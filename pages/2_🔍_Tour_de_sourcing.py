@@ -3,7 +3,7 @@ from urllib.parse import quote
 import requests
 from bs4 import BeautifulSoup
 import re
-import time
+import time, random
 from datetime import datetime
 
 from utils import (
@@ -34,7 +34,7 @@ with st.sidebar:
 
 # -------------------- Boutons homogènes --------------------
 def action_buttons(save_label, open_label, url, context="default"):
-    """Boutons Sauvegarder + Ouvrir, homogènes et alignés"""
+    """Boutons Sauvegarder + Ouvrir alignés à gauche"""
     col1, col2, _ = st.columns([2, 2, 6])
     clicked = None
     with col1:
@@ -42,8 +42,7 @@ def action_buttons(save_label, open_label, url, context="default"):
             clicked = "save"
     with col2:
         if st.button(open_label, key=f"{context}_open", use_container_width=True):
-            js = f"window.open('{url}')"
-            st.components.v1.html(f"<script>{js}</script>", height=0, width=0)
+            st.markdown(f"<meta http-equiv='refresh' content='0; url={url}'>", unsafe_allow_html=True)
     return clicked
 
 # -------------------- Onglets --------------------
@@ -84,10 +83,8 @@ with tab1:
 
     if st.session_state.get("boolean_query"):
         st.text_area("Requête Boolean:", value=st.session_state["boolean_query"], height=120)
-
         url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
         action = action_buttons("💾 Sauvegarder", "🌐 Ouvrir sur LinkedIn", url_linkedin, "boolean")
-
         if action == "save":
             entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", "poste": poste,
                      "requete": st.session_state["boolean_query"]}
@@ -198,21 +195,21 @@ with tab6:
 with tab7:
     st.header("🤖 Magicien de sourcing")
     questions_pretes = [
-        "Quels sont les synonymes possibles pour le métier de … ?",
-        "Quels intitulés similaires existent pour le poste de … ?",
-        "Quels mots-clés cibler pour recruter un junior en … ?",
-        "Quels mots-clés cibler pour recruter un senior en … ?",
-        "Quels logiciels sont liés au métier de … ?",
-        "Quels outils sont indispensables pour un … ?",
-        "Quelles certifications fréquentes pour le poste de … ?",
-        "Quelles compétences transverses pour le métier de … ?",
-        "Quels secteurs recrutent souvent des … ?",
-        "Quels hashtags LinkedIn utiliser pour … ?",
-        "Quels intitulés anglais pour le poste de … ?",
-        "Quels synonymes académiques pour … ?",
-        "Quels intitulés pour freelances en … ?",
-        "Quels diplômes sont associés au métier de … ?",
-        "Quels intitulés de stage sont liés à … ?",
+        "Quels sont les synonymes possibles pour le métier de ?",
+        "Quels intitulés similaires existent pour le poste de ?",
+        "Quels mots-clés cibler pour recruter un junior en ?",
+        "Quels mots-clés cibler pour recruter un senior en ?",
+        "Quels logiciels sont liés au métier de ?",
+        "Quels outils sont indispensables pour un ?",
+        "Quelles certifications fréquentes pour le poste de ?",
+        "Quelles compétences transverses pour le métier de ?",
+        "Quels secteurs recrutent souvent des ?",
+        "Quels hashtags LinkedIn utiliser pour ?",
+        "Quels intitulés anglais pour le poste de ?",
+        "Quels synonymes académiques pour ?",
+        "Quels intitulés pour freelances en ?",
+        "Quels diplômes sont associés au métier de ?",
+        "Quels intitulés de stage sont liés à ?",
     ]
     q_choice = st.selectbox("📌 Choisir une question prête:", [""] + questions_pretes)
     question = st.text_area("Votre question:", value=q_choice if q_choice else "", key="magicien_question")
@@ -221,6 +218,15 @@ with tab7:
         if question:
             start_time = time.time()
             progress = st.progress(0, text="⏳ Génération en cours...")
+            i = 0
+            while i < 100:
+                i += random.randint(1, 5)
+                i = min(i, 100)
+                elapsed = int(time.time() - start_time)
+                progress.progress(i, text=f"⏳ Génération... {i}% - {elapsed}s")
+                time.sleep(0.1)
+                if i >= 90:
+                    break
             messages = [
                 {"role": "system", "content": "Tu es un expert en sourcing RH et recrutement."},
                 {"role": "user", "content": question}
@@ -228,10 +234,17 @@ with tab7:
             result = ask_deepseek(messages, max_tokens=300)
             elapsed = int(time.time() - start_time)
             progress.progress(100, text=f"✅ Terminé en {elapsed}s")
-            st.session_state["magicien_reponse"] = result["content"]
+            if "magicien_history" not in st.session_state:
+                st.session_state["magicien_history"] = []
+            st.session_state["magicien_history"].append({"question": question, "reponse": result["content"]})
 
-    if st.session_state.get("magicien_reponse"):
-        st.text_area("Réponse:", value=st.session_state["magicien_reponse"], height=200)
+    if "magicien_history" in st.session_state:
+        for i, item in enumerate(reversed(st.session_state["magicien_history"])):
+            with st.expander(f"❓ {item['question']}"):
+                st.text_area("Réponse:", value=item["reponse"], height=200)
+                if st.button("🗑️ Supprimer", key=f"del_{i}"):
+                    st.session_state["magicien_history"].remove(item)
+                    st.experimental_rerun()
 
 # -------------------- Permutator --------------------
 with tab8:
