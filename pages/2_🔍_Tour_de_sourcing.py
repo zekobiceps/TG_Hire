@@ -4,6 +4,7 @@ import webbrowser
 from urllib.parse import quote
 import requests
 from bs4 import BeautifulSoup
+import re
 
 init_session_state()
 
@@ -34,7 +35,8 @@ with tab1:
     with col1:
         poste = st.text_input("Poste recherché:", placeholder="Ex: Développeur Python")
         synonymes = st.text_input("Synonymes (séparés par des virgules):", placeholder="Ex: Developer, Programmeur, Ingénieur")
-        st.caption("💡 Besoin d’aide pour les synonymes ? Utilisez le Magicien de sourcing 🤖 pour générer automatiquement. [Cliquer ici](#magicien-de-sourcing)")
+        st.caption("💡 Besoin d’aide pour les synonymes ? Utilisez le Magicien de sourcing 🤖 ci-dessous :")
+        st.page_link("pages/2_🔍_Tour_de_sourcing.py", label="👉 Cliquer ici → Magicien de sourcing", icon="🤖")
         competences_obligatoires = st.text_input("Compétences obligatoires:", placeholder="Ex: Python, Django")
         secteur = st.text_input("Secteur d'activité:", placeholder="Ex: Informatique, Finance, Santé")
     with col2:
@@ -52,28 +54,26 @@ with tab1:
             boolean_query += f' AND ("{employeur}")'
 
         if boolean_query:
-            st.success("✅ Requête Boolean générée")
-            st.text_area("Requête prête à copier:", value=boolean_query, height=120)
-
-            colA, colB, colC = st.columns(3)
+            st.text_area("Requête Boolean:", value=boolean_query, height=120)
+            colA, colB, colC = st.columns([1,1,1])
             with colA:
-                if st.button("📋 Copier"):
-                    st.write("👉 Copiez manuellement depuis la zone ci-dessus")
+                if st.button("📋 Copier Boolean"):
+                    st.toast("Requête copiée manuellement")
             with colB:
-                if st.button("📚 Sauvegarder"):
-                    entry = {"date": datetime.now().strftime("%Y-%m-%d"),
-                             "type": "Boolean", "poste": poste, "requete": boolean_query}
-                    st.session_state.library_entries.append(entry)
+                if st.button("📚 Sauvegarder Boolean"):
+                    st.session_state.library_entries.append(
+                        {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", "poste": poste, "requete": boolean_query}
+                    )
                     save_library_entries()
-                    st.success("Sauvegardé !")
+                    st.success("Sauvegardé dans la bibliothèque")
             with colC:
-                if st.button("🔄 Réinitialiser"):
+                if st.button("🔄 Réinit Boolean"):
                     st.experimental_rerun()
 
 # -------------------- X-Ray --------------------
 with tab2:
     st.header("🎯 X-Ray Google")
-    st.caption("🔎 Permet d’utiliser Google comme moteur de recherche ciblé (LinkedIn, GitHub...).")
+    st.caption("🔎 Utilise Google pour cibler directement les profils sur LinkedIn ou GitHub.")
     col1, col2 = st.columns(2)
     with col1:
         site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub"])
@@ -84,27 +84,24 @@ with tab2:
 
     if st.button("🔍 Construire X-Ray", type="primary"):
         xray_query = generate_xray_query(site_cible, poste_xray, mots_cles, localisation_xray)
-        st.text_area("Requête:", value=xray_query, height=120)
-        colA, colB, colC = st.columns(3)
+        st.text_area("Requête X-Ray:", value=xray_query, height=120)
+        colA, colB = st.columns([1,1])
         with colA:
-            if st.button("📋 Copier X-Ray"):
-                st.write("👉 Copiez manuellement")
+            if st.button("🌐 Ouvrir sur Google"):
+                url = f"https://www.google.com/search?q={quote(xray_query)}"
+                webbrowser.open_new_tab(url)
         with colB:
             if st.button("📚 Sauvegarder X-Ray"):
                 st.session_state.library_entries.append(
-                    {"date": datetime.now().strftime("%Y-%m-%d"),
-                     "type": "X-Ray", "poste": poste_xray, "requete": xray_query}
+                    {"date": datetime.now().strftime("%Y-%m-%d"), "type": "X-Ray", "poste": poste_xray, "requete": xray_query}
                 )
                 save_library_entries()
                 st.success("Sauvegardé")
-        with colC:
-            if st.button("🔄 Réinit X-Ray"):
-                st.experimental_rerun()
 
 # -------------------- CSE --------------------
 with tab3:
     st.header("🔎 CSE (Custom Search Engine) LinkedIn :")
-    st.caption("Permet d’interroger Google CSE pré-configuré pour les profils LinkedIn.")
+    st.caption("🔎 Google CSE préconfiguré pour chercher uniquement dans les profils LinkedIn.")
     poste_cse = st.text_input("Poste recherché:")
     competences_cse = st.text_input("Compétences clés:")
     localisation_cse = st.text_input("Localisation:")
@@ -113,8 +110,8 @@ with tab3:
     if st.button("🔍 Lancer recherche CSE"):
         cse_query = " ".join(filter(None, [poste_cse, competences_cse, localisation_cse, entreprise_cse]))
         cse_url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(cse_query)}"
-        st.text_area("Requête:", value=cse_query, height=100)
-        if st.button("🌐 Ouvrir résultats"):
+        st.text_area("Requête CSE:", value=cse_query, height=100)
+        if st.button("🌐 Ouvrir résultats CSE"):
             webbrowser.open_new_tab(cse_url)
 
 # -------------------- Dogpile --------------------
@@ -125,7 +122,7 @@ with tab4:
         url = f"https://www.dogpile.com/serp?q={quote(query)}"
         webbrowser.open_new_tab(url)
 
-# -------------------- Web Scraping --------------------
+# -------------------- Web Scraper --------------------
 with tab5:
     st.header("🕷️ Web Scraper")
     choix = st.selectbox("Choisir un objectif:", [
@@ -134,47 +131,36 @@ with tab5:
         "Contact personnalisé",
         "Collecte de CV / emails / téléphones"
     ])
-    st.info("Cet outil est un prototype de scraping (BeautifulSoup)")
-
     url = st.text_input("URL à analyser:")
     if st.button("🚀 Scraper"):
         if url:
             r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
             soup = BeautifulSoup(r.text, "html.parser")
-            texte = soup.get_text()[:1000]
+            texte = soup.get_text()[:800]
+            emails = set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", texte))
             st.text_area("Extrait:", value=texte, height=200)
-
-# -------------------- InMail --------------------
-with tab6:
-    st.header("✉️ Générateur d’InMail")
-    url_linkedin = st.text_input("Profil LinkedIn:")
-    poste_accroche = st.text_input("Poste à pourvoir:")
-    entreprise = st.selectbox("Entreprise:", ["TGCC", "TG ALU", "TG COVER", "TG WOOD",
-                                              "TG STEEL", "TG STONE", "TGEM", "TGCC Immobilier"])
-    if st.button("💌 Générer InMail"):
-        accroche = generate_accroche_inmail(url_linkedin, poste_accroche)
-        message = f"{accroche}\n\nNous serions ravis de vous compter dans notre équipe {entreprise}. Seriez-vous disponible pour en discuter ?"
-        st.text_area("InMail:", value=message, height=200)
+            if emails:
+                st.markdown("📧 Emails détectés:")
+                st.write(", ".join(emails))
 
 # -------------------- Magicien --------------------
 with tab7:
     st.header("🤖 Magicien de sourcing")
     questions = [
-        "Donne-moi des synonymes pour {poste}",
-        "Quels jobboards cibler pour {poste} ?",
-        "Quelles soft skills clés pour {poste} ?",
-        "Comment adapter la recherche pour des profils seniors {poste} ?",
-        "Quels mots-clés sectoriels pour {poste} ?"
+        "Donne-moi des synonymes utiles",
+        "Quels jobboards cibler ?",
+        "Quelles soft skills clés ?",
+        "Comment adapter la recherche pour seniors ?",
+        "Quels mots-clés sectoriels utiliser ?",
+        "Quelles tendances de recrutement récentes ?"
     ]
     q_select = st.selectbox("Choisir une question:", questions)
-    question_magicien = st.text_area("Votre question:", value=q_select, height=100)
-
     if st.button("⚡ Poser la question"):
-        result = ask_deepseek([{"role": "user", "content": question_magicien}], max_tokens=200)
+        result = ask_deepseek([{"role": "user", "content": q_select}], max_tokens=200)
         if "content" in result:
             reponse = result["content"]
             st.text_area("Réponse:", value=reponse, height=150)
-            st.session_state.conversation_history.append({"q": question_magicien, "r": reponse})
+            st.session_state.conversation_history.append({"q": q_select, "r": reponse})
 
     if st.session_state.conversation_history:
         st.subheader("📜 Historique")
@@ -182,25 +168,26 @@ with tab7:
             with st.expander(f"Q{i+1}: {conv['q'][:40]}..."):
                 st.write("**Vous:**", conv["q"])
                 st.write("**Magicien 🤖:**", conv["r"])
-        if st.button("🗑️ Effacer l’historique complet"):
+        if st.button("🗑️ Effacer tout l’historique"):
             st.session_state.conversation_history.clear()
-            st.success("Historique effacé")
 
 # -------------------- Email Permutator --------------------
 with tab8:
     st.header("📧 Email Permutator")
     prenom = st.text_input("Prénom:")
     nom = st.text_input("Nom:")
-    domaine = st.text_input("Domaine:", placeholder="ex: tgcc.ma")
+    domaine = st.text_input("Domaine:", placeholder="ex: tgcc")
     if st.button("⚡ Générer emails"):
         emails = [
-            f"{prenom}.{nom}@{domaine}",
-            f"{prenom}{nom}@{domaine}",
-            f"{nom}{prenom}@{domaine}",
-            f"{prenom[0]}{nom}@{domaine}",
+            f"{prenom}.{nom}@{domaine}.ma",
+            f"{prenom}.{nom}@{domaine}.com",
+            f"{prenom}{nom}@{domaine}.ma",
+            f"{prenom}{nom}@{domaine}.com",
+            f"{nom}{prenom}@{domaine}.ma",
+            f"{prenom[0]}{nom}@{domaine}.com",
         ]
         st.text_area("Résultats:", value="\n".join(emails), height=150)
-    st.caption("💡 Vérification possible via outils externes comme Hunter.io ou NeverBounce")
+    st.caption("💡 Vérifiez vos adresses avec [Hunter.io](https://hunter.io) ou [NeverBounce](https://neverbounce.com)")
 
 # -------------------- Bibliothèque --------------------
 with tab9:
@@ -214,4 +201,4 @@ with tab9:
                     save_library_entries()
                     st.experimental_rerun()
     else:
-        st.info("Aucune recherche sauvegardée pour le moment.")
+        st.info("Aucune recherche sauvegardée")
