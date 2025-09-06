@@ -4,3 +4,4 @@ pandas
 reportlab
 python-docx
 pyperclip
+beautifulsoup4
