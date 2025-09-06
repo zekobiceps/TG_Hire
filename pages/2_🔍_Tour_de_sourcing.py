@@ -1,21 +1,19 @@
 import streamlit as st
-import webbrowser
-from urllib.parse import quote
 import requests
 from bs4 import BeautifulSoup
 import re
-import json
-import time
 from datetime import datetime
+from urllib.parse import quote
+import time
 
-# Import explicite depuis utils.py
+# Import utils
 from utils import (
     init_session_state,
     save_library_entries,
     generate_boolean_query,
     generate_xray_query,
     generate_accroche_inmail,
-    ask_deepseek
+    ask_deepseek,
 )
 
 # Initialiser la session
@@ -28,33 +26,12 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# -------------------- Compteur de tokens global (sidebar) --------------------
+# -------------------- Sidebar --------------------
 with st.sidebar:
     used = st.session_state.api_usage["current_session_tokens"]
     total = st.session_state.api_usage["used_tokens"]
     st.markdown(f"🔑 **Tokens utilisés (session)**: {used}")
     st.markdown(f"📊 **Total cumulé**: {total}")
-
-# -------------------- Fonction boutons HTML --------------------
-def render_buttons(copy_text, save_anchor, external_url, external_label):
-    copy_text = copy_text.replace("'", "\\'")
-    html = f"""
-    <div style="display:flex; gap:8px; margin-top:10px;">
-        <button onclick="navigator.clipboard.writeText('{copy_text}')" 
-            style="padding:6px 14px; background:#2b6cb0; color:white; border:none; border-radius:6px; cursor:pointer;">
-            📋 Copier
-        </button>
-        <button onclick="window.location.href='#{save_anchor}'" 
-            style="padding:6px 14px; background:#38a169; color:white; border:none; border-radius:6px; cursor:pointer;">
-            💾 Sauvegarder
-        </button>
-        <button onclick="window.open('{external_url}', '_blank')" 
-            style="padding:6px 14px; background:#805ad5; color:white; border:none; border-radius:6px; cursor:pointer;">
-            {external_label}
-        </button>
-    </div>
-    """
-    st.markdown(html, unsafe_allow_html=True)
 
 # -------------------- Onglets --------------------
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
@@ -95,15 +72,23 @@ with tab1:
 
     if st.session_state.get("boolean_query"):
         st.text_area("Requête Boolean:", value=st.session_state["boolean_query"], height=120)
-        url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
-        render_buttons(st.session_state["boolean_query"], "save_boolean", url_linkedin, "🌐 LinkedIn")
 
-        if "save_boolean" in st.query_params:
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", "poste": poste,
-                     "requete": st.session_state["boolean_query"]}
-            st.session_state.library_entries.append(entry)
-            save_library_entries()
-            st.success("✅ Sauvegardé dans la bibliothèque")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("📋 Copier", key="copy_boolean"):
+                st.session_state["copied"] = st.session_state["boolean_query"]
+                st.success("✅ Requête copiée !")
+        with col2:
+            if st.button("💾 Sauvegarder", key="save_boolean"):
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", "poste": poste,
+                         "requete": st.session_state["boolean_query"]}
+                st.session_state.library_entries.append(entry)
+                save_library_entries()
+                st.success("✅ Sauvegardé")
+        with col3:
+            if st.button("🌐 LinkedIn", key="linkedin_boolean"):
+                url = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
+                st.markdown(f"[👉 Ouvrir LinkedIn]({url})", unsafe_allow_html=True)
 
 # -------------------- X-Ray --------------------
 with tab2:
@@ -121,19 +106,26 @@ with tab2:
 
     if st.session_state.get("xray_query"):
         st.text_area("Requête X-Ray:", value=st.session_state["xray_query"], height=120)
-        url = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
-        render_buttons(st.session_state["xray_query"], "save_xray", url, "🌐 Google")
-
-        if "save_xray" in st.query_params:
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "X-Ray", "poste": poste_xray,
-                     "requete": st.session_state["xray_query"]}
-            st.session_state.library_entries.append(entry)
-            save_library_entries()
-            st.success("✅ Sauvegardé dans la bibliothèque")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("📋 Copier", key="copy_xray"):
+                st.session_state["copied"] = st.session_state["xray_query"]
+                st.success("✅ Requête copiée !")
+        with col2:
+            if st.button("💾 Sauvegarder", key="save_xray"):
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "X-Ray", "poste": poste_xray,
+                         "requete": st.session_state["xray_query"]}
+                st.session_state.library_entries.append(entry)
+                save_library_entries()
+                st.success("✅ Sauvegardé")
+        with col3:
+            if st.button("🌐 Google", key="google_xray"):
+                url = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
+                st.markdown(f"[👉 Ouvrir Google]({url})", unsafe_allow_html=True)
 
 # -------------------- CSE --------------------
 with tab3:
-    st.header("🔎 CSE (Custom Search Engine) LinkedIn")
+    st.header("🔎 CSE LinkedIn")
     poste_cse = st.text_input("Poste recherché:", key="poste_cse")
     competences_cse = st.text_input("Compétences clés:", key="competences_cse")
     localisation_cse = st.text_input("Localisation:", key="localisation_cse")
@@ -144,25 +136,27 @@ with tab3:
 
     if st.session_state.get("cse_query"):
         st.text_area("Requête CSE:", value=st.session_state["cse_query"], height=100)
-        cse_url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
-        render_buttons(st.session_state["cse_query"], "save_cse", cse_url, "🌐 CSE")
-
-        if "save_cse" in st.query_params:
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "CSE", "poste": poste_cse,
-                     "requete": st.session_state["cse_query"]}
-            st.session_state.library_entries.append(entry)
-            save_library_entries()
-            st.success("✅ Sauvegardé dans la bibliothèque")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            if st.button("📋 Copier", key="copy_cse"):
+                st.session_state["copied"] = st.session_state["cse_query"]
+                st.success("✅ Copiée !")
+        with col2:
+            if st.button("💾 Sauvegarder", key="save_cse"):
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "CSE", "poste": poste_cse,
+                         "requete": st.session_state["cse_query"]}
+                st.session_state.library_entries.append(entry)
+                save_library_entries()
+                st.success("✅ Sauvegardé")
+        with col3:
+            if st.button("🌐 CSE", key="google_cse"):
+                url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
+                st.markdown(f"[👉 Ouvrir CSE]({url})", unsafe_allow_html=True)
 
 # -------------------- Web Scraper --------------------
 with tab5:
     st.header("🕷️ Web Scraper")
-    choix = st.selectbox("Choisir un objectif:", [
-        "Veille salariale & marché",
-        "Intelligence concurrentielle",
-        "Contact personnalisé",
-        "Collecte de CV / emails / téléphones"
-    ], key="scraper_choix")
+    choix = st.selectbox("Objectif:", ["Veille salariale", "Intelligence concurrentielle", "Contact personnalisé", "Collecte CV/emails"], key="scraper_choix")
     url = st.text_input("URL à analyser:", key="scraper_url")
 
     if st.button("🚀 Scraper"):
@@ -184,8 +178,7 @@ with tab6:
     st.header("✉️ Générateur d'InMail")
     url_linkedin = st.text_input("URL du profil LinkedIn:", key="inmail_url")
     poste_accroche = st.text_input("Poste à pourvoir:", key="inmail_poste")
-    entreprise = st.selectbox("Entreprise:", ["TGCC", "TG ALU", "TG COVER", "TG WOOD", "TG STEEL",
-                                             "TG STONE", "TGEM", "TGCC Immobilier"], key="inmail_entreprise")
+    entreprise = st.selectbox("Entreprise:", ["TGCC", "TG ALU", "TG COVER", "TG WOOD"], key="inmail_entreprise")
 
     if st.button("💌 Générer InMail", type="primary"):
         st.session_state["inmail_message"] = generate_accroche_inmail(url_linkedin, poste_accroche) + \
@@ -197,8 +190,7 @@ with tab6:
 # -------------------- Magicien --------------------
 with tab7:
     st.header("🤖 Magicien de sourcing")
-    question = st.text_area("Votre question:", key="magicien_question",
-                            placeholder="Ex: Quels sont les synonymes possibles pour le métier de Développeur Python ?")
+    question = st.text_area("Votre question:", key="magicien_question", placeholder="Ex: Quels sont les synonymes pour le métier de ... ?")
 
     if st.button("✨ Poser la question", type="primary"):
         if question:
@@ -209,7 +201,7 @@ with tab7:
                 progress.progress(i, text=f"⏳ Génération... {i}% - {elapsed}s")
                 time.sleep(0.02)
             messages = [
-                {"role": "system", "content": "Tu es un expert en sourcing RH et recrutement. Réponds toujours de manière concise et directement exploitable."},
+                {"role": "system", "content": "Tu es un expert en sourcing RH et recrutement. Réponds toujours de manière concise."},
                 {"role": "user", "content": question}
             ]
             result = ask_deepseek(messages, max_tokens=300)
@@ -235,7 +227,7 @@ with tab8:
 
     if st.session_state.get("perm_result"):
         st.text_area("Résultats:", value="\n".join(st.session_state["perm_result"]), height=150)
-        st.caption("Tester le fonctionnement d'une boite mail : [Hunter.io](https://hunter.io/) ou [NeverBounce](https://neverbounce.com/)")
+        st.caption("Tester la validité: [Hunter.io](https://hunter.io/) ou [NeverBounce](https://neverbounce.com/)")
 
 # -------------------- Bibliothèque --------------------
 with tab9:
