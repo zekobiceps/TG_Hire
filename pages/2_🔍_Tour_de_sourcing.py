@@ -55,19 +55,11 @@ with tab1:
 
     if st.session_state.get("boolean_query"):
         st.text_area("Requête Boolean:", value=st.session_state["boolean_query"], height=120)
-        colA, colB = st.columns(2)
-        with colA:
-            if st.button("📚 Sauvegarder Boolean"):
-                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", "poste": poste, "requete": st.session_state["boolean_query"]}
-                st.session_state.library_entries.append(entry)
-                save_library_entries()
-                st.success("✅ Sauvegardé dans la bibliothèque")
-        with colB:
-            if st.button("🔄 Réinit Boolean"):
-                for key in ["poste","synonymes","competences_obligatoires","secteur",
-                            "competences_optionnelles","exclusions","localisation","employeur","boolean_query"]:
-                    st.session_state[key] = st.session_state.get(key, "")
-                st.warning("⚠️ Champs réinitialisés")
+        if st.button("📚 Sauvegarder Boolean"):
+            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", "poste": poste, "requete": st.session_state["boolean_query"]}
+            st.session_state.library_entries.append(entry)
+            save_library_entries()
+            st.success("✅ Sauvegardé dans la bibliothèque")
 
 # -------------------- X-Ray --------------------
 with tab2:
@@ -86,7 +78,7 @@ with tab2:
 
     if st.session_state.get("xray_query"):
         st.text_area("Requête X-Ray:", value=st.session_state["xray_query"], height=120)
-        colA, colB, colC = st.columns(3)
+        colA, colB = st.columns(2)
         with colA:
             if st.button("📚 Sauvegarder X-Ray"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "X-Ray", "poste": poste_xray, "requete": st.session_state["xray_query"]}
@@ -94,11 +86,6 @@ with tab2:
                 save_library_entries()
                 st.success("✅ Sauvegardé dans la bibliothèque")
         with colB:
-            if st.button("🔄 Réinit X-Ray"):
-                for key in ["poste_xray","mots_cles_xray","localisation_xray","xray_query"]:
-                    st.session_state[key] = st.session_state.get(key, "")
-                st.warning("⚠️ Champs réinitialisés")
-        with colC:
             if st.button("🌐 Ouvrir sur Google"):
                 url = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
                 webbrowser.open_new_tab(url)
@@ -118,8 +105,7 @@ with tab3:
     if st.session_state.get("cse_query"):
         st.text_area("Requête CSE:", value=st.session_state["cse_query"], height=100)
         cse_url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
-
-        colA, colB, colC = st.columns(3)
+        colA, colB = st.columns(2)
         with colA:
             if st.button("📚 Sauvegarder CSE"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "CSE", "poste": poste_cse, "requete": st.session_state["cse_query"]}
@@ -127,11 +113,6 @@ with tab3:
                 save_library_entries()
                 st.success("✅ Sauvegardé dans la bibliothèque")
         with colB:
-            if st.button("🔄 Réinit CSE"):
-                for key in ["poste_cse","competences_cse","localisation_cse","entreprise_cse","cse_query"]:
-                    st.session_state[key] = st.session_state.get(key, "")
-                st.warning("⚠️ Champs réinitialisés")
-        with colC:
             if st.button("🌐 Ouvrir résultats CSE"):
                 webbrowser.open_new_tab(cse_url)
 
@@ -146,8 +127,7 @@ with tab4:
     if st.session_state.get("dogpile_result"):
         st.text_area("Requête Dogpile:", value=st.session_state["dogpile_result"], height=100)
         url = f"https://www.dogpile.com/serp?q={quote(st.session_state['dogpile_result'])}"
-
-        colA, colB, colC = st.columns(3)
+        colA, colB = st.columns(2)
         with colA:
             if st.button("📚 Sauvegarder Dogpile"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Dogpile", "poste": "", "requete": st.session_state["dogpile_result"]}
@@ -155,11 +135,6 @@ with tab4:
                 save_library_entries()
                 st.success("✅ Sauvegardé dans la bibliothèque")
         with colB:
-            if st.button("🔄 Réinit Dogpile"):
-                for key in ["dogpile_query","dogpile_result"]:
-                    st.session_state[key] = st.session_state.get(key, "")
-                st.warning("⚠️ Champs réinitialisés")
-        with colC:
             if st.button("🌐 Ouvrir sur Dogpile"):
                 webbrowser.open_new_tab(url)
 
@@ -185,21 +160,13 @@ with tab5:
 
     if st.session_state.get("scraper_result"):
         st.text_area("Extrait:", value=st.session_state["scraper_result"], height=200)
-        colA, colB, colC = st.columns(3)
-        with colA:
-            if st.button("📚 Sauvegarder Scraper"):
-                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Scraper", "poste": choix, "requete": url}
-                st.session_state.library_entries.append(entry)
-                save_library_entries()
-                st.success("✅ Sauvegardé dans la bibliothèque")
-        with colB:
-            if st.button("🔄 Réinit Scraper"):
-                for key in ["scraper_url","scraper_result","scraper_emails"]:
-                    st.session_state[key] = st.session_state.get(key, "" if key != "scraper_emails" else set())
-                st.warning("⚠️ Champs réinitialisés")
-        with colC:
-            if st.session_state.get("scraper_emails"):
-                st.info("📧 Emails détectés: " + ", ".join(st.session_state["scraper_emails"]))
+        if st.button("📚 Sauvegarder Scraper"):
+            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Scraper", "poste": choix, "requete": url}
+            st.session_state.library_entries.append(entry)
+            save_library_entries()
+            st.success("✅ Sauvegardé dans la bibliothèque")
+        if st.session_state.get("scraper_emails"):
+            st.info("📧 Emails détectés: " + ", ".join(st.session_state["scraper_emails"]))
 
 # -------------------- InMail --------------------
 with tab6:
@@ -213,18 +180,11 @@ with tab6:
 
     if st.session_state.get("inmail_message"):
         st.text_area("Message InMail:", value=st.session_state["inmail_message"], height=200)
-        colA, colB = st.columns(2)
-        with colA:
-            if st.button("📚 Sauvegarder InMail"):
-                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "InMail", "poste": poste_accroche, "requete": st.session_state["inmail_message"]}
-                st.session_state.library_entries.append(entry)
-                save_library_entries()
-                st.success("✅ Sauvegardé dans la bibliothèque")
-        with colB:
-            if st.button("🔄 Réinit InMail"):
-                for key in ["inmail_url","inmail_poste","inmail_entreprise","inmail_message"]:
-                    st.session_state[key] = st.session_state.get(key, "")
-                st.warning("⚠️ Champs réinitialisés")
+        if st.button("📚 Sauvegarder InMail"):
+            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "InMail", "poste": poste_accroche, "requete": st.session_state["inmail_message"]}
+            st.session_state.library_entries.append(entry)
+            save_library_entries()
+            st.success("✅ Sauvegardé dans la bibliothèque")
 
 # -------------------- Magicien --------------------
 with tab7:
@@ -242,7 +202,7 @@ with tab7:
 
     if st.session_state.get("magicien_reponse"):
         st.text_area("Réponse:", value=st.session_state["magicien_reponse"], height=200)
-        colA, colB, colC = st.columns(3)
+        colA, colB = st.columns(2)
         with colA:
             if st.button("📚 Sauvegarder Magicien"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Magicien", "poste": "", "requete": st.session_state["magicien_reponse"]}
@@ -250,14 +210,9 @@ with tab7:
                 save_library_entries()
                 st.success("✅ Sauvegardé dans la bibliothèque")
         with colB:
-            if st.button("🔄 Réinit Magicien"):
-                for key in ["magicien_question","magicien_reponse"]:
-                    st.session_state[key] = st.session_state.get(key, "")
-                st.warning("⚠️ Champs réinitialisés")
-        with colC:
             if st.button("🗑️ Supprimer historique Magicien"):
                 for key in ["magicien_question","magicien_reponse"]:
-                    st.session_state[key] = st.session_state.get(key, "")
+                    st.session_state[key] = ""
                 st.success("🧹 Historique effacé")
 
 # -------------------- Permutator --------------------
@@ -279,18 +234,11 @@ with tab8:
     if st.session_state.get("perm_result"):
         st.text_area("Résultats:", value="\n".join(st.session_state["perm_result"]), height=150)
         st.caption("🔗 Vérifiez vos emails sur [Hunter.io](https://hunter.io/) ou [NeverBounce](https://neverbounce.com/)")
-        colA, colB = st.columns(2)
-        with colA:
-            if st.button("📚 Sauvegarder Permutator"):
-                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Permutator", "poste": "", "requete": ", ".join(st.session_state["perm_result"])}
-                st.session_state.library_entries.append(entry)
-                save_library_entries()
-                st.success("✅ Sauvegardé dans la bibliothèque")
-        with colB:
-            if st.button("🔄 Réinit Permutator"):
-                for key in ["perm_prenom","perm_nom","perm_domaine","perm_result"]:
-                    st.session_state[key] = st.session_state.get(key, "" if key != "perm_result" else [])
-                st.warning("⚠️ Champs réinitialisés")
+        if st.button("📚 Sauvegarder Permutator"):
+            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Permutator", "poste": "", "requete": ", ".join(st.session_state["perm_result"])}
+            st.session_state.library_entries.append(entry)
+            save_library_entries()
+            st.success("✅ Sauvegardé dans la bibliothèque")
 
 # -------------------- Bibliothèque --------------------
 with tab9:
