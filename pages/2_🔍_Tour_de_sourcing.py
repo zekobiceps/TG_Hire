@@ -30,25 +30,24 @@ st.set_page_config(
 )
 
 # -------------------- Style bouton uniforme --------------------
-def action_buttons(copy_text, save_key, url=None, url_label="🌐 Ouvrir"):
-    """Boutons uniformes Copier / Sauvegarder / Ouvrir"""
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col1:
-        if st.button("📋 Copier"):
-            pyperclip.copy(copy_text)
-            st.success("✅ Requête copiée dans le presse-papier")
-    with col2:
-        if st.button("💾 Sauvegarder"):
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"),
-                     "type": save_key,
-                     "poste": st.session_state.get("poste", ""),
-                     "requete": copy_text}
-            st.session_state.library_entries.append(entry)
-            save_library_entries()
-            st.success("✅ Sauvegardé dans la bibliothèque")
-    with col3:
-        if url and st.button(url_label):
-            webbrowser.open_new_tab(url)
+def action_buttons(copy_text, save_key, url, label_url):
+    """Affiche 3 boutons uniformes : Copier / Sauvegarder / Ouvrir"""
+    html = f"""
+    <div style="display:flex; gap:6px; justify-content:flex-start;">
+        <button onclick="navigator.clipboard.writeText('{copy_text}')" 
+        style="padding:6px 14px; background:#2b6cb0; color:white; border:none; border-radius:6px; cursor:pointer;">
+        📋 Copier</button>
+        
+        <button onclick="window.location.href='#{save_key}'"
+        style="padding:6px 14px; background:#38a169; color:white; border:none; border-radius:6px; cursor:pointer;">
+        💾 Sauvegarder</button>
+        
+        <button onclick="window.open('{url}', '_blank')"
+        style="padding:6px 14px; background:#805ad5; color:white; border:none; border-radius:6px; cursor:pointer;">
+        {label_url}</button>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
 
 # -------------------- Onglets --------------------
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([

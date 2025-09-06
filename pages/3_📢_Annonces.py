@@ -1,5 +1,8 @@
 import streamlit as st
 from utils import *
+
+from utils import init_session_state
+
 init_session_state()
 
 st.set_page_config(
