@@ -63,7 +63,9 @@ with tab1:
         colA, colB, colC = st.columns(3)
         with colA:
             if st.button("📋 Copier", key="copy_boolean"):
-                st.markdown(f"<script>navigator.clipboard.writeText({json.dumps(st.session_state['boolean_query'])});</script>", unsafe_allow_html=True)
+                text_to_copy = st.session_state["boolean_query"]
+                js_code = f"<script>navigator.clipboard.writeText({json.dumps(text_to_copy)});</script>"
+                st.markdown(js_code, unsafe_allow_html=True)
                 st.success("✅ Copié")
         with colB:
             if st.button("📚 Sauvegarder", key="save_boolean"):
@@ -95,7 +97,9 @@ with tab2:
         colA, colB, colC = st.columns(3)
         with colA:
             if st.button("📋 Copier", key="copy_xray"):
-                st.markdown(f"<script>navigator.clipboard.writeText({json.dumps(st.session_state['xray_query'])});</script>", unsafe_allow_html=True)
+                text_to_copy = st.session_state["xray_query"]
+                js_code = f"<script>navigator.clipboard.writeText({json.dumps(text_to_copy)});</script>"
+                st.markdown(js_code, unsafe_allow_html=True)
                 st.success("✅ Copié")
         with colB:
             if st.button("📚 Sauvegarder", key="save_xray"):
@@ -124,7 +128,9 @@ with tab3:
         colA, colB, colC = st.columns(3)
         with colA:
             if st.button("📋 Copier", key="copy_cse"):
-                st.markdown(f"<script>navigator.clipboard.writeText({json.dumps(st.session_state['cse_query'])});</script>", unsafe_allow_html=True)
+                text_to_copy = st.session_state["cse_query"]
+                js_code = f"<script>navigator.clipboard.writeText({json.dumps(text_to_copy)});</script>"
+                st.markdown(js_code, unsafe_allow_html=True)
                 st.success("✅ Copié")
         with colB:
             if st.button("📚 Sauvegarder", key="save_cse"):
@@ -150,7 +156,9 @@ with tab4:
         colA, colB, colC = st.columns(3)
         with colA:
             if st.button("📋 Copier", key="copy_dogpile"):
-                st.markdown(f"<script>navigator.clipboard.writeText({json.dumps(st.session_state['dogpile_result'])});</script>", unsafe_allow_html=True)
+                text_to_copy = st.session_state["dogpile_result"]
+                js_code = f"<script>navigator.clipboard.writeText({json.dumps(text_to_copy)});</script>"
+                st.markdown(js_code, unsafe_allow_html=True)
                 st.success("✅ Copié")
         with colB:
             if st.button("📚 Sauvegarder", key="save_dogpile"):
@@ -202,7 +210,9 @@ with tab7:
         colA, colB, colC = st.columns(3)
         with colA:
             if st.button("📋 Copier", key="copy_magicien"):
-                st.markdown(f"<script>navigator.clipboard.writeText({json.dumps(st.session_state['magicien_reponse'])});</script>", unsafe_allow_html=True)
+                text_to_copy = st.session_state["magicien_reponse"]
+                js_code = f"<script>navigator.clipboard.writeText({json.dumps(text_to_copy)});</script>"
+                st.markdown(js_code, unsafe_allow_html=True)
                 st.success("✅ Copié")
         with colB:
             if st.button("📚 Sauvegarder", key="save_magicien"):
@@ -240,7 +250,9 @@ with tab8:
         colA, colB, colC = st.columns(3)
         with colA:
             if st.button("📋 Copier", key="copy_perm"):
-                st.markdown(f"<script>navigator.clipboard.writeText({json.dumps(chr(10).join(st.session_state['perm_result']))});</script>", unsafe_allow_html=True)
+                text_to_copy = "\n".join(st.session_state["perm_result"])
+                js_code = f"<script>navigator.clipboard.writeText({json.dumps(text_to_copy)});</script>"
+                st.markdown(js_code, unsafe_allow_html=True)
                 st.success("✅ Copié")
         with colB:
             if st.button("📚 Sauvegarder", key="save_perm"):
@@ -279,4 +291,3 @@ with tab9:
                     st.experimental_rerun()
     else:
         st.info("Aucune recherche sauvegardée")
-git add pages/2_🔍_Tour_de_sourcing.py utils.py
