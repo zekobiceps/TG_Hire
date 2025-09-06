@@ -328,40 +328,46 @@ with tab5:
             st.info("📧 Emails détectés: " + ", ".join(st.session_state["scraper_emails"]))
 
 # -------------------- Tab 6: InMail --------------------
-# -------------------- Tab 6: InMail --------------------
 with tab6:
     st.header("✉️ Générateur d'InMail Personnalisé")
     
-    # Interface principale compacte avec options avancées intégrées
-    col1, col2, col3, col4 = st.columns([3, 2, 2, 2])
+    # Interface principale compacte
+    url_linkedin = st.text_input("URL du profil LinkedIn:", key="inmail_url", 
+                               placeholder="https://linkedin.com/in/nom-prenom")
     
+    col1, col2 = st.columns(2)
     with col1:
-        url_linkedin = st.text_input("URL du profil LinkedIn:", key="inmail_url", 
-                                   placeholder="https://linkedin.com/in/nom-prenom")
-    
-    with col2:
         entreprise = st.selectbox("Entreprise:", [
             "TGCC", "TG ALU", "TG COVER", "TG WOOD", "TG STEEL",
             "TG STONE", "TGEM", "TGCC Immobilier"
         ], key="inmail_entreprise")
     
-    with col3:
+    with col2:
         poste_accroche = st.text_input("Poste à pourvoir:", key="inmail_poste", 
                                      placeholder="Ex: Directeur Administratif et Financier")
     
-    with col4:
+    # Options supplémentaires
+    col3, col4, col5 = st.columns([2, 2, 1])
+    with col3:
         ton_message = st.selectbox("Ton du message:", 
                                  ["Persuasif", "Professionnel", "Convivial", "Direct"], 
                                  key="inmail_ton", index=0)
+    with col4:
         longueur_message = st.slider("Longueur (mots):", 50, 300, 150, key="inmail_longueur")
+    with col5:
         analyse_profil = st.checkbox("🔍 Analyser le profil", value=True, key="inmail_analyse")
+    
+    # Call-to-Action (CTA)
+    cta_option = st.radio("Type de conclusion:",
+                         ["Proposer un appel", "Partager le CV", "Découvrir l'opportunité sur notre site", "Accepter un rendez-vous"],
+                         index=0, horizontal=True)
 
     def analyser_profil_linkedin(url_linkedin):
         """Analyse d'un profil LinkedIn avec extraction améliorée du nom"""
         time.sleep(0.5)
         
         # Extraction améliorée du nom depuis l'URL
-        prenom_profil = "Candidat"
+        prenom_profil = ""
         nom_profil = ""
         
         if "/in/" in url_linkedin:
@@ -369,13 +375,13 @@ with tab6:
                 # Extraire la partie après /in/
                 profile_part = url_linkedin.split("/in/")[1]
                 # Nettoyer les paramètres d'URL
-                profile_part = profile_part.split('?')[0]
+                profile_part = profile_part.split('?')[0].split('/')[0]
                 # Séparer par les tirets
                 parts = profile_part.split('-')
                 
                 if parts:
                     # Le premier élément est généralement le prénom
-                    prenom_profil = parts[0].strip().capitalize()
+                    prenom_profil = parts[0].strip().title()
                     
                     # Les éléments suivants forment le nom de famille
                     if len(parts) > 1:
@@ -383,16 +389,18 @@ with tab6:
                         for part in parts[1:]:
                             # Ignorer les parties qui sont trop courtes ou numériques
                             if len(part) > 2 and not part.isdigit():
-                                nom_parts.append(part.capitalize())
+                                nom_parts.append(part.title())
                         
                         if nom_parts:
                             nom_profil = " ".join(nom_parts)
-                        else:
-                            nom_profil = "Profil"
-            except:
-                # En cas d'erreur, utiliser des valeurs par défaut
-                prenom_profil = "Candidat"
-                nom_profil = "Profil"
+            except Exception as e:
+                st.error(f"Erreur lors de l'analyse de l'URL: {str(e)}")
+        
+        # Si l'extraction a échoué, utiliser des valeurs par défaut
+        if not prenom_profil:
+            prenom_profil = "Candidat"
+        if not nom_profil:
+            nom_profil = ""
         
         # Simulation des données extraites du profil
         donnees_simulees = {
@@ -408,7 +416,19 @@ with tab6:
         
         return donnees_simulees
 
-    def generate_inmail_personnalise(donnees_profil, poste, entreprise, ton="Persuasif", max_words=150):
+    def generate_cta(cta_type, prenom):
+        """Génère une conclusion selon le type choisi"""
+        if cta_type == "Proposer un appel":
+            return f"Seriez-vous disponible pour un appel téléphonique cette semaine afin que nous en discutions plus en détail ?"
+        elif cta_type == "Partager le CV":
+            return f"Seriez-vous intéressé(e) pour partager votre CV afin que nous examinions ensemble cette opportunité ?"
+        elif cta_type == "Découvrir l'opportunité sur notre site":
+            return f"Souhaiteriez-vous découvrir plus en détail cette opportunité sur notre site carrière ?"
+        elif cta_type == "Accepter un rendez-vous":
+            return f"Seriez-vous disponible pour un rendez-vous afin d'échanger sur cette opportunité qui pourrait vous correspondre ?"
+        return ""
+
+    def generate_inmail_personnalise(donnees_profil, poste, entreprise, ton="Persuasif", max_words=150, cta_type="Proposer un appel"):
         """Génère un message InMail personnalisé basé sur le profil"""
         # Déterminer le terme à utiliser (groupe ou filiale)
         terme_organisation = "groupe" if entreprise == "TGCC" else "filiale"
@@ -426,6 +446,9 @@ with tab6:
         nom = donnees_profil['nom']
         nom_complet = f"{prenom} {nom}".strip()
         
+        # Générer la CTA
+        cta_text = generate_cta(cta_type, prenom)
+        
         if ton == "Persuasif":
             response = f"""Bonjour {prenom},
 
@@ -438,10 +461,7 @@ démontrent que vous pourriez apporter une valeur immédiate à notre organisati
 {f"Vos {donnees_profil['experience_annees']} d'expérience" if donnees_profil['experience_annees'] else "Votre expérience"} {f"et votre formation à {donnees_profil['formation']}" if donnees_profil['formation'] else "et votre parcours"} 
 représentent exactement le profil que nous souhaitons intégrer dans notre équipe.
 
-Cette opportunité représente une évolution naturelle pour votre carrière et nous serions ravis 
-de vous présenter le projet plus en détail.
-
-Quel est le meilleur moment pour échanger à ce sujet ?"""
+{cta_text}"""
         
         elif ton == "Professionnel":
             response = f"""Bonjour {prenom},
@@ -453,7 +473,7 @@ au poste de {poste} que nous recherchons actuellement au sein de notre {terme_or
 {f"Vos {donnees_profil['experience_annees']} d'expérience" if donnees_profil['experience_annees'] else "Votre expérience"} {f"et votre background à {donnees_profil['formation']}" if donnees_profil['formation'] else "et votre parcours"} 
 représentent exactement le profil que nous souhaitons intégrer dans notre équipe.
 
-Seriez-vous intéressé(e) pour discuter de cette opportunité qui me semble en parfaite adéquation avec votre parcours ?"""
+{cta_text}"""
         
         elif ton == "Convivial":
             response = f"""Bonjour {prenom},
@@ -465,7 +485,7 @@ correspondent exactement à ce que nous recherchons pour le poste de {poste} au 
 {f"J'ai particulièrement apprécié voir votre background {donnees_profil['formation']}" if donnees_profil['formation'] else "Votre parcours est particulièrement intéressant"} 
 et je pense que cette opportunité pourrait être très intéressante pour votre carrière.
 
-Ça vous dit qu'on en discute rapidement ?"""
+{cta_text}"""
         
         else:  # Direct
             response = f"""Bonjour {prenom},
@@ -475,12 +495,15 @@ Poste de {poste} au {terme_organisation} {entreprise} - Votre profil correspond 
 Votre expérience {f"de {donnees_profil['poste_actuel']}" if donnees_profil['poste_actuel'] else ""} {f"chez {donnees_profil['entreprise_actuelle']}" if donnees_profil['entreprise_actuelle'] else ""} 
 {f"et vos compétences en {donnees_profil['competences_cles'][0]}" if donnees_profil['competences_cles'][0] else "et vos compétences"} sont exactement ce que nous recherchons.
 
-Disponible pour un entretien cette semaine ?"""
+{cta_text}"""
         
         # Ajuster la longueur du message selon le paramètre
         words = response.split()
         if len(words) > max_words:
-            response = ' '.join(words[:max_words]) + "..."
+            response = ' '.join(words[:max_words])
+            # S'assurer que le message se termine correctement
+            if not response.endswith(('?', '!', '.')):
+                response += "..."
         
         return response.strip(), objet
 
@@ -513,7 +536,8 @@ Disponible pour un entretien cette semaine ?"""
                     poste=poste_accroche,
                     entreprise=entreprise,
                     ton=ton_message,
-                    max_words=longueur_message
+                    max_words=longueur_message,
+                    cta_type=cta_option
                 )
                 
                 total_time = time.time() - start_time
@@ -592,7 +616,8 @@ Disponible pour un entretien cette semaine ?"""
                         poste=poste_accroche,
                         entreprise=entreprise,
                         ton=ton_message,
-                        max_words=longueur_message
+                        max_words=longueur_message,
+                        cta_type=cta_option
                     )
                     st.session_state["inmail_message"] = result
                     st.session_state["inmail_objet"] = objet_auto
