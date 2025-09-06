@@ -180,18 +180,28 @@ with tab4:
 # -------------------- Web Scraper --------------------
 with tab5:
     st.header("🕷️ Web Scraper")
-    url = st.text_input("URL à analyser:", placeholder="Ex: https://example.com")
+    choix = st.selectbox("Choisir un objectif:", [
+        "Veille salariale & marché",
+        "Intelligence concurrentielle",
+        "Contact personnalisé",
+        "Collecte de CV / emails / téléphones"
+    ], key="scraper_choix")
+    url = st.text_input("URL à analyser:", key="scraper_url", placeholder="Ex: https://www.exemple.com")
+
     if st.button("🚀 Scraper"):
         if url:
-            r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
-            soup = BeautifulSoup(r.text, "html.parser")
-            texte = soup.get_text()[:800]
-            emails = set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", texte))
-            st.session_state["scraper_result"] = texte
-            st.session_state["scraper_emails"] = emails
+            try:
+                r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+                soup = BeautifulSoup(r.text, "html.parser")
+                texte = soup.get_text()[:1200]  # extrait limité pour lecture
+                emails = set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", texte))
+                st.session_state["scraper_result"] = texte
+                st.session_state["scraper_emails"] = emails
+            except Exception as e:
+                st.error(f"Erreur lors du scraping : {e}")
 
     if st.session_state.get("scraper_result"):
-        st.text_area("Extrait:", value=st.session_state["scraper_result"], height=200)
+        st.text_area("Extrait du contenu:", value=st.session_state["scraper_result"], height=200)
         if st.session_state.get("scraper_emails"):
             st.info("📧 Emails détectés: " + ", ".join(st.session_state["scraper_emails"]))
 
@@ -213,54 +223,68 @@ with tab6:
 with tab7:
     st.header("🤖 Magicien de sourcing")
 
-    question = st.text_area("Votre question:", placeholder="Ex: Quels sont les synonymes possibles pour le métier de Développeur Python ?")
+    questions_pretes = [
+        "Quels sont les synonymes possibles pour le métier de Développeur Python ?",
+        "Quels outils ou logiciels sont liés au métier de Data Scientist ?",
+        "Quels mots-clés pour cibler les juniors pour le poste de Chef de projet IT ?",
+        "Quels intitulés similaires au poste d’Ingénieur DevOps ?",
+        "Quels critères éliminatoires fréquents pour un Responsable RH ?"
+    ]
+    q_choice = st.selectbox("📌 Questions prêtes :", [""] + questions_pretes, key="magicien_qchoice")
+    question = st.text_area("Votre question :", value=q_choice if q_choice else "", key="magicien_question",
+                            placeholder="Ex: Quels sont les synonymes possibles pour le métier de Développeur Python ?")
 
     if st.button("✨ Poser la question", type="primary"):
         if question:
-            st.session_state["conversation_history"].append({"role": "user", "content": question})
             start_time = time.time()
             progress = st.progress(0, text="⏳ Génération en cours...")
-
-            # Simulation de progression
-            for i in range(1, 101):
+            percent = 0
+            while percent < 100:
                 elapsed = int(time.time() - start_time)
-                progress.progress(i, text=f"⏳ Génération... {i}% - {elapsed}s")
+                percent = min(99, percent + 1)  # ne jamais bloquer à 100 avant la fin
+                progress.progress(percent, text=f"⏳ Génération... {percent}% - {elapsed}s")
                 time.sleep(0.05)
 
             messages = [
-                {"role": "system", "content": "Tu es un expert en sourcing RH et recrutement. Réponds toujours de manière concise et directement exploitable."},
+                {"role": "system", "content": "Tu es un expert en sourcing RH et recrutement. Réponds de manière concise, claire et exploitable."},
                 {"role": "user", "content": question}
             ]
             result = ask_deepseek(messages, max_tokens=300)
-            st.session_state["conversation_history"].append({"role": "assistant", "content": result["content"]})
+            st.session_state.magicien_reponse = result["content"]
+            st.session_state.magicien_history = st.session_state.get("magicien_history", [])
+            st.session_state.magicien_history.append({"q": question, "r": result["content"]})
 
-    if st.session_state.get("conversation_history"):
-        for idx, msg in enumerate(st.session_state["conversation_history"]):
-            role = "👤" if msg["role"] == "user" else "🤖"
-            with st.expander(f"{role} Message {idx+1}"):
-                st.markdown(msg["content"])
-                if st.button("🗑️ Supprimer", key=f"del_{idx}"):
-                    st.session_state["conversation_history"].pop(idx)
+    # Historique
+    if st.session_state.get("magicien_history"):
+        st.subheader("📝 Historique des réponses")
+        for i, item in enumerate(st.session_state.magicien_history[::-1]):  # dernier en premier
+            with st.expander(f"❓ {item['q'][:60]}..."):
+                st.write(item["r"])
+                if st.button("🗑️ Supprimer", key=f"del_magicien_{i}"):
+                    st.session_state.magicien_history.remove(item)
                     st.experimental_rerun()
 
-# -------------------- Email Permutator --------------------
+# -------------------- Permutator --------------------
 with tab8:
     st.header("📧 Email Permutator")
-    prenom = st.text_input("Prénom:", placeholder="Ex: Mohamed")
-    nom = st.text_input("Nom:", placeholder="Ex: El Amrani")
-    entreprise = st.text_input("Nom de l'entreprise:", placeholder="Ex: tgcc")
+    prenom = st.text_input("Prénom:", key="perm_prenom", placeholder="Ex: Ahmed")
+    nom = st.text_input("Nom:", key="perm_nom", placeholder="Ex: El Mansouri")
+    entreprise = st.text_input("Nom de l'entreprise:", key="perm_domaine", placeholder="Ex: jet-contractors")
 
     if st.button("🔮 Générer permutations"):
         if prenom and nom and entreprise:
-            st.session_state["perm_result"] = [
-                f"{prenom.lower()}.{nom.lower()}@{entreprise}.com",
-                f"{prenom[0].lower()}{nom.lower()}@{entreprise}.ma",
-                f"{nom.lower()}.{prenom.lower()}@{entreprise}.com"
-            ]
+            domaines_possibles = [f"{entreprise}.com", f"{entreprise}.ma"]
+            permutations = []
+            for domaine in domaines_possibles:
+                permutations.append(f"{prenom.lower()}.{nom.lower()}@{domaine}")
+                permutations.append(f"{prenom[0].lower()}{nom.lower()}@{domaine}")
+                permutations.append(f"{nom.lower()}.{prenom.lower()}@{domaine}")
+
+            st.session_state["perm_result"] = list(set(permutations))
 
     if st.session_state.get("perm_result"):
         st.text_area("Résultats:", value="\n".join(st.session_state["perm_result"]), height=150)
-        st.caption("Tester sur : [Hunter.io](https://hunter.io/) ou [NeverBounce](https://neverbounce.com/)")
+        st.caption("Tester le fonctionnement d'une boîte mail sur : [Hunter.io](https://hunter.io/) ou [NeverBounce](https://neverbounce.com/)")
 
 # -------------------- Bibliothèque --------------------
 with tab9:
