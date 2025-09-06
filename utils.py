@@ -116,8 +116,19 @@ def generate_xray_query(site, poste, mots_cles, localisation):
     return query.strip()
 
 def generate_accroche_inmail(url_linkedin, poste):
-    prompt = f"Crée une accroche InMail courte et professionnelle.\nPoste: {poste}\nProfil LinkedIn: {url_linkedin}"
-    messages = [{"role": "system", "content": "Tu es un expert en recrutement."},
+    prompt = f"""
+    Crée une accroche InMail professionnelle et directe pour un candidat trouvé sur LinkedIn.
+    Poste à pourvoir: {poste}
+    Profil LinkedIn: {url_linkedin}
+    
+    Règles importantes:
+    1. Pas d'introduction comme "Voici une accroche"
+    2. Commence directement par le message
+    3. Sois concis et percutant
+    4. Personnalise en fonction du profil que tu dois consulter dans le lien/url
+    5. Pas de signature à la fin
+    """
+    messages = [{"role": "system", "content": "Tu es un expert en recrutement qui rédige des messages InMail percutants."},
                 {"role": "user", "content": prompt}]
     return ask_deepseek(messages, max_tokens=250).get("content", "")
 

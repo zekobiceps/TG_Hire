@@ -45,27 +45,6 @@ def action_buttons(save_label, open_label, url, context="default"):
         st.link_button(open_label, url, use_container_width=True)
     return clicked
 
-# -------------------- Boutons --------------------
-def action_buttons(save_label, open_label, url, context="default"):
-    col1, col2, _ = st.columns([1, 2, 7])
-    clicked = None
-    with col1:
-        if st.button(save_label, key=f"{context}_save", use_container_width=True):
-            clicked = "save"
-    with col2:
-        st.markdown(
-            f"""
-            <a href="{url}" target="_blank">
-                <button style="padding:6px 10px; background:#3182ce; color:white; border:none;
-                               border-radius:6px; cursor:pointer; font-size:13px; width:100%;">
-                    {open_label}
-                </button>
-            </a>
-            """,
-            unsafe_allow_html=True
-        )
-    return clicked
-
 # -------------------- Onglets --------------------
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
     "🔍 Recherche Boolean",
@@ -135,8 +114,20 @@ with tab2:
     if st.session_state.get("xray_query"):
         st.text_area("Requête X-Ray:", value=st.session_state["xray_query"], height=120)
         url = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
-        action = action_buttons("💾 Sauvegarder", "🌐 Ouvrir sur Google", url, "xray")
-        st.markdown(f"[🔎 Recherche avancée Google](https://www.google.com/advanced_search?q={quote(st.session_state['xray_query'])})")
+        
+        # CORRECTION: Utilisation correcte des boutons pour X-Ray
+        col1, col2, col3 = st.columns([1, 2, 2])
+        with col1:
+            if st.button("💾 Sauvegarder", key="xray_save", use_container_width=True):
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "X-Ray", 
+                         "poste": poste_xray, "requete": st.session_state["xray_query"]}
+                st.session_state.library_entries.append(entry)
+                save_library_entries()
+                st.success("✅ Sauvegardé")
+        with col2:
+            st.link_button("🌐 Ouvrir sur Google", url, use_container_width=True)
+        with col3:
+            st.link_button("🔎 Recherche avancée", f"https://www.google.com/advanced_search?q={quote(st.session_state['xray_query'])}", use_container_width=True)
 
 # -------------------- CSE --------------------
 with tab3:
@@ -152,14 +143,19 @@ with tab3:
     if st.session_state.get("cse_query"):
         st.text_area("Requête CSE:", value=st.session_state["cse_query"], height=100)
         cse_url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
-        action = action_buttons("💾 Sauvegarder", "🌐 Ouvrir sur CSE", cse_url, "cse")
+        action_buttons("💾 Sauvegarder", "🌐 Ouvrir sur CSE", cse_url, "cse")
 
 # -------------------- Dogpile --------------------
 with tab4:
     st.header("🐶 Dogpile Search")
     query = st.text_input("Requête Dogpile:", key="dogpile_query")
-    if query:
-        dogpile_url = f"http://www.dogpile.com/serp?q={quote(query)}"
+    
+    # CORRECTION: Ajout du bouton de recherche manquant
+    if st.button("🔍 Rechercher", key="dogpile_search", type="primary"):
+        st.session_state.dogpile_query = query
+    
+    if st.session_state.get("dogpile_query"):
+        dogpile_url = f"http://www.dogpile.com/serp?q={quote(st.session_state.dogpile_query)}"
         action_buttons("💾 Sauvegarder", "🌐 Ouvrir sur Dogpile", dogpile_url, "dogpile")
 
 # -------------------- Web Scraper --------------------
@@ -205,20 +201,22 @@ with tab6:
     mode_rapide_inmail = st.checkbox("⚡ Mode rapide (réponse concise)", key="inmail_fast")
 
     if st.button("💌 Générer InMail", type="primary"):
-        start_time = time.time()
-        progress = st.progress(0, text="⏳ Génération en cours...")
-
-        for i in range(100):
-            elapsed = int(time.time() - start_time)
-            progress.progress(i + 1, text=f"⏳ Génération... {i+1}% - {elapsed}s")
-            time.sleep(0.1 if mode_rapide_inmail else 0.2)
-
-        st.session_state["inmail_message"] = generate_accroche_inmail(
-            url_linkedin, poste_accroche
-        ) + f"\n\nJe fais partie de l’équipe recrutement de {entreprise}, et nous serions ravis d’échanger avec vous."
-
-        total_time = int(time.time() - start_time)
-        progress.progress(100, text=f"✅ Génération réussie en {total_time}s")
+        with st.spinner("⏳ Génération en cours..."):
+            # Appel direct à l'API sans simulation de progression
+            result = generate_accroche_inmail(url_linkedin, poste_accroche)
+            
+            # CORRECTION: Nettoyage du texte d'introduction
+            if result.startswith("Voici une accroche") or "Bonjour" in result[:100]:
+                # Trouver le début du message réel
+                lines = result.split('\n')
+                for i, line in enumerate(lines):
+                    if line.strip() and not line.startswith(("Voici", "Bonjour", "[Votre")):
+                        result = '\n'.join(lines[i:])
+                        break
+            
+            # CORRECTION: Ajout de la signature personnalisée
+            signature = f"\n\nJe suis [Votre prénom] et je fais partie de l'équipe recrutement de {entreprise}, et nous serions ravis d'échanger avec vous."
+            st.session_state["inmail_message"] = result + signature
 
     if st.session_state.get("inmail_message"):
         st.text_area("Message InMail:", value=st.session_state["inmail_message"], height=200)
@@ -233,7 +231,7 @@ with tab7:
         "Quels mots-clés pour cibler les juniors pour le poste de",
         "Quels intitulés similaires au poste de",
         "Quels critères éliminatoires fréquents pour le poste de",
-        "Quels secteurs d’activité embauchent souvent pour le poste de",
+        "Quels secteurs d'activité embauchent souvent pour le poste de",
         "Quelles certifications utiles pour le métier de",
         "Quels intitulés de poste équivalents dans le marché marocain pour",
         "Quels rôles proches à considérer lors du sourcing pour",
@@ -246,26 +244,35 @@ with tab7:
     mode_rapide_magicien = st.checkbox("⚡ Mode rapide (réponse concise)", key="magicien_fast")
 
     if st.button("✨ Poser la question", type="primary", key="ask_magicien"):
-        if question:
-            start_time = time.time()
-            progress = st.progress(0, text="⏳ Génération en cours...")
-
-            for i in range(100):
-                elapsed = int(time.time() - start_time)
-                progress.progress(i + 1, text=f"⏳ Génération... {i+1}% - {elapsed}s")
-                time.sleep(0.1 if mode_rapide_magicien else 0.3)
-
-            result = ask_deepseek([{"role": "user", "content": question}], max_tokens=150 if mode_rapide_magicien else 300)
-            total_time = int(time.time() - start_time)
-            st.session_state.magicien_history.append({"q": question, "r": result["content"], "time": total_time})
-            progress.progress(100, text=f"✅ Génération réussie en {total_time}s")
+    if question:
+        start_time = time.time()  # AJOUTER CETTE LIGNE
+        with st.spinner("⏳ Génération en cours..."):
+            # Amélioration du prompt pour des réponses plus structurées
+            enhanced_question = question
+            if "synonymes" in question.lower():
+                enhanced_question += ". Réponds uniquement avec une liste de synonymes séparés par des virgules, sans introduction."
+            elif "outils" in question.lower() or "logiciels" in question.lower():
+                enhanced_question += ". Réponds avec une liste à puces des outils, sans introduction."
+            elif "compétences" in question.lower() or "skills" in question.lower():
+                enhanced_question += ". Réponds avec une liste à puces, sans introduction."
+            
+            result = ask_deepseek([{"role": "user", "content": enhanced_question}], 
+                                 max_tokens=150 if mode_rapide_magicien else 300)
+            
+            total_time = int(time.time() - start_time)  # CALCUL DU TEMPS
+            
+            st.session_state.magicien_history.append({
+                "q": question, 
+                "r": result["content"], 
+                "time": total_time  # UTILISATION DE LA VARIABLE DÉFINIE
+            })
 
     if st.session_state.get("magicien_history"):
         st.subheader("📝 Historique des réponses")
         for i, item in enumerate(st.session_state.magicien_history[::-1]):
             with st.expander(f"❓ {item['q']} ({item['time']}s)"):
                 st.write(item["r"])
-                if st.button("🗑️ Supprimer", key=f"del_magicien_{i}_{time.time()}"):
+                if st.button("🗑️ Supprimer", key=f"del_magicien_{i}"):
                     st.session_state.magicien_history.remove(item)
                     st.rerun()
         if st.button("🧹 Supprimer tout", key="clear_magicien_all"):
@@ -295,6 +302,9 @@ with tab8:
                 permutations.append(f"{prenom.lower()}.{nom.lower()}@{domain}")
                 permutations.append(f"{prenom[0].lower()}{nom.lower()}@{domain}")
                 permutations.append(f"{nom.lower()}.{prenom.lower()}@{domain}")
+                permutations.append(f"{prenom.lower()}{nom.lower()}@{domain}")
+                permutations.append(f"{prenom.lower()}-{nom.lower()}@{domain}")
+                permutations.append(f"{nom.lower()}.{prenom[0].lower()}@{domain}")
             st.session_state["perm_result"] = list(set(permutations))
 
     if st.session_state.get("perm_result"):
