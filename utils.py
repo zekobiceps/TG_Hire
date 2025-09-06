@@ -7,7 +7,7 @@ import os
 import pickle
 import re
 import io
-import pyperclip  # ✅ pour copier correctement
+import pyperclip
 from urllib.parse import quote
 
 # -------------------- Optionnels PDF / Word --------------------
@@ -78,6 +78,14 @@ KSA_MODEL = {
     "Abilities (Aptitudes)": ["Ex. Gestion du stress"]
 }
 
+# -------------------- Templates de briefs --------------------
+BRIEF_TEMPLATES = {
+    "Template Vide": {
+        category: {item: {"valeur": "", "importance": 3} for item in items}
+        for category, items in SIMPLIFIED_CHECKLIST.items()
+    }
+}
+
 # -------------------- Initialisation Session --------------------
 def init_session_state():
     """Initialise tous les états nécessaires"""
@@ -99,7 +107,18 @@ def init_session_state():
         'scraper_result': "",
         'scraper_emails': set(),
         'inmail_message': "",
-        'perm_result': []
+        'perm_result': [],
+        'poste_intitule': "",
+        'manager_nom': "",
+        'recruteur': "Zakaria",
+        'affectation_type': "Chantier",
+        'affectation_nom': "",
+        'brief_data': {},
+        'ksa_data': {},
+        'comment_libre': "",
+        'current_brief_name': "",
+        'filtered_briefs': {},
+        'show_filtered_results': False
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -113,6 +132,35 @@ def save_library_entries():
             pickle.dump(st.session_state.library_entries, f)
     except Exception as e:
         st.error(f"Erreur sauvegarde bibliothèque: {e}")
+
+def save_briefs():
+    """Sauvegarde les briefs"""
+    try:
+        with open("saved_briefs.pkl", "wb") as f:
+            pickle.dump(st.session_state.saved_briefs, f)
+    except Exception as e:
+        st.error(f"Erreur sauvegarde briefs: {e}")
+
+# -------------------- Génération nom automatique --------------------
+def generate_automatic_brief_name():
+    """Génère un nom automatique de brief"""
+    now = datetime.now()
+    return f"{now.strftime('%d-%m-%y')}-{st.session_state.poste_intitule or 'poste'}"
+
+# -------------------- Filtrer briefs --------------------
+def filter_briefs(saved_briefs, filter_month=None, filter_recruteur=None,
+                  filter_poste=None, filter_manager=None):
+    """Filtre les briefs enregistrés"""
+    filtered = {}
+    for name, data in saved_briefs.items():
+        if filter_poste and filter_poste.lower() not in data.get("poste_intitule", "").lower():
+            continue
+        if filter_manager and filter_manager.lower() not in data.get("manager_nom", "").lower():
+            continue
+        if filter_recruteur and filter_recruteur.lower() != data.get("recruteur", "").lower():
+            continue
+        filtered[name] = data
+    return filtered
 
 # -------------------- API DeepSeek --------------------
 def ask_deepseek(messages, max_tokens=500, response_format="text"):
@@ -140,7 +188,6 @@ def ask_deepseek(messages, max_tokens=500, response_format="text"):
             usage = result.get("usage", {})
             total_tokens = usage.get("total_tokens", 0)
 
-            # 🔥 Mise à jour des compteurs
             st.session_state.api_usage["used_tokens"] += total_tokens
             st.session_state.api_usage["current_session_tokens"] += total_tokens
             st.session_state["token_counter"] += total_tokens
@@ -151,9 +198,8 @@ def ask_deepseek(messages, max_tokens=500, response_format="text"):
     except Exception as e:
         return {"content": f"❌ Exception: {str(e)}", "total_tokens": 0}
 
-# -------------------- Générateurs de requêtes --------------------
+# -------------------- Générateurs --------------------
 def generate_boolean_query(poste, synonymes, comp_oblig, comp_opt, exclusions, localisation, secteur):
-    """Construit une requête Boolean"""
     query_parts = []
     if poste:
         poste_part = f'("{poste}"'
@@ -180,7 +226,6 @@ def generate_boolean_query(poste, synonymes, comp_oblig, comp_opt, exclusions, l
     return query
 
 def generate_xray_query(site, poste, mots_cles, localisation):
-    """Construit une requête X-Ray Google"""
     site_urls = {"LinkedIn": "site:linkedin.com/in/", "GitHub": "site:github.com"}
     query = site_urls.get(site, "site:linkedin.com/in/") + " "
     if poste:
@@ -192,8 +237,18 @@ def generate_xray_query(site, poste, mots_cles, localisation):
         query += f'"{localisation}" '
     return query.strip()
 
+def generate_annonce(poste, competences):
+    prompt = f"""
+    Crée une annonce d'emploi attractive et concise pour le poste de {poste}.
+    Compétences clés: {competences}
+    """
+    messages = [
+        {"role": "system", "content": "Tu es un expert en rédaction d'annonces d'emploi."},
+        {"role": "user", "content": prompt}
+    ]
+    return ask_deepseek(messages, max_tokens=600).get("content", "")
+
 def generate_accroche_inmail(url_linkedin, poste):
-    """Accroche InMail courte"""
     prompt = f"""
     Crée une accroche InMail courte et professionnelle.
     Poste: {poste}
@@ -205,106 +260,18 @@ def generate_accroche_inmail(url_linkedin, poste):
     ]
     return ask_deepseek(messages, max_tokens=250).get("content", "")
 
-# -------------------- Utilitaire Copier --------------------
+# -------------------- Export PDF / Word --------------------
+def export_brief_pdf():
+    return None  # Implémentation possible si besoin
+
+def export_brief_word():
+    return None  # Implémentation possible si besoin
+
+# -------------------- Copier --------------------
 def copy_to_clipboard(text):
-    """Copie une chaîne dans le presse-papier"""
     try:
         pyperclip.copy(text)
         return True
     except Exception as e:
         st.error(f"Erreur copie: {e}")
         return False
-# -------------------- Export Brief en PDF --------------------
-def export_brief_pdf():
-    """Exporte le brief en PDF"""
-    if not PDF_AVAILABLE:
-        st.error("Module reportlab non installé. Utilisez : pip install reportlab")
-        return None
-
-    try:
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4)
-        styles = getSampleStyleSheet()
-        story = []
-
-        # Titre
-        story.append(Paragraph("Brief Recrutement", styles['Heading1']))
-        story.append(Spacer(1, 20))
-
-        # Infos principales
-        infos = [
-            ["Poste", st.session_state.get("poste_intitule", "")],
-            ["Manager", st.session_state.get("manager_nom", "")],
-            ["Recruteur", st.session_state.get("recruteur", "")],
-            ["Affectation", f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}"]
-        ]
-        table = Table(infos, colWidths=[150, 300])
-        table.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-            ("GRID", (0, 0), (-1, -1), 1, colors.black)
-        ]))
-        story.append(table)
-        story.append(Spacer(1, 20))
-
-        # Sections
-        if "brief_data" in st.session_state:
-            for cat, items in st.session_state["brief_data"].items():
-                story.append(Paragraph(cat, styles['Heading2']))
-                for item, data in items.items():
-                    if isinstance(data, dict):
-                        val = data.get("valeur", "")
-                    else:
-                        val = str(data)
-                    if val:
-                        story.append(Paragraph(f"<b>{item}:</b> {val}", styles['Normal']))
-                story.append(Spacer(1, 15))
-
-        doc.build(story)
-        buffer.seek(0)
-        return buffer
-    except Exception as e:
-        st.error(f"Erreur PDF: {e}")
-        return None
-
-
-# -------------------- Export Brief en Word --------------------
-def export_brief_word():
-    """Exporte le brief en Word"""
-    if not WORD_AVAILABLE:
-        st.error("Module python-docx non installé. Utilisez : pip install python-docx")
-        return None
-
-    try:
-        doc = Document()
-        doc.add_heading("Brief Recrutement", 0)
-
-        # Infos principales
-        infos = {
-            "Poste": st.session_state.get("poste_intitule", ""),
-            "Manager": st.session_state.get("manager_nom", ""),
-            "Recruteur": st.session_state.get("recruteur", ""),
-            "Affectation": f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}"
-        }
-        for k, v in infos.items():
-            doc.add_paragraph(f"{k}: {v}")
-
-        # Sections
-        if "brief_data" in st.session_state:
-            for cat, items in st.session_state["brief_data"].items():
-                doc.add_heading(cat, level=1)
-                for item, data in items.items():
-                    if isinstance(data, dict):
-                        val = data.get("valeur", "")
-                    else:
-                        val = str(data)
-                    if val:
-                        doc.add_paragraph(f"{item}: {val}")
-
-        buffer = io.BytesIO()
-        doc.save(buffer)
-        buffer.seek(0)
-        return buffer
-    except Exception as e:
-        st.error(f"Erreur Word: {e}")
-        return None
