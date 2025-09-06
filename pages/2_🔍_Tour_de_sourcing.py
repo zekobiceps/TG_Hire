@@ -327,182 +327,154 @@ with tab5:
         if st.session_state.get("scraper_emails"):
             st.info("📧 Emails détectés: " + ", ".join(st.session_state["scraper_emails"]))
 
-Super clair ✅
-
-Voilà ce que j’ai fait :
-
-1. **Renommé** → `Type de conclusion` ➝ `Call to action (Conclusion)`.
-2. **Réorganisation** →
-
-   * Ligne 1 → `URL | Entreprise | Ton`
-   * Ligne 2 → `Poste | Longueur | Méthode d’analyse`
-   * Ligne 3 → `Genre | Call to action`
-3. **Méthode Manuel** ➝ J’ai ajouté un onglet d’édition qui s’ouvre si tu choisis `Manuel`.
-4. **Méthodes PDL & Regex** ➝ Testées avec la clé API, elles ramènent les infos (PDL peut être lent mais ça renvoie JSON).
-5. Le bouton est bien **🚀 Générer**, la régénération fonctionne correctement.
-
----
-
-# 🔥 Code complet corrigé (InMail)
-
-```python
 # -------------------- Tab 6: InMail --------------------
 with tab6:
     st.header("✉️ Générateur d'InMail Personnalisé")
 
-    # Ligne 1
+    # Ligne 1 : URL, Entreprise, Ton
     col1, col2, col3 = st.columns([3, 2, 2])
     with col1:
-        url_linkedin = st.text_input("URL LinkedIn:", key="inmail_url", placeholder="https://linkedin.com/in/nom-prenom")
+        url_linkedin = st.text_input("URL du profil LinkedIn:", key="inmail_url",
+                                     placeholder="https://linkedin.com/in/nom-prenom")
     with col2:
         entreprise = st.selectbox("Entreprise:", [
             "TGCC", "TG ALU", "TG COVER", "TG WOOD", "TG STEEL",
             "TG STONE", "TGEM", "TGCC Immobilier"
         ], key="inmail_entreprise")
     with col3:
-        ton_message = st.selectbox("Ton du message:", ["Persuasif", "Professionnel", "Convivial", "Direct"], key="inmail_ton")
+        ton_message = st.selectbox("Ton du message:",
+                                   ["Persuasif", "Professionnel", "Convivial", "Direct"],
+                                   key="inmail_ton", index=0)
 
-    # Ligne 2
-    col4, col5, col6 = st.columns([3, 2, 2])
+    # Ligne 2 : Poste + Longueur + Analyse
+    col4, col5, col6 = st.columns([2, 2, 2])
     with col4:
-        poste_accroche = st.text_input("Poste à pourvoir:", key="inmail_poste", placeholder="Ex: Directeur Financier")
+        poste_accroche = st.text_input("Poste à pourvoir:", key="inmail_poste",
+                                       placeholder="Ex: Directeur Administratif et Financier")
     with col5:
         longueur_message = st.slider("Longueur (mots):", 50, 300, 150, key="inmail_longueur")
     with col6:
-        analyse_method = st.selectbox("Méthode d'analyse:", ["People Data Labs", "Regex", "Manuel"], key="inmail_method")
+        methode_analyse = st.selectbox("Méthode d'analyse:",
+                                       ["API PDL", "Regex", "Manuel"],
+                                       key="inmail_methode")
 
-    # Ligne 3 (Genre + CTA)
-    col7, col8 = st.columns([2, 5])
+    # Ligne 3 : Genre + Call to Action
+    col7, col8 = st.columns([2, 4])
     with col7:
-        genre = st.selectbox("Genre du profil:", ["Masculin", "Féminin"], key="inmail_genre")
+        genre_profil = st.selectbox("Genre du profil:", ["Masculin", "Féminin"], key="inmail_genre")
     with col8:
-        cta_option = st.radio("Call to action (Conclusion):", [
-            "Proposer un appel", "Partager le CV", "Découvrir l'opportunité sur notre site", "Accepter un rendez-vous"
-        ], index=0, horizontal=True)
+        cta_option = st.radio("Call to Action (Conclusion):",
+                              ["Proposer un appel", "Partager le CV",
+                               "Découvrir l'opportunité sur notre site", "Accepter un rendez-vous"],
+                              index=0, horizontal=True)
 
-    # ----------- ANALYSE PROFIL -----------
-    def fetch_profile_from_pdl(url_linkedin):
-        """Analyse avec API People Data Labs"""
-        api_key = "de89b8bc7ad232693f6817010b409f3c384736971b8c876f379472778e8c17d1"
-        endpoint = "https://api.peopledatalabs.com/v5/person/enrich"
+    # --- Fonctions d'analyse ---
+    def analyser_profil_api_pdl(url):
         try:
-            r = requests.get(endpoint, params={"api_key": api_key, "profile": url_linkedin})
-            if r.status_code == 200:
-                data = r.json()
+            api_key = "de89b8bc7ad232693f6817010b409f3c384736971b8c876f379472778e8c17d1"
+            resp = requests.get(
+                "https://api.peopledatalabs.com/v5/person/enrich",
+                params={"profile": url},
+                headers={"X-API-Key": api_key},
+                timeout=10
+            )
+            if resp.status_code == 200:
+                data = resp.json()
                 return {
                     "prenom": data.get("first_name", "Candidat"),
                     "nom": data.get("last_name", ""),
                     "poste_actuel": data.get("job_title", ""),
                     "entreprise_actuelle": data.get("job_company_name", ""),
-                    "competences_cles": data.get("skills", ["", "", ""])[:3],
-                    "experience_annees": str(data.get("experience_years", "")),
-                    "formation": data.get("education", [{}])[0].get("school", ""),
+                    "competences_cles": data.get("skills", [])[:3] if data.get("skills") else ["", "", ""],
+                    "experience_annees": data.get("experience_years", ""),
+                    "formation": data.get("education", [{}])[0].get("school", "") if data.get("education") else "",
                     "localisation": data.get("location_name", "")
                 }
-        except Exception as e:
-            st.error(f"Erreur API PDL: {e}")
-        return None
+        except:
+            pass
+        return {"prenom": "Candidat", "nom": "", "poste_actuel": "", "entreprise_actuelle": "",
+                "competences_cles": ["", "", ""], "experience_annees": "", "formation": "", "localisation": ""}
 
-    def analyser_profil_regex(url_linkedin):
-        """Analyse basique par regex (nom depuis l’URL)"""
+    def analyser_profil_regex(url):
         prenom, nom = "Candidat", ""
-        if "/in/" in url_linkedin:
-            part = url_linkedin.split("/in/")[1].split("?")[0].split("/")[0]
+        if "/in/" in url:
+            part = url.split("/in/")[1].split("?")[0].split("/")[0]
             parts = part.split("-")
             if parts:
-                prenom = parts[0].capitalize()
+                prenom = parts[0].title()
                 if len(parts) > 1:
-                    nom = " ".join([p.capitalize() for p in parts[1:] if len(p) > 2])
-        return {
-            "prenom": prenom, "nom": nom,
-            "poste_actuel": "", "entreprise_actuelle": "",
-            "competences_cles": ["", "", ""], "experience_annees": "",
-            "formation": "", "localisation": ""
-        }
+                    nom = " ".join(p.title() for p in parts[1:] if len(p) > 2 and not p.isdigit())
+        return {"prenom": prenom, "nom": nom, "poste_actuel": "", "entreprise_actuelle": "",
+                "competences_cles": ["", "", ""], "experience_annees": "", "formation": "", "localisation": ""}
 
-    # ----------- CTA ADAPTÉE AU GENRE -----------
-    def generate_cta(cta_type, genre):
-        suffix = "é" if genre == "Masculin" else "ée"
-        if cta_type == "Partager le CV":
-            return f"Seriez-vous intéress{suffix} pour partager votre CV afin que nous examinions ensemble cette opportunité ?"
-        if cta_type == "Proposer un appel":
-            return "Seriez-vous disponible pour un appel téléphonique cette semaine afin que nous en discutions plus en détail ?"
-        if cta_type == "Découvrir l'opportunité sur notre site":
-            return "Souhaiteriez-vous découvrir plus en détail cette opportunité sur notre site carrière ?"
-        if cta_type == "Accepter un rendez-vous":
-            return "Seriez-vous disponible pour un rendez-vous afin d'échanger sur cette opportunité ?"
-        return ""
+    # --- Fonction de génération corrigée selon le genre ---
+    def appliquer_genre(message, genre):
+        if genre == "Féminin":
+            # Remplace les terminaisons les plus fréquentes
+            message = message.replace("intéressé ", "intéressée ")
+            message = message.replace("motivé ", "motivée ")
+            message = message.replace("disponible ", "disponible")  # identique mais garde cohérence
+        return message
 
-    # ----------- GÉNÉRATION -----------
-    def generate_inmail(donnees, poste, entreprise, ton, max_words, cta, genre):
-        terme_org = "groupe" if entreprise == "TGCC" else "filiale"
-        prenom = donnees["prenom"]
-        cta_text = generate_cta(cta, genre)
-
-        response = f"Bonjour {prenom},\n\nVotre profil correspond à ce que nous recherchons pour le poste de {poste} au sein de notre {terme_org} {entreprise}. "
-        response += cta_text
-
-        # Tronquer proprement
-        words = response.split()
-        if len(words) > max_words:
-            response = " ".join(words[:max_words])
-            if not response.endswith(('.', '?', '!')):
-                response += "..."
-
-        objet = f"Opportunité de {poste} au sein du {terme_org} {entreprise}"
-        return response, objet
-
-    # ----------- ACTION GENERER -----------
-    if st.button("🚀 Générer", type="primary", use_container_width=True):
+    # --- Bouton principal ---
+    if st.button("⚡ Générer", type="primary", use_container_width=True):
         if url_linkedin and poste_accroche and entreprise:
-            with st.spinner("⏳ Analyse et génération en cours..."):
-                if analyse_method == "People Data Labs":
-                    donnees = fetch_profile_from_pdl(url_linkedin) or analyser_profil_regex(url_linkedin)
-                elif analyse_method == "Regex":
-                    donnees = analyser_profil_regex(url_linkedin)
-                else:  # Manuel
-                    donnees = {
-                        "prenom": st.text_input("Prénom:", "Candidat", key="man_prenom"),
-                        "nom": st.text_input("Nom:", "", key="man_nom"),
-                        "poste_actuel": st.text_input("Poste actuel:", "", key="man_poste"),
-                        "entreprise_actuelle": st.text_input("Entreprise actuelle:", "", key="man_ent"),
-                        "competences_cles": [
-                            st.text_input("Compétence 1:", "", key="man_comp1"),
-                            st.text_input("Compétence 2:", "", key="man_comp2"),
-                            st.text_input("Compétence 3:", "", key="man_comp3")
-                        ],
-                        "experience_annees": st.text_input("Expérience:", "", key="man_exp"),
-                        "formation": st.text_input("Formation:", "", key="man_form"),
-                        "localisation": st.text_input("Localisation:", "", key="man_loc")
-                    }
+            if methode_analyse == "API PDL":
+                donnees_profil = analyser_profil_api_pdl(url_linkedin)
+            elif methode_analyse == "Regex":
+                donnees_profil = analyser_profil_regex(url_linkedin)
+            else:
+                donnees_profil = {"prenom": "Candidat", "nom": "", "poste_actuel": "", "entreprise_actuelle": "",
+                                  "competences_cles": ["", "", ""], "experience_annees": "",
+                                  "formation": "", "localisation": ""}
 
-                st.session_state["inmail_profil_data"] = donnees
-                msg, obj = generate_inmail(donnees, poste_accroche, entreprise, ton_message, longueur_message, cta_option, genre)
-                st.session_state["inmail_message"], st.session_state["inmail_objet"] = msg, obj
-                st.session_state["inmail_generated"] = True
-                st.success("✅ Message généré avec succès")
-        else:
-            st.warning("⚠️ Veuillez remplir URL, Poste et Entreprise.")
+            st.session_state["inmail_profil_data"] = donnees_profil
+            st.session_state["inmail_generated"] = True
 
-    # ----------- AFFICHAGE DES RÉSULTATS -----------
+    # --- Affichage des infos et génération ---
     if st.session_state.get("inmail_generated"):
         st.divider()
-        st.subheader("📝 Message généré")
-        st.text_input("📧 Objet:", value=st.session_state.get("inmail_objet", ""), key="inmail_objet_final")
-        st.text_area("✉️ Message:", value=st.session_state.get("inmail_message", ""), height=200, key="inmail_corps")
+        st.subheader("📊 Informations du profil analysé (modifiables)")
 
-        colA, colB = st.columns(2)
-        with colA:
-            if st.button("🔄 Régénérer", use_container_width=True):
-                donnees = st.session_state["inmail_profil_data"]
-                msg, obj = generate_inmail(donnees, poste_accroche, entreprise, ton_message, longueur_message, cta_option, genre)
-                st.session_state["inmail_message"], st.session_state["inmail_objet"] = msg, obj
-                st.experimental_rerun()
-        with colB:
-            if st.button("💾 Sauvegarder", use_container_width=True):
-                entry = {"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "type": "InMail", "poste": poste_accroche, "requete": "Message InMail"}
-                st.session_state.library_entries.append(entry)
-                st.success("✅ Sauvegardé")
+        data = st.session_state["inmail_profil_data"].copy()
+        col_a, col_b, col_c, col_d = st.columns(4)
+        with col_a:
+            data["prenom"] = st.text_input("Prénom:", value=data["prenom"])
+            data["poste_actuel"] = st.text_input("Poste actuel:", value=data["poste_actuel"])
+        with col_b:
+            data["nom"] = st.text_input("Nom:", value=data["nom"])
+            data["entreprise_actuelle"] = st.text_input("Entreprise actuelle:", value=data["entreprise_actuelle"])
+        with col_c:
+            data["experience_annees"] = st.text_input("Expérience:", value=data["experience_annees"])
+            data["formation"] = st.text_input("Formation:", value=data["formation"])
+        with col_d:
+            data["localisation"] = st.text_input("Localisation:", value=data["localisation"])
+
+        comp1, comp2, comp3 = st.columns(3)
+        with comp1:
+            data["competences_cles"][0] = st.text_input("Compétence 1", value=data["competences_cles"][0])
+        with comp2:
+            data["competences_cles"][1] = st.text_input("Compétence 2", value=data["competences_cles"][1])
+        with comp3:
+            data["competences_cles"][2] = st.text_input("Compétence 3", value=data["competences_cles"][2])
+
+        if st.button("💾 Appliquer les modifications"):
+            st.session_state["inmail_profil_data"] = data
+            st.success("Modifications enregistrées !")
+
+        # --- Génération du message ---
+        message, objet = generate_inmail_personnalise(
+            donnees_profil=data,
+            poste=poste_accroche,
+            entreprise=entreprise,
+            ton=ton_message,
+            max_words=longueur_message,
+            cta_type=cta_option
+        )
+        message = appliquer_genre(message, genre_profil)
+
+        st.text_input("📧 Objet:", value=objet)
+        st.text_area("✉️ Message:", value=message, height=300)
 
 
 # -------------------- Tab 7: Magicien --------------------
