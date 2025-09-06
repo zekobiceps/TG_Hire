@@ -55,11 +55,17 @@ with tab1:
 
     if st.session_state.get("boolean_query"):
         st.text_area("Requête Boolean:", value=st.session_state["boolean_query"], height=120)
-        if st.button("📚 Sauvegarder Boolean"):
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", "poste": poste, "requete": st.session_state["boolean_query"]}
-            st.session_state.library_entries.append(entry)
-            save_library_entries()
-            st.success("✅ Sauvegardé dans la bibliothèque")
+        colA, colB = st.columns(2)
+        with colA:
+            if st.button("📚 Sauvegarder Boolean"):
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", "poste": poste, "requete": st.session_state["boolean_query"]}
+                st.session_state.library_entries.append(entry)
+                save_library_entries()
+                st.success("✅ Sauvegardé dans la bibliothèque")
+        with colB:
+            if st.button("🌐 Ouvrir sur Google (Boolean)"):
+                url = f"https://www.google.com/search?q={quote(st.session_state['boolean_query'])}"
+                st.markdown(f"[👉 Ouvrir la recherche]({url})", unsafe_allow_html=True)
 
 # -------------------- X-Ray --------------------
 with tab2:
@@ -86,9 +92,9 @@ with tab2:
                 save_library_entries()
                 st.success("✅ Sauvegardé dans la bibliothèque")
         with colB:
-            if st.button("🌐 Ouvrir sur Google"):
+            if st.button("🌐 Ouvrir sur Google (X-Ray)"):
                 url = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
-                webbrowser.open_new_tab(url)
+                st.markdown(f"[👉 Ouvrir la recherche]({url})", unsafe_allow_html=True)
 
 # -------------------- CSE --------------------
 with tab3:
@@ -114,7 +120,7 @@ with tab3:
                 st.success("✅ Sauvegardé dans la bibliothèque")
         with colB:
             if st.button("🌐 Ouvrir résultats CSE"):
-                webbrowser.open_new_tab(cse_url)
+                st.markdown(f"[👉 Ouvrir la recherche]({cse_url})", unsafe_allow_html=True)
 
 # -------------------- Dogpile --------------------
 with tab4:
@@ -136,7 +142,7 @@ with tab4:
                 st.success("✅ Sauvegardé dans la bibliothèque")
         with colB:
             if st.button("🌐 Ouvrir sur Dogpile"):
-                webbrowser.open_new_tab(url)
+                st.markdown(f"[👉 Ouvrir la recherche]({url})", unsafe_allow_html=True)
 
 # -------------------- Web Scraper --------------------
 with tab5:
@@ -189,7 +195,16 @@ with tab6:
 # -------------------- Magicien --------------------
 with tab7:
     st.header("🤖 Magicien de sourcing")
-    question = st.text_area("Votre question:", key="magicien_question", placeholder="Ex: Quels sont les synonymes pour Développeur Python ?")
+
+    questions_pretes = [
+        "Quels sont les synonymes pour Développeur Python ?",
+        "Quels mots-clés utiliser pour recruter un Data Scientist ?",
+        "Quelles compétences vérifier pour un Chef de projet IT ?",
+        "Quels intitulés de poste similaires à Ingénieur DevOps ?"
+    ]
+    q_choice = st.selectbox("📌 Choisir une question prédéfinie:", [""] + questions_pretes, key="magicien_qchoice")
+    question = st.text_area("Votre question:", value=q_choice if q_choice else "", key="magicien_question", placeholder="Ex: Quels sont les synonymes pour Développeur Python ?")
+    poste_magicien = st.text_input("Ajouter mon poste à la fin:", key="magicien_poste")
 
     if st.button("✨ Poser la question", type="primary"):
         if question:
@@ -198,20 +213,23 @@ with tab7:
                 {"role": "user", "content": question}
             ]
             result = ask_deepseek(messages, max_tokens=300)
-            st.session_state["magicien_reponse"] = result["content"]
+            reponse = result["content"]
+            if poste_magicien:
+                reponse += f"\n\n👉 Question finale liée à ton poste: {poste_magicien}"
+            st.session_state["magicien_reponse"] = reponse
 
     if st.session_state.get("magicien_reponse"):
         st.text_area("Réponse:", value=st.session_state["magicien_reponse"], height=200)
         colA, colB = st.columns(2)
         with colA:
             if st.button("📚 Sauvegarder Magicien"):
-                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Magicien", "poste": "", "requete": st.session_state["magicien_reponse"]}
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Magicien", "poste": poste_magicien, "requete": st.session_state["magicien_reponse"]}
                 st.session_state.library_entries.append(entry)
                 save_library_entries()
                 st.success("✅ Sauvegardé dans la bibliothèque")
         with colB:
             if st.button("🗑️ Supprimer historique Magicien"):
-                for key in ["magicien_question","magicien_reponse"]:
+                for key in ["magicien_question","magicien_reponse","magicien_poste"]:
                     st.session_state[key] = ""
                 st.success("🧹 Historique effacé")
 
@@ -220,7 +238,7 @@ with tab8:
     st.header("📧 Email Permutator")
     prenom = st.text_input("Prénom:", key="perm_prenom")
     nom = st.text_input("Nom:", key="perm_nom")
-    domaine = st.text_input("Domaine (ex: tgcc.ma ou gidna.com):", key="perm_domaine")
+    domaine = st.text_input("Domaine (ex: TGCC.ma ou Jet-contractors.com):", key="perm_domaine")
 
     if st.button("🔮 Générer permutations"):
         if prenom and nom and domaine:
@@ -233,7 +251,7 @@ with tab8:
 
     if st.session_state.get("perm_result"):
         st.text_area("Résultats:", value="\n".join(st.session_state["perm_result"]), height=150)
-        st.caption("🔗 Vérifiez vos emails sur [Hunter.io](https://hunter.io/) ou [NeverBounce](https://neverbounce.com/)")
+        st.caption("Tester le fonctionnement d'une boite mail : [Hunter.io](https://hunter.io/) ou [NeverBounce](https://neverbounce.com/)")
         if st.button("📚 Sauvegarder Permutator"):
             entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Permutator", "poste": "", "requete": ", ".join(st.session_state["perm_result"])}
             st.session_state.library_entries.append(entry)
@@ -243,8 +261,23 @@ with tab8:
 # -------------------- Bibliothèque --------------------
 with tab9:
     st.header("📚 Bibliothèque des recherches")
+
     if st.session_state.library_entries:
-        for i, entry in enumerate(st.session_state.library_entries):
+        search_term = st.text_input("🔎 Rechercher dans la bibliothèque:")
+        sort_by = st.selectbox("📌 Trier par:", ["Date", "Type", "Poste"], key="sort_by")
+
+        entries = st.session_state.library_entries
+        if search_term:
+            entries = [e for e in entries if search_term.lower() in e["requete"].lower() or search_term.lower() in e["poste"].lower()]
+
+        if sort_by == "Type":
+            entries = sorted(entries, key=lambda x: x["type"])
+        elif sort_by == "Poste":
+            entries = sorted(entries, key=lambda x: x["poste"])
+        else:
+            entries = sorted(entries, key=lambda x: x["date"], reverse=True)
+
+        for i, entry in enumerate(entries):
             with st.expander(f"{entry['date']} - {entry['type']} - {entry['poste']}"):
                 st.text_area("Requête:", value=entry['requete'], height=100)
                 if st.button("🗑️ Supprimer", key=f"del_{i}"):
