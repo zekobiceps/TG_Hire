@@ -1,8 +1,9 @@
 import streamlit as st
+
 from utils import (
     init_session_state,
     generate_annonce,
-    generate_accroche_inmail
+    generate_accroche_inmail,
 )
 
 # Initialisation de la session

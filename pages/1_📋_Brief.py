@@ -1,4 +1,5 @@
 import streamlit as st
+
 from utils import (
     init_session_state,
     generate_automatic_brief_name,
@@ -6,10 +7,10 @@ from utils import (
     save_briefs,
     BRIEF_TEMPLATES,
     SIMPLIFIED_CHECKLIST,
+    PDF_AVAILABLE,
+    WORD_AVAILABLE,
     export_brief_pdf,
     export_brief_word,
-    PDF_AVAILABLE,
-    WORD_AVAILABLE
 )
 
 # Initialisation de la session
