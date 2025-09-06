@@ -56,20 +56,19 @@ with tab1:
         if boolean_query:
             st.text_area("Requête Boolean:", value=boolean_query, height=120)
 
-            colA, colB, colC = st.columns(3)
+            colA, colB = st.columns(2)
             with colA:
-                st.download_button("📋 Copier", data=boolean_query, file_name="requete_boolean.txt", mime="text/plain")
-            with colB:
                 if st.button("📚 Sauvegarder Boolean"):
                     entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", "poste": poste, "requete": boolean_query}
                     st.session_state.library_entries.append(entry)
                     save_library_entries()
                     st.success("✅ Sauvegardé dans la bibliothèque")
-            with colC:
+            with colB:
                 if st.button("🔄 Réinit Boolean"):
-                    for key in ["poste","synonymes","competences_obligatoires","secteur","competences_optionnelles","exclusions","localisation","employeur"]:
+                    for key in ["poste","synonymes","competences_obligatoires","secteur",
+                                "competences_optionnelles","exclusions","localisation","employeur"]:
                         st.session_state[key] = ""
-                    st.experimental_rerun()
+                    st.warning("⚠️ Champs réinitialisés")
 
 # -------------------- X-Ray --------------------
 with tab2:
@@ -89,13 +88,16 @@ with tab2:
 
         colA, colB, colC = st.columns(3)
         with colA:
-            st.download_button("📋 Copier", data=xray_query, file_name="requete_xray.txt", mime="text/plain")
-        with colB:
             if st.button("📚 Sauvegarder X-Ray"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "X-Ray", "poste": poste_xray, "requete": xray_query}
                 st.session_state.library_entries.append(entry)
                 save_library_entries()
                 st.success("✅ Sauvegardé dans la bibliothèque")
+        with colB:
+            if st.button("🔄 Réinit X-Ray"):
+                for key in ["poste_xray","mots_cles_xray","localisation_xray"]:
+                    st.session_state[key] = ""
+                st.warning("⚠️ Champs réinitialisés")
         with colC:
             if st.button("🌐 Ouvrir sur Google"):
                 url = f"https://www.google.com/search?q={quote(xray_query)}"
@@ -117,13 +119,16 @@ with tab3:
 
         colA, colB, colC = st.columns(3)
         with colA:
-            st.download_button("📋 Copier", data=cse_query, file_name="requete_cse.txt", mime="text/plain")
-        with colB:
             if st.button("📚 Sauvegarder CSE"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "CSE", "poste": poste_cse, "requete": cse_query}
                 st.session_state.library_entries.append(entry)
                 save_library_entries()
                 st.success("✅ Sauvegardé dans la bibliothèque")
+        with colB:
+            if st.button("🔄 Réinit CSE"):
+                for key in ["poste_cse","competences_cse","localisation_cse","entreprise_cse"]:
+                    st.session_state[key] = ""
+                st.warning("⚠️ Champs réinitialisés")
         with colC:
             if st.button("🌐 Ouvrir résultats CSE"):
                 webbrowser.open_new_tab(cse_url)
@@ -136,15 +141,18 @@ with tab4:
         if query:
             url = f"https://www.dogpile.com/serp?q={quote(query)}"
             st.text_area("Requête Dogpile:", value=query, height=100)
+
             colA, colB, colC = st.columns(3)
             with colA:
-                st.download_button("📋 Copier", data=query, file_name="requete_dogpile.txt", mime="text/plain")
-            with colB:
                 if st.button("📚 Sauvegarder Dogpile"):
                     entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Dogpile", "poste": "", "requete": query}
                     st.session_state.library_entries.append(entry)
                     save_library_entries()
                     st.success("✅ Sauvegardé dans la bibliothèque")
+            with colB:
+                if st.button("🔄 Réinit Dogpile"):
+                    st.session_state["dogpile_query"] = ""
+                    st.warning("⚠️ Champs réinitialisés")
             with colC:
                 if st.button("🌐 Ouvrir sur Dogpile"):
                     webbrowser.open_new_tab(url)
@@ -166,19 +174,21 @@ with tab5:
             texte = soup.get_text()[:800]
             emails = set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", texte))
             st.text_area("Extrait:", value=texte, height=200)
+
             colA, colB, colC = st.columns(3)
             with colA:
-                st.download_button("📋 Copier", data=texte, file_name="scraper_result.txt", mime="text/plain")
-            with colB:
                 if st.button("📚 Sauvegarder Scraper"):
                     entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Scraper", "poste": choix, "requete": url}
                     st.session_state.library_entries.append(entry)
                     save_library_entries()
                     st.success("✅ Sauvegardé dans la bibliothèque")
-            with colC:
+            with colB:
                 if st.button("🔄 Réinit Scraper"):
                     st.session_state["scraper_url"] = ""
-                    st.experimental_rerun()
+                    st.warning("⚠️ Champs réinitialisés")
+            with colC:
+                if emails:
+                    st.info("📧 Emails détectés: " + ", ".join(emails))
 
 # -------------------- Bibliothèque --------------------
 with tab9:
