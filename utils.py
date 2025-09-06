@@ -31,8 +31,8 @@ except ImportError:
 
 # Configuration de l'API DeepSeek
 try:
-    DEEPSEEK_API_KEY = "sk-da3c2fde36b14f108e8cdb73e73e885f"  # À sécuriser en production
-except:
+    DEEPSEEK_API_KEY = st.secrets["DEEPSEEK_API_KEY"]
+except Exception as e:
     st.error("Clé API non configurée.")
     st.stop()
 
