@@ -3,13 +3,14 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import time
-import json
+import threading
 from urllib.parse import quote
 from datetime import datetime
 
 from utils import (
     init_session_state,
     save_library_entries,
+    save_magicien_history,
     generate_boolean_query,
     generate_xray_query,
     generate_accroche_inmail,
@@ -71,15 +72,18 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
 # -------------------- Boolean --------------------
 with tab1:
     st.header("🔍 Recherche Boolean")
-    poste = st.text_input("Poste recherché:", key="poste", placeholder="Ex: Ingénieur de travaux")
-    synonymes = st.text_input("Synonymes (séparés par des virgules):", key="synonymes", placeholder="Ex: Conducteur de travaux, Chef de chantier")
-    st.caption("💡 Pour plus de synonymes, utilisez le Magicien de sourcing 🤖")
-    competences_obligatoires = st.text_input("Compétences obligatoires:", key="competences_obligatoires", placeholder="Ex: Autocad, Robot Structural Analysis")
-    secteur = st.text_input("Secteur d'activité:", key="secteur", placeholder="Ex: BTP, Construction")
-    competences_optionnelles = st.text_input("Compétences optionnelles:", key="competences_optionnelles", placeholder="Ex: Primavera, ArchiCAD")
-    exclusions = st.text_input("Mots à exclure:", key="exclusions", placeholder="Ex: Stage, Alternance")
-    localisation = st.text_input("Localisation:", key="localisation", placeholder="Ex: Casablanca")
-    employeur = st.text_input("Employeur actuel/précédent:", key="employeur", placeholder="Ex: TGCC")
+    col1, col2 = st.columns(2)
+    with col1:
+        poste = st.text_input("Poste recherché:", key="poste", placeholder="Ex: Ingénieur de travaux")
+        synonymes = st.text_input("Synonymes (séparés par des virgules):", key="synonymes", placeholder="Ex: Conducteur de travaux, Chef de chantier")
+        st.caption("💡 Pour plus de synonymes, utilisez le Magicien de sourcing 🤖")
+        competences_obligatoires = st.text_input("Compétences obligatoires:", key="competences_obligatoires", placeholder="Ex: Autocad, Robot Structural Analysis")
+        secteur = st.text_input("Secteur d'activité:", key="secteur", placeholder="Ex: BTP, Construction")
+    with col2:
+        competences_optionnelles = st.text_input("Compétences optionnelles:", key="competences_optionnelles", placeholder="Ex: Primavera, ArchiCAD")
+        exclusions = st.text_input("Mots à exclure:", key="exclusions", placeholder="Ex: Stage, Alternance")
+        localisation = st.text_input("Localisation:", key="localisation", placeholder="Ex: Casablanca")
+        employeur = st.text_input("Employeur actuel/précédent:", key="employeur", placeholder="Ex: TGCC")
 
     if st.button("🪄 Générer la requête Boolean", type="primary"):
         st.session_state["boolean_query"] = generate_boolean_query(
@@ -104,10 +108,13 @@ with tab1:
 # -------------------- X-Ray --------------------
 with tab2:
     st.header("🎯 X-Ray Google")
-    site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub"], key="site_cible")
-    poste_xray = st.text_input("Poste:", key="poste_xray", placeholder="Ex: Développeur Fullstack")
-    mots_cles = st.text_input("Mots-clés:", key="mots_cles_xray", placeholder="Ex: Python, Django, API")
-    localisation_xray = st.text_input("Localisation:", key="localisation_xray", placeholder="Ex: Rabat")
+    col1, col2 = st.columns(2)
+    with col1:
+        site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub"], key="site_cible")
+        poste_xray = st.text_input("Poste:", key="poste_xray", placeholder="Ex: Développeur Fullstack")
+    with col2:
+        mots_cles = st.text_input("Mots-clés:", key="mots_cles_xray", placeholder="Ex: Python, Django, API")
+        localisation_xray = st.text_input("Localisation:", key="localisation_xray", placeholder="Ex: Rabat")
 
     if st.button("🔍 Construire X-Ray", type="primary"):
         st.session_state["xray_query"] = generate_xray_query(site_cible, poste_xray, mots_cles, localisation_xray)
@@ -126,10 +133,13 @@ with tab2:
 # -------------------- CSE --------------------
 with tab3:
     st.header("🔎 CSE LinkedIn")
-    poste_cse = st.text_input("Poste recherché:", key="poste_cse", placeholder="Ex: Architecte logiciel")
-    competences_cse = st.text_input("Compétences clés:", key="competences_cse", placeholder="Ex: Java, Spring")
-    localisation_cse = st.text_input("Localisation:", key="localisation_cse", placeholder="Ex: Marrakech")
-    entreprise_cse = st.text_input("Entreprise:", key="entreprise_cse", placeholder="Ex: OCP")
+    col1, col2 = st.columns(2)
+    with col1:
+        poste_cse = st.text_input("Poste recherché:", key="poste_cse", placeholder="Ex: Architecte logiciel")
+        competences_cse = st.text_input("Compétences clés:", key="competences_cse", placeholder="Ex: Java, Spring")
+    with col2:
+        localisation_cse = st.text_input("Localisation:", key="localisation_cse", placeholder="Ex: Marrakech")
+        entreprise_cse = st.text_input("Entreprise:", key="entreprise_cse", placeholder="Ex: OCP")
 
     if st.button("🔍 Lancer recherche CSE", type="primary"):
         st.session_state["cse_query"] = " ".join(filter(None, [poste_cse, competences_cse, localisation_cse, entreprise_cse]))
@@ -219,19 +229,39 @@ with tab7:
         if question:
             start_time = time.time()
             progress = st.progress(0, text="⏳ Génération en cours...")
-            elapsed = 0
-            for i in range(100):
-                elapsed = int(time.time() - start_time)
-                progress.progress(i + 1, text=f"⏳ Génération... {i+1}% - {elapsed}s")
-                time.sleep(0.2)  # ~20s max
+            compteur = st.empty()
+
             messages = [
                 {"role": "system", "content": "Tu es un expert en sourcing RH au Maroc. Réponds de façon concise et directement exploitable."},
                 {"role": "user", "content": question}
             ]
-            result = ask_deepseek(messages, max_tokens=300)
-            st.session_state.magicien_reponse = result["content"]
-            st.session_state.magicien_history = st.session_state.get("magicien_history", [])
-            st.session_state.magicien_history.append({"q": question, "r": result["content"]})
+
+            result_container = {"done": False, "content": ""}
+
+            def call_api():
+                result = ask_deepseek(messages, max_tokens=250)
+                result_container["content"] = result["content"]
+                result_container["done"] = True
+
+            thread = threading.Thread(target=call_api)
+            thread.start()
+
+            i = 0
+            while not result_container["done"]:
+                elapsed = int(time.time() - start_time)
+                compteur.write(f"⏱️ {elapsed}s")
+                progress.progress(min(i, 99), text=f"⏳ Génération... {i}% - {elapsed}s")
+                time.sleep(0.3)
+                i += 1
+                if i > 99:
+                    i = 90
+
+            st.session_state.magicien_reponse = result_container["content"]
+            st.session_state.magicien_history.append({"q": question, "r": result_container["content"]})
+            save_magicien_history()
+
+            compteur.write(f"✅ Génération réussie en {int(time.time() - start_time)}s")
+            progress.progress(100, text="✅ Génération terminée")
 
     if st.session_state.get("magicien_history"):
         st.subheader("📝 Historique des réponses")
@@ -240,6 +270,7 @@ with tab7:
                 st.write(item["r"])
                 if st.button("🗑️ Supprimer", key=f"del_magicien_{i}"):
                     st.session_state.magicien_history.remove(item)
+                    save_magicien_history()
                     st.experimental_rerun()
 
 # -------------------- Permutator --------------------

@@ -12,9 +12,8 @@ from urllib.parse import quote
 # -------------------- Optionnels PDF / Word --------------------
 try:
     from reportlab.lib.pagesizes import A4
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-    from reportlab.lib.units import inch
     from reportlab.lib import colors
     PDF_AVAILABLE = True
 except ImportError:
