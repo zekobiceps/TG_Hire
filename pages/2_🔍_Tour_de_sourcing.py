@@ -33,6 +33,18 @@ with st.sidebar:
     st.markdown(f"🔑 **Tokens utilisés (session)**: {used}")
     st.markdown(f"📊 **Total cumulé**: {total}")
 
+# -------------------- Boutons CORRIGÉ --------------------
+def action_buttons(save_label, open_label, url, context="default"):
+    col1, col2, _ = st.columns([1, 2, 7])
+    clicked = None
+    with col1:
+        if st.button(save_label, key=f"{context}_save", use_container_width=True):
+            clicked = "save"
+    with col2:
+        # Utilisation de st.link_button au lieu de HTML personnalisé
+        st.link_button(open_label, url, use_container_width=True)
+    return clicked
+
 # -------------------- Boutons --------------------
 def action_buttons(save_label, open_label, url, context="default"):
     col1, col2, _ = st.columns([1, 2, 7])
