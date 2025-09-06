@@ -7,7 +7,6 @@ import os
 import pickle
 import re
 import io
-import pyperclip
 from urllib.parse import quote
 
 # -------------------- Optionnels PDF / Word --------------------
@@ -78,21 +77,30 @@ KSA_MODEL = {
     "Abilities (Aptitudes)": ["Ex. Gestion du stress"]
 }
 
-# -------------------- Templates de briefs --------------------
-BRIEF_TEMPLATES = {
-    "Template Vide": {
-        category: {item: {"valeur": "", "importance": 3} for item in items}
-        for category, items in SIMPLIFIED_CHECKLIST.items()
-    }
-}
+# -------------------- Chargement fichiers persistants --------------------
+def load_pickle(file, default):
+    if os.path.exists(file):
+        try:
+            with open(file, "rb") as f:
+                return pickle.load(f)
+        except Exception:
+            return default
+    return default
+
+def save_pickle(file, data):
+    try:
+        with open(file, "wb") as f:
+            pickle.dump(data, f)
+    except Exception as e:
+        st.error(f"Erreur sauvegarde {file}: {e}")
 
 # -------------------- Initialisation Session --------------------
 def init_session_state():
-    """Initialise tous les états nécessaires"""
+    """Initialise tous les états nécessaires et recharge les données persistées"""
     defaults = {
-        'saved_briefs': {},
-        'sourcing_history': [],
-        'library_entries': [],
+        'saved_briefs': load_pickle("saved_briefs.pkl", {}),
+        'sourcing_history': load_pickle("sourcing_history.pkl", []),
+        'library_entries': load_pickle("library_entries.pkl", []),
         'api_usage': {
             "total_tokens": 800000,
             "used_tokens": 0,
@@ -101,6 +109,7 @@ def init_session_state():
         'token_counter': 0,
         'current_messages': [],
         'magicien_reponse': "",
+        'magicien_history': load_pickle("magicien_history.pkl", []),
         'boolean_query': "",
         'xray_query': "",
         'cse_query': "",
@@ -108,17 +117,16 @@ def init_session_state():
         'scraper_emails': set(),
         'inmail_message': "",
         'perm_result': [],
+        # Champs du brief
         'poste_intitule': "",
         'manager_nom': "",
         'recruteur': "Zakaria",
         'affectation_type': "Chantier",
         'affectation_nom': "",
-        'brief_data': {},
+        'brief_data': {category: {item: {"valeur": "", "importance": 3} for item in items}
+                       for category, items in SIMPLIFIED_CHECKLIST.items()},
         'ksa_data': {},
-        'comment_libre': "",
-        'current_brief_name': "",
-        'filtered_briefs': {},
-        'show_filtered_results': False
+        'comment_libre': ""
     }
     for key, value in defaults.items():
         if key not in st.session_state:
@@ -126,41 +134,13 @@ def init_session_state():
 
 # -------------------- Sauvegardes --------------------
 def save_library_entries():
-    """Sauvegarde la bibliothèque"""
-    try:
-        with open("library_entries.pkl", "wb") as f:
-            pickle.dump(st.session_state.library_entries, f)
-    except Exception as e:
-        st.error(f"Erreur sauvegarde bibliothèque: {e}")
+    save_pickle("library_entries.pkl", st.session_state.library_entries)
 
 def save_briefs():
-    """Sauvegarde les briefs"""
-    try:
-        with open("saved_briefs.pkl", "wb") as f:
-            pickle.dump(st.session_state.saved_briefs, f)
-    except Exception as e:
-        st.error(f"Erreur sauvegarde briefs: {e}")
+    save_pickle("saved_briefs.pkl", st.session_state.saved_briefs)
 
-# -------------------- Génération nom automatique --------------------
-def generate_automatic_brief_name():
-    """Génère un nom automatique de brief"""
-    now = datetime.now()
-    return f"{now.strftime('%d-%m-%y')}-{st.session_state.poste_intitule or 'poste'}"
-
-# -------------------- Filtrer briefs --------------------
-def filter_briefs(saved_briefs, filter_month=None, filter_recruteur=None,
-                  filter_poste=None, filter_manager=None):
-    """Filtre les briefs enregistrés"""
-    filtered = {}
-    for name, data in saved_briefs.items():
-        if filter_poste and filter_poste.lower() not in data.get("poste_intitule", "").lower():
-            continue
-        if filter_manager and filter_manager.lower() not in data.get("manager_nom", "").lower():
-            continue
-        if filter_recruteur and filter_recruteur.lower() != data.get("recruteur", "").lower():
-            continue
-        filtered[name] = data
-    return filtered
+def save_magicien_history():
+    save_pickle("magicien_history.pkl", st.session_state.magicien_history)
 
 # -------------------- API DeepSeek --------------------
 def ask_deepseek(messages, max_tokens=500, response_format="text"):
@@ -188,6 +168,7 @@ def ask_deepseek(messages, max_tokens=500, response_format="text"):
             usage = result.get("usage", {})
             total_tokens = usage.get("total_tokens", 0)
 
+            # 🔥 Mise à jour des compteurs
             st.session_state.api_usage["used_tokens"] += total_tokens
             st.session_state.api_usage["current_session_tokens"] += total_tokens
             st.session_state["token_counter"] += total_tokens
@@ -198,8 +179,9 @@ def ask_deepseek(messages, max_tokens=500, response_format="text"):
     except Exception as e:
         return {"content": f"❌ Exception: {str(e)}", "total_tokens": 0}
 
-# -------------------- Générateurs --------------------
+# -------------------- Générateurs de requêtes --------------------
 def generate_boolean_query(poste, synonymes, comp_oblig, comp_opt, exclusions, localisation, secteur):
+    """Construit une requête Boolean"""
     query_parts = []
     if poste:
         poste_part = f'("{poste}"'
@@ -226,6 +208,7 @@ def generate_boolean_query(poste, synonymes, comp_oblig, comp_opt, exclusions, l
     return query
 
 def generate_xray_query(site, poste, mots_cles, localisation):
+    """Construit une requête X-Ray Google"""
     site_urls = {"LinkedIn": "site:linkedin.com/in/", "GitHub": "site:github.com"}
     query = site_urls.get(site, "site:linkedin.com/in/") + " "
     if poste:
@@ -237,18 +220,8 @@ def generate_xray_query(site, poste, mots_cles, localisation):
         query += f'"{localisation}" '
     return query.strip()
 
-def generate_annonce(poste, competences):
-    prompt = f"""
-    Crée une annonce d'emploi attractive et concise pour le poste de {poste}.
-    Compétences clés: {competences}
-    """
-    messages = [
-        {"role": "system", "content": "Tu es un expert en rédaction d'annonces d'emploi."},
-        {"role": "user", "content": prompt}
-    ]
-    return ask_deepseek(messages, max_tokens=600).get("content", "")
-
 def generate_accroche_inmail(url_linkedin, poste):
+    """Accroche InMail courte"""
     prompt = f"""
     Crée une accroche InMail courte et professionnelle.
     Poste: {poste}
@@ -260,18 +233,47 @@ def generate_accroche_inmail(url_linkedin, poste):
     ]
     return ask_deepseek(messages, max_tokens=250).get("content", "")
 
-# -------------------- Export PDF / Word --------------------
+# -------------------- Exports --------------------
 def export_brief_pdf():
-    return None  # Implémentation possible si besoin
+    if not PDF_AVAILABLE:
+        return None
+    try:
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        styles = getSampleStyleSheet()
+        story = []
+        title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=16, textColor=colors.darkblue)
+        story.append(Paragraph(f"Brief Recrutement - {st.session_state.poste_intitule}", title_style))
+        story.append(Spacer(1, 20))
+        for category, items in st.session_state.brief_data.items():
+            story.append(Paragraph(category, styles['Heading2']))
+            for item, data in items.items():
+                if isinstance(data, dict) and data.get("valeur"):
+                    story.append(Paragraph(f"<b>{item}:</b> {data['valeur']}", styles['Normal']))
+            story.append(Spacer(1, 10))
+        doc.build(story)
+        buffer.seek(0)
+        return buffer
+    except Exception as e:
+        st.error(f"Erreur PDF: {e}")
+        return None
 
 def export_brief_word():
-    return None  # Implémentation possible si besoin
-
-# -------------------- Copier --------------------
-def copy_to_clipboard(text):
+    if not WORD_AVAILABLE:
+        return None
     try:
-        pyperclip.copy(text)
-        return True
+        doc = Document()
+        doc.add_heading(f"Brief Recrutement - {st.session_state.poste_intitule}", 0)
+        for category, items in st.session_state.brief_data.items():
+            doc.add_heading(category, level=1)
+            for item, data in items.items():
+                if isinstance(data, dict) and data.get("valeur"):
+                    doc.add_heading(item, level=2)
+                    doc.add_paragraph(data['valeur'])
+        buffer = io.BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+        return buffer
     except Exception as e:
-        st.error(f"Erreur copie: {e}")
-        return False
+        st.error(f"Erreur Word: {e}")
+        return None
