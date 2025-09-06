@@ -8,12 +8,10 @@ import os
 import pickle
 import re
 import io
-import webbrowser
-from urllib.parse import quote
 
 # Imports optionnels pour l'export PDF/Word
 try:
-    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.pagesizes import A4
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import inch
@@ -24,107 +22,38 @@ except ImportError:
 
 try:
     from docx import Document
-    from docx.shared import Inches
     WORD_AVAILABLE = True
 except ImportError:
     WORD_AVAILABLE = False
 
-# Configuration de l'API DeepSeek
+# Configuration API DeepSeek
 try:
     DEEPSEEK_API_KEY = st.secrets["DEEPSEEK_API_KEY"]
-except Exception as e:
-    st.error("Clé API non configurée.")
+except Exception:
+    st.error("Clé API DeepSeek non configurée dans .streamlit/secrets.toml")
     st.stop()
 
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
 
-# -------------------- Constantes --------------------
-SIMPLIFIED_CHECKLIST = {
-    "Contexte du Poste et Environnement": [
-        "Pourquoi ce poste est-il ouvert?",
-        "Fourchette budgétaire (entre X et Y)",
-        "Date de prise de poste souhaitée",
-        "Équipe (taille, composition)",
-        "Manager (poste, expertise, style)",
-        "Collaborations internes/externes",
-        "Lieux de travail et déplacements"
-    ],
-    "Missions et Responsabilités": [
-        "Mission principale du poste",
-        "Objectifs à atteindre (3-5 maximum)",
-        "Sur quoi la performance sera évaluée?",
-        "3-5 Principales tâches quotidiennes",
-        "2 Tâches les plus importantes/critiques",
-        "Outils informatiques à maitriser"
-    ],
-    "Compétences - Modèle KSA": [],
-    "Profil et Formation": [
-        "Expérience minimum requise",
-        "Formation/diplôme nécessaire"
-    ],
-    "Stratégie de Recrutement": [
-        "Pourquoi recruter maintenant?",
-        "Difficultés anticipées",
-        "Mot-clés cruciaux (CV screening)",
-        "Canaux de sourcing prioritaires",
-        "Plans B : Autres postes, Revoir certains critères...",
-        "Exemple d'un profil cible sur LinkedIn",
-        "Processus de sélection étape par étape"
-    ]
-}
+# -------------------- Session State --------------------
+def init_session_state():
+    """Initialise les variables globales de session"""
+    defaults = {
+        "library_entries": [],
+        "sourcing_history": [],
+        "saved_briefs": {},
+        "api_usage": {
+            "total_tokens": 800000,
+            "used_tokens": 0,
+            "current_session_tokens": 0
+        },
+        "token_counter": 0
+    }
+    for key, value in defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
 
-KSA_MODEL = {
-    "Knowledge (Connaissances)": [
-        "Ex. Connaissance du droit du travail",
-        "Ex. Connaissance des outils ATS"
-    ],
-    "Skills (Savoir-faire)": [
-        "Ex. Conduite d'entretien structuré",
-        "Ex. Rédaction d'annonces attractives",
-        "Ex. Négociation avec candidats"
-    ],
-    "Abilities (Aptitudes)": [
-        "Ex. Analyse et synthèse",
-        "Ex. Résilience face aux refus",
-        "Ex. Gestion du stress"
-    ]
-}
-
-# -------------------- Gestion des données locales --------------------
-def load_saved_briefs():
-    try:
-        if os.path.exists("saved_briefs.pkl"):
-            with open("saved_briefs.pkl", "rb") as f:
-                return pickle.load(f)
-    except:
-        pass
-    return {}
-
-def load_sourcing_history():
-    try:
-        if os.path.exists("sourcing_history.pkl"):
-            with open("sourcing_history.pkl", "rb") as f:
-                return pickle.load(f)
-    except:
-        pass
-    return []
-
-def save_sourcing_history():
-    try:
-        with open("sourcing_history.pkl", "wb") as f:
-            pickle.dump(st.session_state.sourcing_history, f)
-    except Exception as e:
-        st.error(f"Erreur sauvegarde historique: {e}")
-
-def load_library_entries():
-    try:
-        if os.path.exists("library_entries.pkl"):
-            with open("library_entries.pkl", "rb") as f:
-                return pickle.load(f)
-    except:
-        pass
-    return []
-
+# -------------------- Fichiers persistants --------------------
 def save_library_entries():
     try:
         with open("library_entries.pkl", "wb") as f:
@@ -132,60 +61,16 @@ def save_library_entries():
     except Exception as e:
         st.error(f"Erreur sauvegarde bibliothèque: {e}")
 
-def generate_automatic_brief_name():
-    now = datetime.now()
-    date_str = f"{now.strftime('%d')}/{now.strftime('%m')}/{now.strftime('%y')}"
-    poste = st.session_state.get('poste_intitule', '').replace(' ', '-').lower()
-    manager = st.session_state.get('manager_nom', '').replace(' ', '-').lower()
-    recruteur = st.session_state.get('recruteur', '').lower()
-    affectation = st.session_state.get('affectation_nom', '').replace(' ', '-').lower()
-    return f"{date_str}-{poste}-{manager}-{recruteur}-{affectation}"
-
-def init_session_state():
-    saved_briefs = load_saved_briefs()
-    sourcing_history = load_sourcing_history()
-    library_entries = load_library_entries()
-
-    defaults = {
-        'brief_data': {category: {item: {"valeur": "", "importance": 3} for item in items} for category, items in SIMPLIFIED_CHECKLIST.items()},
-        'ksa_data': {},
-        'current_brief_name': "",
-        'poste_intitule': "",
-        'manager_nom': "",
-        'recruteur': "Zakaria",
-        'affectation_type': "Chantier",
-        'affectation_nom': "",
-        'saved_briefs': saved_briefs,
-        'sourcing_history': sourcing_history,
-        'library_entries': library_entries,
-        'api_usage': {
-            "total_tokens": 800000,
-            "used_tokens": 0,
-            "current_session_tokens": 0
-        },
-        'token_counter': 0
-    }
-
-    for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
-
-def save_briefs():
-    try:
-        with open("saved_briefs.pkl", "wb") as f:
-            pickle.dump(st.session_state.saved_briefs, f)
-    except Exception as e:
-        st.error(f"Erreur sauvegarde: {e}")
-
-# -------------------- DeepSeek API --------------------
+# -------------------- API DeepSeek --------------------
 def ask_deepseek(messages, max_tokens=500, response_format="text"):
+    """Appelle l'API DeepSeek et met à jour le compteur de tokens"""
     headers = {
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
         "Content-Type": "application/json"
     }
 
     if response_format == "tableau" and messages:
-        messages[-1]["content"] += "\n\nRéponds OBLIGATOIREMENT sous forme de tableau markdown avec des colonnes appropriées."
+        messages[-1]["content"] += "\n\nRéponds OBLIGATOIREMENT sous forme de tableau markdown."
 
     data = {
         "model": "deepseek-chat",
@@ -197,7 +82,6 @@ def ask_deepseek(messages, max_tokens=500, response_format="text"):
 
     try:
         response = requests.post(DEEPSEEK_API_URL, headers=headers, json=data, timeout=30)
-
         if response.status_code == 200:
             result = response.json()
             usage = result.get("usage", {})
@@ -206,7 +90,7 @@ def ask_deepseek(messages, max_tokens=500, response_format="text"):
             # 🔥 Mise à jour des compteurs
             st.session_state.api_usage["used_tokens"] += total_tokens
             st.session_state.api_usage["current_session_tokens"] += total_tokens
-            st.session_state["token_counter"] = st.session_state.get("token_counter", 0) + total_tokens
+            st.session_state["token_counter"] += total_tokens
 
             return {
                 "content": result["choices"][0]["message"]["content"],
@@ -214,6 +98,70 @@ def ask_deepseek(messages, max_tokens=500, response_format="text"):
             }
         else:
             return {"content": f"❌ Erreur {response.status_code}", "total_tokens": 0}
-
     except Exception as e:
         return {"content": f"❌ Erreur: {str(e)}", "total_tokens": 0}
+
+# -------------------- Générateurs --------------------
+def generate_boolean_query(poste, synonymes, competences_obligatoires, competences_optionnelles, exclusions, localisation, secteur):
+    """Construit une requête Boolean"""
+    query_parts = []
+    if poste:
+        poste_part = f'("{poste}"'
+        if synonymes:
+            for syn in synonymes.split(","):
+                poste_part += f' OR "{syn.strip()}"'
+        poste_part += ")"
+        query_parts.append(poste_part)
+
+    if competences_obligatoires:
+        for comp in competences_obligatoires.split(","):
+            query_parts.append(f'"{comp.strip()}"')
+
+    if competences_optionnelles:
+        opt_part = "(" + " OR ".join([f'"{c.strip()}"' for c in competences_optionnelles.split(",")]) + ")"
+        query_parts.append(opt_part)
+
+    if localisation:
+        query_parts.append(f'"{localisation}"')
+    if secteur:
+        query_parts.append(f'"{secteur}"')
+
+    query = " AND ".join(query_parts)
+
+    if exclusions:
+        for excl in exclusions.split(","):
+            query += f' NOT "{excl.strip()}"'
+
+    return query
+
+def generate_xray_query(site, poste, mots_cles, localisation):
+    """Construit une requête X-Ray Google"""
+    site_urls = {
+        "LinkedIn": "site:linkedin.com/in/",
+        "GitHub": "site:github.com",
+        "Indeed": "site:indeed.com"
+    }
+    query = f"{site_urls.get(site, 'site:linkedin.com/in/')} "
+    if poste:
+        query += f'"{poste}" '
+    if mots_cles:
+        query += " ".join([f'"{mot.strip()}"' for mot in mots_cles.split(",")])
+    if localisation:
+        query += f'"{localisation}"'
+    return query.strip()
+
+def generate_accroche_inmail(url_linkedin, poste):
+    """Génère une accroche InMail personnalisée"""
+    prompt = f"""
+    Crée une accroche InMail percutante pour contacter un candidat sur LinkedIn.
+    Poste à pourvoir: {poste}
+    Profil LinkedIn: {url_linkedin}
+    L'accroche doit être courte (4-5 lignes max), professionnelle mais chaleureuse,
+    et toujours orientée recrutement RH.
+    """
+    messages = [
+        {"role": "system", "content": "Tu es un expert en recrutement RH. Crée des messages courts et engageants."},
+        {"role": "user", "content": prompt}
+    ]
+    response = ask_deepseek(messages, max_tokens=300)
+    return response["content"] if "content" in response else "Erreur de génération"
