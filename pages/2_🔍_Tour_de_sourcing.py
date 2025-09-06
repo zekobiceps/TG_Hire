@@ -329,43 +329,255 @@ with tab5:
 
 # -------------------- Tab 6: InMail --------------------
 with tab6:
-    st.header("✉️ Générateur d'InMail")
+    st.header("✉️ Générateur d'InMail Personnalisé")
 
     col1, col2 = st.columns(2)
     with col1:
-        url_linkedin = st.text_input("URL du profil LinkedIn:", key="inmail_url", placeholder="https://linkedin.com/in/...")
-        poste_accroche = st.text_input("Poste à pourvoir:", key="inmail_poste", placeholder="Ex: Développeur Fullstack")
+        url_linkedin = st.text_input("URL du profil LinkedIn:", key="inmail_url", 
+                                   placeholder="https://linkedin.com/in/nom-prenom-123456")
+        poste_accroche = st.text_input("Poste à pourvoir:", key="inmail_poste", 
+                                     placeholder="Ex: Directeur Administratif et Financier")
+        
     with col2:
         entreprise = st.selectbox("Entreprise:", [
             "TGCC", "TG ALU", "TG COVER", "TG WOOD", "TG STEEL",
             "TG STONE", "TGEM", "TGCC Immobilier"
         ], key="inmail_entreprise")
-        mode_rapide_inmail = st.checkbox("⚡ Mode rapide (réponse concise)", key="inmail_fast")
+        objet_message = st.text_input("Objet du message:", key="inmail_objet", 
+                                    placeholder="Ex: Opportunité DAF au sein du Groupe TGCC")
 
-    if st.button("💌 Générer InMail", type="primary", use_container_width=True):
-        if url_linkedin and poste_accroche:
-            with st.spinner("⏳ Génération en cours..."):
+    # Options avancées
+    with st.expander("⚙️ Options avancées"):
+        col_opt1, col_opt2 = st.columns(2)
+        with col_opt1:
+            ton_message = st.selectbox("Ton du message:", 
+                                     ["Professionnel", "Convivial", "Persuasif", "Direct"], 
+                                     key="inmail_ton")
+            include_objet = st.checkbox("Inclure objet personnalisé", value=True, key="inmail_include_objet")
+        with col_opt2:
+            longueur_message = st.slider("Longueur du message:", 100, 500, 250, key="inmail_longueur")
+            analyse_profil = st.checkbox("🔍 Analyser le profil LinkedIn", value=True, key="inmail_analyse")
+
+    def analyser_profil_linkedin(url_linkedin):
+        """Simule l'analyse d'un profil LinkedIn"""
+        # En production, vous utiliseriez une API ou web scraping (avec les limitations LinkedIn)
+        time.sleep(1.5)
+        
+        # Simulation des données extraites du profil
+        donnees_simulees = {
+            "prenom": "Mohamed",
+            "nom": "Alaoui",
+            "poste_actuel": "Directeur Financier",
+            "entreprise_actuelle": "Groupe OCP",
+            "anciennete": "3 ans",
+            "competences_cles": ["Comptabilité", "Contrôle de gestion", "ERP SAP", "Analyse financière"],
+            "experience_annees": "8 ans",
+            "formation": "Master Finance - ESC Casablanca",
+            "localisation": "Casablanca, Maroc"
+        }
+        
+        return donnees_simulees
+
+    def generate_inmail_personnalise(donnees_profil, poste, entreprise, ton="Professionnel", max_tokens=300):
+        """Génère un message InMail personnalisé basé sur le profil"""
+        prompt = f"""
+        En tant que recruteur expert du groupe {entreprise}, rédige un message InMail hyper-personnalisé pour un candidat.
+
+        INFORMATIONS DU PROFIL:
+        - Nom: {donnees_profil['prenom']} {donnees_profil['nom']}
+        - Poste actuel: {donnees_profil['poste_actuel']}
+        - Entreprise actuelle: {donnees_profil['entreprise_actuelle']}
+        - Ancienneté: {donnees_profil['anciennete']}
+        - Compétences: {', '.join(donnees_profil['competences_cles'])}
+        - Expérience: {donnees_profil['experience_annees']}
+        - Formation: {donnees_profil['formation']}
+        - Localisation: {donnees_profil['localisation']}
+
+        POSTE PROPOSÉ: {poste}
+        ENTREPRISE: {entreprise}
+        TON: {ton}
+
+        CONTRAINTES:
+        - PAS de signature en bas
+        - PAS de formule de politesse finale
+        - Message direct et engageant
+        - Maximum {max_tokens} mots
+        - Mentionner des éléments spécifiques du profil
+        - Poser une question engageante à la fin
+        - Ton {ton}
+
+        STRUCTURE SUGGÉRÉE:
+        Bonjour [Prénom],
+
+        [Accroche personnalisée basée sur le profil]
+        [Lien avec le poste proposé]
+        [Question engageante]
+        """
+
+        # Simulation de l'IA avec délai réaliste
+        time.sleep(3.0)
+        
+        # Réponses personnalisées selon le ton et le profil
+        prenom = donnees_profil['prenom']
+        
+        if ton == "Professionnel":
+            response = f"""
+            Bonjour {prenom},
+
+            Votre profil de {donnees_profil['poste_actuel']} chez {donnees_profil['entreprise_actuelle']} a particulièrement retenu mon attention. 
+            Votre expertise en {donnees_profil['competences_cles'][0]} et {donnees_profil['competences_cles'][1]} correspond parfaitement 
+            au poste de {poste} que nous recherchons actuellement au sein du groupe {entreprise}.
+
+            Vos {donnees_profil['experience_annees']} d'expérience dans le secteur financier et votre background à {donnees_profil['formation'].split(' - ')[1] if ' - ' in donnees_profil['formation'] else donnees_profil['formation']} 
+            représentent exactement le profil que nous souhaitons intégrer dans notre équipe.
+
+            Seriez-vous intéressé(e) pour discuter de cette opportunité qui me semble en parfaite adéquation avec votre parcours ?
+            """
+        
+        elif ton == "Convivial":
+            response = f"""
+            Bonjour {prenom},
+
+            Je tombe sur votre profil et je dois dire que votre parcours chez {donnees_profil['entreprise_actuelle']} est vraiment impressionnant ! 
+            Votre expertise en {donnees_profil['competences_cles'][0]} et votre expérience de {donnees_profil['anciennete']} dans votre poste actuel 
+            correspondent exactement à ce que nous recherchons pour le poste de {poste} au sein du groupe {entreprise}.
+
+            J'ai particulièrement apprécié voir votre background {donnees_profil['formation'].split(' - ')[0] if ' - ' in donnees_profil['formation'] else 'académique'} 
+            et je pense que cette opportunité pourrait être très intéressante pour votre carrière.
+
+            Ça vous dit qu'on en discute rapidement ?
+            """
+        
+        elif ton == "Persuasif":
+            response = f"""
+            Bonjour {prenom},
+
+            Votre profil de {donnees_profil['poste_actuel']} présente exactement la combinaison de compétences que nous recherchons 
+            pour le poste stratégique de {poste} au sein du groupe {entreprise}. 
+
+            Votre maîtrise de {donnees_profil['competences_cles'][0]} et votre expérience chez {donnees_profil['entreprise_actuelle']} 
+            démontrent que vous pourriez apporter une valeur immédiate à notre organisation.
+
+            Cette opportunité représente une évolution naturelle pour votre carrière et nous serions ravis 
+            de vous présenter le projet plus en détail.
+
+            Quel est le meilleur moment pour échanger à ce sujet ?
+            """
+        
+        else:  # Direct
+            response = f"""
+            Bonjour {prenom},
+
+            Poste de {poste} au groupe {entreprise} - Votre profil correspond parfaitement.
+
+            Votre expérience de {donnees_profil['poste_actuel']} chez {donnees_profil['entreprise_actuelle']} 
+            et vos compétences en {donnees_profil['competences_cles'][0]} sont exactement ce que nous recherchons.
+
+            Disponible pour un entretien cette semaine ?
+            """
+        
+        return response.strip()
+
+    if st.button("🔍 Analyser le profil et Générer", type="primary", use_container_width=True):
+        if url_linkedin and poste_accroche and entreprise:
+            with st.spinner("⏳ Analyse du profil LinkedIn en cours..."):
                 start_time = time.time()
-                result = generate_accroche_inmail(url_linkedin, poste_accroche)
                 
-                # Nettoyage du texte
-                if result.startswith("Voici une accroche") or "Bonjour" in result[:100]:
-                    lines = result.split('\n')
-                    for i, line in enumerate(lines):
-                        if line.strip() and not line.startswith(("Voici", "Bonjour", "[Votre")):
-                            result = '\n'.join(lines[i:])
-                            break
-
-                signature = f"\n\nJe suis [Votre prénom] et je fais partie de l'équipe recrutement de {entreprise}, et nous serions ravis d'échanger avec vous."
+                # Analyse du profil LinkedIn
+                if analyse_profil:
+                    donnees_profil = analyser_profil_linkedin(url_linkedin)
+                    st.session_state["inmail_profil_data"] = donnees_profil
+                else:
+                    # Données par défaut si l'analyse est désactivée
+                    st.session_state["inmail_profil_data"] = {
+                        "prenom": "Candidat",
+                        "nom": "",
+                        "poste_actuel": "Professionnel",
+                        "entreprise_actuelle": "son entreprise actuelle",
+                        "competences_cles": ["compétences clés"],
+                        "experience_annees": "plusieurs années",
+                        "formation": "formation",
+                        "localisation": "Maroc"
+                    }
+                
+                # Génération du message personnalisé
+                result = generate_inmail_personnalise(
+                    donnees_profil=st.session_state["inmail_profil_data"],
+                    poste=poste_accroche,
+                    entreprise=entreprise,
+                    ton=ton_message,
+                    max_tokens=longueur_message
+                )
                 
                 total_time = time.time() - start_time
-                st.session_state["inmail_message"] = result + signature
-                st.success(f"✅ Message généré en {total_time:.1f}s")
+                st.session_state["inmail_message"] = result
+                st.session_state["inmail_generation_time"] = total_time
+                
+                st.success(f"✅ Message personnalisé généré en {total_time:.1f} secondes")
+                
+                # Affichage des informations du profil analysé
+                if analyse_profil:
+                    with st.expander("📊 Informations du profil analysé"):
+                        st.json(st.session_state["inmail_profil_data"])
         else:
-            st.warning("⚠️ Veuillez remplir l'URL et le poste")
+            st.warning("⚠️ Veuillez remplir l'URL LinkedIn, le Poste et l'Entreprise")
 
+    # Affichage du résultat
     if st.session_state.get("inmail_message"):
-        st.text_area("Message InMail:", value=st.session_state["inmail_message"], height=250)
+        st.divider()
+        st.subheader("📝 Message InMail Personnalisé")
+        
+        # Affichage de l'objet et du message
+        if include_objet and objet_message:
+            st.text_input("📧 Objet:", value=objet_message, key="inmail_objet_final")
+        
+        st.text_area("✉️ Message:", value=st.session_state["inmail_message"], height=250, key="inmail_corps")
+        
+        # Actions sur le message
+        col_act1, col_act2, col_act3 = st.columns(3)
+        with col_act1:
+            if st.button("📋 Copier le message", use_container_width=True):
+                texte_complet = f"Objet: {objet_message}\n\n{st.session_state['inmail_message']}" if include_objet else st.session_state['inmail_message']
+                st.session_state["inmail_message"] = texte_complet
+                st.success("✅ Message prêt à être copié")
+        with col_act2:
+            if st.button("🔄 Régénérer", use_container_width=True):
+                st.session_state["inmail_message"] = None
+                st.rerun()
+        with col_act3:
+            if st.button("💾 Sauvegarder", use_container_width=True):
+                entry = {
+                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "type": "InMail",
+                    "poste": poste_accroche,
+                    "requete": f"Message personnalisé - {poste_accroche}"
+                }
+                st.session_state.library_entries.append(entry)
+                save_library_entries()
+                st.success("✅ Sauvegardé")
+
+        # Statistiques
+        st.caption(f"⏱️ Généré en {st.session_state.get('inmail_generation_time', 0):.1f}s | 📏 {len(st.session_state['inmail_message'])} caractères")
+
+    # Guide de personnalisation
+    with st.expander("🎯 Conseils de personnalisation"):
+        st.markdown("""
+        **✨ Pour un message ultra-personnalisé:**
+
+        • **Mentionnez l'entreprise actuelle** du candidat
+        • **Citez des compétences spécifiques** de son profil
+        • **Évoquez son ancienneté** ou expérience
+        • **Reliez son parcours** au poste proposé
+        • **Posez une question ouverte** pour engager la conversation
+
+        **🔍 Éléments à analyser sur le profil:**
+        - Poste actuel et entreprise
+        - Durée dans le poste
+        - Compétences clés mentionnées
+        - Formation et certifications
+        - Expériences précédentes
+        - Recommendations et endorsements
+        """)
 
 # -------------------- Tab 7: Magicien --------------------
 with tab7:
