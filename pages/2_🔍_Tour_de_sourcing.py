@@ -331,7 +331,7 @@ with tab5:
 with tab6:
     st.header("✉️ Générateur d'InMail Personnalisé")
 
-    # ---- Fonction CTA ----
+    # --------- FONCTIONS UTILES ---------
     def generate_cta(cta_type, prenom, genre):
         suffix = "e" if genre == "Féminin" else ""
         if cta_type == "Proposer un appel":
@@ -344,55 +344,71 @@ with tab6:
             return f"Je serai ravi{suffix} de convenir d’un rendez-vous afin d’échanger sur cette opportunité."
         return ""
 
-    # ---- Fonction principale génération ----
     def generate_inmail(donnees_profil, poste, entreprise, ton, max_words, cta_type, genre):
         terme_organisation = "groupe" if entreprise == "TGCC" else "filiale"
+
+        # Objet automatique
         objet = f"Opportunité de {poste} au sein du {terme_organisation} {entreprise}"
 
-        # Accroches variées (IA simulée par random)
-        import random
-        accroches = {
-            "Persuasif": [
-                f"Votre profil de {donnees_profil['poste_actuel']} chez {donnees_profil['entreprise_actuelle']} correspond exactement au profil que nous recherchons.",
-                f"Votre expertise en {donnees_profil['competences_cles'][0]} est un atout majeur pour le poste de {poste}.",
-                f"Vos {donnees_profil['experience_annees']} d’expérience renforcent la pertinence de votre candidature."
-            ],
-            "Professionnel": [
-                f"Votre parcours professionnel chez {donnees_profil['entreprise_actuelle']} est aligné avec nos besoins.",
-                f"Votre background en {donnees_profil['formation']} correspond parfaitement à ce poste.",
-                f"Votre expertise en {donnees_profil['competences_cles'][0]} et {donnees_profil['competences_cles'][1]} est recherchée."
-            ],
-            "Convivial": [
-                f"J’ai découvert votre profil et je dois dire que votre parcours chez {donnees_profil['entreprise_actuelle']} est impressionnant !",
-                f"Votre expertise en {donnees_profil['competences_cles'][0]} et votre expérience sont exactement ce que je recherche.",
-                f"Votre carrière montre une évolution remarquable qui correspond à ce poste."
-            ],
-            "Direct": [
-                f"Votre profil de {donnees_profil['poste_actuel']} chez {donnees_profil['entreprise_actuelle']} correspond à mes attentes.",
-                f"Poste {poste} – votre expérience et vos compétences sont parfaitement alignées.",
-                f"Votre expertise est directement en adéquation avec les besoins pour ce poste."
-            ]
-        }
+        # IA pour générer l'accroche personnalisée
+        accroche_prompt = f"""
+        Tu es un recruteur marocain qui écrit des accroches pour InMail.
+        Génère une accroche persuasive adaptée au ton "{ton}".
+        Infos candidat: {donnees_profil}.
+        Poste à pourvoir: {poste}, Entreprise: {entreprise}.
+        L'accroche doit être concise, unique et engageante.
+        """
+        accroche_result = ask_deepseek([{"role": "user", "content": accroche_prompt}], max_tokens=80)
+        accroche = accroche_result["content"].strip()
 
-        accroche = random.choice(accroches.get(ton, accroches["Persuasif"]))
+        # Conclusion CTA
         cta_text = generate_cta(cta_type, donnees_profil["prenom"], genre)
 
+        # Construction du message
         response = f"""Bonjour {donnees_profil['prenom']},
 
 {accroche}
 
-Votre mission actuelle {donnees_profil['mission']} ainsi que vos compétences principales ({", ".join(filter(None, donnees_profil['competences_cles']))}) démontrent un potentiel fort pour le poste de {poste} au sein de notre {terme_organisation} {entreprise}.
+Votre mission actuelle {donnees_profil['mission']} ainsi que vos compétences principales ({", ".join(filter(None, donnees_profil['competences_cles']))}) 
+démontrent un potentiel fort pour le poste de {poste} au sein de notre {terme_organisation} {entreprise}.
 
 {cta_text}
 """
 
+        # Ajustement de longueur (respect slider)
         words = response.split()
         if len(words) > max_words:
             response = " ".join(words[:max_words]) + "..."
+        elif len(words) < int(max_words * 0.8):
+            # Si trop court → regénérer avec IA un développement
+            extend_prompt = f"Développe ce message en {max_words} mots environ sans répétitions :\n{response}"
+            extend_result = ask_deepseek([{"role": "user", "content": extend_prompt}], max_tokens=max_words * 2)
+            response = extend_result["content"]
 
         return response.strip(), objet
 
-    # ---- Paramètres principaux ----
+    # --------- IMPORTER UN MODÈLE ---------
+    if st.session_state.library_entries:
+        templates = [f"{e['poste']} - {e['date']}" for e in st.session_state.library_entries if e['type'] == "InMail"]
+        selected_template = st.selectbox("📂 Importer un modèle sauvegardé :", [""] + templates, key="import_template")
+        if selected_template:
+            template_entry = next(e for e in st.session_state.library_entries if f"{e['poste']} - {e['date']}" == selected_template)
+            # Remplir directement les infos candidat
+            st.session_state["inmail_profil_data"] = {
+                "prenom": "Candidat",
+                "nom": "",
+                "poste_actuel": "",
+                "entreprise_actuelle": "",
+                "competences_cles": ["", "", ""],
+                "experience_annees": "",
+                "formation": "",
+                "mission": "",
+                "localisation": ""
+            }
+            st.session_state["inmail_message"] = template_entry["requete"]
+            st.success("📥 Modèle importé et infos candidat prêtes")
+
+    # --------- PARAMÈTRES GÉNÉRAUX ---------
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         url_linkedin = st.text_input("Profil LinkedIn", key="inmail_url", placeholder="linkedin.com/in/nom-prenom")
@@ -409,33 +425,11 @@ Votre mission actuelle {donnees_profil['mission']} ainsi que vos compétences pr
     with col6:
         longueur_message = st.slider("Longueur (mots)", 50, 300, 150, key="inmail_longueur")
     with col7:
-        analyse_profil = st.selectbox("Méthode analyse", ["Manuel", "Regex", "API de PeopleDataLabs"], index=0, key="inmail_analyse")
+        analyse_profil = st.selectbox("Méthode analyse", ["Manuel", "Regex", "Compét API"], index=0, key="inmail_analyse")
     with col8:
         cta_option = st.selectbox("Call to action (Conclusion)", ["Proposer un appel", "Partager le CV", "Découvrir l'opportunité sur notre site", "Accepter un rendez-vous"], key="inmail_cta")
 
-    # ---- Importer modèle (juste après paramètres) ----
-    col_imp1, col_imp2 = st.columns([3, 1])
-    with col_imp1:
-        if st.session_state.library_entries:
-            templates = [f"{e['poste']} - {e['date']}" for e in st.session_state.library_entries if e['type'] == "InMail"]
-            selected_template = st.selectbox("📂 Importer un modèle existant :", [""] + templates, key="import_template")
-            if selected_template:
-                template_entry = next(e for e in st.session_state.library_entries if f"{e['poste']} - {e['date']}" == selected_template)
-                st.session_state["inmail_message"] = template_entry["requete"]
-                st.success("📥 Modèle importé avec succès")
-
-    with col_imp2:
-        if st.button("✨ Générer", type="primary", use_container_width=True):
-            donnees_profil = st.session_state.get("inmail_profil_data", {
-                "prenom": "Candidat", "nom": "", "poste_actuel": "", "entreprise_actuelle": "",
-                "competences_cles": ["", "", ""], "experience_annees": "", "formation": "", "mission": "", "localisation": ""
-            })
-            msg, objet_auto = generate_inmail(donnees_profil, poste_accroche, entreprise, ton_message, longueur_message, cta_option, genre_profil)
-            st.session_state["inmail_message"] = msg
-            st.session_state["inmail_objet"] = objet_auto
-            st.session_state["inmail_generated"] = True
-
-    # ---- Informations candidat ----
+    # --------- INFORMATIONS CANDIDAT ---------
     st.subheader("📊 Informations candidat")
     profil_data = st.session_state.get("inmail_profil_data", {"prenom": "Candidat", "nom": "", "poste_actuel": "", "entreprise_actuelle": "", "competences_cles": ["", "", ""], "experience_annees": "", "formation": "", "mission": "", "localisation": ""})
 
@@ -455,11 +449,27 @@ Votre mission actuelle {donnees_profil['mission']} ainsi que vos compétences pr
 
     profil_data["mission"] = st.text_area("Mission du poste", profil_data["mission"], height=80)
 
-    if st.button("💾 Appliquer infos candidat"):
-        st.session_state["inmail_profil_data"] = profil_data
-        st.success("✅ Infos candidat mises à jour")
+    col_ap1, col_ap2 = st.columns(2)
+    with col_ap1:
+        if st.button("🔍 Analyser profil"):
+            # (TODO : intégrer API PDL ou Regex)
+            profil_data.update({"poste_actuel": "Manager", "entreprise_actuelle": "ExempleCorp"})
+            st.session_state["inmail_profil_data"] = profil_data
+            st.success("✅ Profil pré-rempli automatiquement")
+    with col_ap2:
+        if st.button("💾 Appliquer infos candidat"):
+            st.session_state["inmail_profil_data"] = profil_data
+            st.success("✅ Infos candidat mises à jour")
 
-    # ---- Résultat ----
+    # --------- GÉNÉRATION ---------
+    if st.button("✨ Générer", type="primary", use_container_width=True):
+        donnees_profil = st.session_state.get("inmail_profil_data", profil_data)
+        msg, objet_auto = generate_inmail(donnees_profil, poste_accroche, entreprise, ton_message, longueur_message, cta_option, genre_profil)
+        st.session_state["inmail_message"] = msg
+        st.session_state["inmail_objet"] = objet_auto
+        st.session_state["inmail_generated"] = True
+
+    # --------- RÉSULTAT ---------
     if st.session_state.get("inmail_generated"):
         st.subheader("📝 Message InMail généré")
         st.text_input("📧 Objet", st.session_state.get("inmail_objet", ""))
@@ -481,7 +491,6 @@ Votre mission actuelle {donnees_profil['mission']} ainsi que vos compétences pr
                 st.session_state.library_entries.append(entry)
                 save_library_entries()
                 st.success(f"✅ Modèle '{poste_accroche} - {entry['date']}' sauvegardé")
-
 
 # -------------------- Tab 7: Magicien --------------------
 with tab7:
