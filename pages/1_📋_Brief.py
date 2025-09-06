@@ -1,10 +1,16 @@
+import streamlit as st
 from utils import (
     init_session_state,
     SIMPLIFIED_CHECKLIST,
     PDF_AVAILABLE,
     WORD_AVAILABLE,
+    BRIEF_TEMPLATES,
+    generate_automatic_brief_name,
+    filter_briefs,
+    save_briefs,
+    export_brief_pdf,
+    export_brief_word
 )
-
 
 # Initialisation de la session
 init_session_state()
@@ -27,6 +33,9 @@ brief_phase = st.radio(
 )
 
 st.session_state.brief_phase = brief_phase
+
+# ... (tout ton code reste inchangé après ça)
+
 
 # ---------------- Phase Gestion ----------------
 if brief_phase == "📁 Gestion":
