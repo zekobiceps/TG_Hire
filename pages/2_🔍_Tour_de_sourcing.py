@@ -343,8 +343,6 @@ with tab6:
             "TGCC", "TG ALU", "TG COVER", "TG WOOD", "TG STEEL",
             "TG STONE", "TGEM", "TGCC Immobilier"
         ], key="inmail_entreprise")
-        objet_message = st.text_input("Objet du message:", key="inmail_objet", 
-                                    placeholder="Ex: Opportunité DAF au sein du Groupe TGCC")
 
     # Options avancées
     with st.expander("⚙️ Options avancées"):
@@ -353,27 +351,35 @@ with tab6:
             ton_message = st.selectbox("Ton du message:", 
                                      ["Professionnel", "Convivial", "Persuasif", "Direct"], 
                                      key="inmail_ton")
-            include_objet = st.checkbox("Inclure objet personnalisé", value=True, key="inmail_include_objet")
         with col_opt2:
             longueur_message = st.slider("Longueur du message:", 100, 500, 250, key="inmail_longueur")
             analyse_profil = st.checkbox("🔍 Analyser le profil LinkedIn", value=True, key="inmail_analyse")
 
     def analyser_profil_linkedin(url_linkedin):
-        """Simule l'analyse d'un profil LinkedIn"""
+        """Analyse d'un profil LinkedIn"""
         # En production, vous utiliseriez une API ou web scraping (avec les limitations LinkedIn)
         time.sleep(1.5)
         
-        # Simulation des données extraites du profil
+        # Extraction du nom du profil depuis l'URL
+        nom_profil = "Candidat"
+        if "/in/" in url_linkedin:
+            # Extraction du nom à partir de l'URL
+            parts = url_linkedin.split("/in/")[1].split("-")
+            if parts:
+                # Capitaliser la première lettre du prénom
+                nom_profil = parts[0].capitalize()
+        
+        # Simulation des données extraites du profil basées sur l'URL
         donnees_simulees = {
-            "prenom": "Mohamed",
-            "nom": "Alaoui",
-            "poste_actuel": "Directeur Financier",
-            "entreprise_actuelle": "Groupe OCP",
-            "anciennete": "3 ans",
-            "competences_cles": ["Comptabilité", "Contrôle de gestion", "ERP SAP", "Analyse financière"],
-            "experience_annees": "8 ans",
-            "formation": "Master Finance - ESC Casablanca",
-            "localisation": "Casablanca, Maroc"
+            "prenom": nom_profil,
+            "nom": "Profil LinkedIn",
+            "poste_actuel": "Poste actuel",
+            "entreprise_actuelle": "Entreprise actuelle",
+            "anciennete": "X ans",
+            "competences_cles": ["Compétence 1", "Compétence 2", "Compétence 3"],
+            "experience_annees": "X ans",
+            "formation": "Formation principale",
+            "localisation": "Localisation"
         }
         
         return donnees_simulees
@@ -428,7 +434,7 @@ with tab6:
             Votre expertise en {donnees_profil['competences_cles'][0]} et {donnees_profil['competences_cles'][1]} correspond parfaitement 
             au poste de {poste} que nous recherchons actuellement au sein du groupe {entreprise}.
 
-            Vos {donnees_profil['experience_annees']} d'expérience dans le secteur financier et votre background à {donnees_profil['formation'].split(' - ')[1] if ' - ' in donnees_profil['formation'] else donnees_profil['formation']} 
+            Vos {donnees_profil['experience_annees']} d'expérience dans le secteur financier et votre background à {donnees_profil['formation']} 
             représentent exactement le profil que nous souhaitons intégrer dans notre équipe.
 
             Seriez-vous intéressé(e) pour discuter de cette opportunité qui me semble en parfaite adéquation avec votre parcours ?
@@ -442,7 +448,7 @@ with tab6:
             Votre expertise en {donnees_profil['competences_cles'][0]} et votre expérience de {donnees_profil['anciennete']} dans votre poste actuel 
             correspondent exactement à ce que nous recherchons pour le poste de {poste} au sein du groupe {entreprise}.
 
-            J'ai particulièrement apprécié voir votre background {donnees_profil['formation'].split(' - ')[0] if ' - ' in donnees_profil['formation'] else 'académique'} 
+            J'ai particulièrement apprécié voir votre background {donnees_profil['formation']} 
             et je pense que cette opportunité pourrait être très intéressante pour votre carrière.
 
             Ça vous dit qu'on en discute rapidement ?
@@ -527,24 +533,19 @@ with tab6:
         st.divider()
         st.subheader("📝 Message InMail Personnalisé")
         
-        # Affichage de l'objet et du message
-        if include_objet and objet_message:
-            st.text_input("📧 Objet:", value=objet_message, key="inmail_objet_final")
+        # Génération automatique de l'objet
+        objet_auto = f"Opportunité {poste_accroche} au sein du Groupe {entreprise}"
+        st.text_input("📧 Objet:", value=objet_auto, key="inmail_objet_final")
         
         st.text_area("✉️ Message:", value=st.session_state["inmail_message"], height=250, key="inmail_corps")
         
         # Actions sur le message
-        col_act1, col_act2, col_act3 = st.columns(3)
+        col_act1, col_act2 = st.columns(2)
         with col_act1:
-            if st.button("📋 Copier le message", use_container_width=True):
-                texte_complet = f"Objet: {objet_message}\n\n{st.session_state['inmail_message']}" if include_objet else st.session_state['inmail_message']
-                st.session_state["inmail_message"] = texte_complet
-                st.success("✅ Message prêt à être copié")
-        with col_act2:
             if st.button("🔄 Régénérer", use_container_width=True):
                 st.session_state["inmail_message"] = None
                 st.rerun()
-        with col_act3:
+        with col_act2:
             if st.button("💾 Sauvegarder", use_container_width=True):
                 entry = {
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -558,27 +559,6 @@ with tab6:
 
         # Statistiques
         st.caption(f"⏱️ Généré en {st.session_state.get('inmail_generation_time', 0):.1f}s | 📏 {len(st.session_state['inmail_message'])} caractères")
-
-    # Guide de personnalisation
-    with st.expander("🎯 Conseils de personnalisation"):
-        st.markdown("""
-        **✨ Pour un message ultra-personnalisé:**
-
-        • **Mentionnez l'entreprise actuelle** du candidat
-        • **Citez des compétences spécifiques** de son profil
-        • **Évoquez son ancienneté** ou expérience
-        • **Reliez son parcours** au poste proposé
-        • **Posez une question ouverte** pour engager la conversation
-
-        **🔍 Éléments à analyser sur le profil:**
-        - Poste actuel et entreprise
-        - Durée dans le poste
-        - Compétences clés mentionnées
-        - Formation et certifications
-        - Expériences précédentes
-        - Recommendations et endorsements
-        """)
-
 # -------------------- Tab 7: Magicien --------------------
 with tab7:
     st.header("🤖 Magicien de sourcing")
