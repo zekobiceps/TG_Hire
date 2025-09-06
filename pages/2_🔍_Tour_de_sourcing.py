@@ -6,6 +6,7 @@ import re
 from datetime import datetime
 import json
 import time
+import threading
 
 init_session_state()
 
@@ -33,6 +34,16 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
     "📚 Bibliothèque"
 ])
 
+# -------------------- Fonction Copier universelle --------------------
+def copier_button(label, text, key):
+    html_button = f"""
+    <button onclick="navigator.clipboard.writeText(`{text}`)" 
+            style="padding:5px 10px; background:#2b6cb0; color:white; border:none; border-radius:5px; cursor:pointer;">
+        📋 {label}
+    </button>
+    """
+    st.markdown(html_button, unsafe_allow_html=True)
+
 # -------------------- Boolean --------------------
 with tab1:
     st.header("🔍 Recherche Boolean")
@@ -59,17 +70,9 @@ with tab1:
 
     if st.session_state.get("boolean_query"):
         st.text_area("Requête Boolean:", value=st.session_state["boolean_query"], height=120)
-        colA, colB, colC = st.columns([0.3,0.3,0.3])
+        colA, colB, colC, _ = st.columns([1,1,1,6])
         with colA:
-            if st.button("📋 Copier", key="copy_boolean"):
-                text_to_copy = st.session_state["boolean_query"]
-                st.write("✅ Copié")
-                st.markdown(f"""
-                    <textarea id="booleanQuery" style="display:none;">{text_to_copy}</textarea>
-                    <script>
-                        navigator.clipboard.writeText(document.getElementById("booleanQuery").value);
-                    </script>
-                """, unsafe_allow_html=True)
+            copier_button("Copier", st.session_state["boolean_query"], "copy_boolean")
         with colB:
             if st.button("📚 Sauvegarder", key="save_boolean"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", "poste": poste, "requete": st.session_state["boolean_query"]}
@@ -78,7 +81,7 @@ with tab1:
                 st.success("✅ Sauvegardé")
         with colC:
             url = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
-            st.markdown(f"[🌐 LinkedIn]({url})", unsafe_allow_html=True)
+            st.markdown(f"<a href='{url}' target='_blank'><button style='padding:5px 10px;'>🌐 LinkedIn</button></a>", unsafe_allow_html=True)
 
 # -------------------- X-Ray --------------------
 with tab2:
@@ -96,17 +99,9 @@ with tab2:
 
     if st.session_state.get("xray_query"):
         st.text_area("Requête X-Ray:", value=st.session_state["xray_query"], height=120)
-        colA, colB, colC = st.columns([0.3,0.3,0.3])
+        colA, colB, colC, _ = st.columns([1,1,1,6])
         with colA:
-            if st.button("📋 Copier", key="copy_xray"):
-                text_to_copy = st.session_state["xray_query"]
-                st.write("✅ Copié")
-                st.markdown(f"""
-                    <textarea id="xrayQuery" style="display:none;">{text_to_copy}</textarea>
-                    <script>
-                        navigator.clipboard.writeText(document.getElementById("xrayQuery").value);
-                    </script>
-                """, unsafe_allow_html=True)
+            copier_button("Copier", st.session_state["xray_query"], "copy_xray")
         with colB:
             if st.button("📚 Sauvegarder", key="save_xray"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "X-Ray", "poste": poste_xray, "requete": st.session_state["xray_query"]}
@@ -115,7 +110,7 @@ with tab2:
                 st.success("✅ Sauvegardé")
         with colC:
             url = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
-            st.markdown(f"[🌐 Google]({url})", unsafe_allow_html=True)
+            st.markdown(f"<a href='{url}' target='_blank'><button style='padding:5px 10px;'>🌐 Google</button></a>", unsafe_allow_html=True)
 
 # -------------------- CSE --------------------
 with tab3:
@@ -130,17 +125,9 @@ with tab3:
 
     if st.session_state.get("cse_query"):
         st.text_area("Requête CSE:", value=st.session_state["cse_query"], height=100)
-        colA, colB, colC = st.columns([0.3,0.3,0.3])
+        colA, colB, colC, _ = st.columns([1,1,1,6])
         with colA:
-            if st.button("📋 Copier", key="copy_cse"):
-                text_to_copy = st.session_state["cse_query"]
-                st.write("✅ Copié")
-                st.markdown(f"""
-                    <textarea id="cseQuery" style="display:none;">{text_to_copy}</textarea>
-                    <script>
-                        navigator.clipboard.writeText(document.getElementById("cseQuery").value);
-                    </script>
-                """, unsafe_allow_html=True)
+            copier_button("Copier", st.session_state["cse_query"], "copy_cse")
         with colB:
             if st.button("📚 Sauvegarder", key="save_cse"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "CSE", "poste": poste_cse, "requete": st.session_state["cse_query"]}
@@ -149,7 +136,7 @@ with tab3:
                 st.success("✅ Sauvegardé")
         with colC:
             url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
-            st.markdown(f"[🌐 Ouvrir CSE]({url})", unsafe_allow_html=True)
+            st.markdown(f"<a href='{url}' target='_blank'><button style='padding:5px 10px;'>🌐 CSE</button></a>", unsafe_allow_html=True)
 
 # -------------------- Dogpile --------------------
 with tab4:
@@ -161,17 +148,9 @@ with tab4:
 
     if st.session_state.get("dogpile_result"):
         st.text_area("Requête Dogpile:", value=st.session_state["dogpile_result"], height=100)
-        colA, colB, colC = st.columns([0.3,0.3,0.3])
+        colA, colB, colC, _ = st.columns([1,1,1,6])
         with colA:
-            if st.button("📋 Copier", key="copy_dogpile"):
-                text_to_copy = st.session_state["dogpile_result"]
-                st.write("✅ Copié")
-                st.markdown(f"""
-                    <textarea id="dogpileQuery" style="display:none;">{text_to_copy}</textarea>
-                    <script>
-                        navigator.clipboard.writeText(document.getElementById("dogpileQuery").value);
-                    </script>
-                """, unsafe_allow_html=True)
+            copier_button("Copier", st.session_state["dogpile_result"], "copy_dogpile")
         with colB:
             if st.button("📚 Sauvegarder", key="save_dogpile"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Dogpile", "poste": "", "requete": st.session_state["dogpile_result"]}
@@ -180,7 +159,55 @@ with tab4:
                 st.success("✅ Sauvegardé")
         with colC:
             url = f"https://www.dogpile.com/serp?q={quote(st.session_state['dogpile_result'])}"
-            st.markdown(f"[🌐 Dogpile]({url})", unsafe_allow_html=True)
+            st.markdown(f"<a href='{url}' target='_blank'><button style='padding:5px 10px;'>🌐 Dogpile</button></a>", unsafe_allow_html=True)
+
+# -------------------- Web Scraper --------------------
+with tab5:
+    st.header("🕷️ Web Scraper")
+    choix = st.selectbox("Choisir un objectif:", [
+        "Veille salariale & marché",
+        "Intelligence concurrentielle",
+        "Contact personnalisé",
+        "Collecte de CV / emails / téléphones"
+    ], key="scraper_choix")
+    url = st.text_input("URL à analyser:", key="scraper_url")
+
+    if st.button("🚀 Scraper"):
+        if url:
+            r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            soup = BeautifulSoup(r.text, "html.parser")
+            texte = soup.get_text()[:800]
+            emails = set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", texte))
+            st.session_state["scraper_result"] = texte
+            st.session_state["scraper_emails"] = emails
+
+    if st.session_state.get("scraper_result"):
+        st.text_area("Extrait:", value=st.session_state["scraper_result"], height=200)
+        if st.button("📚 Sauvegarder Scraper"):
+            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Scraper", "poste": choix, "requete": url}
+            st.session_state.library_entries.append(entry)
+            save_library_entries()
+            st.success("✅ Sauvegardé")
+        if st.session_state.get("scraper_emails"):
+            st.info("📧 Emails détectés: " + ", ".join(st.session_state["scraper_emails"]))
+
+# -------------------- InMail --------------------
+with tab6:
+    st.header("✉️ Générateur d'InMail")
+    url_linkedin = st.text_input("URL du profil LinkedIn:", key="inmail_url")
+    poste_accroche = st.text_input("Poste à pourvoir:", key="inmail_poste")
+    entreprise = st.selectbox("Entreprise:", ["TGCC", "TG ALU", "TG COVER", "TG WOOD", "TG STEEL", "TG STONE", "TGEM", "TGCC Immobilier"], key="inmail_entreprise")
+
+    if st.button("💌 Générer InMail", type="primary"):
+        st.session_state["inmail_message"] = generate_accroche_inmail(url_linkedin, poste_accroche) + f"\n\nNous serions ravis de discuter avec vous chez {entreprise}."
+
+    if st.session_state.get("inmail_message"):
+        st.text_area("Message InMail:", value=st.session_state["inmail_message"], height=200)
+        if st.button("📚 Sauvegarder InMail"):
+            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "InMail", "poste": poste_accroche, "requete": st.session_state["inmail_message"]}
+            st.session_state.library_entries.append(entry)
+            save_library_entries()
+            st.success("✅ Sauvegardé")
 
 # -------------------- Magicien --------------------
 with tab7:
@@ -213,18 +240,27 @@ with tab7:
             timer_placeholder = st.empty()
             start_time = time.time()
 
-            for percent in range(0, 101, 10):
-                progress_bar.progress(percent)
+            def fetch_response():
+                messages = [
+                    {"role": "system", "content": "Tu es un expert en recrutement et sourcing RH. Réponds de manière concise et exploitable."},
+                    {"role": "user", "content": question}
+                ]
+                result = ask_deepseek(messages, max_tokens=300)
+                st.session_state["magicien_reponse"] = result["content"]
+
+            thread = threading.Thread(target=fetch_response)
+            thread.start()
+
+            percent = 0
+            while thread.is_alive():
+                percent = min(percent + 5, 90)
+                progress_bar.progress(percent, text=f"⏳ {percent}%")
                 elapsed = int(time.time() - start_time)
                 timer_placeholder.write(f"⏱️ {elapsed}s")
-                time.sleep(0.1)
+                time.sleep(0.2)
 
-            messages = [
-                {"role": "system", "content": "Tu es un expert en sourcing. Réponds de manière concise et exploitable."},
-                {"role": "user", "content": question}
-            ]
-            result = ask_deepseek(messages, max_tokens=300)
-            st.session_state["magicien_reponse"] = result["content"]
+            thread.join()
+            progress_bar.progress(100, text="✅ 100%")
 
     if st.session_state.get("magicien_reponse"):
         st.text_area("Réponse:", value=st.session_state["magicien_reponse"], height=200)
@@ -250,17 +286,10 @@ with tab8:
 
     if st.session_state.get("perm_result"):
         st.text_area("Résultats:", value="\n".join(st.session_state["perm_result"]), height=150)
-        colA, colB = st.columns([0.3,0.3])
+        st.caption("Tester le fonctionnement d'une boîte mail : [Hunter.io](https://hunter.io/) ou [NeverBounce](https://neverbounce.com/)")
+        colA, colB, _ = st.columns([1,1,8])
         with colA:
-            if st.button("📋 Copier", key="copy_perm"):
-                text_to_copy = "\n".join(st.session_state["perm_result"])
-                st.write("✅ Copié")
-                st.markdown(f"""
-                    <textarea id="permQuery" style="display:none;">{text_to_copy}</textarea>
-                    <script>
-                        navigator.clipboard.writeText(document.getElementById("permQuery").value);
-                    </script>
-                """, unsafe_allow_html=True)
+            copier_button("Copier", "\n".join(st.session_state["perm_result"]), "copy_perm")
         with colB:
             if st.button("📚 Sauvegarder", key="save_perm"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Permutator", "poste": "", "requete": ", ".join(st.session_state["perm_result"])}

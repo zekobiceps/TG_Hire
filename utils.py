@@ -265,17 +265,17 @@ def save_briefs():
             pickle.dump(st.session_state.saved_briefs, f)
     except Exception as e:
         st.error(f"Erreur sauvegarde: {e}")
-        
+
 def ask_deepseek(messages, max_tokens=500, response_format="text"):
     """Fonction pour interroger l'API DeepSeek"""
     headers = {
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
         "Content-Type": "application/json"
     }
-    
+
     if response_format == "tableau" and messages:
         messages[-1]["content"] += "\n\nRéponds OBLIGATOIREMENT sous forme de tableau markdown avec des colonnes appropriées."
-    
+
     data = {
         "model": "deepseek-chat",
         "messages": messages,
@@ -283,39 +283,30 @@ def ask_deepseek(messages, max_tokens=500, response_format="text"):
         "max_tokens": max_tokens,
         "stream": False
     }
-    
+
     try:
         response = requests.post(DEEPSEEK_API_URL, headers=headers, json=data, timeout=30)
-        
+
         if response.status_code == 200:
             result = response.json()
             usage = result.get("usage", {})
             total_tokens = usage.get("total_tokens", 0)
-            
+
             # 🔥 Mise à jour des compteurs
             st.session_state.api_usage["used_tokens"] += total_tokens
             st.session_state.api_usage["current_session_tokens"] += total_tokens
-            if "token_counter" not in st.session_state:
-                st.session_state["token_counter"] = 0
-            st.session_state["token_counter"] += total_tokens
-            
+            st.session_state["token_counter"] = st.session_state.get("token_counter", 0) + total_tokens
+
             return {
                 "content": result["choices"][0]["message"]["content"],
                 "total_tokens": total_tokens
             }
         else:
             return {"content": f"❌ Erreur {response.status_code}", "total_tokens": 0}
-            
+
     except Exception as e:
         return {"content": f"❌ Erreur: {str(e)}", "total_tokens": 0}
-    
-def ask_deepseek(messages, max_tokens=500, response_format="text"):
-    """Fonction pour interroger l'API DeepSeek"""
-    headers = {
-        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
+
     # Modifier le prompt selon le format demandé
     if response_format == "tableau" and messages:
         messages[-1]["content"] += "\n\nRéponds OBLIGATOIREMENT sous forme de tableau markdown avec des colonnes appropriées."
