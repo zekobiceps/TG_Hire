@@ -66,8 +66,7 @@ with tab1:
             if st.button("🔄 Réinit Boolean"):
                 for key in ["poste","synonymes","competences_obligatoires","secteur",
                             "competences_optionnelles","exclusions","localisation","employeur","boolean_query"]:
-                    if key in st.session_state:
-                        st.session_state[key] = ""
+                    st.session_state[key] = st.session_state.get(key, "")
                 st.warning("⚠️ Champs réinitialisés")
 
 # -------------------- X-Ray --------------------
@@ -97,8 +96,7 @@ with tab2:
         with colB:
             if st.button("🔄 Réinit X-Ray"):
                 for key in ["poste_xray","mots_cles_xray","localisation_xray","xray_query"]:
-                    if key in st.session_state:
-                        st.session_state[key] = ""
+                    st.session_state[key] = st.session_state.get(key, "")
                 st.warning("⚠️ Champs réinitialisés")
         with colC:
             if st.button("🌐 Ouvrir sur Google"):
@@ -131,8 +129,7 @@ with tab3:
         with colB:
             if st.button("🔄 Réinit CSE"):
                 for key in ["poste_cse","competences_cse","localisation_cse","entreprise_cse","cse_query"]:
-                    if key in st.session_state:
-                        st.session_state[key] = ""
+                    st.session_state[key] = st.session_state.get(key, "")
                 st.warning("⚠️ Champs réinitialisés")
         with colC:
             if st.button("🌐 Ouvrir résultats CSE"):
@@ -160,8 +157,7 @@ with tab4:
         with colB:
             if st.button("🔄 Réinit Dogpile"):
                 for key in ["dogpile_query","dogpile_result"]:
-                    if key in st.session_state:
-                        st.session_state[key] = ""
+                    st.session_state[key] = st.session_state.get(key, "")
                 st.warning("⚠️ Champs réinitialisés")
         with colC:
             if st.button("🌐 Ouvrir sur Dogpile"):
@@ -199,8 +195,7 @@ with tab5:
         with colB:
             if st.button("🔄 Réinit Scraper"):
                 for key in ["scraper_url","scraper_result","scraper_emails"]:
-                    if key in st.session_state:
-                        st.session_state[key] = "" if key != "scraper_emails" else set()
+                    st.session_state[key] = st.session_state.get(key, "" if key != "scraper_emails" else set())
                 st.warning("⚠️ Champs réinitialisés")
         with colC:
             if st.session_state.get("scraper_emails"):
@@ -228,8 +223,7 @@ with tab6:
         with colB:
             if st.button("🔄 Réinit InMail"):
                 for key in ["inmail_url","inmail_poste","inmail_entreprise","inmail_message"]:
-                    if key in st.session_state:
-                        st.session_state[key] = ""
+                    st.session_state[key] = st.session_state.get(key, "")
                 st.warning("⚠️ Champs réinitialisés")
 
 # -------------------- Magicien --------------------
@@ -258,14 +252,12 @@ with tab7:
         with colB:
             if st.button("🔄 Réinit Magicien"):
                 for key in ["magicien_question","magicien_reponse"]:
-                    if key in st.session_state:
-                        st.session_state[key] = ""
+                    st.session_state[key] = st.session_state.get(key, "")
                 st.warning("⚠️ Champs réinitialisés")
         with colC:
             if st.button("🗑️ Supprimer historique Magicien"):
                 for key in ["magicien_question","magicien_reponse"]:
-                    if key in st.session_state:
-                        st.session_state[key] = ""
+                    st.session_state[key] = st.session_state.get(key, "")
                 st.success("🧹 Historique effacé")
 
 # -------------------- Permutator --------------------
@@ -287,7 +279,6 @@ with tab8:
     if st.session_state.get("perm_result"):
         st.text_area("Résultats:", value="\n".join(st.session_state["perm_result"]), height=150)
         st.caption("🔗 Vérifiez vos emails sur [Hunter.io](https://hunter.io/) ou [NeverBounce](https://neverbounce.com/)")
-
         colA, colB = st.columns(2)
         with colA:
             if st.button("📚 Sauvegarder Permutator"):
@@ -298,8 +289,7 @@ with tab8:
         with colB:
             if st.button("🔄 Réinit Permutator"):
                 for key in ["perm_prenom","perm_nom","perm_domaine","perm_result"]:
-                    if key in st.session_state:
-                        st.session_state[key] = "" if key != "perm_result" else []
+                    st.session_state[key] = st.session_state.get(key, "" if key != "perm_result" else [])
                 st.warning("⚠️ Champs réinitialisés")
 
 # -------------------- Bibliothèque --------------------
