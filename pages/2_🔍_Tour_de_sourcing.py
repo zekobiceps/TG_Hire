@@ -3,7 +3,7 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import time
-import threading
+import json
 from urllib.parse import quote
 from datetime import datetime
 
@@ -37,7 +37,7 @@ with st.sidebar:
 # -------------------- Boutons uniformes --------------------
 def action_buttons(save_label, open_label, url, context="default"):
     """Boutons Sauvegarder + Ouvrir alignés à gauche"""
-    col1, col2, _ = st.columns([2, 2, 6])
+    col1, col2, _ = st.columns([1.5, 2, 6])
     clicked = None
     with col1:
         if st.button(save_label, key=f"{context}_save", use_container_width=True):
@@ -65,7 +65,7 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
     "🕷️ Web Scraper",
     "✉️ InMail",
     "🤖 Magicien de sourcing",
-    "📧 Email Permutator",
+    "📧 Permutateur Email",
     "📚 Bibliothèque"
 ])
 
@@ -76,7 +76,6 @@ with tab1:
     with col1:
         poste = st.text_input("Poste recherché:", key="poste", placeholder="Ex: Ingénieur de travaux")
         synonymes = st.text_input("Synonymes (séparés par des virgules):", key="synonymes", placeholder="Ex: Conducteur de travaux, Chef de chantier")
-        st.caption("💡 Pour plus de synonymes, utilisez le Magicien de sourcing 🤖")
         competences_obligatoires = st.text_input("Compétences obligatoires:", key="competences_obligatoires", placeholder="Ex: Autocad, Robot Structural Analysis")
         secteur = st.text_input("Secteur d'activité:", key="secteur", placeholder="Ex: BTP, Construction")
     with col2:
@@ -96,7 +95,6 @@ with tab1:
     if st.session_state.get("boolean_query"):
         st.text_area("Requête Boolean:", value=st.session_state["boolean_query"], height=120)
         url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
-
         action = action_buttons("💾 Sauvegarder", "🌐 Ouvrir sur LinkedIn", url_linkedin, "boolean")
         if action == "save":
             entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", "poste": poste,
@@ -112,17 +110,26 @@ with tab2:
     with col1:
         site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub"], key="site_cible")
         poste_xray = st.text_input("Poste:", key="poste_xray", placeholder="Ex: Développeur Fullstack")
-    with col2:
         mots_cles = st.text_input("Mots-clés:", key="mots_cles_xray", placeholder="Ex: Python, Django, API")
+    with col2:
         localisation_xray = st.text_input("Localisation:", key="localisation_xray", placeholder="Ex: Rabat")
+        exclusions_xray = st.text_input("Mots à exclure:", key="exclusions_xray", placeholder="Ex: Stagiaire, Alternance")
 
     if st.button("🔍 Construire X-Ray", type="primary"):
         st.session_state["xray_query"] = generate_xray_query(site_cible, poste_xray, mots_cles, localisation_xray)
+        if exclusions_xray:
+            st.session_state["xray_query"] += " " + " ".join([f'-"{e.strip()}"' for e in exclusions_xray.split(",")])
 
     if st.session_state.get("xray_query"):
         st.text_area("Requête X-Ray:", value=st.session_state["xray_query"], height=120)
         url = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
-        action = action_buttons("💾 Sauvegarder", "🌐 Ouvrir sur Google", url, "xray")
+        adv_url = f"https://www.google.com/advanced_search?q={quote(st.session_state['xray_query'])}"
+        col1, col2 = st.columns(2)
+        with col1:
+            action = action_buttons("💾 Sauvegarder", "🌐 Ouvrir sur Google", url, "xray")
+        with col2:
+            st.markdown(f"[🔎 Recherche avancée Google]({adv_url})", unsafe_allow_html=True)
+
         if action == "save":
             entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "X-Ray", "poste": poste_xray,
                      "requete": st.session_state["xray_query"]}
@@ -199,7 +206,15 @@ with tab6:
     entreprise = st.selectbox("Entreprise:", ["TGCC", "TG ALU", "TG COVER", "TG WOOD", "TG STEEL", "TG STONE", "TGEM", "TGCC Immobilier"], key="inmail_entreprise")
 
     if st.button("💌 Générer InMail", type="primary"):
+        start_time = time.time()
+        progress = st.progress(0, text="⏳ Génération en cours...")
+        for i in range(100):
+            elapsed = int(time.time() - start_time)
+            progress.progress(i + 1, text=f"⏳ Génération... {i+1}% - {elapsed}s")
+            time.sleep(0.15)
         st.session_state["inmail_message"] = generate_accroche_inmail(url_linkedin, poste_accroche) + f"\n\nNous serions ravis de discuter avec vous chez {entreprise}."
+        elapsed = int(time.time() - start_time)
+        progress.progress(100, text=f"✅ Génération réussie en {elapsed}s")
 
     if st.session_state.get("inmail_message"):
         st.text_area("Message InMail:", value=st.session_state["inmail_message"], height=200)
@@ -229,46 +244,46 @@ with tab7:
         if question:
             start_time = time.time()
             progress = st.progress(0, text="⏳ Génération en cours...")
-
-            # Simulation barre + compteur temps
             for i in range(100):
                 elapsed = int(time.time() - start_time)
                 progress.progress(i + 1, text=f"⏳ Génération... {i+1}% - {elapsed}s")
-                time.sleep(0.2)  # ~20s max
-
-            # Appel API
+                time.sleep(0.15)
             messages = [
                 {"role": "system", "content": "Tu es un expert en sourcing RH au Maroc. Réponds de façon concise et directement exploitable."},
                 {"role": "user", "content": question}
             ]
             result = ask_deepseek(messages, max_tokens=300)
             elapsed = int(time.time() - start_time)
-
+            progress.progress(100, text=f"✅ Génération réussie en {elapsed}s")
             st.session_state.magicien_reponse = result["content"]
             st.session_state.magicien_history = st.session_state.get("magicien_history", [])
-            st.session_state.magicien_history.append({"q": question, "r": result["content"], "t": elapsed})
-
-            # ✅ Message final
-            st.success(f"✅ Génération réussie en {elapsed}s")
+            st.session_state.magicien_history.append({"q": question, "r": result["content"]})
+            save_magicien_history()
 
     if st.session_state.get("magicien_history"):
         st.subheader("📝 Historique des réponses")
+        if st.button("🗑️ Supprimer tout l'historique"):
+            st.session_state.magicien_history = []
+            save_magicien_history()
+            st.experimental_rerun()
         for i, item in enumerate(st.session_state.magicien_history[::-1]):
             with st.expander(f"❓ {item['q']}"):
                 st.write(item["r"])
                 if st.button("🗑️ Supprimer", key=f"del_magicien_{i}"):
                     st.session_state.magicien_history.remove(item)
+                    save_magicien_history()
                     st.experimental_rerun()
 
-# -------------------- Permutateur Email --------------------
+# -------------------- Permutateur --------------------
 with tab8:
     st.header("📧 Permutateur Email")
-
-    prenom = st.text_input("Prénom:", key="perm_prenom", placeholder="Ex: Ahmed")
-    nom = st.text_input("Nom:", key="perm_nom", placeholder="Ex: El Mansouri")
-    entreprise = st.text_input("Nom de l'entreprise:", key="perm_domaine", placeholder="Ex: tgcc")
-
-    methode = st.selectbox("Méthode de détection :", ["🔍 Site officiel", "🌍 Charika.ma"], key="perm_method")
+    col1, col2 = st.columns(2)
+    with col1:
+        prenom = st.text_input("Prénom:", key="perm_prenom", placeholder="Ex: Ahmed")
+        nom = st.text_input("Nom:", key="perm_nom", placeholder="Ex: El Mansouri")
+    with col2:
+        entreprise = st.text_input("Nom de l'entreprise:", key="perm_domaine", placeholder="Ex: tgcc")
+        source = st.selectbox("Méthode de détection :", ["Site officiel", "Charika.ma"], key="perm_source")
 
     if st.button("🔮 Générer permutations"):
         if prenom and nom and entreprise:
@@ -279,32 +294,25 @@ with tab8:
                 permutations.append(f"{prenom[0].lower()}{nom.lower()}@{domaine}")
                 permutations.append(f"{nom.lower()}.{prenom.lower()}@{domaine}")
 
-            found_emails = set()
-
-            # --- Méthode 1 : Site officiel
-            if methode == "🔍 Site officiel":
-                try:
+            # Recherche sur site officiel ou charika
+            try:
+                if source == "Site officiel":
                     site_url = f"http://www.{entreprise}.ma"
-                    r = requests.get(site_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
-                    soup = BeautifulSoup(r.text, "html.parser")
-                    found_emails = set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", soup.get_text()))
-                except:
-                    st.warning("⚠️ Impossible de récupérer des emails sur le site officiel")
+                else:
+                    site_url = f"https://www.charika.ma/societe-{entreprise}.html"
 
-            # --- Méthode 2 : Charika.ma
-            elif methode == "🌍 Charika.ma":
-                try:
-                    url_charika = f"https://www.charika.ma/societe-{entreprise}.html"
-                    r = requests.get(url_charika, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
-                    soup = BeautifulSoup(r.text, "html.parser")
-                    found_emails = set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", soup.get_text()))
-                except:
-                    st.warning("⚠️ Impossible de récupérer des emails sur Charika.ma")
+                r = requests.get(site_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+                soup = BeautifulSoup(r.text, "html.parser")
+                found_emails = set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", soup.get_text()))
+                if found_emails:
+                    st.success("✅ Format détecté : " + ", ".join(found_emails))
+                    st.session_state["perm_result"] = list(found_emails)
+                else:
+                    st.warning("⚠️ Aucun format détecté automatiquement.")
+            except:
+                st.warning("⚠️ Impossible de récupérer des emails avec cette méthode")
 
-            if found_emails:
-                st.info("📧 Format(s) détecté(s) : " + ", ".join(found_emails))
-
-            st.session_state["perm_result"] = list(set(permutations))
+            st.session_state["perm_result"] = st.session_state.get("perm_result", []) + permutations
 
     if st.session_state.get("perm_result"):
         st.text_area("Résultats:", value="\n".join(st.session_state["perm_result"]), height=150)
