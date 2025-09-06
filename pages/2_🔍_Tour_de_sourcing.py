@@ -1,12 +1,11 @@
 import streamlit as st
 from utils import *
-import webbrowser
-from urllib.parse import quote
 import requests
 from bs4 import BeautifulSoup
 import re
 from datetime import datetime
 import json
+import time
 
 init_session_state()
 
@@ -60,13 +59,17 @@ with tab1:
 
     if st.session_state.get("boolean_query"):
         st.text_area("Requête Boolean:", value=st.session_state["boolean_query"], height=120)
-        colA, colB, colC = st.columns(3)
+        colA, colB, colC = st.columns([0.3,0.3,0.3])
         with colA:
             if st.button("📋 Copier", key="copy_boolean"):
                 text_to_copy = st.session_state["boolean_query"]
-                js_code = f"<script>navigator.clipboard.writeText({json.dumps(text_to_copy)});</script>"
-                st.markdown(js_code, unsafe_allow_html=True)
-                st.success("✅ Copié")
+                st.write("✅ Copié")
+                st.markdown(f"""
+                    <textarea id="booleanQuery" style="display:none;">{text_to_copy}</textarea>
+                    <script>
+                        navigator.clipboard.writeText(document.getElementById("booleanQuery").value);
+                    </script>
+                """, unsafe_allow_html=True)
         with colB:
             if st.button("📚 Sauvegarder", key="save_boolean"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", "poste": poste, "requete": st.session_state["boolean_query"]}
@@ -74,9 +77,8 @@ with tab1:
                 save_library_entries()
                 st.success("✅ Sauvegardé")
         with colC:
-            if st.button("🌐 LinkedIn", key="open_boolean"):
-                url = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
-                webbrowser.open_new_tab(url)
+            url = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
+            st.markdown(f"[🌐 LinkedIn]({url})", unsafe_allow_html=True)
 
 # -------------------- X-Ray --------------------
 with tab2:
@@ -94,13 +96,17 @@ with tab2:
 
     if st.session_state.get("xray_query"):
         st.text_area("Requête X-Ray:", value=st.session_state["xray_query"], height=120)
-        colA, colB, colC = st.columns(3)
+        colA, colB, colC = st.columns([0.3,0.3,0.3])
         with colA:
             if st.button("📋 Copier", key="copy_xray"):
                 text_to_copy = st.session_state["xray_query"]
-                js_code = f"<script>navigator.clipboard.writeText({json.dumps(text_to_copy)});</script>"
-                st.markdown(js_code, unsafe_allow_html=True)
-                st.success("✅ Copié")
+                st.write("✅ Copié")
+                st.markdown(f"""
+                    <textarea id="xrayQuery" style="display:none;">{text_to_copy}</textarea>
+                    <script>
+                        navigator.clipboard.writeText(document.getElementById("xrayQuery").value);
+                    </script>
+                """, unsafe_allow_html=True)
         with colB:
             if st.button("📚 Sauvegarder", key="save_xray"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "X-Ray", "poste": poste_xray, "requete": st.session_state["xray_query"]}
@@ -108,9 +114,8 @@ with tab2:
                 save_library_entries()
                 st.success("✅ Sauvegardé")
         with colC:
-            if st.button("🌐 Google", key="open_xray"):
-                url = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
-                webbrowser.open_new_tab(url)
+            url = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
+            st.markdown(f"[🌐 Google]({url})", unsafe_allow_html=True)
 
 # -------------------- CSE --------------------
 with tab3:
@@ -125,13 +130,17 @@ with tab3:
 
     if st.session_state.get("cse_query"):
         st.text_area("Requête CSE:", value=st.session_state["cse_query"], height=100)
-        colA, colB, colC = st.columns(3)
+        colA, colB, colC = st.columns([0.3,0.3,0.3])
         with colA:
             if st.button("📋 Copier", key="copy_cse"):
                 text_to_copy = st.session_state["cse_query"]
-                js_code = f"<script>navigator.clipboard.writeText({json.dumps(text_to_copy)});</script>"
-                st.markdown(js_code, unsafe_allow_html=True)
-                st.success("✅ Copié")
+                st.write("✅ Copié")
+                st.markdown(f"""
+                    <textarea id="cseQuery" style="display:none;">{text_to_copy}</textarea>
+                    <script>
+                        navigator.clipboard.writeText(document.getElementById("cseQuery").value);
+                    </script>
+                """, unsafe_allow_html=True)
         with colB:
             if st.button("📚 Sauvegarder", key="save_cse"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "CSE", "poste": poste_cse, "requete": st.session_state["cse_query"]}
@@ -139,9 +148,8 @@ with tab3:
                 save_library_entries()
                 st.success("✅ Sauvegardé")
         with colC:
-            if st.button("🌐 Ouvrir CSE", key="open_cse"):
-                url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
-                webbrowser.open_new_tab(url)
+            url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
+            st.markdown(f"[🌐 Ouvrir CSE]({url})", unsafe_allow_html=True)
 
 # -------------------- Dogpile --------------------
 with tab4:
@@ -153,13 +161,17 @@ with tab4:
 
     if st.session_state.get("dogpile_result"):
         st.text_area("Requête Dogpile:", value=st.session_state["dogpile_result"], height=100)
-        colA, colB, colC = st.columns(3)
+        colA, colB, colC = st.columns([0.3,0.3,0.3])
         with colA:
             if st.button("📋 Copier", key="copy_dogpile"):
                 text_to_copy = st.session_state["dogpile_result"]
-                js_code = f"<script>navigator.clipboard.writeText({json.dumps(text_to_copy)});</script>"
-                st.markdown(js_code, unsafe_allow_html=True)
-                st.success("✅ Copié")
+                st.write("✅ Copié")
+                st.markdown(f"""
+                    <textarea id="dogpileQuery" style="display:none;">{text_to_copy}</textarea>
+                    <script>
+                        navigator.clipboard.writeText(document.getElementById("dogpileQuery").value);
+                    </script>
+                """, unsafe_allow_html=True)
         with colB:
             if st.button("📚 Sauvegarder", key="save_dogpile"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Dogpile", "poste": "", "requete": st.session_state["dogpile_result"]}
@@ -167,30 +179,29 @@ with tab4:
                 save_library_entries()
                 st.success("✅ Sauvegardé")
         with colC:
-            if st.button("🌐 Ouvrir Dogpile", key="open_dogpile"):
-                url = f"https://www.dogpile.com/serp?q={quote(st.session_state['dogpile_result'])}"
-                webbrowser.open_new_tab(url)
+            url = f"https://www.dogpile.com/serp?q={quote(st.session_state['dogpile_result'])}"
+            st.markdown(f"[🌐 Dogpile]({url})", unsafe_allow_html=True)
 
 # -------------------- Magicien --------------------
 with tab7:
     st.header("🤖 Magicien de sourcing")
 
     questions_pretes = [
-        "Quels sont les synonymes possibles pour le poste de ... ?",
-        "Quels mots-clés utiliser pour recruter sur le poste de ... ?",
-        "Quelles compétences sont indispensables pour le poste de ... ?",
-        "Quels termes techniques sont associés au poste de ... ?",
-        "Quels intitulés similaires existent pour le poste de ... ?",
-        "Quels diplômes ou certifications rechercher pour le poste de ... ?",
-        "Quelles compétences comportementales sont attendues pour le poste de ... ?",
-        "Quels outils ou logiciels sont liés au poste de ... ?",
-        "Quels hashtags LinkedIn pourraient être utiles pour le poste de ... ?",
-        "Quels intitulés anglais sont utilisés pour le poste de ... ?",
-        "Quels mots-clés exclure pour gagner en précision sur le poste de ... ?",
-        "Quels profils transverses peuvent correspondre au poste de ... ?",
-        "Quels mots-clés utiliser pour cibler les juniors pour le poste de ... ?",
-        "Quels mots-clés utiliser pour cibler les seniors pour le poste de ... ?",
-        "Quels synonymes ou variantes régionales existent pour le poste de ... ?"
+        "Quels sont les synonymes possibles ?",
+        "Quels mots-clés utiliser pour recruter ?",
+        "Quelles compétences sont indispensables ?",
+        "Quels termes techniques sont associés ?",
+        "Quels intitulés similaires existent ?",
+        "Quels diplômes ou certifications rechercher ?",
+        "Quelles compétences comportementales sont attendues ?",
+        "Quels outils ou logiciels sont liés ?",
+        "Quels hashtags LinkedIn pourraient être utiles ?",
+        "Quels intitulés anglais sont utilisés ?",
+        "Quels mots-clés exclure pour gagner en précision ?",
+        "Quels profils transverses peuvent correspondre ?",
+        "Quels mots-clés utiliser pour cibler les juniors ?",
+        "Quels mots-clés utiliser pour cibler les seniors ?",
+        "Quels synonymes ou variantes régionales existent ?"
     ]
 
     q_choice = st.selectbox("📌 Choisir une question prédéfinie:", [""] + questions_pretes, key="magicien_qchoice")
@@ -198,6 +209,16 @@ with tab7:
 
     if st.button("✨ Poser la question", type="primary", key="gen_magicien"):
         if question:
+            progress_bar = st.progress(0)
+            timer_placeholder = st.empty()
+            start_time = time.time()
+
+            for percent in range(0, 101, 10):
+                progress_bar.progress(percent)
+                elapsed = int(time.time() - start_time)
+                timer_placeholder.write(f"⏱️ {elapsed}s")
+                time.sleep(0.1)
+
             messages = [
                 {"role": "system", "content": "Tu es un expert en sourcing. Réponds de manière concise et exploitable."},
                 {"role": "user", "content": question}
@@ -207,37 +228,19 @@ with tab7:
 
     if st.session_state.get("magicien_reponse"):
         st.text_area("Réponse:", value=st.session_state["magicien_reponse"], height=200)
-        colA, colB, colC = st.columns(3)
-        with colA:
-            if st.button("📋 Copier", key="copy_magicien"):
-                text_to_copy = st.session_state["magicien_reponse"]
-                js_code = f"<script>navigator.clipboard.writeText({json.dumps(text_to_copy)});</script>"
-                st.markdown(js_code, unsafe_allow_html=True)
-                st.success("✅ Copié")
-        with colB:
-            if st.button("📚 Sauvegarder", key="save_magicien"):
-                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Magicien", "poste": "", "requete": st.session_state["magicien_reponse"]}
-                st.session_state.library_entries.append(entry)
-                save_library_entries()
-                st.success("✅ Sauvegardé")
-        with colC:
-            if st.button("🗑️ Supprimer", key="clear_magicien"):
-                for key in ["magicien_question","magicien_reponse"]:
-                    st.session_state[key] = ""
-                st.success("🧹 Effacé")
 
 # -------------------- Permutator --------------------
 with tab8:
     st.header("📧 Email Permutator")
     prenom = st.text_input("Prénom:", key="perm_prenom")
     nom = st.text_input("Nom:", key="perm_nom")
-    domaine = st.text_input("Domaine (ex: TGCC):", key="perm_domaine")
+    entreprise = st.text_input("Nom de l'entreprise:", key="perm_entreprise")
 
     if st.button("🔮 Générer permutations", key="gen_perm"):
-        if prenom and nom and domaine:
-            domaines = [domaine, domaine + ".com", domaine + ".ma"]
+        if prenom and nom and entreprise:
+            domaines = [entreprise.lower() + ".com", entreprise.lower() + ".ma"]
             permutations = []
-            for d in set(domaines):
+            for d in domaines:
                 permutations.extend([
                     f"{prenom.lower()}.{nom.lower()}@{d}",
                     f"{prenom[0].lower()}{nom.lower()}@{d}",
@@ -247,21 +250,23 @@ with tab8:
 
     if st.session_state.get("perm_result"):
         st.text_area("Résultats:", value="\n".join(st.session_state["perm_result"]), height=150)
-        colA, colB, colC = st.columns(3)
+        colA, colB = st.columns([0.3,0.3])
         with colA:
             if st.button("📋 Copier", key="copy_perm"):
                 text_to_copy = "\n".join(st.session_state["perm_result"])
-                js_code = f"<script>navigator.clipboard.writeText({json.dumps(text_to_copy)});</script>"
-                st.markdown(js_code, unsafe_allow_html=True)
-                st.success("✅ Copié")
+                st.write("✅ Copié")
+                st.markdown(f"""
+                    <textarea id="permQuery" style="display:none;">{text_to_copy}</textarea>
+                    <script>
+                        navigator.clipboard.writeText(document.getElementById("permQuery").value);
+                    </script>
+                """, unsafe_allow_html=True)
         with colB:
             if st.button("📚 Sauvegarder", key="save_perm"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Permutator", "poste": "", "requete": ", ".join(st.session_state["perm_result"])}
                 st.session_state.library_entries.append(entry)
                 save_library_entries()
                 st.success("✅ Sauvegardé")
-        with colC:
-            st.caption("Tester sur [Hunter.io](https://hunter.io/) ou [NeverBounce](https://neverbounce.com/)")
 
 # -------------------- Bibliothèque --------------------
 with tab9:
