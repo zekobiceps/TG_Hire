@@ -415,6 +415,60 @@ with tab6:
             message = message.replace("motivé ", "motivée ")
             message = message.replace("disponible ", "disponible")  # identique mais garde cohérence
         return message
+def generate_inmail_personnalise(donnees_profil, poste, entreprise, ton="Persuasif", max_words=150, cta_type="Proposer un appel"):
+    """Génère un message InMail personnalisé basé sur le profil"""
+
+    terme_organisation = "groupe" if entreprise == "TGCC" else "filiale"
+
+    if poste.lower().startswith(('a', 'e', 'i', 'o', 'u', 'h')):
+        objet = f"Opportunité d'{poste} au sein du {terme_organisation} {entreprise}"
+    else:
+        objet = f"Opportunité de {poste} au sein du {terme_organisation} {entreprise}"
+
+    prenom = donnees_profil.get('prenom', "Candidat")
+    nom = donnees_profil.get('nom', "")
+    nom_complet = f"{prenom} {nom}".strip()
+
+    cta_text = {
+        "Proposer un appel": f"Seriez-vous disponible pour un appel téléphonique cette semaine ?",
+        "Partager le CV": f"Seriez-vous intéressé(e) pour partager votre CV afin que nous examinions ensemble cette opportunité ?",
+        "Découvrir l'opportunité sur notre site": f"Souhaiteriez-vous découvrir plus en détail cette opportunité sur notre site carrière ?",
+        "Accepter un rendez-vous": f"Seriez-vous disponible pour un rendez-vous afin d'échanger sur cette opportunité ?"
+    }.get(cta_type, "")
+
+    if ton == "Persuasif":
+        message = f"""Bonjour {prenom},
+
+Votre profil {f"de {donnees_profil['poste_actuel']}" if donnees_profil.get('poste_actuel') else ""} {f"chez {donnees_profil['entreprise_actuelle']}" if donnees_profil.get('entreprise_actuelle') else ""} présente exactement les compétences que nous recherchons pour le poste stratégique de {poste} au sein de notre {terme_organisation} {entreprise}.
+
+{f"Votre maîtrise de {donnees_profil['competences_cles'][0]}" if donnees_profil['competences_cles'] and donnees_profil['competences_cles'][0] else "Votre expertise"} et {f"votre expérience chez {donnees_profil['entreprise_actuelle']}" if donnees_profil.get('entreprise_actuelle') else "votre expérience"} montrent que vous pourriez apporter une valeur immédiate.
+
+{cta_text}"""
+    elif ton == "Professionnel":
+        message = f"""Bonjour {prenom},
+
+Votre parcours {f"de {donnees_profil['poste_actuel']}" if donnees_profil.get('poste_actuel') else ""} {f"chez {donnees_profil['entreprise_actuelle']}" if donnees_profil.get('entreprise_actuelle') else ""} correspond parfaitement au poste de {poste} que nous recherchons dans notre {terme_organisation} {entreprise}.
+
+{cta_text}"""
+    elif ton == "Convivial":
+        message = f"""Bonjour {prenom},
+
+J’ai parcouru votre profil et je trouve votre parcours {f"chez {donnees_profil['entreprise_actuelle']}" if donnees_profil.get('entreprise_actuelle') else ""} vraiment intéressant ! Cela correspond bien au poste de {poste} que nous proposons au sein de notre {terme_organisation} {entreprise}.
+
+{cta_text}"""
+    else:
+        message = f"""Bonjour {prenom},
+
+Votre profil correspond parfaitement au poste de {poste} dans notre {terme_organisation} {entreprise}.
+
+{cta_text}"""
+
+    # Limiter la taille du texte
+    words = message.split()
+    if len(words) > max_words:
+        message = " ".join(words[:max_words]) + "..."
+
+    return message.strip(), objet
 
     # --- Bouton principal ---
     if st.button("⚡ Générer", type="primary", use_container_width=True):
