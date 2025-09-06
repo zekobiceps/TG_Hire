@@ -12,8 +12,9 @@ from urllib.parse import quote
 # -------------------- Optionnels PDF / Word --------------------
 try:
     from reportlab.lib.pagesizes import A4
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
     from reportlab.lib import colors
     PDF_AVAILABLE = True
 except ImportError:
@@ -100,6 +101,7 @@ def init_session_state():
         'saved_briefs': load_pickle("saved_briefs.pkl", {}),
         'sourcing_history': load_pickle("sourcing_history.pkl", []),
         'library_entries': load_pickle("library_entries.pkl", []),
+        'magicien_history': load_pickle("magicien_history.pkl", []),
         'api_usage': {
             "total_tokens": 800000,
             "used_tokens": 0,
@@ -108,7 +110,6 @@ def init_session_state():
         'token_counter': 0,
         'current_messages': [],
         'magicien_reponse': "",
-        'magicien_history': load_pickle("magicien_history.pkl", []),
         'boolean_query': "",
         'xray_query': "",
         'cse_query': "",
@@ -180,7 +181,7 @@ def ask_deepseek(messages, max_tokens=500, response_format="text"):
 
 # -------------------- Générateurs de requêtes --------------------
 def generate_boolean_query(poste, synonymes, comp_oblig, comp_opt, exclusions, localisation, secteur):
-    """Construit une requête Boolean"""
+    """Construit une requête Boolean (avec NOT à la fin)"""
     query_parts = []
     if poste:
         poste_part = f'("{poste}"'
@@ -200,6 +201,7 @@ def generate_boolean_query(poste, synonymes, comp_oblig, comp_opt, exclusions, l
     if secteur:
         query_parts.append(f'"{secteur}"')
 
+    # Construction finale avec NOT à la fin
     query = " AND ".join(query_parts)
     if exclusions:
         for e in exclusions.split(','):
@@ -231,48 +233,3 @@ def generate_accroche_inmail(url_linkedin, poste):
         {"role": "user", "content": prompt}
     ]
     return ask_deepseek(messages, max_tokens=250).get("content", "")
-
-# -------------------- Exports --------------------
-def export_brief_pdf():
-    if not PDF_AVAILABLE:
-        return None
-    try:
-        buffer = io.BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4)
-        styles = getSampleStyleSheet()
-        story = []
-        title_style = ParagraphStyle('CustomTitle', parent=styles['Heading1'], fontSize=16, textColor=colors.darkblue)
-        story.append(Paragraph(f"Brief Recrutement - {st.session_state.poste_intitule}", title_style))
-        story.append(Spacer(1, 20))
-        for category, items in st.session_state.brief_data.items():
-            story.append(Paragraph(category, styles['Heading2']))
-            for item, data in items.items():
-                if isinstance(data, dict) and data.get("valeur"):
-                    story.append(Paragraph(f"<b>{item}:</b> {data['valeur']}", styles['Normal']))
-            story.append(Spacer(1, 10))
-        doc.build(story)
-        buffer.seek(0)
-        return buffer
-    except Exception as e:
-        st.error(f"Erreur PDF: {e}")
-        return None
-
-def export_brief_word():
-    if not WORD_AVAILABLE:
-        return None
-    try:
-        doc = Document()
-        doc.add_heading(f"Brief Recrutement - {st.session_state.poste_intitule}", 0)
-        for category, items in st.session_state.brief_data.items():
-            doc.add_heading(category, level=1)
-            for item, data in items.items():
-                if isinstance(data, dict) and data.get("valeur"):
-                    doc.add_heading(item, level=2)
-                    doc.add_paragraph(data['valeur'])
-        buffer = io.BytesIO()
-        doc.save(buffer)
-        buffer.seek(0)
-        return buffer
-    except Exception as e:
-        st.error(f"Erreur Word: {e}")
-        return None
