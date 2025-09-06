@@ -229,39 +229,27 @@ with tab7:
         if question:
             start_time = time.time()
             progress = st.progress(0, text="⏳ Génération en cours...")
-            compteur = st.empty()
 
+            # Simulation barre + compteur temps
+            for i in range(100):
+                elapsed = int(time.time() - start_time)
+                progress.progress(i + 1, text=f"⏳ Génération... {i+1}% - {elapsed}s")
+                time.sleep(0.2)  # ~20s max
+
+            # Appel API
             messages = [
                 {"role": "system", "content": "Tu es un expert en sourcing RH au Maroc. Réponds de façon concise et directement exploitable."},
                 {"role": "user", "content": question}
             ]
+            result = ask_deepseek(messages, max_tokens=300)
+            elapsed = int(time.time() - start_time)
 
-            result_container = {"done": False, "content": ""}
+            st.session_state.magicien_reponse = result["content"]
+            st.session_state.magicien_history = st.session_state.get("magicien_history", [])
+            st.session_state.magicien_history.append({"q": question, "r": result["content"], "t": elapsed})
 
-            def call_api():
-                result = ask_deepseek(messages, max_tokens=250)
-                result_container["content"] = result["content"]
-                result_container["done"] = True
-
-            thread = threading.Thread(target=call_api)
-            thread.start()
-
-            i = 0
-            while not result_container["done"]:
-                elapsed = int(time.time() - start_time)
-                compteur.write(f"⏱️ {elapsed}s")
-                progress.progress(min(i, 99), text=f"⏳ Génération... {i}% - {elapsed}s")
-                time.sleep(0.3)
-                i += 1
-                if i > 99:
-                    i = 90
-
-            st.session_state.magicien_reponse = result_container["content"]
-            st.session_state.magicien_history.append({"q": question, "r": result_container["content"]})
-            save_magicien_history()
-
-            compteur.write(f"✅ Génération réussie en {int(time.time() - start_time)}s")
-            progress.progress(100, text="✅ Génération terminée")
+            # ✅ Message final
+            st.success(f"✅ Génération réussie en {elapsed}s")
 
     if st.session_state.get("magicien_history"):
         st.subheader("📝 Historique des réponses")
@@ -270,15 +258,17 @@ with tab7:
                 st.write(item["r"])
                 if st.button("🗑️ Supprimer", key=f"del_magicien_{i}"):
                     st.session_state.magicien_history.remove(item)
-                    save_magicien_history()
                     st.experimental_rerun()
 
-# -------------------- Permutator --------------------
+# -------------------- Permutateur Email --------------------
 with tab8:
-    st.header("📧 Email Permutator")
+    st.header("📧 Permutateur Email")
+
     prenom = st.text_input("Prénom:", key="perm_prenom", placeholder="Ex: Ahmed")
     nom = st.text_input("Nom:", key="perm_nom", placeholder="Ex: El Mansouri")
     entreprise = st.text_input("Nom de l'entreprise:", key="perm_domaine", placeholder="Ex: tgcc")
+
+    methode = st.selectbox("Méthode de détection :", ["🔍 Site officiel", "🌍 Charika.ma"], key="perm_method")
 
     if st.button("🔮 Générer permutations"):
         if prenom and nom and entreprise:
@@ -289,16 +279,30 @@ with tab8:
                 permutations.append(f"{prenom[0].lower()}{nom.lower()}@{domaine}")
                 permutations.append(f"{nom.lower()}.{prenom.lower()}@{domaine}")
 
-            # Recherche sur le site web
-            try:
-                site_url = f"http://www.{entreprise}.ma"
-                r = requests.get(site_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
-                soup = BeautifulSoup(r.text, "html.parser")
-                found_emails = set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", soup.get_text()))
-                if found_emails:
-                    st.info("📧 Formats détectés sur le site : " + ", ".join(found_emails))
-            except:
-                st.warning("⚠️ Impossible de récupérer des emails sur le site officiel")
+            found_emails = set()
+
+            # --- Méthode 1 : Site officiel
+            if methode == "🔍 Site officiel":
+                try:
+                    site_url = f"http://www.{entreprise}.ma"
+                    r = requests.get(site_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+                    soup = BeautifulSoup(r.text, "html.parser")
+                    found_emails = set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", soup.get_text()))
+                except:
+                    st.warning("⚠️ Impossible de récupérer des emails sur le site officiel")
+
+            # --- Méthode 2 : Charika.ma
+            elif methode == "🌍 Charika.ma":
+                try:
+                    url_charika = f"https://www.charika.ma/societe-{entreprise}.html"
+                    r = requests.get(url_charika, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
+                    soup = BeautifulSoup(r.text, "html.parser")
+                    found_emails = set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", soup.get_text()))
+                except:
+                    st.warning("⚠️ Impossible de récupérer des emails sur Charika.ma")
+
+            if found_emails:
+                st.info("📧 Format(s) détecté(s) : " + ", ".join(found_emails))
 
             st.session_state["perm_result"] = list(set(permutations))
 
