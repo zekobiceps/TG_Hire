@@ -35,8 +35,7 @@ with tab1:
     with col1:
         poste = st.text_input("Poste recherché:", placeholder="Ex: Développeur Python")
         synonymes = st.text_input("Synonymes (séparés par des virgules):", placeholder="Ex: Developer, Programmeur, Ingénieur")
-        st.caption("💡 Besoin d’aide pour les synonymes ? Utilisez le Magicien de sourcing 🤖 ci-dessous :")
-        st.page_link("pages/2_🔍_Tour_de_sourcing.py", label="👉 Cliquer ici → Magicien de sourcing", icon="🤖")
+        st.caption("💡 Besoin d’aide pour les synonymes ? Utilisez le Magicien de sourcing 🤖 ci-dessous.")
         competences_obligatoires = st.text_input("Compétences obligatoires:", placeholder="Ex: Python, Django")
         secteur = st.text_input("Secteur d'activité:", placeholder="Ex: Informatique, Finance, Santé")
     with col2:
@@ -55,19 +54,19 @@ with tab1:
 
         if boolean_query:
             st.text_area("Requête Boolean:", value=boolean_query, height=120)
-            colA, colB, colC = st.columns([1,1,1])
+
+            colA, colB, colC = st.columns(3)
             with colA:
-                if st.button("📋 Copier Boolean"):
-                    st.toast("Requête copiée manuellement")
+                st.markdown(f'<button onclick="navigator.clipboard.writeText(`{boolean_query}`)">📋 Copier</button>', unsafe_allow_html=True)
             with colB:
                 if st.button("📚 Sauvegarder Boolean"):
-                    st.session_state.library_entries.append(
-                        {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", "poste": poste, "requete": boolean_query}
-                    )
+                    entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", "poste": poste, "requete": boolean_query}
+                    st.session_state.library_entries.append(entry)
                     save_library_entries()
-                    st.success("Sauvegardé dans la bibliothèque")
+                    st.toast("✅ Sauvegardé dans la bibliothèque")
             with colC:
                 if st.button("🔄 Réinit Boolean"):
+                    st.session_state.clear()
                     st.experimental_rerun()
 
 # -------------------- X-Ray --------------------
@@ -85,18 +84,20 @@ with tab2:
     if st.button("🔍 Construire X-Ray", type="primary"):
         xray_query = generate_xray_query(site_cible, poste_xray, mots_cles, localisation_xray)
         st.text_area("Requête X-Ray:", value=xray_query, height=120)
-        colA, colB = st.columns([1,1])
+
+        colA, colB, colC = st.columns(3)
         with colA:
+            st.markdown(f'<button onclick="navigator.clipboard.writeText(`{xray_query}`)">📋 Copier</button>', unsafe_allow_html=True)
+        with colB:
+            if st.button("📚 Sauvegarder X-Ray"):
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "X-Ray", "poste": poste_xray, "requete": xray_query}
+                st.session_state.library_entries.append(entry)
+                save_library_entries()
+                st.toast("✅ Sauvegardé dans la bibliothèque")
+        with colC:
             if st.button("🌐 Ouvrir sur Google"):
                 url = f"https://www.google.com/search?q={quote(xray_query)}"
                 webbrowser.open_new_tab(url)
-        with colB:
-            if st.button("📚 Sauvegarder X-Ray"):
-                st.session_state.library_entries.append(
-                    {"date": datetime.now().strftime("%Y-%m-%d"), "type": "X-Ray", "poste": poste_xray, "requete": xray_query}
-                )
-                save_library_entries()
-                st.success("Sauvegardé")
 
 # -------------------- CSE --------------------
 with tab3:
@@ -111,8 +112,19 @@ with tab3:
         cse_query = " ".join(filter(None, [poste_cse, competences_cse, localisation_cse, entreprise_cse]))
         cse_url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(cse_query)}"
         st.text_area("Requête CSE:", value=cse_query, height=100)
-        if st.button("🌐 Ouvrir résultats CSE"):
-            webbrowser.open_new_tab(cse_url)
+
+        colA, colB, colC = st.columns(3)
+        with colA:
+            st.markdown(f'<button onclick="navigator.clipboard.writeText(`{cse_query}`)">📋 Copier</button>', unsafe_allow_html=True)
+        with colB:
+            if st.button("📚 Sauvegarder CSE"):
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "CSE", "poste": poste_cse, "requete": cse_query}
+                st.session_state.library_entries.append(entry)
+                save_library_entries()
+                st.toast("✅ Sauvegardé dans la bibliothèque")
+        with colC:
+            if st.button("🌐 Ouvrir résultats CSE"):
+                webbrowser.open_new_tab(cse_url)
 
 # -------------------- Dogpile --------------------
 with tab4:
@@ -142,52 +154,6 @@ with tab5:
             if emails:
                 st.markdown("📧 Emails détectés:")
                 st.write(", ".join(emails))
-
-# -------------------- Magicien --------------------
-with tab7:
-    st.header("🤖 Magicien de sourcing")
-    questions = [
-        "Donne-moi des synonymes utiles",
-        "Quels jobboards cibler ?",
-        "Quelles soft skills clés ?",
-        "Comment adapter la recherche pour seniors ?",
-        "Quels mots-clés sectoriels utiliser ?",
-        "Quelles tendances de recrutement récentes ?"
-    ]
-    q_select = st.selectbox("Choisir une question:", questions)
-    if st.button("⚡ Poser la question"):
-        result = ask_deepseek([{"role": "user", "content": q_select}], max_tokens=200)
-        if "content" in result:
-            reponse = result["content"]
-            st.text_area("Réponse:", value=reponse, height=150)
-            st.session_state.conversation_history.append({"q": q_select, "r": reponse})
-
-    if st.session_state.conversation_history:
-        st.subheader("📜 Historique")
-        for i, conv in enumerate(st.session_state.conversation_history):
-            with st.expander(f"Q{i+1}: {conv['q'][:40]}..."):
-                st.write("**Vous:**", conv["q"])
-                st.write("**Magicien 🤖:**", conv["r"])
-        if st.button("🗑️ Effacer tout l’historique"):
-            st.session_state.conversation_history.clear()
-
-# -------------------- Email Permutator --------------------
-with tab8:
-    st.header("📧 Email Permutator")
-    prenom = st.text_input("Prénom:")
-    nom = st.text_input("Nom:")
-    domaine = st.text_input("Domaine:", placeholder="ex: tgcc")
-    if st.button("⚡ Générer emails"):
-        emails = [
-            f"{prenom}.{nom}@{domaine}.ma",
-            f"{prenom}.{nom}@{domaine}.com",
-            f"{prenom}{nom}@{domaine}.ma",
-            f"{prenom}{nom}@{domaine}.com",
-            f"{nom}{prenom}@{domaine}.ma",
-            f"{prenom[0]}{nom}@{domaine}.com",
-        ]
-        st.text_area("Résultats:", value="\n".join(emails), height=150)
-    st.caption("💡 Vérifiez vos adresses avec [Hunter.io](https://hunter.io) ou [NeverBounce](https://neverbounce.com)")
 
 # -------------------- Bibliothèque --------------------
 with tab9:
