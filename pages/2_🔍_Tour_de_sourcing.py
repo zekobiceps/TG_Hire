@@ -56,8 +56,12 @@ with tab1:
             st.text_area("Requête Boolean:", value=boolean_query, height=120)
 
             colA, colB, colC = st.columns(3)
+            safe_query = boolean_query.replace("`", "")
             with colA:
-                st.markdown(f'<button onclick="navigator.clipboard.writeText(`{boolean_query}`)">📋 Copier</button>', unsafe_allow_html=True)
+                st.markdown(
+                    f'<button onclick="navigator.clipboard.writeText(`{safe_query}`)">📋 Copier</button>',
+                    unsafe_allow_html=True
+                )
             with colB:
                 if st.button("📚 Sauvegarder Boolean"):
                     entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", "poste": poste, "requete": boolean_query}
@@ -86,8 +90,12 @@ with tab2:
         st.text_area("Requête X-Ray:", value=xray_query, height=120)
 
         colA, colB, colC = st.columns(3)
+        safe_query = xray_query.replace("`", "")
         with colA:
-            st.markdown(f'<button onclick="navigator.clipboard.writeText(`{xray_query}`)">📋 Copier</button>', unsafe_allow_html=True)
+            st.markdown(
+                f'<button onclick="navigator.clipboard.writeText(`{safe_query}`)">📋 Copier</button>',
+                unsafe_allow_html=True
+            )
         with colB:
             if st.button("📚 Sauvegarder X-Ray"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "X-Ray", "poste": poste_xray, "requete": xray_query}
@@ -114,8 +122,12 @@ with tab3:
         st.text_area("Requête CSE:", value=cse_query, height=100)
 
         colA, colB, colC = st.columns(3)
+        safe_query = cse_query.replace("`", "")
         with colA:
-            st.markdown(f'<button onclick="navigator.clipboard.writeText(`{cse_query}`)">📋 Copier</button>', unsafe_allow_html=True)
+            st.markdown(
+                f'<button onclick="navigator.clipboard.writeText(`{safe_query}`)">📋 Copier</button>',
+                unsafe_allow_html=True
+            )
         with colB:
             if st.button("📚 Sauvegarder CSE"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "CSE", "poste": poste_cse, "requete": cse_query}
@@ -131,8 +143,25 @@ with tab4:
     st.header("🐶 Dogpile Search")
     query = st.text_input("Recherche:")
     if st.button("🔎 Rechercher sur Dogpile"):
-        url = f"https://www.dogpile.com/serp?q={quote(query)}"
-        webbrowser.open_new_tab(url)
+        if query:
+            url = f"https://www.dogpile.com/serp?q={quote(query)}"
+            st.text_area("Requête Dogpile:", value=query, height=100)
+            colA, colB, colC = st.columns(3)
+            safe_query = query.replace("`", "")
+            with colA:
+                st.markdown(
+                    f'<button onclick="navigator.clipboard.writeText(`{safe_query}`)">📋 Copier</button>',
+                    unsafe_allow_html=True
+                )
+            with colB:
+                if st.button("📚 Sauvegarder Dogpile"):
+                    entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Dogpile", "poste": "", "requete": query}
+                    st.session_state.library_entries.append(entry)
+                    save_library_entries()
+                    st.toast("✅ Sauvegardé dans la bibliothèque")
+            with colC:
+                if st.button("🌐 Ouvrir sur Dogpile"):
+                    webbrowser.open_new_tab(url)
 
 # -------------------- Web Scraper --------------------
 with tab5:
@@ -151,9 +180,23 @@ with tab5:
             texte = soup.get_text()[:800]
             emails = set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", texte))
             st.text_area("Extrait:", value=texte, height=200)
-            if emails:
-                st.markdown("📧 Emails détectés:")
-                st.write(", ".join(emails))
+            colA, colB, colC = st.columns(3)
+            safe_text = texte.replace("`", "")
+            with colA:
+                st.markdown(
+                    f'<button onclick="navigator.clipboard.writeText(`{safe_text}`)">📋 Copier</button>',
+                    unsafe_allow_html=True
+                )
+            with colB:
+                if st.button("📚 Sauvegarder Scraper"):
+                    entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Scraper", "poste": choix, "requete": url}
+                    st.session_state.library_entries.append(entry)
+                    save_library_entries()
+                    st.toast("✅ Sauvegardé dans la bibliothèque")
+            with colC:
+                if st.button("🔄 Réinit Scraper"):
+                    st.session_state.clear()
+                    st.experimental_rerun()
 
 # -------------------- Bibliothèque --------------------
 with tab9:
