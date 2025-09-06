@@ -67,23 +67,15 @@ with tab1:
 
     col1, col2 = st.columns(2)
     with col1:
-        poste = st.text_input("Poste recherché:", key="poste",
-                              placeholder="Ex: Ingénieur de travaux")
-        synonymes = st.text_input("Synonymes:", key="synonymes",
-                                  placeholder="Ex: Conducteur de travaux, Chef de chantier")
-        competences_obligatoires = st.text_input(
-            "Compétences obligatoires:", key="competences_obligatoires", placeholder="Ex: Autocad, Robot Structural Analysis")
-        secteur = st.text_input(
-            "Secteur d'activité:", key="secteur", placeholder="Ex: BTP, Construction")
+        poste = st.text_input("Poste recherché:", key="poste", placeholder="Ex: Ingénieur de travaux")
+        synonymes = st.text_input("Synonymes:", key="synonymes", placeholder="Ex: Conducteur de travaux, Chef de chantier")
+        competences_obligatoires = st.text_input("Compétences obligatoires:", key="competences_obligatoires", placeholder="Ex: Autocad, Robot Structural Analysis")
+        secteur = st.text_input("Secteur d'activité:", key="secteur", placeholder="Ex: BTP, Construction")
     with col2:
-        competences_optionnelles = st.text_input(
-            "Compétences optionnelles:", key="competences_optionnelles", placeholder="Ex: Primavera, ArchiCAD")
-        exclusions = st.text_input(
-            "Mots à exclure:", key="exclusions", placeholder="Ex: Stage, Alternance")
-        localisation = st.text_input(
-            "Localisation:", key="localisation", placeholder="Ex: Casablanca")
-        employeur = st.text_input(
-            "Employeur:", key="employeur", placeholder="Ex: TGCC")
+        competences_optionnelles = st.text_input("Compétences optionnelles:", key="competences_optionnelles", placeholder="Ex: Primavera, ArchiCAD")
+        exclusions = st.text_input("Mots à exclure:", key="exclusions", placeholder="Ex: Stage, Alternance")
+        localisation = st.text_input("Localisation:", key="localisation", placeholder="Ex: Casablanca")
+        employeur = st.text_input("Employeur:", key="employeur", placeholder="Ex: TGCC")
 
     if st.button("🪄 Générer la requête Boolean", type="primary"):
         st.session_state["boolean_query"] = generate_boolean_query(
@@ -94,17 +86,31 @@ with tab1:
             st.session_state["boolean_query"] += f' AND ("{employeur}")'
 
     if st.session_state.get("boolean_query"):
-        st.text_area("Requête Boolean:",
-                     value=st.session_state["boolean_query"], height=120)
-        url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
-        action = action_buttons(
-            "💾 Sauvegarder", "🌐 Ouvrir sur LinkedIn", url_linkedin, "boolean")
-        if action == "save":
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", "poste": poste,
-                     "requete": st.session_state["boolean_query"]}
-            st.session_state.library_entries.append(entry)
-            save_library_entries()
-            st.success("✅ Sauvegardé")
+        st.text_area("Requête Boolean:", value=st.session_state["boolean_query"], height=120)
+        
+        # CORRECTION: Utilisation du même modèle que X-Ray
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            if st.button("💾 Sauvegarder", key="boolean_save", use_container_width=True):
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", 
+                         "poste": poste, "requete": st.session_state["boolean_query"]}
+                st.session_state.library_entries.append(entry)
+                save_library_entries()
+                st.success("✅ Sauvegardé")
+        with col2:
+            url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
+            st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, use_container_width=True)
+            # Supprimer l'espace de prompt en bas de page
+st.markdown("""
+    <style>
+    .stTextInput textarea {
+        display: none;
+    }
+    .stTextInput label {
+        display: none;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # -------------------- X-Ray --------------------
 with tab2:
@@ -148,38 +154,90 @@ with tab2:
         with col3:
             st.link_button(
                 "🔎 Recherche avancée", f"https://www.google.com/advanced_search?q={quote(st.session_state['xray_query'])}", use_container_width=True)
+            # Supprimer l'espace de prompt en bas de page
+st.markdown("""
+    <style>
+    .stTextInput textarea {
+        display: none;
+    }
+    .stTextInput label {
+        display: none;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # -------------------- CSE --------------------
 with tab3:
     st.header("🔎 CSE LinkedIn")
-    poste_cse = st.text_input("Poste recherché:", key="poste_cse")
-    competences_cse = st.text_input("Compétences clés:", key="competences_cse")
-    localisation_cse = st.text_input("Localisation:", key="localisation_cse")
-    entreprise_cse = st.text_input("Entreprise:", key="entreprise_cse")
+    poste_cse = st.text_input("Poste recherché:", key="poste_cse", placeholder="Ex: Développeur Python")
+    competences_cse = st.text_input("Compétences clés:", key="competences_cse", placeholder="Ex: Django, Flask")
+    localisation_cse = st.text_input("Localisation:", key="localisation_cse", placeholder="Ex: Casablanca")
+    entreprise_cse = st.text_input("Entreprise:", key="entreprise_cse", placeholder="Ex: TGCC")
 
     if st.button("🔍 Lancer recherche CSE", type="primary"):
-        st.session_state["cse_query"] = " ".join(
-            filter(None, [poste_cse, competences_cse, localisation_cse, entreprise_cse]))
+        st.session_state["cse_query"] = " ".join(filter(None, [poste_cse, competences_cse, localisation_cse, entreprise_cse]))
 
     if st.session_state.get("cse_query"):
-        st.text_area("Requête CSE:",
-                     value=st.session_state["cse_query"], height=100)
-        cse_url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
-        action_buttons("💾 Sauvegarder", "🌐 Ouvrir sur CSE", cse_url, "cse")
+        st.text_area("Requête CSE:", value=st.session_state["cse_query"], height=100)
+        
+        # CORRECTION: Utilisation du même modèle que X-Ray
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            if st.button("💾 Sauvegarder", key="cse_save", use_container_width=True):
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "CSE", 
+                         "poste": poste_cse, "requete": st.session_state["cse_query"]}
+                st.session_state.library_entries.append(entry)
+                save_library_entries()
+                st.success("✅ Sauvegardé")
+        with col2:
+            cse_url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
+            st.link_button("🌐 Ouvrir sur CSE", cse_url, use_container_width=True)
+            # Supprimer l'espace de prompt en bas de page
+st.markdown("""
+    <style>
+    .stTextInput textarea {
+        display: none;
+    }
+    .stTextInput label {
+        display: none;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # -------------------- Dogpile --------------------
 with tab4:
     st.header("🐶 Dogpile Search")
-    query = st.text_input("Requête Dogpile:", key="dogpile_query")
-
-    # CORRECTION: Ajout du bouton de recherche manquant
+    query = st.text_input("Requête Dogpile:", key="dogpile_query", placeholder="Ex: Python developer Casablanca")
+    
     if st.button("🔍 Rechercher", key="dogpile_search", type="primary"):
         st.session_state.dogpile_query = query
-
+    
     if st.session_state.get("dogpile_query"):
-        dogpile_url = f"http://www.dogpile.com/serp?q={quote(st.session_state.dogpile_query)}"
-        action_buttons("💾 Sauvegarder", "🌐 Ouvrir sur Dogpile",
-                       dogpile_url, "dogpile")
+        st.text_area("Requête Dogpile:", value=st.session_state.dogpile_query, height=80)
+        
+        # CORRECTION: Utilisation du même modèle que X-Ray
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            if st.button("💾 Sauvegarder", key="dogpile_save", use_container_width=True):
+                entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Dogpile", 
+                         "poste": "Recherche Dogpile", "requete": st.session_state.dogpile_query}
+                st.session_state.library_entries.append(entry)
+                save_library_entries()
+                st.success("✅ Sauvegardé")
+        with col2:
+            dogpile_url = f"http://www.dogpile.com/serp?q={quote(st.session_state.dogpile_query)}"
+            st.link_button("🌐 Ouvrir sur Dogpile", dogpile_url, use_container_width=True)
+            # Supprimer l'espace de prompt en bas de page
+st.markdown("""
+    <style>
+    .stTextInput textarea {
+        display: none;
+    }
+    .stTextInput label {
+        display: none;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # -------------------- Web Scraper --------------------
 with tab5:
@@ -211,6 +269,17 @@ with tab5:
         if st.session_state.get("scraper_emails"):
             st.info("📧 Emails détectés: " +
                     ", ".join(st.session_state["scraper_emails"]))
+            # Supprimer l'espace de prompt en bas de page
+st.markdown("""
+    <style>
+    .stTextInput textarea {
+        display: none;
+    }
+    .stTextInput label {
+        display: none;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # -------------------- InMail --------------------
 with tab6:
@@ -248,6 +317,17 @@ with tab6:
     if st.session_state.get("inmail_message"):
         st.text_area("Message InMail:",
                      value=st.session_state["inmail_message"], height=200)
+        # Supprimer l'espace de prompt en bas de page
+st.markdown("""
+    <style>
+    .stTextInput textarea {
+        display: none;
+    }
+    .stTextInput label {
+        display: none;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 
 # -------------------- Magicien --------------------
@@ -308,6 +388,18 @@ if st.button("✨ Poser la question", type="primary", key="ask_magicien"):
             st.session_state.magicien_history.clear()
             st.rerun()
 
+            # Supprimer l'espace de prompt en bas de page
+st.markdown("""
+    <style>
+    .stTextInput textarea {
+        display: none;
+    }
+    .stTextInput label {
+        display: none;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # -------------------- Permutateur --------------------
 with tab8:
     st.header("📧 Permutateur Email")
@@ -345,6 +437,18 @@ with tab8:
             st.session_state["perm_result"]), height=150)
         st.caption(
             "Tester sur : [Hunter.io](https://hunter.io/) ou [NeverBounce](https://neverbounce.com/)")
+        
+        # Supprimer l'espace de prompt en bas de page
+st.markdown("""
+    <style>
+    .stTextInput textarea {
+        display: none;
+    }
+    .stTextInput label {
+        display: none;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # -------------------- Bibliothèque --------------------
 with tab9:
@@ -375,3 +479,15 @@ with tab9:
                     st.rerun()
     else:
         st.info("Aucune recherche sauvegardée")
+
+        # Supprimer l'espace de prompt en bas de page
+st.markdown("""
+    <style>
+    .stTextInput textarea {
+        display: none;
+    }
+    .stTextInput label {
+        display: none;
+    }
+    </style>
+""", unsafe_allow_html=True)
