@@ -214,3 +214,97 @@ def copy_to_clipboard(text):
     except Exception as e:
         st.error(f"Erreur copie: {e}")
         return False
+# -------------------- Export Brief en PDF --------------------
+def export_brief_pdf():
+    """Exporte le brief en PDF"""
+    if not PDF_AVAILABLE:
+        st.error("Module reportlab non installé. Utilisez : pip install reportlab")
+        return None
+
+    try:
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4)
+        styles = getSampleStyleSheet()
+        story = []
+
+        # Titre
+        story.append(Paragraph("Brief Recrutement", styles['Heading1']))
+        story.append(Spacer(1, 20))
+
+        # Infos principales
+        infos = [
+            ["Poste", st.session_state.get("poste_intitule", "")],
+            ["Manager", st.session_state.get("manager_nom", "")],
+            ["Recruteur", st.session_state.get("recruteur", "")],
+            ["Affectation", f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}"]
+        ]
+        table = Table(infos, colWidths=[150, 300])
+        table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+            ("GRID", (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        story.append(table)
+        story.append(Spacer(1, 20))
+
+        # Sections
+        if "brief_data" in st.session_state:
+            for cat, items in st.session_state["brief_data"].items():
+                story.append(Paragraph(cat, styles['Heading2']))
+                for item, data in items.items():
+                    if isinstance(data, dict):
+                        val = data.get("valeur", "")
+                    else:
+                        val = str(data)
+                    if val:
+                        story.append(Paragraph(f"<b>{item}:</b> {val}", styles['Normal']))
+                story.append(Spacer(1, 15))
+
+        doc.build(story)
+        buffer.seek(0)
+        return buffer
+    except Exception as e:
+        st.error(f"Erreur PDF: {e}")
+        return None
+
+
+# -------------------- Export Brief en Word --------------------
+def export_brief_word():
+    """Exporte le brief en Word"""
+    if not WORD_AVAILABLE:
+        st.error("Module python-docx non installé. Utilisez : pip install python-docx")
+        return None
+
+    try:
+        doc = Document()
+        doc.add_heading("Brief Recrutement", 0)
+
+        # Infos principales
+        infos = {
+            "Poste": st.session_state.get("poste_intitule", ""),
+            "Manager": st.session_state.get("manager_nom", ""),
+            "Recruteur": st.session_state.get("recruteur", ""),
+            "Affectation": f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}"
+        }
+        for k, v in infos.items():
+            doc.add_paragraph(f"{k}: {v}")
+
+        # Sections
+        if "brief_data" in st.session_state:
+            for cat, items in st.session_state["brief_data"].items():
+                doc.add_heading(cat, level=1)
+                for item, data in items.items():
+                    if isinstance(data, dict):
+                        val = data.get("valeur", "")
+                    else:
+                        val = str(data)
+                    if val:
+                        doc.add_paragraph(f"{item}: {val}")
+
+        buffer = io.BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+        return buffer
+    except Exception as e:
+        st.error(f"Erreur Word: {e}")
+        return None
