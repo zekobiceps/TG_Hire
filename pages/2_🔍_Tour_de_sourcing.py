@@ -5,6 +5,8 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import json
+import time
+import pyperclip
 from datetime import datetime
 
 # Import explicite depuis utils.py
@@ -27,25 +29,26 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# -------------------- Compteur de tokens global (sidebar) --------------------
-with st.sidebar:
-    used = st.session_state.api_usage["current_session_tokens"]
-    total = st.session_state.api_usage["used_tokens"]
-    st.markdown(f"🔑 **Tokens utilisés (session)**: {used}")
-    st.markdown(f"📊 **Total cumulé**: {total}")
-
 # -------------------- Style bouton uniforme --------------------
-def action_buttons(buttons):
-    """Affiche plusieurs boutons HTML alignés à gauche"""
-    html = ""
-    for label, color, action in buttons:
-        html += f"""
-        <button onclick='{action}' 
-        style="padding:6px 14px; margin-right:6px; background:{color}; 
-        color:white; border:none; border-radius:6px; cursor:pointer;">
-        {label}</button>
-        """
-    st.markdown(html, unsafe_allow_html=True)
+def action_buttons(copy_text, save_key, url=None, url_label="🌐 Ouvrir"):
+    """Boutons uniformes Copier / Sauvegarder / Ouvrir"""
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col1:
+        if st.button("📋 Copier"):
+            pyperclip.copy(copy_text)
+            st.success("✅ Requête copiée dans le presse-papier")
+    with col2:
+        if st.button("💾 Sauvegarder"):
+            entry = {"date": datetime.now().strftime("%Y-%m-%d"),
+                     "type": save_key,
+                     "poste": st.session_state.get("poste", ""),
+                     "requete": copy_text}
+            st.session_state.library_entries.append(entry)
+            save_library_entries()
+            st.success("✅ Sauvegardé dans la bibliothèque")
+    with col3:
+        if url and st.button(url_label):
+            webbrowser.open_new_tab(url)
 
 # -------------------- Onglets --------------------
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
@@ -67,7 +70,7 @@ with tab1:
     with col1:
         poste = st.text_input("Poste recherché:", key="poste")
         synonymes = st.text_input("Synonymes (séparés par des virgules):", key="synonymes")
-        st.caption("💡 Pour trouver plus de synonymes, utilisez le Magicien de sourcing 🤖")
+        st.caption("💡 Pour plus de synonymes, utilisez le Magicien de sourcing 🤖")
         competences_obligatoires = st.text_input("Compétences obligatoires:", key="competences_obligatoires")
         secteur = st.text_input("Secteur d'activité:", key="secteur")
     with col2:
@@ -86,25 +89,8 @@ with tab1:
 
     if st.session_state.get("boolean_query"):
         st.text_area("Requête Boolean:", value=st.session_state["boolean_query"], height=120)
-
-        # Boutons Copier / Sauvegarder / LinkedIn
-        text_to_copy = json.dumps(st.session_state["boolean_query"])
         url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
-
-        buttons = [
-            ("📋 Copier", "#2b6cb0", f"navigator.clipboard.writeText({text_to_copy})"),
-            ("💾 Sauvegarder", "#38a169", "window.location.href='#save_boolean'"),
-            ("🌐 LinkedIn", "#805ad5", f"window.open('{url_linkedin}', '_blank')")
-        ]
-        action_buttons(buttons)
-
-        # Sauvegarde via ancre
-        if "save_boolean" in st.query_params:
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", "poste": poste,
-                     "requete": st.session_state["boolean_query"]}
-            st.session_state.library_entries.append(entry)
-            save_library_entries()
-            st.success("✅ Sauvegardé dans la bibliothèque")
+        action_buttons(st.session_state["boolean_query"], "Boolean", url_linkedin, "🌐 LinkedIn")
 
 # -------------------- X-Ray --------------------
 with tab2:
@@ -124,26 +110,11 @@ with tab2:
     if st.session_state.get("xray_query"):
         st.text_area("Requête X-Ray:", value=st.session_state["xray_query"], height=120)
         url = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
-
-        text_to_copy = json.dumps(st.session_state["xray_query"])
-        buttons = [
-            ("📋 Copier", "#2b6cb0", f"navigator.clipboard.writeText({text_to_copy})"),
-            ("💾 Sauvegarder", "#38a169", "window.location.href='#save_xray'"),
-            ("🌐 Google", "#d69e2e", f"window.open('{url}', '_blank')")
-        ]
-        action_buttons(buttons)
-
-        if "save_xray" in st.query_params:
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "X-Ray", "poste": poste_xray,
-                     "requete": st.session_state["xray_query"]}
-            st.session_state.library_entries.append(entry)
-            save_library_entries()
-            st.success("✅ Sauvegardé dans la bibliothèque")
+        action_buttons(st.session_state["xray_query"], "X-Ray", url, "🌐 Google")
 
 # -------------------- CSE --------------------
 with tab3:
     st.header("🔎 CSE (Custom Search Engine) LinkedIn :")
-    st.caption("🔎 Google CSE préconfiguré pour chercher uniquement dans les profils LinkedIn.")
     poste_cse = st.text_input("Poste recherché:", key="poste_cse")
     competences_cse = st.text_input("Compétences clés:", key="competences_cse")
     localisation_cse = st.text_input("Localisation:", key="localisation_cse")
@@ -155,21 +126,7 @@ with tab3:
     if st.session_state.get("cse_query"):
         st.text_area("Requête CSE:", value=st.session_state["cse_query"], height=100)
         cse_url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
-
-        text_to_copy = json.dumps(st.session_state["cse_query"])
-        buttons = [
-            ("📋 Copier", "#2b6cb0", f"navigator.clipboard.writeText({text_to_copy})"),
-            ("💾 Sauvegarder", "#38a169", "window.location.href='#save_cse'"),
-            ("🌐 CSE", "#d69e2e", f"window.open('{cse_url}', '_blank')")
-        ]
-        action_buttons(buttons)
-
-        if "save_cse" in st.query_params:
-            entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "CSE", "poste": poste_cse,
-                     "requete": st.session_state["cse_query"]}
-            st.session_state.library_entries.append(entry)
-            save_library_entries()
-            st.success("✅ Sauvegardé dans la bibliothèque")
+        action_buttons(st.session_state["cse_query"], "CSE", cse_url, "🌐 CSE")
 
 # -------------------- Web Scraper --------------------
 with tab5:
@@ -201,8 +158,8 @@ with tab6:
     st.header("✉️ Générateur d'InMail")
     url_linkedin = st.text_input("URL du profil LinkedIn:", key="inmail_url")
     poste_accroche = st.text_input("Poste à pourvoir:", key="inmail_poste")
-    entreprise = st.selectbox("Entreprise:", ["TGCC", "TG ALU", "TG COVER", "TG WOOD", "TG STEEL",
-                                             "TG STONE", "TGEM", "TGCC Immobilier"], key="inmail_entreprise")
+    entreprise = st.selectbox("Entreprise:", ["TGCC", "TG ALU", "TG COVER", "TG WOOD",
+                                             "TG STEEL", "TG STONE", "TGEM", "TGCC Immobilier"], key="inmail_entreprise")
 
     if st.button("💌 Générer InMail", type="primary"):
         st.session_state["inmail_message"] = generate_accroche_inmail(url_linkedin, poste_accroche) + \
@@ -214,8 +171,26 @@ with tab6:
 # -------------------- Magicien --------------------
 with tab7:
     st.header("🤖 Magicien de sourcing")
-    question = st.text_area("Votre question:", key="magicien_question",
-                            placeholder="Ex: Quels sont les synonymes possibles pour le métier de Développeur Python ?")
+
+    questions_pretes = [
+        "Quels sont les synonymes possibles pour le métier de ?",
+        "Quels outils ou logiciels sont liés au métier de ?",
+        "Quels mots-clés pour cibler les juniors pour le poste de ?",
+        "Quels mots-clés pour cibler les seniors pour le poste de ?",
+        "Quels intitulés de poste similaires à celui de ?",
+        "Quels hashtags LinkedIn utiliser pour un recrutement de ?",
+        "Quels critères de recherche LinkedIn pour un profil de ?",
+        "Quelles certifications utiles pour un poste de ?",
+        "Quels groupes LinkedIn suivre pour trouver des profils de ?",
+        "Quels mots-clés techniques pour un emploi de ?",
+        "Quels soft skills à rechercher pour un candidat au poste de ?",
+        "Quels titres alternatifs pour le métier de ?",
+        "Quels mots-clés pour identifier un freelance en tant que ?",
+        "Quels synonymes anglais pour le poste de ?",
+        "Quels mots-clés à exclure dans une recherche de ?"
+    ]
+    q_choice = st.selectbox("📌 Choisir une question prédéfinie:", [""] + questions_pretes, key="magicien_qchoice")
+    question = st.text_area("Votre question:", value=q_choice if q_choice else "", key="magicien_question")
 
     if st.button("✨ Poser la question", type="primary"):
         if question:
