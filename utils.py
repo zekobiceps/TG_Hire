@@ -208,6 +208,31 @@ def generate_boolean_query(poste, synonymes, comp_oblig, comp_opt, exclusions, l
             query += f' NOT "{e.strip()}"'
     return query
 
+def get_email_from_charika(entreprise):
+    """Cherche une adresse mail d'une entreprise sur charika.ma"""
+    try:
+        # On cherche sur Google: "<entreprise> site:charika.ma"
+        query = f"{entreprise} site:charika.ma"
+        url = f"https://www.google.com/search?q={quote(query)}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        r = requests.get(url, headers=headers, timeout=10)
+
+        # Cherche un lien charika
+        match = re.search(r"https://www\.charika\.ma/[^&]+", r.text)
+        if not match:
+            return None
+
+        charika_url = match.group(0)
+        page = requests.get(charika_url, headers=headers, timeout=10)
+        emails = re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", page.text)
+
+        if emails:
+            return emails[0]  # on prend le premier email trouvé
+        return None
+    except Exception as e:
+        return None
+
+
 def generate_xray_query(site, poste, mots_cles, localisation):
     """Construit une requête X-Ray Google"""
     site_urls = {"LinkedIn": "site:linkedin.com/in/", "GitHub": "site:github.com"}
