@@ -33,42 +33,44 @@ with st.sidebar:
     st.markdown(f"🔑 **Tokens utilisés (session)**: {used}")
     st.markdown(f"📊 **Total cumulé**: {total}")
 
-# ---------------- Style Boutons ----------------
-def action_buttons(buttons, context="default"):
-    """Boutons uniformes alignés à gauche"""
-    html = '<div style="display:flex; gap:6px; justify-content:flex-start;">'
-    for i, (label, color, action) in enumerate(buttons):
-        if action == "save":
-            if st.button(label, key=f"{context}_{label}_{i}", use_container_width=False):
-                return "save"
-        else:
-            html += f"""
-            <a href="{action}" target="_blank">
+# ---------------- Boutons Sauvegarde + Lien ----------------
+def action_buttons(save_label, url, context="default"):
+    """Deux boutons côte à côte"""
+    col1, col2 = st.columns([1, 1])
+    with col1:
+        if st.button(save_label, key=f"{context}_save", use_container_width=True):
+            return "save"
+    with col2:
+        st.markdown(
+            f"""
+            <a href="{url}" target="_blank">
                 <button style="
-                    padding:6px 14px;
-                    background:{color};
+                    width:100%;
+                    padding:6px 12px;
+                    background:#2b6cb0;
                     color:white;
                     border:none;
                     border-radius:6px;
                     cursor:pointer;
                     font-size:14px;">
-                    {label}
+                    🌐 Ouvrir
                 </button>
             </a>
-            """
-    html += "</div>"
-    st.markdown(html, unsafe_allow_html=True)
+            """,
+            unsafe_allow_html=True
+        )
+    return None
 
 # ---------------- Onglets ----------------
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
-    "🔍 Recherche Boolean",
+    "🔍 Boolean",
     "🎯 X-Ray",
     "🔎 CSE LinkedIn",
     "🐶 Dogpile",
     "🕷️ Web Scraper",
     "✉️ InMail",
-    "🤖 Magicien de sourcing",
-    "📧 Email Permutator",
+    "🤖 Magicien",
+    "📧 Permutator",
     "📚 Bibliothèque"
 ])
 
@@ -77,18 +79,17 @@ with tab1:
     st.header("🔍 Recherche Boolean")
     col1, col2 = st.columns(2)
     with col1:
-        poste = st.text_input("Poste recherché:", key="poste")
-        synonymes = st.text_input("Synonymes (séparés par des virgules):", key="synonymes")
-        st.caption("💡 Pour plus de synonymes, utilisez le Magicien de sourcing 🤖")
-        comp_oblig = st.text_input("Compétences obligatoires:", key="comp_oblig")
-        secteur = st.text_input("Secteur d'activité:", key="secteur")
+        poste = st.text_input("Poste recherché:", key="poste", placeholder="Ex: Ingénieur de travaux")
+        synonymes = st.text_input("Synonymes:", key="synonymes", placeholder="Ex: Chef de projet, Conducteur de travaux")
+        comp_oblig = st.text_input("Compétences obligatoires:", key="comp_oblig", placeholder="Ex: AutoCAD, Gestion de chantier")
+        secteur = st.text_input("Secteur:", key="secteur", placeholder="Ex: BTP, Immobilier")
     with col2:
-        comp_opt = st.text_input("Compétences optionnelles:", key="comp_opt")
-        exclusions = st.text_input("Mots à exclure:", key="exclusions")
-        localisation = st.text_input("Localisation:", key="localisation")
-        employeur = st.text_input("Employeur:", key="employeur")
+        comp_opt = st.text_input("Compétences optionnelles:", key="comp_opt", placeholder="Ex: Excel, Anglais")
+        exclusions = st.text_input("Exclusions:", key="exclusions", placeholder="Ex: Stage, Alternance")
+        localisation = st.text_input("Localisation:", key="localisation", placeholder="Ex: Casablanca")
+        employeur = st.text_input("Employeur:", key="employeur", placeholder="Ex: TGCC")
 
-    if st.button("🪄 Générer requête Boolean", type="primary"):
+    if st.button("🪄 Générer", type="primary"):
         st.session_state["boolean_query"] = generate_boolean_query(
             poste, synonymes, comp_oblig, comp_opt, exclusions, localisation, secteur
         )
@@ -96,152 +97,170 @@ with tab1:
             st.session_state["boolean_query"] += f' AND ("{employeur}")'
 
     if st.session_state.get("boolean_query"):
-        st.text_area("Requête Boolean:", value=st.session_state["boolean_query"], height=120)
+        st.text_area("Requête:", value=st.session_state["boolean_query"], height=120)
         url = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
-        buttons = [
-            ("💾 Sauvegarder", "#38a169", "save"),
-            ("🌐 LinkedIn", "#2b6cb0", url)
-        ]
-        action = action_buttons(buttons, context="boolean")
+        action = action_buttons("💾 Sauvegarder", url, "boolean")
         if action == "save":
             entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean",
                      "poste": poste, "requete": st.session_state["boolean_query"]}
             st.session_state.library_entries.append(entry)
             save_library_entries()
-            st.success("✅ Sauvegardé dans la bibliothèque")
+            st.success("✅ Sauvegardé")
 
 # ---------------- X-Ray ----------------
 with tab2:
-    st.header("🎯 X-Ray Google")
+    st.header("🎯 X-Ray")
     col1, col2 = st.columns(2)
     with col1:
-        site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub"], key="site_cible")
-        poste_xray = st.text_input("Poste:", key="poste_xray")
+        site = st.selectbox("Site cible:", ["LinkedIn", "GitHub"], key="site")
+        poste_x = st.text_input("Poste:", key="poste_xray", placeholder="Ex: Data Scientist")
     with col2:
-        mots_cles = st.text_input("Mots-clés:", key="mots_cles_xray")
-        localisation_xray = st.text_input("Localisation:", key="localisation_xray")
+        mots = st.text_input("Mots-clés:", key="mots_xray", placeholder="Ex: Python, Machine Learning")
+        loc = st.text_input("Localisation:", key="loc_xray", placeholder="Ex: Rabat")
 
-    if st.button("🔍 Construire X-Ray", type="primary"):
-        st.session_state["xray_query"] = generate_xray_query(site_cible, poste_xray, mots_cles, localisation_xray)
+    if st.button("🔍 Construire", type="primary"):
+        st.session_state["xray_query"] = generate_xray_query(site, poste_x, mots, loc)
 
     if st.session_state.get("xray_query"):
-        st.text_area("Requête X-Ray:", value=st.session_state["xray_query"], height=120)
+        st.text_area("Requête:", value=st.session_state["xray_query"], height=120)
         url = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
-        buttons = [
-            ("💾 Sauvegarder", "#38a169", "save"),
-            ("🌐 Google", "#d69e2e", url)
-        ]
-        action = action_buttons(buttons, context="xray")
+        action = action_buttons("💾 Sauvegarder", url, "xray")
         if action == "save":
             entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "X-Ray",
-                     "poste": poste_xray, "requete": st.session_state["xray_query"]}
+                     "poste": poste_x, "requete": st.session_state["xray_query"]}
             st.session_state.library_entries.append(entry)
             save_library_entries()
-            st.success("✅ Sauvegardé dans la bibliothèque")
+            st.success("✅ Sauvegardé")
 
 # ---------------- CSE ----------------
 with tab3:
     st.header("🔎 CSE LinkedIn")
-    poste_cse = st.text_input("Poste recherché:", key="poste_cse")
-    competences_cse = st.text_input("Compétences clés:", key="competences_cse")
-    localisation_cse = st.text_input("Localisation:", key="localisation_cse")
-    entreprise_cse = st.text_input("Entreprise:", key="entreprise_cse")
+    poste_cse = st.text_input("Poste:", key="poste_cse", placeholder="Ex: Chef de projet IT")
+    comp_cse = st.text_input("Compétences:", key="comp_cse", placeholder="Ex: Agile, PMP")
+    loc_cse = st.text_input("Localisation:", key="loc_cse", placeholder="Ex: Marrakech")
+    ent_cse = st.text_input("Entreprise:", key="ent_cse", placeholder="Ex: OCP")
 
-    if st.button("🔍 Lancer recherche CSE"):
-        st.session_state["cse_query"] = " ".join(
-            filter(None, [poste_cse, competences_cse, localisation_cse, entreprise_cse])
-        )
+    if st.button("🔍 Lancer CSE"):
+        st.session_state["cse_query"] = " ".join(filter(None, [poste_cse, comp_cse, loc_cse, ent_cse]))
 
     if st.session_state.get("cse_query"):
-        st.text_area("Requête CSE:", value=st.session_state["cse_query"], height=100)
-        cse_url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
-        buttons = [
-            ("💾 Sauvegarder", "#38a169", "save"),
-            ("🌐 CSE", "#2b6cb0", cse_url)
-        ]
-        action = action_buttons(buttons, context="cse")
+        st.text_area("Requête:", value=st.session_state["cse_query"], height=100)
+        url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
+        action = action_buttons("💾 Sauvegarder", url, "cse")
         if action == "save":
             entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "CSE",
                      "poste": poste_cse, "requete": st.session_state["cse_query"]}
             st.session_state.library_entries.append(entry)
             save_library_entries()
-            st.success("✅ Sauvegardé dans la bibliothèque")
+            st.success("✅ Sauvegardé")
 
 # ---------------- Dogpile ----------------
 with tab4:
-    st.header("🐶 Dogpile Search")
-    query = st.text_input("Recherche:", key="dogpile_query")
-    if st.button("🔎 Rechercher sur Dogpile"):
+    st.header("🐶 Dogpile")
+    query = st.text_input("Recherche:", key="dogpile", placeholder="Ex: Ingénieur mécanique Maroc")
+
+    if st.button("🔎 Lancer recherche"):
         st.session_state["dogpile_result"] = query
+
     if st.session_state.get("dogpile_result"):
-        st.text_area("Requête Dogpile:", value=st.session_state["dogpile_result"], height=100)
+        st.text_area("Requête:", value=st.session_state["dogpile_result"], height=100)
         url = f"https://www.dogpile.com/serp?q={quote(st.session_state['dogpile_result'])}"
-        buttons = [
-            ("💾 Sauvegarder", "#38a169", "save"),
-            ("🌐 Dogpile", "#805ad5", url)
-        ]
-        action = action_buttons(buttons, context="dogpile")
+        action = action_buttons("💾 Sauvegarder", url, "dogpile")
         if action == "save":
             entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Dogpile",
                      "poste": "", "requete": st.session_state["dogpile_result"]}
             st.session_state.library_entries.append(entry)
             save_library_entries()
-            st.success("✅ Sauvegardé dans la bibliothèque")
+            st.success("✅ Sauvegardé")
+
+# ---------------- Web Scraper ----------------
+with tab5:
+    st.header("🕷️ Web Scraper")
+    choix = st.selectbox("Objectif:", [
+        "Veille salariale",
+        "Intelligence concurrentielle",
+        "Contacts personnalisés",
+        "Collecte de CV/emails"
+    ], key="scraper_obj")
+    url = st.text_input("URL:", key="scraper_url", placeholder="Ex: https://exemple.com")
+
+    if st.button("🚀 Scraper"):
+        if url:
+            r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+            soup = BeautifulSoup(r.text, "html.parser")
+            texte = soup.get_text()[:800]
+            emails = set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", texte))
+            st.session_state["scraper_result"] = texte
+            st.session_state["scraper_emails"] = emails
+
+    if st.session_state.get("scraper_result"):
+        st.text_area("Extrait:", value=st.session_state["scraper_result"], height=200)
+        if st.session_state.get("scraper_emails"):
+            st.info("📧 Emails détectés: " + ", ".join(st.session_state["scraper_emails"]))
 
 # ---------------- InMail ----------------
 with tab6:
-    st.header("✉️ Générateur d'InMail")
-    url_linkedin = st.text_input("URL du profil LinkedIn:", key="inmail_url")
-    poste_accroche = st.text_input("Poste à pourvoir:", key="inmail_poste")
-    entreprise = st.selectbox("Entreprise:", ["TGCC", "TG ALU", "TG COVER", "TG WOOD", "TG STEEL",
-                                             "TG STONE", "TGEM", "TGCC Immobilier"], key="inmail_entreprise")
+    st.header("✉️ InMail")
+    url_lk = st.text_input("URL LinkedIn:", key="inmail_url", placeholder="Ex: https://linkedin.com/in/exemple")
+    poste_inm = st.text_input("Poste:", key="inmail_poste", placeholder="Ex: Chef de projet")
+    entreprise = st.text_input("Entreprise:", key="inmail_ent", placeholder="Ex: TGCC")
 
     if st.button("💌 Générer InMail", type="primary"):
-        st.session_state["inmail_message"] = generate_accroche_inmail(url_linkedin, poste_accroche) + \
-                                            f"\n\nNous serions ravis de discuter avec vous chez {entreprise}."
+        st.session_state["inmail_message"] = generate_accroche_inmail(url_lk, poste_inm) + \
+            f"\n\nNous serions ravis de discuter avec vous chez {entreprise}."
 
     if st.session_state.get("inmail_message"):
-        st.text_area("Message InMail:", value=st.session_state["inmail_message"], height=200)
+        st.text_area("Message:", value=st.session_state["inmail_message"], height=200)
 
 # ---------------- Magicien ----------------
 with tab7:
     st.header("🤖 Magicien de sourcing")
-    questions_pretes = [
+
+    if "magicien_history" not in st.session_state:
+        st.session_state.magicien_history = []
+
+    questions = [
         "Quels sont les synonymes possibles pour le métier de ?",
         "Quels outils ou logiciels sont liés au métier de ?",
         "Quels mots-clés pour cibler les juniors pour le poste de ?",
         "Quels intitulés similaires pour le métier de ?",
-        "Quels certificats ou diplômes recherchés pour le métier de ?",
+        "Quels certificats ou diplômes recherchés pour le métier de ?"
     ]
-    q_choice = st.selectbox("📌 Choisir une question:", [""] + questions_pretes, key="magicien_qchoice")
+    q_choice = st.selectbox("📌 Question prédéfinie:", [""] + questions, key="magicien_choice")
     question = st.text_area("Votre question:", value=q_choice if q_choice else "", key="magicien_question")
 
-    if st.button("✨ Poser la question", type="primary"):
+    if st.button("✨ Poser", type="primary"):
         if question:
             start_time = time.time()
             progress = st.progress(0, text="⏳ Génération en cours...")
-            for i in range(1, 101):
+            for i in range(101):
                 elapsed = int(time.time() - start_time)
-                progress.progress(i, text=f"⏳ Génération... {i}% - {elapsed}s")
-                time.sleep(0.01)
+                progress.progress(i, text=f"⏳ {i}% - {elapsed}s")
+                time.sleep(0.02)
             messages = [
-                {"role": "system", "content": "Tu es un expert en sourcing RH et recrutement. Réponds toujours de manière concise et directement exploitable."},
+                {"role": "system", "content": "Tu es un expert en sourcing RH et recrutement."},
                 {"role": "user", "content": question}
             ]
             result = ask_deepseek(messages, max_tokens=300)
-            st.session_state["magicien_reponse"] = result["content"]
+            st.session_state.magicien_history.append({"q": question, "r": result["content"]})
 
-    if st.session_state.get("magicien_reponse"):
-        st.text_area("Réponse:", value=st.session_state["magicien_reponse"], height=200)
+    if st.session_state.magicien_history:
+        st.subheader("📜 Historique")
+        for i, item in enumerate(st.session_state.magicien_history):
+            with st.expander(f"Q{i+1}: {item['q']}"):
+                st.text_area("Réponse:", value=item["r"], height=200, key=f"rep_{i}")
+                if st.button("🗑️ Supprimer", key=f"del_{i}"):
+                    st.session_state.magicien_history.pop(i)
+                    st.experimental_rerun()
 
 # ---------------- Permutator ----------------
 with tab8:
-    st.header("📧 Email Permutator")
-    prenom = st.text_input("Prénom:", key="perm_prenom")
-    nom = st.text_input("Nom:", key="perm_nom")
-    entreprise = st.text_input("Nom de l'entreprise:", key="perm_domaine")
+    st.header("📧 Permutator")
+    prenom = st.text_input("Prénom:", key="perm_prenom", placeholder="Ex: Mohamed")
+    nom = st.text_input("Nom:", key="perm_nom", placeholder="Ex: Amine")
+    entreprise = st.text_input("Entreprise:", key="perm_ent", placeholder="Ex: TGCC")
 
-    if st.button("🔮 Générer permutations"):
+    if st.button("🔮 Générer"):
         if prenom and nom and entreprise:
             st.session_state["perm_result"] = [
                 f"{prenom.lower()}.{nom.lower()}@{entreprise}.com",
@@ -250,15 +269,15 @@ with tab8:
             ]
 
     if st.session_state.get("perm_result"):
-        st.text_area("Résultats:", value="\n".join(st.session_state["perm_result"]), height=150)
-        st.caption("Tester une boîte mail : [Hunter.io](https://hunter.io/) | [NeverBounce](https://neverbounce.com/)")
+        st.text_area("Emails:", value="\n".join(st.session_state["perm_result"]), height=150)
+        st.caption("Tester les emails: [Hunter.io](https://hunter.io/) | [NeverBounce](https://neverbounce.com/)")
 
 # ---------------- Bibliothèque ----------------
 with tab9:
-    st.header("📚 Bibliothèque des recherches")
+    st.header("📚 Bibliothèque")
     if st.session_state.library_entries:
-        search_term = st.text_input("🔎 Rechercher dans la bibliothèque:")
-        sort_by = st.selectbox("📌 Trier par:", ["Date", "Type", "Poste"], key="sort_by")
+        search_term = st.text_input("🔎 Rechercher:", placeholder="Ex: Data")
+        sort_by = st.selectbox("Trier par:", ["Date", "Type", "Poste"], key="sort")
 
         entries = st.session_state.library_entries
         if search_term:
