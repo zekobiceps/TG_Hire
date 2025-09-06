@@ -5,6 +5,7 @@ from urllib.parse import quote
 import requests
 from bs4 import BeautifulSoup
 import re
+from datetime import datetime
 
 init_session_state()
 
@@ -33,16 +34,16 @@ with tab1:
     st.header("🔍 Recherche Boolean")
     col1, col2 = st.columns(2)
     with col1:
-        poste = st.text_input("Poste recherché:", placeholder="Ex: Développeur Python")
-        synonymes = st.text_input("Synonymes (séparés par des virgules):", placeholder="Ex: Developer, Programmeur, Ingénieur")
+        poste = st.text_input("Poste recherché:", key="poste")
+        synonymes = st.text_input("Synonymes (séparés par des virgules):", key="synonymes")
         st.caption("💡 Besoin d’aide pour les synonymes ? Utilisez le Magicien de sourcing 🤖 ci-dessous.")
-        competences_obligatoires = st.text_input("Compétences obligatoires:", placeholder="Ex: Python, Django")
-        secteur = st.text_input("Secteur d'activité:", placeholder="Ex: Informatique, Finance, Santé")
+        competences_obligatoires = st.text_input("Compétences obligatoires:", key="competences_obligatoires")
+        secteur = st.text_input("Secteur d'activité:", key="secteur")
     with col2:
-        competences_optionnelles = st.text_input("Compétences optionnelles:", placeholder="Ex: React, AWS")
-        exclusions = st.text_input("Mots à exclure:", placeholder="Ex: Manager, Senior")
-        localisation = st.text_input("Localisation:", placeholder="Ex: Casablanca, Maroc")
-        employeur = st.text_input("Employeur actuel/précédent:", placeholder="Ex: OCP, IBM")
+        competences_optionnelles = st.text_input("Compétences optionnelles:", key="competences_optionnelles")
+        exclusions = st.text_input("Mots à exclure:", key="exclusions")
+        localisation = st.text_input("Localisation:", key="localisation")
+        employeur = st.text_input("Employeur actuel/précédent:", key="employeur")
 
     if st.button("🪄 Générer la requête Boolean", type="primary"):
         boolean_query = generate_boolean_query(
@@ -56,21 +57,18 @@ with tab1:
             st.text_area("Requête Boolean:", value=boolean_query, height=120)
 
             colA, colB, colC = st.columns(3)
-            safe_query = boolean_query.replace("`", "")
             with colA:
-                st.markdown(
-                    f'<button onclick="navigator.clipboard.writeText(`{safe_query}`)">📋 Copier</button>',
-                    unsafe_allow_html=True
-                )
+                st.download_button("📋 Copier", data=boolean_query, file_name="requete_boolean.txt", mime="text/plain")
             with colB:
                 if st.button("📚 Sauvegarder Boolean"):
                     entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Boolean", "poste": poste, "requete": boolean_query}
                     st.session_state.library_entries.append(entry)
                     save_library_entries()
-                    st.toast("✅ Sauvegardé dans la bibliothèque")
+                    st.success("✅ Sauvegardé dans la bibliothèque")
             with colC:
                 if st.button("🔄 Réinit Boolean"):
-                    st.session_state.clear()
+                    for key in ["poste","synonymes","competences_obligatoires","secteur","competences_optionnelles","exclusions","localisation","employeur"]:
+                        st.session_state[key] = ""
                     st.experimental_rerun()
 
 # -------------------- X-Ray --------------------
@@ -79,29 +77,25 @@ with tab2:
     st.caption("🔎 Utilise Google pour cibler directement les profils sur LinkedIn ou GitHub.")
     col1, col2 = st.columns(2)
     with col1:
-        site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub"])
-        poste_xray = st.text_input("Poste:", placeholder="Ex: Data Scientist")
+        site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub"], key="site_cible")
+        poste_xray = st.text_input("Poste:", key="poste_xray")
     with col2:
-        mots_cles = st.text_input("Mots-clés:", placeholder="Ex: Machine Learning, Python")
-        localisation_xray = st.text_input("Localisation:", placeholder="Ex: Rabat")
+        mots_cles = st.text_input("Mots-clés:", key="mots_cles_xray")
+        localisation_xray = st.text_input("Localisation:", key="localisation_xray")
 
     if st.button("🔍 Construire X-Ray", type="primary"):
         xray_query = generate_xray_query(site_cible, poste_xray, mots_cles, localisation_xray)
         st.text_area("Requête X-Ray:", value=xray_query, height=120)
 
         colA, colB, colC = st.columns(3)
-        safe_query = xray_query.replace("`", "")
         with colA:
-            st.markdown(
-                f'<button onclick="navigator.clipboard.writeText(`{safe_query}`)">📋 Copier</button>',
-                unsafe_allow_html=True
-            )
+            st.download_button("📋 Copier", data=xray_query, file_name="requete_xray.txt", mime="text/plain")
         with colB:
             if st.button("📚 Sauvegarder X-Ray"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "X-Ray", "poste": poste_xray, "requete": xray_query}
                 st.session_state.library_entries.append(entry)
                 save_library_entries()
-                st.toast("✅ Sauvegardé dans la bibliothèque")
+                st.success("✅ Sauvegardé dans la bibliothèque")
         with colC:
             if st.button("🌐 Ouvrir sur Google"):
                 url = f"https://www.google.com/search?q={quote(xray_query)}"
@@ -111,10 +105,10 @@ with tab2:
 with tab3:
     st.header("🔎 CSE (Custom Search Engine) LinkedIn :")
     st.caption("🔎 Google CSE préconfiguré pour chercher uniquement dans les profils LinkedIn.")
-    poste_cse = st.text_input("Poste recherché:")
-    competences_cse = st.text_input("Compétences clés:")
-    localisation_cse = st.text_input("Localisation:")
-    entreprise_cse = st.text_input("Entreprise:")
+    poste_cse = st.text_input("Poste recherché:", key="poste_cse")
+    competences_cse = st.text_input("Compétences clés:", key="competences_cse")
+    localisation_cse = st.text_input("Localisation:", key="localisation_cse")
+    entreprise_cse = st.text_input("Entreprise:", key="entreprise_cse")
 
     if st.button("🔍 Lancer recherche CSE"):
         cse_query = " ".join(filter(None, [poste_cse, competences_cse, localisation_cse, entreprise_cse]))
@@ -122,18 +116,14 @@ with tab3:
         st.text_area("Requête CSE:", value=cse_query, height=100)
 
         colA, colB, colC = st.columns(3)
-        safe_query = cse_query.replace("`", "")
         with colA:
-            st.markdown(
-                f'<button onclick="navigator.clipboard.writeText(`{safe_query}`)">📋 Copier</button>',
-                unsafe_allow_html=True
-            )
+            st.download_button("📋 Copier", data=cse_query, file_name="requete_cse.txt", mime="text/plain")
         with colB:
             if st.button("📚 Sauvegarder CSE"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "CSE", "poste": poste_cse, "requete": cse_query}
                 st.session_state.library_entries.append(entry)
                 save_library_entries()
-                st.toast("✅ Sauvegardé dans la bibliothèque")
+                st.success("✅ Sauvegardé dans la bibliothèque")
         with colC:
             if st.button("🌐 Ouvrir résultats CSE"):
                 webbrowser.open_new_tab(cse_url)
@@ -141,24 +131,20 @@ with tab3:
 # -------------------- Dogpile --------------------
 with tab4:
     st.header("🐶 Dogpile Search")
-    query = st.text_input("Recherche:")
+    query = st.text_input("Recherche:", key="dogpile_query")
     if st.button("🔎 Rechercher sur Dogpile"):
         if query:
             url = f"https://www.dogpile.com/serp?q={quote(query)}"
             st.text_area("Requête Dogpile:", value=query, height=100)
             colA, colB, colC = st.columns(3)
-            safe_query = query.replace("`", "")
             with colA:
-                st.markdown(
-                    f'<button onclick="navigator.clipboard.writeText(`{safe_query}`)">📋 Copier</button>',
-                    unsafe_allow_html=True
-                )
+                st.download_button("📋 Copier", data=query, file_name="requete_dogpile.txt", mime="text/plain")
             with colB:
                 if st.button("📚 Sauvegarder Dogpile"):
                     entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Dogpile", "poste": "", "requete": query}
                     st.session_state.library_entries.append(entry)
                     save_library_entries()
-                    st.toast("✅ Sauvegardé dans la bibliothèque")
+                    st.success("✅ Sauvegardé dans la bibliothèque")
             with colC:
                 if st.button("🌐 Ouvrir sur Dogpile"):
                     webbrowser.open_new_tab(url)
@@ -171,8 +157,8 @@ with tab5:
         "Intelligence concurrentielle",
         "Contact personnalisé",
         "Collecte de CV / emails / téléphones"
-    ])
-    url = st.text_input("URL à analyser:")
+    ], key="scraper_choix")
+    url = st.text_input("URL à analyser:", key="scraper_url")
     if st.button("🚀 Scraper"):
         if url:
             r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
@@ -181,21 +167,17 @@ with tab5:
             emails = set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", texte))
             st.text_area("Extrait:", value=texte, height=200)
             colA, colB, colC = st.columns(3)
-            safe_text = texte.replace("`", "")
             with colA:
-                st.markdown(
-                    f'<button onclick="navigator.clipboard.writeText(`{safe_text}`)">📋 Copier</button>',
-                    unsafe_allow_html=True
-                )
+                st.download_button("📋 Copier", data=texte, file_name="scraper_result.txt", mime="text/plain")
             with colB:
                 if st.button("📚 Sauvegarder Scraper"):
                     entry = {"date": datetime.now().strftime("%Y-%m-%d"), "type": "Scraper", "poste": choix, "requete": url}
                     st.session_state.library_entries.append(entry)
                     save_library_entries()
-                    st.toast("✅ Sauvegardé dans la bibliothèque")
+                    st.success("✅ Sauvegardé dans la bibliothèque")
             with colC:
                 if st.button("🔄 Réinit Scraper"):
-                    st.session_state.clear()
+                    st.session_state["scraper_url"] = ""
                     st.experimental_rerun()
 
 # -------------------- Bibliothèque --------------------
