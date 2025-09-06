@@ -181,18 +181,30 @@ with tab5:
 # -------------------- InMail --------------------
 with tab6:
     st.header("✉️ Générateur d'InMail")
+
     url_linkedin = st.text_input("URL du profil LinkedIn:", key="inmail_url")
     poste_accroche = st.text_input("Poste à pourvoir:", key="inmail_poste")
-    entreprise = st.text_input("Entreprise:", key="inmail_entreprise")
+
+    entreprise = st.selectbox("Entreprise:", [
+        "TGCC", "TG ALU", "TG COVER", "TG WOOD", "TG STEEL",
+        "TG STONE", "TGEM", "TGCC Immobilier"
+    ], key="inmail_entreprise")
+
+    mode_rapide_inmail = st.checkbox("⚡ Mode rapide (réponse concise)", key="inmail_fast")
 
     if st.button("💌 Générer InMail", type="primary"):
         start_time = time.time()
         progress = st.progress(0, text="⏳ Génération en cours...")
+
         for i in range(100):
             elapsed = int(time.time() - start_time)
             progress.progress(i + 1, text=f"⏳ Génération... {i+1}% - {elapsed}s")
-            time.sleep(0.3)  # ~30s
-        st.session_state["inmail_message"] = generate_accroche_inmail(url_linkedin, poste_accroche) + f"\n\nEntreprise : {entreprise}"
+            time.sleep(0.1 if mode_rapide_inmail else 0.2)
+
+        st.session_state["inmail_message"] = generate_accroche_inmail(
+            url_linkedin, poste_accroche
+        ) + f"\n\nJe fais partie de l’équipe recrutement de {entreprise}, et nous serions ravis d’échanger avec vous."
+
         total_time = int(time.time() - start_time)
         progress.progress(100, text=f"✅ Génération réussie en {total_time}s")
 
@@ -203,17 +215,35 @@ with tab6:
 with tab7:
     st.header("🤖 Magicien de sourcing")
 
-    question = st.text_area("Votre question :", key="magicien_question")
+    questions_pretes = [
+        "Quels sont les synonymes possibles pour le métier de",
+        "Quels outils ou logiciels sont liés au métier de",
+        "Quels mots-clés pour cibler les juniors pour le poste de",
+        "Quels intitulés similaires au poste de",
+        "Quels critères éliminatoires fréquents pour le poste de",
+        "Quels secteurs d’activité embauchent souvent pour le poste de",
+        "Quelles certifications utiles pour le métier de",
+        "Quels intitulés de poste équivalents dans le marché marocain pour",
+        "Quels rôles proches à considérer lors du sourcing pour",
+        "Quelles tendances de recrutement récentes pour le métier de"
+    ]
+
+    q_choice = st.selectbox("📌 Questions prêtes :", [""] + questions_pretes, key="magicien_qchoice")
+    question = st.text_area("Votre question :", value=q_choice if q_choice else "", key="magicien_question")
+
+    mode_rapide_magicien = st.checkbox("⚡ Mode rapide (réponse concise)", key="magicien_fast")
 
     if st.button("✨ Poser la question", type="primary", key="ask_magicien"):
         if question:
             start_time = time.time()
             progress = st.progress(0, text="⏳ Génération en cours...")
+
             for i in range(100):
                 elapsed = int(time.time() - start_time)
                 progress.progress(i + 1, text=f"⏳ Génération... {i+1}% - {elapsed}s")
-                time.sleep(0.3)
-            result = ask_deepseek([{"role": "user", "content": question}], max_tokens=300)
+                time.sleep(0.1 if mode_rapide_magicien else 0.3)
+
+            result = ask_deepseek([{"role": "user", "content": question}], max_tokens=150 if mode_rapide_magicien else 300)
             total_time = int(time.time() - start_time)
             st.session_state.magicien_history.append({"q": question, "r": result["content"], "time": total_time})
             progress.progress(100, text=f"✅ Génération réussie en {total_time}s")
@@ -241,12 +271,14 @@ with tab8:
     with col2:
         entreprise = st.text_input("Entreprise:", key="perm_domaine")
 
+    source = st.radio("Source de détection :", ["Site officiel", "Charika.ma"], key="perm_source", horizontal=True)
+
     if st.button("🔮 Générer permutations"):
         if prenom and nom and entreprise:
             permutations = []
-            detected = get_email_from_charika(entreprise)
+            detected = get_email_from_charika(entreprise) if source == "Charika.ma" else None
             if detected:
-                st.info(f"📧 Format détecté depuis Charika : {detected}")
+                st.info(f"📧 Format détecté : {detected}")
                 domain = detected.split("@")[1]
                 permutations.append(f"{prenom.lower()}.{nom.lower()}@{domain}")
                 permutations.append(f"{prenom[0].lower()}{nom.lower()}@{domain}")
