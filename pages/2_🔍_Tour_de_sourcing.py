@@ -165,7 +165,7 @@ with tab4:
         col1, _ = st.columns([1, 9])
         with col1:
             if st.button("🌐 Dogpile", key="dogpile_button"):
-                st.markdown(f"<script>window.open('{st.session_state['dogpile_url}')</script>", unsafe_allow_html=True)
+                st.markdown(f"<script>window.open('{st.session_state['dogpile_url']}')</script>", unsafe_allow_html=True)
 
 # -------------------- Web Scraper --------------------
 with tab5:
