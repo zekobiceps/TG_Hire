@@ -355,7 +355,7 @@ with tab6:
         longueur_message = st.slider("Longueur (mots):", 50, 300, 150, key="inmail_longueur")
     with col6:
         methode_analyse = st.selectbox("Méthode d'analyse:", 
-                                       ["API PDL", "Regex", "Manuel"], key="inmail_methode")
+                                       ["Manuel", "Regex", "Compét API"], key="inmail_methode")
 
     # Ligne 3 : Genre + Call to Action
     col7, col8 = st.columns([2, 2])
@@ -383,13 +383,19 @@ with tab6:
             "localisation": ""
         }
 
-        if methode == "Regex" and "/in/" in url:
-            parts = url.split("/in/")[1].split("/")[0].split('-')
-            if parts:
-                donnees["prenom"] = parts[0].title()
-                donnees["nom"] = " ".join([p.title() for p in parts[1:] if len(p) > 1])
+        if methode == "Regex" and url:
+            import re
+            try:
+                match = re.search(r"linkedin\.com/in/([a-zA-Z\-0-9éèêëàâäïîç]+)/?", url)
+                if match:
+                    parts = match.group(1).split('-')
+                    if parts:
+                        donnees["prenom"] = parts[0].title()
+                        donnees["nom"] = " ".join([p.title() for p in parts[1:] if len(p) > 1])
+            except Exception:
+                pass
 
-        elif methode == "API PDL":
+        elif methode == "Compét API" and url:
             try:
                 api_key = "de89b8bc7ad232693f6817010b409f3c384736971b8c876f379472778e8c17d1"
                 resp = requests.get(
@@ -410,7 +416,7 @@ with tab6:
                         if skills:
                             donnees["competences_cles"] = skills[:3]
             except Exception as e:
-                st.error(f"Erreur API PDL: {e}")
+                st.error(f"Erreur Compét API: {e}")
 
         return donnees
 
@@ -428,11 +434,28 @@ with tab6:
         return ""
 
     def generate_inmail(donnees, poste, entreprise, ton, genre, max_words, cta_type):
-        """Génération du texte InMail"""
+        """Génération du texte InMail plus intelligent"""
         prenom = donnees.get("prenom", "Candidat")
+        nom = donnees.get("nom", "")
+        poste_actuel = donnees.get("poste_actuel", "")
+        entreprise_actuelle = donnees.get("entreprise_actuelle", "")
+        competence = ", ".join([c for c in donnees.get("competences_cles", []) if c])
+        experience = donnees.get("experience_annees", "")
+        formation = donnees.get("formation", "")
+        localisation = donnees.get("localisation", "")
         cta_text = generate_cta(cta_type, prenom, genre)
 
-        base_msg = f"Bonjour {prenom},\n\nVotre parcours semble correspondre au poste de {poste} au sein de {entreprise}.\n\n{cta_text}"
+        if ton == "Persuasif":
+            base_msg = f"Bonjour {prenom},\n\nVotre parcours {poste_actuel} {('chez ' + entreprise_actuelle) if entreprise_actuelle else ''} démontre une expertise remarquable. Votre maîtrise de {competence if competence else 'vos compétences'} et vos {experience} années d’expérience sont des atouts pour le poste de {poste} au sein de {entreprise}.\n\n{cta_text}"
+
+        elif ton == "Professionnel":
+            base_msg = f"Bonjour {prenom},\n\nNous avons remarqué votre profil {poste_actuel} {('chez ' + entreprise_actuelle) if entreprise_actuelle else ''}. Votre parcours {formation if formation else 'académique et professionnel'} ainsi que vos compétences ({competence if competence else 'clés'}) correspondent parfaitement au poste de {poste} au sein de {entreprise}.\n\n{cta_text}"
+
+        elif ton == "Convivial":
+            base_msg = f"Bonjour {prenom},\n\nEn découvrant votre profil {localisation if localisation else ''}, nous avons été impressionnés par votre parcours {('chez ' + entreprise_actuelle) if entreprise_actuelle else ''}. Votre expertise en {competence if competence else 'plusieurs domaines'} correspond à ce que nous recherchons pour le poste de {poste} au sein de {entreprise}.\n\n{cta_text}"
+
+        else:  # Direct
+            base_msg = f"Bonjour {prenom},\n\nVotre profil correspond parfaitement au poste de {poste} au sein de {entreprise}. Votre expérience {poste_actuel} et vos compétences ({competence if competence else 'techniques'}) sont exactement ce que nous recherchons.\n\n{cta_text}"
 
         words = base_msg.split()
         if len(words) > max_words:
@@ -461,7 +484,7 @@ with tab6:
         st.divider()
         st.subheader("📝 Message InMail Personnalisé")
 
-        # Expander modifiable toujours affiché
+        # Expander modifiable
         with st.expander("📊 Informations du profil analysé (modifiables)", expanded=True):
             edited = st.session_state.get("inmail_profil_data", {}).copy()
             col_a, col_b, col_c = st.columns(3)
@@ -472,8 +495,8 @@ with tab6:
                 edited["nom"] = st.text_input("Nom:", value=edited["nom"], key="edit_nom")
                 edited["entreprise_actuelle"] = st.text_input("Entreprise actuelle:", value=edited["entreprise_actuelle"], key="edit_entreprise")
             with col_c:
-                edited["experience_annees"] = st.text_input("Expérience:", value=edited["experience_annees"], key="edit_exp")
-                edited["formation"] = st.text_input("Formation:", value=edited["formation"], key="edit_form")
+                edited["experience_annees"] = st.text_input("Nombre d'années d'expérience:", value=edited["experience_annees"], key="edit_exp")
+                edited["formation"] = st.text_input("Domaine de formation:", value=edited["formation"], key="edit_form")
 
             edited["competences_cles"][0] = st.text_input("Compétence 1:", value=edited["competences_cles"][0], key="comp1")
             edited["competences_cles"][1] = st.text_input("Compétence 2:", value=edited["competences_cles"][1], key="comp2")
@@ -486,34 +509,6 @@ with tab6:
         # Zone message
         message = st.session_state.get("inmail_message", "")
         st.text_area("✉️ Message:", value=message, height=250)
-
-        # Actions
-        col_x, col_y = st.columns(2)
-        with col_x:
-            if st.button("🔄 Régénérer avec modifications"):
-                result = generate_inmail(
-                    donnees=st.session_state["inmail_profil_data"],
-                    poste=poste_accroche,
-                    entreprise=entreprise,
-                    ton=ton_message,
-                    genre=genre_profil,
-                    max_words=longueur_message,
-                    cta_type=cta_option
-                )
-                st.session_state["inmail_message"] = result
-                st.rerun()
-        with col_y:
-            if st.button("💾 Sauvegarder"):
-                entry = {
-                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                    "type": "InMail",
-                    "poste": poste_accroche,
-                    "requete": f"Message personnalisé - {poste_accroche}"
-                }
-                if 'library_entries' not in st.session_state:
-                    st.session_state.library_entries = []
-                st.session_state.library_entries.append(entry)
-                st.success("✅ Sauvegardé")
 
 # -------------------- Tab 7: Magicien --------------------
 with tab7:
