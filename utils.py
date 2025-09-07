@@ -3,6 +3,7 @@ import streamlit as st
 import os
 import pickle
 from datetime import datetime
+from io import BytesIO
 
 # -------------------- Session --------------------
 def init_session_state():
@@ -125,7 +126,6 @@ try:
     WORD_AVAILABLE = True
 except ImportError:
     WORD_AVAILABLE = False
-from io import BytesIO
 
 # -------------------- Export PDF --------------------
 def export_brief_pdf():
@@ -169,6 +169,22 @@ def export_brief_pdf():
                 c.showPage()
                 y = height - 100
 
+    # ➕ Export de la matrice KSA
+    if st.session_state.get("ksa_data"):
+        c.setFont("Helvetica-Bold", 14)
+        c.drawString(50, y, "Matrice KSA :")
+        y -= 20
+        c.setFont("Helvetica", 11)
+        for cat, comps in st.session_state["ksa_data"].items():
+            c.drawString(50, y, f"{cat}")
+            y -= 15
+            for comp, details in comps.items():
+                c.drawString(70, y, f"{comp} | Niv: {details.get('niveau','')} | Prio: {details.get('priorite','')} | Eval: {details.get('evaluateur','')}")
+                y -= 15
+                if y < 100:
+                    c.showPage()
+                    y = height - 100
+
     c.save()
     buffer.seek(0)
     return buffer
@@ -195,7 +211,76 @@ def export_brief_word():
         for it, val in items.items():
             doc.add_paragraph(f"{it}: {val.get('valeur', '')} (importance: {val.get('importance', '')})")
 
+    # ➕ Export matrice KSA
+    if st.session_state.get("ksa_data"):
+        doc.add_heading("Matrice KSA", level=1)
+        for cat, comps in st.session_state["ksa_data"].items():
+            doc.add_heading(cat, level=2)
+            for comp, details in comps.items():
+                doc.add_paragraph(f"{comp} | Niv: {details.get('niveau','')} | Prio: {details.get('priorite','')} | Eval: {details.get('evaluateur','')}")
+
     buffer = BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer
+
+# -------------------- Section KSA interactive --------------------
+def render_ksa_section():
+    """Affiche et gère la matrice KSA"""
+    st.subheader("📊 Matrice KSA (Knowledge / Skills / Abilities)")
+
+    if "ksa_data" not in st.session_state or not st.session_state.ksa_data:
+        st.session_state.ksa_data = {
+            "Knowledge (Connaissances)": {},
+            "Skills (Savoir-faire)": {},
+            "Abilities (Aptitudes)": {}
+        }
+
+    for category in st.session_state.ksa_data.keys():
+        st.markdown(f"### {category}")
+
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            new_comp = st.text_input(f"Ajouter une compétence pour {category}", key=f"new_{category}")
+        with col2:
+            if st.button("➕ Ajouter", key=f"add_{category}"):
+                if new_comp:
+                    st.session_state.ksa_data[category][new_comp] = {
+                        "niveau": "Intermédiaire",
+                        "priorite": "Indispensable",
+                        "evaluateur": "Manager"
+                    }
+                    st.rerun()
+
+        to_delete = None
+        for comp, details in st.session_state.ksa_data[category].items():
+            col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 1])
+            with col1:
+                st.write(f"🔹 {comp}")
+            with col2:
+                st.session_state.ksa_data[category][comp]["niveau"] = st.selectbox(
+                    "Niveau",
+                    ["Débutant", "Intermédiaire", "Expert"],
+                    index=["Débutant", "Intermédiaire", "Expert"].index(details.get("niveau", "Intermédiaire")),
+                    key=f"{category}_{comp}_niv"
+                )
+            with col3:
+                st.session_state.ksa_data[category][comp]["priorite"] = st.selectbox(
+                    "Priorité",
+                    ["Indispensable", "Souhaitable"],
+                    index=["Indispensable", "Souhaitable"].index(details.get("priorite", "Indispensable")),
+                    key=f"{category}_{comp}_prio"
+                )
+            with col4:
+                st.session_state.ksa_data[category][comp]["evaluateur"] = st.selectbox(
+                    "Évaluateur",
+                    ["Manager", "Recruteur", "Les deux"],
+                    index=["Manager", "Recruteur", "Les deux"].index(details.get("evaluateur", "Manager")),
+                    key=f"{category}_{comp}_eval"
+                )
+            with col5:
+                if st.button("🗑️", key=f"del_{category}_{comp}"):
+                    to_delete = comp
+        if to_delete:
+            del st.session_state.ksa_data[category][to_delete]
+            st.rerun()
