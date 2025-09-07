@@ -2,11 +2,11 @@ import streamlit as st
 import json
 import os
 from datetime import date
+from io import BytesIO
 
 # ---------------- INIT SESSION STATE ----------------
 def init_session():
     defaults = {
-        "step": 1,
         "current_brief_name": "",
         "saved_briefs": {},
         "identite_poste": {
@@ -18,18 +18,8 @@ def init_session():
             "budget_salaire": "",
             "date_prise_poste": ""
         },
-        "contexte": {
-            "raison_ouverture": "",
-            "impact_strategique": "",
-            "rattachement": "",
-            "defis_principaux": ""
-        },
-        "recherches": {
-            "benchmark_salaire": "",
-            "disponibilite_profils": "",
-            "concurrents_directs": "",
-            "specificites_sectorielles": ""
-        },
+        "contexte": {"raison_ouverture": "", "impact_strategique": "", "rattachement": "", "defis_principaux": ""},
+        "recherches": {"benchmark_salaire": "", "disponibilite_profils": "", "concurrents_directs": "", "specificites_sectorielles": ""},
         "questions_manager": [],
         "incidents": {
             "reussite_exceptionnelle": {"contexte": "", "actions": "", "resultat": ""},
@@ -49,15 +39,15 @@ init_session()
 
 st.set_page_config(page_title="TG-Hire IA - Brief Recrutement", page_icon="📋", layout="wide")
 
-# ---------------- GESTION ONGLET ----------------
-tab1, tab2 = st.tabs(["📁 Gestion", "🧩 Brief Structuré"])
+# ---------------- ONGLET NAVIGATION ----------------
+tabs = st.tabs(["📁 Gestion", "🔄 Avant-brief", "✅ Réunion", "📊 Synthèse"])
 
 # --------- ONGLET GESTION ---------
-with tab1:
+with tabs[0]:
     st.header("📁 Gestion des Briefs")
     col1, col2 = st.columns(2)
     with col1:
-        st.text_input("Nom du Brief (automatique si vide)", key="current_brief_name")
+        st.text_input("Nom du Brief (auto si vide)", key="current_brief_name")
         st.text_input("Recruteur", key="recruteur_gestion")
         st.text_input("Manager", key="manager_gestion")
         st.text_input("Intitulé du poste", key="poste_intitule_gestion")
@@ -102,61 +92,43 @@ with tab1:
                     st.download_button("Télécharger JSON", data=export_data,
                                        file_name=f"{choix}.json", mime="application/json")
 
-# --------- ONGLET BRIEF STRUCTURÉ ---------
-with tab2:
-    st.header("🧩 Brief Structuré - Wizard")
-    total_steps = 10
-    progress = st.session_state.step / total_steps
-    st.progress(progress)
-    st.write(f"Étape {st.session_state.step}/{total_steps}")
-
-    # SECTION PAR ÉTAPE
-    if st.session_state.step == 1:
-        st.subheader("Fiche Identité")
+# --------- ONGLET AVANT-BRIEF ---------
+with tabs[1]:
+    st.header("🔄 Avant-brief (Préparation)")
+    with st.expander("📋 Identité du poste", expanded=False):
         for key in st.session_state.identite_poste:
-            st.session_state.identite_poste[key] = st.text_input(
-                key.replace("_", " ").capitalize(), st.session_state.identite_poste[key]
-            )
-
-    elif st.session_state.step == 2:
-        st.subheader("Contexte & Enjeux")
+            st.session_state.identite_poste[key] = st.text_input(key.capitalize(), st.session_state.identite_poste[key])
+    with st.expander("🎯 Contexte", expanded=False):
         for key in st.session_state.contexte:
-            st.session_state.contexte[key] = st.text_area(
-                key.replace("_", " ").capitalize(), st.session_state.contexte[key]
-            )
-
-    elif st.session_state.step == 3:
-        st.subheader("Recherches Marché")
+            st.session_state.contexte[key] = st.text_area(key.capitalize(), st.session_state.contexte[key])
+    with st.expander("📚 Recherches marché", expanded=False):
         for key in st.session_state.recherches:
-            st.session_state.recherches[key] = st.text_area(
-                key.replace("_", " ").capitalize(), st.session_state.recherches[key]
-            )
+            st.session_state.recherches[key] = st.text_area(key.capitalize(), st.session_state.recherches[key])
 
-    elif st.session_state.step == 4:
-        st.subheader("Questions Manager")
+# --------- ONGLET REUNION ---------
+with tabs[2]:
+    st.header("✅ Réunion de brief (Validation)")
+    with st.expander("❓ Questions manager"):
         new_q = st.text_input("Ajouter une question")
-        if st.button("➕ Ajouter question"):
+        if st.button("➕ Ajouter"):
             if new_q:
                 st.session_state.questions_manager.append(new_q)
         st.write(st.session_state.questions_manager)
 
-    elif st.session_state.step == 5:
-        st.subheader("Incidents Critiques")
+    with st.expander("🎭 Incidents critiques"):
         for k, fields in st.session_state.incidents.items():
-            st.markdown(f"**{k.replace('_', ' ').capitalize()}**")
+            st.markdown(f"**{k.replace('_',' ').capitalize()}**")
             for f in fields:
                 st.session_state.incidents[k][f] = st.text_area(f, st.session_state.incidents[k][f])
 
-    elif st.session_state.step == 6:
-        st.subheader("Questions Comportementales")
+    with st.expander("🔍 Questions comportementales"):
         q = st.text_input("Question")
         r = st.text_area("Réponse attendue")
-        if st.button("➕ Ajouter Q° comportementale"):
+        if st.button("➕ Ajouter Q°"):
             st.session_state.questions_comportementales.append({"question": q, "reponse_attendue": r})
         st.write(st.session_state.questions_comportementales)
 
-    elif st.session_state.step == 7:
-        st.subheader("Matrice KSA")
+    with st.expander("📊 Matrice KSA"):
         cat = st.selectbox("Catégorie", ["knowledge", "skills", "abilities"])
         comp = st.text_input("Compétence")
         niv = st.slider("Niveau requis (1-5)", 1, 5, 3)
@@ -164,53 +136,87 @@ with tab2:
         eval = st.selectbox("Évaluateur", ["Recruteur", "Manager", "Les deux"])
         if st.button("➕ Ajouter compétence"):
             st.session_state.ksa_matrix[cat].append(
-                {"competence": comp, "niveau": niv, "importance": imp / 100, "evaluateur": eval}
+                {"competence": comp, "niveau": niv, "importance": imp/100, "evaluateur": eval}
             )
         st.write(st.session_state.ksa_matrix)
 
-    elif st.session_state.step == 8:
-        st.subheader("Stratégie Recrutement")
+    with st.expander("⚙️ Stratégie recrutement"):
         st.session_state.strategie["canaux_prioritaires"] = st.text_area(
-            "Canaux prioritaires (séparés par virgule)",
-            ", ".join(st.session_state.strategie["canaux_prioritaires"])
+            "Canaux prioritaires", ", ".join(st.session_state.strategie["canaux_prioritaires"])
         ).split(",")
         st.session_state.strategie["criteres_exclusion"] = st.text_area(
-            "Critères d’exclusion",
-            ", ".join(st.session_state.strategie["criteres_exclusion"])
+            "Critères d’exclusion", ", ".join(st.session_state.strategie["criteres_exclusion"])
         ).split(",")
 
-    elif st.session_state.step == 9:
-        st.subheader("Scoring & Synthèse")
-        def calculer_score_reference():
-            total, poids_total = 0, 0
-            for comp in st.session_state.ksa_matrix["knowledge"] + st.session_state.ksa_matrix["skills"]:
-                total += comp["niveau"] * comp["importance"]
-                poids_total += comp["importance"]
-            for comp in st.session_state.ksa_matrix["abilities"]:
-                total += comp["niveau"] * comp["importance"]
-                poids_total += comp["importance"]
-            return total / poids_total if poids_total > 0 else 0
+# --------- ONGLET SYNTHÈSE ---------
+with tabs[3]:
+    st.header("📊 Synthèse & Scoring global")
 
-        score = calculer_score_reference()
-        st.metric("Score de référence", f"{score:.2f}/5")
+    def calculer_score_reference():
+        total, poids_total = 0, 0
+        for comp in st.session_state.ksa_matrix["knowledge"] + st.session_state.ksa_matrix["skills"]:
+            total += comp["niveau"] * comp["importance"]
+            poids_total += comp["importance"]
+        for comp in st.session_state.ksa_matrix["abilities"]:
+            total += comp["niveau"] * comp["importance"]
+            poids_total += comp["importance"]
+        return total / poids_total if poids_total > 0 else 0
 
-    elif st.session_state.step == 10:
-        st.subheader("Plan d’Action & Calendrier")
-        st.session_state.plan_action["prochaines_etapes"] = st.text_area(
-            "Prochaines étapes", "\n".join(st.session_state.plan_action["prochaines_etapes"])
-        ).split("\n")
-        st.session_state.calendrier["date_lancement"] = st.date_input("Date lancement")
-        st.session_state.calendrier["date_limite_candidatures"] = st.date_input("Date limite candidatures")
+    score = calculer_score_reference()
+    st.metric("Score de référence", f"{score:.2f}/5")
 
-    # NAVIGATION
+    st.subheader("📝 Plan d’action")
+    st.session_state.plan_action["prochaines_etapes"] = st.text_area(
+        "Prochaines étapes", "\n".join(st.session_state.plan_action["prochaines_etapes"])
+    ).split("\n")
+
+    st.subheader("📅 Calendrier")
+    st.session_state.calendrier["date_lancement"] = st.date_input("Date lancement")
+    st.session_state.calendrier["date_limite_candidatures"] = st.date_input("Date limite candidatures")
+
+    # --------- EXPORT PDF & WORD ---------
+    st.subheader("📄 Export du Brief")
+
+    def export_pdf():
+        try:
+            from reportlab.pdfgen import canvas
+            buffer = BytesIO()
+            c = canvas.Canvas(buffer)
+            c.drawString(100, 800, f"Brief : {st.session_state.current_brief_name}")
+            c.drawString(100, 780, f"Score référence : {score:.2f}/5")
+            c.showPage()
+            c.save()
+            buffer.seek(0)
+            return buffer
+        except ImportError:
+            return None
+
+    def export_word():
+        try:
+            from docx import Document
+            doc = Document()
+            doc.add_heading(f"Brief : {st.session_state.current_brief_name}", 0)
+            doc.add_paragraph(f"Score référence : {score:.2f}/5")
+            buffer = BytesIO()
+            doc.save(buffer)
+            buffer.seek(0)
+            return buffer
+        except ImportError:
+            return None
+
     col1, col2 = st.columns(2)
     with col1:
-        if st.session_state.step > 1:
-            if st.button("⬅️ Précédent"):
-                st.session_state.step -= 1
-                st.experimental_rerun()
+        pdf_buf = export_pdf()
+        if pdf_buf:
+            st.download_button("⬇️ Télécharger PDF", data=pdf_buf, file_name=f"{st.session_state.current_brief_name}.pdf",
+                               mime="application/pdf")
+        else:
+            st.info("⚠️ PDF non dispo (pip install reportlab)")
+
     with col2:
-        if st.session_state.step < total_steps:
-            if st.button("➡️ Suivant"):
-                st.session_state.step += 1
-                st.experimental_rerun()
+        word_buf = export_word()
+        if word_buf:
+            st.download_button("⬇️ Télécharger Word", data=word_buf, file_name=f"{st.session_state.current_brief_name}.docx",
+                               mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        else:
+            st.info("⚠️ Word non dispo (pip install python-docx)")
