@@ -307,7 +307,6 @@ with tab5:
         st.text_area("Extrait du contenu:", value=st.session_state["scraper_result"], height=200, key="scraper_area")
         if st.session_state.get("scraper_emails"):
             st.info("📧 Emails détectés: " + ", ".join(st.session_state["scraper_emails"]))
-
 # -------------------- Tab 6: InMail --------------------
 with tab6:
     st.header("✉️ Générateur d'InMail Personnalisé")
@@ -327,11 +326,8 @@ with tab6:
 
     def generate_inmail(donnees_profil, poste, entreprise, ton, max_words, cta_type, genre):
         terme_organisation = "groupe" if entreprise == "TGCC" else "filiale"
-
-        # Objet automatique
         objet = f"Opportunité de {poste} au sein du {terme_organisation} {entreprise}"
 
-        # IA pour générer l'accroche personnalisée
         accroche_prompt = f"""
         Tu es un recruteur marocain qui écrit des accroches pour InMail.
         Génère une accroche persuasive adaptée au ton "{ton}".
@@ -342,10 +338,8 @@ with tab6:
         accroche_result = ask_deepseek([{"role": "user", "content": accroche_prompt}], max_tokens=80)
         accroche = accroche_result["content"].strip()
 
-        # Conclusion CTA
         cta_text = generate_cta(cta_type, donnees_profil["prenom"], genre)
 
-        # Construction du message
         response = f"""Bonjour {donnees_profil['prenom']},
 
 {accroche}
@@ -356,12 +350,10 @@ démontrent un potentiel fort pour le poste de {poste} au sein de notre {terme_o
 {cta_text}
 """
 
-        # Ajustement de longueur (respect slider)
         words = response.split()
         if len(words) > max_words:
             response = " ".join(words[:max_words]) + "..."
         elif len(words) < int(max_words * 0.8):
-            # Si trop court → regénérer avec IA un développement
             extend_prompt = f"Développe ce message en {max_words} mots environ sans répétitions :\n{response}"
             extend_result = ask_deepseek([{"role": "user", "content": extend_prompt}], max_tokens=max_words * 2)
             response = extend_result["content"]
@@ -374,7 +366,6 @@ démontrent un potentiel fort pour le poste de {poste} au sein de notre {terme_o
         selected_template = st.selectbox("📂 Importer un modèle sauvegardé :", [""] + templates, key="import_template")
         if selected_template:
             template_entry = next(e for e in st.session_state.library_entries if f"{e['poste']} - {e['date']}" == selected_template)
-            # Remplir directement les infos candidat
             st.session_state["inmail_profil_data"] = {
                 "prenom": "Candidat",
                 "nom": "",
@@ -410,40 +401,52 @@ démontrent un potentiel fort pour le poste de {poste} au sein de notre {terme_o
     with col8:
         cta_option = st.selectbox("Call to action (Conclusion)", ["Proposer un appel", "Partager le CV", "Découvrir l'opportunité sur notre site", "Accepter un rendez-vous"], key="inmail_cta")
 
-    # --------- INFORMATIONS CANDIDAT ---------
+    # --------- INFORMATIONS CANDIDAT (avec correctif KeyError) ---------
     st.subheader("📊 Informations candidat")
-    profil_data = st.session_state.get("inmail_profil_data", {"prenom": "Candidat", "nom": "", "poste_actuel": "", "entreprise_actuelle": "", "competences_cles": ["", "", ""], "experience_annees": "", "formation": "", "mission": "", "localisation": ""})
+
+    default_profil = {
+        "prenom": "Candidat",
+        "nom": "",
+        "poste_actuel": "",
+        "entreprise_actuelle": "",
+        "competences_cles": ["", "", ""],
+        "experience_annees": "",
+        "formation": "",
+        "mission": "",
+        "localisation": ""
+    }
+    profil_data = {**default_profil, **st.session_state.get("inmail_profil_data", {})}
 
     cols = st.columns(5)
-    profil_data["prenom"] = cols[0].text_input("Prénom", profil_data["prenom"])
-    profil_data["nom"] = cols[1].text_input("Nom", profil_data["nom"])
-    profil_data["poste_actuel"] = cols[2].text_input("Poste actuel", profil_data["poste_actuel"])
-    profil_data["entreprise_actuelle"] = cols[3].text_input("Entreprise actuelle", profil_data["entreprise_actuelle"])
-    profil_data["experience_annees"] = cols[4].text_input("Nombre d'années d'expérience", profil_data["experience_annees"])
+    profil_data["prenom"] = cols[0].text_input("Prénom", profil_data.get("prenom", ""))
+    profil_data["nom"] = cols[1].text_input("Nom", profil_data.get("nom", ""))
+    profil_data["poste_actuel"] = cols[2].text_input("Poste actuel", profil_data.get("poste_actuel", ""))
+    profil_data["entreprise_actuelle"] = cols[3].text_input("Entreprise actuelle", profil_data.get("entreprise_actuelle", ""))
+    profil_data["experience_annees"] = cols[4].text_input("Années d'expérience", profil_data.get("experience_annees", ""))
 
     cols2 = st.columns(5)
-    profil_data["formation"] = cols2[0].text_input("Domaine de formation", profil_data["formation"])
+    profil_data["formation"] = cols2[0].text_input("Domaine de formation", profil_data.get("formation", ""))
     profil_data["competences_cles"][0] = cols2[1].text_input("Compétence 1", profil_data["competences_cles"][0])
     profil_data["competences_cles"][1] = cols2[2].text_input("Compétence 2", profil_data["competences_cles"][1])
     profil_data["competences_cles"][2] = cols2[3].text_input("Compétence 3", profil_data["competences_cles"][2])
-    profil_data["localisation"] = cols2[4].text_input("Localisation", profil_data["localisation"])
+    profil_data["localisation"] = cols2[4].text_input("Localisation", profil_data.get("localisation", ""))
 
-    profil_data["mission"] = st.text_area("Mission du poste", profil_data["mission"], height=80)
+    profil_data["mission"] = st.text_area("Mission du poste", profil_data.get("mission", ""), height=80)
 
     col_ap1, col_ap2 = st.columns(2)
     with col_ap1:
-        if st.button("🔍 Analyser profil"):
+        if st.button("🔍 Analyser profil", key="btn_analyse_inmail"):
             # (TODO : intégrer API PDL ou Regex)
             profil_data.update({"poste_actuel": "Manager", "entreprise_actuelle": "ExempleCorp"})
             st.session_state["inmail_profil_data"] = profil_data
             st.success("✅ Profil pré-rempli automatiquement")
     with col_ap2:
-        if st.button("💾 Appliquer infos candidat"):
+        if st.button("💾 Appliquer infos candidat", key="btn_apply_inmail"):
             st.session_state["inmail_profil_data"] = profil_data
             st.success("✅ Infos candidat mises à jour")
 
     # --------- GÉNÉRATION ---------
-    if st.button("✨ Générer", type="primary", use_container_width=True):
+    if st.button("✨ Générer", type="primary", use_container_width=True, key="btn_generate_inmail"):
         donnees_profil = st.session_state.get("inmail_profil_data", profil_data)
         msg, objet_auto = generate_inmail(donnees_profil, poste_accroche, entreprise, ton_message, longueur_message, cta_option, genre_profil)
         st.session_state["inmail_message"] = msg
@@ -453,21 +456,21 @@ démontrent un potentiel fort pour le poste de {poste} au sein de notre {terme_o
     # --------- RÉSULTAT ---------
     if st.session_state.get("inmail_generated"):
         st.subheader("📝 Message InMail généré")
-        st.text_input("📧 Objet", st.session_state.get("inmail_objet", ""))
+        st.text_input("📧 Objet", st.session_state.get("inmail_objet", ""), key="inmail_objet_display")
         msg = st.session_state["inmail_message"]
-        st.text_area("Message", msg, height=250)
+        st.text_area("Message", msg, height=250, key="inmail_msg_display")
         st.caption(f"📏 {len(msg.split())} mots | {len(msg)} caractères")
 
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🔄 Régénérer avec mêmes paramètres"):
+            if st.button("🔄 Régénérer avec mêmes paramètres", key="btn_regen_inmail"):
                 donnees_profil = st.session_state.get("inmail_profil_data", profil_data)
                 msg, objet_auto = generate_inmail(donnees_profil, poste_accroche, entreprise, ton_message, longueur_message, cta_option, genre_profil)
                 st.session_state["inmail_message"] = msg
                 st.session_state["inmail_objet"] = objet_auto
                 st.rerun()
         with col2:
-            if st.button("💾 Sauvegarder comme modèle"):
+            if st.button("💾 Sauvegarder comme modèle", key="btn_save_inmail"):
                 entry = {"date": datetime.now().strftime("%Y-%m-%d %H:%M"), "type": "InMail", "poste": poste_accroche, "requete": st.session_state["inmail_message"]}
                 st.session_state.library_entries.append(entry)
                 save_library_entries()
