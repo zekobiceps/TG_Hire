@@ -90,64 +90,102 @@ if "filtered_briefs" not in st.session_state:
 # ---------------- NAVIGATION PRINCIPALE ----------------
 st.title("🤖 TG-Hire IA - Brief")
 
+# Utilise une colonne pour centrer les boutons si tu le souhaites
+# col_center = st.columns([1, 6, 1])[1]
+
+# Définir les onglets avec leurs icônes et leurs labels
+onglets = {
+    "📁 Gestion": "Gestion",
+    "🔄 Avant-brief": "Avant-brief",
+    "✅ Réunion de brief": "Réunion de brief",
+    "📝 Synthèse": "Synthèse"
+}
+
 # Style CSS pour le menu de navigation
 st.markdown("""
     <style>
+    .stButton>button {
+        background-color: transparent !important;
+        border: none !important;
+        color: white !important;
+        text-align: center !important;
+        padding: 8px 12px !important;
+        margin: 0 5px !important;
+        font-size: 16px !important;
+        cursor: pointer !important;
+        transition: all 0.3s ease 0s !important;
+        border-radius: 8px !important;
+    }
+    .stButton>button:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+    }
+    .stButton>button:focus:not(:active) {
+        box-shadow: none !important;
+    }
+    .active-tab {
+        border-bottom: 2px solid #00BFFF !important;
+        font-weight: bold !important;
+    }
     .nav-container {
         display: flex;
-        justify-content: space-between;
-        background-color: #f0f2f6;
-        padding: 10px;
-        border-radius: 10px;
+        justify-content: flex-start;
+        padding-bottom: 5px;
         margin-bottom: 20px;
-    }
-    .nav-item {
-        padding: 10px 15px;
-        border-radius: 5px;
-        cursor: pointer;
-        text-align: center;
-        flex: 1;
-        margin: 0 5px;
-        font-weight: normal;
-        background-color: #e6e6e6;
-    }
-    .nav-item.active {
-        background-color: #4CAF50;
-        color: white;
-        font-weight: bold;
-    }
-    .nav-item:hover {
-        background-color: #d9d9d9;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Créer la navigation
-phases = ["📁 Gestion", "🔄 Avant-brief", "✅ Réunion de brief", "📝 Synthèse"]
+# Afficher les boutons dans un conteneur horizontal
+container = st.container()
+with container:
+    cols = st.columns(len(onglets))
+    for i, (icone, label) in enumerate(onglets.items()):
+        with cols[i]:
+            if st.button(icone, key=f"tab_{i}"):
+                st.session_state.brief_phase = icone
 
-# Conteneur HTML pour le menu
-nav_html = '<div class="nav-container">'
-for i, phase in enumerate(phases):
-    is_active = st.session_state.brief_phase == phase
-    nav_class = "nav-item active" if is_active else "nav-item"
-    nav_html += f'<div class="{nav_class}" onclick="window.location.href=\'?phase={i}\'">{phase}</div>'
-nav_html += '</div>'
+# Marquer l'onglet actif avec une ligne en dessous
+st.markdown(f"""
+    <div style="border-bottom: 2px solid #4CAF50; width: 100%; margin-bottom: 20px;"></div>
+""", unsafe_allow_html=True)
 
-st.markdown(nav_html, unsafe_allow_html=True)
+# ---------------- GESTION DES ONGLES ----------------
+if "brief_phase" not in st.session_state:
+    st.session_state.brief_phase = "📁 Gestion"
 
-# Gérer le changement d'onglet via paramètre URL
-query_params = st.experimental_get_query_params()
-if "phase" in query_params:
-    try:
-        phase_index = int(query_params["phase"][0])
-        if 0 <= phase_index < len(phases):
-            st.session_state.brief_phase = phases[phase_index]
-            st.experimental_set_query_params()
-            st.rerun()
-    except:
-        pass
+# Mettre à jour le style de l'onglet actif via une manipulation JavaScript simple
+js = f"""
+    <script>
+    const activeTab = document.querySelector('[data-testid="stButton"] button[key="tab_{list(onglets.keys()).index(st.session_state.brief_phase)}"]');
+    if (activeTab) {{
+        activeTab.classList.add("active-tab");
+    }}
+    </script>
+"""
+st.markdown(js, unsafe_allow_html=True)
 
-st.markdown("---")
+# ---------------- CONTENU D'ONGLET ----------------
+# Le reste de ton code reste inchangé, la logique est déjà correcte
+# Elle se base sur la variable st.session_state.brief_phase
+# ... ton code actuel pour chaque phase ...
+
+if st.session_state.brief_phase == "📁 Gestion":
+    col_main, col_side = st.columns([2, 1])
+    # ... (le contenu de Gestion)
+    # ...
+elif st.session_state.brief_phase == "🔄 Avant-brief":
+    st.header("🔄 Avant-brief (Préparation)")
+    st.info("Remplissez les informations préparatoires avant la réunion avec le manager.")
+    # ... (le contenu d'Avant-brief)
+    # ...
+elif st.session_state.brief_phase == "✅ Réunion de brief":
+    st.header("✅ Réunion de brief avec le Manager")
+    # ... (le contenu de Réunion de brief)
+    # ...
+elif st.session_state.brief_phase == "📝 Synthèse":
+    st.header("📝 Synthèse du Brief")
+    # ... (le contenu de Synthèse)
+    # ...
 
 # ---------------- ONGLET GESTION ----------------
 if st.session_state.brief_phase == "📁 Gestion":
