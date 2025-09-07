@@ -1,6 +1,7 @@
 import sys, os
 import streamlit as st
 from datetime import datetime
+import json
 
 # ✅ permet d'accéder à utils.py à la racine
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -98,59 +99,52 @@ onglets = {
 # Style CSS pour le menu de navigation et les boutons
 st.markdown("""
     <style>
-    /* Réduire l'espace en haut de la page */
-    .block-container {
-        padding-top: 1rem !important;
+    /* Réduire le padding par défaut de Streamlit pour les entêtes */
+    .st-emotion-cache-18ni7ap {
+        padding-top: 1rem;
+        padding-bottom: 0rem;
+    }
+    .st-emotion-cache-h5h60a {
+        padding-bottom: 0rem;
     }
     
-    /* Cibler les boutons de navigation */
-    .stButton > button {
+    /* Cache les onglets par défaut de Streamlit */
+    .st-emotion-cache-16ya5a5 {
+        display: none !important;
+    }
+
+    /* Style pour les boutons de navigation personnalisés */
+    .nav-button button {
         background-color: transparent !important;
+        color: rgba(255, 255, 255, 0.6) !important;
         border: none !important;
-        color: rgba(255, 255, 255, 0.6) !important; /* Couleur du texte par défaut (non actif) */
+        box-shadow: none !important;
         font-size: 14px !important;
         padding: 8px 12px !important;
         margin-right: 5px !important;
+        border-radius: 0px !important;
     }
-    
-    /* Style pour le bouton actif */
-    .stButton > button.active {
-        color: white !important; /* Couleur du texte pour l'onglet actif */
+
+    /* Style pour le bouton actif (l'onglet sélectionné) */
+    .active-nav-button button {
+        color: white !important;
         font-weight: bold !important;
         border-bottom: 3px solid #66b366 !important;
     }
-    
-    /* Supprimer la bordure et le fond des boutons par défaut */
-    .stButton > button {
-        box-shadow: none !important;
-    }
 
-    /* Style pour le bouton "Rechercher" */
+    /* Supprimer la bordure et le fond de tous les stButton sauf le bouton "Rechercher" */
+    .stButton > button {
+        border: none !important;
+        background-color: transparent !important;
+    }
+    
+    /* Style spécifique pour le bouton "Rechercher" */
     .stButton[data-testid="base-button-secondaryFormSubmit"] > button {
         background-color: #6a1b9a !important;
         color: white !important;
-        border-radius: 8px !important;
         border: 1px solid #6a1b9a !important;
+        border-radius: 8px !important;
     }
-    
-    /* Réduire l'espacement des sous-titres */
-    h2 {
-        margin-top: 1rem;
-        margin-bottom: 0.5rem;
-    }
-    
-    /* Réduire l'espacement des en-têtes */
-    h1 {
-        margin-top: 0.5rem;
-        margin-bottom: 0.5rem;
-    }
-    
-    /* Réduire l'espacement des lignes de séparation */
-    hr {
-        margin-top: 0rem;
-        margin-bottom: 1rem;
-    }
-
     </style>
 """, unsafe_allow_html=True)
 
@@ -160,15 +154,13 @@ with st.container():
     for i, (icone, label) in enumerate(onglets.items()):
         with cols[i]:
             if st.session_state.brief_phase == icone:
-                # Ajout d'une classe "active" sur l'onglet sélectionné
-                st.markdown(f'<div class="stButton"><button class="active">{icone} {label}</button></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="active-nav-button"><button>{icone} {label}</button></div>', unsafe_allow_html=True)
             else:
                 if st.button(f"{icone} {label}", key=f"tab_{i}"):
                     st.session_state.brief_phase = icone
                     st.rerun()
 
-st.markdown("<hr style='border:1px solid #66b366; margin-top:-10px;'>", unsafe_allow_html=True)
-
+st.markdown("<hr style='border:1px solid #66b366; margin-top: -10px;'>", unsafe_allow_html=True)
 
 # ---------------- ONGLET GESTION ----------------
 if st.session_state.brief_phase == "📁 Gestion":
