@@ -1,4 +1,7 @@
 import sys, os
+import streamlit as st  # ✅ nécessaire avant tout appel à st.
+
+# Permet de retrouver utils.py situé à la racine du projet
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from utils import (
@@ -9,11 +12,13 @@ from utils import (
     export_brief_pdf,
     export_brief_word,
     generate_checklist_advice,
+    filter_briefs
 )
 
 # ---------------- INIT ----------------
-init_session_state()
 st.set_page_config(page_title="TG-Hire IA - Brief", page_icon="🤖", layout="wide")
+
+init_session_state()
 
 if "brief_phase" not in st.session_state:
     st.session_state.brief_phase = "📁 Gestion"
