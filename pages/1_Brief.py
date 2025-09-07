@@ -86,11 +86,11 @@ if "filtered_briefs" not in st.session_state:
     st.session_state.filtered_briefs = {}
 
 # ---------------- NAVIGATION PRINCIPALE ----------------
-st.title("🤖 TG-Hire IA - Brief")
+st.title("💡 Outil de Gestion des Briefs") # Nouveau titre
 
 # Définir les onglets avec leurs icônes et leurs labels
 onglets = {
-    "Gestion": "📁 Gestion", # Clé = label simple, Valeur = icône + label complet
+    "Gestion": "📁 Gestion", 
     "Avant-brief": "🔄 Avant-brief",
     "Réunion de brief": "✅ Réunion de brief",
     "Synthèse": "📝 Synthèse"
@@ -114,46 +114,65 @@ st.markdown("""
     }
 
     /* Ajuster l'espacement pour les boutons de navigation */
-    div.st-emotion-cache-1pxazr7 > div:first-child > div {
-        flex: 0 1 auto !important;
-        padding: 0 5px !important;
+    /* Cela cible les colonnes Streamlit elles-mêmes pour réduire l'espace */
+    div.st-emotion-cache-1pxazr7 > div:first-child > div[data-testid="stColumn"] {
+        flex: 0 1 auto !important; /* Permet aux colonnes de prendre juste l'espace nécessaire */
+        padding: 0 5px !important; /* Réduit le padding horizontal des colonnes */
+        margin: 0 -10px !important; /* Rapproche encore plus les colonnes/boutons */
     }
 
     /* Styles généraux pour tous les boutons de navigation (non-actifs) */
     .stButton > button {
-        background-color: transparent !important;
-        color: rgba(255, 255, 255, 0.6) !important; /* Texte gris clair */
+        background-color: #6a1b9a !important; /* Fond violet pour tous les onglets */
+        color: white !important; /* Texte blanc par défaut */
         border: none !important;
         box-shadow: none !important;
         font-size: 14px !important;
         padding: 8px 12px !important;
-        border-radius: 0px !important;
+        border-radius: 0px !important; /* Coins carrés comme l'image Boolean */
         white-space: nowrap; /* Empêche le retour à la ligne du texte */
+        margin: 0; /* Assure aucune marge interne aux boutons */
+        display: inline-flex; /* Permet un meilleur alignement icône/texte */
+        align-items: center;
+        justify-content: center;
+        gap: 5px; /* Espace entre icône et texte */
     }
     
     /* Style pour le bouton de navigation ACTIF */
     .stButton > button.active-tab {
-        color: white !important; /* Texte blanc */
+        background-color: #6a1b9a !important; /* Reste violet */
+        color: white !important; /* Reste blanc */
         font-weight: bold !important;
         border-bottom: 3px solid #ff4b4b !important; /* Ligne rouge en dessous */
         margin-bottom: -3px; /* Soulève légèrement pour couvrir la ligne de la div parente */
     }
 
-    /* Styles pour les boutons "Sauvegarder" et "Rechercher" */
-    /* Cible tous les boutons de type "primary" et "secondary" */
+    /* Styles pour les boutons "Sauvegarder le Brief" et "Rechercher" */
+    /* Cible tous les boutons de type "primary" et "secondary" pour le fond violet */
+    /* Le !important est crucial pour surcharger les styles par défaut de Streamlit */
     button[data-testid*="primary"],
     button[data-testid*="secondary"] {
         background-color: #6a1b9a !important; /* Violet */
         color: white !important;
         border: 1px solid #6a1b9a !important;
         border-radius: 8px !important;
+        padding: 10px 20px !important; /* Plus de padding pour ces boutons */
+        font-weight: bold !important;
+    }
+    /* S'assurer que le bouton "Rechercher" dans la colonne a le bon style */
+    div[data-testid="stColumn"] button[data-testid*="secondary"] {
+        background-color: #6a1b9a !important;
+        border-color: #6a1b9a !important;
     }
     
     </style>
 """, unsafe_allow_html=True)
 
 # Créer les colonnes pour les boutons de navigation
-cols = st.columns(len(onglets))
+# st.columns sans arguments tente de diviser l'espace également.
+# Pour les rapprocher, on peut spécifier une largeur pour chaque colonne si besoin,
+# mais un bon CSS est souvent plus flexible.
+cols = st.columns(len(onglets)) 
     
 for i, (key_label, full_label) in enumerate(onglets.items()):
     with cols[i]:
@@ -169,9 +188,10 @@ for i, (key_label, full_label) in enumerate(onglets.items()):
         if is_active:
             st.markdown(f"""
                 <script>
-                var buttons = document.querySelectorAll('[data-testid="stColumn"] button');
-                if (buttons[{i}]) {{
-                    buttons[{i}].classList.add("active-tab");
+                // Sélectionne spécifiquement le bouton qui vient d'être rendu dans cette colonne
+                var buttonElement = document.querySelector('[data-testid="stColumn"]:nth-child({i+1}) button');
+                if (buttonElement) {{
+                    buttonElement.classList.add("active-tab");
                 }}
                 </script>
             """, unsafe_allow_html=True)
