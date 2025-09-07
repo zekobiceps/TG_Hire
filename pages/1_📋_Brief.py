@@ -4,16 +4,15 @@ import importlib.util
 import streamlit as st
 from datetime import datetime
 
-# Charger utils.py dynamiquement
+# -------------------- Import utils --------------------
 UTILS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "utils.py"))
 spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
 utils = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(utils)
 
-# Init session
+# -------------------- Init session --------------------
 utils.init_session_state()
 
-# Initialisation des variables si manquantes
 defaults = {
     "poste_intitule": "",
     "manager_nom": "",
@@ -41,7 +40,7 @@ st.set_page_config(
 
 st.title("📋 Brief Recrutement")
 
-# Choix de la phase
+# -------------------- Phase sélection --------------------
 brief_phase = st.radio(
     "Phase du Brief:",
     ["📁 Gestion", "🔄 Avant-brief", "✅ Réunion de brief"],
@@ -50,13 +49,15 @@ brief_phase = st.radio(
 )
 st.session_state.brief_phase = brief_phase
 
-# Phase Gestion
+# -------------------- Phase Gestion --------------------
 if brief_phase == "📁 Gestion":
     st.header("📁 Gestion du Brief")
+
     col1, col2 = st.columns(2)
 
     with col1:
         st.subheader("Informations de base")
+
         st.session_state.poste_intitule = st.text_input(
             "Intitulé du poste:",
             value=st.session_state.poste_intitule,
@@ -110,8 +111,8 @@ if brief_phase == "📁 Gestion":
 
     with col2:
         st.subheader("Chargement & Templates")
-        st.markdown("**Filtres de recherche:**")
 
+        st.markdown("**Filtres de recherche:**")
         filter_col1, filter_col2 = st.columns(2)
         with filter_col1:
             filter_month = st.selectbox("Mois:", [""] + [f"{i:02d}" for i in range(1, 13)], key="filter_month")
@@ -133,6 +134,7 @@ if brief_phase == "📁 Gestion":
         if st.session_state.show_filtered_results:
             if st.session_state.filtered_briefs:
                 st.markdown(f"**{len(st.session_state.filtered_briefs)} brief(s) trouvé(s):**")
+
                 selected_brief = st.selectbox("Choisir un brief:", [""] + list(st.session_state.filtered_briefs.keys()), key="select_brief")
                 target_tab = st.radio("Charger dans:", ["🔄 Avant-brief", "✅ Réunion de brief"], horizontal=True, key="target_tab")
 
