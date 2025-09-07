@@ -112,3 +112,16 @@ SIMPLIFIED_CHECKLIST = {
     "Contexte": ["Objectifs", "Budget"],
     "Profil recherché": ["Compétences techniques", "Soft skills"],
 }
+
+# -------------------- Disponibilité PDF & Word --------------------
+try:
+    import reportlab
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
+
+try:
+    import docx
+    WORD_AVAILABLE = True
+except ImportError:
+    WORD_AVAILABLE = False
