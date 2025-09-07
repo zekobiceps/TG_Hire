@@ -208,7 +208,7 @@ if st.session_state.brief_phase == "📁 Gestion":
             manager = st.text_input("Manager")
             affectation = st.selectbox("Affectation", ["", "Chantier", "Siège"], key="search_affectation")
 
-        if st.button("🔎 Rechercher", type="secondaryFormSubmit", use_container_width=True):
+        if st.button("🔎 Rechercher", type="secondary", use_container_width=True):
             briefs = load_briefs()
             st.session_state.filtered_briefs = filter_briefs(briefs, month, recruteur, poste, manager, affectation)
             if st.session_state.filtered_briefs:
