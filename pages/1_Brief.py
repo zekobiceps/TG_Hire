@@ -33,7 +33,6 @@ def render_ksa_section():
     """Affiche la section KSA (Knowledge, Skills, Abilities)"""
     st.info("Matrice des compétences requises (KSA)")
     
-    # Initialisation des données KSA si nécessaire
     if "ksa_data" not in st.session_state:
         st.session_state.ksa_data = {
             "Connaissances": {},
@@ -41,7 +40,6 @@ def render_ksa_section():
             "Aptitudes": {}
         }
     
-    # Interface pour ajouter de nouvelles compétences
     with st.expander("➕ Ajouter une compétence"):
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -57,7 +55,6 @@ def render_ksa_section():
                 st.success(f"✅ {new_comp} ajouté à {new_cat}")
                 st.rerun()
     
-    # Affichage des compétences existantes
     for categorie, competences in st.session_state.ksa_data.items():
         with st.expander(f"{categorie} ({len(competences)})"):
             if competences:
@@ -101,52 +98,53 @@ onglets = {
 # Style CSS pour le menu de navigation et les boutons
 st.markdown("""
     <style>
-    /* Conteneur pour le menu de navigation */
+    /* Styles pour le conteneur du menu */
     .nav-container {
         display: flex;
-        justify-content: flex-start; /* Aligner les éléments à gauche */
+        justify-content: flex-start;
         align-items: center;
         width: 100%;
         margin-bottom: 20px;
+        padding-top: 10px;
     }
     /* Style pour tous les boutons du menu */
-    .nav-container .stButton > button {
+    .nav-button > button {
         background-color: transparent !important;
         color: white !important;
         border: none !important;
         font-size: 16px !important;
         padding: 8px 12px !important;
-        margin-right: 20px !important; /* Espacement entre les boutons */
+        margin-right: 20px !important;
         border-radius: 0px !important;
     }
-    /* Style de l'onglet actif avec la bordure verte en bas */
-    .nav-container .stButton.active > button {
+    /* Ligne verte pour l'onglet actif */
+    .nav-button.active > button {
         font-weight: bold !important;
         border-bottom: 3px solid #66b366 !important;
     }
-    /* Style du bouton "Rechercher" */
-    .st-emotion-cache-19a9f5d.st-emotion-cache-19a9f5d.st-emotion-cache-19a9f5d .st-emotion-cache-10o5huv.st-emotion-cache-10o5huv.st-emotion-cache-10o5huv {
-        background-color: #6a1b9a; /* Couleur violette */
-        color: white;
+    /* Style pour le bouton "Rechercher" */
+    .stButton[data-testid="base-button-secondaryFormSubmit"] > button {
+        background-color: #6a1b9a !important;
+        color: white !important;
+        border-radius: 8px !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Gérer l'état de l'onglet actif
-if "brief_phase" not in st.session_state:
-    st.session_state.brief_phase = "📁 Gestion"
-
-# Créer un conteneur pour les boutons de navigation
+# Créer un conteneur horizontal pour les boutons de navigation
 with st.container():
     cols = st.columns(len(onglets))
     for i, (icone, label) in enumerate(onglets.items()):
         with cols[i]:
-            # Créez une classe CSS "active" pour l'onglet sélectionné
-            is_active = "active" if st.session_state.brief_phase == icone else ""
-            st.button(icone, key=f"tab_{i}", help=label)
+            if st.session_state.brief_phase == icone:
+                st.markdown(f'<div class="nav-button active"><button>{icone} {label}</button></div>', unsafe_allow_html=True)
+            else:
+                if st.button(f"{icone} {label}", key=f"tab_{i}"):
+                    st.session_state.brief_phase = icone
+                    st.rerun()
 
-# Une ligne de séparation verte
-st.markdown("<div style='border-bottom: 3px solid #66b366; width: 100%; margin-top: -15px;'></div>", unsafe_allow_html=True)
+st.markdown("<hr style='border:1px solid #66b366; margin-top:-10px;'>", unsafe_allow_html=True)
+
 
 # ---------------- ONGLET GESTION ----------------
 if st.session_state.brief_phase == "📁 Gestion":
@@ -171,7 +169,7 @@ if st.session_state.brief_phase == "📁 Gestion":
 
         # --- SAUVEGARDE
         if st.button("💾 Sauvegarder le Brief", type="primary", use_container_width=True):
-            if not st.session_state.poste_intitule or not st.session_state.manager_nom or not st.session_state.recruteur or not st.session_state.date_brief:
+            if not all([st.session_state.poste_intitule, st.session_state.manager_nom, st.session_state.recruteur, st.session_state.date_brief]):
                 st.error("Veuillez remplir tous les champs obligatoires (*)")
             else:
                 brief_name = generate_automatic_brief_name()
@@ -210,7 +208,7 @@ if st.session_state.brief_phase == "📁 Gestion":
             manager = st.text_input("Manager")
             affectation = st.selectbox("Affectation", ["", "Chantier", "Siège"], key="search_affectation")
 
-        if st.button("🔎 Rechercher", use_container_width=True):
+        if st.button("🔎 Rechercher", type="secondaryFormSubmit", use_container_width=True):
             briefs = load_briefs()
             st.session_state.filtered_briefs = filter_briefs(briefs, month, recruteur, poste, manager, affectation)
             if st.session_state.filtered_briefs:
@@ -231,7 +229,6 @@ if st.session_state.brief_phase == "📁 Gestion":
                     colA, colB = st.columns(2)
                     with colA:
                         if st.button(f"📂 Charger", key=f"load_{name}"):
-                            # Charger les données sans écraser les clés essentielles
                             safe_keys = [k for k in data.keys() if k not in ['ksa_data'] or data[k]]
                             for k in safe_keys:
                                 if k in data and data[k]:
@@ -246,11 +243,11 @@ if st.session_state.brief_phase == "📁 Gestion":
                                 del all_briefs[name]
                                 st.session_state.saved_briefs = all_briefs
                                 save_briefs()
-                                # Mettre à jour les briefs filtrés
                                 if name in st.session_state.filtered_briefs:
                                     del st.session_state.filtered_briefs[name]
                                 st.warning(f"❌ Brief '{name}' supprimé.")
                                 st.rerun()
+
 # ---------------- AVANT-BRIEF ----------------
 elif st.session_state.brief_phase == "🔄 Avant-brief":
     st.header("🔄 Avant-brief (Préparation)")
@@ -262,7 +259,6 @@ elif st.session_state.brief_phase == "🔄 Avant-brief":
     st.text_area("Défis principaux", key="defis_principaux")
 
     if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True):
-        # Mettre à jour le brief sauvegardé avec les nouvelles données
         if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
             brief_name = st.session_state.current_brief_name
             st.session_state.saved_briefs[brief_name].update({
@@ -310,7 +306,6 @@ elif st.session_state.brief_phase == "✅ Réunion de brief":
         st.text_area("Processus d'évaluation (détails)", key="processus_evaluation")
 
         if st.button("💾 Enregistrer réunion", type="primary", use_container_width=True):
-            # Mettre à jour le brief sauvegardé avec les nouvelles données
             if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
                 brief_name = st.session_state.current_brief_name
                 st.session_state.saved_briefs[brief_name].update({
@@ -354,7 +349,6 @@ elif st.session_state.brief_phase == "📝 Synthèse":
     })
 
     st.subheader("📊 Calcul automatique du Score Global")
-    # Exemple simple basé sur KSA
     score_total = 0
     count = 0
     if "ksa_data" in st.session_state:
@@ -381,7 +375,7 @@ elif st.session_state.brief_phase == "📝 Synthèse":
                 pdf_buf = export_brief_pdf()
                 if pdf_buf:
                     st.download_button("⬇️ Télécharger PDF", data=pdf_buf,
-                                       file_name=f"{st.session_state.current_brief_name}.pdf", mime="application/pdf")
+                                     file_name=f"{st.session_state.current_brief_name}.pdf", mime="application/pdf")
             else:
                 st.info("ℹ️ Créez d'abord un brief pour l'exporter")
         else:
@@ -392,8 +386,8 @@ elif st.session_state.brief_phase == "📝 Synthèse":
                 word_buf = export_brief_word()
                 if word_buf:
                     st.download_button("⬇️ Télécharger Word", data=word_buf,
-                                       file_name=f"{st.session_state.current_brief_name}.docx",
-                                       mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                                     file_name=f"{st.session_state.current_brief_name}.docx",
+                                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
             else:
                 st.info("ℹ️ Créez d'abord un brief pour l'exporter")
         else:
