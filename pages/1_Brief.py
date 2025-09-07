@@ -1,11 +1,11 @@
-# -*- coding: utf-8 -*-
-import streamlit as st
+import sys, os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 from utils import (
     init_session_state,
     PDF_AVAILABLE,
     WORD_AVAILABLE,
     save_briefs,
-    filter_briefs,
     export_brief_pdf,
     export_brief_word,
     generate_checklist_advice,
