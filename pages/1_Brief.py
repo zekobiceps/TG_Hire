@@ -90,10 +90,10 @@ st.title("🤖 TG-Hire IA - Brief")
 
 # Définir les onglets avec leurs icônes et leurs labels
 onglets = {
-    "📁 Gestion": "Gestion",
-    "🔄 Avant-brief": "Avant-brief",
-    "✅ Réunion de brief": "Réunion de brief",
-    "📝 Synthèse": "Synthèse"
+    "Gestion": "📁 Gestion", # Clé = label simple, Valeur = icône + label complet
+    "Avant-brief": "🔄 Avant-brief",
+    "Réunion de brief": "✅ Réunion de brief",
+    "Synthèse": "📝 Synthèse"
 }
 
 # Style CSS pour le menu de navigation et les boutons
@@ -104,75 +104,78 @@ st.markdown("""
         display: none !important;
     }
 
-    /* Conteneur de la barre de navigation et sa ligne rouge */
-    .st-emotion-cache-1pxazr7 {
+    /* Conteneur des colonnes de navigation pour la ligne rouge principale */
+    /* Cible le parent direct des colonnes pour appliquer la bordure inférieure */
+    div.st-emotion-cache-1pxazr7 > div:first-child { 
         border-bottom: 3px solid #ff4b4b; 
+        margin-bottom: 10px;
     }
     
-    /* Styles pour tous les boutons de navigation */
+    /* Styles généraux pour tous les boutons de navigation (non-actifs) */
     .stButton > button {
         background-color: transparent !important;
-        color: rgba(255, 255, 255, 0.6) !important;
+        color: rgba(255, 255, 255, 0.6) !important; /* Texte gris clair */
         border: none !important;
         box-shadow: none !important;
         font-size: 14px !important;
         padding: 8px 12px !important;
         border-radius: 0px !important;
-        margin: 0;
-        margin-right: -10px;
+        margin: 0 -10px; /* Rapproche les boutons */
+        white-space: nowrap; /* Empêche le retour à la ligne du texte */
     }
     
-    /* Style pour le bouton actif (l'onglet sélectionné) */
+    /* Style pour le bouton de navigation ACTIF */
     .stButton > button.active-tab {
-        color: white !important;
+        color: white !important; /* Texte blanc */
         font-weight: bold !important;
-        border-bottom: 3px solid #ff4b4b !important;
-        margin-bottom: -3px; /* Pour que la ligne active couvre la ligne du conteneur */
+        border-bottom: 3px solid #ff4b4b !important; /* Ligne rouge en dessous */
+        margin-bottom: -3px; /* Soulève légèrement pour couvrir la ligne de la div parente */
     }
 
-    /* Cible les boutons Sauvegarder et Rechercher */
-    /* Utilisez des sélecteurs plus spécifiques pour éviter les conflits */
-    button[data-testid="base-button-secondary"],
-    button[data-testid="base-button-primary"] {
-        background-color: #6a1b9a !important; /* Violet */
-        color: white !important;
-        border: 1px solid #6a1b9a !important;
-        border-radius: 8px !important;
-    }
-    /* S'assurer que les boutons dans les colonnes/formulaires sont aussi ciblés */
-    div[data-testid="stForm"] .stButton > button,
-    div[data-testid="stColumn"] .stButton > button {
+    /* Styles pour les boutons "Sauvegarder" et "Rechercher" */
+    /* Cible tous les boutons de type "primary" et "secondary" */
+    button[data-testid*="primary"],
+    button[data-testid*="secondary"] {
         background-color: #6a1b9a !important; /* Violet */
         color: white !important;
         border: 1px solid #6a1b9a !important;
         border-radius: 8px !important;
     }
     
+    /* Spécifique pour le bouton "Générer la requête Boolean" si nécessaire */
+    /* Cible le bouton 'primary' dans la page de recherche Boolean */
+    button.st-emotion-cache-l2z66q.st-emotion-cache-f1x3ln { /* S'ajuster au data-testid actuel de Streamlit pour les primary buttons */
+        background-color: #FF4B4B !important; /* Rouge */
+        border-color: #FF4B4B !important;
+        color: white !important;
+    }
+
     </style>
 """, unsafe_allow_html=True)
 
-# Créer un conteneur horizontal pour les boutons de navigation
+# Créer les colonnes pour les boutons de navigation
 cols = st.columns(len(onglets))
     
-for i, (icone, label) in enumerate(onglets.items()):
+for i, (key_label, full_label) in enumerate(onglets.items()):
     with cols[i]:
-        # Créer le bouton Streamlit
-        button_label = f"{icone} {label}"
+        # Comparer le label simple avec l'état de la session
+        is_active = (st.session_state.brief_phase == full_label)
         
-        # Le bouton actif est stylisé via une classe CSS 'active-tab' injectée
-        if st.session_state.brief_phase == icone:
-            if st.button(button_label, key=f"tab_{i}", use_container_width=True):
-                st.session_state.brief_phase = icone
-                st.rerun()
+        # Créer le bouton. Ajouter la classe 'active-tab' directement si actif.
+        if st.button(full_label, key=f"tab_{key_label}", use_container_width=True):
+            st.session_state.brief_phase = full_label
+            st.rerun()
+        
+        # Injecter du JavaScript pour ajouter la classe 'active-tab' si le bouton est actif
+        if is_active:
             st.markdown(f"""
                 <script>
-                document.querySelector('[data-testid="stColumn"]:nth-child({i+1}) button').classList.add("active-tab");
+                var buttons = document.querySelectorAll('[data-testid="stColumn"] button');
+                if (buttons[{i}]) {{
+                    buttons[{i}].classList.add("active-tab");
+                }}
                 </script>
             """, unsafe_allow_html=True)
-        else:
-            if st.button(button_label, key=f"tab_{i}", use_container_width=True):
-                st.session_state.brief_phase = icone
-                st.rerun()
 
 # ---------------- ONGLET GESTION ----------------
 if st.session_state.brief_phase == "📁 Gestion":
