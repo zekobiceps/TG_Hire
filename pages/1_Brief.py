@@ -113,16 +113,7 @@ st.markdown("""
         display: none !important;
     }
 
-    /* Style pour le conteneur de navigation */
-    .nav-container {
-        display: flex;
-        flex-direction: row;
-        gap: 0;
-        padding: 0;
-        margin: 0;
-    }
-    
-    /* Style pour les boutons de navigation */
+    /* Style pour les boutons de navigation personnalisés */
     .nav-button button {
         background-color: transparent !important;
         color: rgba(255, 255, 255, 0.6) !important;
@@ -138,18 +129,26 @@ st.markdown("""
     .active-nav-button button {
         color: white !important;
         font-weight: bold !important;
-        border-bottom: 3px solid #66b366 !important;
+        border-bottom: 3px solid #ff4b4b !important; /* Ligne rouge */
     }
 
-    /* Supprimer la bordure et le fond de tous les stButton sauf le bouton "Rechercher" */
+    /* Supprimer la bordure et le fond de tous les stButton sauf les boutons spécifiques */
     .stButton > button {
         border: none !important;
         background-color: transparent !important;
     }
-    
-    /* Style spécifique pour le bouton "Rechercher" */
+
+    /* Style spécifique pour le bouton "Sauvegarder" */
     .stButton[data-testid="base-button-secondaryFormSubmit"] > button {
-        background-color: #6a1b9a !important;
+        background-color: #6a1b9a !important; /* Violet */
+        color: white !important;
+        border: 1px solid #6a1b9a !important;
+        border-radius: 8px !important;
+    }
+
+    /* Style spécifique pour le bouton "Rechercher" */
+    .stButton[data-testid="base-button-secondaryFormSubmit"]:first-of-type > button {
+        background-color: #6a1b9a !important; /* Violet */
         color: white !important;
         border: 1px solid #6a1b9a !important;
         border-radius: 8px !important;
@@ -164,12 +163,13 @@ with st.container():
     
     for i, (icone, label) in enumerate(onglets.items()):
         with cols[i]:
-            if st.session_state.brief_phase == icone:
-                st.markdown(f'<div class="active-nav-button"><button>{icone} {label}</button></div>', unsafe_allow_html=True)
-            else:
-                if st.button(f"{icone} {label}", key=f"tab_{i}"):
-                    st.session_state.brief_phase = icone
-                    st.rerun()
+            # Utiliser la même méthode pour le bouton actif et les autres pour éviter la duplication
+            is_active = st.session_state.brief_phase == icone
+            button_class = "active-nav-button" if is_active else "nav-button"
+            
+            if st.button(f"{icone} {label}", key=f"tab_{i}"):
+                st.session_state.brief_phase = icone
+                st.rerun()
 
 st.markdown("<hr style='border:1px solid #66b366; margin-top: -10px;'>", unsafe_allow_html=True)
 
