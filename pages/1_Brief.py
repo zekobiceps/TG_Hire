@@ -131,24 +131,25 @@ st.markdown("""
         font-weight: bold !important;
         border-bottom: 3px solid #ff4b4b !important; /* Ligne rouge */
     }
-
-    /* Supprimer la bordure et le fond de tous les stButton sauf les boutons spécifiques */
+    
+    /* Style pour les boutons avec un fond spécifique (Sauvegarder, Rechercher) */
     .stButton > button {
         border: none !important;
         background-color: transparent !important;
+        color: #fff !important;
     }
 
-    /* Style spécifique pour le bouton "Sauvegarder" */
-    .stButton[data-testid="base-button-secondaryFormSubmit"] > button {
-        background-color: #6a1b9a !important; /* Violet */
-        color: white !important;
+    /* Styles pour les boutons Sauvegarder et Rechercher */
+    div[data-testid="stForm"] .stButton > button {
+        background-color: #6a1b9a !important;
         border: 1px solid #6a1b9a !important;
+        color: white !important;
         border-radius: 8px !important;
     }
-
-    /* Style spécifique pour le bouton "Rechercher" */
-    .stButton[data-testid="base-button-secondaryFormSubmit"]:first-of-type > button {
-        background-color: #6a1b9a !important; /* Violet */
+    
+    /* Le bouton "Rechercher" est souvent le premier d'un formulaire */
+    div[data-testid="stForm"] .stButton:first-of-type > button {
+        background-color: #6a1b9a !important;
         color: white !important;
         border: 1px solid #6a1b9a !important;
         border-radius: 8px !important;
@@ -158,20 +159,19 @@ st.markdown("""
 
 # Créer un conteneur horizontal pour les boutons de navigation
 with st.container():
-    col1, col2, col3, col4, _ = st.columns([1, 1, 1, 1, 8])
-    cols = [col1, col2, col3, col4]
+    cols = st.columns(len(onglets) + 1)
     
     for i, (icone, label) in enumerate(onglets.items()):
         with cols[i]:
-            # Utiliser la même méthode pour le bouton actif et les autres pour éviter la duplication
-            is_active = st.session_state.brief_phase == icone
-            button_class = "active-nav-button" if is_active else "nav-button"
-            
-            if st.button(f"{icone} {label}", key=f"tab_{i}"):
-                st.session_state.brief_phase = icone
-                st.rerun()
+            if st.session_state.brief_phase == icone:
+                st.button(f"{icone} {label}", key=f"tab_{i}", help="Onglet actif", use_container_width=True)
+                st.markdown(f'<div class="active-nav-button"><button></button></div>', unsafe_allow_html=True)
+            else:
+                if st.button(f"{icone} {label}", key=f"tab_{i}", use_container_width=True):
+                    st.session_state.brief_phase = icone
+                    st.rerun()
 
-st.markdown("<hr style='border:1px solid #66b366; margin-top: -10px;'>", unsafe_allow_html=True)
+st.markdown("<hr style='border:1px solid #ff4b4b; margin-top: -10px;'>", unsafe_allow_html=True)
 
 # ---------------- ONGLET GESTION ----------------
 if st.session_state.brief_phase == "📁 Gestion":
