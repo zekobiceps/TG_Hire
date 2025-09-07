@@ -112,9 +112,9 @@ st.markdown("""
         background-color: transparent !important;
         color: white !important;
         border: none !important;
-        font-size: 16px !important;
+        font-size: 14px !important; /* Taille de police réduite */
         padding: 8px 12px !important;
-        margin-right: 20px !important;
+        margin-right: 5px !important; /* Espacement réduit entre les boutons */
         border-radius: 0px !important;
     }
     /* Ligne verte pour l'onglet actif */
