@@ -125,3 +125,77 @@ try:
     WORD_AVAILABLE = True
 except ImportError:
     WORD_AVAILABLE = False
+from io import BytesIO
+
+# -------------------- Export PDF --------------------
+def export_brief_pdf():
+    """Exporte le brief courant en PDF (si reportlab dispo)"""
+    if not PDF_AVAILABLE:
+        return None
+
+    from reportlab.lib.pagesizes import A4
+    from reportlab.pdfgen import canvas
+
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(50, height - 50, f"Brief Recrutement : {st.session_state.get('current_brief_name', '')}")
+
+    c.setFont("Helvetica", 12)
+    y = height - 100
+    c.drawString(50, y, f"Poste : {st.session_state.get('poste_intitule', '')}")
+    y -= 20
+    c.drawString(50, y, f"Manager : {st.session_state.get('manager_nom', '')}")
+    y -= 20
+    c.drawString(50, y, f"Recruteur : {st.session_state.get('recruteur', '')}")
+    y -= 20
+    c.drawString(50, y, f"Affectation : {st.session_state.get('affectation_type', '')} - {st.session_state.get('affectation_nom', '')}")
+
+    y -= 40
+    c.setFont("Helvetica-Bold", 14)
+    c.drawString(50, y, "Données du brief :")
+    c.setFont("Helvetica", 11)
+    y -= 20
+
+    for cat, items in st.session_state.get("brief_data", {}).items():
+        c.drawString(50, y, f"- {cat}")
+        y -= 15
+        for it, val in items.items():
+            c.drawString(70, y, f"{it}: {val.get('valeur', '')} (importance: {val.get('importance', '')})")
+            y -= 15
+            if y < 100:  # Nouvelle page si trop bas
+                c.showPage()
+                y = height - 100
+
+    c.save()
+    buffer.seek(0)
+    return buffer
+
+# -------------------- Export Word --------------------
+def export_brief_word():
+    """Exporte le brief courant en Word (si python-docx dispo)"""
+    if not WORD_AVAILABLE:
+        return None
+
+    from docx import Document
+
+    doc = Document()
+    doc.add_heading(f"Brief Recrutement : {st.session_state.get('current_brief_name', '')}", 0)
+
+    doc.add_paragraph(f"Poste : {st.session_state.get('poste_intitule', '')}")
+    doc.add_paragraph(f"Manager : {st.session_state.get('manager_nom', '')}")
+    doc.add_paragraph(f"Recruteur : {st.session_state.get('recruteur', '')}")
+    doc.add_paragraph(f"Affectation : {st.session_state.get('affectation_type', '')} - {st.session_state.get('affectation_nom', '')}")
+
+    doc.add_heading("Données du brief", level=1)
+    for cat, items in st.session_state.get("brief_data", {}).items():
+        doc.add_heading(cat, level=2)
+        for it, val in items.items():
+            doc.add_paragraph(f"{it}: {val.get('valeur', '')} (importance: {val.get('importance', '')})")
+
+    buffer = BytesIO()
+    doc.save(buffer)
+    buffer.seek(0)
+    return buffer
