@@ -86,7 +86,7 @@ if "filtered_briefs" not in st.session_state:
     st.session_state.filtered_briefs = {}
 
 # ---------------- NAVIGATION PRINCIPALE ----------------
-st.title("💡 Briefs") # Nouveau titre renommé
+st.title("💡 Briefs") 
 
 # Définir les onglets avec leurs icônes et leurs labels
 onglets = {
@@ -106,7 +106,7 @@ st.markdown("""
 
     /* Conteneur principal des boutons de navigation pour le style de la ligne */
     div[data-testid="stVerticalBlock"] > div:first-child > div[data-testid="stHorizontalBlock"] {
-        border-bottom: 3px solid #ff4b4b; /* Ligne rouge */
+        border-bottom: 3px solid #ff4b4b; /* Ligne rouge vif */
         padding-bottom: 0px; 
         margin-bottom: 0px; 
     }
@@ -124,12 +124,12 @@ st.markdown("""
 
     /* Styles généraux pour tous les boutons de navigation (non-actifs et actifs) */
     .stButton > button {
-        background-color: #8B0000 !important; /* Fond bordeaux pour les onglets */
-        color: white !important; /* Texte blanc */
+        background-color: #D20000 !important; /* Rouge moins vif pour les onglets inactifs */
+        color: white !important; 
         border: none !important;
         box-shadow: none !important;
         font-size: 14px !important;
-        padding: 5px 10px !important; /* Réduit le padding pour rapprocher texte/bord */
+        padding: 5px 10px !important; 
         border-radius: 0px !important; 
         white-space: nowrap; 
         margin: 0 !important; 
@@ -142,20 +142,19 @@ st.markdown("""
     
     /* Style pour le bouton de navigation ACTIF */
     .stButton > button.active-tab {
-        background-color: #8B0000 !important; 
+        background-color: #ff4b4b !important; /* Rouge vif pour le bouton actif */
         color: white !important;
         font-weight: bold !important;
         border-bottom: 3px solid #ff4b4b !important; 
         margin-bottom: -3px !important; 
     }
 
-    /* Styles pour les boutons "Sauvegarder le Brief" et "Rechercher" */
-    /* Cible tous les boutons de type "primary" et "secondary" */
+    /* Styles pour les boutons d'action "Sauvegarder le Brief" et "Rechercher" */
     button[data-testid*="primary"],
     button[data-testid*="secondary"] {
-        background-color: #8B0000 !important; /* Bordeaux */
+        background-color: #ff4b4b !important; /* Rouge vif */
         color: white !important;
-        border: 1px solid #8B0000 !important;
+        border: 1px solid #ff4b4b !important;
         border-radius: 8px !important;
         padding: 10px 20px !important; 
         font-weight: bold !important;
@@ -165,8 +164,8 @@ st.markdown("""
 
     /* S'assurer que le bouton de recherche dans les colonnes a le bon style */
     div[data-testid="stColumn"] button[data-testid*="secondary"] {
-        background-color: #8B0000 !important;
-        border-color: #8B0000 !important;
+        background-color: #ff4b4b !important;
+        border-color: #ff4b4b !important;
         color: white !important;
     }
     
