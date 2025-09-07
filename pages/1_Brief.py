@@ -208,6 +208,18 @@ st.markdown("""
         border-radius: 4px !important;
         border: none !important;
     }
+    
+    /* Réduire la hauteur de la section avant-brief */
+    .stTextArea textarea {
+        height: 100px !important;
+    }
+    
+    /* Ajustement pour le message de confirmation */
+    .message-container {
+        margin-top: 25px;
+        padding: 10px;
+        border-radius: 5px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -238,10 +250,13 @@ with tab1:
             st.selectbox("Affectation", ["", "Chantier", "Siège"], key="affectation_type")
             st.text_input("Nom de l'affectation", key="affectation_nom")
         
-        st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date())
-        
-        # Placeholder pour les messages d'erreur/confirmation
-        message_placeholder = st.empty()
+        # Nouvelle disposition pour Date du Brief et message
+        col_date, col_msg = st.columns([1, 2])
+        with col_date:
+            st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date())
+        with col_msg:
+            # Placeholder pour les messages d'erreur/confirmation
+            message_placeholder = st.empty()
 
         # --- SAUVEGARDE
         if st.button("💾 Sauvegarder le Brief", type="primary", use_container_width=True):
@@ -366,10 +381,11 @@ with tab2:
     st.subheader("🔄 Avant-brief (Préparation)")
     st.info("Remplissez les informations préparatoires avant la réunion avec le manager.")
 
-    conseil_button("Raison ouverture", "Contexte", "Pourquoi ce poste est-il ouvert?", key="raison_ouverture")
-    conseil_button("Impact stratégique", "Contexte", "Impact stratégique du poste", key="impact_strategique")
-    st.text_area("Rattachement hiérarchique", key="rattachement")
-    st.text_area("Défis principaux", key="defis_principaux")
+    # Réduire la hauteur des zones de texte
+    st.text_area("Raison ouverture", key="raison_ouverture", height=100)
+    st.text_area("Impact stratégique", key="impact_strategique", height=100)
+    st.text_area("Rattachement hiérarchique", key="rattachement", height=100)
+    st.text_area("Défis principaux", key="defis_principaux", height=100)
 
     if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True):
         if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
@@ -395,18 +411,18 @@ with tab3:
 
     if step == 1:
         st.subheader("1️⃣ Incidents Critiques")
-        st.text_area("Réussite exceptionnelle - Contexte", key="reussite_contexte")
-        st.text_area("Réussite exceptionnelle - Actions", key="reussite_actions")
-        st.text_area("Réussite exceptionnelle - Résultat", key="reussite_resultat")
-        st.text_area("Échec significatif - Contexte", key="echec_contexte")
-        st.text_area("Échec significatif - Causes", key="echec_causes")
-        st.text_area("Échec significatif - Impact", key="echec_impact")
+        st.text_area("Réussite exceptionnelle - Contexte", key="reussite_contexte", height=100)
+        st.text_area("Réussite exceptionnelle - Actions", key="reussite_actions", height=100)
+        st.text_area("Réussite exceptionnelle - Résultat", key="reussite_resultat", height=100)
+        st.text_area("Échec significatif - Contexte", key="echec_contexte", height=100)
+        st.text_area("Échec significatif - Causes", key="echec_causes", height=100)
+        st.text_area("Échec significatif - Impact", key="echec_impact", height=100)
 
     elif step == 2:
         st.subheader("2️⃣ Questions Comportementales")
-        st.text_area("Comment le candidat devrait-il gérer [situation difficile] ?", key="comp_q1")
-        st.text_area("Réponse attendue", key="comp_rep1")
-        st.text_area("Compétences évaluées", key="comp_eval1")
+        st.text_area("Comment le candidat devrait-il gérer [situation difficile] ?", key="comp_q1", height=100)
+        st.text_area("Réponse attendue", key="comp_rep1", height=100)
+        st.text_area("Compétences évaluées", key="comp_eval1", height=100)
 
     elif step == 3:
         st.subheader("3️⃣ Validation Matrice KSA")
@@ -415,8 +431,8 @@ with tab3:
     elif step == 4:
         st.subheader("4️⃣ Stratégie Recrutement")
         st.multiselect("Canaux prioritaires", ["LinkedIn", "Jobboards", "Cooptation"], key="canaux_prioritaires")
-        st.text_area("Critères d'exclusion", key="criteres_exclusion")
-        st.text_area("Processus d'évaluation (détails)", key="processus_evaluation")
+        st.text_area("Critères d'exclusion", key="criteres_exclusion", height=100)
+        st.text_area("Processus d'évaluation (détails)", key="processus_evaluation", height=100)
 
         if st.button("💾 Enregistrer réunion", type="primary", use_container_width=True):
             if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
