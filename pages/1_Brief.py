@@ -113,7 +113,16 @@ st.markdown("""
         display: none !important;
     }
 
-    /* Style pour les boutons de navigation personnalisés */
+    /* Style pour le conteneur de navigation */
+    .nav-container {
+        display: flex;
+        flex-direction: row;
+        gap: 0;
+        padding: 0;
+        margin: 0;
+    }
+    
+    /* Style pour les boutons de navigation */
     .nav-button button {
         background-color: transparent !important;
         color: rgba(255, 255, 255, 0.6) !important;
@@ -121,7 +130,7 @@ st.markdown("""
         box-shadow: none !important;
         font-size: 14px !important;
         padding: 8px 12px !important;
-        margin-right: 5px !important;
+        margin-right: -10px; /* Rapproche les boutons */
         border-radius: 0px !important;
     }
 
@@ -150,7 +159,9 @@ st.markdown("""
 
 # Créer un conteneur horizontal pour les boutons de navigation
 with st.container():
-    cols = st.columns(len(onglets))
+    col1, col2, col3, col4, _ = st.columns([1, 1, 1, 1, 8])
+    cols = [col1, col2, col3, col4]
+    
     for i, (icone, label) in enumerate(onglets.items()):
         with cols[i]:
             if st.session_state.brief_phase == icone:
