@@ -21,81 +21,22 @@ try:
 except ImportError:
     WORD_AVAILABLE = False
 
-# -------------------- Checklist simplifiée --------------------
-SIMPLIFIED_CHECKLIST = {
-    "Contexte du Poste et Environnement": [
-        "Pourquoi ce poste est-il ouvert?",
-        "Fourchette budgétaire (entre X et Y)",
-        "Date de prise de poste souhaitée",
-        "Équipe (taille, composition)",
-        "Manager (poste, expertise, style)",
-        "Collaborations internes/externes",
-        "Lieux de travail et déplacements"
-    ],
-    "Missions et Responsabilités": [
-        "Mission principale du poste",
-        "Objectifs à atteindre (3-5 maximum)",
-        "Sur quoi la performance sera évaluée?",
-        "3-5 Principales tâches quotidiennes",
-        "2 Tâches les plus importantes/critiques",
-        "Outils informatiques à maitriser"
-    ],
-    "Profil et Formation": [
-        "Expérience minimum requise",
-        "Formation/diplôme nécessaire"
-    ],
-    "Stratégie de Recrutement": [
-        "Pourquoi recruter maintenant?",
-        "Difficultés anticipées",
-        "Mot-clés cruciaux (CV screening)",
-        "Canaux de sourcing prioritaires",
-        "Plans B : Autres postes, Revoir certains critères...",
-        "Exemple d'un profil cible sur LinkedIn",
-        "Processus de sélection étape par étape"
-    ]
-}
-
-# -------------------- Templates de Brief --------------------
-BRIEF_TEMPLATES = {
-    "Template standard": {
-        "Contexte": {
-            "Objectifs": {"valeur": "Définir clairement les besoins", "importance": 3},
-            "Budget": {"valeur": "Selon projet", "importance": 2},
-        },
-        "Profil recherché": {
-            "Compétences techniques": {"valeur": "Ex: Autocad, Robot Structural Analysis", "importance": 3},
-            "Soft skills": {"valeur": "Esprit d’équipe, autonomie", "importance": 2},
-        },
-    },
-    "Template direction": {
-        "Contexte": {
-            "Objectifs": {"valeur": "Alignement avec stratégie groupe", "importance": 3},
-            "Budget": {"valeur": "Validé par direction", "importance": 2},
-        },
-        "Profil recherché": {
-            "Compétences techniques": {"valeur": "Leadership, gestion multi-projets", "importance": 3},
-            "Soft skills": {"valeur": "Communication, stratégie", "importance": 2},
-        },
-    },
-}
-
 # -------------------- Initialisation Session --------------------
 def init_session_state():
-    """Initialise les variables de session par défaut"""
     defaults = {
         "poste_intitule": "",
-        "manager_nom": "",
+        "service": "",
+        "niveau_hierarchique": "",
+        "type_contrat": "",
+        "localisation": "",
+        "budget_salaire": "",
+        "date_prise_poste": "",
         "recruteur": "",
-        "affectation_type": "Chantier",
+        "manager_nom": "",
+        "affectation_type": "",
         "affectation_nom": "",
-        "current_brief_name": "",
-        "saved_briefs": {},
-        "filtered_briefs": {},
-        "show_filtered_results": False,
-        "brief_data": {},
         "ksa_data": {},
-        "comment_libre": "",
-        "library_entries": [],
+        "saved_briefs": {},
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -103,66 +44,25 @@ def init_session_state():
 
 # -------------------- Persistence --------------------
 def save_briefs():
-    """Sauvegarde des briefs en fichier pickle"""
     with open("briefs.pkl", "wb") as f:
         pickle.dump(st.session_state.saved_briefs, f)
 
 def load_briefs():
-    """Chargement des briefs depuis pickle"""
     if os.path.exists("briefs.pkl"):
         with open("briefs.pkl", "rb") as f:
             return pickle.load(f)
     return {}
 
-def save_library_entries():
-    """Sauvegarde de la bibliothèque"""
-    with open("library_entries.pkl", "wb") as f:
-        pickle.dump(st.session_state.library_entries, f)
-
-def load_library_entries():
-    """Chargement de la bibliothèque"""
-    if os.path.exists("library_entries.pkl"):
-        with open("library_entries.pkl", "rb") as f:
-            return pickle.load(f)
-    return []
-
-# -------------------- Brief --------------------
-def generate_automatic_brief_name():
-    """Génère un nom automatique pour un brief"""
-    poste = st.session_state.get("poste_intitule", "Poste")
-    manager = st.session_state.get("manager_nom", "Manager")
-    recruteur = st.session_state.get("recruteur", "Recruteur")
-    date = datetime.now().strftime("%Y%m%d")
-    return f"{poste}_{manager}_{recruteur}_{date}"
-
-def filter_briefs(saved_briefs, month=None, recruteur=None, poste=None, manager=None):
-    """Filtrer les briefs existants"""
-    results = {}
-    for name, data in saved_briefs.items():
-        if month and month not in name:
-            continue
-        if recruteur and data.get("recruteur") != recruteur:
-            continue
-        if poste and poste.lower() not in data.get("poste_intitule", "").lower():
-            continue
-        if manager and manager.lower() not in data.get("manager_nom", "").lower():
-            continue
-        results[name] = data
-    return results
-
 # -------------------- Conseils IA --------------------
 def generate_checklist_advice(category, item):
-    """Génère des conseils simplifiés (placeholder IA)"""
     conseils = {
         "Pourquoi ce poste est-il ouvert?": "- Clarifier le départ ou création de poste\n- Identifier l'urgence\n- Relier au contexte business",
-        "Mission principale du poste": "- Décrire en une phrase claire\n- Lier aux objectifs stratégiques\n- Éviter les tâches trop détaillées",
-        "Objectifs à atteindre (3-5 maximum)": "- Formuler en SMART\n- Limiter à 3-5\n- Mesurables et précis",
+        "Impact stratégique du poste": "- Détailler la valeur ajoutée stratégique\n- Relier aux objectifs de l’entreprise",
     }
     return conseils.get(item, f"- Fournir des détails pratiques pour {item}\n- Exemple concret\n- Piège à éviter")
 
-# -------------------- Export PDF --------------------
+# -------------------- EXPORT PDF --------------------
 def export_brief_pdf():
-    """Exporte le brief courant en PDF (si reportlab dispo)"""
     if not PDF_AVAILABLE:
         return None
 
@@ -171,71 +71,150 @@ def export_brief_pdf():
     styles = getSampleStyleSheet()
     story = []
 
-    # Titre
     story.append(Paragraph("📋 Brief Recrutement", styles['Heading1']))
     story.append(Spacer(1, 20))
 
-    # Infos de base
+    # --- SECTION 1: Identité
+    story.append(Paragraph("1. Identité du poste", styles['Heading2']))
     infos = [
-        ["Poste", st.session_state.get("poste_intitule", "")],
-        ["Manager", st.session_state.get("manager_nom", "")],
+        ["Intitulé", st.session_state.get("poste_intitule", "")],
+        ["Service", st.session_state.get("service", "")],
+        ["Niveau hiérarchique", st.session_state.get("niveau_hierarchique", "")],
+        ["Contrat", st.session_state.get("type_contrat", "")],
+        ["Localisation", st.session_state.get("localisation", "")],
+        ["Budget", st.session_state.get("budget_salaire", "")],
+        ["Date prise poste", str(st.session_state.get("date_prise_poste", ""))],
         ["Recruteur", st.session_state.get("recruteur", "")],
+        ["Manager", st.session_state.get("manager_nom", "")],
         ["Affectation", f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}"]
     ]
-    table = Table(infos, colWidths=[150, 300])
-    table.setStyle(TableStyle([
-        ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-        ("GRID", (0, 0), (-1, -1), 1, colors.black)
-    ]))
-    story.append(table)
-    story.append(Spacer(1, 20))
+    story.append(Table(infos, colWidths=[150, 300],
+                       style=[("GRID", (0, 0), (-1, -1), 1, colors.black)]))
+    story.append(Spacer(1, 15))
 
-    # Score global
-    if "ksa_data" in st.session_state and st.session_state.ksa_data:
-        story.append(Paragraph("🎯 Score global cible", styles['Heading2']))
-        story.append(Paragraph("Score calculé automatiquement selon la matrice KSA", styles['Normal']))
-        story.append(Spacer(1, 15))
+    # --- SECTION 2: Contexte
+    story.append(Paragraph("2. Contexte & Enjeux", styles['Heading2']))
+    for field in ["raison_ouverture", "impact_strategique", "rattachement", "defis_principaux"]:
+        if field in st.session_state:
+            story.append(Paragraph(f"- {field.replace('_',' ').title()} : {st.session_state[field]}", styles['Normal']))
+    story.append(Spacer(1, 15))
 
-    # Sections contextuelles
-    for section in ["contexte", "recherches", "plan_action", "calendrier"]:
-        if section in st.session_state:
-            story.append(Paragraph(section.capitalize(), styles['Heading2']))
-            for k, v in st.session_state[section].items():
-                story.append(Paragraph(f"{k}: {v}", styles['Normal']))
-            story.append(Spacer(1, 15))
+    # --- SECTION 3: Recherches
+    story.append(Paragraph("3. Recherches Marché", styles['Heading2']))
+    for field in ["benchmark_salaire", "disponibilite_profils", "concurrents_directs", "specificites_sectorielles"]:
+        if field in st.session_state:
+            story.append(Paragraph(f"- {field.replace('_',' ').title()} : {st.session_state[field]}", styles['Normal']))
+    story.append(Spacer(1, 15))
+
+    # --- SECTION 4: Questions manager
+    story.append(Paragraph("4. Questions Manager", styles['Heading2']))
+    for field in ["q1_manager", "q2_manager", "q3_manager"]:
+        if field in st.session_state:
+            story.append(Paragraph(f"- {st.session_state[field]}", styles['Normal']))
+    story.append(Spacer(1, 15))
+
+    # --- SECTION 5: Incidents critiques
+    story.append(Paragraph("5. Incidents Critiques", styles['Heading2']))
+    for field in ["reussite_contexte", "reussite_actions", "reussite_resultat", "echec_contexte", "echec_causes", "echec_impact"]:
+        if field in st.session_state:
+            story.append(Paragraph(f"- {field.replace('_',' ').title()} : {st.session_state[field]}", styles['Normal']))
+    story.append(Spacer(1, 15))
+
+    # --- SECTION 6: Comportementales
+    story.append(Paragraph("6. Questions Comportementales", styles['Heading2']))
+    for field in ["comp_q1", "comp_rep1", "comp_eval1"]:
+        if field in st.session_state:
+            story.append(Paragraph(f"- {field.replace('_',' ').title()} : {st.session_state[field]}", styles['Normal']))
+    story.append(Spacer(1, 15))
+
+    # --- SECTION 7: KSA
+    story.append(Paragraph("7. Matrice KSA", styles['Heading2']))
+    for cat, comps in st.session_state.get("ksa_data", {}).items():
+        story.append(Paragraph(f"{cat}", styles['Heading3']))
+        for comp, details in comps.items():
+            story.append(Paragraph(f"- {comp} ({details})", styles['Normal']))
+    story.append(Spacer(1, 15))
+
+    # --- SECTION 8: Stratégie
+    story.append(Paragraph("8. Stratégie Recrutement", styles['Heading2']))
+    for field in ["canaux_prioritaires", "criteres_exclusion", "processus_evaluation"]:
+        if field in st.session_state:
+            story.append(Paragraph(f"- {field.replace('_',' ').title()} : {st.session_state[field]}", styles['Normal']))
+    story.append(Spacer(1, 15))
+
+    # --- SECTION 9: Synthèse
+    story.append(Paragraph("9. Synthèse & Scoring", styles['Heading2']))
+    story.append(Paragraph("Score global cible calculé automatiquement.", styles['Normal']))
+    story.append(Spacer(1, 15))
+
+    # --- SECTION 10: Plan d’action
+    story.append(Paragraph("10. Plan d’Action & Calendrier", styles['Heading2']))
+    for field in ["prochaines_etapes", "responsables", "delais", "points_blocants", "date_lancement", "date_limite_candidatures", "dates_entretiens", "date_decision_finale"]:
+        if field in st.session_state:
+            story.append(Paragraph(f"- {field.replace('_',' ').title()} : {st.session_state[field]}", styles['Normal']))
 
     doc.build(story)
     buffer.seek(0)
     return buffer
 
-# -------------------- Export Word --------------------
+# -------------------- EXPORT WORD --------------------
 def export_brief_word():
-    """Exporte le brief courant en Word (si python-docx dispo)"""
     if not WORD_AVAILABLE:
         return None
 
     doc = Document()
     doc.add_heading("📋 Brief Recrutement", 0)
 
-    infos = {
-        "Poste": st.session_state.get("poste_intitule", ""),
-        "Manager": st.session_state.get("manager_nom", ""),
-        "Recruteur": st.session_state.get("recruteur", ""),
-        "Affectation": f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}"
-    }
-    for k, v in infos.items():
-        doc.add_paragraph(f"{k}: {v}")
+    # Identité
+    doc.add_heading("1. Identité du poste", level=1)
+    for k in ["poste_intitule","service","niveau_hierarchique","type_contrat","localisation","budget_salaire","date_prise_poste","recruteur","manager_nom","affectation_type","affectation_nom"]:
+        doc.add_paragraph(f"{k.replace('_',' ').title()} : {st.session_state.get(k,'')}")
 
-    if "ksa_data" in st.session_state and st.session_state.ksa_data:
-        doc.add_heading("🎯 Score global cible", level=1)
-        doc.add_paragraph("Score calculé automatiquement selon la matrice KSA")
+    # Contexte
+    doc.add_heading("2. Contexte & Enjeux", level=1)
+    for k in ["raison_ouverture","impact_strategique","rattachement","defis_principaux"]:
+        doc.add_paragraph(f"{k.replace('_',' ').title()} : {st.session_state.get(k,'')}")
 
-    for section in ["contexte", "recherches", "plan_action", "calendrier"]:
-        if section in st.session_state:
-            doc.add_heading(section.capitalize(), level=1)
-            for k, v in st.session_state[section].items():
-                doc.add_paragraph(f"{k}: {v}")
+    # Recherches
+    doc.add_heading("3. Recherches Marché", level=1)
+    for k in ["benchmark_salaire","disponibilite_profils","concurrents_directs","specificites_sectorielles"]:
+        doc.add_paragraph(f"{k.replace('_',' ').title()} : {st.session_state.get(k,'')}")
+
+    # Questions Manager
+    doc.add_heading("4. Questions Manager", level=1)
+    for k in ["q1_manager","q2_manager","q3_manager"]:
+        doc.add_paragraph(st.session_state.get(k,""))
+
+    # Incidents
+    doc.add_heading("5. Incidents Critiques", level=1)
+    for k in ["reussite_contexte","reussite_actions","reussite_resultat","echec_contexte","echec_causes","echec_impact"]:
+        doc.add_paragraph(f"{k.replace('_',' ').title()} : {st.session_state.get(k,'')}")
+
+    # Comportementales
+    doc.add_heading("6. Questions Comportementales", level=1)
+    for k in ["comp_q1","comp_rep1","comp_eval1"]:
+        doc.add_paragraph(f"{k.replace('_',' ').title()} : {st.session_state.get(k,'')}")
+
+    # KSA
+    doc.add_heading("7. Matrice KSA", level=1)
+    for cat, comps in st.session_state.get("ksa_data", {}).items():
+        doc.add_heading(cat, level=2)
+        for comp, details in comps.items():
+            doc.add_paragraph(f"- {comp} ({details})")
+
+    # Stratégie
+    doc.add_heading("8. Stratégie Recrutement", level=1)
+    for k in ["canaux_prioritaires","criteres_exclusion","processus_evaluation"]:
+        doc.add_paragraph(f"{k.replace('_',' ').title()} : {st.session_state.get(k,'')}")
+
+    # Synthèse
+    doc.add_heading("9. Synthèse & Scoring", level=1)
+    doc.add_paragraph("Score global cible calculé automatiquement.")
+
+    # Plan d’action
+    doc.add_heading("10. Plan d’Action & Calendrier", level=1)
+    for k in ["prochaines_etapes","responsables","delais","points_blocants","date_lancement","date_limite_candidatures","dates_entretiens","date_decision_finale"]:
+        doc.add_paragraph(f"{k.replace('_',' ').title()} : {st.session_state.get(k,'')}")
 
     buffer = io.BytesIO()
     doc.save(buffer)
