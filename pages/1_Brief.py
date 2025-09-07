@@ -113,31 +113,31 @@ st.markdown("""
 
     /* Conteneur des colonnes individuelles de navigation */
     div[data-testid="stVerticalBlock"] > div:first-child > div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
-        flex-grow: 0 !important; 
-        flex-shrink: 0 !important; 
-        flex-basis: auto !important; 
-        width: auto !important; 
-        padding-left: 0px !important; 
-        padding-right: 0px !important; 
-        margin-right: 5px !important; 
+        flex-grow: 0 !important; /* Empêche les colonnes de prendre de l'espace supplémentaire */
+        flex-shrink: 0 !important; /* Empêche les colonnes de rétrécir */
+        flex-basis: auto !important; /* La taille est basée sur le contenu */
+        width: auto !important; /* Largeur automatique */
+        padding-left: 0px !important; /* Pas de padding à gauche */
+        padding-right: 0px !important; /* Pas de padding à droite */
+        margin-right: 5px !important; /* Petite marge entre les boutons pour les séparer légèrement */
     }
 
     /* Styles généraux pour tous les boutons de navigation (non-actifs et actifs) */
     .stButton > button {
-        background-color: #D20000 !important; /* Rouge moins vif pour les onglets inactifs */
+        background-color: #D20000 !important; /* Rouge plus foncé pour les onglets inactifs */
         color: white !important; 
         border: none !important;
         box-shadow: none !important;
         font-size: 14px !important;
-        padding: 5px 10px !important; 
-        border-radius: 0px !important; 
-        white-space: nowrap; 
-        margin: 0 !important; 
-        display: inline-flex;
+        padding: 5px 10px !important; /* Réduit le padding pour rapprocher texte/bord */
+        border-radius: 0px !important; /* Coins carrés */
+        white-space: nowrap; /* Empêche le texte de passer à la ligne */
+        margin: 0 !important; /* Annule toutes les marges */
+        display: inline-flex; /* Permet un bon alignement icône/texte et le rapprochement */
         align-items: center;
         justify-content: center;
-        gap: 5px; 
-        height: auto !important; 
+        gap: 5px; /* Espace entre icône et texte */
+        height: auto !important; /* La hauteur s'ajuste au contenu */
     }
     
     /* Style pour le bouton de navigation ACTIF */
@@ -145,21 +145,21 @@ st.markdown("""
         background-color: #ff4b4b !important; /* Rouge vif pour le bouton actif */
         color: white !important;
         font-weight: bold !important;
-        border-bottom: 3px solid #ff4b4b !important; 
-        margin-bottom: -3px !important; 
+        border-bottom: 3px solid #ff4b4b !important; /* Ligne rouge vif en dessous */
+        margin-bottom: -3px !important; /* Soulève légèrement pour couvrir la ligne du conteneur */
     }
 
     /* Styles pour les boutons d'action "Sauvegarder le Brief" et "Rechercher" */
     button[data-testid*="primary"],
     button[data-testid*="secondary"] {
-        background-color: #ff4b4b !important; /* Rouge vif */
+        background-color: #ff4b4b !important; /* Rouge vif pour les boutons d'action */
         color: white !important;
         border: 1px solid #ff4b4b !important;
         border-radius: 8px !important;
-        padding: 10px 20px !important; 
+        padding: 10px 20px !important; /* Plus de padding pour ces boutons */
         font-weight: bold !important;
-        margin-top: 10px; 
-        margin-bottom: 10px; 
+        margin-top: 10px; /* Ajoute un peu d'espace au-dessus */
+        margin-bottom: 10px; /* Ajoute un peu d'espace en dessous */
     }
 
     /* S'assurer que le bouton de recherche dans les colonnes a le bon style */
