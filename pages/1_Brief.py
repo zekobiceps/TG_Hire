@@ -98,32 +98,31 @@ onglets = {
 # Style CSS pour le menu de navigation et les boutons
 st.markdown("""
     <style>
-    /* Styles pour le conteneur du menu */
-    .nav-container {
-        display: flex;
-        justify-content: flex-start;
-        align-items: center;
-        width: 100%;
-        margin-bottom: 20px;
-        padding-top: 10px;
+    /* Réduire l'espace en haut de la page */
+    .block-container {
+        padding-top: 1rem !important;
     }
     
-    /* Ciblage spécifique des boutons de navigation Streamlit */
-    div[data-testid="stVerticalBlock"] > div > .stButton > button {
+    /* Cibler les boutons de navigation */
+    .stButton > button {
         background-color: transparent !important;
-        color: white !important;
         border: none !important;
+        color: rgba(255, 255, 255, 0.6) !important; /* Couleur du texte par défaut (non actif) */
         font-size: 14px !important;
         padding: 8px 12px !important;
         margin-right: 5px !important;
-        border-radius: 0px !important;
-        box-shadow: none !important;
     }
     
-    /* Style pour le bouton actif (l'onglet sélectionné) */
-    div[data-testid="stVerticalBlock"] > div > .stButton > button.active {
+    /* Style pour le bouton actif */
+    .stButton > button.active {
+        color: white !important; /* Couleur du texte pour l'onglet actif */
         font-weight: bold !important;
         border-bottom: 3px solid #66b366 !important;
+    }
+    
+    /* Supprimer la bordure et le fond des boutons par défaut */
+    .stButton > button {
+        box-shadow: none !important;
     }
 
     /* Style pour le bouton "Rechercher" */
@@ -131,13 +130,27 @@ st.markdown("""
         background-color: #6a1b9a !important;
         color: white !important;
         border-radius: 8px !important;
+        border: 1px solid #6a1b9a !important;
     }
     
-    /* Supprimer la bordure et le fond de tous les stButton sauf le bouton rechercher */
-    .stButton > button:not(.stButton[data-testid="base-button-secondaryFormSubmit"] > button) {
-        border: none !important;
-        background-color: transparent !important;
+    /* Réduire l'espacement des sous-titres */
+    h2 {
+        margin-top: 1rem;
+        margin-bottom: 0.5rem;
     }
+    
+    /* Réduire l'espacement des en-têtes */
+    h1 {
+        margin-top: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+    
+    /* Réduire l'espacement des lignes de séparation */
+    hr {
+        margin-top: 0rem;
+        margin-bottom: 1rem;
+    }
+
     </style>
 """, unsafe_allow_html=True)
 
@@ -147,6 +160,7 @@ with st.container():
     for i, (icone, label) in enumerate(onglets.items()):
         with cols[i]:
             if st.session_state.brief_phase == icone:
+                # Ajout d'une classe "active" sur l'onglet sélectionné
                 st.markdown(f'<div class="stButton"><button class="active">{icone} {label}</button></div>', unsafe_allow_html=True)
             else:
                 if st.button(f"{icone} {label}", key=f"tab_{i}"):
@@ -154,6 +168,7 @@ with st.container():
                     st.rerun()
 
 st.markdown("<hr style='border:1px solid #66b366; margin-top:-10px;'>", unsafe_allow_html=True)
+
 
 # ---------------- ONGLET GESTION ----------------
 if st.session_state.brief_phase == "📁 Gestion":
