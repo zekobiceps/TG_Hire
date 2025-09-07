@@ -113,65 +113,73 @@ st.markdown("""
         display: none !important;
     }
 
-    /* Style pour les boutons de navigation personnalisés */
-    .nav-button button {
+    /* Conteneur pour la barre de navigation */
+    .main-nav-container {
+        display: flex;
+        flex-direction: row;
+        border-bottom: 3px solid #ff4b4b; /* Ligne rouge pour la navigation */
+        margin-bottom: 10px; /* Espace sous la ligne */
+    }
+
+    /* Style pour les boutons de navigation (non-actifs) */
+    .main-nav-container .stButton > button {
         background-color: transparent !important;
         color: rgba(255, 255, 255, 0.6) !important;
         border: none !important;
         box-shadow: none !important;
         font-size: 14px !important;
         padding: 8px 12px !important;
-        margin-right: -10px; /* Rapproche les boutons */
         border-radius: 0px !important;
+        margin-right: -10px; /* Rapproche les boutons */
+        white-space: nowrap; /* Empêche le retour à la ligne du texte */
     }
 
-    /* Style pour le bouton actif (l'onglet sélectionné) */
-    .active-nav-button button {
+    /* Style pour le bouton de navigation actif */
+    .main-nav-container .stButton > button.active-nav-button {
         color: white !important;
         font-weight: bold !important;
-        border-bottom: 3px solid #ff4b4b !important; /* Ligne rouge */
+        border-bottom: 3px solid #ff4b4b !important; /* Ligne rouge pour le bouton actif */
+        margin-bottom: -3px; /* Pour que la ligne du bouton actif chevauche la ligne générale */
     }
     
-    /* Style pour les boutons avec un fond spécifique (Sauvegarder, Rechercher) */
-    .stButton > button {
-        border: none !important;
-        background-color: transparent !important;
-        color: #fff !important;
+    /* Styles pour les boutons "Sauvegarder" et "Rechercher" */
+    /* Cible les boutons de type "primary" et "secondary" qui sont généralement dans des formulaires */
+    button[data-testid="base-button-secondary"], 
+    button[data-testid="base-button-primary"] {
+        background-color: #6a1b9a !important; /* Violet */
+        color: white !important;
+        border: 1px solid #6a1b9a !important;
+        border-radius: 8px !important;
+    }
+    
+    /* Pour le bouton "Rechercher" qui est parfois styled différemment par Streamlit */
+    .stButton[data-testid="stFormSubmitButton"] > button {
+        background-color: #6a1b9a !important;
+        color: white !important;
+        border: 1px solid #6a1b9a !important;
+        border-radius: 8px !important;
     }
 
-    /* Styles pour les boutons Sauvegarder et Rechercher */
-    div[data-testid="stForm"] .stButton > button {
-        background-color: #6a1b9a !important;
-        border: 1px solid #6a1b9a !important;
-        color: white !important;
-        border-radius: 8px !important;
-    }
-    
-    /* Le bouton "Rechercher" est souvent le premier d'un formulaire */
-    div[data-testid="stForm"] .stButton:first-of-type > button {
-        background-color: #6a1b9a !important;
-        color: white !important;
-        border: 1px solid #6a1b9a !important;
-        border-radius: 8px !important;
-    }
     </style>
 """, unsafe_allow_html=True)
 
 # Créer un conteneur horizontal pour les boutons de navigation
-with st.container():
-    cols = st.columns(len(onglets) + 1)
+st.markdown('<div class="main-nav-container">', unsafe_allow_html=True)
+cols = st.columns(len(onglets) + 1) # +1 pour une colonne vide à droite si nécessaire
     
-    for i, (icone, label) in enumerate(onglets.items()):
-        with cols[i]:
-            if st.session_state.brief_phase == icone:
-                st.button(f"{icone} {label}", key=f"tab_{i}", help="Onglet actif", use_container_width=True)
-                st.markdown(f'<div class="active-nav-button"><button></button></div>', unsafe_allow_html=True)
-            else:
-                if st.button(f"{icone} {label}", key=f"tab_{i}", use_container_width=True):
-                    st.session_state.brief_phase = icone
-                    st.rerun()
+for i, (icone, label) in enumerate(onglets.items()):
+    with cols[i]:
+        # Appliquer la classe 'active-nav-button' si l'onglet est actif via une classe CSS dynamique
+        button_class = "active-nav-button" if st.session_state.brief_phase == icone else ""
+        if st.button(f"{icone} {label}", key=f"tab_{i}", help=f"Aller à l'onglet {label}", use_container_width=True):
+            st.session_state.brief_phase = icone
+            st.rerun()
+        # Streamlit ne permet pas d'ajouter directement une classe à un bouton, 
+        # donc nous allons utiliser un trick CSS pour simuler l'état actif
+        if st.session_state.brief_phase == icone:
+            st.markdown(f'<script>document.querySelector("[data-testid=\'stVerticalBlock\'] > div > div:nth-child({i+1}) button").classList.add("active-nav-button");</script>', unsafe_allow_html=True)
+st.markdown('</div>', unsafe_allow_html=True)
 
-st.markdown("<hr style='border:1px solid #ff4b4b; margin-top: -10px;'>", unsafe_allow_html=True)
 
 # ---------------- ONGLET GESTION ----------------
 if st.session_state.brief_phase == "📁 Gestion":
