@@ -104,29 +104,28 @@ st.markdown("""
         display: none !important;
     }
 
-    /* Conteneur principal des boutons de navigation */
+    /* Conteneur principal des boutons de navigation pour le style de la ligne */
     div[data-testid="stVerticalBlock"] > div:first-child > div[data-testid="stHorizontalBlock"] {
         border-bottom: 3px solid #ff4b4b; /* Ligne rouge vif */
         padding-bottom: 0px; 
         margin-bottom: 0px; 
-        width: 100%;
-        gap: 0px; /* Supprime l'espace entre les colonnes */
     }
 
     /* Conteneur des colonnes individuelles de navigation */
     div[data-testid="stVerticalBlock"] > div:first-child > div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
-        flex-grow: 0 !important; /* Empêche les colonnes de prendre de l'espace */
+        flex-grow: 0 !important;
         flex-shrink: 0 !important;
         flex-basis: auto !important;
         width: auto !important;
-        padding: 0px !important;
-        margin-right: 5px !important; /* Petite marge entre les boutons */
+        padding-left: 0px !important;
+        padding-right: 0px !important;
+        margin-right: 5px !important;
     }
 
-    /* Styles généraux pour tous les boutons de navigation */
+    /* Styles généraux pour tous les boutons de navigation (non-actifs et actifs) */
     .stButton > button {
-        background-color: #D20000 !important; /* Rouge foncé pour les onglets inactifs */
-        color: white !important; 
+        background-color: #D20000 !important;
+        color: white !important;
         border: none !important;
         box-shadow: none !important;
         font-size: 14px !important;
@@ -143,26 +142,12 @@ st.markdown("""
     
     /* Style pour le bouton de navigation ACTIF */
     .stButton > button.active-tab {
-        background-color: #ff4b4b !important; /* Rouge vif pour le bouton actif */
+        background-color: #ff4b4b !important;
         color: white !important;
         font-weight: bold !important;
         border-bottom: 3px solid #ff4b4b !important;
         margin-bottom: -3px !important;
     }
-
-    /* Styles pour les boutons d'action "Sauvegarder le Brief" et "Rechercher" */
-    button[data-testid*="primary"],
-    button[data-testid*="secondary"] {
-        background-color: #ff4b4b !important; /* Rouge vif */
-        color: white !important;
-        border: 1px solid #ff4b4b !important;
-        border-radius: 8px !important;
-        padding: 10px 20px !important; 
-        font-weight: bold !important;
-        margin-top: 10px; 
-        margin-bottom: 10px; 
-    }
-    
     </style>
 """, unsafe_allow_html=True)
 
