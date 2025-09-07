@@ -118,7 +118,7 @@ st.markdown("""
     }
     
     /* Style de base pour tous les onglets */
-    .stTabs [data-baseweb="tab"] {
+    .stTabs [data.baseweb="tab"] {
         background-color: transparent !important;
         color: white !important;
         border: none !important;
@@ -130,7 +130,7 @@ st.markdown("""
     }
     
     /* Style pour l'onglet actif */
-    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+    .stTabs [data.baseweb="tab"][aria-selected="true"] {
         color: #ff4b4b !important;
         background-color: transparent !important;
         border-bottom: 3px solid #ff4b4b !important;
@@ -178,7 +178,7 @@ st.markdown("""
     }
     
     /* Correction pour les selectbox */
-    div[data-baseweb="select"] > div {
+    div[data.baseweb="select"] > div {
         border: none !important;
         background-color: #262730 !important;
         color: white !important;
@@ -368,23 +368,24 @@ with tab1:
                     colA, colB = st.columns(2)
                     with colA:
                         if st.button(f"📂 Charger", key=f"load_{name}"):
-                            # Charger seulement les clés qui existent dans st.session_state
+                            # Liste des clés autorisées pour le chargement
                             allowed_keys = [
                                 "poste_intitule", "manager_nom", "niveau_hierarchique", 
                                 "recruteur", "affectation_type", "affectation_nom",
                                 "raison_ouverture", "impact_strategique", "rattachement",
                                 "defis_principaux", "entreprises_profil", "canaux_profil",
-                                "synonymes_poste", "budget", "commentaires"
+                                "synonymes_poste", "budget", "commentaires", "date_brief"
                             ]
                             
-                            for k in data.keys():
-                                if k in allowed_keys and k in st.session_state:
+                            # Charger les données autorisées
+                            for k in allowed_keys:
+                                if k in data:
                                     st.session_state[k] = data[k]
                             
-                            # Gérer les données KSA séparément
+                            # Gestion spéciale pour les données KSA
                             if "ksa_data" in data:
                                 st.session_state.ksa_data = data["ksa_data"]
-                                
+                            
                             st.session_state.current_brief_name = name
                             st.success(f"✅ Brief '{name}' chargé avec succès!")
                             st.rerun()
@@ -437,35 +438,31 @@ with tab2:
             **Remplir ce tableau avec 2-3 sources**
             """)
             
-            # Tableau d'analyse comparative
-            st.markdown("**Mes infos de départ**")
-            col1, col2, col3 = st.columns(3)
+            # Tableau d'analyse comparative amélioré
+            cols = st.columns(3)
+            categories = [
+                "Intitulé du poste",
+                "Les tâches/missions", 
+                "Les connaissances",
+                "Diplômes/certifications demandés",
+                "Les compétences (techniques et sociales) et les outils à maîtriser",
+                "Salaires, avantages et plus values proposées"
+            ]
             
-            with col1:
-                st.text_input("Intitulé du poste", key="infos_intitule", placeholder="Intitulé du poste...")
-                st.text_area("Les tâches/missions", key="infos_taches", height=80, placeholder="Tâches et missions...")
-                st.text_area("Les connaissances", key="infos_connaissances", height=80, placeholder="Connaissances requises...")
-                st.text_area("Diplômes/certifications", key="infos_diplomes", height=80, placeholder="Diplômes et certifications...")
-                st.text_area("Compétences et outils", key="infos_competences", height=80, placeholder="Compétences et outils à maîtriser...")
-                st.text_area("Salaires et avantages", key="infos_salaires", height=80, placeholder="Salaires et avantages...")
+            with cols[0]:
+                st.markdown("**Mes infos de départ**")
+                for i, category in enumerate(categories):
+                    st.text_input(f"{category}", key=f"infos_{i}", placeholder=category)
             
-            with col2:
+            with cols[1]:
                 st.markdown("**Source 1**")
-                st.text_input("Source 1 - Intitulé", key="source1_intitule", placeholder="Intitulé du poste...")
-                st.text_area("Source 1 - Tâches", key="source1_taches", height=80, placeholder="Tâches et missions...")
-                st.text_area("Source 1 - Connaissances", key="source1_connaissances", height=80, placeholder="Connaissances requises...")
-                st.text_area("Source 1 - Diplômes", key="source1_diplomes", height=80, placeholder="Diplômes et certifications...")
-                st.text_area("Source 1 - Compétences", key="source1_competences", height=80, placeholder="Compétences et outils...")
-                st.text_area("Source 1 - Salaires", key="source1_salaires", height=80, placeholder="Salaires et avantages...")
+                for i, category in enumerate(categories):
+                    st.text_input(f"Source 1 - {category}", key=f"source1_{i}", placeholder=category)
             
-            with col3:
+            with cols[2]:
                 st.markdown("**Source 2**")
-                st.text_input("Source 2 - Intitulé", key="source2_intitule", placeholder="Intitulé du poste...")
-                st.text_area("Source 2 - Tâches", key="source2_taches", height=80, placeholder="Tâches et missions...")
-                st.text_area("Source 2 - Connaissances", key="source2_connaissances", height=80, placeholder="Connaissances requises...")
-                st.text_area("Source 2 - Diplômes", key="source2_diplomes", height=80, placeholder="Diplômes et certifications...")
-                st.text_area("Source 2 - Compétences", key="source2_competences", height=80, placeholder="Compétences et outils...")
-                st.text_area("Source 2 - Salaires", key="source2_salaires", height=80, placeholder="Salaires et avantages...")
+                for i, category in enumerate(categories):
+                    st.text_input(f"Source 2 - {category}", key=f"source2_{i}", placeholder=category)
             
             st.markdown("---")
             st.markdown("**Points à éclaircir avec le manager**")
@@ -513,26 +510,15 @@ with tab2:
                     "commentaires": st.session_state.get("commentaires", ""),
                     "verif_intitule": st.session_state.get("verif_intitule", ""),
                     "verif_criteres": st.session_state.get("verif_criteres", ""),
-                    "infos_intitule": st.session_state.get("infos_intitule", ""),
-                    "infos_taches": st.session_state.get("infos_taches", ""),
-                    "infos_connaissances": st.session_state.get("infos_connaissances", ""),
-                    "infos_diplomes": st.session_state.get("infos_diplomes", ""),
-                    "infos_competences": st.session_state.get("infos_competences", ""),
-                    "infos_salaires": st.session_state.get("infos_salaires", ""),
-                    "source1_intitule": st.session_state.get("source1_intitule", ""),
-                    "source1_taches": st.session_state.get("source1_taches", ""),
-                    "source1_connaissances": st.session_state.get("source1_connaissances", ""),
-                    "source1_diplomes": st.session_state.get("source1_diplomes", ""),
-                    "source1_competences": st.session_state.get("source1_competences", ""),
-                    "source1_salaires": st.session_state.get("source1_salaires", ""),
-                    "source2_intitule": st.session_state.get("source2_intitule", ""),
-                    "source2_taches": st.session_state.get("source2_taches", ""),
-                    "source2_connaissances": st.session_state.get("source2_connaissances", ""),
-                    "source2_diplomes": st.session_state.get("source2_diplomes", ""),
-                    "source2_competences": st.session_state.get("source2_competences", ""),
-                    "source2_salaires": st.session_state.get("source2_salaires", ""),
                     "questions_discussion": st.session_state.get("questions_discussion", "")
                 })
+                
+                # Sauvegarder les données du tableau comparatif
+                for i in range(6):  # 6 catégories
+                    st.session_state.saved_briefs[brief_name][f"infos_{i}"] = st.session_state.get(f"infos_{i}", "")
+                    st.session_state.saved_briefs[brief_name][f"source1_{i}"] = st.session_state.get(f"source1_{i}", "")
+                    st.session_state.saved_briefs[brief_name][f"source2_{i}"] = st.session_state.get(f"source2_{i}", "")
+                
                 save_briefs()
                 st.success("✅ Modifications sauvegardées")
             else:
