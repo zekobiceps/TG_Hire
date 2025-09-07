@@ -216,9 +216,15 @@ st.markdown("""
     
     /* Ajustement pour le message de confirmation */
     .message-container {
-        margin-top: 25px;
+        margin-top: 10px;
         padding: 10px;
         border-radius: 5px;
+    }
+    
+    /* Style pour les messages d'alerte */
+    .stAlert {
+        padding: 10px;
+        margin-top: 10px;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -258,32 +264,65 @@ with tab1:
             # Placeholder pour les messages d'erreur/confirmation
             message_placeholder = st.empty()
 
-        # --- SAUVEGARDE
-        if st.button("💾 Sauvegarder le Brief", type="primary", use_container_width=True):
-            if not all([st.session_state.poste_intitule, st.session_state.manager_nom, st.session_state.recruteur, st.session_state.date_brief]):
-                message_placeholder.error("Veuillez remplir tous les champs obligatoires (*)")
-            else:
-                brief_name = generate_automatic_brief_name()
-                if "saved_briefs" not in st.session_state:
-                    st.session_state.saved_briefs = {}
-                
-                st.session_state.saved_briefs[brief_name] = {
-                    "poste_intitule": st.session_state.poste_intitule,
-                    "manager_nom": st.session_state.manager_nom,
-                    "recruteur": st.session_state.recruteur,
-                    "date_brief": str(st.session_state.date_brief),
-                    "niveau_hierarchique": st.session_state.niveau_hierarchique,
-                    "affectation_type": st.session_state.affectation_type,
-                    "affectation_nom": st.session_state.affectation_nom,
-                    "raison_ouverture": st.session_state.get("raison_ouverture", ""),
-                    "impact_strategique": st.session_state.get("impact_strategique", ""),
-                    "rattachement": st.session_state.get("rattachement", ""),
-                    "defis_principaux": st.session_state.get("defis_principaux", ""),
-                    "ksa_data": st.session_state.get("ksa_data", {})
+        # --- SAUVEGARDE ET NOUVEAU BRIEF
+        col_save, col_new = st.columns(2)
+        with col_save:
+            if st.button("💾 Sauvegarder le Brief", type="primary", use_container_width=True):
+                if not all([st.session_state.poste_intitule, st.session_state.manager_nom, st.session_state.recruteur, st.session_state.date_brief]):
+                    message_placeholder.error("Veuillez remplir tous les champs obligatoires (*)")
+                else:
+                    brief_name = generate_automatic_brief_name()
+                    if "saved_briefs" not in st.session_state:
+                        st.session_state.saved_briefs = {}
+                    
+                    st.session_state.saved_briefs[brief_name] = {
+                        "poste_intitule": st.session_state.poste_intitule,
+                        "manager_nom": st.session_state.manager_nom,
+                        "recruteur": st.session_state.recruteur,
+                        "date_brief": str(st.session_state.date_brief),
+                        "niveau_hierarchique": st.session_state.niveau_hierarchique,
+                        "affectation_type": st.session_state.affectation_type,
+                        "affectation_nom": st.session_state.affectation_nom,
+                        "raison_ouverture": st.session_state.get("raison_ouverture", ""),
+                        "impact_strategique": st.session_state.get("impact_strategique", ""),
+                        "rattachement": st.session_state.get("rattachement", ""),
+                        "defis_principaux": st.session_state.get("defis_principaux", ""),
+                        "entreprises_profil": st.session_state.get("entreprises_profil", ""),
+                        "canaux_profil": st.session_state.get("canaux_profil", ""),
+                        "synonymes_poste": st.session_state.get("synonymes_poste", ""),
+                        "budget": st.session_state.get("budget", ""),
+                        "commentaires": st.session_state.get("commentaires", ""),
+                        "ksa_data": st.session_state.get("ksa_data", {})
+                    }
+                    save_briefs()
+                    message_placeholder.success(f"✅ Brief '{brief_name}' sauvegardé avec succès !")
+                    st.session_state.current_brief_name = brief_name
+                    
+        with col_new:
+            if st.button("📝 Nouveau Brief Vide", type="secondary", use_container_width=True):
+                # Réinitialiser les champs pour un nouveau brief
+                st.session_state.poste_intitule = ""
+                st.session_state.manager_nom = ""
+                st.session_state.niveau_hierarchique = ""
+                st.session_state.recruteur = ""
+                st.session_state.affectation_type = ""
+                st.session_state.affectation_nom = ""
+                st.session_state.raison_ouverture = ""
+                st.session_state.impact_strategique = ""
+                st.session_state.rattachement = ""
+                st.session_state.defis_principaux = ""
+                st.session_state.entreprises_profil = ""
+                st.session_state.canaux_profil = ""
+                st.session_state.synonymes_poste = ""
+                st.session_state.budget = ""
+                st.session_state.commentaires = ""
+                st.session_state.ksa_data = {
+                    "Connaissances": {},
+                    "Compétences": {},
+                    "Aptitudes": {}
                 }
-                save_briefs()
-                message_placeholder.success(f"✅ Brief '{brief_name}' sauvegardé avec succès !")
-                st.session_state.current_brief_name = brief_name
+                st.session_state.current_brief_name = "Nouveau Brief"
+                message_placeholder.info("📝 Nouveau brief vide créé. Remplissez les informations et sauvegardez.")
 
     with col_side:
         st.subheader("Recherche & Chargement")
@@ -378,146 +417,207 @@ with tab1:
 
 # ---------------- AVANT-BRIEF ----------------
 with tab2:
-    st.subheader("🔄 Avant-brief (Préparation)")
-    st.info("Remplissez les informations préparatoires avant la réunion avec le manager.")
+    if "current_brief_name" not in st.session_state or st.session_state.current_brief_name == "":
+        st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
+    else:
+        st.subheader("🔄 Avant-brief (Préparation)")
+        st.info("Remplissez les informations préparatoires avant la réunion avec le manager.")
 
-    # Réduire la hauteur des zones de texte
-    st.text_area("Raison ouverture", key="raison_ouverture", height=100)
-    st.text_area("Impact stratégique", key="impact_strategique", height=100)
-    st.text_area("Rattachement hiérarchique", key="rattachement", height=100)
-    st.text_area("Défis principaux", key="defis_principaux", height=100)
+        # Méthode rapide (15-30 min) - Jeu des 7 différences
+        with st.expander("⚡️ Méthode rapide (15-30 min) - Jeu des 7 différences"):
+            st.markdown("""
+            **Confronter les infos données par le manager aux données du terrain.**
+            
+            L'idée : identifier les incohérences ou les angles morts.
+            
+            Concentrez-vous en priorité :
+            
+            1. **Sur l'adéquation intitulé de poste / missions** - Vérifiez que les autres sources décrivent les mêmes missions pour l'intitulé de poste donné par le manager (peut-être du jargon interne).
+            
+            2. **Sur les critères demandés** (diplômes, expérience, tâches à maîtriser, compétences sociales) - Comparez avec les profils réels sur le marché.
+            """)
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.text_area("Intitulé de poste vs Missions réelles", key="verif_intitule", height=100, 
+                           placeholder="Comparaison entre l'intitulé donné et les missions réelles sur le terrain...")
+            with col2:
+                st.text_area("Critères demandés vs Réalité marché", key="verif_criteres", height=100,
+                           placeholder="Comparaison entre les critères demandés et la réalité du marché...")
 
-    if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True):
-        if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
-            brief_name = st.session_state.current_brief_name
-            st.session_state.saved_briefs[brief_name].update({
-                "raison_ouverture": st.session_state.get("raison_ouverture", ""),
-                "impact_strategique": st.session_state.get("impact_strategique", ""),
-                "rattachement": st.session_state.get("rattachement", ""),
-                "defis_principaux": st.session_state.get("defis_principaux", "")
-            })
-            save_briefs()
-            st.success("✅ Modifications sauvegardées")
-        else:
-            st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
+        # Réduire la hauteur des zones de texte
+        st.text_area("Raison ouverture", key="raison_ouverture", height=100, 
+                   placeholder="Pourquoi ce poste est-il ouvert? (départ, croissance, nouveau poste...)")
+        st.text_area("Impact stratégique", key="impact_strategique", height=100,
+                   placeholder="Impact stratégique de ce poste dans l'organisation...")
+        st.text_area("Rattachement hiérarchique", key="rattachement", height=100,
+                   placeholder="À qui le poste sera rattaché hiérarchiquement...")
+        st.text_area("Défis principaux", key="defis_principaux", height=100,
+                   placeholder="Principaux défis et challenges du poste...")
+        
+        # Nouveaux champs demandés
+        st.text_area("Entreprises où trouver ce profil", key="entreprises_profil", height=100,
+                   placeholder="Liste des entreprises où on peut trouver ce type de profil...")
+        st.text_area("Canaux à utiliser", key="canaux_profil", height=100,
+                   placeholder="LinkedIn, réseaux sociaux, job boards, chasse de tête...")
+        st.text_area("Synonymes de postes", key="synonymes_poste", height=100,
+                   placeholder="Autres intitulés de postes similaires ou équivalents...")
+        
+        # Budget et commentaires
+        col_budget, col_comment = st.columns(2)
+        with col_budget:
+            st.text_input("Budget", key="budget", placeholder="Budget alloué pour ce recrutement...")
+        with col_comment:
+            st.text_area("Commentaires libres", key="commentaires", height=100,
+                       placeholder="Espace pour commentaires supplémentaires...")
 
-# ---------------- RÉUNION (Wizard interne) ----------------
-with tab3:
-    st.subheader("✅ Réunion de brief avec le Manager")
-
-    total_steps = 4
-    step = st.session_state.reunion_step
-    st.progress(int((step / total_steps) * 100), text=f"Étape {step}/{total_steps}")
-
-    if step == 1:
-        st.subheader("1️⃣ Incidents Critiques")
-        st.text_area("Réussite exceptionnelle - Contexte", key="reussite_contexte", height=100)
-        st.text_area("Réussite exceptionnelle - Actions", key="reussite_actions", height=100)
-        st.text_area("Réussite exceptionnelle - Résultat", key="reussite_resultat", height=100)
-        st.text_area("Échec significatif - Contexte", key="echec_contexte", height=100)
-        st.text_area("Échec significatif - Causes", key="echec_causes", height=100)
-        st.text_area("Échec significatif - Impact", key="echec_impact", height=100)
-
-    elif step == 2:
-        st.subheader("2️⃣ Questions Comportementales")
-        st.text_area("Comment le candidat devrait-il gérer [situation difficile] ?", key="comp_q1", height=100)
-        st.text_area("Réponse attendue", key="comp_rep1", height=100)
-        st.text_area("Compétences évaluées", key="comp_eval1", height=100)
-
-    elif step == 3:
-        st.subheader("3️⃣ Validation Matrice KSA")
-        render_ksa_section()
-
-    elif step == 4:
-        st.subheader("4️⃣ Stratégie Recrutement")
-        st.multiselect("Canaux prioritaires", ["LinkedIn", "Jobboards", "Cooptation"], key="canaux_prioritaires")
-        st.text_area("Critères d'exclusion", key="criteres_exclusion", height=100)
-        st.text_area("Processus d'évaluation (détails)", key="processus_evaluation", height=100)
-
-        if st.button("💾 Enregistrer réunion", type="primary", use_container_width=True):
+        if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True):
             if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
                 brief_name = st.session_state.current_brief_name
                 st.session_state.saved_briefs[brief_name].update({
-                    "ksa_data": st.session_state.get("ksa_data", {})
+                    "raison_ouverture": st.session_state.get("raison_ouverture", ""),
+                    "impact_strategique": st.session_state.get("impact_strategique", ""),
+                    "rattachement": st.session_state.get("rattachement", ""),
+                    "defis_principaux": st.session_state.get("defis_principaux", ""),
+                    "entreprises_profil": st.session_state.get("entreprises_profil", ""),
+                    "canaux_profil": st.session_state.get("canaux_profil", ""),
+                    "synonymes_poste": st.session_state.get("synonymes_poste", ""),
+                    "budget": st.session_state.get("budget", ""),
+                    "commentaires": st.session_state.get("commentaires", ""),
+                    "verif_intitule": st.session_state.get("verif_intitule", ""),
+                    "verif_criteres": st.session_state.get("verif_criteres", "")
                 })
                 save_briefs()
-                st.success("✅ Données de réunion sauvegardées")
+                st.success("✅ Modifications sauvegardées")
             else:
                 st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
 
-    # ---- Navigation wizard ----
-    col1, col2, col3 = st.columns([1, 6, 1])
-    with col1:
-        if step > 1:
-            if st.button("⬅️ Précédent"):
-                st.session_state.reunion_step -= 1
-                st.rerun()
-    with col3:
-        if step < total_steps:
-            if st.button("Suivant ➡️"):
-                st.session_state.reunion_step += 1
-                st.rerun()
+# ---------------- RÉUNION (Wizard interne) ----------------
+with tab3:
+    if "current_brief_name" not in st.session_state or st.session_state.current_brief_name == "":
+        st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
+    else:
+        st.subheader("✅ Réunion de brief avec le Manager")
+
+        total_steps = 4
+        step = st.session_state.reunion_step
+        st.progress(int((step / total_steps) * 100), text=f"Étape {step}/{total_steps}")
+
+        if step == 1:
+            st.subheader("1️⃣ Incidents Critiques")
+            st.text_area("Réussite exceptionnelle - Contexte", key="reussite_contexte", height=100)
+            st.text_area("Réussite exceptionnelle - Actions", key="reussite_actions", height=100)
+            st.text_area("Réussite exceptionnelle - Résultat", key="reussite_resultat", height=100)
+            st.text_area("Échec significatif - Contexte", key="echec_contexte", height=100)
+            st.text_area("Échec significatif - Causes", key="echec_causes", height=100)
+            st.text_area("Échec significatif - Impact", key="echec_impact", height=100)
+
+        elif step == 2:
+            st.subheader("2️⃣ Questions Comportementales")
+            st.text_area("Comment le candidat devrait-il gérer [situation difficile] ?", key="comp_q1", height=100)
+            st.text_area("Réponse attendue", key="comp_rep1", height=100)
+            st.text_area("Compétences évaluées", key="comp_eval1", height=100)
+
+        elif step == 3:
+            st.subheader("3️⃣ Validation Matrice KSA")
+            render_ksa_section()
+
+        elif step == 4:
+            st.subheader("4️⃣ Stratégie Recrutement")
+            st.multiselect("Canaux prioritaires", ["LinkedIn", "Jobboards", "Cooptation", "Réseaux sociaux", "Chasse de tête"], key="canaux_prioritaires")
+            st.text_area("Critères d'exclusion", key="criteres_exclusion", height=100)
+            st.text_area("Processus d'évaluation (détails)", key="processus_evaluation", height=100)
+
+            if st.button("💾 Enregistrer réunion", type="primary", use_container_width=True):
+                if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
+                    brief_name = st.session_state.current_brief_name
+                    st.session_state.saved_briefs[brief_name].update({
+                        "ksa_data": st.session_state.get("ksa_data", {})
+                    })
+                    save_briefs()
+                    st.success("✅ Données de réunion sauvegardées")
+                else:
+                    st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
+
+        # ---- Navigation wizard ----
+        col1, col2, col3 = st.columns([1, 6, 1])
+        with col1:
+            if step > 1:
+                if st.button("⬅️ Précédent"):
+                    st.session_state.reunion_step -= 1
+                    st.rerun()
+        with col3:
+            if step < total_steps:
+                if st.button("Suivant ➡️"):
+                    st.session_state.reunion_step += 1
+                    st.rerun()
 
 # ---------------- SYNTHÈSE ----------------
 with tab4:
-    st.subheader("📝 Synthèse du Brief")
-    
-    if "current_brief_name" in st.session_state:
-        st.success(f"Brief actuel: {st.session_state.current_brief_name}")
-    
-    st.subheader("Résumé des informations")
-    st.json({
-        "Poste": st.session_state.get("poste_intitule", ""),
-        "Manager": st.session_state.get("manager_nom", ""),
-        "Recruteur": st.session_state.get("recruteur", ""),
-        "Affectation": f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}",
-        "Date": str(st.session_state.get("date_brief", "")),
-        "Raison ouverture": st.session_state.get("raison_ouverture", ""),
-        "Impact stratégique": st.session_state.get("impact_strategique", ""),
-        "Défis principaux": st.session_state.get("defis_principaux", ""),
-    })
-
-    st.subheader("📊 Calcul automatique du Score Global")
-    score_total = 0
-    count = 0
-    if "ksa_data" in st.session_state:
-        for cat, comps in st.session_state.ksa_data.items():
-            for comp, details in comps.items():
-                score_total += int(details.get("score") or 0)
-                count += 1
-    score_global = (score_total / count) if count else 0
-    st.metric("Score Global Cible", f"{score_global:.2f}/5")
-
-    if st.button("💾 Confirmer sauvegarde", type="primary", use_container_width=True):
+    if "current_brief_name" not in st.session_state or st.session_state.current_brief_name == "":
+        st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
+    else:
+        st.subheader("📝 Synthèse du Brief")
+        
         if "current_brief_name" in st.session_state:
-            save_briefs()
-            st.success("✅ Brief final confirmé et sauvegardé")
-        else:
-            st.error("❌ Aucun brief à sauvegarder. Veuillez d'abord créer un brief.")
+            st.success(f"Brief actuel: {st.session_state.current_brief_name}")
+        
+        st.subheader("Résumé des informations")
+        st.json({
+            "Poste": st.session_state.get("poste_intitule", ""),
+            "Manager": st.session_state.get("manager_nom", ""),
+            "Recruteur": st.session_state.get("recruteur", ""),
+            "Affectation": f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}",
+            "Date": str(st.session_state.get("date_brief", "")),
+            "Raison ouverture": st.session_state.get("raison_ouverture", ""),
+            "Impact stratégique": st.session_state.get("impact_strategique", ""),
+            "Défis principaux": st.session_state.get("defis_principaux", ""),
+            "Entreprises profil": st.session_state.get("entreprises_profil", ""),
+            "Canaux": st.session_state.get("canaux_profil", ""),
+            "Budget": st.session_state.get("budget", ""),
+        })
 
-    # -------- EXPORT PDF/WORD --------
-    st.subheader("📄 Export du Brief complet")
-    col1, col2 = st.columns(2)
-    with col1:
-        if PDF_AVAILABLE:
+        st.subheader("📊 Calcul automatique du Score Global")
+        score_total = 0
+        count = 0
+        if "ksa_data" in st.session_state:
+            for cat, comps in st.session_state.ksa_data.items():
+                for comp, details in comps.items():
+                    score_total += int(details.get("score") or 0)
+                    count += 1
+        score_global = (score_total / count) if count else 0
+        st.metric("Score Global Cible", f"{score_global:.2f}/5")
+
+        if st.button("💾 Confirmer sauvegarde", type="primary", use_container_width=True):
             if "current_brief_name" in st.session_state:
-                pdf_buf = export_brief_pdf()
-                if pdf_buf:
-                    st.download_button("⬇️ Télécharger PDF", data=pdf_buf,
-                                     file_name=f"{st.session_state.current_brief_name}.pdf", mime="application/pdf")
+                save_briefs()
+                st.success("✅ Brief final confirmé et sauvegardé")
             else:
-                st.info("ℹ️ Créez d'abord un brief pour l'exporter")
-        else:
-            st.info("⚠️ PDF non dispo (pip install reportlab)")
-    with col2:
-        if WORD_AVAILABLE:
-            if "current_brief_name" in st.session_state:
-                word_buf = export_brief_word()
-                if word_buf:
-                    st.download_button("⬇️ Télécharger Word", data=word_buf,
-                                     file_name=f"{st.session_state.current_brief_name}.docx",
-                                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                st.error("❌ Aucun brief à sauvegarder. Veuillez d'abord créer un brief.")
+
+        # -------- EXPORT PDF/WORD --------
+        st.subheader("📄 Export du Brief complet")
+        col1, col2 = st.columns(2)
+        with col1:
+            if PDF_AVAILABLE:
+                if "current_brief_name" in st.session_state:
+                    pdf_buf = export_brief_pdf()
+                    if pdf_buf:
+                        st.download_button("⬇️ Télécharger PDF", data=pdf_buf,
+                                         file_name=f"{st.session_state.current_brief_name}.pdf", mime="application/pdf")
+                else:
+                    st.info("ℹ️ Créez d'abord un brief pour l'exporter")
             else:
-                st.info("ℹ️ Créez d'abord un brief pour l'exporter")
-        else:
-            st.info("⚠️ Word non dispo (pip install python-docx)")
+                st.info("⚠️ PDF non dispo (pip install reportlab)")
+        with col2:
+            if WORD_AVAILABLE:
+                if "current_brief_name" in st.session_state:
+                    word_buf = export_brief_word()
+                    if word_buf:
+                        st.download_button("⬇️ Télécharger Word", data=word_buf,
+                                         file_name=f"{st.session_state.current_brief_name}.docx",
+                                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                else:
+                    st.info("ℹ️ Créez d'abord un brief pour l'exporter")
+            else:
+                st.info("⚠️ Word non dispo (pip install python-docx)")
