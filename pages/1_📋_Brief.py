@@ -13,6 +13,26 @@ spec.loader.exec_module(utils)
 # -------------------- Init session --------------------
 utils.init_session_state()
 
+# Initialisation des variables manquantes
+defaults = {
+    "poste_intitule": "",
+    "manager_nom": "",
+    "recruteur": "Zakaria",
+    "affectation_type": "Chantier",
+    "affectation_nom": "",
+    "current_brief_name": "",
+    "saved_briefs": {},
+    "filtered_briefs": {},
+    "show_filtered_results": False,
+    "brief_data": {},
+    "ksa_data": {},
+    "comment_libre": "",
+}
+for k, v in defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+# -------------------- Page config --------------------
 st.set_page_config(
     page_title="TG-Hire IA - Assistant Recrutement",
     page_icon="🤖",
@@ -37,6 +57,7 @@ if brief_phase == "📁 Gestion":
 
     col1, col2 = st.columns(2)
 
+    # -------- Colonne gauche --------
     with col1:
         st.subheader("Informations de base")
 
@@ -91,6 +112,7 @@ if brief_phase == "📁 Gestion":
                 key="brief_nom"
             )
 
+    # -------- Colonne droite --------
     with col2:
         st.subheader("Chargement & Templates")
 
@@ -142,3 +164,17 @@ if brief_phase == "📁 Gestion":
                         st.rerun()
             else:
                 st.warning("Aucun brief trouvé avec ces critères.")
+
+# -------------------- Phase Avant-brief --------------------
+elif brief_phase == "🔄 Avant-brief":
+    st.header("🔄 Avant-brief")
+    st.write("➡️ Ici tu ajoutes les champs spécifiques à l’avant-brief (questions au manager, contexte, etc.)")
+    # Exemple
+    st.session_state.comment_libre = st.text_area("Commentaires libres", value=st.session_state.comment_libre, key="avant_comment")
+
+# -------------------- Phase Réunion de brief --------------------
+elif brief_phase == "✅ Réunion de brief":
+    st.header("✅ Réunion de brief")
+    st.write("➡️ Ici tu ajoutes les champs spécifiques à la réunion de brief (points validés, validations finales, etc.)")
+    # Exemple
+    st.session_state.comment_libre = st.text_area("Compte rendu réunion", value=st.session_state.comment_libre, key="reunion_comment")
