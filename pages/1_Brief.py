@@ -89,9 +89,38 @@ if "filtered_briefs" not in st.session_state:
 
 # ---------------- NAVIGATION PRINCIPALE ----------------
 st.title("🤖 TG-Hire IA - Brief")
+
+# Style CSS pour imiter l'apparence de la PJ
+st.markdown("""
+    <style>
+    .nav-button {
+        background-color: #f0f2f6;
+        border: 1px solid #d0d0d0;
+        border-radius: 5px;
+        padding: 10px;
+        margin: 5px 0;
+        text-align: center;
+        cursor: pointer;
+    }
+    .nav-button:hover {
+        background-color: #e6e6e6;
+    }
+    .nav-button.active {
+        background-color: #4CAF50;
+        color: white;
+        font-weight: bold;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Créer la navigation
 phases = ["📁 Gestion", "🔄 Avant-brief", "✅ Réunion de brief", "📝 Synthèse"]
 cols = st.columns(len(phases))
+
 for i, phase in enumerate(phases):
+    is_active = st.session_state.brief_phase == phase
+    button_class = "nav-button active" if is_active else "nav-button"
+    
     if cols[i].button(phase, use_container_width=True, key=f"nav_{i}"):
         st.session_state.brief_phase = phase
         st.rerun()
@@ -111,7 +140,7 @@ if st.session_state.brief_phase == "📁 Gestion":
             st.text_input("Intitulé du poste *", key="poste_intitule")
             st.text_input("Nom du manager *", key="manager_nom")
         with col2:
-            st.text_input("Niveau hiérarchique", key="niveau_hierarchique")
+            st.text_input("Poste à recruter", key="niveau_hierarchique")
             st.selectbox("Recruteur *", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="recruteur")
         with col3:
             st.selectbox("Affectation", ["", "Chantier", "Siège"], key="affectation_type")
@@ -174,6 +203,7 @@ if st.session_state.brief_phase == "📁 Gestion":
                     st.write(f"**Poste:** {data.get('poste_intitule', '')}")
                     st.write(f"**Manager:** {data.get('manager_nom', '')}")
                     st.write(f"**Recruteur:** {data.get('recruteur', '')}")
+                    st.write(f"**Affectation:** {data.get('affectation_type', '')} - {data.get('affectation_nom', '')}")
                     st.write(f"**Date:** {data.get('date_brief', '')}")
                     
                     colA, colB = st.columns(2)
