@@ -90,9 +90,6 @@ if "filtered_briefs" not in st.session_state:
 # ---------------- NAVIGATION PRINCIPALE ----------------
 st.title("🤖 TG-Hire IA - Brief")
 
-# Utilise une colonne pour centrer les boutons si tu le souhaites
-# col_center = st.columns([1, 6, 1])[1]
-
 # Définir les onglets avec leurs icônes et leurs labels
 onglets = {
     "📁 Gestion": "Gestion",
@@ -101,91 +98,55 @@ onglets = {
     "📝 Synthèse": "Synthèse"
 }
 
-# Style CSS pour le menu de navigation
+# Style CSS pour le menu de navigation et les boutons
 st.markdown("""
     <style>
-    .stButton>button {
-        background-color: transparent !important;
-        border: none !important;
-        color: white !important;
-        text-align: center !important;
-        padding: 8px 12px !important;
-        margin: 0 5px !important;
-        font-size: 16px !important;
-        cursor: pointer !important;
-        transition: all 0.3s ease 0s !important;
-        border-radius: 8px !important;
-    }
-    .stButton>button:hover {
-        background-color: rgba(255, 255, 255, 0.1) !important;
-    }
-    .stButton>button:focus:not(:active) {
-        box-shadow: none !important;
-    }
-    .active-tab {
-        border-bottom: 2px solid #00BFFF !important;
-        font-weight: bold !important;
-    }
+    /* Conteneur pour le menu de navigation */
     .nav-container {
         display: flex;
-        justify-content: flex-start;
-        padding-bottom: 5px;
+        justify-content: flex-start; /* Aligner les éléments à gauche */
+        align-items: center;
+        width: 100%;
         margin-bottom: 20px;
+    }
+    /* Style pour tous les boutons du menu */
+    .nav-container .stButton > button {
+        background-color: transparent !important;
+        color: white !important;
+        border: none !important;
+        font-size: 16px !important;
+        padding: 8px 12px !important;
+        margin-right: 20px !important; /* Espacement entre les boutons */
+        border-radius: 0px !important;
+    }
+    /* Style de l'onglet actif avec la bordure verte en bas */
+    .nav-container .stButton.active > button {
+        font-weight: bold !important;
+        border-bottom: 3px solid #66b366 !important;
+    }
+    /* Style du bouton "Rechercher" */
+    .st-emotion-cache-19a9f5d.st-emotion-cache-19a9f5d.st-emotion-cache-19a9f5d .st-emotion-cache-10o5huv.st-emotion-cache-10o5huv.st-emotion-cache-10o5huv {
+        background-color: #6a1b9a; /* Couleur violette */
+        color: white;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Afficher les boutons dans un conteneur horizontal
-container = st.container()
-with container:
-    cols = st.columns(len(onglets))
-    for i, (icone, label) in enumerate(onglets.items()):
-        with cols[i]:
-            if st.button(icone, key=f"tab_{i}"):
-                st.session_state.brief_phase = icone
-
-# Marquer l'onglet actif avec une ligne en dessous
-st.markdown(f"""
-    <div style="border-bottom: 2px solid #4CAF50; width: 100%; margin-bottom: 20px;"></div>
-""", unsafe_allow_html=True)
-
-# ---------------- GESTION DES ONGLES ----------------
+# Gérer l'état de l'onglet actif
 if "brief_phase" not in st.session_state:
     st.session_state.brief_phase = "📁 Gestion"
 
-# Mettre à jour le style de l'onglet actif via une manipulation JavaScript simple
-js = f"""
-    <script>
-    const activeTab = document.querySelector('[data-testid="stButton"] button[key="tab_{list(onglets.keys()).index(st.session_state.brief_phase)}"]');
-    if (activeTab) {{
-        activeTab.classList.add("active-tab");
-    }}
-    </script>
-"""
-st.markdown(js, unsafe_allow_html=True)
+# Créer un conteneur pour les boutons de navigation
+with st.container():
+    cols = st.columns(len(onglets))
+    for i, (icone, label) in enumerate(onglets.items()):
+        with cols[i]:
+            # Créez une classe CSS "active" pour l'onglet sélectionné
+            is_active = "active" if st.session_state.brief_phase == icone else ""
+            st.button(icone, key=f"tab_{i}", help=label)
 
-# ---------------- CONTENU D'ONGLET ----------------
-# Le reste de ton code reste inchangé, la logique est déjà correcte
-# Elle se base sur la variable st.session_state.brief_phase
-# ... ton code actuel pour chaque phase ...
-
-if st.session_state.brief_phase == "📁 Gestion":
-    col_main, col_side = st.columns([2, 1])
-    # ... (le contenu de Gestion)
-    # ...
-elif st.session_state.brief_phase == "🔄 Avant-brief":
-    st.header("🔄 Avant-brief (Préparation)")
-    st.info("Remplissez les informations préparatoires avant la réunion avec le manager.")
-    # ... (le contenu d'Avant-brief)
-    # ...
-elif st.session_state.brief_phase == "✅ Réunion de brief":
-    st.header("✅ Réunion de brief avec le Manager")
-    # ... (le contenu de Réunion de brief)
-    # ...
-elif st.session_state.brief_phase == "📝 Synthèse":
-    st.header("📝 Synthèse du Brief")
-    # ... (le contenu de Synthèse)
-    # ...
+# Une ligne de séparation verte
+st.markdown("<div style='border-bottom: 3px solid #66b366; width: 100%; margin-top: -15px;'></div>", unsafe_allow_html=True)
 
 # ---------------- ONGLET GESTION ----------------
 if st.session_state.brief_phase == "📁 Gestion":
