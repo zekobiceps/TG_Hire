@@ -13,6 +13,15 @@ spec.loader.exec_module(utils)
 # -------------------- Init session --------------------
 utils.init_session_state()
 
+# Initialiser les variables manquantes
+defaults = {
+    "annonces": [],
+}
+for k, v in defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
+
+# -------------------- Page config --------------------
 st.set_page_config(
     page_title="TG-Hire IA - Annonces",
     page_icon="📢",
@@ -22,45 +31,60 @@ st.set_page_config(
 
 st.title("📢 Gestion des annonces")
 
-# -------------------- Données --------------------
-if "annonces" not in st.session_state:
-    st.session_state.annonces = []
+# -------------------- Ajout d’une annonce --------------------
+st.subheader("➕ Ajouter une annonce")
 
-# -------------------- Interface --------------------
-col1, col2 = st.columns([2, 1])
+col1, col2 = st.columns(2)
 with col1:
     titre = st.text_input("Titre de l’annonce", key="annonce_titre")
-    description = st.text_area("Description de l’annonce", key="annonce_desc", height=200)
+    poste = st.text_input("Poste concerné", key="annonce_poste")
 with col2:
-    date_pub = st.date_input("Date de publication", datetime.today(), key="annonce_date")
-    recruteur = st.selectbox("Recruteur", ["Zakaria", "Sara", "Jalal", "Bouchra"], key="annonce_recruteur")
+    entreprise = st.text_input("Entreprise", key="annonce_entreprise")
+    localisation = st.text_input("Localisation", key="annonce_loc")
 
-if st.button("➕ Ajouter annonce", type="primary", key="add_annonce"):
-    if titre and description:
+contenu = st.text_area("Contenu de l’annonce", key="annonce_contenu", height=150)
+
+if st.button("💾 Publier l’annonce", type="primary", use_container_width=True, key="btn_publier_annonce"):
+    if titre and poste and entreprise and contenu:
         annonce = {
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "titre": titre,
-            "description": description,
-            "date": str(date_pub),
-            "recruteur": recruteur
+            "poste": poste,
+            "entreprise": entreprise,
+            "localisation": localisation,
+            "contenu": contenu,
         }
         st.session_state.annonces.append(annonce)
-        st.success("✅ Annonce ajoutée")
+        st.success("✅ Annonce publiée avec succès !")
     else:
-        st.warning("⚠️ Veuillez remplir tous les champs")
+        st.warning("⚠️ Merci de remplir tous les champs obligatoires")
 
 st.divider()
-st.subheader("📋 Liste des annonces")
 
-if st.session_state.annonces:
-    for i, annonce in enumerate(st.session_state.annonces):
-        with st.expander(f"{annonce['titre']} ({annonce['date']}) - {annonce['recruteur']}", expanded=False):
-            st.write(annonce["description"])
+# -------------------- Liste des annonces --------------------
+st.subheader("📋 Annonces publiées")
+
+if not st.session_state.annonces:
+    st.info("Aucune annonce publiée pour le moment.")
+else:
+    for i, annonce in enumerate(st.session_state.annonces[::-1]):  # affichage dernière en premier
+        with st.expander(f"{annonce['date']} - {annonce['titre']} ({annonce['poste']})", expanded=False):
+            st.write(f"**Entreprise :** {annonce['entreprise']}")
+            st.write(f"**Localisation :** {annonce['localisation'] or 'Non spécifiée'}")
+            st.write("**Contenu :**")
+            st.text_area("Contenu", annonce["contenu"], height=120, key=f"annonce_contenu_{i}", disabled=True)
+
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("🗑️ Supprimer", key=f"del_annonce_{i}"):
-                    st.session_state.annonces.pop(i)
+                if st.button("🗑️ Supprimer", key=f"delete_annonce_{i}"):
+                    st.session_state.annonces.pop(len(st.session_state.annonces) - 1 - i)
+                    st.success("Annonce supprimée.")
                     st.rerun()
             with col2:
-                st.write(f"👤 Recruteur : {annonce['recruteur']}")
-else:
-    st.info("ℹ️ Aucune annonce enregistrée")
+                st.download_button(
+                    "⬇️ Exporter",
+                    data=f"Titre: {annonce['titre']}\nPoste: {annonce['poste']}\nEntreprise: {annonce['entreprise']}\nLocalisation: {annonce['localisation']}\n\n{annonce['contenu']}",
+                    file_name=f"annonce_{annonce['poste']}_{i}.txt",
+                    mime="text/plain",
+                    key=f"download_annonce_{i}"
+                )
