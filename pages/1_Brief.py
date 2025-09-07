@@ -107,26 +107,36 @@ st.markdown("""
         margin-bottom: 20px;
         padding-top: 10px;
     }
-    /* Style pour tous les boutons du menu */
-    .nav-button > button {
+    
+    /* Ciblage spécifique des boutons de navigation Streamlit */
+    div[data-testid="stVerticalBlock"] > div > .stButton > button {
         background-color: transparent !important;
         color: white !important;
         border: none !important;
-        font-size: 14px !important; /* Taille de police réduite */
+        font-size: 14px !important;
         padding: 8px 12px !important;
-        margin-right: 5px !important; /* Espacement réduit entre les boutons */
+        margin-right: 5px !important;
         border-radius: 0px !important;
+        box-shadow: none !important;
     }
-    /* Ligne verte pour l'onglet actif */
-    .nav-button.active > button {
+    
+    /* Style pour le bouton actif (l'onglet sélectionné) */
+    div[data-testid="stVerticalBlock"] > div > .stButton > button.active {
         font-weight: bold !important;
         border-bottom: 3px solid #66b366 !important;
     }
+
     /* Style pour le bouton "Rechercher" */
     .stButton[data-testid="base-button-secondaryFormSubmit"] > button {
         background-color: #6a1b9a !important;
         color: white !important;
         border-radius: 8px !important;
+    }
+    
+    /* Supprimer la bordure et le fond de tous les stButton sauf le bouton rechercher */
+    .stButton > button:not(.stButton[data-testid="base-button-secondaryFormSubmit"] > button) {
+        border: none !important;
+        background-color: transparent !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -137,14 +147,13 @@ with st.container():
     for i, (icone, label) in enumerate(onglets.items()):
         with cols[i]:
             if st.session_state.brief_phase == icone:
-                st.markdown(f'<div class="nav-button active"><button>{icone} {label}</button></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="stButton"><button class="active">{icone} {label}</button></div>', unsafe_allow_html=True)
             else:
                 if st.button(f"{icone} {label}", key=f"tab_{i}"):
                     st.session_state.brief_phase = icone
                     st.rerun()
 
 st.markdown("<hr style='border:1px solid #66b366; margin-top:-10px;'>", unsafe_allow_html=True)
-
 
 # ---------------- ONGLET GESTION ----------------
 if st.session_state.brief_phase == "📁 Gestion":
