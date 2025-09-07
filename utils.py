@@ -4,16 +4,13 @@ import os
 import pickle
 from datetime import datetime
 import io
-import re
-import requests
 
 # -------------------- Disponibilité PDF & Word --------------------
 try:
     from reportlab.lib.pagesizes import A4
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.styles import getSampleStyleSheet
     from reportlab.lib import colors
-    from reportlab.lib.units import inch
     PDF_AVAILABLE = True
 except ImportError:
     PDF_AVAILABLE = False
@@ -174,9 +171,11 @@ def export_brief_pdf():
     styles = getSampleStyleSheet()
     story = []
 
-    story.append(Paragraph("Brief Recrutement", styles['Heading1']))
+    # Titre
+    story.append(Paragraph("📋 Brief Recrutement", styles['Heading1']))
     story.append(Spacer(1, 20))
 
+    # Infos de base
     infos = [
         ["Poste", st.session_state.get("poste_intitule", "")],
         ["Manager", st.session_state.get("manager_nom", "")],
@@ -192,20 +191,19 @@ def export_brief_pdf():
     story.append(table)
     story.append(Spacer(1, 20))
 
-    if "brief_data" in st.session_state:
-        for cat, items in st.session_state["brief_data"].items():
-            story.append(Paragraph(cat, styles['Heading2']))
-            for item, data in items.items():
-                val = data.get("valeur", "") if isinstance(data, dict) else str(data)
-                if val:
-                    story.append(Paragraph(f"<b>{item}:</b> {val}", styles['Normal']))
-            story.append(Spacer(1, 15))
+    # Score global
+    if "ksa_data" in st.session_state and st.session_state.ksa_data:
+        story.append(Paragraph("🎯 Score global cible", styles['Heading2']))
+        story.append(Paragraph("Score calculé automatiquement selon la matrice KSA", styles['Normal']))
+        story.append(Spacer(1, 15))
 
-    if "ksa_data" in st.session_state:
-        for cat, comps in st.session_state["ksa_data"].items():
-            story.append(Paragraph(cat, styles['Heading2']))
-            for comp, details in comps.items():
-                story.append(Paragraph(f"- {comp} ({details})", styles['Normal']))
+    # Sections contextuelles
+    for section in ["contexte", "recherches", "plan_action", "calendrier"]:
+        if section in st.session_state:
+            story.append(Paragraph(section.capitalize(), styles['Heading2']))
+            for k, v in st.session_state[section].items():
+                story.append(Paragraph(f"{k}: {v}", styles['Normal']))
+            story.append(Spacer(1, 15))
 
     doc.build(story)
     buffer.seek(0)
@@ -218,7 +216,7 @@ def export_brief_word():
         return None
 
     doc = Document()
-    doc.add_heading("Brief Recrutement", 0)
+    doc.add_heading("📋 Brief Recrutement", 0)
 
     infos = {
         "Poste": st.session_state.get("poste_intitule", ""),
@@ -229,19 +227,15 @@ def export_brief_word():
     for k, v in infos.items():
         doc.add_paragraph(f"{k}: {v}")
 
-    if "brief_data" in st.session_state:
-        for cat, items in st.session_state["brief_data"].items():
-            doc.add_heading(cat, level=1)
-            for item, data in items.items():
-                val = data.get("valeur", "") if isinstance(data, dict) else str(data)
-                if val:
-                    doc.add_paragraph(f"{item}: {val}")
+    if "ksa_data" in st.session_state and st.session_state.ksa_data:
+        doc.add_heading("🎯 Score global cible", level=1)
+        doc.add_paragraph("Score calculé automatiquement selon la matrice KSA")
 
-    if "ksa_data" in st.session_state:
-        for cat, comps in st.session_state["ksa_data"].items():
-            doc.add_heading(cat, level=2)
-            for comp, details in comps.items():
-                doc.add_paragraph(f"{comp}: {details}")
+    for section in ["contexte", "recherches", "plan_action", "calendrier"]:
+        if section in st.session_state:
+            doc.add_heading(section.capitalize(), level=1)
+            for k, v in st.session_state[section].items():
+                doc.add_paragraph(f"{k}: {v}")
 
     buffer = io.BytesIO()
     doc.save(buffer)
