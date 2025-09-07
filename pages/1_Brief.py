@@ -264,8 +264,8 @@ with tab1:
             # Placeholder pour les messages d'erreur/confirmation
             message_placeholder = st.empty()
 
-        # --- SAUVEGARDE ET NOUVEAU BRIEF
-        col_save, col_new = st.columns(2)
+        # --- SAUVEGARDE ET RÉINITIALISATION
+        col_save, col_reset = st.columns(2)
         with col_save:
             if st.button("💾 Sauvegarder le Brief", type="primary", use_container_width=True):
                 if not all([st.session_state.poste_intitule, st.session_state.manager_nom, st.session_state.recruteur, st.session_state.date_brief]):
@@ -298,31 +298,30 @@ with tab1:
                     message_placeholder.success(f"✅ Brief '{brief_name}' sauvegardé avec succès !")
                     st.session_state.current_brief_name = brief_name
                     
-        with col_new:
-            if st.button("📝 Nouveau Brief Vide", type="secondary", use_container_width=True):
+        with col_reset:
+            if st.button("🔄 Réinitialiser", type="secondary", use_container_width=True):
                 # Réinitialiser les champs pour un nouveau brief
-                st.session_state.poste_intitule = ""
-                st.session_state.manager_nom = ""
-                st.session_state.niveau_hierarchique = ""
-                st.session_state.recruteur = ""
-                st.session_state.affectation_type = ""
-                st.session_state.affectation_nom = ""
-                st.session_state.raison_ouverture = ""
-                st.session_state.impact_strategique = ""
-                st.session_state.rattachement = ""
-                st.session_state.defis_principaux = ""
-                st.session_state.entreprises_profil = ""
-                st.session_state.canaux_profil = ""
-                st.session_state.synonymes_poste = ""
-                st.session_state.budget = ""
-                st.session_state.commentaires = ""
-                st.session_state.ksa_data = {
-                    "Connaissances": {},
-                    "Compétences": {},
-                    "Aptitudes": {}
-                }
+                keys_to_clear = [
+                    "poste_intitule", "manager_nom", "niveau_hierarchique", 
+                    "recruteur", "affectation_type", "affectation_nom",
+                    "raison_ouverture", "impact_strategique", "rattachement",
+                    "defis_principaux", "entreprises_profil", "canaux_profil",
+                    "synonymes_poste", "budget", "commentaires"
+                ]
+                
+                for key in keys_to_clear:
+                    if key in st.session_state:
+                        st.session_state[key] = ""
+                
+                if "ksa_data" in st.session_state:
+                    st.session_state.ksa_data = {
+                        "Connaissances": {},
+                        "Compétences": {},
+                        "Aptitudes": {}
+                    }
+                
                 st.session_state.current_brief_name = "Nouveau Brief"
-                message_placeholder.info("📝 Nouveau brief vide créé. Remplissez les informations et sauvegardez.")
+                message_placeholder.info("📝 Brief réinitialisé. Remplissez les informations et sauvegardez.")
 
     with col_side:
         st.subheader("Recherche & Chargement")
@@ -396,9 +395,9 @@ with tab1:
                     colA, colB = st.columns(2)
                     with colA:
                         if st.button(f"📂 Charger", key=f"load_{name}"):
-                            safe_keys = [k for k in data.keys() if k not in ['ksa_data'] or data[k]]
-                            for k in safe_keys:
-                                if k in data and data[k]:
+                            # Charger seulement les clés qui existent dans st.session_state
+                            for k in data.keys():
+                                if k in st.session_state:
                                     st.session_state[k] = data[k]
                             st.session_state.current_brief_name = name
                             st.success(f"✅ Brief '{name}' chargé avec succès!")
@@ -445,30 +444,98 @@ with tab2:
                 st.text_area("Critères demandés vs Réalité marché", key="verif_criteres", height=100,
                            placeholder="Comparaison entre les critères demandés et la réalité du marché...")
 
-        # Réduire la hauteur des zones de texte
-        st.text_area("Raison ouverture", key="raison_ouverture", height=100, 
-                   placeholder="Pourquoi ce poste est-il ouvert? (départ, croissance, nouveau poste...)")
-        st.text_area("Impact stratégique", key="impact_strategique", height=100,
-                   placeholder="Impact stratégique de ce poste dans l'organisation...")
-        st.text_area("Rattachement hiérarchique", key="rattachement", height=100,
-                   placeholder="À qui le poste sera rattaché hiérarchiquement...")
-        st.text_area("Défis principaux", key="defis_principaux", height=100,
-                   placeholder="Principaux défis et challenges du poste...")
+        # Méthode complète (30min-1h)
+        with st.expander("🧠 Méthode complète (30min-1h) - Analyse comparative"):
+            st.markdown("""
+            **Remplir ce tableau avec 3 à 5 sources (où s'arrêter si on ne note plus rien de nouveau).**
+            """)
+            
+            # Tableau d'analyse comparative
+            col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+            with col1:
+                st.markdown("**Catégories**")
+                st.markdown("Intitulé du poste")
+                st.markdown("Les tâches/missions")
+                st.markdown("Les connaissances / diplômes / certification demandés")
+                st.markdown("Les compétences (techniques et sociales) et les outils à maîtriser")
+                st.markdown("Salaires, avantages et plus values proposées")
+                st.markdown("Case libre, si un autre élément te paraît important")
+            
+            with col2:
+                st.markdown("**Mes infos de départ**")
+                st.text_area("infos_intitule", key="infos_intitule", height=30, label_visibility="collapsed")
+                st.text_area("infos_taches", key="infos_taches", height=30, label_visibility="collapsed")
+                st.text_area("infos_diplomes", key="infos_diplomes", height=30, label_visibility="collapsed")
+                st.text_area("infos_competences", key="infos_competences", height=30, label_visibility="collapsed")
+                st.text_area("infos_salaires", key="infos_salaires", height=30, label_visibility="collapsed")
+                st.text_area("infos_libre", key="infos_libre", height=30, label_visibility="collapsed")
+            
+            with col3:
+                st.markdown("**Source 1**")
+                st.text_area("source1_intitule", key="source1_intitule", height=30, label_visibility="collapsed")
+                st.text_area("source1_taches", key="source1_taches", height=30, label_visibility="collapsed")
+                st.text_area("source1_diplomes", key="source1_diplomes", height=30, label_visibility="collapsed")
+                st.text_area("source1_competences", key="source1_competences", height=30, label_visibility="collapsed")
+                st.text_area("source1_salaires", key="source1_salaires", height=30, label_visibility="collapsed")
+                st.text_area("source1_libre", key="source1_libre", height=30, label_visibility="collapsed")
+            
+            with col4:
+                st.markdown("**Source 2**")
+                st.text_area("source2_intitule", key="source2_intitule", height=30, label_visibility="collapsed")
+                st.text_area("source2_taches", key="source2_taches", height=30, label_visibility="collapsed")
+                st.text_area("source2_diplomes", key="source2_diplomes", height=30, label_visibility="collapsed")
+                st.text_area("source2_competences", key="source2_competences", height=30, label_visibility="collapsed")
+                st.text_area("source2_salaires", key="source2_salaires", height=30, label_visibility="collapsed")
+                st.text_area("source2_libre", key="source2_libre", height=30, label_visibility="collapsed")
+            
+            st.markdown("---")
+            st.markdown("**2. Analyse des différentes infos récoltées**")
+            
+            col_grp1, col_grp2, col_grp3 = st.columns(3)
+            with col_grp1:
+                st.markdown("**Groupe 1 : Incontournables**")
+                st.text_area("Infos présentes dans toutes les sources", key="groupe1", height=100,
+                           placeholder="Éléments présents dans toutes les sources...")
+            
+            with col_grp2:
+                st.markdown("**Groupe 2 : Fréquents mais pas universels**")
+                st.text_area("Infos présentes dans plusieurs sources", key="groupe2", height=100,
+                           placeholder="Éléments fréquents mais pas universels...")
+            
+            with col_grp3:
+                st.markdown("**Groupe 3 : Rares mais intéressants**")
+                st.text_area("Infos rares mais potentiellement intéressantes", key="groupe3", height=100,
+                           placeholder="Éléments rares mais potentiellement attractifs...")
+            
+            st.markdown("---")
+            st.markdown("**3. Le récap : préparer ses questions pour challenger**")
+            st.text_area("Points à éclaircir avec votre manager/client", key="points_eclaircir", height=100,
+                       placeholder="Notez les points à éclaircir suite à l'analyse...")
+            st.text_area("Questions pour ouvrir la discussion", key="questions_discussion", height=100,
+                       placeholder="Préparez les questions à poser pour chaque point...")
+
+        # Disposition en colonnes pour les champs simples
+        col1, col2 = st.columns(2)
         
-        # Nouveaux champs demandés
-        st.text_area("Entreprises où trouver ce profil", key="entreprises_profil", height=100,
-                   placeholder="Liste des entreprises où on peut trouver ce type de profil...")
-        st.text_area("Canaux à utiliser", key="canaux_profil", height=100,
-                   placeholder="LinkedIn, réseaux sociaux, job boards, chasse de tête...")
-        st.text_area("Synonymes de postes", key="synonymes_poste", height=100,
-                   placeholder="Autres intitulés de postes similaires ou équivalents...")
+        with col1:
+            st.text_area("Raison ouverture", key="raison_ouverture", height=100, 
+                       placeholder="Pourquoi ce poste est-il ouvert? (départ, croissance, nouveau poste...)")
+            st.text_area("Impact stratégique", key="impact_strategique", height=100,
+                       placeholder="Impact stratégique de ce poste dans l'organisation...")
+            st.text_area("Rattachement hiérarchique", key="rattachement", height=100,
+                       placeholder="À qui le poste sera rattaché hiérarchiquement...")
+            st.text_area("Défis principaux", key="defis_principaux", height=100,
+                       placeholder="Principaux défis et challenges du poste...")
+            st.text_area("Entreprises où trouver ce profil", key="entreprises_profil", height=100,
+                       placeholder="Liste des entreprises où on peut trouver ce type de profil...")
         
-        # Budget et commentaires
-        col_budget, col_comment = st.columns(2)
-        with col_budget:
+        with col2:
+            st.text_area("Canaux à utiliser", key="canaux_profil", height=100,
+                       placeholder="LinkedIn, réseaux sociaux, job boards, chasse de tête...")
+            st.text_area("Synonymes de postes", key="synonymes_poste", height=100,
+                       placeholder="Autres intitulés de postes similaires ou équivalents...")
             st.text_input("Budget", key="budget", placeholder="Budget alloué pour ce recrutement...")
-        with col_comment:
-            st.text_area("Commentaires libres", key="commentaires", height=100,
+            st.text_area("Commentaires libres", key="commentaires", height=140,
                        placeholder="Espace pour commentaires supplémentaires...")
 
         if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True):
@@ -485,7 +552,30 @@ with tab2:
                     "budget": st.session_state.get("budget", ""),
                     "commentaires": st.session_state.get("commentaires", ""),
                     "verif_intitule": st.session_state.get("verif_intitule", ""),
-                    "verif_criteres": st.session_state.get("verif_criteres", "")
+                    "verif_criteres": st.session_state.get("verif_criteres", ""),
+                    "infos_intitule": st.session_state.get("infos_intitule", ""),
+                    "infos_taches": st.session_state.get("infos_taches", ""),
+                    "infos_diplomes": st.session_state.get("infos_diplomes", ""),
+                    "infos_competences": st.session_state.get("infos_competences", ""),
+                    "infos_salaires": st.session_state.get("infos_salaires", ""),
+                    "infos_libre": st.session_state.get("infos_libre", ""),
+                    "source1_intitule": st.session_state.get("source1_intitule", ""),
+                    "source1_taches": st.session_state.get("source1_taches", ""),
+                    "source1_diplomes": st.session_state.get("source1_diplomes", ""),
+                    "source1_competences": st.session_state.get("source1_competences", ""),
+                    "source1_salaires": st.session_state.get("source1_salaires", ""),
+                    "source1_libre": st.session_state.get("source1_libre", ""),
+                    "source2_intitule": st.session_state.get("source2_intitule", ""),
+                    "source2_taches": st.session_state.get("source2_taches", ""),
+                    "source2_diplomes": st.session_state.get("source2_diplomes", ""),
+                    "source2_competences": st.session_state.get("source2_competences", ""),
+                    "source2_salaires": st.session_state.get("source2_salaires", ""),
+                    "source2_libre": st.session_state.get("source2_libre", ""),
+                    "groupe1": st.session_state.get("groupe1", ""),
+                    "groupe2": st.session_state.get("groupe2", ""),
+                    "groupe3": st.session_state.get("groupe3", ""),
+                    "points_eclaircir": st.session_state.get("points_eclaircir", ""),
+                    "questions_discussion": st.session_state.get("questions_discussion", "")
                 })
                 save_briefs()
                 st.success("✅ Modifications sauvegardées")
@@ -562,20 +652,47 @@ with tab4:
         if "current_brief_name" in st.session_state:
             st.success(f"Brief actuel: {st.session_state.current_brief_name}")
         
-        st.subheader("Résumé des informations")
-        st.json({
-            "Poste": st.session_state.get("poste_intitule", ""),
-            "Manager": st.session_state.get("manager_nom", ""),
-            "Recruteur": st.session_state.get("recruteur", ""),
-            "Affectation": f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}",
-            "Date": str(st.session_state.get("date_brief", "")),
-            "Raison ouverture": st.session_state.get("raison_ouverture", ""),
-            "Impact stratégique": st.session_state.get("impact_strategique", ""),
-            "Défis principaux": st.session_state.get("defis_principaux", ""),
-            "Entreprises profil": st.session_state.get("entreprises_profil", ""),
-            "Canaux": st.session_state.get("canaux_profil", ""),
-            "Budget": st.session_state.get("budget", ""),
-        })
+        st.subheader("Résumé des informations (modifiable)")
+        
+        # Affichage des informations sous forme de champs modifiables
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.text_input("Poste", key="syn_poste", value=st.session_state.get("poste_intitule", ""))
+            st.text_input("Manager", key="syn_manager", value=st.session_state.get("manager_nom", ""))
+            st.text_input("Recruteur", key="syn_recruteur", value=st.session_state.get("recruteur", ""))
+            st.text_input("Affectation", key="syn_affectation", 
+                         value=f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}")
+            st.text_input("Date", key="syn_date", value=str(st.session_state.get("date_brief", "")))
+        
+        with col2:
+            st.text_area("Raison ouverture", key="syn_raison", value=st.session_state.get("raison_ouverture", ""), height=100)
+            st.text_area("Impact stratégique", key="syn_impact", value=st.session_state.get("impact_strategique", ""), height=100)
+            st.text_area("Défis principaux", key="syn_defis", value=st.session_state.get("defis_principaux", ""), height=100)
+        
+        # Bouton pour appliquer les modifications
+        if st.button("💾 Appliquer les modifications", type="primary", use_container_width=True):
+            # Mettre à jour les valeurs dans session_state
+            st.session_state.poste_intitule = st.session_state.syn_poste
+            st.session_state.manager_nom = st.session_state.syn_manager
+            st.session_state.recruteur = st.session_state.syn_recruteur
+            st.session_state.raison_ouverture = st.session_state.syn_raison
+            st.session_state.impact_strategique = st.session_state.syn_impact
+            st.session_state.defis_principaux = st.session_state.syn_defis
+            
+            # Mettre à jour le brief sauvegardé
+            if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
+                brief_name = st.session_state.current_brief_name
+                st.session_state.saved_briefs[brief_name].update({
+                    "poste_intitule": st.session_state.poste_intitule,
+                    "manager_nom": st.session_state.manager_nom,
+                    "recruteur": st.session_state.recruteur,
+                    "raison_ouverture": st.session_state.raison_ouverture,
+                    "impact_strategique": st.session_state.impact_strategique,
+                    "defis_principaux": st.session_state.defis_principaux
+                })
+                save_briefs()
+                st.success("✅ Modifications appliquées et sauvegardées")
 
         st.subheader("📊 Calcul automatique du Score Global")
         score_total = 0
@@ -588,10 +705,10 @@ with tab4:
         score_global = (score_total / count) if count else 0
         st.metric("Score Global Cible", f"{score_global:.2f}/5")
 
-        if st.button("💾 Confirmer sauvegarde", type="primary", use_container_width=True):
+        if st.button("💾 Confirmer sauvegarde finale", type="primary", use_container_width=True):
             if "current_brief_name" in st.session_state:
                 save_briefs()
-                st.success("✅ Brief final confirmé et sauvegardé")
+                st.success(f"✅ Brief '{st.session_state.current_brief_name}' final confirmé et sauvegardé")
             else:
                 st.error("❌ Aucun brief à sauvegarder. Veuillez d'abord créer un brief.")
 
