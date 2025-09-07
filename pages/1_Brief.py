@@ -105,10 +105,73 @@ with st.sidebar:
     st.divider()
     st.info("💡 Assistant IA pour la création et gestion de briefs de recrutement")
 
-# Style CSS pour uniformiser avec la page de sourcing
+# ---------------- NAVIGATION PRINCIPALE ----------------
+st.title("🤖 TG-Hire IA - Brief")
+
+# Style CSS pour les onglets personnalisés
 st.markdown("""
     <style>
-    /* Style général */
+    /* Cache les onglets par défaut de Streamlit */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0px;
+        border-bottom: 1px solid #424242;
+    }
+    
+    /* Style de base pour tous les onglets */
+    .stTabs [data-baseweb="tab"] {
+        background-color: transparent !important;
+        color: white !important;
+        border: none !important;
+        padding: 10px 16px !important;
+        font-weight: 500 !important;
+        border-radius: 0 !important;
+        margin-right: 0 !important;
+        height: auto !important;
+    }
+    
+    /* Style pour l'onglet actif */
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+        color: #ff4b4b !important;
+        background-color: transparent !important;
+        border-bottom: 3px solid #ff4b4b !important;
+    }
+    
+    /* Supprimer les bordures des inputs */
+    .stTextInput > div > div > input {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    /* Supprimer les bordures des selectbox */
+    .stSelectbox > div > div {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    /* Style pour les textareas */
+    .stTextArea > div > div > textarea {
+        border: none !important;
+        box-shadow: none !important;
+    }
+    
+    /* Ajustement de l'apparence des inputs */
+    .stTextInput > div > div > input,
+    .stSelectbox > div > div,
+    .stTextArea > div > div > textarea {
+        background-color: #262730 !important;
+        color: white !important;
+        border-radius: 4px !important;
+        padding: 8px 12px !important;
+    }
+    
+    /* Style pour les séparateurs */
+    .stHorizontalBlock > div {
+        border-bottom: 1px solid #424242;
+        padding-bottom: 1rem;
+        margin-bottom: 1rem;
+    }
+    
+    /* Style général pour l'application */
     .stApp {
         background-color: #0E1117;
         color: #FAFAFA;
@@ -141,38 +204,6 @@ st.markdown("""
         color: #FAFAFA;
     }
     
-    /* Onglets */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
-    }
-    
-    .stTabs [data-baseweb="tab"] {
-        height: 50px;
-        white-space: pre-wrap;
-        background-color: #262730;
-        border-radius: 5px 5px 0px 0px;
-        gap: 8px;
-        padding-top: 10px;
-        padding-bottom: 10px;
-        font-weight: 500;
-    }
-    
-    .stTabs [aria-selected="true"] {
-        background-color: #FF4B4B;
-        color: white;
-    }
-    
-    /* Inputs */
-    .stTextInput > div > div > input {
-        background-color: #262730;
-        color: #FAFAFA;
-    }
-    
-    .stSelectbox > div > div {
-        background-color: #262730;
-        color: #FAFAFA;
-    }
-    
     /* Expanders */
     .streamlit-expanderHeader {
         background-color: #262730;
@@ -182,9 +213,6 @@ st.markdown("""
     }
     </style>
 """, unsafe_allow_html=True)
-
-# ---------------- NAVIGATION PRINCIPALE ----------------
-st.title("🤖 TG-Hire IA - Brief")
 
 # Utilisation d'onglets comme dans la page sourcing
 tab1, tab2, tab3, tab4 = st.tabs([
@@ -199,7 +227,7 @@ with tab1:
     col_main, col_side = st.columns([2, 1])
     
     with col_main:
-        st.header("Informations de base")
+        st.subheader("Informations de base")
         
         # --- INFOS DE BASE (3 colonnes)
         col1, col2, col3 = st.columns(3)
@@ -243,7 +271,7 @@ with tab1:
                 st.session_state.current_brief_name = brief_name
 
     with col_side:
-        st.header("Recherche & Chargement")
+        st.subheader("Recherche & Chargement")
         
         # --- RECHERCHE & CHARGEMENT (2 colonnes)
         col1, col2 = st.columns(2)
@@ -298,7 +326,7 @@ with tab1:
 
 # ---------------- AVANT-BRIEF ----------------
 with tab2:
-    st.header("🔄 Avant-brief (Préparation)")
+    st.subheader("🔄 Avant-brief (Préparation)")
     st.info("Remplissez les informations préparatoires avant la réunion avec le manager.")
 
     conseil_button("Raison ouverture", "Contexte", "Pourquoi ce poste est-il ouvert?", key="raison_ouverture")
@@ -322,7 +350,7 @@ with tab2:
 
 # ---------------- RÉUNION (Wizard interne) ----------------
 with tab3:
-    st.header("✅ Réunion de brief avec le Manager")
+    st.subheader("✅ Réunion de brief avec le Manager")
 
     total_steps = 4
     step = st.session_state.reunion_step
@@ -379,7 +407,7 @@ with tab3:
 
 # ---------------- SYNTHÈSE ----------------
 with tab4:
-    st.header("📝 Synthèse du Brief")
+    st.subheader("📝 Synthèse du Brief")
     
     if "current_brief_name" in st.session_state:
         st.success(f"Brief actuel: {st.session_state.current_brief_name}")
