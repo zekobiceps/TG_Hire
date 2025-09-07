@@ -136,35 +136,6 @@ st.markdown("""
         border-bottom: 3px solid #ff4b4b !important;
     }
     
-    /* Supprimer les bordures des inputs */
-    .stTextInput > div > div > input {
-        border: none !important;
-        box-shadow: none !important;
-    }
-    
-    /* Style pour les textareas */
-    .stTextArea > div > div > textarea {
-        border: none !important;
-        box-shadow: none !important;
-    }
-    
-    /* Ajustement de l'apparence des inputs */
-    .stTextInput > div > div > input,
-    .stTextArea > div > div > textarea {
-        background-color: #262730 !important;
-        color: white !important;
-        border-radius: 4px !important;
-        padding: 8px 12px !important;
-    }
-    
-    /* Style pour les selectbox */
-    .stSelectbox > div > div {
-        background-color: #262730 !important;
-        color: white !important;
-        border-radius: 4px !important;
-        padding: 4px 8px !important;
-    }
-    
     /* Style général pour l'application */
     .stApp {
         background-color: #0E1117;
@@ -204,6 +175,38 @@ st.markdown("""
         color: #FAFAFA;
         border-radius: 5px;
         padding: 0.5rem;
+    }
+    
+    /* Correction pour les selectbox */
+    div[data-baseweb="select"] > div {
+        border: none !important;
+        background-color: #262730 !important;
+        color: white !important;
+        border-radius: 4px !important;
+    }
+    
+    /* Correction pour les inputs */
+    .stTextInput input {
+        background-color: #262730 !important;
+        color: white !important;
+        border-radius: 4px !important;
+        border: none !important;
+    }
+    
+    /* Correction pour les textareas */
+    .stTextArea textarea {
+        background-color: #262730 !important;
+        color: white !important;
+        border-radius: 4px !important;
+        border: none !important;
+    }
+    
+    /* Correction pour les date inputs */
+    .stDateInput input {
+        background-color: #262730 !important;
+        color: white !important;
+        border-radius: 4px !important;
+        border: none !important;
     }
     </style>
 """, unsafe_allow_html=True)
