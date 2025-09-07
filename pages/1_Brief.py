@@ -109,8 +109,16 @@ st.markdown("""
     div.st-emotion-cache-1pxazr7 > div:first-child { 
         border-bottom: 3px solid #ff4b4b; 
         margin-bottom: 10px;
+        padding-top: 0;
+        padding-bottom: 0;
     }
-    
+
+    /* Ajuster l'espacement pour les boutons de navigation */
+    div.st-emotion-cache-1pxazr7 > div:first-child > div {
+        flex: 0 1 auto !important;
+        padding: 0 5px !important;
+    }
+
     /* Styles généraux pour tous les boutons de navigation (non-actifs) */
     .stButton > button {
         background-color: transparent !important;
@@ -120,7 +128,6 @@ st.markdown("""
         font-size: 14px !important;
         padding: 8px 12px !important;
         border-radius: 0px !important;
-        margin: 0 -10px; /* Rapproche les boutons */
         white-space: nowrap; /* Empêche le retour à la ligne du texte */
     }
     
@@ -142,14 +149,6 @@ st.markdown("""
         border-radius: 8px !important;
     }
     
-    /* Spécifique pour le bouton "Générer la requête Boolean" si nécessaire */
-    /* Cible le bouton 'primary' dans la page de recherche Boolean */
-    button.st-emotion-cache-l2z66q.st-emotion-cache-f1x3ln { /* S'ajuster au data-testid actuel de Streamlit pour les primary buttons */
-        background-color: #FF4B4B !important; /* Rouge */
-        border-color: #FF4B4B !important;
-        color: white !important;
-    }
-
     </style>
 """, unsafe_allow_html=True)
 
@@ -161,7 +160,7 @@ for i, (key_label, full_label) in enumerate(onglets.items()):
         # Comparer le label simple avec l'état de la session
         is_active = (st.session_state.brief_phase == full_label)
         
-        # Créer le bouton. Ajouter la classe 'active-tab' directement si actif.
+        # Créer le bouton.
         if st.button(full_label, key=f"tab_{key_label}", use_container_width=True):
             st.session_state.brief_phase = full_label
             st.rerun()
