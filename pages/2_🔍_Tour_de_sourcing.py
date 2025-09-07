@@ -7,35 +7,30 @@ from urllib.parse import quote
 from datetime import datetime
 import json
 import os
+import hashlib
 
 # -------------------- Configuration initiale --------------------
 def init_session_state():
     """Initialise les variables de session"""
-    if "api_usage" not in st.session_state:
-        st.session_state.api_usage = {
-            "current_session_tokens": 0,
-            "used_tokens": 0
-        }
-    if "library_entries" not in st.session_state:
-        st.session_state.library_entries = []
-    if "magicien_history" not in st.session_state:
-        st.session_state.magicien_history = []
-    if "boolean_query" not in st.session_state:
-        st.session_state.boolean_query = ""
-    if "xray_query" not in st.session_state:
-        st.session_state.xray_query = ""
-    if "cse_query" not in st.session_state:
-        st.session_state.cse_query = ""
-    if "dogpile_query" not in st.session_state:
-        st.session_state.dogpile_query = ""
-    if "scraper_result" not in st.session_state:
-        st.session_state.scraper_result = ""
-    if "scraper_emails" not in st.session_state:
-        st.session_state.scraper_emails = set()
-    if "inmail_message" not in st.session_state:
-        st.session_state.inmail_message = ""
-    if "perm_result" not in st.session_state:
-        st.session_state.perm_result = []
+    defaults = {
+        "api_usage": {"current_session_tokens": 0, "used_tokens": 0},
+        "library_entries": [],
+        "magicien_history": [],
+        "boolean_query": "",
+        "xray_query": "",
+        "cse_query": "",
+        "dogpile_query": "",
+        "scraper_result": "",
+        "scraper_emails": set(),
+        "inmail_message": "",
+        "perm_result": [],
+        "inmail_objet": "",
+        "inmail_generated": False,
+        "inmail_profil_data": {},
+    }
+    for k, v in defaults.items():
+        if k not in st.session_state:
+            st.session_state[k] = v
 
 def save_library_entries():
     """Sauvegarde les entrées de la bibliothèque (simulation)"""
@@ -68,7 +63,7 @@ def generate_xray_query(site_cible, poste, mots_cles, localisation):
     return " ".join(query_parts)
 
 def generate_accroche_inmail(url_linkedin, poste_accroche):
-    """Génère un message InMail"""
+    """Génère un message InMail basique"""
     return f"""Bonjour,
 
 Votre profil sur LinkedIn a retenu mon attention, particulièrement votre expérience dans le domaine.
@@ -81,15 +76,14 @@ Dans l'attente de votre retour,"""
 
 def ask_deepseek(messages, max_tokens=300):
     """Simule l'appel à l'API DeepSeek"""
-    time.sleep(2)  # Simulation de délai
-    question = messages[0]["content"]
+    time.sleep(1)  # Simulation de délai
+    question = messages[0]["content"].lower()
     
-    # Réponses simulées selon le type de question
-    if "synonymes" in question.lower():
+    if "synonymes" in question:
         return {"content": "Ingénieur travaux, Chef de chantier, Conducteur de travaux, Responsable de projet BTP, Manager construction"}
-    elif "outils" in question.lower() or "logiciels" in question.lower():
+    elif "outils" in question or "logiciels" in question:
         return {"content": "• AutoCAD\n• Revit\n• Primavera P6\n• MS Project\n• Robot Structural Analysis\n• SketchUp"}
-    elif "compétences" in question.lower():
+    elif "compétences" in question:
         return {"content": "• Gestion de projet\n• Lecture de plans techniques\n• Management d'équipe\n• Budget et planning\n• Conformité réglementaire\n• Négociation fournisseurs"}
     else:
         return {"content": "Voici des informations pertinentes concernant votre demande. N'hésitez pas à préciser votre question pour une réponse plus ciblée."}
@@ -133,20 +127,19 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
 # -------------------- Tab 1: Boolean Search --------------------
 with tab1:
     st.header("🔍 Recherche Boolean")
-    
     col1, col2 = st.columns(2)
     with col1:
-        poste = st.text_input("Poste recherché:", key="poste", placeholder="Ex: Ingénieur de travaux")
-        synonymes = st.text_input("Synonymes:", key="synonymes", placeholder="Ex: Conducteur de travaux, Chef de chantier")
-        competences_obligatoires = st.text_input("Compétences obligatoires:", key="competences_obligatoires", placeholder="Ex: Autocad, Robot Structural Analysis")
-        secteur = st.text_input("Secteur d'activité:", key="secteur", placeholder="Ex: BTP, Construction")
+        poste = st.text_input("Poste recherché:", key="boolean_poste", placeholder="Ex: Ingénieur de travaux")
+        synonymes = st.text_input("Synonymes:", key="boolean_synonymes", placeholder="Ex: Conducteur de travaux, Chef de chantier")
+        competences_obligatoires = st.text_input("Compétences obligatoires:", key="boolean_comp_oblig", placeholder="Ex: Autocad, Robot Structural Analysis")
+        secteur = st.text_input("Secteur d'activité:", key="boolean_secteur", placeholder="Ex: BTP, Construction")
     with col2:
-        competences_optionnelles = st.text_input("Compétences optionnelles:", key="competences_optionnelles", placeholder="Ex: Primavera, ArchiCAD")
-        exclusions = st.text_input("Mots à exclure:", key="exclusions", placeholder="Ex: Stage, Alternance")
-        localisation = st.text_input("Localisation:", key="localisation", placeholder="Ex: Casablanca")
-        employeur = st.text_input("Employeur:", key="employeur", placeholder="Ex: TGCC")
+        competences_optionnelles = st.text_input("Compétences optionnelles:", key="boolean_comp_opt", placeholder="Ex: Primavera, ArchiCAD")
+        exclusions = st.text_input("Mots à exclure:", key="boolean_exclusions", placeholder="Ex: Stage, Alternance")
+        localisation = st.text_input("Localisation:", key="boolean_loc", placeholder="Ex: Casablanca")
+        employeur = st.text_input("Employeur:", key="boolean_employeur", placeholder="Ex: TGCC")
 
-    if st.button("🪄 Générer la requête Boolean", type="primary", use_container_width=True):
+    if st.button("🪄 Générer la requête Boolean", type="primary", use_container_width=True, key="boolean_generate"):
         with st.spinner("⏳ Génération en cours..."):
             start_time = time.time()
             st.session_state["boolean_query"] = generate_boolean_query(
@@ -159,7 +152,7 @@ with tab1:
             st.success(f"✅ Requête générée en {total_time:.1f}s")
 
     if st.session_state.get("boolean_query"):
-        st.text_area("Requête Boolean:", value=st.session_state["boolean_query"], height=120)
+        st.text_area("Requête Boolean:", value=st.session_state["boolean_query"], height=120, key="boolean_area")
         
         col1, col2 = st.columns([1, 2])
         with col1:
@@ -180,17 +173,16 @@ with tab1:
 # -------------------- Tab 2: X-Ray --------------------
 with tab2:
     st.header("🎯 X-Ray Google")
-
     col1, col2 = st.columns(2)
     with col1:
-        site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub"], key="site_cible")
-        poste_xray = st.text_input("Poste:", key="poste_xray", placeholder="Ex: Développeur Python")
-        mots_cles = st.text_input("Mots-clés:", key="mots_cles_xray", placeholder="Ex: Django, Flask")
+        site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub"], key="xray_site")
+        poste_xray = st.text_input("Poste:", key="xray_poste", placeholder="Ex: Développeur Python")
+        mots_cles = st.text_input("Mots-clés:", key="xray_mots_cles", placeholder="Ex: Django, Flask")
     with col2:
-        localisation_xray = st.text_input("Localisation:", key="localisation_xray", placeholder="Ex: Casablanca")
-        exclusions_xray = st.text_input("Mots à exclure:", key="exclusions_xray", placeholder="Ex: Stage, Junior")
+        localisation_xray = st.text_input("Localisation:", key="xray_loc", placeholder="Ex: Casablanca")
+        exclusions_xray = st.text_input("Mots à exclure:", key="xray_exclusions", placeholder="Ex: Stage, Junior")
 
-    if st.button("🔍 Construire X-Ray", type="primary", use_container_width=True):
+    if st.button("🔍 Construire X-Ray", type="primary", use_container_width=True, key="xray_build"):
         with st.spinner("⏳ Génération en cours..."):
             start_time = time.time()
             st.session_state["xray_query"] = generate_xray_query(site_cible, poste_xray, mots_cles, localisation_xray)
@@ -200,9 +192,8 @@ with tab2:
             st.success(f"✅ Requête générée en {total_time:.1f}s")
 
     if st.session_state.get("xray_query"):
-        st.text_area("Requête X-Ray:", value=st.session_state["xray_query"], height=120)
+        st.text_area("Requête X-Ray:", value=st.session_state["xray_query"], height=120, key="xray_area")
         url = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
-
         col1, col2, col3 = st.columns([1, 2, 2])
         with col1:
             if st.button("💾 Sauvegarder", key="xray_save", use_container_width=True):
@@ -223,16 +214,15 @@ with tab2:
 # -------------------- Tab 3: CSE --------------------
 with tab3:
     st.header("🔎 CSE LinkedIn")
-    
     col1, col2 = st.columns(2)
     with col1:
-        poste_cse = st.text_input("Poste recherché:", key="poste_cse", placeholder="Ex: Développeur Python")
-        competences_cse = st.text_input("Compétences clés:", key="competences_cse", placeholder="Ex: Django, Flask")
+        poste_cse = st.text_input("Poste recherché:", key="cse_poste", placeholder="Ex: Développeur Python")
+        competences_cse = st.text_input("Compétences clés:", key="cse_comp", placeholder="Ex: Django, Flask")
     with col2:
-        localisation_cse = st.text_input("Localisation:", key="localisation_cse", placeholder="Ex: Casablanca")
-        entreprise_cse = st.text_input("Entreprise:", key="entreprise_cse", placeholder="Ex: TGCC")
+        localisation_cse = st.text_input("Localisation:", key="cse_loc", placeholder="Ex: Casablanca")
+        entreprise_cse = st.text_input("Entreprise:", key="cse_ent", placeholder="Ex: TGCC")
 
-    if st.button("🔍 Lancer recherche CSE", type="primary", use_container_width=True):
+    if st.button("🔍 Lancer recherche CSE", type="primary", use_container_width=True, key="cse_search"):
         with st.spinner("⏳ Construction de la requête..."):
             start_time = time.time()
             query_parts = []
@@ -245,8 +235,7 @@ with tab3:
             st.success(f"✅ Requête générée en {total_time:.1f}s")
 
     if st.session_state.get("cse_query"):
-        st.text_area("Requête CSE:", value=st.session_state["cse_query"], height=100)
-        
+        st.text_area("Requête CSE:", value=st.session_state["cse_query"], height=100, key="cse_area")
         col1, col2 = st.columns([1, 2])
         with col1:
             if st.button("💾 Sauvegarder", key="cse_save", use_container_width=True):
@@ -266,20 +255,16 @@ with tab3:
 # -------------------- Tab 4: Dogpile --------------------
 with tab4:
     st.header("🐶 Dogpile Search")
-    
-    query = st.text_input("Requête Dogpile:", key="dogpile_input", placeholder="Ex: Python developer Casablanca")
-    
-    if st.button("🔍 Rechercher", key="dogpile_search", type="primary", use_container_width=True):
+    query = st.text_input("Requête Dogpile:", key="dogpile_query_input", placeholder="Ex: Python developer Casablanca")
+    if st.button("🔍 Rechercher", key="dogpile_search_btn", type="primary", use_container_width=True):
         if query:
             st.session_state["dogpile_query"] = query
             st.success("✅ Requête enregistrée")
-    
     if st.session_state.get("dogpile_query"):
-        st.text_area("Requête Dogpile:", value=st.session_state["dogpile_query"], height=80)
-        
+        st.text_area("Requête Dogpile:", value=st.session_state["dogpile_query"], height=80, key="dogpile_area")
         col1, col2 = st.columns([1, 2])
         with col1:
-            if st.button("💾 Sauvegarder", key="dogpile_save", use_container_width=True):
+            if st.button("💾 Sauvegarder", key="dogpile_save_btn", use_container_width=True):
                 entry = {
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M"), 
                     "type": "Dogpile", 
@@ -296,17 +281,14 @@ with tab4:
 # -------------------- Tab 5: Web Scraper --------------------
 with tab5:
     st.header("🕷️ Web Scraper")
-    
     choix = st.selectbox("Choisir un objectif:", [
         "Veille salariale & marché",
         "Intelligence concurrentielle",
         "Contact personnalisé",
         "Collecte de CV / emails / téléphones"
-    ], key="scraper_choix")
-    
+    ], key="scraper_choice")
     url = st.text_input("URL à analyser:", key="scraper_url", placeholder="https://exemple.com")
-
-    if st.button("🚀 Scraper", use_container_width=True):
+    if st.button("🚀 Scraper", use_container_width=True, key="scraper_btn"):
         if url:
             try:
                 with st.spinner("⏳ Scraping en cours..."):
@@ -321,9 +303,8 @@ with tab5:
                     st.success(f"✅ Scraping terminé en {total_time:.1f}s - {len(emails)} email(s) trouvé(s)")
             except Exception as e:
                 st.error(f"❌ Erreur scraping : {e}")
-
     if st.session_state.get("scraper_result"):
-        st.text_area("Extrait du contenu:", value=st.session_state["scraper_result"], height=200)
+        st.text_area("Extrait du contenu:", value=st.session_state["scraper_result"], height=200, key="scraper_area")
         if st.session_state.get("scraper_emails"):
             st.info("📧 Emails détectés: " + ", ".join(st.session_state["scraper_emails"]))
 

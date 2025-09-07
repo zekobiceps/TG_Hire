@@ -1,150 +1,154 @@
-import streamlit as st
-import requests
-import json
-import time
-from datetime import datetime
+import sys
 import os
-import pickle
-import re
-from bs4 import BeautifulSoup
+import importlib.util
+import streamlit as st
+from datetime import datetime
 
-# -------------------- API --------------------
-try:
-    DEEPSEEK_API_KEY = st.secrets["DEEPSEEK_API_KEY"]
-except Exception:
-    st.error("Clé API DeepSeek non configurée")
-    st.stop()
+# Charger utils.py dynamiquement
+UTILS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "utils.py"))
+spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
+utils = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(utils)
 
-DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
+# Init session
+utils.init_session_state()
 
-# -------------------- Persistence --------------------
-def load_pickle(file, default):
-    if os.path.exists(file):
-        try:
-            with open(file, "rb") as f:
-                return pickle.load(f)
-        except Exception:
-            return default
-    return default
+# Initialisation des variables si manquantes
+defaults = {
+    "poste_intitule": "",
+    "manager_nom": "",
+    "recruteur": "Zakaria",
+    "affectation_type": "Chantier",
+    "affectation_nom": "",
+    "current_brief_name": "",
+    "saved_briefs": {},
+    "filtered_briefs": {},
+    "show_filtered_results": False,
+    "brief_data": {},
+    "ksa_data": {},
+    "comment_libre": "",
+}
+for k, v in defaults.items():
+    if k not in st.session_state:
+        st.session_state[k] = v
 
-def save_pickle(file, data):
-    try:
-        with open(file, "wb") as f:
-            pickle.dump(data, f)
-    except Exception as e:
-        st.error(f"Erreur sauvegarde {file}: {e}")
+st.set_page_config(
+    page_title="TG-Hire IA - Assistant Recrutement",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# -------------------- Initialisation --------------------
-def init_session_state():
-    defaults = {
-        'library_entries': load_pickle("library_entries.pkl", []),
-        'api_usage': {"total_tokens": 800000, "used_tokens": 0, "current_session_tokens": 0},
-        'token_counter': 0,
-        'magicien_reponse': "",
-        'magicien_history': load_pickle("magicien_history.pkl", []),
-        'boolean_query': "",
-        'xray_query': "",
-        'cse_query': "",
-        'scraper_result': "",
-        'scraper_emails': set(),
-        'inmail_message': "",
-        'perm_result': []
-    }
-    for key, value in defaults.items():
-        if key not in st.session_state:
-            st.session_state[key] = value
+st.title("📋 Brief Recrutement")
 
-# -------------------- Sauvegarde --------------------
-def save_library_entries():
-    save_pickle("library_entries.pkl", st.session_state.library_entries)
+# Choix de la phase
+brief_phase = st.radio(
+    "Phase du Brief:",
+    ["📁 Gestion", "🔄 Avant-brief", "✅ Réunion de brief"],
+    horizontal=True,
+    key="brief_phase_selector"
+)
+st.session_state.brief_phase = brief_phase
 
-# -------------------- DeepSeek --------------------
-def ask_deepseek(messages, max_tokens=500):
-    headers = {"Authorization": f"Bearer {DEEPSEEK_API_KEY}", "Content-Type": "application/json"}
-    data = {"model": "deepseek-chat", "messages": messages, "temperature": 0.7, "max_tokens": max_tokens}
-    try:
-        response = requests.post(DEEPSEEK_API_URL, headers=headers, json=data, timeout=40)
-        if response.status_code == 200:
-            result = response.json()
-            usage = result.get("usage", {})
-            total_tokens = usage.get("total_tokens", 0)
-            st.session_state.api_usage["used_tokens"] += total_tokens
-            st.session_state.api_usage["current_session_tokens"] += total_tokens
-            st.session_state["token_counter"] += total_tokens
-            return {"content": result["choices"][0]["message"]["content"], "total_tokens": total_tokens}
-        else:
-            return {"content": f"❌ Erreur API {response.status_code}"}
-    except Exception as e:
-        return {"content": f"❌ Exception: {str(e)}"}
+# Phase Gestion
+if brief_phase == "📁 Gestion":
+    st.header("📁 Gestion du Brief")
+    col1, col2 = st.columns(2)
 
-# -------------------- Queries --------------------
-def generate_boolean_query(poste, synonymes, comp_oblig, comp_opt, exclusions, localisation, secteur):
-    query_parts = []
-    if poste:
-        poste_part = f'("{poste}"'
-        if synonymes:
-            for syn in synonymes.split(','):
-                poste_part += f' OR "{syn.strip()}"'
-        poste_part += ")"
-        query_parts.append(poste_part)
-    if comp_oblig:
-        for c in comp_oblig.split(','):
-            query_parts.append(f'"{c.strip()}"')
-    if comp_opt:
-        query_parts.append("(" + " OR ".join([f'"{c.strip()}"' for c in comp_opt.split(',')]) + ")")
-    if localisation:
-        query_parts.append(f'"{localisation}"')
-    if secteur:
-        query_parts.append(f'"{secteur}"')
+    with col1:
+        st.subheader("Informations de base")
+        st.session_state.poste_intitule = st.text_input(
+            "Intitulé du poste:",
+            value=st.session_state.poste_intitule,
+            placeholder="Ex: Chargé de recrutement"
+        )
 
-    query = " AND ".join(query_parts)
-    if exclusions:
-        for e in exclusions.split(','):
-            query += f' NOT "{e.strip()}"'
-    return query
+        st.session_state.manager_nom = st.text_input(
+            "Nom du manager:",
+            value=st.session_state.manager_nom,
+            placeholder="Ex: Ahmed Alami"
+        )
 
-def generate_xray_query(site, poste, mots_cles, localisation):
-    site_urls = {"LinkedIn": "site:linkedin.com/in/", "GitHub": "site:github.com"}
-    query = site_urls.get(site, "site:linkedin.com/in/") + " "
-    if poste:
-        query += f'"{poste}" '
-    if mots_cles:
-        for mot in mots_cles.split(','):
-            query += f'"{mot.strip()}" '
-    if localisation:
-        query += f'"{localisation}" '
-    return query.strip()
+        st.session_state.recruteur = st.selectbox(
+            "Recruteur:",
+            ["Zakaria", "Sara", "Jalal", "Bouchra"],
+            index=["Zakaria", "Sara", "Jalal", "Bouchra"].index(st.session_state.recruteur)
+        )
 
-def generate_accroche_inmail(url_linkedin, poste):
-    prompt = f"""
-    Crée une accroche InMail professionnelle et directe pour un candidat trouvé sur LinkedIn.
-    Poste à pourvoir: {poste}
-    Profil LinkedIn: {url_linkedin}
-    
-    Règles importantes:
-    1. Pas d'introduction comme "Voici une accroche"
-    2. Commence directement par le message
-    3. Sois concis et percutant
-    4. Personnalise en fonction du profil que tu dois consulter dans le lien/url
-    5. Pas de signature à la fin
-    """
-    messages = [{"role": "system", "content": "Tu es un expert en recrutement qui rédige des messages InMail percutants."},
-                {"role": "user", "content": prompt}]
-    return ask_deepseek(messages, max_tokens=250).get("content", "")
+        col_aff1, col_aff2 = st.columns(2)
+        with col_aff1:
+            st.session_state.affectation_type = st.selectbox(
+                "Affectation:",
+                ["Chantier", "Direction"],
+                index=0 if st.session_state.affectation_type == "Chantier" else 1
+            )
+        with col_aff2:
+            st.session_state.affectation_nom = st.text_input(
+                "Nom:",
+                value=st.session_state.affectation_nom,
+                placeholder=f"Nom du {st.session_state.affectation_type.lower()}"
+            )
 
-# -------------------- Charika Email --------------------
-def get_email_from_charika(entreprise):
-    """Cherche un email sur charika.ma en utilisant Google"""
-    try:
-        search_url = f"https://www.google.com/search?q={entreprise}+site:charika.ma"
-        r = requests.get(search_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-        soup = BeautifulSoup(r.text, "html.parser")
-        links = [a['href'] for a in soup.find_all('a', href=True) if "charika.ma/societe" in a['href']]
-        if links:
-            page = requests.get(links[0], headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-            emails = re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", page.text)
-            if emails:
-                return emails[0]
-    except Exception:
-        return None
-    return None
+        if (
+            st.session_state.manager_nom
+            and st.session_state.poste_intitule
+            and st.session_state.recruteur
+            and st.session_state.affectation_nom
+        ):
+            suggested_name = utils.generate_automatic_brief_name()
+            st.session_state.current_brief_name = st.text_input(
+                "Nom du brief:",
+                value=suggested_name,
+                placeholder="Nom automatique généré"
+            )
+
+    with col2:
+        st.subheader("Chargement & Templates")
+        st.markdown("**Filtres de recherche:**")
+
+        filter_col1, filter_col2 = st.columns(2)
+        with filter_col1:
+            filter_month = st.selectbox("Mois:", [""] + [f"{i:02d}" for i in range(1, 13)], key="filter_month")
+            filter_recruteur = st.selectbox("Recruteur:", [""] + ["Zakaria", "Sara", "Jalal", "Bouchra"], key="filter_recruteur")
+        with filter_col2:
+            filter_poste = st.text_input("Poste:", key="filter_poste")
+            filter_manager = st.text_input("Manager:", key="filter_manager")
+
+        if st.button("🔍 Rechercher briefs", type="secondary", key="search_briefs"):
+            st.session_state.filtered_briefs = utils.filter_briefs(
+                st.session_state.saved_briefs,
+                filter_month or None,
+                filter_recruteur or None,
+                filter_poste or None,
+                filter_manager or None
+            )
+            st.session_state.show_filtered_results = True
+
+        if st.session_state.show_filtered_results:
+            if st.session_state.filtered_briefs:
+                st.markdown(f"**{len(st.session_state.filtered_briefs)} brief(s) trouvé(s):**")
+                selected_brief = st.selectbox("Choisir un brief:", [""] + list(st.session_state.filtered_briefs.keys()), key="select_brief")
+                target_tab = st.radio("Charger dans:", ["🔄 Avant-brief", "✅ Réunion de brief"], horizontal=True, key="target_tab")
+
+                col_load1, col_load2 = st.columns(2)
+                with col_load1:
+                    if selected_brief and st.button("📂 Charger ce brief", key="load_brief"):
+                        loaded_data = st.session_state.filtered_briefs[selected_brief]
+                        if isinstance(loaded_data, dict):
+                            for k in ["poste_intitule", "manager_nom", "recruteur", "affectation_type", "affectation_nom", "brief_data", "ksa_data", "comment_libre"]:
+                                st.session_state[k] = loaded_data.get(k, st.session_state[k])
+                            st.session_state.current_brief_name = selected_brief
+                            st.session_state.brief_phase = target_tab
+                            st.success("Brief chargé avec succès!")
+                            st.rerun()
+
+                with col_load2:
+                    if selected_brief and st.button("🗑️ Supprimer ce brief", key="delete_brief"):
+                        del st.session_state.saved_briefs[selected_brief]
+                        if selected_brief in st.session_state.filtered_briefs:
+                            del st.session_state.filtered_briefs[selected_brief]
+                        utils.save_briefs()
+                        st.success("Brief supprimé!")
+                        st.rerun()
+            else:
+                st.warning("Aucun brief trouvé avec ces critères.")

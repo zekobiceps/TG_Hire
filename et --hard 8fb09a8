@@ -1,0 +1,96 @@
+[33m5fad18d[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m  mod 20
+[33m2c1fae7[m  mod 20
+[33m845f53f[m  mod 20
+[33md949ec2[m  mod 20
+[33m62ce070[m  mod 20
+[33m4720474[m  mod 20
+[33mbeef228[m  mod 20
+[33m583e240[m  mod 19
+[33m0d23ec6[m  mod 19
+[33m77e5c4f[m  mod 19
+[33med84dbe[m  mod 18
+[33m529eb14[m  mod 17
+[33m6477047[m  mod 16
+[33m80a6a6a[m  mod 15
+[33m8fb09a8[m test final 15
+[33m32b11c4[m test final 14
+[33m00dd7ec[m test final 13
+[33m3e1e28f[m test final 12
+[33mc07bb25[m test final 11
+[33m7eba702[m test final 10
+[33m7c6b9c6[m test final 9
+[33m86ca455[m test final 8
+[33m5803838[m test final 7
+[33mdd45c4a[m test final 7
+[33m6cb2881[m test final 6
+[33m24cde34[m test final 5
+[33m000638b[m test final 4
+[33mf58f1d2[m test final 3
+[33m6097865[m test final 2
+[33m2ef981b[m test final ava
+[33m78cffae[m Le message généré est  personnalisé et basé sur l'analyse du profil LinkedIn, sans signature superfle
+[33m08b7ebf[m Fix: Magicien et InMail avec mode rapide + amélioration boutons
+[33m2e6d526[m Correction complète du fichier avec interface uniformisée
+[33m3d3ee23[m Uniformisation interface et corrections affichage
+[33m591dd6d[m Correction syntaxe section Magicien de sourcing
+[33mb43082c[m Correction des boutons et amélioration des fonctionnalités
+[33m878a11c[m Correction des boutons mal formés avec st.link_button
+[33m4888e74[m Améliorations Magicien & InMail: mode rapide, corrections boutons, permutateur avec source, X-Ray avancé
+[33m7d9e4c4[m ✨ Mise à jour complète : corrections Magicien, InMail, X-Ray, Permutateur (Charika), alignement boutons, gestion historique
+[33m5090204[m Fix: ajout de la fonction get_email_from_charika dans utils.py pour corriger ImportError
+[33m7acc56b[m Améliorations Magicien + InMail + Permutateur avec Charika + UI boutons
+[33m462c535[m ✅ Mise à jour Tour de sourcing : X-Ray, Boolean NOT, Permutateur amélioré, Magicien corrigé
+[33mfc1b03d[m 🔧 Correction utils.py : NOT à la fin des Boolean + historique magicien persistant
+[33m61bf379[m Amélioration Magicien (compteur + succès), refonte Permutateur Email (site officiel + Charika.ma), corrections UI
+[33m664c90b[m Mise à jour complète utils.py + Tour_de_sourcing (boutons uniformes, Magicien amélioré, Permutator site check)
+[33m36a6fc2[m ✨ Mise à jour complète Tour de sourcing (Magicien amélioré, 10 questions, Permutator avec scraping site web, corrections boutons)
+[33m54fb92d[m Ajout Web Scraper, questions Magicien, amélioration Permutator
+[33m26203e6[m ✅ Correction boutons uniformes + ouverture liens externes (Tour de sourcing)
+[33m0679f1f[m Amélioration complète : boutons homogènes, magicien avec historique et progression dynamique
+[33m795495c[m Refonte complète Tour de sourcing : boutons homogènes, magicien amélioré, placeholders
+[33m063d044[m Fix boutons alignés, Magicien compteur dynamique et historique, placeholders ajoutés
+[33m42a848b[m Uniformisation des boutons + corrections Magicien + placeholders exemples
+[33m727b595[m Refonte complète Tour de sourcing : boutons uniformes réduits, Magicien amélioré avec timer et historique, placeholders ajoutés
+[33md16244e[m Refonte complète Tour de sourcing : boutons homogènes, magicien avec historique, placeholders
+[33mc955d2e[m Fix boutons uniformes + LinkedIn direct + correction duplicate keys
+[33me7c4d19[m Correction complète Tour_de_sourcing : boutons uniformes, ouverture direct nouvel onglet, Dogpile rétabli, Magicien amélioré
+[33m2503fb6[m Fix boutons uniformes (Google/LinkedIn/CSE/Dogpile), Magicien avec questions prêtes
+[33m27aca43[m Correction Tour_de_sourcing (boutons uniformes, LinkedIn direct, Magicien questions, Dogpile corrigé)
+[33mf59fbc5[m Refonte Tour_de_sourcing: boutons uniformes, magicien, dogpile, permutator et bibliothèque
+[33m70e9f5a[m Fix boutons Streamlit et actions homogènes sur Tour_de_sourcing
+[33m55c69c0[m Correction Tour_de_sourcing + homogénéisation des boutons
+[33m19d44e4[m Fix utils.py (ajout fonctions manquantes) + corrections Brief et Annonces
+[33m9406162[m Fix: correction des imports et sécurisation des clés session_state dans Brief et Annonces
+[33m267dc32[m Fix: ajout des fonctions export_brief_pdf et export_brief_word dans utils
+[33m814710d[m Fix: correction des imports utils dans Brief et Annonces
+[33m29b3633[m Fix: correction des imports utils dans Brief et Annonces
+[33ma03afc3[m Fix: corrections imports utils + init_session_state dans Brief et Annonces
+[33m59e5869[m Fix: init_session_state ajouté, correction copier sans pyperclip, uniformisation boutons
+[33m8ee436f[m Mise à jour utils.py et 2_🔍_Tour_de_sourcing.py : correction tokens, copier, boutons et Magicien
+[33me6f4e77[m Fix utils.py (compteur tokens, doublons supprimés) + Tour de sourcing (UI, copier, magicien, boutons uniformes)
+[33m4931b90[m Fix import header: utils import explicite au lieu de *
+[33m6985120[m Correction utils.py : doublon supprimé + compteur tokens fonctionnel
+[33m30732f3[m Fix complet: copier HTML, boutons alignés, WebScraper & InMail rétablis, Permutator .com/.ma, Magicien progress dynamique, compteur tokens
+[33mcecc1bb[m Fix complet : Copier, boutons alignés, Permutator .com/.ma, Magicien progress bar + timer, search fixes
+[33mcc0a0af[m Fix complet des boutons Copier (encapsulation js_code, pas de SyntaxError)
+[33ma5cfda0[m Refonte complète Tour de sourcing (copier, LinkedIn direct, magicien enrichi, permutator .com/.ma, alignement boutons)
+[33m580048f[m Mise à jour Tour de sourcing + utils (LinkedIn direct, copier requête, Magicien enrichi, Permutator .com/.ma, compteur tokens)
+[33m2e1f5aa[m Correction et amélioration de l'app Streamlit (InMail, Magicien, Permutator, Bibliothèque)
+[33m52b695d[m Remove: boutons Réinit (source d'erreurs) sur Tour de Sourcing
+[33m58780d4[m Fix: utilisation de session_state.get pour Réinit (toutes sections)
+[33m3277372[m Fix: sécurisation Réinit + persistance boutons + corrections Tour de sourcing
+[33ma545172[m Fix: boutons Sauvegarder/Réinit + ajout InMail, Magicien, Permutator
+[33m0d8e556[m Fix: suppression bouton Copier + correction Sauvegarder & Réinitiliser
+[33mcdc309a[m Fix boutons Copier/Sauvegarder/Réinit sur tous les onglets
+[33m28713d5[m Ajout BeautifulSoup4 et lxml dans requirements
+[33m261a0e9[m Ajout Copier/Sauvegarder/Réinit sur Boolean, X-Ray, CSE, Dogpile et Scraper
+[33m976b2d0[m Correction des boutons Copier / Sauvegarder / Réinit pour Boolean, X-Ray et CSE
+[33ma39da48[m Update utils.py
+[33ma0057d3[m Ajout de scripts pour web scraping
+[33mfa4ec88[m Refonte complète du module Tour de Sourcing
+[33m9c6b0bc[m Ajout de beautifulsoup4 pour web scraping
+[33ma5db995[m Refonte complète du module Tour de Sourcing
+[33mff1efb8[m Ajout de pyperclip aux dépendances
+[33maabecca[m Added Dev Container Folder
+[33m97497c1[m Add files via upload
+[33m0c1c366[m Initial commit
