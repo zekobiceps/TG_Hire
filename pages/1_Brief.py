@@ -226,8 +226,30 @@ st.markdown("""
         padding: 10px;
         margin-top: 10px;
     }
+    
+    /* Style pour le tableau de méthode complète */
+    .comparison-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1rem;
+    }
+    
+    .comparison-table th, .comparison-table td {
+        border: 1px solid #424242;
+        padding: 8px;
+        text-align: left;
+    }
+    
+    .comparison-table th {
+        background-color: #262730;
+        font-weight: bold;
+    }
     </style>
 """, unsafe_allow_html=True)
+
+# Vérification si un brief est chargé au début de l'application
+if "current_brief_name" not in st.session_state:
+    st.session_state.current_brief_name = ""
 
 # Utilisation d'onglets comme dans la page sourcing
 tab1, tab2, tab3, tab4 = st.tabs([
@@ -369,32 +391,30 @@ with tab1:
                     with colA:
                         if st.button(f"📂 Charger", key=f"load_{name}"):
                             try:
-                                # Liste des clés autorisées pour le chargement
-                                allowed_keys = [
-                                    "poste_intitule", "manager_nom", "niveau_hierarchique", 
-                                    "recruteur", "affectation_type", "affectation_nom",
-                                    "raison_ouverture", "impact_strategique", "rattachement",
-                                    "defis_principaux", "entreprises_profil", "canaux_profil",
-                                    "synonymes_poste", "budget", "commentaires"
-                                ]
+                                # Créer un nouveau brief sans écraser les widgets
+                                new_brief = {}
                                 
-                                # Charger les données autorisées
-                                for k in allowed_keys:
-                                    if k in data and k in st.session_state:
-                                        st.session_state[k] = data[k]
+                                # Copier toutes les données du brief
+                                for key, value in data.items():
+                                    new_brief[key] = value
+                                
+                                # Stocker le brief chargé dans une clé spéciale
+                                st.session_state.loaded_brief = new_brief
+                                st.session_state.current_brief_name = name
+                                
+                                # Mettre à jour uniquement les champs non-widgets
+                                non_widget_keys = ["raison_ouverture", "impact_strategique", "rattachement", 
+                                                  "defis_principaux", "entreprises_profil", "canaux_profil",
+                                                  "synonymes_poste", "budget", "commentaires"]
+                                
+                                for key in non_widget_keys:
+                                    if key in data:
+                                        st.session_state[key] = data[key]
                                 
                                 # Gestion spéciale pour les données KSA
                                 if "ksa_data" in data:
                                     st.session_state.ksa_data = data["ksa_data"]
                                 
-                                # Gestion de la date
-                                if "date_brief" in data:
-                                    try:
-                                        st.session_state.date_brief = datetime.strptime(data["date_brief"], "%Y-%m-%d").date()
-                                    except:
-                                        st.session_state.date_brief = datetime.today().date()
-                                
-                                st.session_state.current_brief_name = name
                                 st.success(f"✅ Brief '{name}' chargé avec succès!")
                                 st.rerun()
                             
@@ -420,7 +440,10 @@ with tab2:
         st.info("💡 Utilisez l'onglet Gestion pour créer un nouveau brief ou charger un template existant")
         st.stop()  # Arrête le rendu de cet onglet
     
-    st.subheader("🔄 Avant-brief (Préparation)")
+    # Afficher les informations du brief en cours
+    st.subheader(f"🔄 Avant-brief (Préparation) - {st.session_state.get('poste_intitule', '')}")
+    st.info(f"Manager: {st.session_state.get('manager_nom', '')} | Recruteur: {st.session_state.get('recruteur', '')}")
+    
     st.info("Remplissez les informations préparatoires avant la réunion avec le manager.")
 
     # Méthode rapide (15-30 min) - Jeu des 7 différences
@@ -439,11 +462,9 @@ with tab2:
         
         col1, col2 = st.columns(2)
         with col1:
-            st.text_area("Intitulé de poste vs Missions réelles", key="verif_intitule", height=100, 
-                       placeholder="Comparaison entre l'intitulé donné et les missions réelles sur le terrain...")
+            st.text_area("Intitulé de poste vs Missions réelles", key="verif_intitule", height=100)
         with col2:
-            st.text_area("Critères demandés vs Réalité marché", key="verif_criteres", height=100,
-                       placeholder="Comparaison entre les critères demandés et la réalité du marché...")
+            st.text_area("Critères demandés vs Réalité marché", key="verif_criteres", height=100)
 
     # Méthode complète (30min-1h)
     with st.expander("🧠 Méthode complète (30min-1h) - Analyse comparative"):
@@ -452,61 +473,81 @@ with tab2:
         """)
         
         # Tableau d'analyse comparative amélioré
-        cols = st.columns(3)
-        categories = [
-            "Intitulé du poste",
-            "Les tâches/missions", 
-            "Les connaissances",
-            "Diplômes/certifications demandés",
-            "Les compétences (techniques et sociales) et les outils à maîtriser",
-            "Salaires, avantages et plus values proposées"
-        ]
-        
-        with cols[0]:
-            st.markdown("**Mes infos de départ**")
-            for i, category in enumerate(categories):
-                st.text_input(f"{category}", key=f"infos_{i}", placeholder=category)
-        
-        with cols[1]:
-            st.markdown("**Source 1**")
-            for i, category in enumerate(categories):
-                st.text_input(f"Source 1 - {category}", key=f"source1_{i}", placeholder=category)
-        
-        with cols[2]:
-            st.markdown("**Source 2**")
-            for i, category in enumerate(categories):
-                st.text_input(f"Source 2 - {category}", key=f"source2_{i}", placeholder=category)
+        st.markdown("""
+        <table class="comparison-table">
+            <tr>
+                <th>Catégories</th>
+                <th>Mes infos de départ</th>
+                <th>Source 1</th>
+                <th>Source 2</th>
+                <th>Source 3</th>
+            </tr>
+            <tr>
+                <td>Intitulé du poste</td>
+                <td><input type="text" style="width: 100%;"></td>
+                <td><input type="text" style="width: 100%;"></td>
+                <td><input type="text" style="width: 100%;"></td>
+                <td><input type="text" style="width: 100%;"></td>
+            </tr>
+            <tr>
+                <td>Les tâches/missions</td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+            </tr>
+            <tr>
+                <td>Les connaissances</td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+            </tr>
+            <tr>
+                <td>Diplômes/certifications demandés</td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+            </tr>
+            <tr>
+                <td>Les compétences et outils à maîtriser</td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+            </tr>
+            <tr>
+                <td>Salaires, avantages et plus values</td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
+            </tr>
+        </table>
+        """, unsafe_allow_html=True)
         
         st.markdown("---")
         st.markdown("**Points à éclaircir avec le manager**")
-        st.text_area("Questions pour ouvrir la discussion", key="questions_discussion", height=100,
-                   placeholder="Préparez les questions à poser pour chaque point...")
+        st.text_area("Questions pour ouvrir la discussion", key="questions_discussion", height=100)
 
     # Disposition en colonnes pour les champs simples
     col1, col2 = st.columns(2)
     
     with col1:
-        st.text_area("Raison ouverture", key="raison_ouverture", height=100, 
-                   placeholder="Pourquoi ce poste est-il ouvert? (départ, croissance, nouveau poste...)")
-        st.text_area("Impact stratégique", key="impact_strategique", height=100,
-                   placeholder="Impact stratégique de ce poste dans l'organisation...")
-        st.text_area("Rattachement hiérarchique", key="rattachement", height=100,
-                   placeholder="À qui le poste sera rattaché hiérarchiquement...")
-        st.text_area("Défis principaux", key="defis_principaux", height=100,
-                   placeholder="Principaux défis et challenges du poste...")
+        st.text_area("Raison ouverture", key="raison_ouverture", height=100)
+        st.text_area("Impact stratégique", key="impact_strategique", height=100)
+        st.text_area("Rattachement hiérarchique", key="rattachement", height=100)
+        st.text_area("Défis principaux", key="defis_principaux", height=100)
     
     with col2:
-        st.text_area("Entreprises où trouver ce profil", key="entreprises_profil", height=100,
-                   placeholder="Liste des entreprises où on peut trouver ce type de profil...")
-        st.text_area("Canaux à utiliser", key="canaux_profil", height=100,
-                   placeholder="LinkedIn, réseaux sociaux, job boards, chasse de tête...")
-        st.text_area("Synonymes de postes", key="synonymes_poste", height=100,
-                   placeholder="Autres intitulés de postes similaires ou équivalents...")
-        st.text_input("Budget", key="budget", placeholder="Budget alloué pour ce recrutement...")
+        st.text_area("Entreprises où trouver ce profil", key="entreprises_profil", height=100)
+        st.text_area("Canaux à utiliser", key="canaux_profil", height=100)
+        st.text_area("Synonymes de postes", key="synonymes_poste", height=100)
+        st.text_input("Budget", key="budget")
     
     # Commentaires libres en bas
-    st.text_area("Commentaires libres", key="commentaires", height=100,
-               placeholder="Espace pour commentaires supplémentaires...")
+    st.text_area("Commentaires libres", key="commentaires", height=100)
 
     if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True):
         if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
@@ -526,12 +567,6 @@ with tab2:
                 "questions_discussion": st.session_state.get("questions_discussion", "")
             })
             
-            # Sauvegarder les données du tableau comparatif
-            for i in range(6):  # 6 catégories
-                st.session_state.saved_briefs[brief_name][f"infos_{i}"] = st.session_state.get(f"infos_{i}", "")
-                st.session_state.saved_briefs[brief_name][f"source1_{i}"] = st.session_state.get(f"source1_{i}", "")
-                st.session_state.saved_briefs[brief_name][f"source2_{i}"] = st.session_state.get(f"source2_{i}", "")
-            
             save_briefs()
             st.success("✅ Modifications sauvegardées")
         else:
@@ -545,7 +580,9 @@ with tab3:
         st.info("💡 Utilisez l'onglet Gestion pour créer un nouveau brief ou charger un template existant")
         st.stop()  # Arrête le rendu de cet onglet
     
-    st.subheader("✅ Réunion de brief avec le Manager")
+    # Afficher les informations du brief en cours
+    st.subheader(f"✅ Réunion de brief avec le Manager - {st.session_state.get('poste_intitule', '')}")
+    st.info(f"Manager: {st.session_state.get('manager_nom', '')} | Recruteur: {st.session_state.get('recruteur', '')}")
 
     total_steps = 4
     step = st.session_state.reunion_step
@@ -608,7 +645,9 @@ with tab4:
         st.info("💡 Utilisez l'onglet Gestion pour créer un nouveau brief ou charger un template existant")
         st.stop()  # Arrête le rendu de cet onglet
     
-    st.subheader("📝 Synthèse du Brief")
+    # Afficher les informations du brief en cours
+    st.subheader(f"📝 Synthèse du Brief - {st.session_state.get('poste_intitule', '')}")
+    st.info(f"Manager: {st.session_state.get('manager_nom', '')} | Recruteur: {st.session_state.get('recruteur', '')}")
     
     if "current_brief_name" in st.session_state:
         st.success(f"Brief actuel: {st.session_state.current_brief_name}")
