@@ -1,7 +1,7 @@
 import sys, os
-import streamlit as st  # ✅ nécessaire avant tout appel à st.
+import streamlit as st  # nécessaire avant tout appel à st
 
-# Permet de retrouver utils.py situé à la racine du projet
+# Ajoute la racine du projet (où est utils.py) dans le path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from utils import (
@@ -12,7 +12,7 @@ from utils import (
     export_brief_pdf,
     export_brief_word,
     generate_checklist_advice,
-    filter_briefs
+    filter_briefs,
 )
 
 # ---------------- INIT ----------------
