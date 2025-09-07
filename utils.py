@@ -3,15 +3,92 @@ import streamlit as st
 import os
 import pickle
 from datetime import datetime
-from io import BytesIO
+import io
+import re
+import requests
 
-# -------------------- Session --------------------
+# -------------------- Disponibilité PDF & Word --------------------
+try:
+    from reportlab.lib.pagesizes import A4
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+    PDF_AVAILABLE = True
+except ImportError:
+    PDF_AVAILABLE = False
+
+try:
+    from docx import Document
+    WORD_AVAILABLE = True
+except ImportError:
+    WORD_AVAILABLE = False
+
+# -------------------- Checklist simplifiée --------------------
+SIMPLIFIED_CHECKLIST = {
+    "Contexte du Poste et Environnement": [
+        "Pourquoi ce poste est-il ouvert?",
+        "Fourchette budgétaire (entre X et Y)",
+        "Date de prise de poste souhaitée",
+        "Équipe (taille, composition)",
+        "Manager (poste, expertise, style)",
+        "Collaborations internes/externes",
+        "Lieux de travail et déplacements"
+    ],
+    "Missions et Responsabilités": [
+        "Mission principale du poste",
+        "Objectifs à atteindre (3-5 maximum)",
+        "Sur quoi la performance sera évaluée?",
+        "3-5 Principales tâches quotidiennes",
+        "2 Tâches les plus importantes/critiques",
+        "Outils informatiques à maitriser"
+    ],
+    "Profil et Formation": [
+        "Expérience minimum requise",
+        "Formation/diplôme nécessaire"
+    ],
+    "Stratégie de Recrutement": [
+        "Pourquoi recruter maintenant?",
+        "Difficultés anticipées",
+        "Mot-clés cruciaux (CV screening)",
+        "Canaux de sourcing prioritaires",
+        "Plans B : Autres postes, Revoir certains critères...",
+        "Exemple d'un profil cible sur LinkedIn",
+        "Processus de sélection étape par étape"
+    ]
+}
+
+# -------------------- Templates de Brief --------------------
+BRIEF_TEMPLATES = {
+    "Template standard": {
+        "Contexte": {
+            "Objectifs": {"valeur": "Définir clairement les besoins", "importance": 3},
+            "Budget": {"valeur": "Selon projet", "importance": 2},
+        },
+        "Profil recherché": {
+            "Compétences techniques": {"valeur": "Ex: Autocad, Robot Structural Analysis", "importance": 3},
+            "Soft skills": {"valeur": "Esprit d’équipe, autonomie", "importance": 2},
+        },
+    },
+    "Template direction": {
+        "Contexte": {
+            "Objectifs": {"valeur": "Alignement avec stratégie groupe", "importance": 3},
+            "Budget": {"valeur": "Validé par direction", "importance": 2},
+        },
+        "Profil recherché": {
+            "Compétences techniques": {"valeur": "Leadership, gestion multi-projets", "importance": 3},
+            "Soft skills": {"valeur": "Communication, stratégie", "importance": 2},
+        },
+    },
+}
+
+# -------------------- Initialisation Session --------------------
 def init_session_state():
     """Initialise les variables de session par défaut"""
     defaults = {
         "poste_intitule": "",
         "manager_nom": "",
-        "recruteur": "Zakaria",
+        "recruteur": "",
         "affectation_type": "Chantier",
         "affectation_nom": "",
         "current_brief_name": "",
@@ -57,75 +134,34 @@ def generate_automatic_brief_name():
     """Génère un nom automatique pour un brief"""
     poste = st.session_state.get("poste_intitule", "Poste")
     manager = st.session_state.get("manager_nom", "Manager")
+    recruteur = st.session_state.get("recruteur", "Recruteur")
     date = datetime.now().strftime("%Y%m%d")
-    return f"{poste}_{manager}_{date}"
+    return f"{poste}_{manager}_{recruteur}_{date}"
 
 def filter_briefs(saved_briefs, month=None, recruteur=None, poste=None, manager=None):
     """Filtrer les briefs existants"""
     results = {}
     for name, data in saved_briefs.items():
-        if month and not name.startswith(month):
+        if month and month not in name:
             continue
         if recruteur and data.get("recruteur") != recruteur:
             continue
-        if poste and data.get("poste_intitule") != poste:
+        if poste and poste.lower() not in data.get("poste_intitule", "").lower():
             continue
-        if manager and data.get("manager_nom") != manager:
+        if manager and manager.lower() not in data.get("manager_nom", "").lower():
             continue
         results[name] = data
     return results
 
-# -------------------- Templates de Brief --------------------
-BRIEF_TEMPLATES = {
-    "Template standard": {
-        "Contexte": {
-            "Objectifs": {"valeur": "Définir clairement les besoins", "importance": 3},
-            "Budget": {"valeur": "Selon projet", "importance": 2},
-        },
-        "Profil recherché": {
-            "Compétences techniques": {
-                "valeur": "Ex: Autocad, Robot Structural Analysis",
-                "importance": 3,
-            },
-            "Soft skills": {"valeur": "Esprit d’équipe, autonomie", "importance": 2},
-        },
-    },
-    "Template direction": {
-        "Contexte": {
-            "Objectifs": {
-                "valeur": "Alignement avec stratégie groupe",
-                "importance": 3,
-            },
-            "Budget": {"valeur": "Validé par direction", "importance": 2},
-        },
-        "Profil recherché": {
-            "Compétences techniques": {
-                "valeur": "Leadership, gestion multi-projets",
-                "importance": 3,
-            },
-            "Soft skills": {"valeur": "Communication, stratégie", "importance": 2},
-        },
-    },
-}
-
-# -------------------- Checklist simplifiée --------------------
-SIMPLIFIED_CHECKLIST = {
-    "Contexte": ["Objectifs", "Budget"],
-    "Profil recherché": ["Compétences techniques", "Soft skills"],
-}
-
-# -------------------- Disponibilité PDF & Word --------------------
-try:
-    import reportlab
-    PDF_AVAILABLE = True
-except ImportError:
-    PDF_AVAILABLE = False
-
-try:
-    import docx
-    WORD_AVAILABLE = True
-except ImportError:
-    WORD_AVAILABLE = False
+# -------------------- Conseils IA --------------------
+def generate_checklist_advice(category, item):
+    """Génère des conseils simplifiés (placeholder IA)"""
+    conseils = {
+        "Pourquoi ce poste est-il ouvert?": "- Clarifier le départ ou création de poste\n- Identifier l'urgence\n- Relier au contexte business",
+        "Mission principale du poste": "- Décrire en une phrase claire\n- Lier aux objectifs stratégiques\n- Éviter les tâches trop détaillées",
+        "Objectifs à atteindre (3-5 maximum)": "- Formuler en SMART\n- Limiter à 3-5\n- Mesurables et précis",
+    }
+    return conseils.get(item, f"- Fournir des détails pratiques pour {item}\n- Exemple concret\n- Piège à éviter")
 
 # -------------------- Export PDF --------------------
 def export_brief_pdf():
@@ -133,59 +169,45 @@ def export_brief_pdf():
     if not PDF_AVAILABLE:
         return None
 
-    from reportlab.lib.pagesizes import A4
-    from reportlab.pdfgen import canvas
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4)
+    styles = getSampleStyleSheet()
+    story = []
 
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-    width, height = A4
+    story.append(Paragraph("Brief Recrutement", styles['Heading1']))
+    story.append(Spacer(1, 20))
 
-    c.setFont("Helvetica-Bold", 16)
-    c.drawString(50, height - 50, f"Brief Recrutement : {st.session_state.get('current_brief_name', '')}")
+    infos = [
+        ["Poste", st.session_state.get("poste_intitule", "")],
+        ["Manager", st.session_state.get("manager_nom", "")],
+        ["Recruteur", st.session_state.get("recruteur", "")],
+        ["Affectation", f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}"]
+    ]
+    table = Table(infos, colWidths=[150, 300])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.grey),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
+        ("GRID", (0, 0), (-1, -1), 1, colors.black)
+    ]))
+    story.append(table)
+    story.append(Spacer(1, 20))
 
-    c.setFont("Helvetica", 12)
-    y = height - 100
-    c.drawString(50, y, f"Poste : {st.session_state.get('poste_intitule', '')}")
-    y -= 20
-    c.drawString(50, y, f"Manager : {st.session_state.get('manager_nom', '')}")
-    y -= 20
-    c.drawString(50, y, f"Recruteur : {st.session_state.get('recruteur', '')}")
-    y -= 20
-    c.drawString(50, y, f"Affectation : {st.session_state.get('affectation_type', '')} - {st.session_state.get('affectation_nom', '')}")
+    if "brief_data" in st.session_state:
+        for cat, items in st.session_state["brief_data"].items():
+            story.append(Paragraph(cat, styles['Heading2']))
+            for item, data in items.items():
+                val = data.get("valeur", "") if isinstance(data, dict) else str(data)
+                if val:
+                    story.append(Paragraph(f"<b>{item}:</b> {val}", styles['Normal']))
+            story.append(Spacer(1, 15))
 
-    y -= 40
-    c.setFont("Helvetica-Bold", 14)
-    c.drawString(50, y, "Données du brief :")
-    c.setFont("Helvetica", 11)
-    y -= 20
-
-    for cat, items in st.session_state.get("brief_data", {}).items():
-        c.drawString(50, y, f"- {cat}")
-        y -= 15
-        for it, val in items.items():
-            c.drawString(70, y, f"{it}: {val.get('valeur', '')} (importance: {val.get('importance', '')})")
-            y -= 15
-            if y < 100:  # Nouvelle page si trop bas
-                c.showPage()
-                y = height - 100
-
-    # ➕ Export de la matrice KSA
-    if st.session_state.get("ksa_data"):
-        c.setFont("Helvetica-Bold", 14)
-        c.drawString(50, y, "Matrice KSA :")
-        y -= 20
-        c.setFont("Helvetica", 11)
+    if "ksa_data" in st.session_state:
         for cat, comps in st.session_state["ksa_data"].items():
-            c.drawString(50, y, f"{cat}")
-            y -= 15
+            story.append(Paragraph(cat, styles['Heading2']))
             for comp, details in comps.items():
-                c.drawString(70, y, f"{comp} | Niv: {details.get('niveau','')} | Prio: {details.get('priorite','')} | Eval: {details.get('evaluateur','')}")
-                y -= 15
-                if y < 100:
-                    c.showPage()
-                    y = height - 100
+                story.append(Paragraph(f"- {comp} ({details})", styles['Normal']))
 
-    c.save()
+    doc.build(story)
     buffer.seek(0)
     return buffer
 
@@ -195,92 +217,33 @@ def export_brief_word():
     if not WORD_AVAILABLE:
         return None
 
-    from docx import Document
-
     doc = Document()
-    doc.add_heading(f"Brief Recrutement : {st.session_state.get('current_brief_name', '')}", 0)
+    doc.add_heading("Brief Recrutement", 0)
 
-    doc.add_paragraph(f"Poste : {st.session_state.get('poste_intitule', '')}")
-    doc.add_paragraph(f"Manager : {st.session_state.get('manager_nom', '')}")
-    doc.add_paragraph(f"Recruteur : {st.session_state.get('recruteur', '')}")
-    doc.add_paragraph(f"Affectation : {st.session_state.get('affectation_type', '')} - {st.session_state.get('affectation_nom', '')}")
+    infos = {
+        "Poste": st.session_state.get("poste_intitule", ""),
+        "Manager": st.session_state.get("manager_nom", ""),
+        "Recruteur": st.session_state.get("recruteur", ""),
+        "Affectation": f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}"
+    }
+    for k, v in infos.items():
+        doc.add_paragraph(f"{k}: {v}")
 
-    doc.add_heading("Données du brief", level=1)
-    for cat, items in st.session_state.get("brief_data", {}).items():
-        doc.add_heading(cat, level=2)
-        for it, val in items.items():
-            doc.add_paragraph(f"{it}: {val.get('valeur', '')} (importance: {val.get('importance', '')})")
+    if "brief_data" in st.session_state:
+        for cat, items in st.session_state["brief_data"].items():
+            doc.add_heading(cat, level=1)
+            for item, data in items.items():
+                val = data.get("valeur", "") if isinstance(data, dict) else str(data)
+                if val:
+                    doc.add_paragraph(f"{item}: {val}")
 
-    # ➕ Export matrice KSA
-    if st.session_state.get("ksa_data"):
-        doc.add_heading("Matrice KSA", level=1)
+    if "ksa_data" in st.session_state:
         for cat, comps in st.session_state["ksa_data"].items():
             doc.add_heading(cat, level=2)
             for comp, details in comps.items():
-                doc.add_paragraph(f"{comp} | Niv: {details.get('niveau','')} | Prio: {details.get('priorite','')} | Eval: {details.get('evaluateur','')}")
+                doc.add_paragraph(f"{comp}: {details}")
 
-    buffer = BytesIO()
+    buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer
-
-# -------------------- Section KSA interactive --------------------
-def render_ksa_section():
-    """Affiche et gère la matrice KSA"""
-    st.subheader("📊 Matrice KSA (Knowledge / Skills / Abilities)")
-
-    if "ksa_data" not in st.session_state or not st.session_state.ksa_data:
-        st.session_state.ksa_data = {
-            "Knowledge (Connaissances)": {},
-            "Skills (Savoir-faire)": {},
-            "Abilities (Aptitudes)": {}
-        }
-
-    for category in st.session_state.ksa_data.keys():
-        st.markdown(f"### {category}")
-
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            new_comp = st.text_input(f"Ajouter une compétence pour {category}", key=f"new_{category}")
-        with col2:
-            if st.button("➕ Ajouter", key=f"add_{category}"):
-                if new_comp:
-                    st.session_state.ksa_data[category][new_comp] = {
-                        "niveau": "Intermédiaire",
-                        "priorite": "Indispensable",
-                        "evaluateur": "Manager"
-                    }
-                    st.rerun()
-
-        to_delete = None
-        for comp, details in st.session_state.ksa_data[category].items():
-            col1, col2, col3, col4, col5 = st.columns([2, 1, 1, 1, 1])
-            with col1:
-                st.write(f"🔹 {comp}")
-            with col2:
-                st.session_state.ksa_data[category][comp]["niveau"] = st.selectbox(
-                    "Niveau",
-                    ["Débutant", "Intermédiaire", "Expert"],
-                    index=["Débutant", "Intermédiaire", "Expert"].index(details.get("niveau", "Intermédiaire")),
-                    key=f"{category}_{comp}_niv"
-                )
-            with col3:
-                st.session_state.ksa_data[category][comp]["priorite"] = st.selectbox(
-                    "Priorité",
-                    ["Indispensable", "Souhaitable"],
-                    index=["Indispensable", "Souhaitable"].index(details.get("priorite", "Indispensable")),
-                    key=f"{category}_{comp}_prio"
-                )
-            with col4:
-                st.session_state.ksa_data[category][comp]["evaluateur"] = st.selectbox(
-                    "Évaluateur",
-                    ["Manager", "Recruteur", "Les deux"],
-                    index=["Manager", "Recruteur", "Les deux"].index(details.get("evaluateur", "Manager")),
-                    key=f"{category}_{comp}_eval"
-                )
-            with col5:
-                if st.button("🗑️", key=f"del_{category}_{comp}"):
-                    to_delete = comp
-        if to_delete:
-            del st.session_state.ksa_data[category][to_delete]
-            st.rerun()
