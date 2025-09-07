@@ -286,7 +286,7 @@ with tab1:
 
         if st.button("🔎 Rechercher", type="secondary", use_container_width=True):
             briefs = load_briefs()
-            st.session_state.filtered_briefs = filter_briefs(briefs, month, recruteur, poste, manager, affectation)
+            st.session_state.filtered_briefs = filter_briefs(briefs, month, recruteur, poste, manager)
             if st.session_state.filtered_briefs:
                 st.info(f"ℹ️ {len(st.session_state.filtered_briefs)} brief(s) trouvé(s).")
             else:
