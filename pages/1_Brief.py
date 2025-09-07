@@ -151,7 +151,7 @@ if st.session_state.brief_phase == "📁 Gestion":
     col_main, col_side = st.columns([2, 1])
     
     with col_main:
-        st.header("Informations de base")
+        st.subheader("Informations de base")
         
         # --- INFOS DE BASE (3 colonnes)
         col1, col2, col3 = st.columns(3)
@@ -195,7 +195,7 @@ if st.session_state.brief_phase == "📁 Gestion":
                 st.session_state.current_brief_name = brief_name
 
     with col_side:
-        st.header("Recherche & Chargement")
+        st.subheader("Recherche & Chargement")
         
         # --- RECHERCHE & CHARGEMENT (2 colonnes)
         col1, col2 = st.columns(2)
@@ -250,7 +250,7 @@ if st.session_state.brief_phase == "📁 Gestion":
 
 # ---------------- AVANT-BRIEF ----------------
 elif st.session_state.brief_phase == "🔄 Avant-brief":
-    st.header("🔄 Avant-brief (Préparation)")
+    st.subheader("🔄 Avant-brief (Préparation)")
     st.info("Remplissez les informations préparatoires avant la réunion avec le manager.")
 
     conseil_button("Raison ouverture", "Contexte", "Pourquoi ce poste est-il ouvert?", key="raison_ouverture")
@@ -274,7 +274,7 @@ elif st.session_state.brief_phase == "🔄 Avant-brief":
 
 # ---------------- RÉUNION (Wizard interne) ----------------
 elif st.session_state.brief_phase == "✅ Réunion de brief":
-    st.header("✅ Réunion de brief avec le Manager")
+    st.subheader("✅ Réunion de brief avec le Manager")
 
     total_steps = 4
     step = st.session_state.reunion_step
@@ -331,7 +331,7 @@ elif st.session_state.brief_phase == "✅ Réunion de brief":
 
 # ---------------- SYNTHÈSE ----------------
 elif st.session_state.brief_phase == "📝 Synthèse":
-    st.header("📝 Synthèse du Brief")
+    st.subheader("📝 Synthèse du Brief")
     
     if "current_brief_name" in st.session_state:
         st.success(f"Brief actuel: {st.session_state.current_brief_name}")
