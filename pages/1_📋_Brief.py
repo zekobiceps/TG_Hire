@@ -40,10 +40,10 @@ def render_ksa_section():
     categories = ["Knowledge (Connaissances)", "Skills (Savoir-faire)", "Abilities (Aptitudes)"]
 
     for cat in categories:
-        with st.expander(cat, expanded=True):
-            if cat not in st.session_state.ksa_data:
-                st.session_state.ksa_data[cat] = {}
+        if cat not in st.session_state.ksa_data:
+            st.session_state.ksa_data[cat] = {}
 
+        with st.expander(cat, expanded=True):
             new_comp = st.text_input(f"Ajouter {cat}", key=f"new_{cat}")
             if st.button(f"➕ Ajouter {cat}", key=f"btn_add_{cat}") and new_comp:
                 st.session_state.ksa_data[cat][new_comp] = {
@@ -53,7 +53,6 @@ def render_ksa_section():
                     "score": "",
                     "texte": ""
                 }
-                st.session_state[f"new_{cat}"] = ""  # vider la case
                 st.rerun()
 
             for comp, details in list(st.session_state.ksa_data[cat].items()):
@@ -90,6 +89,30 @@ def render_ksa_section():
                     if st.button("🗑️", key=f"del_{cat}_{comp}"):
                         del st.session_state.ksa_data[cat][comp]
                         st.rerun()
+
+# ---------------- Fonction Section Texte ----------------
+def render_text_sections():
+    st.subheader("📝 Sections descriptives")
+    st.session_state.brief_data["contexte"] = st.text_area(
+        "Contexte du poste",
+        value=st.session_state.brief_data.get("contexte", ""),
+        height=100
+    )
+    st.session_state.brief_data["missions"] = st.text_area(
+        "Missions principales",
+        value=st.session_state.brief_data.get("missions", ""),
+        height=120
+    )
+    st.session_state.brief_data["profil"] = st.text_area(
+        "Profil recherché",
+        value=st.session_state.brief_data.get("profil", ""),
+        height=120
+    )
+    st.session_state.comment_libre = st.text_area(
+        "Commentaire libre",
+        value=st.session_state.comment_libre,
+        height=80
+    )
 
 # ---------------- Phase Gestion ----------------
 if brief_phase == "📁 Gestion":
@@ -200,6 +223,7 @@ if brief_phase == "📁 Gestion":
 elif brief_phase == "🔄 Avant-brief":
     st.info("Phase de préparation : remplissez les informations collectées avant la réunion.")
     render_ksa_section()
+    render_text_sections()
     if st.button("💾 Enregistrer modifications (Avant-brief)", type="primary", use_container_width=True):
         save_briefs()
         st.success("✅ Modifications sauvegardées")
@@ -208,6 +232,7 @@ elif brief_phase == "🔄 Avant-brief":
 elif brief_phase == "✅ Réunion de brief":
     st.info("Phase de réunion : corrigez et validez les informations avec le manager.")
     render_ksa_section()
+    render_text_sections()
     if st.button("💾 Enregistrer modifications (Réunion)", type="primary", use_container_width=True):
         save_briefs()
         st.success("✅ Modifications sauvegardées")
