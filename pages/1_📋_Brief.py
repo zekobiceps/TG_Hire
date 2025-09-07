@@ -165,16 +165,81 @@ if brief_phase == "📁 Gestion":
             else:
                 st.warning("Aucun brief trouvé avec ces critères.")
 
+        st.divider()
+        # Application d’un template existant
+        template_choice = st.selectbox("Choisir un template:", list(utils.BRIEF_TEMPLATES.keys()), key="template_choice")
+        col_template1, col_template2 = st.columns(2)
+        with col_template1:
+            if st.button("🔄 Appliquer le template", key="apply_template"):
+                st.session_state.brief_data = utils.BRIEF_TEMPLATES[template_choice].copy()
+                st.success("Template appliqué!")
+                st.rerun()
+        with col_template2:
+            if st.button("🔄 Réinitialiser tout", key="reset_template"):
+                st.session_state.brief_data = {
+                    category: {item: {"valeur": "", "importance": 3} for item in items}
+                    for category, items in utils.SIMPLIFIED_CHECKLIST.items()
+                }
+                st.session_state.ksa_data = {}
+                st.success("Brief réinitialisé!")
+                st.rerun()
+
+    st.divider()
+    st.subheader("📄 Export du Brief")
+    col_export1, col_export2 = st.columns(2)
+    with col_export1:
+        if utils.PDF_AVAILABLE:
+            if st.button("📄 Exporter en PDF", use_container_width=True, key="export_pdf"):
+                pdf_buffer = utils.export_brief_pdf()
+                if pdf_buffer:
+                    st.download_button(
+                        label="⬇️ Télécharger PDF",
+                        data=pdf_buffer,
+                        file_name=f"brief_{st.session_state.poste_intitule.replace(' ', '_')}.pdf",
+                        mime="application/pdf",
+                        use_container_width=True,
+                        key="download_pdf"
+                    )
+        else:
+            st.info("📄 Exporter en PDF: pip install reportlab")
+
+    with col_export2:
+        if utils.WORD_AVAILABLE:
+            if st.button("📄 Exporter en Word", use_container_width=True, key="export_word"):
+                word_buffer = utils.export_brief_word()
+                if word_buffer:
+                    st.download_button(
+                        label="⬇️ Télécharger Word",
+                        data=word_buffer,
+                        file_name=f"brief_{st.session_state.poste_intitule.replace(' ', '_')}.docx",
+                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                        use_container_width=True,
+                        key="download_word"
+                    )
+        else:
+            st.info("📄 Exporter en Word: pip install python-docx")
+
+    st.divider()
+    # -------- Sauvegarde vers bibliothèque --------
+    if st.button("💾 Sauvegarder dans la bibliothèque", key="save_brief_lib"):
+        entry = {
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "type": "Brief",
+            "poste": st.session_state.poste_intitule,
+            "requete": f"Brief {st.session_state.current_brief_name}",
+        }
+        st.session_state.library_entries.append(entry)
+        utils.save_library_entries()
+        st.success("✅ Brief ajouté à la bibliothèque")
+
 # -------------------- Phase Avant-brief --------------------
 elif brief_phase == "🔄 Avant-brief":
     st.header("🔄 Avant-brief")
     st.write("➡️ Ici tu ajoutes les champs spécifiques à l’avant-brief (questions au manager, contexte, etc.)")
-    # Exemple
     st.session_state.comment_libre = st.text_area("Commentaires libres", value=st.session_state.comment_libre, key="avant_comment")
 
 # -------------------- Phase Réunion de brief --------------------
 elif brief_phase == "✅ Réunion de brief":
     st.header("✅ Réunion de brief")
     st.write("➡️ Ici tu ajoutes les champs spécifiques à la réunion de brief (points validés, validations finales, etc.)")
-    # Exemple
     st.session_state.comment_libre = st.text_area("Compte rendu réunion", value=st.session_state.comment_libre, key="reunion_comment")
