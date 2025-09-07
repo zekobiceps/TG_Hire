@@ -13,24 +13,6 @@ spec.loader.exec_module(utils)
 # -------------------- Init session --------------------
 utils.init_session_state()
 
-defaults = {
-    "poste_intitule": "",
-    "manager_nom": "",
-    "recruteur": "Zakaria",
-    "affectation_type": "Chantier",
-    "affectation_nom": "",
-    "current_brief_name": "",
-    "saved_briefs": {},
-    "filtered_briefs": {},
-    "show_filtered_results": False,
-    "brief_data": {},
-    "ksa_data": {},
-    "comment_libre": "",
-}
-for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
-
 st.set_page_config(
     page_title="TG-Hire IA - Assistant Recrutement",
     page_icon="🤖",
