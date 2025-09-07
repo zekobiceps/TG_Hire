@@ -72,3 +72,41 @@ def filter_briefs(saved_briefs, month=None, recruteur=None, poste=None, manager=
             continue
         results[name] = data
     return results
+
+# -------------------- Templates de Brief --------------------
+BRIEF_TEMPLATES = {
+    "Template standard": {
+        "Contexte": {
+            "Objectifs": {"valeur": "Définir clairement les besoins", "importance": 3},
+            "Budget": {"valeur": "Selon projet", "importance": 2},
+        },
+        "Profil recherché": {
+            "Compétences techniques": {"valeur": "Ex: Autocad, Robot Structural Analysis", "importance": 3},
+            "Soft skills": {"valeur": "Esprit d’équipe, autonomie", "importance": 2},
+        },
+    },
+    "Template direction": {
+        "Contexte": {
+            "Objectifs": {"valeur": "Alignement avec stratégie groupe", "importance": 3},
+            "Budget": {"valeur": "Validé par direction", "importance": 2},
+        },
+        "Profil recherché": {
+            "Compétences techniques": {"valeur": "Leadership, gestion multi-projets", "importance": 3},
+            "Soft skills": {"valeur": "Communication, stratégie", "importance": 2},
+        },
+    },
+}
+
+# -------------------- Checklist simplifiée --------------------
+SIMPLIFIED_CHECKLIST = {
+    "Contexte": ["Objectifs", "Budget"],
+    "Profil recherché": ["Compétences techniques", "Soft skills"],
+}
+# 1. Ajouter utils.py corrigé
+git add utils.py
+
+# 2. Commit clair
+git commit -m "fix(utils): ajout de BRIEF_TEMPLATES et SIMPLIFIED_CHECKLIST pour prise en charge des briefs"
+
+# 3. Push vers GitHub
+git push origin main
