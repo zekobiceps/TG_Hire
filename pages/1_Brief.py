@@ -100,54 +100,53 @@ onglets = {
 st.markdown("""
     <style>
     /* Cache les onglets par défaut de Streamlit */
-    .st-emotion-cache-16ya5a5 { /* S'ajuster au data-testid actuel de Streamlit */
+    .st-emotion-cache-16ya5a5 { 
         display: none !important;
     }
 
     /* Conteneur principal des boutons de navigation pour le style de la ligne */
-    /* Cible le div qui englobe les colonnes de navigation pour la ligne rouge */
     div[data-testid="stVerticalBlock"] > div:first-child > div[data-testid="stHorizontalBlock"] {
         border-bottom: 3px solid #ff4b4b; /* Ligne rouge */
-        padding-bottom: 0px; /* Réduit l'espace sous la ligne */
-        margin-bottom: 0px; /* Réduit la marge sous la ligne */
+        padding-bottom: 0px; 
+        margin-bottom: 0px; 
     }
 
     /* Conteneur des colonnes individuelles de navigation */
     div[data-testid="stVerticalBlock"] > div:first-child > div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
-        flex-grow: 0 !important; /* Ne pas prendre d'espace supplémentaire */
-        flex-shrink: 0 !important; /* Ne pas rétrécir */
-        flex-basis: auto !important; /* Taille basée sur le contenu */
-        width: auto !important; /* Largeur automatique */
-        padding-left: 0px !important; /* Pas de padding à gauche */
-        padding-right: 0px !important; /* Pas de padding à droite */
-        margin-right: 5px !important; /* Petite marge entre les boutons pour éviter qu'ils ne se touchent */
+        flex-grow: 0 !important; 
+        flex-shrink: 0 !important; 
+        flex-basis: auto !important; 
+        width: auto !important; 
+        padding-left: 0px !important; 
+        padding-right: 0px !important; 
+        margin-right: 5px !important; 
     }
 
     /* Styles généraux pour tous les boutons de navigation (non-actifs et actifs) */
     .stButton > button {
-        background-color: #8B0000 !important; /* Nouveau fond bordeaux pour les onglets */
+        background-color: #8B0000 !important; /* Fond bordeaux pour les onglets */
         color: white !important; /* Texte blanc */
         border: none !important;
         box-shadow: none !important;
         font-size: 14px !important;
         padding: 5px 10px !important; /* Réduit le padding pour rapprocher texte/bord */
-        border-radius: 0px !important; /* Coins carrés */
-        white-space: nowrap; /* Empêche le retour à la ligne */
-        margin: 0 !important; /* Annule toutes les marges */
+        border-radius: 0px !important; 
+        white-space: nowrap; 
+        margin: 0 !important; 
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 5px; /* Espace entre icône et texte */
-        height: auto !important; /* Permet au bouton de s'ajuster au padding */
+        gap: 5px; 
+        height: auto !important; 
     }
     
     /* Style pour le bouton de navigation ACTIF */
     .stButton > button.active-tab {
-        background-color: #8B0000 !important; /* Reste bordeaux */
+        background-color: #8B0000 !important; 
         color: white !important;
         font-weight: bold !important;
-        border-bottom: 3px solid #ff4b4b !important; /* Ligne rouge en dessous */
-        margin-bottom: -3px !important; /* Soulève légèrement pour couvrir la ligne du conteneur */
+        border-bottom: 3px solid #ff4b4b !important; 
+        margin-bottom: -3px !important; 
     }
 
     /* Styles pour les boutons "Sauvegarder le Brief" et "Rechercher" */
@@ -158,30 +157,30 @@ st.markdown("""
         color: white !important;
         border: 1px solid #8B0000 !important;
         border-radius: 8px !important;
-        padding: 10px 20px !important; /* Un peu plus de padding pour ces boutons d'action */
+        padding: 10px 20px !important; 
         font-weight: bold !important;
-        margin-top: 10px; /* Ajoute un peu d'espace au-dessus */
-        margin-bottom: 10px; /* Ajoute un peu d'espace en dessous */
+        margin-top: 10px; 
+        margin-bottom: 10px; 
     }
 
-    /* S'assurer que le bouton "Générer la requête Boolean" si présent est rouge vif */
-    /* Cette partie devrait être dans le fichier de la page Boolean */
-    /* button[data-testid="base-button-primary"] { */
-    /* background-color: #FF4B4B !important; */
-    /* border-color: #FF4B4B !important; */
-    /* } */
+    /* S'assurer que le bouton de recherche dans les colonnes a le bon style */
+    div[data-testid="stColumn"] button[data-testid*="secondary"] {
+        background-color: #8B0000 !important;
+        border-color: #8B0000 !important;
+        color: white !important;
+    }
+    
     </style>
 """, unsafe_allow_html=True)
 
 # Créer les colonnes pour les boutons de navigation
-# Utiliser st.columns([]) pour forcer un layout serré et horizontal
 cols = st.columns(len(onglets)) 
     
 for i, (key_label, full_label) in enumerate(onglets.items()):
     with cols[i]:
         is_active = (st.session_state.brief_phase == full_label)
         
-        if st.button(full_label, key=f"tab_{key_label}", use_container_width=False): # use_container_width=False
+        if st.button(full_label, key=f"tab_{key_label}", use_container_width=False):
             st.session_state.brief_phase = full_label
             st.rerun()
         
@@ -214,7 +213,7 @@ if st.session_state.brief_phase == "📁 Gestion":
             st.selectbox("Affectation", ["", "Chantier", "Siège"], key="affectation_type")
             st.text_input("Nom de l'affectation", key="affectation_nom")
         
-        st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date()) # Fixe la date à aujourd'hui par défaut
+        st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date()) 
 
         # --- SAUVEGARDE
         if st.button("💾 Sauvegarder le Brief", type="primary", use_container_width=True):
