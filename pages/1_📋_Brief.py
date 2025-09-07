@@ -12,7 +12,7 @@ from utils import (
     export_brief_word
 )
 
-# Initialisation de la session
+# ---------------- Init ----------------
 init_session_state()
 
 st.set_page_config(
@@ -24,15 +24,72 @@ st.set_page_config(
 
 st.title("📋 Brief Recrutement")
 
-# Choix de la phase du brief
+# ---------------- Choix de la phase ----------------
 brief_phase = st.radio(
     "Phase du Brief:",
     ["📁 Gestion", "🔄 Avant-brief", "✅ Réunion de brief"],
     horizontal=True,
     key="brief_phase_selector"
 )
-
 st.session_state.brief_phase = brief_phase
+
+# ---------------- Fonction Section KSA ----------------
+def render_ksa_section():
+    st.subheader("📊 Modèle KSA (Knowledge, Skills, Abilities)")
+
+    categories = ["Knowledge (Connaissances)", "Skills (Savoir-faire)", "Abilities (Aptitudes)"]
+
+    for cat in categories:
+        with st.expander(cat, expanded=True):
+            if cat not in st.session_state.ksa_data:
+                st.session_state.ksa_data[cat] = {}
+
+            new_comp = st.text_input(f"Ajouter {cat}", key=f"new_{cat}")
+            if st.button(f"➕ Ajouter {cat}", key=f"btn_add_{cat}") and new_comp:
+                st.session_state.ksa_data[cat][new_comp] = {
+                    "niveau": "Intermédiaire",
+                    "priorite": "Indispensable",
+                    "evaluateur": "Recruteur",
+                    "score": "",
+                    "texte": ""
+                }
+                st.session_state[f"new_{cat}"] = ""  # vider la case
+                st.rerun()
+
+            for comp, details in list(st.session_state.ksa_data[cat].items()):
+                col1, col2, col3, col4, col5, col6 = st.columns([2, 1, 1, 1, 1, 1])
+                with col1:
+                    st.write(f"📝 {comp}")
+                with col2:
+                    st.session_state.ksa_data[cat][comp]["niveau"] = st.selectbox(
+                        "Niveau",
+                        ["Débutant", "Intermédiaire", "Expert"],
+                        index=["Débutant", "Intermédiaire", "Expert"].index(details.get("niveau", "Intermédiaire")),
+                        key=f"niv_{cat}_{comp}"
+                    )
+                with col3:
+                    st.session_state.ksa_data[cat][comp]["priorite"] = st.selectbox(
+                        "Priorité",
+                        ["Indispensable", "Souhaitable"],
+                        index=["Indispensable", "Souhaitable"].index(details.get("priorite", "Indispensable")),
+                        key=f"prio_{cat}_{comp}"
+                    )
+                with col4:
+                    st.session_state.ksa_data[cat][comp]["evaluateur"] = st.selectbox(
+                        "Évaluateur",
+                        ["Recruteur", "Manager", "Les deux"],
+                        index=["Recruteur", "Manager", "Les deux"].index(details.get("evaluateur", "Recruteur")),
+                        key=f"eval_{cat}_{comp}"
+                    )
+                with col5:
+                    st.session_state.ksa_data[cat][comp]["score"] = st.number_input(
+                        "Score", min_value=0, max_value=10, value=int(details.get("score") or 0),
+                        key=f"score_{cat}_{comp}"
+                    )
+                with col6:
+                    if st.button("🗑️", key=f"del_{cat}_{comp}"):
+                        del st.session_state.ksa_data[cat][comp]
+                        st.rerun()
 
 # ---------------- Phase Gestion ----------------
 if brief_phase == "📁 Gestion":
@@ -42,77 +99,57 @@ if brief_phase == "📁 Gestion":
 
     with col1:
         st.subheader("Informations de base")
-        st.session_state.poste_intitule = st.text_input(
-            "Intitulé du poste:",
-            value=st.session_state.poste_intitule,
-            placeholder="Ex: Chargé de recrutement",
-            key="poste_intitule_base"
-        )
-
-        st.session_state.manager_nom = st.text_input(
-            "Nom du manager:",
-            value=st.session_state.manager_nom,
-            placeholder="Ex: Ahmed Alami",
-            key="manager_nom_base"
-        )
-
+        st.session_state.poste_intitule = st.text_input("Intitulé du poste", value=st.session_state.poste_intitule)
+        st.session_state.manager_nom = st.text_input("Nom du manager", value=st.session_state.manager_nom)
         st.session_state.recruteur = st.selectbox(
             "Recruteur",
-            ["Zakaria", "Sara", "Jalal", "Bouchra"],
-            index=(["Zakaria", "Sara", "Jalal", "Bouchra"].index(st.session_state.recruteur)
+            ["", "Zakaria", "Sara", "Jalal", "Bouchra"],
+            index=(["", "Zakaria", "Sara", "Jalal", "Bouchra"].index(st.session_state.recruteur)
                    if st.session_state.recruteur in ["Zakaria", "Sara", "Jalal", "Bouchra"] else 0),
-            key="recruteur_base"
+            key="recruteur_gestion"
         )
-
         col_aff1, col_aff2 = st.columns(2)
         with col_aff1:
             st.session_state.affectation_type = st.selectbox(
-                "Affectation:",
+                "Affectation",
                 ["Chantier", "Direction"],
-                index=0 if st.session_state.affectation_type == "Chantier" else 1,
-                key="affectation_type_base"
+                index=0 if st.session_state.affectation_type == "Chantier" else 1
             )
         with col_aff2:
-            st.session_state.affectation_nom = st.text_input(
-                "Nom:",
-                value=st.session_state.affectation_nom,
-                placeholder=f"Nom du {st.session_state.affectation_type.lower()}",
-                key="affectation_nom_base"
-            )
+            st.session_state.affectation_nom = st.text_input("Nom", value=st.session_state.affectation_nom)
 
-        if (
-            st.session_state.manager_nom
-            and st.session_state.poste_intitule
-            and st.session_state.recruteur
-            and st.session_state.affectation_nom
-        ):
-            suggested_name = generate_automatic_brief_name()
-            st.session_state.current_brief_name = st.text_input(
-                "Nom du brief:",
-                value=suggested_name,
-                placeholder="Nom automatique généré",
-                key="brief_nom_base"
-            )
+        if st.button("💾 Sauvegarder le brief", type="primary", use_container_width=True):
+            if not st.session_state.current_brief_name:
+                st.session_state.current_brief_name = generate_automatic_brief_name()
+            nom = st.session_state.current_brief_name
+            save_data = {
+                "poste_intitule": st.session_state.poste_intitule,
+                "manager_nom": st.session_state.manager_nom,
+                "recruteur": st.session_state.recruteur,
+                "affectation_type": st.session_state.affectation_type,
+                "affectation_nom": st.session_state.affectation_nom,
+                "brief_data": st.session_state.brief_data,
+                "ksa_data": st.session_state.ksa_data,
+                "comment_libre": st.session_state.comment_libre,
+            }
+            st.session_state.saved_briefs[nom] = save_data
+            save_briefs()
+            st.success(f"✅ Brief créé avec succès sous le nom : {nom}")
+            st.session_state.brief_phase = "🔄 Avant-brief"
+            st.rerun()
 
     with col2:
         st.subheader("Chargement & Templates")
-
-        st.markdown("**Filtres de recherche:**")
+        st.markdown("**Filtres de recherche**")
         filter_col1, filter_col2 = st.columns(2)
-
         with filter_col1:
-            filter_month = st.selectbox("Mois:", [""] + [f"{i:02d}" for i in range(1, 13)], key="filter_month")
-            filter_recruteur = st.selectbox(
-                "Recruteur:",
-                [""] + ["Zakaria", "Sara", "Jalal", "Bouchra"],
-                key="filter_recruteur"
-            )
-
+            filter_month = st.selectbox("Mois", [""] + [f"{i:02d}" for i in range(1, 13)], key="filter_month")
+            filter_recruteur = st.selectbox("Recruteur", [""] + ["Zakaria", "Sara", "Jalal", "Bouchra"], key="filter_recruteur")
         with filter_col2:
-            filter_poste = st.text_input("Poste:", key="filter_poste")
-            filter_manager = st.text_input("Manager:", key="filter_manager")
+            filter_poste = st.text_input("Poste", key="filter_poste")
+            filter_manager = st.text_input("Manager", key="filter_manager")
 
-        if st.button("🔍 Rechercher briefs", type="secondary", key="search_briefs_btn"):
+        if st.button("🔍 Rechercher briefs", type="secondary"):
             st.session_state.filtered_briefs = filter_briefs(
                 st.session_state.saved_briefs,
                 filter_month or None,
@@ -124,99 +161,77 @@ if brief_phase == "📁 Gestion":
 
         if st.session_state.show_filtered_results:
             if st.session_state.filtered_briefs:
-                st.markdown(f"**{len(st.session_state.filtered_briefs)} brief(s) trouvé(s):**")
-
-                selected_brief = st.selectbox(
-                    "Choisir un brief:", [""] + list(st.session_state.filtered_briefs.keys()), key="select_brief"
-                )
-                target_tab = st.radio(
-                    "Charger dans:", ["🔄 Avant-brief", "✅ Réunion de brief"],
-                    horizontal=True,
-                    key="target_tab_radio"
-                )
-
+                selected_brief = st.selectbox("Choisir un brief", [""] + list(st.session_state.filtered_briefs.keys()))
+                target_tab = st.radio("Charger dans", ["🔄 Avant-brief", "✅ Réunion de brief"], horizontal=True)
                 col_load1, col_load2 = st.columns(2)
                 with col_load1:
-                    if selected_brief and st.button("📂 Charger ce brief", key="load_brief_btn"):
+                    if selected_brief and st.button("📂 Charger ce brief"):
                         loaded_data = st.session_state.filtered_briefs[selected_brief]
-                        if isinstance(loaded_data, dict):
-                            st.session_state.poste_intitule = loaded_data.get("poste_intitule", "")
-                            st.session_state.manager_nom = loaded_data.get("manager_nom", "")
-                            st.session_state.recruteur = loaded_data.get("recruteur", "Zakaria")
-                            st.session_state.affectation_type = loaded_data.get("affectation_type", "Chantier")
-                            st.session_state.affectation_nom = loaded_data.get("affectation_nom", "")
-                            st.session_state.brief_data = loaded_data.get("brief_data", {})
-                            st.session_state.ksa_data = loaded_data.get("ksa_data", {})
-                            st.session_state.comment_libre = loaded_data.get("comment_libre", "")
-                            st.session_state.current_brief_name = selected_brief
-
-                            st.session_state.brief_phase = target_tab
-                            st.success("Brief chargé avec succès!")
-                            st.rerun()
-
+                        for k, v in loaded_data.items():
+                            st.session_state[k] = v
+                        st.session_state.current_brief_name = selected_brief
+                        st.session_state.brief_phase = target_tab
+                        st.success("Brief chargé avec succès!")
+                        st.rerun()
                 with col_load2:
-                    if selected_brief and st.button("🗑️ Supprimer ce brief", key="delete_brief_btn"):
+                    if selected_brief and st.button("🗑️ Supprimer ce brief"):
                         del st.session_state.saved_briefs[selected_brief]
-                        if selected_brief in st.session_state.filtered_briefs:
-                            del st.session_state.filtered_briefs[selected_brief]
                         save_briefs()
                         st.success("Brief supprimé!")
                         st.rerun()
-            else:
-                st.warning("Aucun brief trouvé avec ces critères.")
 
         st.divider()
-        template_choice = st.selectbox("Choisir un template:", list(BRIEF_TEMPLATES.keys()), key="template_choice")
-
+        template_choice = st.selectbox("Choisir un template", list(BRIEF_TEMPLATES.keys()))
         col_template1, col_template2 = st.columns(2)
         with col_template1:
-            if st.button("🔄 Appliquer le template", key="apply_template_btn"):
+            if st.button("🔄 Appliquer le template"):
                 st.session_state.brief_data = BRIEF_TEMPLATES[template_choice].copy()
                 st.success("Template appliqué!")
+                st.session_state.brief_phase = "🔄 Avant-brief"
                 st.rerun()
-
         with col_template2:
-            if st.button("🔄 Réinitialiser tout", key="reset_template_btn"):
-                st.session_state.brief_data = {
-                    category: {item: {"valeur": "", "importance": 3} for item in items}
-                    for category, items in SIMPLIFIED_CHECKLIST.items()
-                }
-                st.session_state.ksa_data = {}
-                st.success("Brief réinitialisé!")
-                st.rerun()
+            if st.button("🗑️ Supprimer ce template"):
+                if template_choice in BRIEF_TEMPLATES and template_choice != "Template standard":
+                    del BRIEF_TEMPLATES[template_choice]
+                    st.success("Template supprimé!")
+                    st.rerun()
 
-    st.divider()
-    st.subheader("📄 Export du Brief")
-    col_export1, col_export2 = st.columns(2)
+# ---------------- Phase Avant-brief ----------------
+elif brief_phase == "🔄 Avant-brief":
+    st.info("Phase de préparation : remplissez les informations collectées avant la réunion.")
+    render_ksa_section()
+    if st.button("💾 Enregistrer modifications (Avant-brief)", type="primary", use_container_width=True):
+        save_briefs()
+        st.success("✅ Modifications sauvegardées")
 
-    with col_export1:
-        if PDF_AVAILABLE:
-            if st.button("📄 Exporter en PDF", use_container_width=True, key="export_pdf_btn"):
-                pdf_buffer = export_brief_pdf()
-                if pdf_buffer:
-                    st.download_button(
-                        label="⬇️ Télécharger PDF",
-                        data=pdf_buffer,
-                        file_name=f"brief_{st.session_state.poste_intitule.replace(' ', '_')}.pdf",
-                        mime="application/pdf",
-                        use_container_width=True,
-                        key="download_pdf_btn"
-                    )
-        else:
-            st.info("📄 Exporter en PDF: pip install reportlab")
+# ---------------- Phase Réunion ----------------
+elif brief_phase == "✅ Réunion de brief":
+    st.info("Phase de réunion : corrigez et validez les informations avec le manager.")
+    render_ksa_section()
+    if st.button("💾 Enregistrer modifications (Réunion)", type="primary", use_container_width=True):
+        save_briefs()
+        st.success("✅ Modifications sauvegardées")
 
-    with col_export2:
-        if WORD_AVAILABLE:
-            if st.button("📄 Exporter en Word", use_container_width=True, key="export_word_btn"):
-                word_buffer = export_brief_word()
-                if word_buffer:
-                    st.download_button(
-                        label="⬇️ Télécharger Word",
-                        data=word_buffer,
-                        file_name=f"brief_{st.session_state.poste_intitule.replace(' ', '_')}.docx",
-                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        use_container_width=True,
-                        key="download_word_btn"
-                    )
-        else:
-            st.info("📄 Exporter en Word: pip install python-docx")
+# ---------------- Export ----------------
+st.divider()
+st.subheader("📄 Export du Brief")
+col1, col2 = st.columns(2)
+with col1:
+    if PDF_AVAILABLE:
+        if st.button("📄 Exporter en PDF", use_container_width=True):
+            pdf_buffer = export_brief_pdf()
+            if pdf_buffer:
+                st.download_button("⬇️ Télécharger PDF", data=pdf_buffer,
+                                   file_name=f"brief_{st.session_state.poste_intitule}.pdf", mime="application/pdf")
+    else:
+        st.info("PDF non dispo (pip install reportlab)")
+with col2:
+    if WORD_AVAILABLE:
+        if st.button("📄 Exporter en Word", use_container_width=True):
+            word_buffer = export_brief_word()
+            if word_buffer:
+                st.download_button("⬇️ Télécharger Word", data=word_buffer,
+                                   file_name=f"brief_{st.session_state.poste_intitule}.docx",
+                                   mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    else:
+        st.info("Word non dispo (pip install python-docx)")
