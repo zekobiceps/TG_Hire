@@ -90,40 +90,62 @@ if "filtered_briefs" not in st.session_state:
 # ---------------- NAVIGATION PRINCIPALE ----------------
 st.title("🤖 TG-Hire IA - Brief")
 
-# Style CSS pour imiter l'apparence de la PJ
+# Style CSS pour le menu de navigation
 st.markdown("""
     <style>
-    .nav-button {
+    .nav-container {
+        display: flex;
+        justify-content: space-between;
         background-color: #f0f2f6;
-        border: 1px solid #d0d0d0;
-        border-radius: 5px;
         padding: 10px;
-        margin: 5px 0;
-        text-align: center;
-        cursor: pointer;
+        border-radius: 10px;
+        margin-bottom: 20px;
     }
-    .nav-button:hover {
+    .nav-item {
+        padding: 10px 15px;
+        border-radius: 5px;
+        cursor: pointer;
+        text-align: center;
+        flex: 1;
+        margin: 0 5px;
+        font-weight: normal;
         background-color: #e6e6e6;
     }
-    .nav-button.active {
+    .nav-item.active {
         background-color: #4CAF50;
         color: white;
         font-weight: bold;
+    }
+    .nav-item:hover {
+        background-color: #d9d9d9;
     }
     </style>
 """, unsafe_allow_html=True)
 
 # Créer la navigation
 phases = ["📁 Gestion", "🔄 Avant-brief", "✅ Réunion de brief", "📝 Synthèse"]
-cols = st.columns(len(phases))
 
+# Conteneur HTML pour le menu
+nav_html = '<div class="nav-container">'
 for i, phase in enumerate(phases):
     is_active = st.session_state.brief_phase == phase
-    button_class = "nav-button active" if is_active else "nav-button"
-    
-    if cols[i].button(phase, use_container_width=True, key=f"nav_{i}"):
-        st.session_state.brief_phase = phase
-        st.rerun()
+    nav_class = "nav-item active" if is_active else "nav-item"
+    nav_html += f'<div class="{nav_class}" onclick="window.location.href=\'?phase={i}\'">{phase}</div>'
+nav_html += '</div>'
+
+st.markdown(nav_html, unsafe_allow_html=True)
+
+# Gérer le changement d'onglet via paramètre URL
+query_params = st.experimental_get_query_params()
+if "phase" in query_params:
+    try:
+        phase_index = int(query_params["phase"][0])
+        if 0 <= phase_index < len(phases):
+            st.session_state.brief_phase = phases[phase_index]
+            st.experimental_set_query_params()
+            st.rerun()
+    except:
+        pass
 
 st.markdown("---")
 
@@ -187,10 +209,11 @@ if st.session_state.brief_phase == "📁 Gestion":
         with col2:
             recruteur = st.selectbox("Recruteur", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="search_recruteur")
             manager = st.text_input("Manager")
+            affectation = st.selectbox("Affectation", ["", "Chantier", "Siège"], key="search_affectation")
 
         if st.button("🔎 Rechercher", use_container_width=True):
             briefs = load_briefs()
-            st.session_state.filtered_briefs = filter_briefs(briefs, month, recruteur, poste, manager)
+            st.session_state.filtered_briefs = filter_briefs(briefs, month, recruteur, poste, manager, affectation)
             if st.session_state.filtered_briefs:
                 st.info(f"ℹ️ {len(st.session_state.filtered_briefs)} brief(s) trouvé(s).")
             else:
@@ -209,9 +232,11 @@ if st.session_state.brief_phase == "📁 Gestion":
                     colA, colB = st.columns(2)
                     with colA:
                         if st.button(f"📂 Charger", key=f"load_{name}"):
-                            for k, v in data.items():
-                                if k != 'ksa_data' or v:  # Ne pas écraser ksa_data si vide dans les données chargées
-                                    st.session_state[k] = v
+                            # Charger les données sans écraser les clés essentielles
+                            safe_keys = [k for k in data.keys() if k not in ['ksa_data'] or data[k]]
+                            for k in safe_keys:
+                                if k in data and data[k]:
+                                    st.session_state[k] = data[k]
                             st.session_state.current_brief_name = name
                             st.success(f"✅ Brief '{name}' chargé avec succès!")
                             st.rerun()
