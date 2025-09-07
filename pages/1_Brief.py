@@ -90,42 +90,34 @@ if "filtered_briefs" not in st.session_state:
 # ---------------- NAVIGATION PRINCIPALE ----------------
 st.title("🤖 TG-Hire IA - Brief")
 
-# Style CSS pour le menu de navigation inspiré de votre exemple
+# Style CSS pour le menu de navigation
 st.markdown("""
     <style>
     .nav-container {
         display: flex;
         justify-content: space-between;
-        background-color: #2c3e50;
-        padding: 8px;
-        border-radius: 12px;
+        background-color: #f0f2f6;
+        padding: 10px;
+        border-radius: 10px;
         margin-bottom: 20px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
     .nav-item {
-        padding: 12px 20px;
-        border-radius: 8px;
+        padding: 10px 15px;
+        border-radius: 5px;
         cursor: pointer;
         text-align: center;
         flex: 1;
-        margin: 0 4px;
-        font-weight: 500;
-        background-color: #34495e;
-        color: #ecf0f1;
-        transition: all 0.3s ease;
-        border: 2px solid transparent;
-        font-size: 14px;
+        margin: 0 5px;
+        font-weight: normal;
+        background-color: #e6e6e6;
     }
     .nav-item.active {
-        background-color: #3498db;
+        background-color: #4CAF50;
         color: white;
-        font-weight: 600;
-        border-color: #2980b9;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        font-weight: bold;
     }
-    .nav-item:hover:not(.active) {
-        background-color: #4a6b8a;
-        transform: translateY(-2px);
+    .nav-item:hover {
+        background-color: #d9d9d9;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -144,14 +136,13 @@ nav_html += '</div>'
 st.markdown(nav_html, unsafe_allow_html=True)
 
 # Gérer le changement d'onglet via paramètre URL
-query_params = st.query_params
+query_params = st.experimental_get_query_params()
 if "phase" in query_params:
     try:
-        phase_index = int(query_params.get("phase"))
+        phase_index = int(query_params["phase"][0])
         if 0 <= phase_index < len(phases):
             st.session_state.brief_phase = phases[phase_index]
-            # Pour effacer les paramètres après utilisation
-            st.query_params.clear()
+            st.experimental_set_query_params()
             st.rerun()
     except:
         pass
@@ -261,7 +252,6 @@ if st.session_state.brief_phase == "📁 Gestion":
                                     del st.session_state.filtered_briefs[name]
                                 st.warning(f"❌ Brief '{name}' supprimé.")
                                 st.rerun()
-
 # ---------------- AVANT-BRIEF ----------------
 elif st.session_state.brief_phase == "🔄 Avant-brief":
     st.header("🔄 Avant-brief (Préparation)")
