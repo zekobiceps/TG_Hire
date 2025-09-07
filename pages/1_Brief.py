@@ -86,7 +86,7 @@ if "filtered_briefs" not in st.session_state:
     st.session_state.filtered_briefs = {}
 
 # ---------------- NAVIGATION PRINCIPALE ----------------
-st.title("💡 Outil de Gestion des Briefs") # Nouveau titre
+st.title("💡 Briefs") # Nouveau titre renommé
 
 # Définir les onglets avec leurs icônes et leurs labels
 onglets = {
@@ -100,96 +100,95 @@ onglets = {
 st.markdown("""
     <style>
     /* Cache les onglets par défaut de Streamlit */
-    .st-emotion-cache-16ya5a5 {
+    .st-emotion-cache-16ya5a5 { /* S'ajuster au data-testid actuel de Streamlit */
         display: none !important;
     }
 
-    /* Conteneur des colonnes de navigation pour la ligne rouge principale */
-    /* Cible le parent direct des colonnes pour appliquer la bordure inférieure */
-    div.st-emotion-cache-1pxazr7 > div:first-child { 
-        border-bottom: 3px solid #ff4b4b; 
-        margin-bottom: 10px;
-        padding-top: 0;
-        padding-bottom: 0;
+    /* Conteneur principal des boutons de navigation pour le style de la ligne */
+    /* Cible le div qui englobe les colonnes de navigation pour la ligne rouge */
+    div[data-testid="stVerticalBlock"] > div:first-child > div[data-testid="stHorizontalBlock"] {
+        border-bottom: 3px solid #ff4b4b; /* Ligne rouge */
+        padding-bottom: 0px; /* Réduit l'espace sous la ligne */
+        margin-bottom: 0px; /* Réduit la marge sous la ligne */
     }
 
-    /* Ajuster l'espacement pour les boutons de navigation */
-    /* Cela cible les colonnes Streamlit elles-mêmes pour réduire l'espace */
-    div.st-emotion-cache-1pxazr7 > div:first-child > div[data-testid="stColumn"] {
-        flex: 0 1 auto !important; /* Permet aux colonnes de prendre juste l'espace nécessaire */
-        padding: 0 5px !important; /* Réduit le padding horizontal des colonnes */
-        margin: 0 -10px !important; /* Rapproche encore plus les colonnes/boutons */
+    /* Conteneur des colonnes individuelles de navigation */
+    div[data-testid="stVerticalBlock"] > div:first-child > div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+        flex-grow: 0 !important; /* Ne pas prendre d'espace supplémentaire */
+        flex-shrink: 0 !important; /* Ne pas rétrécir */
+        flex-basis: auto !important; /* Taille basée sur le contenu */
+        width: auto !important; /* Largeur automatique */
+        padding-left: 0px !important; /* Pas de padding à gauche */
+        padding-right: 0px !important; /* Pas de padding à droite */
+        margin-right: 5px !important; /* Petite marge entre les boutons pour éviter qu'ils ne se touchent */
     }
 
-    /* Styles généraux pour tous les boutons de navigation (non-actifs) */
+    /* Styles généraux pour tous les boutons de navigation (non-actifs et actifs) */
     .stButton > button {
-        background-color: #6a1b9a !important; /* Fond violet pour tous les onglets */
-        color: white !important; /* Texte blanc par défaut */
+        background-color: #8B0000 !important; /* Nouveau fond bordeaux pour les onglets */
+        color: white !important; /* Texte blanc */
         border: none !important;
         box-shadow: none !important;
         font-size: 14px !important;
-        padding: 8px 12px !important;
-        border-radius: 0px !important; /* Coins carrés comme l'image Boolean */
-        white-space: nowrap; /* Empêche le retour à la ligne du texte */
-        margin: 0; /* Assure aucune marge interne aux boutons */
-        display: inline-flex; /* Permet un meilleur alignement icône/texte */
+        padding: 5px 10px !important; /* Réduit le padding pour rapprocher texte/bord */
+        border-radius: 0px !important; /* Coins carrés */
+        white-space: nowrap; /* Empêche le retour à la ligne */
+        margin: 0 !important; /* Annule toutes les marges */
+        display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: 5px; /* Espace entre icône et texte */
+        height: auto !important; /* Permet au bouton de s'ajuster au padding */
     }
     
     /* Style pour le bouton de navigation ACTIF */
     .stButton > button.active-tab {
-        background-color: #6a1b9a !important; /* Reste violet */
-        color: white !important; /* Reste blanc */
+        background-color: #8B0000 !important; /* Reste bordeaux */
+        color: white !important;
         font-weight: bold !important;
         border-bottom: 3px solid #ff4b4b !important; /* Ligne rouge en dessous */
-        margin-bottom: -3px; /* Soulève légèrement pour couvrir la ligne de la div parente */
+        margin-bottom: -3px !important; /* Soulève légèrement pour couvrir la ligne du conteneur */
     }
 
     /* Styles pour les boutons "Sauvegarder le Brief" et "Rechercher" */
-    /* Cible tous les boutons de type "primary" et "secondary" pour le fond violet */
-    /* Le !important est crucial pour surcharger les styles par défaut de Streamlit */
+    /* Cible tous les boutons de type "primary" et "secondary" */
     button[data-testid*="primary"],
     button[data-testid*="secondary"] {
-        background-color: #6a1b9a !important; /* Violet */
+        background-color: #8B0000 !important; /* Bordeaux */
         color: white !important;
-        border: 1px solid #6a1b9a !important;
+        border: 1px solid #8B0000 !important;
         border-radius: 8px !important;
-        padding: 10px 20px !important; /* Plus de padding pour ces boutons */
+        padding: 10px 20px !important; /* Un peu plus de padding pour ces boutons d'action */
         font-weight: bold !important;
+        margin-top: 10px; /* Ajoute un peu d'espace au-dessus */
+        margin-bottom: 10px; /* Ajoute un peu d'espace en dessous */
     }
-    /* S'assurer que le bouton "Rechercher" dans la colonne a le bon style */
-    div[data-testid="stColumn"] button[data-testid*="secondary"] {
-        background-color: #6a1b9a !important;
-        border-color: #6a1b9a !important;
-    }
-    
+
+    /* S'assurer que le bouton "Générer la requête Boolean" si présent est rouge vif */
+    /* Cette partie devrait être dans le fichier de la page Boolean */
+    /* button[data-testid="base-button-primary"] { */
+    /* background-color: #FF4B4B !important; */
+    /* border-color: #FF4B4B !important; */
+    /* } */
     </style>
 """, unsafe_allow_html=True)
 
 # Créer les colonnes pour les boutons de navigation
-# st.columns sans arguments tente de diviser l'espace également.
-# Pour les rapprocher, on peut spécifier une largeur pour chaque colonne si besoin,
-# mais un bon CSS est souvent plus flexible.
+# Utiliser st.columns([]) pour forcer un layout serré et horizontal
 cols = st.columns(len(onglets)) 
     
 for i, (key_label, full_label) in enumerate(onglets.items()):
     with cols[i]:
-        # Comparer le label simple avec l'état de la session
         is_active = (st.session_state.brief_phase == full_label)
         
-        # Créer le bouton.
-        if st.button(full_label, key=f"tab_{key_label}", use_container_width=True):
+        if st.button(full_label, key=f"tab_{key_label}", use_container_width=False): # use_container_width=False
             st.session_state.brief_phase = full_label
             st.rerun()
         
-        # Injecter du JavaScript pour ajouter la classe 'active-tab' si le bouton est actif
         if is_active:
             st.markdown(f"""
                 <script>
-                // Sélectionne spécifiquement le bouton qui vient d'être rendu dans cette colonne
-                var buttonElement = document.querySelector('[data-testid="stColumn"]:nth-child({i+1}) button');
+                var buttonElement = document.querySelector('[data-testid="stVerticalBlock"] > div:first-child > div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-child({i+1}) button');
                 if (buttonElement) {{
                     buttonElement.classList.add("active-tab");
                 }}
@@ -210,12 +209,12 @@ if st.session_state.brief_phase == "📁 Gestion":
             st.text_input("Nom du manager *", key="manager_nom")
         with col2:
             st.text_input("Poste à recruter", key="niveau_hierarchique")
-            st.selectbox("Recruteur *", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="recruteur")
+            st.selectbox("Recruteur *", ["", "Zakaria", "Sara", "Sara", "Jalal", "Bouchra", "Ghita"], key="recruteur")
         with col3:
             st.selectbox("Affectation", ["", "Chantier", "Siège"], key="affectation_type")
             st.text_input("Nom de l'affectation", key="affectation_nom")
         
-        st.date_input("Date du Brief *", key="date_brief")
+        st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date()) # Fixe la date à aujourd'hui par défaut
 
         # --- SAUVEGARDE
         if st.button("💾 Sauvegarder le Brief", type="primary", use_container_width=True):
