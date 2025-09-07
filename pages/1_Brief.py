@@ -142,12 +142,6 @@ st.markdown("""
         box-shadow: none !important;
     }
     
-    /* Supprimer les bordures des selectbox */
-    .stSelectbox > div > div {
-        border: none !important;
-        box-shadow: none !important;
-    }
-    
     /* Style pour les textareas */
     .stTextArea > div > div > textarea {
         border: none !important;
@@ -156,12 +150,19 @@ st.markdown("""
     
     /* Ajustement de l'apparence des inputs */
     .stTextInput > div > div > input,
-    .stSelectbox > div > div,
     .stTextArea > div > div > textarea {
         background-color: #262730 !important;
         color: white !important;
         border-radius: 4px !important;
         padding: 8px 12px !important;
+    }
+    
+    /* Style pour les selectbox */
+    .stSelectbox > div > div {
+        background-color: #262730 !important;
+        color: white !important;
+        border-radius: 4px !important;
+        padding: 4px 8px !important;
     }
     
     /* Style général pour l'application */
@@ -288,7 +289,38 @@ with tab1:
 
         if st.button("🔎 Rechercher", type="secondary", use_container_width=True):
             briefs = load_briefs()
-            st.session_state.filtered_briefs = filter_briefs(briefs, month, recruteur, poste, manager, affectation, nom_affectation)
+            # Modification ici pour gérer les nouveaux paramètres de filtrage
+            st.session_state.filtered_briefs = {}
+            
+            for name, data in briefs.items():
+                # Filtrage par mois
+                if month and month != "":
+                    brief_date = data.get("date_brief", "")
+                    if not (brief_date and brief_date.split("-")[1] == month):
+                        continue
+                
+                # Filtrage par recruteur
+                if recruteur and recruteur != "" and data.get("recruteur") != recruteur:
+                    continue
+                
+                # Filtrage par poste
+                if poste and poste != "" and poste.lower() not in data.get("poste_intitule", "").lower():
+                    continue
+                
+                # Filtrage par manager
+                if manager and manager != "" and manager.lower() not in data.get("manager_nom", "").lower():
+                    continue
+                
+                # Filtrage par affectation
+                if affectation and affectation != "" and data.get("affectation_type") != affectation:
+                    continue
+                
+                # Filtrage par nom d'affectation
+                if nom_affectation and nom_affectation != "" and nom_affectation.lower() not in data.get("affectation_nom", "").lower():
+                    continue
+                
+                st.session_state.filtered_briefs[name] = data
+            
             if st.session_state.filtered_briefs:
                 st.info(f"ℹ️ {len(st.session_state.filtered_briefs)} brief(s) trouvé(s).")
             else:
