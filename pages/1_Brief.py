@@ -90,34 +90,42 @@ if "filtered_briefs" not in st.session_state:
 # ---------------- NAVIGATION PRINCIPALE ----------------
 st.title("🤖 TG-Hire IA - Brief")
 
-# Style CSS pour le menu de navigation
+# Style CSS pour le menu de navigation inspiré de votre exemple
 st.markdown("""
     <style>
     .nav-container {
         display: flex;
         justify-content: space-between;
-        background-color: #f0f2f6;
-        padding: 10px;
-        border-radius: 10px;
+        background-color: #2c3e50;
+        padding: 8px;
+        border-radius: 12px;
         margin-bottom: 20px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
     .nav-item {
-        padding: 10px 15px;
-        border-radius: 5px;
+        padding: 12px 20px;
+        border-radius: 8px;
         cursor: pointer;
         text-align: center;
         flex: 1;
-        margin: 0 5px;
-        font-weight: normal;
-        background-color: #e6e6e6;
+        margin: 0 4px;
+        font-weight: 500;
+        background-color: #34495e;
+        color: #ecf0f1;
+        transition: all 0.3s ease;
+        border: 2px solid transparent;
+        font-size: 14px;
     }
     .nav-item.active {
-        background-color: #4CAF50;
+        background-color: #3498db;
         color: white;
-        font-weight: bold;
+        font-weight: 600;
+        border-color: #2980b9;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
-    .nav-item:hover {
-        background-color: #d9d9d9;
+    .nav-item:hover:not(.active) {
+        background-color: #4a6b8a;
+        transform: translateY(-2px);
     }
     </style>
 """, unsafe_allow_html=True)
@@ -136,13 +144,14 @@ nav_html += '</div>'
 st.markdown(nav_html, unsafe_allow_html=True)
 
 # Gérer le changement d'onglet via paramètre URL
-query_params = st.experimental_get_query_params()
+query_params = st.query_params
 if "phase" in query_params:
     try:
-        phase_index = int(query_params["phase"][0])
+        phase_index = int(query_params.get("phase"))
         if 0 <= phase_index < len(phases):
             st.session_state.brief_phase = phases[phase_index]
-            st.experimental_set_query_params()
+            # Pour effacer les paramètres après utilisation
+            st.query_params.clear()
             st.rerun()
     except:
         pass
