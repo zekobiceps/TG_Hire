@@ -164,13 +164,6 @@ st.markdown("""
         padding: 8px 12px !important;
     }
     
-    /* Style pour les séparateurs */
-    .stHorizontalBlock > div {
-        border-bottom: 1px solid #424242;
-        padding-bottom: 1rem;
-        margin-bottom: 1rem;
-    }
-    
     /* Style général pour l'application */
     .stApp {
         background-color: #0E1117;
@@ -242,11 +235,14 @@ with tab1:
             st.text_input("Nom de l'affectation", key="affectation_nom")
         
         st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date())
+        
+        # Placeholder pour les messages d'erreur/confirmation
+        message_placeholder = st.empty()
 
         # --- SAUVEGARDE
         if st.button("💾 Sauvegarder le Brief", type="primary", use_container_width=True):
             if not all([st.session_state.poste_intitule, st.session_state.manager_nom, st.session_state.recruteur, st.session_state.date_brief]):
-                st.error("Veuillez remplir tous les champs obligatoires (*)")
+                message_placeholder.error("Veuillez remplir tous les champs obligatoires (*)")
             else:
                 brief_name = generate_automatic_brief_name()
                 if "saved_briefs" not in st.session_state:
@@ -267,7 +263,7 @@ with tab1:
                     "ksa_data": st.session_state.get("ksa_data", {})
                 }
                 save_briefs()
-                st.success(f"✅ Brief '{brief_name}' sauvegardé avec succès !")
+                message_placeholder.success(f"✅ Brief '{brief_name}' sauvegardé avec succès !")
                 st.session_state.current_brief_name = brief_name
 
     with col_side:
@@ -282,11 +278,17 @@ with tab1:
         with col2:
             recruteur = st.selectbox("Recruteur", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="search_recruteur")
             manager = st.text_input("Manager")
+        
+        # Nouvelle ligne pour Affectation et Nom de l'affectation
+        col_affect, col_nom_affect = st.columns(2)
+        with col_affect:
             affectation = st.selectbox("Affectation", ["", "Chantier", "Siège"], key="search_affectation")
+        with col_nom_affect:
+            nom_affectation = st.text_input("Nom de l'affectation", key="search_nom_affectation")
 
         if st.button("🔎 Rechercher", type="secondary", use_container_width=True):
             briefs = load_briefs()
-            st.session_state.filtered_briefs = filter_briefs(briefs, month, recruteur, poste, manager)
+            st.session_state.filtered_briefs = filter_briefs(briefs, month, recruteur, poste, manager, affectation, nom_affectation)
             if st.session_state.filtered_briefs:
                 st.info(f"ℹ️ {len(st.session_state.filtered_briefs)} brief(s) trouvé(s).")
             else:
