@@ -74,7 +74,12 @@ def render_ksa_section():
 
 # ---------------- INIT ----------------
 init_session_state()
-st.set_page_config(page_title="TG-Hire IA - Brief", page_icon="🤖", layout="wide")
+st.set_page_config(
+    page_title="TG-Hire IA - Brief",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
 if "brief_phase" not in st.session_state:
     st.session_state.brief_phase = "📁 Gestion"
@@ -85,99 +90,116 @@ if "reunion_step" not in st.session_state:
 if "filtered_briefs" not in st.session_state:
     st.session_state.filtered_briefs = {}
 
-# ---------------- NAVIGATION PRINCIPALE ----------------
-st.title("💡 Briefs") 
+# -------------------- Sidebar --------------------
+with st.sidebar:
+    st.title("📊 Statistiques Brief")
+    
+    # Calculer quelques statistiques
+    total_briefs = len(st.session_state.get("saved_briefs", {}))
+    completed_briefs = sum(1 for b in st.session_state.get("saved_briefs", {}).values() 
+                          if b.get("ksa_data") and any(b["ksa_data"].values()))
+    
+    st.metric("📋 Briefs créés", total_briefs)
+    st.metric("✅ Briefs complétés", completed_briefs)
+    
+    st.divider()
+    st.info("💡 Assistant IA pour la création et gestion de briefs de recrutement")
 
-# Définir les onglets avec leurs icônes et leurs labels
-onglets = {
-    "Gestion": "📁 Gestion", 
-    "Avant-brief": "🔄 Avant-brief",
-    "Réunion de brief": "✅ Réunion de brief",
-    "Synthèse": "📝 Synthèse"
-}
-
-# Style CSS pour le menu de navigation et les boutons
+# Style CSS pour uniformiser avec la page de sourcing
 st.markdown("""
     <style>
-    /* Cache les onglets par défaut de Streamlit */
-    .st-emotion-cache-16ya5a5 { 
-        display: none !important;
-    }
-
-    /* Conteneur principal des boutons de navigation pour le style de la ligne */
-    div[data-testid="stVerticalBlock"] > div:first-child > div[data-testid="stHorizontalBlock"] {
-        border-bottom: 3px solid #ff4b4b; /* Ligne rouge vif */
-        padding-bottom: 0px; 
-        margin-bottom: 0px; 
-    }
-
-    /* Conteneur des colonnes individuelles de navigation */
-    div[data-testid="stVerticalBlock"] > div:first-child > div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
-        flex-grow: 0 !important;
-        flex-shrink: 0 !important;
-        flex-basis: auto !important;
-        width: auto !important;
-        padding-left: 0px !important;
-        padding-right: 0px !important;
-        margin-right: 5px !important;
-    }
-
-    /* Styles généraux pour tous les boutons de navigation (non-actifs et actifs) */
-    .stButton > button {
-        background-color: #D20000 !important;
-        color: white !important;
-        border: none !important;
-        box-shadow: none !important;
-        font-size: 14px !important;
-        padding: 5px 10px !important;
-        border-radius: 0px !important;
-        white-space: nowrap;
-        margin: 0 !important;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 5px;
-        height: auto !important;
+    /* Style général */
+    .stApp {
+        background-color: #0E1117;
+        color: #FAFAFA;
     }
     
-    /* Style pour le bouton de navigation ACTIF */
-    .stButton > button.active-tab {
-        background-color: #ff4b4b !important;
-        color: white !important;
-        font-weight: bold !important;
-        border-bottom: 3px solid #ff4b4b !important;
-        margin-bottom: -3px !important;
+    /* Boutons principaux */
+    .stButton > button {
+        background-color: #FF4B4B;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 0.5rem 1rem;
+        font-weight: 500;
+    }
+    
+    .stButton > button:hover {
+        background-color: #FF6B6B;
+        color: white;
+    }
+    
+    /* Boutons secondaires */
+    .stButton > button[kind="secondary"] {
+        background-color: #262730;
+        color: #FAFAFA;
+        border: 1px solid #FF4B4B;
+    }
+    
+    .stButton > button[kind="secondary"]:hover {
+        background-color: #3D3D4D;
+        color: #FAFAFA;
+    }
+    
+    /* Onglets */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        height: 50px;
+        white-space: pre-wrap;
+        background-color: #262730;
+        border-radius: 5px 5px 0px 0px;
+        gap: 8px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        font-weight: 500;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: #FF4B4B;
+        color: white;
+    }
+    
+    /* Inputs */
+    .stTextInput > div > div > input {
+        background-color: #262730;
+        color: #FAFAFA;
+    }
+    
+    .stSelectbox > div > div {
+        background-color: #262730;
+        color: #FAFAFA;
+    }
+    
+    /* Expanders */
+    .streamlit-expanderHeader {
+        background-color: #262730;
+        color: #FAFAFA;
+        border-radius: 5px;
+        padding: 0.5rem;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# Créer les colonnes pour les boutons de navigation
-cols = st.columns(len(onglets)) 
-    
-for i, (key_label, full_label) in enumerate(onglets.items()):
-    with cols[i]:
-        is_active = (st.session_state.brief_phase == full_label)
-        
-        if st.button(full_label, key=f"tab_{key_label}", use_container_width=False):
-            st.session_state.brief_phase = full_label
-            st.rerun()
-        
-        if is_active:
-            st.markdown(f"""
-                <script>
-                var buttonElement = document.querySelector('[data-testid="stVerticalBlock"] > div:first-child > div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-child({i+1}) button');
-                if (buttonElement) {{
-                    buttonElement.classList.add("active-tab");
-                }}
-                </script>
-            """, unsafe_allow_html=True)
+# ---------------- NAVIGATION PRINCIPALE ----------------
+st.title("🤖 TG-Hire IA - Brief")
+
+# Utilisation d'onglets comme dans la page sourcing
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📁 Gestion", 
+    "🔄 Avant-brief", 
+    "✅ Réunion de brief", 
+    "📝 Synthèse"
+])
 
 # ---------------- ONGLET GESTION ----------------
-if st.session_state.brief_phase == "📁 Gestion":
+with tab1:
     col_main, col_side = st.columns([2, 1])
     
     with col_main:
-        st.subheader("Informations de base")
+        st.header("Informations de base")
         
         # --- INFOS DE BASE (3 colonnes)
         col1, col2, col3 = st.columns(3)
@@ -186,12 +208,12 @@ if st.session_state.brief_phase == "📁 Gestion":
             st.text_input("Nom du manager *", key="manager_nom")
         with col2:
             st.text_input("Poste à recruter", key="niveau_hierarchique")
-            st.selectbox("Recruteur *", ["", "Zakaria", "Sara", "Sara", "Jalal", "Bouchra", "Ghita"], key="recruteur")
+            st.selectbox("Recruteur *", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="recruteur")
         with col3:
             st.selectbox("Affectation", ["", "Chantier", "Siège"], key="affectation_type")
             st.text_input("Nom de l'affectation", key="affectation_nom")
         
-        st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date()) 
+        st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date())
 
         # --- SAUVEGARDE
         if st.button("💾 Sauvegarder le Brief", type="primary", use_container_width=True):
@@ -221,7 +243,7 @@ if st.session_state.brief_phase == "📁 Gestion":
                 st.session_state.current_brief_name = brief_name
 
     with col_side:
-        st.subheader("Recherche & Chargement")
+        st.header("Recherche & Chargement")
         
         # --- RECHERCHE & CHARGEMENT (2 colonnes)
         col1, col2 = st.columns(2)
@@ -275,8 +297,8 @@ if st.session_state.brief_phase == "📁 Gestion":
                                 st.rerun()
 
 # ---------------- AVANT-BRIEF ----------------
-elif st.session_state.brief_phase == "🔄 Avant-brief":
-    st.subheader("🔄 Avant-brief (Préparation)")
+with tab2:
+    st.header("🔄 Avant-brief (Préparation)")
     st.info("Remplissez les informations préparatoires avant la réunion avec le manager.")
 
     conseil_button("Raison ouverture", "Contexte", "Pourquoi ce poste est-il ouvert?", key="raison_ouverture")
@@ -299,8 +321,8 @@ elif st.session_state.brief_phase == "🔄 Avant-brief":
             st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
 
 # ---------------- RÉUNION (Wizard interne) ----------------
-elif st.session_state.brief_phase == "✅ Réunion de brief":
-    st.subheader("✅ Réunion de brief avec le Manager")
+with tab3:
+    st.header("✅ Réunion de brief avec le Manager")
 
     total_steps = 4
     step = st.session_state.reunion_step
@@ -356,8 +378,8 @@ elif st.session_state.brief_phase == "✅ Réunion de brief":
                 st.rerun()
 
 # ---------------- SYNTHÈSE ----------------
-elif st.session_state.brief_phase == "📝 Synthèse":
-    st.subheader("📝 Synthèse du Brief")
+with tab4:
+    st.header("📝 Synthèse du Brief")
     
     if "current_brief_name" in st.session_state:
         st.success(f"Brief actuel: {st.session_state.current_brief_name}")
