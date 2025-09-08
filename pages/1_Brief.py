@@ -446,6 +446,70 @@ with tab2:
     
     st.info("Remplissez les informations préparatoires avant la réunion avec le manager.")
 
+    # Organisation structurée sous forme de tableau
+    with st.expander("📋 Organisation structurée du poste", expanded=True):
+        st.markdown("""
+        <table class="comparison-table">
+            <tr>
+                <th>Section</th>
+                <th>Détails à compléter</th>
+            </tr>
+            <tr>
+                <td><strong>1️⃣ Contexte du poste</strong></td>
+                <td>
+                    <strong>1.1 Raison de l'ouverture:</strong> Remplacement / Création / Évolution interne<br>
+                    <strong>1.2 Mission globale:</strong> Résumé du rôle et objectif principal<br>
+                    <strong>1.3 Défis principaux:</strong> Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget
+                </td>
+            </tr>
+            <tr>
+                <td><strong>2️⃣ Organisation et hiérarchie</strong></td>
+                <td>
+                    <strong>2.1 Rattachement hiérarchique:</strong> Responsable direct, département / service<br>
+                    <strong>2.2 Équipe:</strong> Taille, rôle des collaborateurs, interaction avec autres services
+                </td>
+            </tr>
+            <tr>
+                <td><strong>3️⃣ Profil recherché</strong></td>
+                <td>
+                    <strong>3.1 Expérience:</strong> Nombre d'années minimum, expériences similaires dans le secteur<br>
+                    <strong>3.2 Connaissances / Diplômes / Certifications:</strong> Diplômes exigés, certifications spécifiques<br>
+                    <strong>3.3 Compétences / Outils:</strong> Techniques, logiciels, méthodes à maîtriser<br>
+                    <strong>3.4 Soft skills / aptitudes comportementales:</strong> Leadership, rigueur, communication, autonomie
+                </td>
+            </tr>
+            <tr>
+                <td><strong>4️⃣ Sourcing et marché</strong></td>
+                <td>
+                    <strong>4.1 Entreprises où trouver ce profil:</strong> Concurrents, secteurs similaires<br>
+                    <strong>4.2 Synonymes / intitulés proches:</strong> Titres alternatifs pour affiner le sourcing<br>
+                    <strong>4.3 Canaux à utiliser:</strong> LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels
+                </td>
+            </tr>
+            <tr>
+                <td><strong>5️⃣ Conditions et contraintes</strong></td>
+                <td>
+                    <strong>5.1 Localisation:</strong> Site principal, télétravail, déplacements<br>
+                    <strong>5.2 Budget recrutement:</strong> Salaire indicatif, avantages, primes éventuelles
+                </td>
+            </tr>
+            <tr>
+                <td><strong>6️⃣ Missions / Tâches</strong></td>
+                <td>
+                    <strong>6.1 Tâches principales:</strong> 4-6 missions détaillées<br>
+                    <strong>6.2 Autres responsabilités:</strong> Points additionnels ou spécifiques à préciser
+                </td>
+            </tr>
+            <tr>
+                <td><strong>7️⃣ Notes libres</strong></td>
+                <td>
+                    <strong>7.1 Points à discuter ou à clarifier avec le manager</strong><br>
+                    <strong>7.2 Case libre:</strong> Pour tout point additionnel ou remarque spécifique
+                </td>
+            </tr>
+        </table>
+        """, unsafe_allow_html=True)
+
     # Méthode rapide (15-30 min) - Jeu des 7 différences
     with st.expander("⚡️ Méthode rapide (15-30 min) - Jeu des 7 différences"):
         st.markdown("""
@@ -535,33 +599,64 @@ with tab2:
     col1, col2 = st.columns(2)
     
     with col1:
-        st.text_area("Raison ouverture", key="raison_ouverture", height=100)
-        st.text_area("Impact stratégique", key="impact_strategique", height=100)
-        st.text_area("Rattachement hiérarchique", key="rattachement", height=100)
-        st.text_area("Défis principaux", key="defis_principaux", height=100)
+        st.text_area("1.1 Raison ouverture", key="raison_ouverture", height=100)
+        st.text_area("1.2 Mission globale", key="mission_globale", height=100)
+        st.text_area("1.3 Défis principaux", key="defis_principaux", height=100)
+        st.text_area("2.1 Rattachement hiérarchique", key="rattachement", height=100)
+        st.text_area("2.2 Équipe", key="equipe_description", height=100)
     
     with col2:
-        st.text_area("Entreprises où trouver ce profil", key="entreprises_profil", height=100)
-        st.text_area("Canaux à utiliser", key="canaux_profil", height=100)
-        st.text_area("Synonymes de postes", key="synonymes_poste", height=100)
-        st.text_input("Budget", key="budget")
+        st.text_area("4.1 Entreprises où trouver ce profil", key="entreprises_profil", height=100)
+        st.text_area("4.2 Synonymes de postes", key="synonymes_poste", height=100)
+        st.text_area("4.3 Canaux à utiliser", key="canaux_profil", height=100)
+        st.text_area("5.1 Localisation", key="localisation", height=100)
+        st.text_input("5.2 Budget recrutement", key="budget")
     
-    # Commentaires libres en bas
-    st.text_area("Commentaires libres", key="commentaires", height=100)
+    # Section 3: Profil recherché
+    st.subheader("3️⃣ Profil recherché")
+    col3_1, col3_2 = st.columns(2)
+    with col3_1:
+        st.text_area("3.1 Expérience", key="experience_requise", height=100)
+        st.text_area("3.2 Connaissances/Diplômes/Certifications", key="diplomes_certifications", height=100)
+    with col3_2:
+        st.text_area("3.3 Compétences/Outils", key="competences_outils", height=100)
+        st.text_area("3.4 Soft skills/aptitudes comportementales", key="soft_skills", height=100)
+    
+    # Section 6: Missions/Tâches
+    st.subheader("6️⃣ Missions / Tâches")
+    col6_1, col6_2 = st.columns(2)
+    with col6_1:
+        st.text_area("6.1 Tâches principales (4-6)", key="taches_principales", height=150)
+    with col6_2:
+        st.text_area("6.2 Autres responsabilités", key="autres_responsabilites", height=150)
+    
+    # Section 7: Notes libres
+    st.subheader("7️⃣ Notes libres")
+    st.text_area("7.1 Points à discuter avec le manager", key="points_a_discuter", height=100)
+    st.text_area("7.2 Case libre", key="notes_libres", height=100)
 
     if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True):
         if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
             brief_name = st.session_state.current_brief_name
             st.session_state.saved_briefs[brief_name].update({
                 "raison_ouverture": st.session_state.get("raison_ouverture", ""),
-                "impact_strategique": st.session_state.get("impact_strategique", ""),
-                "rattachement": st.session_state.get("rattachement", ""),
+                "mission_globale": st.session_state.get("mission_globale", ""),
                 "defis_principaux": st.session_state.get("defis_principaux", ""),
+                "rattachement": st.session_state.get("rattachement", ""),
+                "equipe_description": st.session_state.get("equipe_description", ""),
+                "experience_requise": st.session_state.get("experience_requise", ""),
+                "diplomes_certifications": st.session_state.get("diplomes_certifications", ""),
+                "competences_outils": st.session_state.get("competences_outils", ""),
+                "soft_skills": st.session_state.get("soft_skills", ""),
                 "entreprises_profil": st.session_state.get("entreprises_profil", ""),
-                "canaux_profil": st.session_state.get("canaux_profil", ""),
                 "synonymes_poste": st.session_state.get("synonymes_poste", ""),
+                "canaux_profil": st.session_state.get("canaux_profil", ""),
+                "localisation": st.session_state.get("localisation", ""),
                 "budget": st.session_state.get("budget", ""),
-                "commentaires": st.session_state.get("commentaires", ""),
+                "taches_principales": st.session_state.get("taches_principales", ""),
+                "autres_responsabilites": st.session_state.get("autres_responsabilites", ""),
+                "points_a_discuter": st.session_state.get("points_a_discuter", ""),
+                "notes_libres": st.session_state.get("notes_libres", ""),
                 "verif_intitule": st.session_state.get("verif_intitule", ""),
                 "verif_criteres": st.session_state.get("verif_criteres", ""),
                 "questions_discussion": st.session_state.get("questions_discussion", "")
