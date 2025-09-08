@@ -447,171 +447,141 @@ with tab2:
     st.info("Remplissez les informations préparatoires avant la réunion avec le manager.")
 
     # Organisation structurée sous forme de tableau
-    with st.expander("📋 Organisation structurée du poste", expanded=True):
-        st.markdown("""
-        <style>
-        .custom-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .custom-table th, .custom-table td {
-            border: 1px solid #424242;
-            padding: 8px;
-            text-align: left;
-        }
-        .custom-table th {
-            background-color: #262730;
-            font-weight: bold;
-        }
-        .section-col {
-            width: 20%;
-        }
-        .details-col {
-            width: 40%;
-        }
-        .info-col {
-            width: 40%;
-        }
-        .info-textarea {
-            width: 100%;
-            height: 120px;
-            background-color: #262730;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 8px;
-        }
-        </style>
-        
-        <table class="custom-table">
-            <tr>
-                <th class="section-col">Section</th>
-                <th class="details-col">Détails</th>
-                <th class="info-col">Infos de départ</th>
-            </tr>
-            <tr>
-                <td><strong>Contexte du poste</strong></td>
-                <td>
-                    Raison de l'ouverture: Remplacement / Création / Évolution interne<br><br>
-                    Mission globale: Résumé du rôle et objectif principal<br><br>
-                    Défis principaux: Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget
-                </td>
-                <td>
-                    <textarea class="info-textarea" placeholder="Raison de l'ouverture..." 
-                              onfocus="if(this.value==''){this.value='Raison de l\\'ouverture: '}" 
-                              onblur="if(this.value=='Raison de l\\'ouverture: '){this.value=''}"></textarea>
-                    <textarea class="info-textarea" placeholder="Mission globale..." 
-                              onfocus="if(this.value==''){this.value='Mission globale: '}" 
-                              onblur="if(this.value=='Mission globale: '){this.value=''}"></textarea>
-                    <textarea class="info-textarea" placeholder="Défis principaux..." 
-                              onfocus="if(this.value==''){this.value='Défis principaux: '}" 
-                              onblur="if(this.value=='Défis principaux: '){this.value=''}"></textarea>
-                </td>
-            </tr>
-            <tr>
-                <td><strong>Organisation et hiérarchie</strong></td>
-                <td>
-                    Rattachement hiérarchique: Responsable direct, département / service<br><br>
-                    Équipe: Taille, rôle des collaborateurs, interaction avec autres services
-                </td>
-                <td>
-                    <textarea class="info-textarea" placeholder="Rattachement hiérarchique..." 
-                              onfocus="if(this.value==''){this.value='Rattachement hiérarchique: '}" 
-                              onblur="if(this.value=='Rattachement hiérarchique: '){this.value=''}"></textarea>
-                    <textarea class="info-textarea" placeholder="Équipe..." 
-                              onfocus="if(this.value==''){this.value='Équipe: '}" 
-                              onblur="if(this.value=='Équipe: '){this.value=''}"></textarea>
-                </td>
-            </tr>
-            <tr>
-                <td><strong>Profil recherché</strong></td>
-                <td>
-                    Expérience: Nombre d'années minimum, expériences similaires dans le secteur<br><br>
-                    Connaissances / Diplômes / Certifications: Diplômes exigés, certifications spécifiques<br><br>
-                    Compétences / Outils: Techniques, logiciels, méthodes à maîtriser<br><br>
-                    Soft skills / aptitudes comportementales: Leadership, rigueur, communication, autonomie
-                </td>
-                <td>
-                    <textarea class="info-textarea" placeholder="Expérience..." 
-                              onfocus="if(this.value==''){this.value='Expérience: '}" 
-                              onblur="if(this.value=='Expérience: '){this.value=''}"></textarea>
-                    <textarea class="info-textarea" placeholder="Connaissances/Diplômes/Certifications..." 
-                              onfocus="if(this.value==''){this.value='Connaissances/Diplômes/Certifications: '}" 
-                              onblur="if(this.value=='Connaissances/Diplômes/Certifications: '){this.value=''}"></textarea>
-                    <textarea class="info-textarea" placeholder="Compétences/Outils..." 
-                              onfocus="if(this.value==''){this.value='Compétences/Outils: '}" 
-                              onblur="if(this.value=='Compétences/Outils: '){this.value=''}"></textarea>
-                    <textarea class="info-textarea" placeholder="Soft skills..." 
-                              onfocus="if(this.value==''){this.value='Soft skills: '}" 
-                              onblur="if(this.value=='Soft skills: '){this.value=''}"></textarea>
-                </td>
-            </tr>
-            <tr>
-                <td><strong>Sourcing et marché</strong></td>
-                <td>
-                    Entreprises où trouver ce profil: Concurrents, secteurs similaires<br><br>
-                    Synonymes / intitulés proches: Titres alternatifs pour affiner le sourcing<br><br>
-                    Canaux à utiliser: LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels
-                </td>
-                <td>
-                    <textarea class="info-textarea" placeholder="Entreprises où trouver ce profil..." 
-                              onfocus="if(this.value==''){this.value='Entreprises où trouver ce profil: '}" 
-                              onblur="if(this.value=='Entreprises où trouver ce profil: '){this.value=''}"></textarea>
-                    <textarea class="info-textarea" placeholder="Synonymes de postes..." 
-                              onfocus="if(this.value==''){this.value='Synonymes de postes: '}" 
-                              onblur="if(this.value=='Synonymes de postes: '){this.value=''}"></textarea>
-                    <textarea class="info-textarea" placeholder="Canaux à utiliser..." 
-                              onfocus="if(this.value==''){this.value='Canaux à utiliser: '}" 
-                              onblur="if(this.value=='Canaux à utiliser: '){this.value=''}"></textarea>
-                </td>
-            </tr>
-            <tr>
-                <td><strong>Conditions et contraintes</strong></td>
-                <td>
-                    Localisation: Site principal, télétravail, déplacements<br><br>
-                    Budget recrutement: Salaire indicatif, avantages, primes éventuelles
-                </td>
-                <td>
-                    <textarea class="info-textarea" placeholder="Localisation..." 
-                              onfocus="if(this.value==''){this.value='Localisation: '}" 
-                              onblur="if(this.value=='Localisation: '){this.value=''}"></textarea>
-                    <textarea class="info-textarea" placeholder="Budget recrutement..." 
-                              onfocus="if(this.value==''){this.value='Budget recrutement: '}" 
-                              onblur="if(this.value=='Budget recrutement: '){this.value=''}"></textarea>
-                </td>
-            </tr>
-            <tr>
-                <td><strong>Missions / Tâches</strong></td>
-                <td>
-                    Tâches principales: 4-6 missions détaillées<br><br>
-                    Autres responsabilités: Points additionnels ou spécifiques à préciser
-                </td>
-                <td>
-                    <textarea class="info-textarea" placeholder="Tâches principales..." 
-                              onfocus="if(this.value==''){this.value='Tâches principales: '}" 
-                              onblur="if(this.value=='Tâches principales: '){this.value=''}"></textarea>
-                    <textarea class="info-textarea" placeholder="Autres responsabilités..." 
-                              onfocus="if(this.value==''){this.value='Autres responsabilités: '}" 
-                              onblur="if(this.value=='Autres responsabilités: '){this.value=''}"></textarea>
-                </td>
-            </tr>
-            <tr>
-                <td><strong>Notes libres</strong></td>
-                <td>
-                    Points à discuter ou à clarifier avec le manager<br><br>
-                    Case libre: Pour tout point additionnel ou remarque spécifique
-                </td>
-                <td>
-                    <textarea class="info-textarea" placeholder="Points à discuter..." 
-                              onfocus="if(this.value==''){this.value='Points à discuter: '}" 
-                              onblur="if(this.value=='Points à discuter: '){this.value=''}"></textarea>
-                    <textarea class="info-textarea" placeholder="Case libre..." 
-                              onfocus="if(this.value==''){this.value='Case libre: '}" 
-                              onblur="if(this.value=='Case libre: '){this.value=''}"></textarea>
-                </td>
-            </tr>
-        </table>
-        """, unsafe_allow_html=True)
+    st.markdown("""
+    <style>
+    .custom-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+    }
+    .custom-table th, .custom-table td {
+        border: 1px solid #424242;
+        padding: 8px;
+        text-align: left;
+        vertical-align: top;
+    }
+    .custom-table th {
+        background-color: #262730;
+        font-weight: bold;
+    }
+    .section-col {
+        width: 20%;
+    }
+    .details-col {
+        width: 40%;
+    }
+    .info-col {
+        width: 40%;
+    }
+    .info-textarea {
+        width: 100%;
+        height: 80px;
+        background-color: #262730;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 8px;
+        margin-bottom: 10px;
+    }
+    .detail-row {
+        margin-bottom: 15px;
+    }
+    </style>
+    
+    <table class="custom-table">
+        <tr>
+            <th class="section-col">Section</th>
+            <th class="details-col">Détails</th>
+            <th class="info-col">Infos de départ</th>
+        </tr>
+        <!-- Contexte du poste -->
+        <tr>
+            <td rowspan="3"><strong>Contexte du poste</strong></td>
+            <td class="detail-row">Raison de l'ouverture</td>
+            <td><textarea class="info-textarea" placeholder="Remplacement / Création / Évolution interne"></textarea></td>
+        </tr>
+        <tr>
+            <td class="detail-row">Mission globale</td>
+            <td><textarea class="info-textarea" placeholder="Résumé du rôle et objectif principal"></textarea></td>
+        </tr>
+        <tr>
+            <td class="detail-row">Défis principaux</td>
+            <td><textarea class="info-textarea" placeholder="Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"></textarea></td>
+        </tr>
+        <!-- Organisation et hiérarchie -->
+        <tr>
+            <td rowspan="2"><strong>Organisation et hiérarchie</strong></td>
+            <td class="detail-row">Rattachement hiérarchique</td>
+            <td><textarea class="info-textarea" placeholder="Responsable direct, département / service"></textarea></td>
+        </tr>
+        <tr>
+            <td class="detail-row">Équipe</td>
+            <td><textarea class="info-textarea" placeholder="Taille, rôle des collaborateurs, interaction avec autres services"></textarea></td>
+        </tr>
+        <!-- Profil recherché -->
+        <tr>
+            <td rowspan="4"><strong>Profil recherché</strong></td>
+            <td class="detail-row">Expérience</td>
+            <td><textarea class="info-textarea" placeholder="Nombre d'années minimum, expériences similaires dans le secteur"></textarea></td>
+        </tr>
+        <tr>
+            <td class="detail-row">Connaissances / Diplômes / Certifications</td>
+            <td><textarea class="info-textarea" placeholder="Diplômes exigés, certifications spécifiques"></textarea></td>
+        </tr>
+        <tr>
+            <td class="detail-row">Compétences / Outils</td>
+            <td><textarea class="info-textarea" placeholder="Techniques, logiciels, méthodes à maîtriser"></textarea></td>
+        </tr>
+        <tr>
+            <td class="detail-row">Soft skills / aptitudes comportementales</td>
+            <td><textarea class="info-textarea" placeholder="Leadership, rigueur, communication, autonomie"></textarea></td>
+        </tr>
+        <!-- Sourcing et marché -->
+        <tr>
+            <td rowspan="3"><strong>Sourcing et marché</strong></td>
+            <td class="detail-row">Entreprises où trouver ce profil</td>
+            <td><textarea class="info-textarea" placeholder="Concurrents, secteurs similaires"></textarea></td>
+        </tr>
+        <tr>
+            <td class="detail-row">Synonymes / intitulés proches</td>
+            <td><textarea class="info-textarea" placeholder="Titres alternatifs pour affiner le sourcing"></textarea></td>
+        </tr>
+        <tr>
+            <td class="detail-row">Canaux à utiliser</td>
+            <td><textarea class="info-textarea" placeholder="LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"></textarea></td>
+        </tr>
+        <!-- Conditions et contraintes -->
+        <tr>
+            <td rowspan="2"><strong>Conditions et contraintes</strong></td>
+            <td class="detail-row">Localisation</td>
+            <td><textarea class="info-textarea" placeholder="Site principal, télétravail, déplacements"></textarea></td>
+        </tr>
+        <tr>
+            <td class="detail-row">Budget recrutement</td>
+            <td><textarea class="info-textarea" placeholder="Salaire indicatif, avantages, primes éventuelles"></textarea></td>
+        </tr>
+        <!-- Missions / Tâches -->
+        <tr>
+            <td rowspan="2"><strong>Missions / Tâches</strong></td>
+            <td class="detail-row">Tâches principales</td>
+            <td><textarea class="info-textarea" placeholder="4-6 missions détaillées"></textarea></td>
+        </tr>
+        <tr>
+            <td class="detail-row">Autres responsabilités</td>
+            <td><textarea class="info-textarea" placeholder="Points additionnels ou spécifiques à préciser"></textarea></td>
+        </tr>
+        <!-- Notes libres -->
+        <tr>
+            <td rowspan="2"><strong>Notes libres</strong></td>
+            <td class="detail-row">Points à discuter ou à clarifier avec le manager</td>
+            <td><textarea class="info-textarea" placeholder="Points à discuter ou à clarifier"></textarea></td>
+        </tr>
+        <tr>
+            <td class="detail-row">Case libre</td>
+            <td><textarea class="info-textarea" placeholder="Pour tout point additionnel ou remarque spécifique"></textarea></td>
+        </tr>
+    </table>
+    """, unsafe_allow_html=True)
 
     if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True):
         if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
