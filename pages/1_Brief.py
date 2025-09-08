@@ -265,31 +265,29 @@ with tab1:
     
     with col_main:
         # Nouvelle disposition pour le type de création
+        st.subheader("Informations de base")
+        
+        # Type de création et bouton sauvegarde sur la même ligne
         col_type, col_btn = st.columns([2, 1])
         with col_type:
             creation_type = st.radio("Type de création", ["Créer un brief", "Créer un canevas"], horizontal=True)
-        
-        st.subheader("Informations de base")
         
         # --- INFOS DE BASE (3 colonnes avec réorganisation)
         col1, col2, col3 = st.columns(3)
         with col1:
             st.text_input("Nom du manager *", key="manager_nom")
-            # Nom de l'affectation déplacé ici
             st.text_input("Nom de l'affectation", key="affectation_nom")
         with col2:
             st.text_input("Poste à recruter *", key="niveau_hierarchique")
             st.selectbox("Recruteur *", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="recruteur")
-            # Affectation déplacée ici
-            st.selectbox("Affectation", ["", "Chantier", "Siège"], key="affectation_type")
         with col3:
-            # Date du Brief déplacée ici
             st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date())
+            st.selectbox("Affectation", ["", "Chantier", "Siège"], key="affectation_type")
         
         # Placeholder pour les messages d'erreur/confirmation
         message_placeholder = st.empty()
 
-        # --- SAUVEGARDE
+        # --- SAUVEGARDE (bouton en bas)
         with col_btn:
             if st.button("💾 Sauvegarder le Brief", type="primary", use_container_width=True):
                 # Utiliser niveau_hierarchique comme intitulé du poste
@@ -403,10 +401,13 @@ with tab1:
             st.subheader("Résultats de recherche")
             for name, data in st.session_state.filtered_briefs.items():
                 with st.expander(f"📌 {name}"):
+                    # Modification de l'affichage du type
+                    display_type = "Canevas" if data.get("creation_type") == "Créer un canevas" else "Brief"
+                    
                     st.write(f"**Poste:** {data.get('poste_intitule', '')}")
                     st.write(f"**Manager:** {data.get('manager_nom', '')}")
                     st.write(f"**Recruteur:** {data.get('recruteur', '')}")
-                    st.write(f"**Type:** {data.get('creation_type', 'Brief')}")
+                    st.write(f"**Type:** {display_type}")
                     st.write(f"**Affectation:** {data.get('affectation_type', '')} - {data.get('affectation_nom', '')}")
                     st.write(f"**Date:** {data.get('date_brief', '')}")
                     
@@ -432,7 +433,7 @@ with tab1:
                                 if "ksa_data" in data:
                                     st.session_state.ksa_data = data["ksa_data"]
                                 
-                                st.success(f"✅ {data.get('creation_type', 'Brief')} '{name}' chargé avec succès!")
+                                st.success(f"✅ {display_type} '{name}' chargé avec succès!")
                                 st.rerun()
                             
                             except Exception as e:
@@ -446,7 +447,7 @@ with tab1:
                                 save_briefs()
                                 if name in st.session_state.filtered_briefs:
                                     del st.session_state.filtered_briefs[name]
-                                st.warning(f"❌ {data.get('creation_type', 'Brief')} '{name}' supprimé.")
+                                st.warning(f"❌ {display_type} '{name}' supprimé.")
                                 st.rerun()
 
 # ---------------- AVANT-BRIEF ----------------
