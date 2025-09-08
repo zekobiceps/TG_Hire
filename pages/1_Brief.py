@@ -397,67 +397,66 @@ with tab1:
             else:
                 st.error("❌ Aucun brief trouvé avec ces critères.")
 
-        if st.session_state.filtered_briefs:
-            st.subheader("Résultats de recherche")
-            for name, data in st.session_state.filtered_briefs.items():
-                with st.expander(f"📌 {name}"):
-                    # Modification de l'affichage du type
-                    display_type = "Canevas" if data.get("creation_type") == "Créer un canevas" else "Brief"
+        # Dans la section d'affichage des résultats
+if st.session_state.filtered_briefs:
+    st.subheader("Résultats de recherche")
+    for name, data in st.session_state.filtered_briefs.items():
+        with st.expander(f"📌 {name}"):
+            # Modification de l'affichage du type
+            display_type = "Canevas" if data.get("creation_type") == "Créer un canevas" else "Brief"
+            
+            # Affichage en 2 colonnes
+            col_info1, col_info2 = st.columns(2)
+            
+            with col_info1:
+                st.write(f"**Poste:** {data.get('poste_intitule', '')}")
+                st.write(f"**Manager:** {data.get('manager_nom', '')}")
+                st.write(f"**Recruteur:** {data.get('recruteur', '')}")
+            
+            with col_info2:
+                st.write(f"**Type:** {display_type}")
+                st.write(f"**Affectation:** {data.get('affectation_type', '')} - {data.get('affectation_nom', '')}")
+                st.write(f"**Date:** {data.get('date_brief', '')}")
+            
+            # Boutons Charger et Supprimer
+            colA, colB = st.columns(2)
+            with colA:
+                if st.button(f"📂 Charger", key=f"load_{name}"):
+                    try:
+                        # Stocker les données sans modifier directement les widgets
+                        st.session_state.current_brief_data = data
+                        st.session_state.current_brief_name = name
+                        st.session_state.brief_created = True
+                        
+                        # Mettre à jour les champs non-widgets
+                        non_widget_keys = ["raison_ouverture", "impact_strategique", "rattachement", 
+                                          "defis_principaux", "entreprises_profil", "canaux_profil",
+                                          "synonymes_poste", "budget", "commentaires"]
+                        
+                        for key in non_widget_keys:
+                            if key in data:
+                                st.session_state[key] = data[key]
+                        
+                        # Gestion spéciale pour les données KSA
+                        if "ksa_data" in data:
+                            st.session_state.ksa_data = data["ksa_data"]
+                        
+                        st.success(f"✅ {display_type} '{name}' chargé avec succès!")
+                        st.rerun()
                     
-                    # Affichage en 3 colonnes
-                    col_info1, col_info2, col_info3 = st.columns(3)
-                    
-                    with col_info1:
-                        st.write(f"**Poste:** {data.get('poste_intitule', '')}")
-                        st.write(f"**Manager:** {data.get('manager_nom', '')}")
-                    
-                    with col_info2:
-                        st.write(f"**Recruteur:** {data.get('recruteur', '')}")
-                        st.write(f"**Type:** {display_type}")
-                    
-                    with col_info3:
-                        st.write(f"**Affectation:** {data.get('affectation_type', '')} - {data.get('affectation_nom', '')}")
-                        st.write(f"**Date:** {data.get('date_brief', '')}")
-                    
-                    # Boutons Charger et Supprimer
-                    colA, colB = st.columns(2)
-                    with colA:
-                        if st.button(f"📂 Charger", key=f"load_{name}"):
-                            try:
-                                # Stocker les données sans modifier directement les widgets
-                                st.session_state.current_brief_data = data
-                                st.session_state.current_brief_name = name
-                                st.session_state.brief_created = True
-                                
-                                # Mettre à jour les champs non-widgets
-                                non_widget_keys = ["raison_ouverture", "impact_strategique", "rattachement", 
-                                                  "defis_principaux", "entreprises_profil", "canaux_profil",
-                                                  "synonymes_poste", "budget", "commentaires"]
-                                
-                                for key in non_widget_keys:
-                                    if key in data:
-                                        st.session_state[key] = data[key]
-                                
-                                # Gestion spéciale pour les données KSA
-                                if "ksa_data" in data:
-                                    st.session_state.ksa_data = data["ksa_data"]
-                                
-                                st.success(f"✅ {display_type} '{name}' chargé avec succès!")
-                                st.rerun()
-                            
-                            except Exception as e:
-                                st.error(f"❌ Erreur lors du chargement: {str(e)}")
-                    with colB:
-                        if st.button(f"🗑️ Supprimer", key=f"del_{name}"):
-                            all_briefs = load_briefs()
-                            if name in all_briefs:
-                                del all_briefs[name]
-                                st.session_state.saved_briefs = all_briefs
-                                save_briefs()
-                                if name in st.session_state.filtered_briefs:
-                                    del st.session_state.filtered_briefs[name]
-                                st.warning(f"❌ {display_type} '{name}' supprimé.")
-                                st.rerun()
+                    except Exception as e:
+                        st.error(f"❌ Erreur lors du chargement: {str(e)}")
+            with colB:
+                if st.button(f"🗑️ Supprimer", key=f"del_{name}"):
+                    all_briefs = load_briefs()
+                    if name in all_briefs:
+                        del all_briefs[name]
+                        st.session_state.saved_briefs = all_briefs
+                        save_briefs()
+                        if name in st.session_state.filtered_briefs:
+                            del st.session_state.filtered_briefs[name]
+                        st.warning(f"❌ {display_type} '{name}' supprimé.")
+                        st.rerun()
 
 # ---------------- AVANT-BRIEF ----------------
 with tab2:
