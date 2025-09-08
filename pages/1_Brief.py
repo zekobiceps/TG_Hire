@@ -608,7 +608,7 @@ with tab3:
         st.subheader("1️⃣ Incidents Critiques")
         st.text_area("Réussite exceptionnelle - Contexte", key="reussite_contexte", height=100)
         st.text_area("Réussite exceptionnelle - Actions", key="reussite_actions", height=100)
-        st.text_area("Réussite exceptionnelle - Résultat", key"reussite_resultat", height=100)
+        st.text_area("Réussite exceptionnelle - Résultat", key="reussite_resultat", height=100)
         st.text_area("Échec significatif - Contexte", key="echec_contexte", height=100)
         st.text_area("Échec significatif - Causes", key="echec_causes", height=100)
         st.text_area("Échec significatif - Impact", key="echec_impact", height=100)
