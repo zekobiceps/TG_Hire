@@ -328,135 +328,135 @@ with tab1:
                 st.session_state.current_brief_name = brief_name
                 st.session_state.brief_created = True
 
-    with col_side:
-        st.subheader("Recherche & Chargement")
-        
-        # --- RECHERCHE & CHARGEMENT (2 colonnes)
-        col1, col2 = st.columns(2)
-        with col1:
-            months = ["", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
-            month = st.selectbox("Mois", months)
-            poste = st.text_input("Poste")
-        with col2:
-            recruteur = st.selectbox("Recruteur", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="search_recruteur")
-            manager = st.text_input("Manager")
-        
-        # Nouvelle ligne pour Affectation et Nom de l'affectation
-        col_affect, col_nom_affect = st.columns(2)
-        with col_affect:
-            affectation = st.selectbox("Affectation", ["", "Chantier", "Siège"], key="search_affectation")
-        with col_nom_affect:
-            nom_affectation = st.text_input("Nom de l'affectation", key="search_nom_affectation")
-        
-        # Nouveau filtre pour le type de création
-        type_recherche = st.selectbox("Type", ["", "Brief", "Canevas"], key="search_type")
+with col_side:
+    st.subheader("Recherche & Chargement")
+    
+    # --- RECHERCHE & CHARGEMENT (2 colonnes)
+    col1, col2 = st.columns(2)
+    with col1:
+        months = ["", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
+        month = st.selectbox("Mois", months)
+        poste = st.text_input("Poste")
+    with col2:
+        recruteur = st.selectbox("Recruteur", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="search_recruteur")
+        manager = st.text_input("Manager")
+    
+    # Nouvelle ligne pour Affectation et Nom de l'affectation
+    col_affect, col_nom_affect = st.columns(2)
+    with col_affect:
+        affectation = st.selectbox("Affectation", ["", "Chantier", "Siège"], key="search_affectation")
+    with col_nom_affect:
+        nom_affectation = st.text_input("Nom de l'affectation", key="search_nom_affectation")
+    
+    # Nouveau filtre pour le type de création
+    type_recherche = st.selectbox("Type", ["", "Brief", "Canevas"], key="search_type")
 
-        if st.button("🔎 Rechercher", type="secondary", use_container_width=True):
-            briefs = load_briefs()
-            # Modification ici pour gérer les nouveaux paramètres de filtrage
-            st.session_state.filtered_briefs = {}
+    if st.button("🔎 Rechercher", type="secondary", use_container_width=True):
+        briefs = load_briefs()
+        # Modification ici pour gérer les nouveaux paramètres de filtrage
+        st.session_state.filtered_briefs = {}
+        
+        for name, data in briefs.items():
+            # Filtrage par mois
+            if month and month != "":
+                brief_date = data.get("date_brief", "")
+                if not (brief_date and brief_date.split("-")[1] == month):
+                    continue
             
-            for name, data in briefs.items():
-                # Filtrage par mois
-                if month and month != "":
-                    brief_date = data.get("date_brief", "")
-                    if not (brief_date and brief_date.split("-")[1] == month):
-                        continue
-                
-                # Filtrage par recruteur
-                if recruteur and recruteur != "" and data.get("recruteur") != recruteur:
-                    continue
-                
-                # Filtrage par poste
-                if poste and poste != "" and poste.lower() not in data.get("poste_intitule", "").lower():
-                    continue
-                
-                # Filtrage par manager
-                if manager and manager != "" and manager.lower() not in data.get("manager_nom", "").lower():
-                    continue
-                
-                # Filtrage par affectation
-                if affectation and affectation != "" and data.get("affectation_type") != affectation:
-                    continue
-                
-                # Filtrage par nom d'affectation
-                if nom_affectation and nom_affectation != "" and nom_affectation.lower() not in data.get("affectation_nom", "").lower():
-                    continue
-                
-                # Filtrage par type
-                if type_recherche and type_recherche != "":
-                    creation_type_data = data.get("creation_type", "Créer un brief")
-                    if (type_recherche == "Brief" and creation_type_data != "Créer un brief") or \
-                       (type_recherche == "Canevas" and creation_type_data != "Créer un canevas"):
-                        continue
-                
-                st.session_state.filtered_briefs[name] = data
+            # Filtrage par recruteur
+            if recruteur and recruteur != "" and data.get("recruteur") != recruteur:
+                continue
             
-            if st.session_state.filtered_briefs:
-                st.info(f"ℹ️ {len(st.session_state.filtered_briefs)} Résultats.")
-            else:
-                st.error("❌ Aucun brief trouvé avec ces critères.")
+            # Filtrage par poste
+            if poste and poste != "" and poste.lower() not in data.get("poste_intitule", "").lower():
+                continue
+            
+            # Filtrage par manager
+            if manager and manager != "" and manager.lower() not in data.get("manager_nom", "").lower():
+                continue
+            
+            # Filtrage par affectation
+            if affectation and affectation != "" and data.get("affectation_type") != affectation:
+                continue
+            
+            # Filtrage par nom d'affectation
+            if nom_affectation and nom_affectation != "" and nom_affectation.lower() not in data.get("affectation_nom", "").lower():
+                continue
+            
+            # Filtrage par type
+            if type_recherche and type_recherche != "":
+                creation_type_data = data.get("creation_type", "Créer un brief")
+                if (type_recherche == "Brief" and creation_type_data != "Créer un brief") or \
+                   (type_recherche == "Canevas" and creation_type_data != "Créer un canevas"):
+                    continue
+            
+            st.session_state.filtered_briefs[name] = data
+        
+        if st.session_state.filtered_briefs:
+            st.info(f"ℹ️ {len(st.session_state.filtered_briefs)} Résultats.")
+        else:
+            st.error("❌ Aucun brief trouvé avec ces critères.")
 
-        # Dans la section d'affichage des résultats
-if st.session_state.filtered_briefs:
-    st.subheader("Résultats de recherche")
-    for name, data in st.session_state.filtered_briefs.items():
-        with st.expander(f"📌 {name}"):
-            # Modification de l'affichage du type
-            display_type = "Canevas" if data.get("creation_type") == "Créer un canevas" else "Brief"
-            
-            # Affichage en 2 colonnes
-            col_info1, col_info2 = st.columns(2)
-            
-            with col_info1:
-                st.write(f"**Poste:** {data.get('poste_intitule', '')}")
-                st.write(f"**Manager:** {data.get('manager_nom', '')}")
-                st.write(f"**Recruteur:** {data.get('recruteur', '')}")
-            
-            with col_info2:
-                st.write(f"**Type:** {display_type}")
-                st.write(f"**Affectation:** {data.get('affectation_type', '')} - {data.get('affectation_nom', '')}")
-                st.write(f"**Date:** {data.get('date_brief', '')}")
-            
-            # Boutons Charger et Supprimer
-            colA, colB = st.columns(2)
-            with colA:
-                if st.button(f"📂 Charger", key=f"load_{name}"):
-                    try:
-                        # Stocker les données sans modifier directement les widgets
-                        st.session_state.current_brief_data = data
-                        st.session_state.current_brief_name = name
-                        st.session_state.brief_created = True
+    # AFFICHAGE DES RÉSULTATS (toujours visible après la recherche)
+    if st.session_state.filtered_briefs:
+        st.subheader("Résultats de recherche")
+        for name, data in st.session_state.filtered_briefs.items():
+            with st.expander(f"📌 {name}"):
+                # Modification de l'affichage du type
+                display_type = "Canevas" if data.get("creation_type") == "Créer un canevas" else "Brief"
+                
+                # Affichage en 2 colonnes
+                col_info1, col_info2 = st.columns(2)
+                
+                with col_info1:
+                    st.write(f"**Poste:** {data.get('poste_intitule', '')}")
+                    st.write(f"**Manager:** {data.get('manager_nom', '')}")
+                    st.write(f"**Recruteur:** {data.get('recruteur', '')}")
+                
+                with col_info2:
+                    st.write(f"**Type:** {display_type}")
+                    st.write(f"**Affectation:** {data.get('affectation_type', '')} - {data.get('affectation_nom', '')}")
+                    st.write(f"**Date:** {data.get('date_brief', '')}")
+                
+                # Boutons Charger et Supprimer
+                colA, colB = st.columns(2)
+                with colA:
+                    if st.button(f"📂 Charger", key=f"load_{name}"):
+                        try:
+                            # Stocker les données sans modifier directement les widgets
+                            st.session_state.current_brief_data = data
+                            st.session_state.current_brief_name = name
+                            st.session_state.brief_created = True
+                            
+                            # Mettre à jour les champs non-widgets
+                            non_widget_keys = ["raison_ouverture", "impact_strategique", "rattachement", 
+                                              "defis_principaux", "entreprises_profil", "canaux_profil",
+                                              "synonymes_poste", "budget", "commentaires"]
+                            
+                            for key in non_widget_keys:
+                                if key in data:
+                                    st.session_state[key] = data[key]
+                            
+                            # Gestion spéciale pour les données KSA
+                            if "ksa_data" in data:
+                                st.session_state.ksa_data = data["ksa_data"]
+                            
+                            st.success(f"✅ {display_type} '{name}' chargé avec succès!")
+                            st.rerun()
                         
-                        # Mettre à jour les champs non-widgets
-                        non_widget_keys = ["raison_ouverture", "impact_strategique", "rattachement", 
-                                          "defis_principaux", "entreprises_profil", "canaux_profil",
-                                          "synonymes_poste", "budget", "commentaires"]
-                        
-                        for key in non_widget_keys:
-                            if key in data:
-                                st.session_state[key] = data[key]
-                        
-                        # Gestion spéciale pour les données KSA
-                        if "ksa_data" in data:
-                            st.session_state.ksa_data = data["ksa_data"]
-                        
-                        st.success(f"✅ {display_type} '{name}' chargé avec succès!")
-                        st.rerun()
-                    
-                    except Exception as e:
-                        st.error(f"❌ Erreur lors du chargement: {str(e)}")
-            with colB:
-                if st.button(f"🗑️ Supprimer", key=f"del_{name}"):
-                    all_briefs = load_briefs()
-                    if name in all_briefs:
-                        del all_briefs[name]
-                        st.session_state.saved_briefs = all_briefs
-                        save_briefs()
-                        if name in st.session_state.filtered_briefs:
-                            del st.session_state.filtered_briefs[name]
-                        st.warning(f"❌ {display_type} '{name}' supprimé.")
-                        st.rerun()
+                        except Exception as e:
+                            st.error(f"❌ Erreur lors du chargement: {str(e)}")
+                with colB:
+                    if st.button(f"🗑️ Supprimer", key=f"del_{name}"):
+                        all_briefs = load_briefs()
+                        if name in all_briefs:
+                            del all_briefs[name]
+                            st.session_state.saved_briefs = all_briefs
+                            save_briefs()
+                            if name in st.session_state.filtered_briefs:
+                                del st.session_state.filtered_briefs[name]
+                            st.warning(f"❌ {display_type} '{name}' supprimé.")
+                            st.rerun()
 
 # ---------------- AVANT-BRIEF ----------------
 with tab2:
