@@ -449,177 +449,99 @@ with tab2:
     
     st.info("Remplissez les informations préparatoires avant la réunion avec le manager.")
 
-    # Organisation structurée sous forme de tableau amélioré
+    # Organisation structurée sous forme de tableau
     st.markdown("""
-    <style>
-    .brief-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 20px;
-        font-family: Arial, sans-serif;
-    }
-    .brief-table th {
-        background-color: #2c2c36;
-        color: #FF4B4B;
-        padding: 12px;
-        text-align: left;
-        font-weight: bold;
-        border: 1px solid #424242;
-    }
-    .brief-table td {
-        padding: 12px;
-        border: 1px solid #424242;
-        vertical-align: top;
-    }
-    .section-header {
-        background-color: #2c2c36;
-        color: #FF4B4B;
-        font-weight: bold;
-    }
-    .detail-cell {
-        font-weight: 500;
-        color: #FAFAFA;
-    }
-    .info-textarea {
-        width: 100%;
-        min-height: 80px;
-        background-color: #262730;
-        color: white;
-        border: 1px solid #424242;
-        border-radius: 4px;
-        padding: 8px;
-        resize: vertical;
-        font-family: Arial, sans-serif;
-    }
-    .info-textarea:focus {
-        outline: none;
-        border-color: #FF4B4B;
-    }
-    </style>
-    
-    <table class="brief-table">
+    <table class="comparison-table">
         <tr>
-            <th style="width: 20%;">Section</th>
-            <th style="width: 30%;">Détails</th>
-            <th style="width: 50%;">Informations</th>
+            <th>Section</th>
+            <th>Détails</th>
+            <th>Informations</th>
         </tr>
         <!-- Contexte du poste -->
-        <tr class="section-header">
-            <td colspan="3">Contexte du poste</td>
+        <tr>
+            <td rowspan="3"><strong>Contexte du poste</strong></td>
+            <td>Raison de l'ouverture</td>
+            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Remplacement / Création / Évolution interne"></textarea></td>
         </tr>
         <tr>
-            <td></td>
-            <td class="detail-cell">Raison de l'ouverture</td>
-            <td><textarea class="info-textarea" placeholder="Remplacement / Création / Évolution interne"></textarea></td>
+            <td>Mission globale</td>
+            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Résumé du rôle et objectif principal"></textarea></td>
         </tr>
         <tr>
-            <td></td>
-            <td class="detail-cell">Mission globale</td>
-            <td><textarea class="info-textarea" placeholder="Résumé du rôle et objectif principal"></textarea></td>
-        </tr>
-        <tr>
-            <td></td>
-            <td class="detail-cell">Défis principaux</td>
-            <td><textarea class="info-textarea" placeholder="Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"></textarea></td>
+            <td>Défis principaux</td>
+            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"></textarea></td>
         </tr>
         <!-- Organisation et hiérarchie -->
-        <tr class="section-header">
-            <td colspan="3">Organisation et hiérarchie</td>
+        <tr>
+            <td rowspan="2"><strong>Organisation et hiérarchie</strong></td>
+            <td>Rattachement hiérarchique</td>
+            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Responsable direct, département / service"></textarea></td>
         </tr>
         <tr>
-            <td></td>
-            <td class="detail-cell">Rattachement hiérarchique</td>
-            <td><textarea class="info-textarea" placeholder="Responsable direct, département / service"></textarea></td>
-        </tr>
-        <tr>
-            <td></td>
-            <td class="detail-cell">Équipe</td>
-            <td><textarea class="info-textarea" placeholder="Taille, rôle des collaborateurs, interaction avec autres services"></textarea></td>
+            <td>Équipe</td>
+            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Taille, rôle des collaborateurs, interaction avec autres services"></textarea></td>
         </tr>
         <!-- Profil recherché -->
-        <tr class="section-header">
-            <td colspan="3">Profil recherché</td>
+        <tr>
+            <td rowspan="4"><strong>Profil recherché</strong></td>
+            <td>Expérience</td>
+            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Nombre d'années minimum, expériences similaires dans le secteur"></textarea></td>
         </tr>
         <tr>
-            <td></td>
-            <td class="detail-cell">Expérience</td>
-            <td><textarea class="info-textarea" placeholder="Nombre d'années minimum, expériences similaires dans le secteur"></textarea></td>
+            <td>Connaissances / Diplômes / Certifications</td>
+            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Diplômes exigés, certifications spécifiques"></textarea></td>
         </tr>
         <tr>
-            <td></td>
-            <td class="detail-cell">Connaissances / Diplômes / Certifications</td>
-            <td><textarea class="info-textarea" placeholder="Diplômes exigés, certifications spécifiques"></textarea></td>
+            <td>Compétences / Outils</td>
+            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Techniques, logiciels, méthodes à maîtriser"></textarea></td>
         </tr>
         <tr>
-            <td></td>
-            <td class="detail-cell">Compétences / Outils</td>
-            <td><textarea class="info-textarea" placeholder="Techniques, logiciels, méthodes à maîtriser"></textarea></td>
-        </tr>
-        <tr>
-            <td></td>
-            <td class="detail-cell">Soft skills / aptitudes comportementales</td>
-            <td><textarea class="info-textarea" placeholder="Leadership, rigueur, communication, autonomie"></textarea></td>
+            <td>Soft skills / aptitudes comportementales</td>
+            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Leadership, rigueur, communication, autonomie"></textarea></td>
         </tr>
         <!-- Sourcing et marché -->
-        <tr class="section-header">
-            <td colspan="3">Sourcing et marché</td>
+        <tr>
+            <td rowspan="3"><strong>Sourcing et marché</strong></td>
+            <td>Entreprises où trouver ce profil</td>
+            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Concurrents, secteurs similaires"></textarea></td>
         </tr>
         <tr>
-            <td></td>
-            <td class="detail-cell">Entreprises où trouver ce profil</td>
-            <td><textarea class="info-textarea" placeholder="Concurrents, secteurs similaires"></textarea></td>
+            <td>Synonymes / intitulés proches</td>
+            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Titres alternatifs pour affiner le sourcing"></textarea></td>
         </tr>
         <tr>
-            <td></td>
-            <td class="detail-cell">Synonymes / intitulés proches</td>
-            <td><textarea class="info-textarea" placeholder="Titres alternatifs pour affiner le sourcing"></textarea></td>
-        </tr>
-        <tr>
-            <td></td>
-            <td class="detail-cell">Canaux à utiliser</td>
-            <td><textarea class="info-textarea" placeholder="LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"></textarea></td>
+            <td>Canaux à utiliser</td>
+            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"></textarea></td>
         </tr>
         <!-- Conditions et contraintes -->
-        <tr class="section-header">
-            <td colspan="3">Conditions et contraintes</td>
+        <tr>
+            <td rowspan="2"><strong>Conditions et contraintes</strong></td>
+            <td>Localisation</td>
+            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Site principal, télétravail, déplacements"></textarea></td>
         </tr>
         <tr>
-            <td></td>
-            <td class="detail-cell">Localisation</td>
-            <td><textarea class="info-textarea" placeholder="Site principal, télétravail, déplacements"></textarea></td>
-        </tr>
-        <tr>
-            <td></td>
-            <td class="detail-cell">Budget recrutement</td>
-            <td><textarea class="info-textarea" placeholder="Salaire indicatif, avantages, primes éventuelles"></textarea></td>
+            <td>Budget recrutement</td>
+            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Salaire indicatif, avantages, primes éventuelles"></textarea></td>
         </tr>
         <!-- Missions / Tâches -->
-        <tr class="section-header">
-            <td colspan="3">Missions / Tâches</td>
+        <tr>
+            <td rowspan="2"><strong>Missions / Tâches</strong></td>
+            <td>Tâches principales</td>
+            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="4-6 missions détaillées"></textarea></td>
         </tr>
         <tr>
-            <td></td>
-            <td class="detail-cell">Tâches principales</td>
-            <td><textarea class="info-textarea" placeholder="4-6 missions détaillées"></textarea></td>
-        </tr>
-        <tr>
-            <td></td>
-            <td class="detail-cell">Autres responsabilités</td>
-            <td><textarea class="info-textarea" placeholder="Points additionnels ou spécifiques à préciser"></textarea></td>
+            <td>Autres responsabilités</td>
+            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Points additionnels ou spécifiques à préciser"></textarea></td>
         </tr>
         <!-- Notes libres -->
-        <tr class="section-header">
-            <td colspan="3">Notes libres</td>
+        <tr>
+            <td rowspan="2"><strong>Notes libres</strong></td>
+            <td>Points à discuter ou à clarifier avec le manager</td>
+            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Points à discuter ou à clarifier"></textarea></td>
         </tr>
         <tr>
-            <td></td>
-            <td class="detail-cell">Points à discuter ou à clarifier avec le manager</td>
-            <td><textarea class="info-textarea" placeholder="Points à discuter ou à clarifier"></textarea></td>
-        </tr>
-        <tr>
-            <td></td>
-            <td class="detail-cell">Case libre</td>
-            <td><textarea class="info-textarea" placeholder="Pour tout point additionnel ou remarque spécifique"></textarea></td>
+            <td>Case libre</td>
+            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Pour tout point additionnel ou remarque spécifique"></textarea></td>
         </tr>
     </table>
     """, unsafe_allow_html=True)
