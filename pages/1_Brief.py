@@ -441,96 +441,132 @@ with tab2:
         st.stop()  # Arrête le rendu de cet onglet
     
     # Afficher les informations du brief en cours avec Manager/Recruteur à gauche
-    st.subheader(f"🔄 Avant-brief (Préparation) - {st.session_state.get('poste_intitule', '')} - Manager: {st.session_state.get('manager_nom', '')} | Recruteur: {st.session_state.get('recruteur', '')}")
-    
-    st.info("Remplissez les informations préparatoires avant la réunion avec le manager.")
+    st.markdown(f"<h3>🔄 Avant-brief (Préparation) - Manager: {st.session_state.get('manager_nom', '')} | Recruteur: {st.session_state.get('recruteur', '')}</h3>", 
+                unsafe_allow_html=True)
 
     # Titre pour le tableau
-    st.subheader("📋 Fiche de poste")
+    st.subheader("Portrait robot candidat")
 
     # Organisation structurée sous forme de tableau minimaliste
     st.markdown("""
-    <table class="comparison-table">
+    <style>
+    .minimal-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+    }
+    .minimal-table th, .minimal-table td {
+        border: 1px solid #424242;
+        padding: 6px;
+        text-align: left;
+    }
+    .minimal-table th {
+        background-color: #262730;
+        font-weight: bold;
+    }
+    .section-col {
+        width: 15%;
+        font-weight: bold;
+    }
+    .details-col {
+        width: 25%;
+    }
+    .info-col {
+        width: 60%;
+    }
+    .info-textarea {
+        width: 100%;
+        height: 60px;
+        background-color: #262730;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 8px;
+        resize: vertical;
+    }
+    </style>
+    
+    <table class="minimal-table">
         <tr>
-            <th style="width: 20%;">Section</th>
-            <th style="width: 30%;">Détails</th>
-            <th style="width: 50%;">Informations</th>
+            <th class="section-col">Section</th>
+            <th class="details-col">Détails</th>
+            <th class="info-col">Informations</th>
         </tr>
         <!-- Contexte du poste -->
         <tr>
-            <td rowspan="3"><strong>Contexte du poste</strong></td>
-            <td>Raison de l'ouverture</td>
-            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+            <td rowspan="3" class="section-col">Contexte du poste</td>
+            <td class="details-col">Raison de l'ouverture</td>
+            <td><textarea class="info-textarea" placeholder="Remplacement / Création / Évolution interne"></textarea></td>
         </tr>
         <tr>
-            <td>Mission globale</td>
-            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+            <td class="details-col">Mission globale</td>
+            <td><textarea class="info-textarea" placeholder="Résumé du rôle et objectif principal"></textarea></td>
         </tr>
         <tr>
-            <td>Défis principaux</td>
-            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+            <td class="details-col">Défis principaux</td>
+            <td><textarea class="info-textarea" placeholder="Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"></textarea></td>
         </tr>
         <!-- Profil recherché -->
         <tr>
-            <td rowspan="4"><strong>Profil recherché</strong></td>
-            <td>Expérience</td>
-            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+            <td rowspan="4" class="section-col">Profil recherché</td>
+            <td class="details-col">Expérience</td>
+            <td><textarea class="info-textarea" placeholder="Nombre d'années minimum, expériences similaires dans le secteur"></textarea></td>
         </tr>
         <tr>
-            <td>Connaissances / Diplômes / Certifications</td>
-            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+            <td class="details-col">Connaissances / Diplômes / Certifications</td>
+            <td><textarea class="info-textarea" placeholder="Diplômes exigés, certifications spécifiques"></textarea></td>
         </tr>
         <tr>
-            <td>Compétences / Outils</td>
-            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+            <td class="details-col">Compétences / Outils</td>
+            <td><textarea class="info-textarea" placeholder="Techniques, logiciels, méthodes à maîtriser"></textarea></td>
         </tr>
         <tr>
-            <td>Soft skills / aptitudes comportementales</td>
-            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+            <td class="details-col">Soft skills / aptitudes comportementales</td>
+            <td><textarea class="info-textarea" placeholder="Leadership, rigueur, communication, autonomie"></textarea></td>
         </tr>
         <!-- Missions / Tâches -->
         <tr>
-            <td rowspan="2"><strong>Missions / Tâches</strong></td>
-            <td>Tâches principales</td>
-            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+            <td rowspan="2" class="section-col">Missions / Tâches</td>
+            <td class="details-col">Tâches principales</td>
+            <td><textarea class="info-textarea" placeholder="4-6 missions détaillées"></textarea></td>
         </tr>
         <tr>
-            <td>Autres responsabilités</td>
-            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+            <td class="details-col">Autres responsabilités</td>
+            <td><textarea class="info-textarea" placeholder="Points additionnels ou spécifiques à préciser"></textarea></td>
         </tr>
         <!-- Sourcing et marché -->
         <tr>
-            <td rowspan="3"><strong>Sourcing et marché</strong></td>
-            <td>Entreprises où trouver ce profil</td>
-            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+            <td rowspan="3" class="section-col">Sourcing et marché</td>
+            <td class="details-col">Entreprises où trouver ce profil</td>
+            <td><textarea class="info-textarea" placeholder="Concurrents, secteurs similaires"></textarea></td>
         </tr>
         <tr>
-            <td>Synonymes / intitulés proches</td>
-            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+            <td class="details-col">Synonymes / intitulés proches</td>
+            <td><textarea class="info-textarea" placeholder="Titres alternatifs pour affiner le sourcing"></textarea></td>
         </tr>
         <tr>
-            <td>Canaux à utiliser</td>
-            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+            <td class="details-col">Canaux à utiliser</td>
+            <td><textarea class="info-textarea" placeholder="LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"></textarea></td>
         </tr>
         <!-- Conditions et contraintes -->
         <tr>
-            <td rowspan="2"><strong>Conditions et contraintes</strong></td>
-            <td>Localisation</td>
-            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+            <td rowspan="2" class="section-col">Conditions et contraintes</td>
+            <td class="details-col">Localisation</td>
+            <td><textarea class="info-textarea" placeholder="Site principal, télétravail, déplacements"></textarea></td>
         </tr>
         <tr>
-            <td>Budget recrutement</td>
-            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+            <td class="details-col">Budget recrutement</td>
+            <td><textarea class="info-textarea" placeholder="Salaire indicatif, avantages, primes éventuelles"></textarea></td>
         </tr>
         <!-- Notes libres -->
         <tr>
-            <td rowspan="2"><strong>Notes libres</strong></td>
-            <td>Points à discuter ou à clarifier avec le manager</td>
-            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+            <td rowspan="2" class="section-col">Notes libres</td>
+            <td class="details-col">Points à discuter ou à clarifier avec le manager</td>
+            <td><textarea class="info-textarea" placeholder="Points à discuter ou à clarifier"></textarea></td>
         </tr>
         <tr>
-            <td>Case libre</td>
-            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+            <td class="details-col">Case libre</td>
+            <td><textarea class="info-textarea" placeholder="Pour tout point additionnel ou remarque spécifique"></textarea></td>
         </tr>
     </table>
     """, unsafe_allow_html=True)
