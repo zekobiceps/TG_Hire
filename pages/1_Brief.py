@@ -2,6 +2,7 @@ import sys, os
 import streamlit as st
 from datetime import datetime
 import json
+import pandas as pd
 
 # ✅ permet d'accéder à utils.py à la racine
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -19,7 +20,74 @@ from utils import (
     generate_automatic_brief_name,
 )
 
-# ---------------- FONCTIONS MANQUANTES ----------------
+# ---------------- NOUVELLES FONCTIONS ----------------
+def render_ksa_matrix():
+    """Affiche la matrice KSA sous forme de tableau"""
+    st.subheader("📊 Matrice KSA (Knowledge, Skills, Abilities)")
+    
+    # Initialiser les données KSA si elles n'existent pas
+    if "ksa_matrix" not in st.session_state:
+        st.session_state.ksa_matrix = pd.DataFrame(columns=[
+            "Rubrique", "Critère", "Cible / Standard attendu", 
+            "Échelle d'évaluation (1-5)", "Évaluateur"
+        ])
+    
+    # Formulaire pour ajouter une nouvelle ligne
+    with st.expander("➕ Ajouter un critère"):
+        col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
+        
+        with col1:
+            new_rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique")
+        with col2:
+            new_critere = st.text_input("Critère", key="new_critere")
+        with col3:
+            new_cible = st.text_input("Cible / Standard attendu", key="new_cible")
+        with col4:
+            new_score = st.selectbox("Importance", [1, 2, 3, 4, 5], key="new_score")
+        with col5:
+            new_evaluateur = st.selectbox("Évaluateur", ["Manager", "Recruteur", "Les deux"], key="new_evaluateur")
+        
+        if st.button("Ajouter", key="add_ksa"):
+            if new_critere and new_cible:
+                new_row = {
+                    "Rubrique": new_rubrique,
+                    "Critère": new_critere,
+                    "Cible / Standard attendu": new_cible,
+                    "Échelle d'évaluation (1-5)": new_score,
+                    "Évaluateur": new_evaluateur
+                }
+                
+                # Ajouter la nouvelle ligne au DataFrame
+                st.session_state.ksa_matrix = pd.concat([
+                    st.session_state.ksa_matrix, 
+                    pd.DataFrame([new_row])
+                ], ignore_index=True)
+                
+                st.success("✅ Critère ajouté avec succès")
+                st.rerun()
+    
+    # Afficher le tableau KSA
+    if not st.session_state.ksa_matrix.empty:
+        st.dataframe(
+            st.session_state.ksa_matrix,
+            use_container_width=True,
+            hide_index=True
+        )
+        
+        # Calculer et afficher la note globale
+        if "Échelle d'évaluation (1-5)" in st.session_state.ksa_matrix.columns:
+            scores = st.session_state.ksa_matrix["Échelle d'évaluation (1-5)"].astype(int)
+            moyenne = scores.mean()
+            st.metric("Note globale", f"{moyenne:.1f}/5")
+        
+        # Bouton pour supprimer la dernière entrée
+        if st.button("🗑️ Supprimer le dernier critère", type="secondary"):
+            if len(st.session_state.ksa_matrix) > 0:
+                st.session_state.ksa_matrix = st.session_state.ksa_matrix.iloc[:-1]
+                st.rerun()
+    else:
+        st.info("Aucun critère défini. Ajoutez des critères pour commencer.")
+
 def conseil_button(titre, categorie, conseil, key):
     """Crée un bouton avec conseil pour un champ"""
     col1, col2 = st.columns([4, 1])
@@ -29,48 +97,6 @@ def conseil_button(titre, categorie, conseil, key):
         if st.button("💡", key=f"btn_{key}"):
             st.session_state[key] = generate_checklist_advice(categorie, titre)
             st.rerun()
-
-def render_ksa_section():
-    """Affiche la section KSA (Knowledge, Skills, Abilities)"""
-    st.info("Matrice des compétences requises (KSA)")
-    
-    if "ksa_data" not in st.session_state:
-        st.session_state.ksa_data = {
-            "Connaissances": {},
-            "Compétences": {},
-            "Aptitudes": {}
-        }
-    
-    with st.expander("➕ Ajouter une compétence"):
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            new_cat = st.selectbox("Catégorie", ["Connaissances", "Compétences", "Aptitudes"], key="new_cat")
-        with col2:
-            new_comp = st.text_input("Compétence", key="new_comp")
-        with col3:
-            new_score = st.slider("Importance", 1, 5, 3, key="new_score")
-        
-        if st.button("Ajouter", key="add_comp"):
-            if new_comp:
-                st.session_state.ksa_data[new_cat][new_comp] = {"score": new_score}
-                st.success(f"✅ {new_comp} ajouté à {new_cat}")
-                st.rerun()
-    
-    for categorie, competences in st.session_state.ksa_data.items():
-        with st.expander(f"{categorie} ({len(competences)})"):
-            if competences:
-                for comp, details in competences.items():
-                    col1, col2, col3 = st.columns([3, 1, 1])
-                    with col1:
-                        st.write(f"**{comp}**")
-                    with col2:
-                        st.write(f"Importance: {details.get('score', 'N/A')}/5")
-                    with col3:
-                        if st.button("🗑️", key=f"del_{categorie}_{comp}"):
-                            del st.session_state.ksa_data[categorie][comp]
-                            st.rerun()
-            else:
-                st.info("Aucune compétence définie")
 
 # ---------------- INIT ----------------
 init_session_state()
@@ -244,6 +270,11 @@ st.markdown("""
         background-color: #262730;
         font-weight: bold;
     }
+
+    /* Style pour la matrice KSA */
+    .dataframe {
+        width: 100%;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -275,6 +306,7 @@ with tab1:
             st.text_input("Poste à recruter", key="niveau_hierarchique")
             st.selectbox("Recruteur *", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="recruteur")
         with col3:
+            st.selectbox("Type de brief", ["Brief", "Template"], key="brief_type")
             st.selectbox("Affectation", ["", "Chantier", "Siège"], key="affectation_type")
             st.text_input("Nom de l'affectation", key="affectation_nom")
         
@@ -301,6 +333,7 @@ with tab1:
                     "recruteur": st.session_state.recruteur,
                     "date_brief": str(st.session_state.date_brief),
                     "niveau_hierarchique": st.session_state.niveau_hierarchique,
+                    "brief_type": st.session_state.brief_type,
                     "affectation_type": st.session_state.affectation_type,
                     "affectation_nom": st.session_state.affectation_nom,
                     "raison_ouverture": st.session_state.get("raison_ouverture", ""),
@@ -312,7 +345,8 @@ with tab1:
                     "synonymes_poste": st.session_state.get("synonymes_poste", ""),
                     "budget": st.session_state.get("budget", ""),
                     "commentaires": st.session_state.get("commentaires", ""),
-                    "ksa_data": st.session_state.get("ksa_data", {})
+                    "ksa_data": st.session_state.get("ksa_data", {}),
+                    "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict() if hasattr(st.session_state, 'ksa_matrix') else {}
                 }
                 save_briefs()
                 message_placeholder.success(f"✅ Brief '{brief_name}' sauvegardé avec succès !")
@@ -326,7 +360,7 @@ with tab1:
         with col1:
             months = ["", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
             month = st.selectbox("Mois", months)
-            poste = st.text_input("Poste")
+            brief_type_filter = st.selectbox("Type", ["", "Brief", "Template"], key="brief_type_filter")
         with col2:
             recruteur = st.selectbox("Recruteur", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="search_recruteur")
             manager = st.text_input("Manager")
@@ -350,12 +384,12 @@ with tab1:
                     if not (brief_date and brief_date.split("-")[1] == month):
                         continue
                 
-                # Filtrage par recruteur
-                if recruteur and recruteur != "" and data.get("recruteur") != recruteur:
+                # Filtrage par type
+                if brief_type_filter and brief_type_filter != "" and data.get("brief_type") != brief_type_filter:
                     continue
                 
-                # Filtrage par poste
-                if poste and poste != "" and poste.lower() not in data.get("poste_intitule", "").lower():
+                # Filtrage par recruteur
+                if recruteur and recruteur != "" and data.get("recruteur") != recruteur:
                     continue
                 
                 # Filtrage par manager
@@ -379,58 +413,127 @@ with tab1:
 
         if st.session_state.filtered_briefs:
             st.subheader("Résultats de recherche")
-            for name, data in st.session_state.filtered_briefs.items():
-                with st.expander(f"📌 {name}"):
-                    st.write(f"**Poste:** {data.get('poste_intitule', '')}")
-                    st.write(f"**Manager:** {data.get('manager_nom', '')}")
-                    st.write(f"**Recruteur:** {data.get('recruteur', '')}")
-                    st.write(f"**Affectation:** {data.get('affectation_type', '')} - {data.get('affectation_nom', '')}")
-                    st.write(f"**Date:** {data.get('date_brief', '')}")
-                    
-                    colA, colB = st.columns(2)
-                    with colA:
-                        if st.button(f"📂 Charger", key=f"load_{name}"):
-                            try:
-                                # Créer un nouveau brief sans écraser les widgets
-                                new_brief = {}
+            
+            # Afficher les résultats en deux colonnes
+            briefs_list = list(st.session_state.filtered_briefs.items())
+            half = len(briefs_list) // 2
+            col_left, col_right = st.columns(2)
+            
+            with col_left:
+                for name, data in briefs_list[:half]:
+                    with st.expander(f"📌 {name}"):
+                        st.write(f"**Type:** {data.get('brief_type', '')}")
+                        st.write(f"**Manager:** {data.get('manager_nom', '')}")
+                        st.write(f"**Recruteur:** {data.get('recruteur', '')}")
+                        st.write(f"**Affectation:** {data.get('affectation_type', '')} - {data.get('affectation_nom', '')}")
+                        st.write(f"**Date:** {data.get('date_brief', '')}")
+                        
+                        colA, colB = st.columns(2)
+                        with colA:
+                            if st.button(f"📂 Charger", key=f"load_{name}"):
+                                try:
+                                    # Créer un nouveau brief sans écraser les widgets
+                                    new_brief = {}
+                                    
+                                    # Copier toutes les données du brief
+                                    for key, value in data.items():
+                                        new_brief[key] = value
+                                    
+                                    # Stocker le brief chargé dans une clé spéciale
+                                    st.session_state.loaded_brief = new_brief
+                                    st.session_state.current_brief_name = name
+                                    
+                                    # Mettre à jour uniquement les champs non-widgets
+                                    non_widget_keys = ["raison_ouverture", "impact_strategique", "rattachement", 
+                                                      "defis_principaux", "entreprises_profil", "canaux_profil",
+                                                      "synonymes_poste", "budget", "commentaires", "brief_type"]
+                                    
+                                    for key in non_widget_keys:
+                                        if key in data:
+                                            st.session_state[key] = data[key]
+                                    
+                                    # Gestion spéciale pour les données KSA
+                                    if "ksa_data" in data:
+                                        st.session_state.ksa_data = data["ksa_data"]
+                                    
+                                    # Gestion spéciale pour la matrice KSA
+                                    if "ksa_matrix" in data and data["ksa_matrix"]:
+                                        st.session_state.ksa_matrix = pd.DataFrame(data["ksa_matrix"])
+                                    
+                                    st.success(f"✅ Brief '{name}' chargé avec succès!")
+                                    st.rerun()
                                 
-                                # Copier toutes les données du brief
-                                for key, value in data.items():
-                                    new_brief[key] = value
+                                except Exception as e:
+                                    st.error(f"❌ Erreur lors du chargement: {str(e)}")
+                        with colB:
+                            if st.button(f"🗑️ Supprimer", key=f"del_{name}"):
+                                all_briefs = load_briefs()
+                                if name in all_briefs:
+                                    del all_briefs[name]
+                                    st.session_state.saved_briefs = all_briefs
+                                    save_briefs()
+                                    if name in st.session_state.filtered_briefs:
+                                        del st.session_state.filtered_briefs[name]
+                                    st.warning(f"❌ Brief '{name}' supprimé.")
+                                    st.rerun()
+            
+            with col_right:
+                for name, data in briefs_list[half:]:
+                    with st.expander(f"📌 {name}"):
+                        st.write(f"**Type:** {data.get('brief_type', '')}")
+                        st.write(f"**Manager:** {data.get('manager_nom', '')}")
+                        st.write(f"**Recruteur:** {data.get('recruteur', '')}")
+                        st.write(f"**Affectation:** {data.get('affectation_type', '')} - {data.get('affectation_nom', '')}")
+                        st.write(f"**Date:** {data.get('date_brief', '')}")
+                        
+                        colA, colB = st.columns(2)
+                        with colA:
+                            if st.button(f"📂 Charger", key=f"load2_{name}"):
+                                try:
+                                    # Créer un nouveau brief sans écraser les widgets
+                                    new_brief = {}
+                                    
+                                    # Copier toutes les données du brief
+                                    for key, value in data.items():
+                                        new_brief[key] = value
+                                    
+                                    # Stocker le brief chargé dans une clé spéciale
+                                    st.session_state.loaded_brief = new_brief
+                                    st.session_state.current_brief_name = name
+                                    
+                                    # Mettre à jour uniquement les champs non-widgets
+                                    non_widget_keys = ["raison_ouverture", "impact_strategique", "rattachement", 
+                                                      "defis_principaux", "entreprises_profil", "canaux_profil",
+                                                      "synonymes_poste", "budget", "commentaires", "brief_type"]
+                                    
+                                    for key in non_widget_keys:
+                                        if key in data:
+                                            st.session_state[key] = data[key]
+                                    
+                                    # Gestion spéciale pour les données KSA
+                                    if "ksa_data" in data:
+                                        st.session_state.ksa_data = data["ksa_data"]
+                                    
+                                    # Gestion spéciale pour la matrice KSA
+                                    if "ksa_matrix" in data and data["ksa_matrix"]:
+                                        st.session_state.ksa_matrix = pd.DataFrame(data["ksa_matrix"])
+                                    
+                                    st.success(f"✅ Brief '{name}' chargé avec succès!")
+                                    st.rerun()
                                 
-                                # Stocker le brief chargé dans une clé spéciale
-                                st.session_state.loaded_brief = new_brief
-                                st.session_state.current_brief_name = name
-                                
-                                # Mettre à jour uniquement les champs non-widgets
-                                non_widget_keys = ["raison_ouverture", "impact_strategique", "rattachement", 
-                                                  "defis_principaux", "entreprises_profil", "canaux_profil",
-                                                  "synonymes_poste", "budget", "commentaires"]
-                                
-                                for key in non_widget_keys:
-                                    if key in data:
-                                        st.session_state[key] = data[key]
-                                
-                                # Gestion spéciale pour les données KSA
-                                if "ksa_data" in data:
-                                    st.session_state.ksa_data = data["ksa_data"]
-                                
-                                st.success(f"✅ Brief '{name}' chargé avec succès!")
-                                st.rerun()
-                            
-                            except Exception as e:
-                                st.error(f"❌ Erreur lors du chargement: {str(e)}")
-                    with colB:
-                        if st.button(f"🗑️ Supprimer", key=f"del_{name}"):
-                            all_briefs = load_briefs()
-                            if name in all_briefs:
-                                del all_briefs[name]
-                                st.session_state.saved_briefs = all_briefs
-                                save_briefs()
-                                if name in st.session_state.filtered_briefs:
-                                    del st.session_state.filtered_briefs[name]
-                                st.warning(f"❌ Brief '{name}' supprimé.")
-                                st.rerun()
+                                except Exception as e:
+                                    st.error(f"❌ Erreur lors du chargement: {str(e)}")
+                        with colB:
+                            if st.button(f"🗑️ Supprimer", key=f"del2_{name}"):
+                                all_briefs = load_briefs()
+                                if name in all_briefs:
+                                    del all_briefs[name]
+                                    st.session_state.saved_briefs = all_briefs
+                                    save_briefs()
+                                    if name in st.session_state.filtered_briefs:
+                                        del st.session_state.filtered_briefs[name]
+                                    st.warning(f"❌ Brief '{name}' supprimé.")
+                                    st.rerun()
 
 # ---------------- AVANT-BRIEF ----------------
 with tab2:
@@ -445,7 +548,7 @@ with tab2:
                 unsafe_allow_html=True)
 
     # Titre pour le tableau
-    st.subheader("Portrait robot candidat")
+    st.subheader("📋 Portrait robot candidat")
 
     # Organisation structurée sous forme de tableau minimaliste
     st.markdown("""
@@ -625,13 +728,76 @@ with tab3:
     st.progress(int((step / total_steps) * 100), text=f"Étape {step}/{total_steps}")
 
     if step == 1:
-        st.subheader("1️⃣ Incidents Critiques")
-        st.text_area("Réussite exceptionnelle - Contexte", key="reussite_contexte", height=100)
-        st.text_area("Réussite exceptionnelle - Actions", key="reussite_actions", height=100)
-        st.text_area("Réussite exceptionnelle - Résultat", key="reussite_resultat", height=100)
-        st.text_area("Échec significatif - Contexte", key="echec_contexte", height=100)
-        st.text_area("Échec significatif - Causes", key="echec_causes", height=100)
-        st.text_area("Échec significatif - Impact", key="echec_impact", height=100)
+        st.subheader("📋 Portrait robot candidat - Validation manager")
+        
+        # Afficher le tableau du portrait robot avec une colonne pour les notes du manager
+        st.info("Veuillez valider et compléter le portrait robot candidat")
+        
+        # Créer un formulaire pour que le manager puisse ajouter ses notes
+        st.markdown("""
+        <style>
+        .manager-notes {
+            background-color: #262730;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        st.markdown('<div class="manager-notes">', unsafe_allow_html=True)
+        st.text_area("Notes du manager", key="manager_notes", height=150, 
+                    placeholder="Ajoutez vos commentaires et notes sur le portrait robot candidat...")
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Afficher le tableau du portrait robot (similaire à l'onglet Avant-brief)
+        st.markdown("""
+        <table class="minimal-table">
+            <tr>
+                <th class="section-col">Section</th>
+                <th class="details-col">Détails</th>
+                <th class="info-col">Informations</th>
+            </tr>
+            <tr>
+                <td rowspan="3" class="section-col">Contexte du poste</td>
+                <td class="details-col">Raison de l'ouverture</td>
+                <td>{raison_ouverture}</td>
+            </tr>
+            <tr>
+                <td class="details-col">Mission globale</td>
+                <td>{mission_globale}</td>
+            </tr>
+            <tr>
+                <td class="details-col">Défis principaux</td>
+                <td>{defis_principaux}</td>
+            </tr>
+            <tr>
+                <td rowspan="4" class="section-col">Profil recherché</td>
+                <td class="details-col">Expérience</td>
+                <td>{experience}</td>
+            </tr>
+            <tr>
+                <td class="details-col">Connaissances / Diplômes / Certifications</td>
+                <td>{diplomes}</td>
+            </tr>
+            <tr>
+                <td class="details-col">Compétences / Outils</td>
+                <td>{competences}</td>
+            </tr>
+            <tr>
+                <td class="details-col">Soft skills / aptitudes comportementales</td>
+                <td>{soft_skills}</td>
+            </tr>
+        </table>
+        """.format(
+            raison_ouverture=st.session_state.get("raison_ouverture", "Non renseigné"),
+            mission_globale=st.session_state.get("mission_globale", "Non renseigné"),
+            defis_principaux=st.session_state.get("defis_principaux", "Non renseigné"),
+            experience=st.session_state.get("experience_requise", "Non renseigné"),
+            diplomes=st.session_state.get("diplomes_certifications", "Non renseigné"),
+            competences=st.session_state.get("competences_outils", "Non renseigné"),
+            soft_skills=st.session_state.get("soft_skills", "Non renseigné")
+        ), unsafe_allow_html=True)
 
     elif step == 2:
         st.subheader("2️⃣ Questions Comportementales")
@@ -640,8 +806,8 @@ with tab3:
         st.text_area("Compétences évaluées", key="comp_eval1", height=100)
 
     elif step == 3:
-        st.subheader("3️⃣ Validation Matrice KSA")
-        render_ksa_section()
+        st.subheader("📊 Matrice KSA - Validation manager")
+        render_ksa_matrix()
 
     elif step == 4:
         st.subheader("4️⃣ Stratégie Recrutement")
@@ -653,7 +819,9 @@ with tab3:
             if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
                 brief_name = st.session_state.current_brief_name
                 st.session_state.saved_briefs[brief_name].update({
-                    "ksa_data": st.session_state.get("ksa_data", {})
+                    "ksa_data": st.session_state.get("ksa_data", {}),
+                    "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict(),
+                    "manager_notes": st.session_state.get("manager_notes", "")
                 })
                 save_briefs()
                 st.success("✅ Données de réunion sauvegardées")
@@ -693,10 +861,10 @@ with tab4:
         "Poste": st.session_state.get("poste_intitule", ""),
         "Manager": st.session_state.get("manager_nom", ""),
         "Recruteur": st.session_state.get("recruteur", ""),
+        "Type": st.session_state.get("brief_type", ""),
         "Affectation": f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}",
         "Date": str(st.session_state.get("date_brief", "")),
         "Raison ouverture": st.session_state.get("raison_ouverture", ""),
-        "Impact stratégique": st.session_state.get("impact_strategique", ""),
         "Défis principaux": st.session_state.get("defis_principaux", ""),
         "Entreprises profil": st.session_state.get("entreprises_profil", ""),
         "Canaux": st.session_state.get("canaux_profil", ""),
@@ -706,13 +874,24 @@ with tab4:
     st.subheader("📊 Calcul automatique du Score Global")
     score_total = 0
     count = 0
-    if "ksa_data" in st.session_state:
+    
+    # Calcul basé sur la matrice KSA
+    if hasattr(st.session_state, 'ksa_matrix') and not st.session_state.ksa_matrix.empty:
+        if "Échelle d'évaluation (1-5)" in st.session_state.ksa_matrix.columns:
+            scores = st.session_state.ksa_matrix["Échelle d'évaluation (1-5)"].astype(int)
+            score_global = scores.mean()
+            st.metric("Score Global Cible", f"{score_global:.2f}/5")
+    
+    # Calcul de secours basé sur l'ancien système KSA
+    elif "ksa_data" in st.session_state:
         for cat, comps in st.session_state.ksa_data.items():
             for comp, details in comps.items():
                 score_total += int(details.get("score") or 0)
                 count += 1
-    score_global = (score_total / count) if count else 0
-    st.metric("Score Global Cible", f"{score_global:.2f}/5")
+        score_global = (score_total / count) if count else 0
+        st.metric("Score Global Cible", f"{score_global:.2f}/5")
+    else:
+        st.info("ℹ️ Aucune donnée KSA disponible pour calculer le score")
 
     if st.button("💾 Confirmer sauvegarde", type="primary", use_container_width=True):
         if "current_brief_name" in st.session_state:
