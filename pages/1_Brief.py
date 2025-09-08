@@ -440,154 +440,226 @@ with tab2:
         st.info("💡 Utilisez l'onglet Gestion pour créer un nouveau brief ou charger un template existant")
         st.stop()  # Arrête le rendu de cet onglet
     
-    # Afficher les informations du brief en cours
-    st.subheader(f"🔄 Avant-brief (Préparation) - {st.session_state.get('poste_intitule', '')}")
-    st.info(f"Manager: {st.session_state.get('manager_nom', '')} | Recruteur: {st.session_state.get('recruteur', '')}")
+    # Afficher les informations du brief en cours avec Manager/Recruteur à droite
+    col_title, col_info = st.columns([3, 2])
+    with col_title:
+        st.subheader(f"🔄 Avant-brief (Préparation) - {st.session_state.get('poste_intitule', '')}")
+    with col_info:
+        st.markdown(f"<p style='text-align: right; font-size: 0.9em; margin-top: 1.5em; color: #ccc;'>Manager: {st.session_state.get('manager_nom', '')} | Recruteur: {st.session_state.get('recruteur', '')}</p>", unsafe_allow_html=True)
     
     st.info("Remplissez les informations préparatoires avant la réunion avec le manager.")
 
-    # Organisation structurée sous forme de tableau
+    # Organisation structurée sous forme de tableau amélioré
     st.markdown("""
     <style>
-    .custom-table {
+    .brief-table {
         width: 100%;
         border-collapse: collapse;
         margin-bottom: 20px;
+        font-family: Arial, sans-serif;
     }
-    .custom-table th, .custom-table td {
-        border: 1px solid #424242;
-        padding: 8px;
+    .brief-table th {
+        background-color: #2c2c36;
+        color: #FF4B4B;
+        padding: 12px;
         text-align: left;
+        font-weight: bold;
+        border: 1px solid #424242;
+    }
+    .brief-table td {
+        padding: 12px;
+        border: 1px solid #424242;
         vertical-align: top;
     }
-    .custom-table th {
-        background-color: #262730;
+    .section-header {
+        background-color: #2c2c36;
+        color: #FF4B4B;
         font-weight: bold;
     }
-    .section-col {
-        width: 20%;
-    }
-    .details-col {
-        width: 40%;
-    }
-    .info-col {
-        width: 40%;
+    .detail-cell {
+        font-weight: 500;
+        color: #FAFAFA;
     }
     .info-textarea {
         width: 100%;
-        height: 80px;
+        min-height: 80px;
         background-color: #262730;
         color: white;
-        border: none;
+        border: 1px solid #424242;
         border-radius: 4px;
         padding: 8px;
-        margin-bottom: 10px;
+        resize: vertical;
+        font-family: Arial, sans-serif;
     }
-    .detail-row {
-        margin-bottom: 15px;
+    .info-textarea:focus {
+        outline: none;
+        border-color: #FF4B4B;
     }
     </style>
     
-    <table class="custom-table">
+    <table class="brief-table">
         <tr>
-            <th class="section-col">Section</th>
-            <th class="details-col">Détails</th>
-            <th class="info-col">Infos de départ</th>
+            <th style="width: 20%;">Section</th>
+            <th style="width: 30%;">Détails</th>
+            <th style="width: 50%;">Informations</th>
         </tr>
         <!-- Contexte du poste -->
+        <tr class="section-header">
+            <td colspan="3">Contexte du poste</td>
+        </tr>
         <tr>
-            <td rowspan="3"><strong>Contexte du poste</strong></td>
-            <td class="detail-row">Raison de l'ouverture</td>
+            <td></td>
+            <td class="detail-cell">Raison de l'ouverture</td>
             <td><textarea class="info-textarea" placeholder="Remplacement / Création / Évolution interne"></textarea></td>
         </tr>
         <tr>
-            <td class="detail-row">Mission globale</td>
+            <td></td>
+            <td class="detail-cell">Mission globale</td>
             <td><textarea class="info-textarea" placeholder="Résumé du rôle et objectif principal"></textarea></td>
         </tr>
         <tr>
-            <td class="detail-row">Défis principaux</td>
+            <td></td>
+            <td class="detail-cell">Défis principaux</td>
             <td><textarea class="info-textarea" placeholder="Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"></textarea></td>
         </tr>
         <!-- Organisation et hiérarchie -->
+        <tr class="section-header">
+            <td colspan="3">Organisation et hiérarchie</td>
+        </tr>
         <tr>
-            <td rowspan="2"><strong>Organisation et hiérarchie</strong></td>
-            <td class="detail-row">Rattachement hiérarchique</td>
+            <td></td>
+            <td class="detail-cell">Rattachement hiérarchique</td>
             <td><textarea class="info-textarea" placeholder="Responsable direct, département / service"></textarea></td>
         </tr>
         <tr>
-            <td class="detail-row">Équipe</td>
+            <td></td>
+            <td class="detail-cell">Équipe</td>
             <td><textarea class="info-textarea" placeholder="Taille, rôle des collaborateurs, interaction avec autres services"></textarea></td>
         </tr>
         <!-- Profil recherché -->
+        <tr class="section-header">
+            <td colspan="3">Profil recherché</td>
+        </tr>
         <tr>
-            <td rowspan="4"><strong>Profil recherché</strong></td>
-            <td class="detail-row">Expérience</td>
+            <td></td>
+            <td class="detail-cell">Expérience</td>
             <td><textarea class="info-textarea" placeholder="Nombre d'années minimum, expériences similaires dans le secteur"></textarea></td>
         </tr>
         <tr>
-            <td class="detail-row">Connaissances / Diplômes / Certifications</td>
+            <td></td>
+            <td class="detail-cell">Connaissances / Diplômes / Certifications</td>
             <td><textarea class="info-textarea" placeholder="Diplômes exigés, certifications spécifiques"></textarea></td>
         </tr>
         <tr>
-            <td class="detail-row">Compétences / Outils</td>
+            <td></td>
+            <td class="detail-cell">Compétences / Outils</td>
             <td><textarea class="info-textarea" placeholder="Techniques, logiciels, méthodes à maîtriser"></textarea></td>
         </tr>
         <tr>
-            <td class="detail-row">Soft skills / aptitudes comportementales</td>
+            <td></td>
+            <td class="detail-cell">Soft skills / aptitudes comportementales</td>
             <td><textarea class="info-textarea" placeholder="Leadership, rigueur, communication, autonomie"></textarea></td>
         </tr>
         <!-- Sourcing et marché -->
+        <tr class="section-header">
+            <td colspan="3">Sourcing et marché</td>
+        </tr>
         <tr>
-            <td rowspan="3"><strong>Sourcing et marché</strong></td>
-            <td class="detail-row">Entreprises où trouver ce profil</td>
+            <td></td>
+            <td class="detail-cell">Entreprises où trouver ce profil</td>
             <td><textarea class="info-textarea" placeholder="Concurrents, secteurs similaires"></textarea></td>
         </tr>
         <tr>
-            <td class="detail-row">Synonymes / intitulés proches</td>
+            <td></td>
+            <td class="detail-cell">Synonymes / intitulés proches</td>
             <td><textarea class="info-textarea" placeholder="Titres alternatifs pour affiner le sourcing"></textarea></td>
         </tr>
         <tr>
-            <td class="detail-row">Canaux à utiliser</td>
+            <td></td>
+            <td class="detail-cell">Canaux à utiliser</td>
             <td><textarea class="info-textarea" placeholder="LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"></textarea></td>
         </tr>
         <!-- Conditions et contraintes -->
+        <tr class="section-header">
+            <td colspan="3">Conditions et contraintes</td>
+        </tr>
         <tr>
-            <td rowspan="2"><strong>Conditions et contraintes</strong></td>
-            <td class="detail-row">Localisation</td>
+            <td></td>
+            <td class="detail-cell">Localisation</td>
             <td><textarea class="info-textarea" placeholder="Site principal, télétravail, déplacements"></textarea></td>
         </tr>
         <tr>
-            <td class="detail-row">Budget recrutement</td>
+            <td></td>
+            <td class="detail-cell">Budget recrutement</td>
             <td><textarea class="info-textarea" placeholder="Salaire indicatif, avantages, primes éventuelles"></textarea></td>
         </tr>
         <!-- Missions / Tâches -->
+        <tr class="section-header">
+            <td colspan="3">Missions / Tâches</td>
+        </tr>
         <tr>
-            <td rowspan="2"><strong>Missions / Tâches</strong></td>
-            <td class="detail-row">Tâches principales</td>
+            <td></td>
+            <td class="detail-cell">Tâches principales</td>
             <td><textarea class="info-textarea" placeholder="4-6 missions détaillées"></textarea></td>
         </tr>
         <tr>
-            <td class="detail-row">Autres responsabilités</td>
+            <td></td>
+            <td class="detail-cell">Autres responsabilités</td>
             <td><textarea class="info-textarea" placeholder="Points additionnels ou spécifiques à préciser"></textarea></td>
         </tr>
         <!-- Notes libres -->
+        <tr class="section-header">
+            <td colspan="3">Notes libres</td>
+        </tr>
         <tr>
-            <td rowspan="2"><strong>Notes libres</strong></td>
-            <td class="detail-row">Points à discuter ou à clarifier avec le manager</td>
+            <td></td>
+            <td class="detail-cell">Points à discuter ou à clarifier avec le manager</td>
             <td><textarea class="info-textarea" placeholder="Points à discuter ou à clarifier"></textarea></td>
         </tr>
         <tr>
-            <td class="detail-row">Case libre</td>
+            <td></td>
+            <td class="detail-cell">Case libre</td>
             <td><textarea class="info-textarea" placeholder="Pour tout point additionnel ou remarque spécifique"></textarea></td>
         </tr>
     </table>
     """, unsafe_allow_html=True)
 
+    # Section Profils pertinents
+    st.subheader("🔗 Profils pertinents")
+    st.info("Ajoutez jusqu'à 3 liens vers des profils pertinents basés sur votre brief")
+    
+    # Initialiser les liens s'ils n'existent pas
+    if "profil_links" not in st.session_state:
+        st.session_state.profil_links = ["", "", ""]
+    
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.text_input("Lien profil 1", value=st.session_state.profil_links[0], key="profil_link_1", 
+                     placeholder="https://linkedin.com/in/profil-1")
+    
+    with col2:
+        st.text_input("Lien profil 2", value=st.session_state.profil_links[1], key="profil_link_2", 
+                     placeholder="https://linkedin.com/in/profil-2")
+    
+    with col3:
+        st.text_input("Lien profil 3", value=st.session_state.profil_links[2], key="profil_link_3", 
+                     placeholder="https://linkedin.com/in/profil-3")
+
     if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True):
         if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
             brief_name = st.session_state.current_brief_name
-            # Ici vous devriez ajouter la logique pour récupérer les données des textareas
-            # et les sauvegarder dans st.session_state.saved_briefs[brief_name]
+            
+            # Sauvegarder les liens de profils
+            st.session_state.profil_links = [
+                st.session_state.get("profil_link_1", ""),
+                st.session_state.get("profil_link_2", ""),
+                st.session_state.get("profil_link_3", "")
+            ]
+            
+            # Mettre à jour le brief avec les liens
+            st.session_state.saved_briefs[brief_name]["profil_links"] = st.session_state.profil_links
+            
             save_briefs()
             st.success("✅ Modifications sauvegardées")
         else:
