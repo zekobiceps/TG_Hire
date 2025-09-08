@@ -266,19 +266,21 @@ with tab1:
     with col_main:
         st.subheader("Informations de base")
         
+        # Choix entre créer un brief ou un canevas
+        creation_type = st.radio("Type de création", ["Créer un brief", "Créer un canevas"], horizontal=True)
+        
         # --- INFOS DE BASE (3 colonnes)
         col1, col2, col3 = st.columns(3)
         with col1:
             st.text_input("Nom du manager *", key="manager_nom")
         with col2:
             st.text_input("Poste à recruter *", key="niveau_hierarchique")
-            st.selectbox("Recruteur *", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="recruteur")
+            # Date du Brief placée à droite du recruteur
+            st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date())
         with col3:
+            st.selectbox("Recruteur *", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="recruteur")
             st.selectbox("Affectation", ["", "Chantier", "Siège"], key="affectation_type")
             st.text_input("Nom de l'affectation", key="affectation_nom")
-        
-        # Nouvelle disposition pour Date du Brief
-        st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date())
         
         # Placeholder pour les messages d'erreur/confirmation
         message_placeholder = st.empty()
@@ -312,10 +314,11 @@ with tab1:
                     "synonymes_poste": st.session_state.get("synonymes_poste", ""),
                     "budget": st.session_state.get("budget", ""),
                     "commentaires": st.session_state.get("commentaires", ""),
-                    "ksa_data": st.session_state.get("ksa_data", {})
+                    "ksa_data": st.session_state.get("ksa_data", {}),
+                    "creation_type": creation_type
                 }
                 save_briefs()
-                message_placeholder.success(f"✅ Brief '{brief_name}' sauvegardé avec succès !")
+                message_placeholder.success(f"✅ {creation_type} '{brief_name}' sauvegardé avec succès !")
                 st.session_state.current_brief_name = brief_name
                 st.session_state.brief_created = True
 
@@ -385,6 +388,7 @@ with tab1:
                     st.write(f"**Poste:** {data.get('poste_intitule', '')}")
                     st.write(f"**Manager:** {data.get('manager_nom', '')}")
                     st.write(f"**Recruteur:** {data.get('recruteur', '')}")
+                    st.write(f"**Type:** {data.get('creation_type', 'Brief')}")
                     st.write(f"**Affectation:** {data.get('affectation_type', '')} - {data.get('affectation_nom', '')}")
                     st.write(f"**Date:** {data.get('date_brief', '')}")
                     
@@ -392,22 +396,12 @@ with tab1:
                     with colA:
                         if st.button(f"📂 Charger", key=f"load_{name}"):
                             try:
-                                # Mise à jour des champs de base
-                                st.session_state.manager_nom = data.get("manager_nom", "")
-                                st.session_state.niveau_hierarchique = data.get("niveau_hierarchique", data.get("poste_intitule", ""))
-                                st.session_state.recruteur = data.get("recruteur", "")
-                                st.session_state.affectation_type = data.get("affectation_type", "")
-                                st.session_state.affectation_nom = data.get("affectation_nom", "")
+                                # Stocker les données sans modifier directement les widgets
+                                st.session_state.current_brief_data = data
+                                st.session_state.current_brief_name = name
+                                st.session_state.brief_created = True
                                 
-                                # Conversion de la date
-                                date_str = data.get("date_brief", "")
-                                if date_str:
-                                    try:
-                                        st.session_state.date_brief = datetime.strptime(date_str, "%Y-%m-%d").date()
-                                    except:
-                                        st.session_state.date_brief = datetime.today().date()
-                                
-                                # Mettre à jour les champs de l'avant-brief
+                                # Mettre à jour les champs non-widgets
                                 non_widget_keys = ["raison_ouverture", "impact_strategique", "rattachement", 
                                                   "defis_principaux", "entreprises_profil", "canaux_profil",
                                                   "synonymes_poste", "budget", "commentaires"]
@@ -420,9 +414,7 @@ with tab1:
                                 if "ksa_data" in data:
                                     st.session_state.ksa_data = data["ksa_data"]
                                 
-                                st.session_state.current_brief_name = name
-                                st.session_state.brief_created = True
-                                st.success(f"✅ Brief '{name}' chargé avec succès!")
+                                st.success(f"✅ {data.get('creation_type', 'Brief')} '{name}' chargé avec succès!")
                                 st.rerun()
                             
                             except Exception as e:
@@ -436,7 +428,7 @@ with tab1:
                                 save_briefs()
                                 if name in st.session_state.filtered_briefs:
                                     del st.session_state.filtered_briefs[name]
-                                st.warning(f"❌ Brief '{name}' supprimé.")
+                                st.warning(f"❌ {data.get('creation_type', 'Brief')} '{name}' supprimé.")
                                 st.rerun()
 
 # ---------------- AVANT-BRIEF ----------------
@@ -444,7 +436,6 @@ with tab2:
     # Vérification si un brief a été créé
     if not st.session_state.get("brief_created", False):
         st.warning("⚠️ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
-        st.info("💡 Utilisez l'onglet Gestion pour créer un nouveau brief ou charger un template existant")
         st.stop()
     
     # Afficher les informations du brief en cours
@@ -587,8 +578,7 @@ with tab2:
 with tab3:
     # Vérification si l'avant-brief a été sauvegardé
     if not st.session_state.get("avant_brief_saved", False):
-        st.warning("⚠️ Veuillez d'abord sauvegarder l'Avant-brief")
-        st.info("💡 Utilisez l'onglet Avant-brief pour préparer et sauvegarder les informations")
+        st.warning("⚠️ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
         st.stop()
     
     # Afficher les informations du brief en cours
@@ -657,8 +647,7 @@ with tab3:
 with tab4:
     # Vérification si un brief est chargé
     if "current_brief_name" not in st.session_state or st.session_state.current_brief_name == "":
-        st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
-        st.info("💡 Utilisez l'onglet Gestion pour créer un nouveau brief ou charger un template existant")
+        st.warning("⚠️ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
         st.stop()
     
     # Afficher les informations du brief en cours
