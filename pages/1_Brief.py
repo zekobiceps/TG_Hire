@@ -264,63 +264,71 @@ with tab1:
     col_main, col_side = st.columns([2, 1])
     
     with col_main:
+        # Nouvelle disposition pour le type de création
+        col_type, col_btn = st.columns([2, 1])
+        with col_type:
+            creation_type = st.radio("Type de création", ["Créer un brief", "Créer un canevas"], horizontal=True)
+        
         st.subheader("Informations de base")
         
-        # Choix entre créer un brief ou un canevas
-        creation_type = st.radio("Type de création", ["Créer un brief", "Créer un canevas"], horizontal=True)
-        
-        # --- INFOS DE BASE (3 colonnes)
+        # --- INFOS DE BASE (3 colonnes avec réorganisation)
         col1, col2, col3 = st.columns(3)
         with col1:
             st.text_input("Nom du manager *", key="manager_nom")
+            # Nom de l'affectation déplacé ici
+            st.text_input("Nom de l'affectation", key="affectation_nom")
         with col2:
             st.text_input("Poste à recruter *", key="niveau_hierarchique")
-            # Date du Brief placée à droite du recruteur
-            st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date())
-        with col3:
             st.selectbox("Recruteur *", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="recruteur")
+            # Affectation déplacée ici
             st.selectbox("Affectation", ["", "Chantier", "Siège"], key="affectation_type")
-            st.text_input("Nom de l'affectation", key="affectation_nom")
+        with col3:
+            # Date du Brief déplacée ici
+            st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date())
         
         # Placeholder pour les messages d'erreur/confirmation
         message_placeholder = st.empty()
 
         # --- SAUVEGARDE
-        if st.button("💾 Sauvegarder le Brief", type="primary", use_container_width=True):
-            # Utiliser niveau_hierarchique comme intitulé du poste
-            st.session_state.poste_intitule = st.session_state.niveau_hierarchique
-            
-            if not all([st.session_state.niveau_hierarchique, st.session_state.manager_nom, st.session_state.recruteur, st.session_state.date_brief]):
-                message_placeholder.error("Veuillez remplir tous les champs obligatoires (*)")
-            else:
-                brief_name = generate_automatic_brief_name()
-                if "saved_briefs" not in st.session_state:
-                    st.session_state.saved_briefs = {}
+        with col_btn:
+            if st.button("💾 Sauvegarder le Brief", type="primary", use_container_width=True):
+                # Utiliser niveau_hierarchique comme intitulé du poste
+                st.session_state.poste_intitule = st.session_state.niveau_hierarchique
                 
-                st.session_state.saved_briefs[brief_name] = {
-                    "poste_intitule": st.session_state.niveau_hierarchique,
-                    "manager_nom": st.session_state.manager_nom,
-                    "recruteur": st.session_state.recruteur,
-                    "date_brief": str(st.session_state.date_brief),
-                    "niveau_hierarchique": st.session_state.niveau_hierarchique,
-                    "affectation_type": st.session_state.affectation_type,
-                    "affectation_nom": st.session_state.affectation_nom,
-                    "raison_ouverture": st.session_state.get("raison_ouverture", ""),
-                    "impact_strategique": st.session_state.get("impact_strategique", ""),
-                    "rattachement": st.session_state.get("rattachement", ""),
-                    "defis_principaux": st.session_state.get("defis_principaux", ""),
-                    "entreprises_profil": st.session_state.get("entreprises_profil", ""),
-                    "canaux_profil": st.session_state.get("canaux_profil", ""),
-                    "synonymes_poste": st.session_state.get("synonymes_poste", ""),
-                    "budget": st.session_state.get("budget", ""),
-                    "commentaires": st.session_state.get("commentaires", ""),
-                    "ksa_data": st.session_state.get("ksa_data", {}),
-                    "creation_type": creation_type
-                }
-                save_briefs()
-                message_placeholder.success(f"✅ {creation_type} '{brief_name}' sauvegardé avec succès !")
-                st.session_state.current_brief_name = brief_name
-                st.session_state.brief_created = True
+                if not all([st.session_state.niveau_hierarchique, st.session_state.manager_nom, st.session_state.recruteur, st.session_state.date_brief]):
+                    message_placeholder.error("Veuillez remplir tous les champs obligatoires (*)")
+                else:
+                    brief_name = generate_automatic_brief_name()
+                    if "saved_briefs" not in st.session_state:
+                        st.session_state.saved_briefs = {}
+                    
+                    st.session_state.saved_briefs[brief_name] = {
+                        "poste_intitule": st.session_state.niveau_hierarchique,
+                        "manager_nom": st.session_state.manager_nom,
+                        "recruteur": st.session_state.recruteur,
+                        "date_brief": str(st.session_state.date_brief),
+                        "niveau_hierarchique": st.session_state.niveau_hierarchique,
+                        "affectation_type": st.session_state.affectation_type,
+                        "affectation_nom": st.session_state.affectation_nom,
+                        "raison_ouverture": st.session_state.get("raison_ouverture", ""),
+                        "impact_strategique": st.session_state.get("impact_strategique", ""),
+                        "rattachement": st.session_state.get("rattachement", ""),
+                        "defis_principaux": st.session_state.get("defis_principaux", ""),
+                        "entreprises_profil": st.session_state.get("entreprises_profil", ""),
+                        "canaux_profil": st.session_state.get("canaux_profil", ""),
+                        "synonymes_poste": st.session_state.get("synonymes_poste", ""),
+                        "budget": st.session_state.get("budget", ""),
+                        "commentaires": st.session_state.get("commentaires", ""),
+                        "ksa_data": st.session_state.get("ksa_data", {}),
+                        "creation_type": creation_type
+                    }
+                    save_briefs()
+                    if creation_type == "Créer un canevas":
+                        message_placeholder.success(f"✅ Canevas '{brief_name}' sauvegardé avec succès !")
+                    else:
+                        message_placeholder.success(f"✅ {creation_type} '{brief_name}' sauvegardé avec succès !")
+                    st.session_state.current_brief_name = brief_name
+                    st.session_state.brief_created = True
 
     with col_side:
         st.subheader("Recherche & Chargement")
@@ -341,6 +349,9 @@ with tab1:
             affectation = st.selectbox("Affectation", ["", "Chantier", "Siège"], key="search_affectation")
         with col_nom_affect:
             nom_affectation = st.text_input("Nom de l'affectation", key="search_nom_affectation")
+        
+        # Nouveau filtre pour le type de création
+        type_recherche = st.selectbox("Type", ["", "Brief", "Canevas"], key="search_type")
 
         if st.button("🔎 Rechercher", type="secondary", use_container_width=True):
             briefs = load_briefs()
@@ -373,6 +384,13 @@ with tab1:
                 # Filtrage par nom d'affectation
                 if nom_affectation and nom_affectation != "" and nom_affectation.lower() not in data.get("affectation_nom", "").lower():
                     continue
+                
+                # Filtrage par type
+                if type_recherche and type_recherche != "":
+                    creation_type_data = data.get("creation_type", "Créer un brief")
+                    if (type_recherche == "Brief" and creation_type_data != "Créer un brief") or \
+                       (type_recherche == "Canevas" and creation_type_data != "Créer un canevas"):
+                        continue
                 
                 st.session_state.filtered_briefs[name] = data
             
@@ -578,7 +596,7 @@ with tab2:
 with tab3:
     # Vérification si l'avant-brief a été sauvegardé
     if not st.session_state.get("avant_brief_saved", False):
-        st.warning("⚠️ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
+        st.warning("⚠️ Veuillez d'abord compléter et sauvegarder l'Avant-brief")
         st.stop()
     
     # Afficher les informations du brief en cours
@@ -626,6 +644,7 @@ with tab3:
                     "ksa_data": st.session_state.get("ksa_data", {})
                 })
                 save_briefs()
+                st.session_state.reunion_saved = True
                 st.success("✅ Données de réunion sauvegardées")
             else:
                 st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
@@ -645,9 +664,9 @@ with tab3:
 
 # ---------------- SYNTHÈSE ----------------
 with tab4:
-    # Vérification si un brief est chargé
-    if "current_brief_name" not in st.session_state or st.session_state.current_brief_name == "":
-        st.warning("⚠️ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
+    # Vérification si la réunion a été sauvegardée
+    if not st.session_state.get("reunion_saved", False):
+        st.warning("⚠️ Veuillez d'abord compléter et sauvegarder la Réunion de brief")
         st.stop()
     
     # Afficher les informations du brief en cours
