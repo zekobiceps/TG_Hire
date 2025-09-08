@@ -440,115 +440,103 @@ with tab2:
         st.info("💡 Utilisez l'onglet Gestion pour créer un nouveau brief ou charger un template existant")
         st.stop()  # Arrête le rendu de cet onglet
     
-    # Afficher les informations du brief en cours avec Manager/Recruteur à droite
-    col_title, col_info = st.columns([3, 2])
-    with col_title:
-        st.subheader(f"🔄 Avant-brief (Préparation) - {st.session_state.get('poste_intitule', '')}")
-    with col_info:
-        st.markdown(f"<p style='text-align: right; font-size: 0.9em; margin-top: 1.5em; color: #ccc;'>Manager: {st.session_state.get('manager_nom', '')} | Recruteur: {st.session_state.get('recruteur', '')}</p>", unsafe_allow_html=True)
+    # Afficher les informations du brief en cours avec Manager/Recruteur à gauche
+    st.subheader(f"🔄 Avant-brief (Préparation) - {st.session_state.get('poste_intitule', '')} - Manager: {st.session_state.get('manager_nom', '')} | Recruteur: {st.session_state.get('recruteur', '')}")
     
     st.info("Remplissez les informations préparatoires avant la réunion avec le manager.")
 
-    # Organisation structurée sous forme de tableau
+    # Titre pour le tableau
+    st.subheader("📋 Fiche de poste")
+
+    # Organisation structurée sous forme de tableau minimaliste
     st.markdown("""
     <table class="comparison-table">
         <tr>
-            <th>Section</th>
-            <th>Détails</th>
-            <th>Informations</th>
+            <th style="width: 20%;">Section</th>
+            <th style="width: 30%;">Détails</th>
+            <th style="width: 50%;">Informations</th>
         </tr>
         <!-- Contexte du poste -->
         <tr>
             <td rowspan="3"><strong>Contexte du poste</strong></td>
             <td>Raison de l'ouverture</td>
-            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Remplacement / Création / Évolution interne"></textarea></td>
+            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
         </tr>
         <tr>
             <td>Mission globale</td>
-            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Résumé du rôle et objectif principal"></textarea></td>
+            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
         </tr>
         <tr>
             <td>Défis principaux</td>
-            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"></textarea></td>
-        </tr>
-        <!-- Organisation et hiérarchie -->
-        <tr>
-            <td rowspan="2"><strong>Organisation et hiérarchie</strong></td>
-            <td>Rattachement hiérarchique</td>
-            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Responsable direct, département / service"></textarea></td>
-        </tr>
-        <tr>
-            <td>Équipe</td>
-            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Taille, rôle des collaborateurs, interaction avec autres services"></textarea></td>
+            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
         </tr>
         <!-- Profil recherché -->
         <tr>
             <td rowspan="4"><strong>Profil recherché</strong></td>
             <td>Expérience</td>
-            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Nombre d'années minimum, expériences similaires dans le secteur"></textarea></td>
+            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
         </tr>
         <tr>
             <td>Connaissances / Diplômes / Certifications</td>
-            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Diplômes exigés, certifications spécifiques"></textarea></td>
+            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
         </tr>
         <tr>
             <td>Compétences / Outils</td>
-            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Techniques, logiciels, méthodes à maîtriser"></textarea></td>
+            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
         </tr>
         <tr>
             <td>Soft skills / aptitudes comportementales</td>
-            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Leadership, rigueur, communication, autonomie"></textarea></td>
-        </tr>
-        <!-- Sourcing et marché -->
-        <tr>
-            <td rowspan="3"><strong>Sourcing et marché</strong></td>
-            <td>Entreprises où trouver ce profil</td>
-            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Concurrents, secteurs similaires"></textarea></td>
-        </tr>
-        <tr>
-            <td>Synonymes / intitulés proches</td>
-            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Titres alternatifs pour affiner le sourcing"></textarea></td>
-        </tr>
-        <tr>
-            <td>Canaux à utiliser</td>
-            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"></textarea></td>
-        </tr>
-        <!-- Conditions et contraintes -->
-        <tr>
-            <td rowspan="2"><strong>Conditions et contraintes</strong></td>
-            <td>Localisation</td>
-            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Site principal, télétravail, déplacements"></textarea></td>
-        </tr>
-        <tr>
-            <td>Budget recrutement</td>
-            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Salaire indicatif, avantages, primes éventuelles"></textarea></td>
+            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
         </tr>
         <!-- Missions / Tâches -->
         <tr>
             <td rowspan="2"><strong>Missions / Tâches</strong></td>
             <td>Tâches principales</td>
-            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="4-6 missions détaillées"></textarea></td>
+            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
         </tr>
         <tr>
             <td>Autres responsabilités</td>
-            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Points additionnels ou spécifiques à préciser"></textarea></td>
+            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+        </tr>
+        <!-- Sourcing et marché -->
+        <tr>
+            <td rowspan="3"><strong>Sourcing et marché</strong></td>
+            <td>Entreprises où trouver ce profil</td>
+            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+        </tr>
+        <tr>
+            <td>Synonymes / intitulés proches</td>
+            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+        </tr>
+        <tr>
+            <td>Canaux à utiliser</td>
+            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+        </tr>
+        <!-- Conditions et contraintes -->
+        <tr>
+            <td rowspan="2"><strong>Conditions et contraintes</strong></td>
+            <td>Localisation</td>
+            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
+        </tr>
+        <tr>
+            <td>Budget recrutement</td>
+            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
         </tr>
         <!-- Notes libres -->
         <tr>
             <td rowspan="2"><strong>Notes libres</strong></td>
             <td>Points à discuter ou à clarifier avec le manager</td>
-            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Points à discuter ou à clarifier"></textarea></td>
+            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
         </tr>
         <tr>
             <td>Case libre</td>
-            <td><textarea style="width: 100%; height: 60px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;" placeholder="Pour tout point additionnel ou remarque spécifique"></textarea></td>
+            <td><textarea style="width: 100%; height: 40px; background-color: #262730; color: white; border: none; border-radius: 4px; padding: 8px;"></textarea></td>
         </tr>
     </table>
     """, unsafe_allow_html=True)
 
     # Section Profils pertinents
     st.subheader("🔗 Profils pertinents")
-    st.info("Ajoutez jusqu'à 3 liens vers des profils pertinents basés sur votre brief")
     
     # Initialiser les liens s'ils n'existent pas
     if "profil_links" not in st.session_state:
@@ -557,16 +545,13 @@ with tab2:
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.text_input("Lien profil 1", value=st.session_state.profil_links[0], key="profil_link_1", 
-                     placeholder="https://linkedin.com/in/profil-1")
+        st.text_input("Lien profil 1", value=st.session_state.profil_links[0], key="profil_link_1")
     
     with col2:
-        st.text_input("Lien profil 2", value=st.session_state.profil_links[1], key="profil_link_2", 
-                     placeholder="https://linkedin.com/in/profil-2")
+        st.text_input("Lien profil 2", value=st.session_state.profil_links[1], key="profil_link_2")
     
     with col3:
-        st.text_input("Lien profil 3", value=st.session_state.profil_links[2], key="profil_link_3", 
-                     placeholder="https://linkedin.com/in/profil-3")
+        st.text_input("Lien profil 3", value=st.session_state.profil_links[2], key="profil_link_3")
 
     if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True):
         if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
