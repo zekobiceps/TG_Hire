@@ -452,188 +452,111 @@ with tab2:
         <table class="comparison-table">
             <tr>
                 <th>Section</th>
-                <th>Détails à compléter</th>
+                <th>Détails</th>
+                <th>Infos de départ</th>
             </tr>
             <tr>
-                <td><strong>1️⃣ Contexte du poste</strong></td>
+                <td><strong>Contexte du poste</strong></td>
                 <td>
-                    <strong>1.1 Raison de l'ouverture:</strong> Remplacement / Création / Évolution interne<br>
-                    <strong>1.2 Mission globale:</strong> Résumé du rôle et objectif principal<br>
-                    <strong>1.3 Défis principaux:</strong> Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget
+                    <strong>Raison de l'ouverture:</strong> Remplacement / Création / Évolution interne<br>
+                    <strong>Mission globale:</strong> Résumé du rôle et objectif principal<br>
+                    <strong>Défis principaux:</strong> Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget
                 </td>
+                <td><textarea style="width: 100%; height: 120px;" placeholder="Vos informations..."></textarea></td>
             </tr>
             <tr>
-                <td><strong>2️⃣ Organisation et hiérarchie</strong></td>
+                <td><strong>Organisation et hiérarchie</strong></td>
                 <td>
-                    <strong>2.1 Rattachement hiérarchique:</strong> Responsable direct, département / service<br>
-                    <strong>2.2 Équipe:</strong> Taille, rôle des collaborateurs, interaction avec autres services
+                    <strong>Rattachement hiérarchique:</strong> Responsable direct, département / service<br>
+                    <strong>Équipe:</strong> Taille, rôle des collaborateurs, interaction avec autres services
                 </td>
+                <td><textarea style="width: 100%; height: 100px;" placeholder="Vos informations..."></textarea></td>
             </tr>
             <tr>
-                <td><strong>3️⃣ Profil recherché</strong></td>
+                <td><strong>Profil recherché</strong></td>
                 <td>
-                    <strong>3.1 Expérience:</strong> Nombre d'années minimum, expériences similaires dans le secteur<br>
-                    <strong>3.2 Connaissances / Diplômes / Certifications:</strong> Diplômes exigés, certifications spécifiques<br>
-                    <strong>3.3 Compétences / Outils:</strong> Techniques, logiciels, méthodes à maîtriser<br>
-                    <strong>3.4 Soft skills / aptitudes comportementales:</strong> Leadership, rigueur, communication, autonomie
+                    <strong>Expérience:</strong> Nombre d'années minimum, expériences similaires dans le secteur<br>
+                    <strong>Connaissances / Diplômes / Certifications:</strong> Diplômes exigés, certifications spécifiques<br>
+                    <strong>Compétences / Outils:</strong> Techniques, logiciels, méthodes à maîtriser<br>
+                    <strong>Soft skills / aptitudes comportementales:</strong> Leadership, rigueur, communication, autonomie
                 </td>
+                <td><textarea style="width: 100%; height: 140px;" placeholder="Vos informations..."></textarea></td>
             </tr>
             <tr>
-                <td><strong>4️⃣ Sourcing et marché</strong></td>
+                <td><strong>Sourcing et marché</strong></td>
                 <td>
-                    <strong>4.1 Entreprises où trouver ce profil:</strong> Concurrents, secteurs similaires<br>
-                    <strong>4.2 Synonymes / intitulés proches:</strong> Titres alternatifs pour affiner le sourcing<br>
-                    <strong>4.3 Canaux à utiliser:</strong> LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels
+                    <strong>Entreprises où trouver ce profil:</strong> Concurrents, secteurs similaires<br>
+                    <strong>Synonymes / intitulés proches:</strong> Titres alternatifs pour affiner le sourcing<br>
+                    <strong>Canaux à utiliser:</strong> LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels
                 </td>
+                <td><textarea style="width: 100%; height: 120px;" placeholder="Vos informations..."></textarea></td>
             </tr>
             <tr>
-                <td><strong>5️⃣ Conditions et contraintes</strong></td>
+                <td><strong>Conditions et contraintes</strong></td>
                 <td>
-                    <strong>5.1 Localisation:</strong> Site principal, télétravail, déplacements<br>
-                    <strong>5.2 Budget recrutement:</strong> Salaire indicatif, avantages, primes éventuelles
+                    <strong>Localisation:</strong> Site principal, télétravail, déplacements<br>
+                    <strong>Budget recrutement:</strong> Salaire indicatif, avantages, primes éventuelles
                 </td>
+                <td><textarea style="width: 100%; height: 100px;" placeholder="Vos informations..."></textarea></td>
             </tr>
             <tr>
-                <td><strong>6️⃣ Missions / Tâches</strong></td>
+                <td><strong>Missions / Tâches</strong></td>
                 <td>
-                    <strong>6.1 Tâches principales:</strong> 4-6 missions détaillées<br>
-                    <strong>6.2 Autres responsabilités:</strong> Points additionnels ou spécifiques à préciser
+                    <strong>Tâches principales:</strong> 4-6 missions détaillées<br>
+                    <strong>Autres responsabilités:</strong> Points additionnels ou spécifiques à préciser
                 </td>
+                <td><textarea style="width: 100%; height: 100px;" placeholder="Vos informations..."></textarea></td>
             </tr>
             <tr>
-                <td><strong>7️⃣ Notes libres</strong></td>
+                <td><strong>Notes libres</strong></td>
                 <td>
-                    <strong>7.1 Points à discuter ou à clarifier avec le manager</strong><br>
-                    <strong>7.2 Case libre:</strong> Pour tout point additionnel ou remarque spécifique
+                    <strong>Points à discuter ou à clarifier avec le manager</strong><br>
+                    <strong>Case libre:</strong> Pour tout point additionnel ou remarque spécifique
                 </td>
+                <td><textarea style="width: 100%; height: 100px;" placeholder="Vos informations..."></textarea></td>
             </tr>
         </table>
         """, unsafe_allow_html=True)
 
-    # Méthode rapide (15-30 min) - Jeu des 7 différences
-    with st.expander("⚡️ Méthode rapide (15-30 min) - Jeu des 7 différences"):
-        st.markdown("""
-        **Confronter les infos données par le manager aux données du terrain.**
-        
-        L'idée : identifier les incohérences ou les angles morts.
-        
-        Concentrez-vous en priorité :
-        
-        1. **Sur l'adéquation intitulé de poste / missions** - Vérifiez que les autres sources décrivent les mêmes missions pour l'intitulé de poste donné par le manager (peut-être du jargon interne).
-        
-        2. **Sur les critères demandés** (diplômes, expérience, tâches à maîtriser, compétences sociales) - Comparez avec les profils réels sur le marché.
-        """)
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.text_area("Intitulé de poste vs Missions réelles", key="verif_intitule", height=100)
-        with col2:
-            st.text_area("Critères demandés vs Réalité marché", key="verif_criteres", height=100)
-
-    # Méthode complète (30min-1h)
-    with st.expander("🧠 Méthode complète (30min-1h) - Analyse comparative"):
-        st.markdown("""
-        **Remplir ce tableau avec 2-3 sources**
-        """)
-        
-        # Tableau d'analyse comparative amélioré
-        st.markdown("""
-        <table class="comparison-table">
-            <tr>
-                <th>Catégories</th>
-                <th>Mes infos de départ</th>
-                <th>Source 1</th>
-                <th>Source 2</th>
-                <th>Source 3</th>
-            </tr>
-            <tr>
-                <td>Intitulé du poste</td>
-                <td><input type="text" style="width: 100%;"></td>
-                <td><input type="text" style="width: 100%;"></td>
-                <td><input type="text" style="width: 100%;"></td>
-                <td><input type="text" style="width: 100%;"></td>
-            </tr>
-            <tr>
-                <td>Les tâches/missions</td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-            </tr>
-            <tr>
-                <td>Les connaissances</td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-            </tr>
-            <tr>
-                <td>Diplômes/certifications demandés</td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-            </tr>
-            <tr>
-                <td>Les compétences et outils à maîtriser</td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-            </tr>
-            <tr>
-                <td>Salaires, avantages et plus values</td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-                <td><textarea style="width: 100%; height: 60px;"></textarea></td>
-            </tr>
-        </table>
-        """, unsafe_allow_html=True)
-        
-        st.markdown("---")
-        st.markdown("**Points à éclaircir avec le manager**")
-        st.text_area("Questions pour ouvrir la discussion", key="questions_discussion", height=100)
-
-    # Disposition en colonnes pour les champs simples
+    # Disposition en colonnes pour les champs détaillés
     col1, col2 = st.columns(2)
     
     with col1:
-        st.text_area("1.1 Raison ouverture", key="raison_ouverture", height=100)
-        st.text_area("1.2 Mission globale", key="mission_globale", height=100)
-        st.text_area("1.3 Défis principaux", key="defis_principaux", height=100)
-        st.text_area("2.1 Rattachement hiérarchique", key="rattachement", height=100)
-        st.text_area("2.2 Équipe", key="equipe_description", height=100)
+        st.text_area("Raison ouverture", key="raison_ouverture", height=100)
+        st.text_area("Mission globale", key="mission_globale", height=100)
+        st.text_area("Défis principaux", key="defis_principaux", height=100)
+        st.text_area("Rattachement hiérarchique", key="rattachement", height=100)
+        st.text_area("Équipe", key="equipe_description", height=100)
     
     with col2:
-        st.text_area("4.1 Entreprises où trouver ce profil", key="entreprises_profil", height=100)
-        st.text_area("4.2 Synonymes de postes", key="synonymes_poste", height=100)
-        st.text_area("4.3 Canaux à utiliser", key="canaux_profil", height=100)
-        st.text_area("5.1 Localisation", key="localisation", height=100)
-        st.text_input("5.2 Budget recrutement", key="budget")
+        st.text_area("Entreprises où trouver ce profil", key="entreprises_profil", height=100)
+        st.text_area("Synonymes de postes", key="synonymes_poste", height=100)
+        st.text_area("Canaux à utiliser", key="canaux_profil", height=100)
+        st.text_area("Localisation", key="localisation", height=100)
+        st.text_input("Budget recrutement", key="budget")
     
-    # Section 3: Profil recherché
-    st.subheader("3️⃣ Profil recherché")
+    # Section Profil recherché
+    st.subheader("Profil recherché")
     col3_1, col3_2 = st.columns(2)
     with col3_1:
-        st.text_area("3.1 Expérience", key="experience_requise", height=100)
-        st.text_area("3.2 Connaissances/Diplômes/Certifications", key="diplomes_certifications", height=100)
+        st.text_area("Expérience", key="experience_requise", height=100)
+        st.text_area("Connaissances/Diplômes/Certifications", key="diplomes_certifications", height=100)
     with col3_2:
-        st.text_area("3.3 Compétences/Outils", key="competences_outils", height=100)
-        st.text_area("3.4 Soft skills/aptitudes comportementales", key="soft_skills", height=100)
+        st.text_area("Compétences/Outils", key="competences_outils", height=100)
+        st.text_area("Soft skills/aptitudes comportementales", key="soft_skills", height=100)
     
-    # Section 6: Missions/Tâches
-    st.subheader("6️⃣ Missions / Tâches")
+    # Section Missions/Tâches
+    st.subheader("Missions / Tâches")
     col6_1, col6_2 = st.columns(2)
     with col6_1:
-        st.text_area("6.1 Tâches principales (4-6)", key="taches_principales", height=150)
+        st.text_area("Tâches principales (4-6)", key="taches_principales", height=150)
     with col6_2:
-        st.text_area("6.2 Autres responsabilités", key="autres_responsabilites", height=150)
+        st.text_area("Autres responsabilités", key="autres_responsabilites", height=150)
     
-    # Section 7: Notes libres
-    st.subheader("7️⃣ Notes libres")
-    st.text_area("7.1 Points à discuter avec le manager", key="points_a_discuter", height=100)
-    st.text_area("7.2 Case libre", key="notes_libres", height=100)
+    # Section Notes libres
+    st.subheader("Notes libres")
+    st.text_area("Points à discuter avec le manager", key="points_a_discuter", height=100)
+    st.text_area("Case libre", key="notes_libres", height=100)
 
     if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True):
         if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
@@ -656,10 +579,7 @@ with tab2:
                 "taches_principales": st.session_state.get("taches_principales", ""),
                 "autres_responsabilites": st.session_state.get("autres_responsabilites", ""),
                 "points_a_discuter": st.session_state.get("points_a_discuter", ""),
-                "notes_libres": st.session_state.get("notes_libres", ""),
-                "verif_intitule": st.session_state.get("verif_intitule", ""),
-                "verif_criteres": st.session_state.get("verif_criteres", ""),
-                "questions_discussion": st.session_state.get("questions_discussion", "")
+                "notes_libres": st.session_state.get("notes_libres", "")
             })
             
             save_briefs()
