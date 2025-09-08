@@ -269,10 +269,9 @@ with tab1:
         # --- INFOS DE BASE (3 colonnes)
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.text_input("Intitulé du poste *", key="poste_intitule")
             st.text_input("Nom du manager *", key="manager_nom")
         with col2:
-            st.text_input("Poste à recruter", key="niveau_hierarchique")
+            st.text_input("Poste à recruter *", key="niveau_hierarchique")
             st.selectbox("Recruteur *", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="recruteur")
         with col3:
             st.selectbox("Affectation", ["", "Chantier", "Siège"], key="affectation_type")
@@ -288,7 +287,10 @@ with tab1:
 
         # --- SAUVEGARDE
         if st.button("💾 Sauvegarder le Brief", type="primary", use_container_width=True):
-            if not all([st.session_state.poste_intitule, st.session_state.manager_nom, st.session_state.recruteur, st.session_state.date_brief]):
+            # Utiliser niveau_hierarchique comme intitulé du poste
+            st.session_state.poste_intitule = st.session_state.niveau_hierarchique
+            
+            if not all([st.session_state.niveau_hierarchique, st.session_state.manager_nom, st.session_state.recruteur, st.session_state.date_brief]):
                 message_placeholder.error("Veuillez remplir tous les champs obligatoires (*)")
             else:
                 brief_name = generate_automatic_brief_name()
@@ -296,7 +298,7 @@ with tab1:
                     st.session_state.saved_briefs = {}
                 
                 st.session_state.saved_briefs[brief_name] = {
-                    "poste_intitule": st.session_state.poste_intitule,
+                    "poste_intitule": st.session_state.niveau_hierarchique,
                     "manager_nom": st.session_state.manager_nom,
                     "recruteur": st.session_state.recruteur,
                     "date_brief": str(st.session_state.date_brief),
@@ -434,18 +436,24 @@ with tab1:
 
 # ---------------- AVANT-BRIEF ----------------
 with tab2:
-    # Vérification si un brief est chargé
+    # MODIFICATION: Toujours accessible sans brief chargé
+    # Afficher les informations du brief en cours si disponible
+    poste_info = st.session_state.get('niveau_hierarchique', 'Non défini')
+    manager_info = st.session_state.get('manager_nom', 'Non défini')
+    recruteur_info = st.session_state.get('recruteur', 'Non défini')
+    affectation_info = st.session_state.get('affectation_nom', 'Non défini')
+    
+    # MODIFICATION: Nouveau format d'en-tête
+    st.subheader(f"🔄 Avant-brief (Préparation) - {poste_info} - {manager_info} - {recruteur_info} - {affectation_info}")
+    
+    # MODIFICATION: Informations du brief
+    st.info(f"Manager: {manager_info} | Recruteur: {recruteur_info}")
+    
+    # MODIFICATION: Supprimé le message "Remplissez les informations..."
+    
     if "current_brief_name" not in st.session_state or st.session_state.current_brief_name == "":
-        st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
-        st.info("💡 Utilisez l'onglet Gestion pour créer un nouveau brief ou charger un template existant")
-        st.stop()  # Arrête le rendu de cet onglet
+        st.warning("ℹ️ Aucun brief n'est actuellement chargé. Vous pouvez remplir ces informations, mais elles ne seront sauvegardées qu'après création d'un brief.")
     
-    # Afficher les informations du brief en cours
-    st.subheader(f"🔄 Avant-brief (Préparation) - {st.session_state.get('poste_intitule', '')}")
-    st.info(f"Manager: {st.session_state.get('manager_nom', '')} | Recruteur: {st.session_state.get('recruteur', '')}")
-    
-    st.info("Remplissez les informations préparatoires avant la réunion avec le manager.")
-
     # Méthode rapide (15-30 min) - Jeu des 7 différences
     with st.expander("⚡️ Méthode rapide (15-30 min) - Jeu des 7 différences"):
         st.markdown("""
@@ -574,16 +582,21 @@ with tab2:
 
 # ---------------- RÉUNION (Wizard interne) ----------------
 with tab3:
-    # Vérification si un brief est chargé
-    if "current_brief_name" not in st.session_state or st.session_state.current_brief_name == "":
-        st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
-        st.info("💡 Utilisez l'onglet Gestion pour créer un nouveau brief ou charger un template existant")
-        st.stop()  # Arrête le rendu de cet onglet
+    # MODIFICATION: Toujours accessible sans brief chargé
+    poste_info = st.session_state.get('niveau_hierarchique', 'Non défini')
+    manager_info = st.session_state.get('manager_nom', 'Non défini')
+    recruteur_info = st.session_state.get('recruteur', 'Non défini')
+    affectation_info = st.session_state.get('affectation_nom', 'Non défini')
     
-    # Afficher les informations du brief en cours
-    st.subheader(f"✅ Réunion de brief avec le Manager - {st.session_state.get('poste_intitule', '')}")
-    st.info(f"Manager: {st.session_state.get('manager_nom', '')} | Recruteur: {st.session_state.get('recruteur', '')}")
+    # MODIFICATION: Nouveau format d'en-tête
+    st.subheader(f"✅ Réunion de brief avec le Manager - {poste_info} - {manager_info} - {recruteur_info} - {affectation_info}")
 
+    # MODIFICATION: Informations du brief
+    st.info(f"Manager: {manager_info} | Recruteur: {recruteur_info}")
+
+    if "current_brief_name" not in st.session_state or st.session_state.current_brief_name == "":
+        st.warning("ℹ️ Aucun brief n'est actuellement chargé. Vous pouvez remplir ces informations, mais elles ne seront sauvegardées qu'après création d'un brief.")
+    
     total_steps = 4
     step = st.session_state.reunion_step
     st.progress(int((step / total_steps) * 100), text=f"Étape {step}/{total_steps}")
@@ -639,22 +652,27 @@ with tab3:
 
 # ---------------- SYNTHÈSE ----------------
 with tab4:
-    # Vérification si un brief est chargé
-    if "current_brief_name" not in st.session_state or st.session_state.current_brief_name == "":
-        st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
-        st.info("💡 Utilisez l'onglet Gestion pour créer un nouveau brief ou charger un template existant")
-        st.stop()  # Arrête le rendu de cet onglet
+    # MODIFICATION: Toujours accessible sans brief chargé
+    poste_info = st.session_state.get('niveau_hierarchique', 'Non défini')
+    manager_info = st.session_state.get('manager_nom', 'Non défini')
+    recruteur_info = st.session_state.get('recruteur', 'Non défini')
+    affectation_info = st.session_state.get('affectation_nom', 'Non défini')
     
-    # Afficher les informations du brief en cours
-    st.subheader(f"📝 Synthèse du Brief - {st.session_state.get('poste_intitule', '')}")
-    st.info(f"Manager: {st.session_state.get('manager_nom', '')} | Recruteur: {st.session_state.get('recruteur', '')}")
+    # MODIFICATION: Nouveau format d'en-tête
+    st.subheader(f"📝 Synthèse - {poste_info} - {manager_info} - {recruteur_info} - {affectation_info}")
+
+    # MODIFICATION: Informations du brief
+    st.info(f"Manager: {manager_info} | Recruteur: {recruteur_info}")
     
-    if "current_brief_name" in st.session_state:
+    if "current_brief_name" in st.session_state and st.session_state.current_brief_name:
         st.success(f"Brief actuel: {st.session_state.current_brief_name}")
+    
+    if "current_brief_name" not in st.session_state or st.session_state.current_brief_name == "":
+        st.warning("ℹ️ Aucun brief n'est actuellement chargé. Les données affichées ne sont pas sauvegardées.")
     
     st.subheader("Résumé des informations")
     st.json({
-        "Poste": st.session_state.get("poste_intitule", ""),
+        "Poste": st.session_state.get("niveau_hierarchique", ""),
         "Manager": st.session_state.get("manager_nom", ""),
         "Recruteur": st.session_state.get("recruteur", ""),
         "Affectation": f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}",
