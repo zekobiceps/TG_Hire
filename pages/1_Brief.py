@@ -5,7 +5,7 @@ import json
 import pandas as pd
 
 # ✅ permet d'accéder à utils.py à la racine
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.append(os.pathabspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from utils import (
     init_session_state,
@@ -1047,12 +1047,24 @@ with tabs[2]:
             <tr>
                 <td class="details-cell">Lien profil 2</td>
                 <td>{profil_link_2}</td>
-                <td><textarea class"info-textarea" placeholder="Commentaires..." key="manager_comment_17"></textarea></td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_17"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Lien profil 3</td>
                 <td>{profil_link_3}</td>
                 <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_18"></textarea></td>
+            </tr>
+            <!-- Notes libres -->
+            <tr>
+                <td rowspan="2" class="section-header">Notes libres</td>
+                <td class="details-cell">Points à discuter ou à clarifier avec le manager</td>
+                <td>{commentaires}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_19"></textarea></td>
+            </tr>
+            <tr>
+                <td class="details-cell">Case libre</td>
+                <td>{notes_libres}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_20"></textarea></td>
             </tr>
         </table>
         """.format(
@@ -1073,7 +1085,9 @@ with tabs[2]:
             budget=st.session_state.get("budget", "Non renseigné"),
             profil_link_1=st.session_state.get("profil_links", ["", "", ""])[0] if st.session_state.get("profil_links") else "",
             profil_link_2=st.session_state.get("profil_links", ["", "", ""])[1] if st.session_state.get("profil_links") else "",
-            profil_link_3=st.session_state.get("profil_links", ["", "", ""])[2] if st.session_state.get("profil_links") else ""
+            profil_link_3=st.session_state.get("profil_links", ["", "", ""])[2] if st.session_state.get("profil_links") else "",
+            commentaires=st.session_state.get("commentaires", "Non renseigné"),
+            notes_libres=st.session_state.get("notes_libres", "Non renseigné")
         ), unsafe_allow_html=True)
 
     elif step == 2:
@@ -1106,7 +1120,7 @@ with tabs[2]:
                     
                     # Récupérer tous les commentaires du manager
                     manager_comments = {}
-                    for i in range(1, 19):
+                    for i in range(1, 21):  # 20 commentaires maintenant
                         comment_key = f"manager_comment_{i}"
                         if comment_key in st.session_state:
                             manager_comments[comment_key] = st.session_state[comment_key]
