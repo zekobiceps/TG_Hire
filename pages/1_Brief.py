@@ -292,20 +292,26 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 # ---------------- ONGLET GESTION ----------------
 with tab1:
-    # En-tête avec les deux titres alignés
-    col_title_left, col_title_right = st.columns([2, 1])
-    with col_title_left:
-        # Titre "Informations de base" avec le type à droite
-        col_info, col_type = st.columns([3, 1])
-        with col_info:
-            st.subheader("Informations de base")
-        with col_type:
-            # Ajouter un espace vide pour décaler vers le bas
-            st.write("")
-            st.radio("", ["Brief", "Template"], key="brief_type", horizontal=True)
+    # En-tête avec "Informations de base" et le type sur la même ligne
+    st.markdown("""
+    <div style="display: flex; align-items: center; margin-bottom: 1rem;">
+        <h3 style="margin: 0; margin-right: 10px;">Informations de base</h3>
+        <div style="display: flex; align-items: center;">
+            <span style="margin-right: 5px;">Type:</span>
+            <div style="display: flex; background-color: #262730; padding: 5px; border-radius: 5px;">
+                <label style="margin-right: 10px;">
+                    <input type="radio" name="brief_type" value="Brief" checked> Brief
+                </label>
+                <label>
+                    <input type="radio" name="brief_type" value="Template"> Template
+                </label>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    with col_title_right:
-        st.subheader("Recherche & Chargement")
+    # Ajouter un espace pour l'état du radio button dans Streamlit
+    brief_type = st.radio("", ["Brief", "Template"], key="brief_type", horizontal=True, label_visibility="collapsed")
     
     col_main, col_side = st.columns([2, 1])
     
@@ -361,6 +367,8 @@ with tab1:
                 st.session_state.current_brief_name = brief_name
 
     with col_side:
+        st.subheader("Recherche & Chargement")
+        
         # --- RECHERCHE & CHARGEMENT (6 cases organisées en 2 lignes de 3)
         # Première ligne
         col1, col2, col3 = st.columns(3)
