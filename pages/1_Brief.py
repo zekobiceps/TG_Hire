@@ -310,9 +310,6 @@ with tab1:
             </div>
         </div>
         """, unsafe_allow_html=True)
-        
-        # Radio button Streamlit caché pour la fonctionnalité
-        brief_type = st.radio("", ["Brief", "Template"], key="brief_type", horizontal=True, label_visibility="collapsed")
     
     with col_title_right:
         st.subheader("Recherche & Chargement")
@@ -340,8 +337,15 @@ with tab1:
         background-color: #FF4B4B;
         color: white;
     }
+    /* Cacher le radio button Streamlit */
+    div[data-testid="stRadio"] > div {
+        display: none;
+    }
     </style>
     """, unsafe_allow_html=True)
+    
+    # Radio button Streamlit caché pour la fonctionnalité
+    brief_type = st.radio("", ["Brief", "Template"], key="brief_type", horizontal=True, label_visibility="collapsed")
     
     col_main, col_side = st.columns([2, 1])
     
@@ -526,6 +530,32 @@ with tab1:
                                     del st.session_state.filtered_briefs[name]
                                 st.warning(f"❌ Brief '{name}' supprimé.")
                                 st.rerun()
+
+# JavaScript pour synchroniser les radio buttons personnalisés avec Streamlit
+st.markdown("""
+<script>
+// Synchroniser les radio buttons personnalisés avec Streamlit
+document.querySelectorAll('.custom-radio input[type="radio"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        // Mettre à jour la valeur dans Streamlit
+        const value = this.value;
+        const streamlitRadio = parent.document.querySelector('input[type="radio"][value="' + value + '"]');
+        if (streamlitRadio) {
+            streamlitRadio.click();
+        }
+    });
+});
+
+// Synchroniser l'état initial
+document.addEventListener('DOMContentLoaded', function() {
+    const streamlitValue = parent.document.querySelector('input[type="radio"]:checked').value;
+    const customRadio = document.querySelector('.custom-radio input[value="' + streamlitValue + '"]');
+    if (customRadio) {
+        customRadio.checked = true;
+    }
+});
+</script>
+""", unsafe_allow_html=True)
 
 # JavaScript pour synchroniser les radio buttons personnalisés avec Streamlit
 st.markdown("""
