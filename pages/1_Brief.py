@@ -454,8 +454,8 @@ with tabs[0]:
                 <div class="custom-radio">
                     <input type="radio" id="brief" name="brief_type" value="Brief" checked>
                     <label for="brief">Brief</label>
-                    <input type="radio" id="template" name="brief_type" value="Canevas">
-                    <label for="template">Canevas</label>
+                    <input type="radio" id="Canevas" name="brief_type" value="Canevas">
+                    <label for="Canevas">Canevas</label>
                 </div>
             </div>
         </div>
