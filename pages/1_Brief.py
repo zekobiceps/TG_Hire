@@ -295,12 +295,16 @@ with tab1:
     # En-tête avec les deux titres alignés
     col_title_left, col_title_right = st.columns([2, 1])
     with col_title_left:
-        # Titre "Informations de base" avec le type décalé vers la gauche et vers le bas
-        st.subheader("Informations de base")
-        st.radio("Type", ["Brief", "Template"], key="brief_type", horizontal=True)
+        # Titre "Informations de base" avec le type à droite
+        col_info, col_type = st.columns([3, 1])
+        with col_info:
+            st.subheader("Informations de base")
+        with col_type:
+            # Ajouter un espace vide pour décaler vers le bas
+            st.write("")
+            st.radio("", ["Brief", "Template"], key="brief_type", horizontal=True)
     
     with col_title_right:
-        # Titre "Recherche & Chargement" aligné exactement au-dessus de la case Mois
         st.subheader("Recherche & Chargement")
     
     col_main, col_side = st.columns([2, 1])
@@ -416,21 +420,6 @@ with tab1:
                 st.error("❌ Aucun brief trouvé avec ces critères.")
 
         if st.session_state.filtered_briefs:
-            # Ajuster le style pour les résultats avec expanders
-            st.markdown("""
-            <style>
-            .brief-expander {
-                border: 1px solid #424242;
-                border-radius: 5px;
-                margin-bottom: 10px;
-            }
-            .brief-content {
-                padding: 10px;
-                background-color: #262730;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-            
             st.subheader("Résultats de recherche")
             
             # Afficher les résultats avec des expanders
@@ -444,13 +433,13 @@ with tab1:
                         **Type:** {data.get('brief_type', 'N/A')}  
                         **Manager:** {data.get('manager_nom', 'N/A')}  
                         **Recruteur:** {data.get('recruteur', 'N/A')}
-                        **Nom de l'affectation:** {data.get('affectation_nom', 'N/A')}
                         """)
                     
                     with col_right:
                         st.markdown(f"""
                         **Affectation:** {data.get('affectation_type', 'N/A')}  
-                        **Date:** {data.get('date_brief', 'N/A')}
+                        **Date:** {data.get('date_brief', 'N/A')}  
+                        **Nom de l'affectation:** {data.get('affectation_nom', 'N/A')}
                         """)
                     
                     colA, colB = st.columns(2)
@@ -501,7 +490,6 @@ with tab1:
                                     del st.session_state.filtered_briefs[name]
                                 st.warning(f"❌ Brief '{name}' supprimé.")
                                 st.rerun()
-# ---------------- AVANT-BRIEF ----------------
 with tab2:
     # Vérification si un brief est chargé
     if "current_brief_name" not in st.session_state or st.session_state.current_brief_name == "":
