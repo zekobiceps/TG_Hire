@@ -98,6 +98,37 @@ def conseil_button(titre, categorie, conseil, key):
             st.session_state[key] = generate_checklist_advice(categorie, titre)
             st.rerun()
 
+def delete_current_brief():
+    """Supprime le brief actuel"""
+    if "current_brief_name" in st.session_state and st.session_state.current_brief_name:
+        brief_name = st.session_state.current_brief_name
+        if brief_name in st.session_state.saved_briefs:
+            del st.session_state.saved_briefs[brief_name]
+            save_briefs()
+            
+            # Réinitialiser l'état de la session
+            st.session_state.current_brief_name = ""
+            st.session_state.avant_brief_completed = False
+            st.session_state.reunion_completed = False
+            
+            # Réinitialiser les champs du formulaire
+            keys_to_reset = [
+                "manager_nom", "niveau_hierarchique", "affectation_type", 
+                "recruteur", "affectation_nom", "date_brief", "raison_ouverture",
+                "impact_strategique", "rattachement", "taches_principales",
+                "must_have_experience", "must_have_diplomes", "must_have_competences",
+                "must_have_softskills", "nice_to_have_experience", "nice_to_have_diplomes",
+                "nice_to_have_competences", "entreprises_profil", "synonymes_poste",
+                "canaux_profil", "budget", "commentaires", "notes_libres"
+            ]
+            
+            for key in keys_to_reset:
+                if key in st.session_state:
+                    del st.session_state[key]
+            
+            st.success(f"✅ Brief '{brief_name}' supprimé avec succès")
+            st.rerun()
+
 # ---------------- INIT ----------------
 init_session_state()
 st.set_page_config(
@@ -290,62 +321,66 @@ st.markdown("""
         cursor: not-allowed;
     }
     
-    /* Nouveau style pour le tableau amélioré */
-    .modern-table {
+    /* Nouveau style pour le tableau amélioré - VERSION MINIMALISTE */
+    .minimal-table {
         width: 100%;
-        border-collapse: separate;
-        border-spacing: 0;
+        border-collapse: collapse;
         margin-bottom: 20px;
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        background-color: #0E1117;
     }
     
-    .modern-table th {
-        background-color: #FF4B4B;
-        color: white;
-        font-weight: 600;
-        padding: 12px;
+    .minimal-table th, .minimal-table td {
+        padding: 8px;
         text-align: left;
+        border: none;
     }
     
-    .modern-table td {
-        padding: 12px;
+    .minimal-table th {
+        background-color: #0E1117;
+        color: #FF4B4B;
+        font-weight: 600;
+        font-size: 0.9em;
+        padding-bottom: 10px;
+    }
+    
+    .minimal-table tr {
         border-bottom: 1px solid #424242;
-        background-color: #262730;
     }
     
-    .modern-table tr:last-child td {
+    .minimal-table tr:last-child {
         border-bottom: none;
     }
     
-    .modern-table tr:hover td {
-        background-color: #3D3D4D;
-    }
-    
     .section-header {
-        background-color: #363636 !important;
-        font-weight: bold !important;
-        font-size: 1.1em;
+        background-color: #262730 !important;
+        color: #FF4B4B !important;
+        font-weight: bold;
+        font-size: 0.95em;
+        width: 15%;
     }
     
     .details-cell {
+        background-color: #262730;
+        color: #FAFAFA;
         font-weight: 500;
-        color: #FF6B6B;
+        font-size: 0.9em;
+        width: 20%;
     }
     
     .info-cell {
-        background-color: #1E1E1E;
+        background-color: #262730;
+        color: #FAFAFA;
+        width: 65%;
     }
     
     .info-textarea {
         width: 100%;
         height: 80px;
         background-color: #1E1E1E;
-        color: white;
+        color: #FAFAFA;
         border: 1px solid #424242;
-        border-radius: 6px;
-        padding: 10px;
+        border-radius: 4px;
+        padding: 8px;
         resize: vertical;
         font-family: inherit;
         transition: border-color 0.3s;
@@ -454,8 +489,8 @@ with tabs[0]:
                 <div class="custom-radio">
                     <input type="radio" id="brief" name="brief_type" value="Brief" checked>
                     <label for="brief">Brief</label>
-                    <input type="radio" id="Canevas" name="brief_type" value="Canevas">
-                    <label for="Canevas">Canevas</label>
+                    <input type="radio" id="template" name="brief_type" value="Canevas">
+                    <label for="template">Canevas</label>
                 </div>
             </div>
         </div>
@@ -488,41 +523,49 @@ with tabs[0]:
             st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date())
         
         # --- SAUVEGARDE
-        if st.button("💾 Sauvegarder", type="primary", use_container_width=True):
-            if not all([st.session_state.manager_nom, st.session_state.recruteur, st.session_state.date_brief]):
-                st.error("Veuillez remplir tous les champs obligatoires (*)")
-            else:
-                brief_name = generate_automatic_brief_name()
-                if "saved_briefs" not in st.session_state:
-                    st.session_state.saved_briefs = {}
-                
-                st.session_state.saved_briefs[brief_name] = {
-                    "manager_nom": st.session_state.manager_nom,
-                    "recruteur": st.session_state.recruteur,
-                    "date_brief": str(st.session_state.date_brief),
-                    "niveau_hierarchique": st.session_state.niveau_hierarchique,
-                    "brief_type": st.session_state.brief_type,
-                    "affectation_type": st.session_state.affectation_type,
-                    "affectation_nom": st.session_state.affectation_nom,
-                    "raison_ouverture": st.session_state.get("raison_ouverture", ""),
-                    "impact_strategique": st.session_state.get("impact_strategique", ""),
-                    "rattachement": st.session_state.get("rattachement", ""),
-                    "taches_principales": st.session_state.get("taches_principales", ""),
-                    "must_have": st.session_state.get("must_have", ""),
-                    "nice_to_have": st.session_state.get("nice_to_have", ""),
-                    "entreprises_profil": st.session_state.get("entreprises_profil", ""),
-                    "canaux_profil": st.session_state.get("canaux_profil", ""),
-                    "synonymes_poste": st.session_state.get("synonymes_poste", ""),
-                    "budget": st.session_state.get("budget", ""),
-                    "commentaires": st.session_state.get("commentaires", ""),
-                    "ksa_data": st.session_state.get("ksa_data", {}),
-                    "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict() if hasattr(st.session_state, 'ksa_matrix') else {}
-                }
-                save_briefs()
-                st.success(f"✅ Brief '{brief_name}' sauvegardé avec succès !")
-                st.session_state.current_brief_name = brief_name
-                st.session_state.avant_brief_completed = False
-                st.session_state.reunion_completed = False
+        col_save, col_cancel = st.columns([1, 1])
+        with col_save:
+            if st.button("💾 Sauvegarder", type="primary", use_container_width=True):
+                if not all([st.session_state.manager_nom, st.session_state.recruteur, st.session_state.date_brief]):
+                    st.error("Veuillez remplir tous les champs obligatoires (*)")
+                else:
+                    brief_name = generate_automatic_brief_name()
+                    if "saved_briefs" not in st.session_state:
+                        st.session_state.saved_briefs = {}
+                    
+                    st.session_state.saved_briefs[brief_name] = {
+                        "manager_nom": st.session_state.manager_nom,
+                        "recruteur": st.session_state.recruteur,
+                        "date_brief": str(st.session_state.date_brief),
+                        "niveau_hierarchique": st.session_state.niveau_hierarchique,
+                        "brief_type": st.session_state.brief_type,
+                        "affectation_type": st.session_state.affectation_type,
+                        "affectation_nom": st.session_state.affectation_nom,
+                        "raison_ouverture": st.session_state.get("raison_ouverture", ""),
+                        "impact_strategique": st.session_state.get("impact_strategique", ""),
+                        "rattachement": st.session_state.get("rattachement", ""),
+                        "taches_principales": st.session_state.get("taches_principales", ""),
+                        "must_have_experience": st.session_state.get("must_have_experience", ""),
+                        "must_have_diplomes": st.session_state.get("must_have_diplomes", ""),
+                        "must_have_competences": st.session_state.get("must_have_competences", ""),
+                        "must_have_softskills": st.session_state.get("must_have_softskills", ""),
+                        "nice_to_have_experience": st.session_state.get("nice_to_have_experience", ""),
+                        "nice_to_have_diplomes": st.session_state.get("nice_to_have_diplomes", ""),
+                        "nice_to_have_competences": st.session_state.get("nice_to_have_competences", ""),
+                        "entreprises_profil": st.session_state.get("entreprises_profil", ""),
+                        "canaux_profil": st.session_state.get("canaux_profil", ""),
+                        "synonymes_poste": st.session_state.get("synonymes_poste", ""),
+                        "budget": st.session_state.get("budget", ""),
+                        "commentaires": st.session_state.get("commentaires", ""),
+                        "notes_libres": st.session_state.get("notes_libres", ""),
+                        "ksa_data": st.session_state.get("ksa_data", {}),
+                        "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict() if hasattr(st.session_state, 'ksa_matrix') else {}
+                    }
+                    save_briefs()
+                    st.success(f"✅ {st.session_state.brief_type} '{brief_name}' sauvegardé avec succès !")
+                    st.session_state.current_brief_name = brief_name
+                    st.session_state.avant_brief_completed = False
+                    st.session_state.reunion_completed = False
 
     with col_side:
         # --- RECHERCHE & CHARGEMENT (6 cases organisées en 2 lignes de 3)
@@ -623,9 +666,11 @@ with tabs[0]:
                                 
                                 # Mettre à jour uniquement les champs non-widgets
                                 non_widget_keys = ["raison_ouverture", "impact_strategique", "rattachement", 
-                                                  "taches_principales", "must_have", "nice_to_have",
-                                                  "entreprises_profil", "canaux_profil", "synonymes_poste", 
-                                                  "budget", "commentaires", "brief_type"]
+                                                  "taches_principales", "must_have_experience", "must_have_diplomes",
+                                                  "must_have_competences", "must_have_softskills", "nice_to_have_experience",
+                                                  "nice_to_have_diplomes", "nice_to_have_competences", "entreprises_profil", 
+                                                  "canaux_profil", "synonymes_poste", "budget", "commentaires", 
+                                                  "notes_libres", "brief_type"]
                                 
                                 for key in non_widget_keys:
                                     if key in data:
@@ -697,13 +742,13 @@ with tabs[1]:
     # Titre pour le tableau
     st.subheader("📋 Portrait robot candidat")
 
-    # Nouveau tableau amélioré avec design moderne
+    # Nouveau tableau minimaliste avec design amélioré
     st.markdown("""
-    <table class="modern-table">
+    <table class="minimal-table">
         <tr>
-            <th>Section</th>
-            <th>Détails</th>
-            <th>Informations</th>
+            <th class="section-header">Section</th>
+            <th class="details-cell">Détails</th>
+            <th class="info-cell">Informations</th>
         </tr>
         <!-- Contexte du poste -->
         <tr>
@@ -806,46 +851,53 @@ with tabs[1]:
     with col3:
         st.text_input("Lien profil 3", value=st.session_state.profil_links[2], key="profil_link_3")
 
-    if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True):
-        if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
-            brief_name = st.session_state.current_brief_name
-            
-            # Sauvegarder les liens de profils
-            st.session_state.profil_links = [
-                st.session_state.get("profil_link_1", ""),
-                st.session_state.get("profil_link_2", ""),
-                st.session_state.get("profil_link_3", "")
-            ]
-            
-            # Mettre à jour le brief avec les liens
-            st.session_state.saved_briefs[brief_name]["profil_links"] = st.session_state.profil_links
-            
-            # Mettre à jour les champs modifiés
-            st.session_state.saved_briefs[brief_name].update({
-                "raison_ouverture": st.session_state.get("raison_ouverture", ""),
-                "impact_strategique": st.session_state.get("impact_strategique", ""),
-                "taches_principales": st.session_state.get("taches_principales", ""),
-                "must_have_experience": st.session_state.get("must_have_experience", ""),
-                "must_have_diplomes": st.session_state.get("must_have_diplomes", ""),
-                "must_have_competences": st.session_state.get("must_have_competences", ""),
-                "must_have_softskills": st.session_state.get("must_have_softskills", ""),
-                "nice_to_have_experience": st.session_state.get("nice_to_have_experience", ""),
-                "nice_to_have_diplomes": st.session_state.get("nice_to_have_diplomes", ""),
-                "nice_to_have_competences": st.session_state.get("nice_to_have_competences", ""),
-                "entreprises_profil": st.session_state.get("entreprises_profil", ""),
-                "synonymes_poste": st.session_state.get("synonymes_poste", ""),
-                "canaux_profil": st.session_state.get("canaux_profil", ""),
-                "rattachement": st.session_state.get("rattachement", ""),
-                "budget": st.session_state.get("budget", ""),
-                "commentaires": st.session_state.get("commentaires", ""),
-                "notes_libres": st.session_state.get("notes_libres", "")
-            })
-            
-            save_briefs()
-            st.session_state.avant_brief_completed = True
-            st.success("✅ Modifications sauvegardées")
-        else:
-            st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
+    # Boutons Sauvegarder et Annuler
+    col_save, col_cancel = st.columns([1, 1])
+    with col_save:
+        if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True):
+            if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
+                brief_name = st.session_state.current_brief_name
+                
+                # Sauvegarder les liens de profils
+                st.session_state.profil_links = [
+                    st.session_state.get("profil_link_1", ""),
+                    st.session_state.get("profil_link_2", ""),
+                    st.session_state.get("profil_link_3", "")
+                ]
+                
+                # Mettre à jour le brief avec les liens
+                st.session_state.saved_briefs[brief_name]["profil_links"] = st.session_state.profil_links
+                
+                # Mettre à jour les champs modifiés
+                st.session_state.saved_briefs[brief_name].update({
+                    "raison_ouverture": st.session_state.get("raison_ouverture", ""),
+                    "impact_strategique": st.session_state.get("impact_strategique", ""),
+                    "taches_principales": st.session_state.get("taches_principales", ""),
+                    "must_have_experience": st.session_state.get("must_have_experience", ""),
+                    "must_have_diplomes": st.session_state.get("must_have_diplomes", ""),
+                    "must_have_competences": st.session_state.get("must_have_competences", ""),
+                    "must_have_softskills": st.session_state.get("must_have_softskills", ""),
+                    "nice_to_have_experience": st.session_state.get("nice_to_have_experience", ""),
+                    "nice_to_have_diplomes": st.session_state.get("nice_to_have_diplomes", ""),
+                    "nice_to_have_competences": st.session_state.get("nice_to_have_competences", ""),
+                    "entreprises_profil": st.session_state.get("entreprises_profil", ""),
+                    "synonymes_poste": st.session_state.get("synonymes_poste", ""),
+                    "canaux_profil": st.session_state.get("canaux_profil", ""),
+                    "rattachement": st.session_state.get("rattachement", ""),
+                    "budget": st.session_state.get("budget", ""),
+                    "commentaires": st.session_state.get("commentaires", ""),
+                    "notes_libres": st.session_state.get("notes_libres", "")
+                })
+                
+                save_briefs()
+                st.session_state.avant_brief_completed = True
+                st.success("✅ Modifications sauvegardées")
+            else:
+                st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
+    
+    with col_cancel:
+        if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True):
+            delete_current_brief()
 
 # ---------------- RÉUNION (Wizard interne) ----------------
 with tabs[2]:
@@ -889,38 +941,38 @@ with tabs[2]:
         st.markdown("""
         <table class="minimal-table">
             <tr>
-                <th class="section-col">Section</th>
-                <th class="details-col">Détails</th>
-                <th class="info-col">Informations</th>
+                <th class="section-header">Section</th>
+                <th class="details-cell">Détails</th>
+                <th class="info-cell">Informations</th>
             </tr>
             <tr>
-                <td rowspan="3" class="section-col">Contexte du poste</td>
-                <td class="details-col">Raison de l'ouverture</td>
+                <td rowspan="3" class="section-header">Contexte du poste</td>
+                <td class="details-cell">Raison de l'ouverture</td>
                 <td>{raison_ouverture}</td>
             </tr>
             <tr>
-                <td class="details-col">Mission globale</td>
+                <td class="details-cell">Mission globale</td>
                 <td>{mission_globale}</td>
             </tr>
             <tr>
-                <td class="details-col">Tâches principales</td>
+                <td class="details-cell">Tâches principales</td>
                 <td>{taches_principales}</td>
             </tr>
             <tr>
-                <td rowspan="4" class="section-col">Must-have (Indispensables)</td>
-                <td class="details-col">Expérience</td>
+                <td rowspan="4" class="section-header">Must-have (Indispensables)</td>
+                <td class="details-cell">Expérience</td>
                 <td>{must_have_experience}</td>
             </tr>
             <tr>
-                <td class="details-col">Connaissances / Diplômes / Certifications</td>
+                <td class="details-cell">Connaissances / Diplômes / Certifications</td>
                 <td>{must_have_diplomes}</td>
             </tr>
             <tr>
-                <td class="details-col">Compétences / Outils</td>
+                <td class="details-cell">Compétences / Outils</td>
                 <td>{must_have_competences}</td>
             </tr>
             <tr>
-                <td class="details-col">Soft skills / aptitudes comportementales</td>
+                <td class="details-cell">Soft skills / aptitudes comportementales</td>
                 <td>{must_have_softskills}</td>
             </tr>
         </table>
@@ -950,19 +1002,26 @@ with tabs[2]:
         st.text_area("Critères d'exclusion", key="criteres_exclusion", height=100)
         st.text_area("Processus d'évaluation (détails)", key="processus_evaluation", height=100)
 
-        if st.button("💾 Enregistrer réunion", type="primary", use_container_width=True):
-            if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
-                brief_name = st.session_state.current_brief_name
-                st.session_state.saved_briefs[brief_name].update({
-                    "ksa_data": st.session_state.get("ksa_data", {}),
-                    "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict(),
-                    "manager_notes": st.session_state.get("manager_notes", "")
-                })
-                save_briefs()
-                st.session_state.reunion_completed = True
-                st.success("✅ Données de réunion sauvegardées")
-            else:
-                st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
+        # Boutons Enregistrer et Annuler
+        col_save, col_cancel = st.columns([1, 1])
+        with col_save:
+            if st.button("💾 Enregistrer réunion", type="primary", use_container_width=True):
+                if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
+                    brief_name = st.session_state.current_brief_name
+                    st.session_state.saved_briefs[brief_name].update({
+                        "ksa_data": st.session_state.get("ksa_data", {}),
+                        "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict(),
+                        "manager_notes": st.session_state.get("manager_notes", "")
+                    })
+                    save_briefs()
+                    st.session_state.reunion_completed = True
+                    st.success("✅ Données de réunion sauvegardées")
+                else:
+                    st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
+        
+        with col_cancel:
+            if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True):
+                delete_current_brief()
 
     # ---- Navigation wizard ----
     col1, col2, col3 = st.columns([1, 6, 1])
@@ -1028,12 +1087,19 @@ with tabs[3]:
     else:
         st.info("ℹ️ Aucune donnée KSA disponible pour calculer le score")
 
-    if st.button("💾 Confirmer sauvegarde", type="primary", use_container_width=True):
-        if "current_brief_name" in st.session_state:
-            save_briefs()
-            st.success(f"✅ Brief '{st.session_state.current_brief_name}' sauvegardé avec succès !")
-        else:
-            st.error("❌ Aucun brief à sauvegarder. Veuillez d'abord créer un brief.")
+    # Boutons Confirmer et Annuler
+    col_save, col_cancel = st.columns([1, 1])
+    with col_save:
+        if st.button("💾 Confirmer sauvegarde", type="primary", use_container_width=True):
+            if "current_brief_name" in st.session_state:
+                save_briefs()
+                st.success(f"✅ Brief '{st.session_state.current_brief_name}' sauvegardé avec succès !")
+            else:
+                st.error("❌ Aucun brief à sauvegarder. Veuillez d'abord créer un brief.")
+    
+    with col_cancel:
+        if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True):
+            delete_current_brief()
 
     # -------- EXPORT PDF/WORD --------
     st.subheader("📄 Export du Brief complet")
