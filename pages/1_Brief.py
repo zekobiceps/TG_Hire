@@ -292,30 +292,32 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 # ---------------- ONGLET GESTION ----------------
 with tab1:
+    # En-tête avec le titre et la date alignés à droite
+    col_title, col_date_header = st.columns([3, 1])
+    with col_title:
+        st.subheader("Informations de base")
+    with col_date_header:
+        st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date(), label_visibility="collapsed")
+    
     col_main, col_side = st.columns([2, 1])
     
     with col_main:
-        st.subheader("Informations de base")
-        
-        # --- INFOS DE BASE (3 colonnes)
+        # --- INFOS DE BASE (3 colonnes avec switch entre Type de brief et Nom du manager)
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.text_input("Nom du manager *", key="manager_nom")
+            st.selectbox("Type de brief", ["Brief", "Template"], key="brief_type")
         with col2:
             st.text_input("Poste à recruter", key="niveau_hierarchique")
         with col3:
-            st.selectbox("Type de brief", ["Brief", "Template"], key="brief_type")
+            st.selectbox("Affectation", ["", "Chantier", "Siège"], key="affectation_type")
         
         col4, col5, col6 = st.columns(3)
         with col4:
-            st.selectbox("Recruteur *", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="recruteur")
+            st.text_input("Nom du manager *", key="manager_nom")
         with col5:
-            st.selectbox("Affectation", ["", "Chantier", "Siège"], key="affectation_type")
+            st.selectbox("Recruteur *", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="recruteur")
         with col6:
             st.text_input("Nom de l'affectation", key="affectation_nom")
-        
-        # Date du brief
-        st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date())
         
         # --- SAUVEGARDE
         if st.button("💾 Sauvegarder le Brief", type="primary", use_container_width=True):
@@ -412,11 +414,12 @@ with tab1:
                 st.error("❌ Aucun brief trouvé avec ces critères.")
 
         if st.session_state.filtered_briefs:
+            # Étendre les résultats sur toute la largeur
             st.subheader("Résultats de recherche")
             
-            # Afficher les résultats en deux colonnes avec un style amélioré
+            # Afficher les résultats en deux colonnes
             briefs_list = list(st.session_state.filtered_briefs.items())
-            half = (len(briefs_list) + 1) // 2  # Pour gérer les nombres impairs
+            half = (len(briefs_list) + 1) // 2
             
             col_left, col_right = st.columns(2)
             
