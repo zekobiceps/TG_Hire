@@ -289,6 +289,73 @@ st.markdown("""
         pointer-events: none;
         cursor: not-allowed;
     }
+    
+    /* Nouveau style pour le tableau amélioré */
+    .modern-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0;
+        margin-bottom: 20px;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    
+    .modern-table th {
+        background-color: #FF4B4B;
+        color: white;
+        font-weight: 600;
+        padding: 12px;
+        text-align: left;
+    }
+    
+    .modern-table td {
+        padding: 12px;
+        border-bottom: 1px solid #424242;
+        background-color: #262730;
+    }
+    
+    .modern-table tr:last-child td {
+        border-bottom: none;
+    }
+    
+    .modern-table tr:hover td {
+        background-color: #3D3D4D;
+    }
+    
+    .section-header {
+        background-color: #363636 !important;
+        font-weight: bold !important;
+        font-size: 1.1em;
+    }
+    
+    .details-cell {
+        font-weight: 500;
+        color: #FF6B6B;
+    }
+    
+    .info-cell {
+        background-color: #1E1E1E;
+    }
+    
+    .info-textarea {
+        width: 100%;
+        height: 80px;
+        background-color: #1E1E1E;
+        color: white;
+        border: 1px solid #424242;
+        border-radius: 6px;
+        padding: 10px;
+        resize: vertical;
+        font-family: inherit;
+        transition: border-color 0.3s;
+    }
+    
+    .info-textarea:focus {
+        outline: none;
+        border-color: #FF4B4B;
+        box-shadow: 0 0 0 2px rgba(255, 75, 75, 0.2);
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -387,8 +454,8 @@ with tabs[0]:
                 <div class="custom-radio">
                     <input type="radio" id="brief" name="brief_type" value="Brief" checked>
                     <label for="brief">Brief</label>
-                    <input type="radio" id="template" name="brief_type" value="Caneas">
-                    <label for="template">Caneas</label>
+                    <input type="radio" id="template" name="brief_type" value="Canevas">
+                    <label for="template">Canevas</label>
                 </div>
             </div>
         </div>
@@ -398,7 +465,7 @@ with tabs[0]:
         st.markdown("<h3 style='margin-bottom: 0.5rem;'>Recherche & Chargement</h3>", unsafe_allow_html=True)
     
     # Radio button Streamlit caché pour la fonctionnalité
-    brief_type = st.radio("", ["Brief", "Caneas"], key="brief_type", horizontal=True, label_visibility="collapsed")
+    brief_type = st.radio("", ["Brief", "Canevas"], key="brief_type", horizontal=True, label_visibility="collapsed")
     
     col_main, col_side = st.columns([2, 1])
     
@@ -465,7 +532,7 @@ with tabs[0]:
             months = ["", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
             month = st.selectbox("Mois", months)
         with col2:
-            brief_type_filter = st.selectbox("Type", ["", "Brief", "Caneas"], key="brief_type_filter")
+            brief_type_filter = st.selectbox("Type", ["", "Brief", "Canevas"], key="brief_type_filter")
         with col3:
             recruteur = st.selectbox("Recruteur", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="search_recruteur")
         
@@ -621,7 +688,6 @@ with tabs[1]:
     # Vérification si un brief est chargé
     if not can_access_avant_brief:
         st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
-        st.info("💡 Utilisez l'onglet Gestion pour créer un nouveau brief ou charger un canevas existant")
         st.stop()  # Arrête le rendu de cet onglet
     
     # Afficher les informations du brief en cours avec Manager/Recruteur à gauche
@@ -631,130 +697,93 @@ with tabs[1]:
     # Titre pour le tableau
     st.subheader("📋 Portrait robot candidat")
 
-    # Organisation structurée sous forme de tableau minimaliste
+    # Nouveau tableau amélioré avec design moderne
     st.markdown("""
-    <style>
-    .minimal-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 20px;
-    }
-    .minimal-table th, .minimal-table td {
-        border: 1px solid #424242;
-        padding: 6px;
-        text-align: left;
-    }
-    .minimal-table th {
-        background-color: #262730;
-        font-weight: bold;
-    }
-    .section-col {
-        width: 15%;
-        font-weight: bold;
-    }
-    .details-col {
-        width: 25%;
-    }
-    .info-col {
-        width: 60%;
-    }
-    .info-textarea {
-        width: 100%;
-        height: 60px;
-        background-color: #262730;
-        color: white;
-        border: none;
-        border-radius: 4px;
-        padding: 8px;
-        resize: vertical;
-    }
-    </style>
-    
-    <table class="minimal-table">
+    <table class="modern-table">
         <tr>
-            <th class="section-col">Section</th>
-            <th class="details-col">Détails</th>
-            <th class="info-col">Informations</th>
+            <th>Section</th>
+            <th>Détails</th>
+            <th>Informations</th>
         </tr>
         <!-- Contexte du poste -->
         <tr>
-            <td rowspan="3" class="section-col">Contexte du poste</td>
-            <td class="details-col">Raison de l'ouverture</td>
-            <td><textarea class="info-textarea" placeholder="Remplacement / Création / Évolution interne" key="raison_ouverture"></textarea></td>
+            <td rowspan="3" class="section-header">Contexte du poste</td>
+            <td class="details-cell">Raison de l'ouverture</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="Remplacement / Création / Évolution interne" key="raison_ouverture"></textarea></td>
         </tr>
         <tr>
-            <td class="details-col">Mission globale</td>
-            <td><textarea class="info-textarea" placeholder="Résumé du rôle et objectif principal" key="impact_strategique"></textarea></td>
+            <td class="details-cell">Mission globale</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="Résumé du rôle et objectif principal" key="impact_strategique"></textarea></td>
         </tr>
         <tr>
-            <td class="details-col">Tâches principales</td>
-            <td><textarea class="info-textarea" placeholder="Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget" key="taches_principales"></textarea></td>
+            <td class="details-cell">Tâches principales</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget" key="taches_principales"></textarea></td>
         </tr>
-        <!-- Profil recherché -->
+        <!-- Must-have (Indispensables) -->
         <tr>
-            <td rowspan="4" class="section-col">Must-have (Indispensables)</td>
-            <td class="details-col">Expérience</td>
-            <td><textarea class="info-textarea" placeholder="Nombre d'années minimum, expériences similaires dans le secteur" key="must_have_experience"></textarea></td>
-        </tr>
-        <tr>
-            <td class="details-col">Connaissances / Diplômes / Certifications</td>
-            <td><textarea class="info-textarea" placeholder="Diplômes exigés, certifications spécifiques" key="must_have_diplomes"></textarea></td>
+            <td rowspan="4" class="section-header">Must-have (Indispensables)</td>
+            <td class="details-cell">Expérience</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="Nombre d'années minimum, expériences similaires dans le secteur" key="must_have_experience"></textarea></td>
         </tr>
         <tr>
-            <td class="details-col">Compétences / Outils</td>
-            <td><textarea class="info-textarea" placeholder="Techniques, logiciels, méthodes à maîtriser" key="must_have_competences"></textarea></td>
+            <td class="details-cell">Connaissances / Diplômes / Certifications</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="Diplômes exigés, certifications spécifiques" key="must_have_diplomes"></textarea></td>
         </tr>
         <tr>
-            <td class="details-col">Soft skills / aptitudes comportementales</td>
-            <td><textarea class="info-textarea" placeholder="Leadership, rigueur, communication, autonomie" key="must_have_softskills"></textarea></td>
-        </tr>
-        <!-- Nice-to-have -->
-        <tr>
-            <td rowspan="3" class="section-col">Nice-to-have (Atouts)</td>
-            <td class="details-col">Expérience additionnelle</td>
-            <td><textarea class="info-textarea" placeholder="Ex. projets internationaux, multi-sites" key="nice_to_have_experience"></textarea></td>
+            <td class="details-cell">Compétences / Outils</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="Techniques, logiciels, méthodes à maîtriser" key="must_have_competences"></textarea></td>
         </tr>
         <tr>
-            <td class="details-col">Diplômes / Certifications valorisantes</td>
-            <td><textarea class="info-textarea" placeholder="Diplômes ou certifications supplémentaires appréciés" key="nice_to_have_diplomes"></textarea></td>
+            <td class="details-cell">Soft skills / aptitudes comportementales</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="Leadership, rigueur, communication, autonomie" key="must_have_softskills"></textarea></td>
+        </tr>
+        <!-- Nice-to-have (Atouts) -->
+        <tr>
+            <td rowspan="3" class="section-header">Nice-to-have (Atouts)</td>
+            <td class="details-cell">Expérience additionnelle</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="Ex. projets internationaux, multi-sites" key="nice_to_have_experience"></textarea></td>
         </tr>
         <tr>
-            <td class="details-col">Compétences complémentaires</td>
-            <td><textarea class="info-textarea" placeholder="Compétences supplémentaires non essentielles mais appréciées" key="nice_to_have_competences"></textarea></td>
+            <td class="details-cell">Diplômes / Certifications valorisantes</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="Diplômes ou certifications supplémentaires appréciés" key="nice_to_have_diplomes"></textarea></td>
+        </tr>
+        <tr>
+            <td class="details-cell">Compétences complémentaires</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="Compétences supplémentaires non essentielles mais appréciées" key="nice_to_have_competences"></textarea></td>
         </tr>
         <!-- Sourcing et marché -->
         <tr>
-            <td rowspan="3" class="section-col">Sourcing et marché</td>
-            <td class="details-col">Entreprises où trouver ce profil</td>
-            <td><textarea class="info-textarea" placeholder="Concurrents, secteurs similaires" key="entreprises_profil"></textarea></td>
+            <td rowspan="3" class="section-header">Sourcing et marché</td>
+            <td class="details-cell">Entreprises où trouver ce profil</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="Concurrents, secteurs similaires" key="entreprises_profil"></textarea></td>
         </tr>
         <tr>
-            <td class="details-col">Synonymes / intitulés proches</td>
-            <td><textarea class="info-textarea" placeholder="Titres alternatifs pour affiner le sourcing" key="synonymes_poste"></textarea></td>
+            <td class="details-cell">Synonymes / intitulés proches</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="Titres alternatifs pour affiner le sourcing" key="synonymes_poste"></textarea></td>
         </tr>
         <tr>
-            <td class="details-col">Canaux à utiliser</td>
-            <td><textarea class="info-textarea" placeholder="LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels" key="canaux_profil"></textarea></td>
+            <td class="details-cell">Canaux à utiliser</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels" key="canaux_profil"></textarea></td>
         </tr>
         <!-- Conditions et contraintes -->
         <tr>
-            <td rowspan="2" class="section-col">Conditions et contraintes</td>
-            <td class="details-col">Localisation</td>
-            <td><textarea class="info-textarea" placeholder="Site principal, télétravail, déplacements" key="rattachement"></textarea></td>
+            <td rowspan="2" class="section-header">Conditions et contraintes</td>
+            <td class="details-cell">Localisation</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="Site principal, télétravail, déplacements" key="rattachement"></textarea></td>
         </tr>
         <tr>
-            <td class="details-col">Budget recrutement</td>
-            <td><textarea class="info-textarea" placeholder="Salaire indicatif, avantages, primes éventuelles" key="budget"></textarea></td>
+            <td class="details-cell">Budget recrutement</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="Salaire indicatif, avantages, primes éventuelles" key="budget"></textarea></td>
         </tr>
         <!-- Notes libres -->
         <tr>
-            <td rowspan="2" class="section-col">Notes libres</td>
-            <td class="details-col">Points à discuter ou à clarifier avec le manager</td>
-            <td><textarea class="info-textarea" placeholder="Points à discuter ou à clarifier" key="commentaires"></textarea></td>
+            <td rowspan="2" class="section-header">Notes libres</td>
+            <td class="details-cell">Points à discuter ou à clarifier avec le manager</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="Points à discuter ou à clarifier" key="commentaires"></textarea></td>
         </tr>
         <tr>
-            <td class="details-col">Case libre</td>
-            <td><textarea class="info-textarea" placeholder="Pour tout point additionnel ou remarque spécifique" key="notes_libres"></textarea></td>
+            <td class="details-cell">Case libre</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="Pour tout point additionnel ou remarque spécifique" key="notes_libres"></textarea></td>
         </tr>
     </table>
     """, unsafe_allow_html=True)
@@ -823,7 +852,6 @@ with tabs[2]:
     # Vérification si l'onglet est accessible
     if not can_access_reunion:
         st.warning("⚠️ Veuillez d'abord compléter et sauvegarder l'onglet Avant-brief")
-        st.info("💡 Remplissez toutes les informations requises dans l'onglet Avant-brief et cliquez sur 'Sauvegarder'")
         st.stop()  # Arrête le rendu de cet onglet
     
     # Afficher les informations du brief en cours
@@ -954,7 +982,6 @@ with tabs[3]:
     # Vérification si l'onglet est accessible
     if not can_access_synthese:
         st.warning("⚠️ Veuillez d'abord compléter et sauvegarder l'onglet Réunion de brief")
-        st.info("💡 Remplissez toutes les informations requises dans l'onglet Réunion de brief et cliquez sur 'Enregistrer réunion'")
         st.stop()  # Arrête le rendu de cet onglet
     
     # Afficher les informations du brief en cours
