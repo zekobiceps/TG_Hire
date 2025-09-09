@@ -301,26 +301,26 @@ with tab1:
         col1, col2, col3 = st.columns(3)
         with col1:
             st.text_input("Nom du manager *", key="manager_nom")
-            st.selectbox("Type de brief", ["Brief", "Template"], key="brief_type")
         with col2:
             st.text_input("Poste à recruter", key="niveau_hierarchique")
-            st.selectbox("Recruteur *", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="recruteur")
         with col3:
+            st.selectbox("Type de brief", ["Brief", "Template"], key="brief_type")
+        
+        col4, col5, col6 = st.columns(3)
+        with col4:
+            st.selectbox("Recruteur *", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="recruteur")
+        with col5:
             st.selectbox("Affectation", ["", "Chantier", "Siège"], key="affectation_type")
+        with col6:
             st.text_input("Nom de l'affectation", key="affectation_nom")
         
-        # Nouvelle disposition pour Date du Brief et message
-        col_date, col_msg = st.columns([1, 2])
-        with col_date:
-            st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date())
-        with col_msg:
-            # Placeholder pour les messages d'erreur/confirmation
-            message_placeholder = st.empty()
-
+        # Date du brief
+        st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date())
+        
         # --- SAUVEGARDE
         if st.button("💾 Sauvegarder le Brief", type="primary", use_container_width=True):
             if not all([st.session_state.manager_nom, st.session_state.recruteur, st.session_state.date_brief]):
-                message_placeholder.error("Veuillez remplir tous les champs obligatoires (*)")
+                st.error("Veuillez remplir tous les champs obligatoires (*)")
             else:
                 brief_name = generate_automatic_brief_name()
                 if "saved_briefs" not in st.session_state:
@@ -347,7 +347,7 @@ with tab1:
                     "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict() if hasattr(st.session_state, 'ksa_matrix') else {}
                 }
                 save_briefs()
-                message_placeholder.success(f"✅ Brief '{brief_name}' sauvegardé avec succès !")
+                st.success(f"✅ Brief '{brief_name}' sauvegardé avec succès !")
                 st.session_state.current_brief_name = brief_name
 
     with col_side:
@@ -422,17 +422,14 @@ with tab1:
             
             with col_left:
                 for name, data in briefs_list[:half]:
-                    with st.container():
+                    with st.expander(f"📌 {name}", expanded=False):
                         st.markdown(f"""
-                        <div style="border:1px solid #424242; border-radius:5px; padding:10px; margin-bottom:10px">
-                            <h4 style="margin:0; color:#FF4B4B">{name}</h4>
-                            <p style="margin:5px 0"><strong>Type:</strong> {data.get('brief_type', '')}</p>
-                            <p style="margin:5px 0"><strong>Manager:</strong> {data.get('manager_nom', '')}</p>
-                            <p style="margin:5px 0"><strong>Recruteur:</strong> {data.get('recruteur', '')}</p>
-                            <p style="margin:5px 0"><strong>Affectation:</strong> {data.get('affectation_type', '')} - {data.get('affectation_nom', '')}</p>
-                            <p style="margin:5px 0"><strong>Date:</strong> {data.get('date_brief', '')}</p>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        **Type:** {data.get('brief_type', 'N/A')}  
+                        **Manager:** {data.get('manager_nom', 'N/A')}  
+                        **Recruteur:** {data.get('recruteur', 'N/A')}  
+                        **Affectation:** {data.get('affectation_type', 'N/A')} - {data.get('affectation_nom', 'N/A')}  
+                        **Date:** {data.get('date_brief', 'N/A')}
+                        """)
                         
                         colA, colB = st.columns(2)
                         with colA:
@@ -485,17 +482,14 @@ with tab1:
             
             with col_right:
                 for name, data in briefs_list[half:]:
-                    with st.container():
+                    with st.expander(f"📌 {name}", expanded=False):
                         st.markdown(f"""
-                        <div style="border:1px solid #424242; border-radius:5px; padding:10px; margin-bottom:10px">
-                            <h4 style="margin:0; color:#FF4B4B">{name}</h4>
-                            <p style="margin:5px 0"><strong>Type:</strong> {data.get('brief_type', '')}</p>
-                            <p style="margin:5px 0"><strong>Manager:</strong> {data.get('manager_nom', '')}</p>
-                            <p style="margin:5px 0"><strong>Recruteur:</strong> {data.get('recruteur', '')}</p>
-                            <p style="margin:5px 0"><strong>Affectation:</strong> {data.get('affectation_type', '')} - {data.get('affectation_nom', '')}</p>
-                            <p style="margin:5px 0"><strong>Date:</strong> {data.get('date_brief', '')}</p>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        **Type:** {data.get('brief_type', 'N/A')}  
+                        **Manager:** {data.get('manager_nom', 'N/A')}  
+                        **Recruteur:** {data.get('recruteur', 'N/A')}  
+                        **Affectation:** {data.get('affectation_type', 'N/A')} - {data.get('affectation_nom', 'N/A')}  
+                        **Date:** {data.get('date_brief', 'N/A')}
+                        """)
                         
                         colA, colB = st.columns(2)
                         with colA:
