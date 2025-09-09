@@ -300,13 +300,12 @@ with tab1:
         # --- INFOS DE BASE (3 colonnes)
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.text_input("Intitulé du poste *", key="poste_intitule")
             st.text_input("Nom du manager *", key="manager_nom")
+            st.selectbox("Type de brief", ["Brief", "Template"], key="brief_type")
         with col2:
             st.text_input("Poste à recruter", key="niveau_hierarchique")
             st.selectbox("Recruteur *", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="recruteur")
         with col3:
-            st.selectbox("Type de brief", ["Brief", "Template"], key="brief_type")
             st.selectbox("Affectation", ["", "Chantier", "Siège"], key="affectation_type")
             st.text_input("Nom de l'affectation", key="affectation_nom")
         
@@ -320,7 +319,7 @@ with tab1:
 
         # --- SAUVEGARDE
         if st.button("💾 Sauvegarder le Brief", type="primary", use_container_width=True):
-            if not all([st.session_state.poste_intitule, st.session_state.manager_nom, st.session_state.recruteur, st.session_state.date_brief]):
+            if not all([st.session_state.manager_nom, st.session_state.recruteur, st.session_state.date_brief]):
                 message_placeholder.error("Veuillez remplir tous les champs obligatoires (*)")
             else:
                 brief_name = generate_automatic_brief_name()
@@ -328,7 +327,6 @@ with tab1:
                     st.session_state.saved_briefs = {}
                 
                 st.session_state.saved_briefs[brief_name] = {
-                    "poste_intitule": st.session_state.poste_intitule,
                     "manager_nom": st.session_state.manager_nom,
                     "recruteur": st.session_state.recruteur,
                     "date_brief": str(st.session_state.date_brief),
@@ -355,26 +353,28 @@ with tab1:
     with col_side:
         st.subheader("Recherche & Chargement")
         
-        # --- RECHERCHE & CHARGEMENT (2 colonnes)
-        col1, col2 = st.columns(2)
+        # --- RECHERCHE & CHARGEMENT (6 cases organisées en 2 lignes de 3)
+        # Première ligne
+        col1, col2, col3 = st.columns(3)
         with col1:
             months = ["", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
             month = st.selectbox("Mois", months)
-            brief_type_filter = st.selectbox("Type", ["", "Brief", "Template"], key="brief_type_filter")
         with col2:
+            brief_type_filter = st.selectbox("Type", ["", "Brief", "Template"], key="brief_type_filter")
+        with col3:
             recruteur = st.selectbox("Recruteur", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="search_recruteur")
-            manager = st.text_input("Manager")
         
-        # Nouvelle ligne pour Affectation et Nom de l'affectation
-        col_affect, col_nom_affect = st.columns(2)
-        with col_affect:
+        # Deuxième ligne
+        col4, col5, col6 = st.columns(3)
+        with col4:
+            manager = st.text_input("Manager")
+        with col5:
             affectation = st.selectbox("Affectation", ["", "Chantier", "Siège"], key="search_affectation")
-        with col_nom_affect:
+        with col6:
             nom_affectation = st.text_input("Nom de l'affectation", key="search_nom_affectation")
 
         if st.button("🔎 Rechercher", type="secondary", use_container_width=True):
             briefs = load_briefs()
-            # Modification ici pour gérer les nouveaux paramètres de filtrage
             st.session_state.filtered_briefs = {}
             
             for name, data in briefs.items():
@@ -414,19 +414,25 @@ with tab1:
         if st.session_state.filtered_briefs:
             st.subheader("Résultats de recherche")
             
-            # Afficher les résultats en deux colonnes
+            # Afficher les résultats en deux colonnes avec un style amélioré
             briefs_list = list(st.session_state.filtered_briefs.items())
-            half = len(briefs_list) // 2
+            half = (len(briefs_list) + 1) // 2  # Pour gérer les nombres impairs
+            
             col_left, col_right = st.columns(2)
             
             with col_left:
                 for name, data in briefs_list[:half]:
-                    with st.expander(f"📌 {name}"):
-                        st.write(f"**Type:** {data.get('brief_type', '')}")
-                        st.write(f"**Manager:** {data.get('manager_nom', '')}")
-                        st.write(f"**Recruteur:** {data.get('recruteur', '')}")
-                        st.write(f"**Affectation:** {data.get('affectation_type', '')} - {data.get('affectation_nom', '')}")
-                        st.write(f"**Date:** {data.get('date_brief', '')}")
+                    with st.container():
+                        st.markdown(f"""
+                        <div style="border:1px solid #424242; border-radius:5px; padding:10px; margin-bottom:10px">
+                            <h4 style="margin:0; color:#FF4B4B">{name}</h4>
+                            <p style="margin:5px 0"><strong>Type:</strong> {data.get('brief_type', '')}</p>
+                            <p style="margin:5px 0"><strong>Manager:</strong> {data.get('manager_nom', '')}</p>
+                            <p style="margin:5px 0"><strong>Recruteur:</strong> {data.get('recruteur', '')}</p>
+                            <p style="margin:5px 0"><strong>Affectation:</strong> {data.get('affectation_type', '')} - {data.get('affectation_nom', '')}</p>
+                            <p style="margin:5px 0"><strong>Date:</strong> {data.get('date_brief', '')}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
                         
                         colA, colB = st.columns(2)
                         with colA:
@@ -479,12 +485,17 @@ with tab1:
             
             with col_right:
                 for name, data in briefs_list[half:]:
-                    with st.expander(f"📌 {name}"):
-                        st.write(f"**Type:** {data.get('brief_type', '')}")
-                        st.write(f"**Manager:** {data.get('manager_nom', '')}")
-                        st.write(f"**Recruteur:** {data.get('recruteur', '')}")
-                        st.write(f"**Affectation:** {data.get('affectation_type', '')} - {data.get('affectation_nom', '')}")
-                        st.write(f"**Date:** {data.get('date_brief', '')}")
+                    with st.container():
+                        st.markdown(f"""
+                        <div style="border:1px solid #424242; border-radius:5px; padding:10px; margin-bottom:10px">
+                            <h4 style="margin:0; color:#FF4B4B">{name}</h4>
+                            <p style="margin:5px 0"><strong>Type:</strong> {data.get('brief_type', '')}</p>
+                            <p style="margin:5px 0"><strong>Manager:</strong> {data.get('manager_nom', '')}</p>
+                            <p style="margin:5px 0"><strong>Recruteur:</strong> {data.get('recruteur', '')}</p>
+                            <p style="margin:5px 0"><strong>Affectation:</strong> {data.get('affectation_type', '')} - {data.get('affectation_nom', '')}</p>
+                            <p style="margin:5px 0"><strong>Date:</strong> {data.get('date_brief', '')}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
                         
                         colA, colB = st.columns(2)
                         with colA:
