@@ -116,6 +116,13 @@ if "reunion_step" not in st.session_state:
 if "filtered_briefs" not in st.session_state:
     st.session_state.filtered_briefs = {}
 
+# Variables pour gérer l'accès aux onglets
+if "avant_brief_completed" not in st.session_state:
+    st.session_state.avant_brief_completed = False
+
+if "reunion_completed" not in st.session_state:
+    st.session_state.reunion_completed = False
+
 # -------------------- Sidebar --------------------
 with st.sidebar:
     st.title("📊 Statistiques Brief")
@@ -275,6 +282,13 @@ st.markdown("""
     .dataframe {
         width: 100%;
     }
+    
+    /* Style pour les onglets désactivés */
+    .disabled-tab {
+        opacity: 0.5;
+        pointer-events: none;
+        cursor: not-allowed;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -282,16 +296,21 @@ st.markdown("""
 if "current_brief_name" not in st.session_state:
     st.session_state.current_brief_name = ""
 
-# Utilisation d'onglets comme dans la page sourcing
-tab1, tab2, tab3, tab4 = st.tabs([
+# Création des onglets avec gestion des accès
+tabs = st.tabs([
     "📁 Gestion", 
     "🔄 Avant-brief", 
     "✅ Réunion de brief", 
     "📝 Synthèse"
 ])
 
+# Déterminer quels onglets sont accessibles
+can_access_avant_brief = st.session_state.current_brief_name != ""
+can_access_reunion = can_access_avant_brief and st.session_state.avant_brief_completed
+can_access_synthese = can_access_reunion and st.session_state.reunion_completed
+
 # ---------------- ONGLET GESTION ----------------
-with tab1:
+with tabs[0]:
     # Style CSS personnalisé pour réduire les espaces
     st.markdown("""
     <style>
@@ -368,8 +387,8 @@ with tab1:
                 <div class="custom-radio">
                     <input type="radio" id="brief" name="brief_type" value="Brief" checked>
                     <label for="brief">Brief</label>
-                    <input type="radio" id="template" name="brief_type" value="Template">
-                    <label for="template">Template</label>
+                    <input type="radio" id="template" name="brief_type" value="Caneas">
+                    <label for="template">Caneas</label>
                 </div>
             </div>
         </div>
@@ -379,7 +398,7 @@ with tab1:
         st.markdown("<h3 style='margin-bottom: 0.5rem;'>Recherche & Chargement</h3>", unsafe_allow_html=True)
     
     # Radio button Streamlit caché pour la fonctionnalité
-    brief_type = st.radio("", ["Brief", "Template"], key="brief_type", horizontal=True, label_visibility="collapsed")
+    brief_type = st.radio("", ["Brief", "Caneas"], key="brief_type", horizontal=True, label_visibility="collapsed")
     
     col_main, col_side = st.columns([2, 1])
     
@@ -402,7 +421,7 @@ with tab1:
             st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date())
         
         # --- SAUVEGARDE
-        if st.button("💾 Sauvegarder le Brief", type="primary", use_container_width=True):
+        if st.button("💾 Sauvegarder", type="primary", use_container_width=True):
             if not all([st.session_state.manager_nom, st.session_state.recruteur, st.session_state.date_brief]):
                 st.error("Veuillez remplir tous les champs obligatoires (*)")
             else:
@@ -421,7 +440,9 @@ with tab1:
                     "raison_ouverture": st.session_state.get("raison_ouverture", ""),
                     "impact_strategique": st.session_state.get("impact_strategique", ""),
                     "rattachement": st.session_state.get("rattachement", ""),
-                    "defis_principaux": st.session_state.get("defis_principaux", ""),
+                    "taches_principales": st.session_state.get("taches_principales", ""),
+                    "must_have": st.session_state.get("must_have", ""),
+                    "nice_to_have": st.session_state.get("nice_to_have", ""),
                     "entreprises_profil": st.session_state.get("entreprises_profil", ""),
                     "canaux_profil": st.session_state.get("canaux_profil", ""),
                     "synonymes_poste": st.session_state.get("synonymes_poste", ""),
@@ -433,6 +454,8 @@ with tab1:
                 save_briefs()
                 st.success(f"✅ Brief '{brief_name}' sauvegardé avec succès !")
                 st.session_state.current_brief_name = brief_name
+                st.session_state.avant_brief_completed = False
+                st.session_state.reunion_completed = False
 
     with col_side:
         # --- RECHERCHE & CHARGEMENT (6 cases organisées en 2 lignes de 3)
@@ -442,7 +465,7 @@ with tab1:
             months = ["", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
             month = st.selectbox("Mois", months)
         with col2:
-            brief_type_filter = st.selectbox("Type", ["", "Brief", "Template"], key="brief_type_filter")
+            brief_type_filter = st.selectbox("Type", ["", "Brief", "Caneas"], key="brief_type_filter")
         with col3:
             recruteur = st.selectbox("Recruteur", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="search_recruteur")
         
@@ -533,8 +556,9 @@ with tab1:
                                 
                                 # Mettre à jour uniquement les champs non-widgets
                                 non_widget_keys = ["raison_ouverture", "impact_strategique", "rattachement", 
-                                                  "defis_principaux", "entreprises_profil", "canaux_profil",
-                                                  "synonymes_poste", "budget", "commentaires", "brief_type"]
+                                                  "taches_principales", "must_have", "nice_to_have",
+                                                  "entreprises_profil", "canaux_profil", "synonymes_poste", 
+                                                  "budget", "commentaires", "brief_type"]
                                 
                                 for key in non_widget_keys:
                                     if key in data:
@@ -549,6 +573,7 @@ with tab1:
                                     st.session_state.ksa_matrix = pd.DataFrame(data["ksa_matrix"])
                                 
                                 st.success(f"✅ Brief '{name}' chargé avec succès!")
+                                st.session_state.avant_brief_completed = True
                                 st.rerun()
                             
                             except Exception as e:
@@ -591,36 +616,12 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 """, unsafe_allow_html=True)
 
-# JavaScript pour synchroniser les radio buttons personnalisés avec Streamlit
-st.markdown("""
-<script>
-// Synchroniser les radio buttons personnalisés avec Streamlit
-document.querySelectorAll('.custom-radio input[type="radio"]').forEach(radio => {
-    radio.addEventListener('change', function() {
-        // Mettre à jour la valeur dans Streamlit
-        const value = this.value;
-        const streamlitRadio = parent.document.querySelector('input[type="radio"][value="' + value + '"]');
-        if (streamlitRadio) {
-            streamlitRadio.click();
-        }
-    });
-});
-
-// Synchroniser l'état initial
-document.addEventListener('DOMContentLoaded', function() {
-    const streamlitValue = parent.document.querySelector('input[type="radio"]:checked').value;
-    const customRadio = document.querySelector('.custom-radio input[value="' + streamlitValue + '"]');
-    if (customRadio) {
-        customRadio.checked = true;
-    }
-});
-</script>
-""", unsafe_allow_html=True)
-with tab2:
+# ---------------- ONGLET AVANT-BRIEF ----------------
+with tabs[1]:
     # Vérification si un brief est chargé
-    if "current_brief_name" not in st.session_state or st.session_state.current_brief_name == "":
+    if not can_access_avant_brief:
         st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
-        st.info("💡 Utilisez l'onglet Gestion pour créer un nouveau brief ou charger un template existant")
+        st.info("💡 Utilisez l'onglet Gestion pour créer un nouveau brief ou charger un canevas existant")
         st.stop()  # Arrête le rendu de cet onglet
     
     # Afficher les informations du brief en cours avec Manager/Recruteur à gauche
@@ -679,77 +680,81 @@ with tab2:
         <tr>
             <td rowspan="3" class="section-col">Contexte du poste</td>
             <td class="details-col">Raison de l'ouverture</td>
-            <td><textarea class="info-textarea" placeholder="Remplacement / Création / Évolution interne"></textarea></td>
+            <td><textarea class="info-textarea" placeholder="Remplacement / Création / Évolution interne" key="raison_ouverture"></textarea></td>
         </tr>
         <tr>
             <td class="details-col">Mission globale</td>
-            <td><textarea class="info-textarea" placeholder="Résumé du rôle et objectif principal"></textarea></td>
+            <td><textarea class="info-textarea" placeholder="Résumé du rôle et objectif principal" key="impact_strategique"></textarea></td>
         </tr>
         <tr>
-            <td class="details-col">Défis principaux</td>
-            <td><textarea class="info-textarea" placeholder="Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"></textarea></td>
+            <td class="details-col">Tâches principales</td>
+            <td><textarea class="info-textarea" placeholder="Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget" key="taches_principales"></textarea></td>
         </tr>
         <!-- Profil recherché -->
         <tr>
-            <td rowspan="4" class="section-col">Profil recherché</td>
+            <td rowspan="4" class="section-col">Must-have (Indispensables)</td>
             <td class="details-col">Expérience</td>
-            <td><textarea class="info-textarea" placeholder="Nombre d'années minimum, expériences similaires dans le secteur"></textarea></td>
+            <td><textarea class="info-textarea" placeholder="Nombre d'années minimum, expériences similaires dans le secteur" key="must_have_experience"></textarea></td>
         </tr>
         <tr>
             <td class="details-col">Connaissances / Diplômes / Certifications</td>
-            <td><textarea class="info-textarea" placeholder="Diplômes exigés, certifications spécifiques"></textarea></td>
+            <td><textarea class="info-textarea" placeholder="Diplômes exigés, certifications spécifiques" key="must_have_diplomes"></textarea></td>
         </tr>
         <tr>
             <td class="details-col">Compétences / Outils</td>
-            <td><textarea class="info-textarea" placeholder="Techniques, logiciels, méthodes à maîtriser"></textarea></td>
+            <td><textarea class="info-textarea" placeholder="Techniques, logiciels, méthodes à maîtriser" key="must_have_competences"></textarea></td>
         </tr>
         <tr>
             <td class="details-col">Soft skills / aptitudes comportementales</td>
-            <td><textarea class="info-textarea" placeholder="Leadership, rigueur, communication, autonomie"></textarea></td>
+            <td><textarea class="info-textarea" placeholder="Leadership, rigueur, communication, autonomie" key="must_have_softskills"></textarea></td>
         </tr>
-        <!-- Missions / Tâches -->
+        <!-- Nice-to-have -->
         <tr>
-            <td rowspan="2" class="section-col">Missions / Tâches</td>
-            <td class="details-col">Tâches principales</td>
-            <td><textarea class="info-textarea" placeholder="4-6 missions détaillées"></textarea></td>
+            <td rowspan="3" class="section-col">Nice-to-have (Atouts)</td>
+            <td class="details-col">Expérience additionnelle</td>
+            <td><textarea class="info-textarea" placeholder="Ex. projets internationaux, multi-sites" key="nice_to_have_experience"></textarea></td>
         </tr>
         <tr>
-            <td class="details-col">Autres responsabilités</td>
-            <td><textarea class="info-textarea" placeholder="Points additionnels ou spécifiques à préciser"></textarea></td>
+            <td class="details-col">Diplômes / Certifications valorisantes</td>
+            <td><textarea class="info-textarea" placeholder="Diplômes ou certifications supplémentaires appréciés" key="nice_to_have_diplomes"></textarea></td>
+        </tr>
+        <tr>
+            <td class="details-col">Compétences complémentaires</td>
+            <td><textarea class="info-textarea" placeholder="Compétences supplémentaires non essentielles mais appréciées" key="nice_to_have_competences"></textarea></td>
         </tr>
         <!-- Sourcing et marché -->
         <tr>
             <td rowspan="3" class="section-col">Sourcing et marché</td>
             <td class="details-col">Entreprises où trouver ce profil</td>
-            <td><textarea class="info-textarea" placeholder="Concurrents, secteurs similaires"></textarea></td>
+            <td><textarea class="info-textarea" placeholder="Concurrents, secteurs similaires" key="entreprises_profil"></textarea></td>
         </tr>
         <tr>
             <td class="details-col">Synonymes / intitulés proches</td>
-            <td><textarea class="info-textarea" placeholder="Titres alternatifs pour affiner le sourcing"></textarea></td>
+            <td><textarea class="info-textarea" placeholder="Titres alternatifs pour affiner le sourcing" key="synonymes_poste"></textarea></td>
         </tr>
         <tr>
             <td class="details-col">Canaux à utiliser</td>
-            <td><textarea class="info-textarea" placeholder="LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"></textarea></td>
+            <td><textarea class="info-textarea" placeholder="LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels" key="canaux_profil"></textarea></td>
         </tr>
         <!-- Conditions et contraintes -->
         <tr>
             <td rowspan="2" class="section-col">Conditions et contraintes</td>
             <td class="details-col">Localisation</td>
-            <td><textarea class="info-textarea" placeholder="Site principal, télétravail, déplacements"></textarea></td>
+            <td><textarea class="info-textarea" placeholder="Site principal, télétravail, déplacements" key="rattachement"></textarea></td>
         </tr>
         <tr>
             <td class="details-col">Budget recrutement</td>
-            <td><textarea class="info-textarea" placeholder="Salaire indicatif, avantages, primes éventuelles"></textarea></td>
+            <td><textarea class="info-textarea" placeholder="Salaire indicatif, avantages, primes éventuelles" key="budget"></textarea></td>
         </tr>
         <!-- Notes libres -->
         <tr>
             <td rowspan="2" class="section-col">Notes libres</td>
             <td class="details-col">Points à discuter ou à clarifier avec le manager</td>
-            <td><textarea class="info-textarea" placeholder="Points à discuter ou à clarifier"></textarea></td>
+            <td><textarea class="info-textarea" placeholder="Points à discuter ou à clarifier" key="commentaires"></textarea></td>
         </tr>
         <tr>
             <td class="details-col">Case libre</td>
-            <td><textarea class="info-textarea" placeholder="Pour tout point additionnel ou remarque spécifique"></textarea></td>
+            <td><textarea class="info-textarea" placeholder="Pour tout point additionnel ou remarque spécifique" key="notes_libres"></textarea></td>
         </tr>
     </table>
     """, unsafe_allow_html=True)
@@ -786,21 +791,43 @@ with tab2:
             # Mettre à jour le brief avec les liens
             st.session_state.saved_briefs[brief_name]["profil_links"] = st.session_state.profil_links
             
+            # Mettre à jour les champs modifiés
+            st.session_state.saved_briefs[brief_name].update({
+                "raison_ouverture": st.session_state.get("raison_ouverture", ""),
+                "impact_strategique": st.session_state.get("impact_strategique", ""),
+                "taches_principales": st.session_state.get("taches_principales", ""),
+                "must_have_experience": st.session_state.get("must_have_experience", ""),
+                "must_have_diplomes": st.session_state.get("must_have_diplomes", ""),
+                "must_have_competences": st.session_state.get("must_have_competences", ""),
+                "must_have_softskills": st.session_state.get("must_have_softskills", ""),
+                "nice_to_have_experience": st.session_state.get("nice_to_have_experience", ""),
+                "nice_to_have_diplomes": st.session_state.get("nice_to_have_diplomes", ""),
+                "nice_to_have_competences": st.session_state.get("nice_to_have_competences", ""),
+                "entreprises_profil": st.session_state.get("entreprises_profil", ""),
+                "synonymes_poste": st.session_state.get("synonymes_poste", ""),
+                "canaux_profil": st.session_state.get("canaux_profil", ""),
+                "rattachement": st.session_state.get("rattachement", ""),
+                "budget": st.session_state.get("budget", ""),
+                "commentaires": st.session_state.get("commentaires", ""),
+                "notes_libres": st.session_state.get("notes_libres", "")
+            })
+            
             save_briefs()
+            st.session_state.avant_brief_completed = True
             st.success("✅ Modifications sauvegardées")
         else:
             st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
 
 # ---------------- RÉUNION (Wizard interne) ----------------
-with tab3:
-    # Vérification si un brief est chargé
-    if "current_brief_name" not in st.session_state or st.session_state.current_brief_name == "":
-        st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
-        st.info("💡 Utilisez l'onglet Gestion pour créer un nouveau brief ou charger un template existant")
+with tabs[2]:
+    # Vérification si l'onglet est accessible
+    if not can_access_reunion:
+        st.warning("⚠️ Veuillez d'abord compléter et sauvegarder l'onglet Avant-brief")
+        st.info("💡 Remplissez toutes les informations requises dans l'onglet Avant-brief et cliquez sur 'Sauvegarder'")
         st.stop()  # Arrête le rendu de cet onglet
     
     # Afficher les informations du brief en cours
-    st.subheader(f"✅ Réunion de brief avec le Manager - {st.session_state.get('poste_intitule', '')}")
+    st.subheader(f"✅ Réunion de brief avec le Manager - {st.session_state.get('niveau_hierarchique', '')}")
     st.info(f"Manager: {st.session_state.get('manager_nom', '')} | Recruteur: {st.session_state.get('recruteur', '')}")
 
     total_steps = 4
@@ -848,35 +875,35 @@ with tab3:
                 <td>{mission_globale}</td>
             </tr>
             <tr>
-                <td class="details-col">Défis principaux</td>
-                <td>{defis_principaux}</td>
+                <td class="details-col">Tâches principales</td>
+                <td>{taches_principales}</td>
             </tr>
             <tr>
-                <td rowspan="4" class="section-col">Profil recherché</td>
+                <td rowspan="4" class="section-col">Must-have (Indispensables)</td>
                 <td class="details-col">Expérience</td>
-                <td>{experience}</td>
+                <td>{must_have_experience}</td>
             </tr>
             <tr>
                 <td class="details-col">Connaissances / Diplômes / Certifications</td>
-                <td>{diplomes}</td>
+                <td>{must_have_diplomes}</td>
             </tr>
             <tr>
                 <td class="details-col">Compétences / Outils</td>
-                <td>{competences}</td>
+                <td>{must_have_competences}</td>
             </tr>
             <tr>
                 <td class="details-col">Soft skills / aptitudes comportementales</td>
-                <td>{soft_skills}</td>
+                <td>{must_have_softskills}</td>
             </tr>
         </table>
         """.format(
             raison_ouverture=st.session_state.get("raison_ouverture", "Non renseigné"),
-            mission_globale=st.session_state.get("mission_globale", "Non renseigné"),
-            defis_principaux=st.session_state.get("defis_principaux", "Non renseigné"),
-            experience=st.session_state.get("experience_requise", "Non renseigné"),
-            diplomes=st.session_state.get("diplomes_certifications", "Non renseigné"),
-            competences=st.session_state.get("competences_outils", "Non renseigné"),
-            soft_skills=st.session_state.get("soft_skills", "Non renseigné")
+            mission_globale=st.session_state.get("impact_strategique", "Non renseigné"),
+            taches_principales=st.session_state.get("taches_principales", "Non renseigné"),
+            must_have_experience=st.session_state.get("must_have_experience", "Non renseigné"),
+            must_have_diplomes=st.session_state.get("must_have_diplomes", "Non renseigné"),
+            must_have_competences=st.session_state.get("must_have_competences", "Non renseigné"),
+            must_have_softskills=st.session_state.get("must_have_softskills", "Non renseigné")
         ), unsafe_allow_html=True)
 
     elif step == 2:
@@ -904,6 +931,7 @@ with tab3:
                     "manager_notes": st.session_state.get("manager_notes", "")
                 })
                 save_briefs()
+                st.session_state.reunion_completed = True
                 st.success("✅ Données de réunion sauvegardées")
             else:
                 st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
@@ -922,15 +950,15 @@ with tab3:
                 st.rerun()
 
 # ---------------- SYNTHÈSE ----------------
-with tab4:
-    # Vérification si un brief est chargé
-    if "current_brief_name" not in st.session_state or st.session_state.current_brief_name == "":
-        st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
-        st.info("💡 Utilisez l'onglet Gestion pour créer un nouveau brief ou charger un template existant")
+with tabs[3]:
+    # Vérification si l'onglet est accessible
+    if not can_access_synthese:
+        st.warning("⚠️ Veuillez d'abord compléter et sauvegarder l'onglet Réunion de brief")
+        st.info("💡 Remplissez toutes les informations requises dans l'onglet Réunion de brief et cliquez sur 'Enregistrer réunion'")
         st.stop()  # Arrête le rendu de cet onglet
     
     # Afficher les informations du brief en cours
-    st.subheader(f"📝 Synthèse du Brief - {st.session_state.get('poste_intitule', '')}")
+    st.subheader(f"📝 Synthèse du Brief - {st.session_state.get('niveau_hierarchique', '')}")
     st.info(f"Manager: {st.session_state.get('manager_nom', '')} | Recruteur: {st.session_state.get('recruteur', '')}")
     
     if "current_brief_name" in st.session_state:
@@ -938,14 +966,14 @@ with tab4:
     
     st.subheader("Résumé des informations")
     st.json({
-        "Poste": st.session_state.get("poste_intitule", ""),
+        "Poste": st.session_state.get("niveau_hierarchique", ""),
         "Manager": st.session_state.get("manager_nom", ""),
         "Recruteur": st.session_state.get("recruteur", ""),
         "Type": st.session_state.get("brief_type", ""),
         "Affectation": f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}",
         "Date": str(st.session_state.get("date_brief", "")),
         "Raison ouverture": st.session_state.get("raison_ouverture", ""),
-        "Défis principaux": st.session_state.get("defis_principaux", ""),
+        "Tâches principales": st.session_state.get("taches_principales", ""),
         "Entreprises profil": st.session_state.get("entreprises_profil", ""),
         "Canaux": st.session_state.get("canaux_profil", ""),
         "Budget": st.session_state.get("budget", ""),
@@ -1006,3 +1034,20 @@ with tab4:
                 st.info("ℹ️ Créez d'abord un brief pour l'exporter")
         else:
             st.info("⚠️ Word non dispo (pip install python-docx)")
+
+# JavaScript pour désactiver les onglets non accessibles
+st.markdown(f"""
+<script>
+// Désactiver les onglets selon les permissions
+const tabs = parent.document.querySelectorAll('[data-baseweb="tab"]');
+if (!{str(can_access_avant_brief).lower()}) {{
+    tabs[1].classList.add('disabled-tab');
+}}
+if (!{str(can_access_reunion).lower()}) {{
+    tabs[2].classList.add('disabled-tab');
+}}
+if (!{str(can_access_synthese).lower()}) {{
+    tabs[3].classList.add('disabled-tab');
+}}
+</script>
+""", unsafe_allow_html=True)
