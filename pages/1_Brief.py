@@ -187,14 +187,14 @@ st.markdown("""
     /* Style pour les onglets de navigation */
     .stTabs [data-baseweb="tab-list"] {
         gap: 0px;
-        background-color: #FF4B4B;
+        background-color: #0E1117;
         padding: 0px;
         border-radius: 4px;
     }
     
     /* Style de base pour tous les onglets */
     .stTabs [data-baseweb="tab"] {
-        background-color: #FF4B4B !important;
+        background-color: #0E1117 !important;
         color: white !important;
         border: none !important;
         padding: 10px 16px !important;
@@ -206,9 +206,9 @@ st.markdown("""
     
     /* Style pour l'onglet actif */
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        color: white !important;
-        background-color: #FF4B4B !important;
-        border-bottom: 3px solid white !important;
+        color: #ff4b4b !important;
+        background-color: #0E1117 !important;
+        border-bottom: 3px solid #ff4b4b !important;
     }
     
     /* Boutons principaux */
@@ -335,7 +335,7 @@ st.markdown("""
     }
     
     .minimal-table th, .minimal-table td {
-        padding: 8px;
+        padding: 6px;
         text-align: left;
         border: none;
     }
@@ -345,7 +345,7 @@ st.markdown("""
         color: white;
         font-weight: 600;
         font-size: 0.9em;
-        padding: 10px;
+        padding: 8px;
     }
     
     .minimal-table tr {
@@ -375,26 +375,27 @@ st.markdown("""
     .info-cell {
         background-color: #262730;
         color: #FAFAFA;
-        width: 65%;
+        width: 40%;
     }
     
     .manager-cell {
         background-color: #262730;
         color: #FAFAFA;
-        width: 35%;
+        width: 40%;
     }
     
     .info-textarea {
         width: 100%;
-        height: 80px;
+        height: 60px;
         background-color: #1E1E1E;
         color: #FAFAFA;
         border: 1px solid #424242;
         border-radius: 4px;
-        padding: 8px;
+        padding: 6px;
         resize: vertical;
         font-family: inherit;
         transition: border-color 0.3s;
+        font-size: 0.9em;
     }
     
     .info-textarea:focus {
@@ -533,58 +534,56 @@ with tabs[0]:
         with col6:
             st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date())
         
-        # --- SAUVEGARDE
-        col_save, col_cancel = st.columns([1, 1])
-        with col_save:
-            if st.button("💾 Sauvegarder", type="primary", use_container_width=True, key="save_gestion"):
-                if not all([st.session_state.manager_nom, st.session_state.recruteur, st.session_state.date_brief]):
-                    st.error("Veuillez remplir tous les champs obligatoires (*)")
+        # --- SAUVEGARDE - Bouton étendu
+        if st.button("💾 Sauvegarder", type="primary", use_container_width=True, key="save_gestion"):
+            if not all([st.session_state.manager_nom, st.session_state.recruteur, st.session_state.date_brief]):
+                st.error("Veuillez remplir tous les champs obligatoires (*)")
+            else:
+                brief_name = generate_automatic_brief_name()
+                
+                # Charger les briefs existants depuis le fichier
+                existing_briefs = load_briefs()
+                if "saved_briefs" not in st.session_state:
+                    st.session_state.saved_briefs = existing_briefs
                 else:
-                    brief_name = generate_automatic_brief_name()
-                    
-                    # Charger les briefs existants depuis le fichier
-                    existing_briefs = load_briefs()
-                    if "saved_briefs" not in st.session_state:
-                        st.session_state.saved_briefs = existing_briefs
-                    else:
-                        # Mettre à jour avec les briefs existants
-                        st.session_state.saved_briefs.update(existing_briefs)
-                    
-                    # Créer ou mettre à jour le brief
-                    st.session_state.saved_briefs[brief_name] = {
-                        "manager_nom": st.session_state.manager_nom,
-                        "recruteur": st.session_state.recruteur,
-                        "date_brief": str(st.session_state.date_brief),
-                        "niveau_hierarchique": st.session_state.niveau_hierarchique,
-                        "brief_type": st.session_state.brief_type,
-                        "affectation_type": st.session_state.affectation_type,
-                        "affectation_nom": st.session_state.affectation_nom,
-                        "raison_ouverture": st.session_state.get("raison_ouverture", ""),
-                        "impact_strategique": st.session_state.get("impact_strategique", ""),
-                        "rattachement": st.session_state.get("rattachement", ""),
-                        "taches_principales": st.session_state.get("taches_principales", ""),
-                        "must_have_experience": st.session_state.get("must_have_experience", ""),
-                        "must_have_diplomes": st.session_state.get("must_have_diplomes", ""),
-                        "must_have_competences": st.session_state.get("must_have_competences", ""),
-                        "must_have_softskills": st.session_state.get("must_have_softskills", ""),
-                        "nice_to_have_experience": st.session_state.get("nice_to_have_experience", ""),
-                        "nice_to_have_diplomes": st.session_state.get("nice_to_have_diplomes", ""),
-                        "nice_to_have_competences": st.session_state.get("nice_to_have_competences", ""),
-                        "entreprises_profil": st.session_state.get("entreprises_profil", ""),
-                        "canaux_profil": st.session_state.get("canaux_profil", ""),
-                        "synonymes_poste": st.session_state.get("synonymes_poste", ""),
-                        "budget": st.session_state.get("budget", ""),
-                        "commentaires": st.session_state.get("commentaires", ""),
-                        "notes_libres": st.session_state.get("notes_libres", ""),
-                        "profil_links": st.session_state.get("profil_links", ["", "", ""]),
-                        "ksa_data": st.session_state.get("ksa_data", {}),
-                        "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict() if hasattr(st.session_state, 'ksa_matrix') else {}
-                    }
-                    save_briefs()
-                    st.success(f"✅ {st.session_state.brief_type} '{brief_name}' sauvegardé avec succès !")
-                    st.session_state.current_brief_name = brief_name
-                    st.session_state.avant_brief_completed = False
-                    st.session_state.reunion_completed = False
+                    # Mettre à jour avec les briefs existants
+                    st.session_state.saved_briefs.update(existing_briefs)
+                
+                # Créer ou mettre à jour le brief
+                st.session_state.saved_briefs[brief_name] = {
+                    "manager_nom": st.session_state.manager_nom,
+                    "recruteur": st.session_state.recruteur,
+                    "date_brief": str(st.session_state.date_brief),
+                    "niveau_hierarchique": st.session_state.niveau_hierarchique,
+                    "brief_type": st.session_state.brief_type,
+                    "affectation_type": st.session_state.affectation_type,
+                    "affectation_nom": st.session_state.affectation_nom,
+                    "raison_ouverture": st.session_state.get("raison_ouverture", ""),
+                    "impact_strategique": st.session_state.get("impact_strategique", ""),
+                    "rattachement": st.session_state.get("rattachement", ""),
+                    "taches_principales": st.session_state.get("taches_principales", ""),
+                    "must_have_experience": st.session_state.get("must_have_experience", ""),
+                    "must_have_diplomes": st.session_state.get("must_have_diplomes", ""),
+                    "must_have_competences": st.session_state.get("must_have_competences", ""),
+                    "must_have_softskills": st.session_state.get("must_have_softskills", ""),
+                    "nice_to_have_experience": st.session_state.get("nice_to_have_experience", ""),
+                    "nice_to_have_diplomes": st.session_state.get("nice_to_have_diplomes", ""),
+                    "nice_to_have_competences": st.session_state.get("nice_to_have_competences", ""),
+                    "entreprises_profil": st.session_state.get("entreprises_profil", ""),
+                    "canaux_profil": st.session_state.get("canaux_profil", ""),
+                    "synonymes_poste": st.session_state.get("synonymes_poste", ""),
+                    "budget": st.session_state.get("budget", ""),
+                    "commentaires": st.session_state.get("commentaires", ""),
+                    "notes_libres": st.session_state.get("notes_libres", ""),
+                    "profil_links": st.session_state.get("profil_links", ["", "", ""]),
+                    "ksa_data": st.session_state.get("ksa_data", {}),
+                    "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict() if hasattr(st.session_state, 'ksa_matrix') else {}
+                }
+                save_briefs()
+                st.success(f"✅ {st.session_state.brief_type} '{brief_name}' sauvegardé avec succès !")
+                st.session_state.current_brief_name = brief_name
+                st.session_state.avant_brief_completed = False
+                st.session_state.reunion_completed = False
 
     with col_side:
         # --- RECHERCHE & CHARGEMENT (6 cases organisées en 2 lignes de 3)
@@ -861,7 +860,7 @@ with tabs[1]:
         </tr>
         <tr>
             <td class="details-cell">Case libre</td>
-            <td class"info-cell"><textarea class="info-textarea" placeholder="Pour tout point additionnel ou remarque spécifique" key="notes_libres"></textarea></td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="Pour tout point additionnel ou remarque spécifique" key="notes_libres"></textarea></td>
         </tr>
     </table>
     """, unsafe_allow_html=True)
@@ -880,11 +879,9 @@ with tabs[1]:
                     st.session_state.get("profil_link_3", "")
                 ]
                 
-                # Mettre à jour le brief avec les liens
-                st.session_state.saved_briefs[brief_name]["profil_links"] = st.session_state.profil_links
-                
-                # Mettre à jour les champs modifiés
-                st.session_state.saved_briefs[brief_name].update({
+                # Mettre à jour le brief avec les données
+                brief_data = {
+                    "profil_links": st.session_state.profil_links,
                     "raison_ouverture": st.session_state.get("raison_ouverture", ""),
                     "impact_strategique": st.session_state.get("impact_strategique", ""),
                     "taches_principales": st.session_state.get("taches_principales", ""),
@@ -902,11 +899,20 @@ with tabs[1]:
                     "budget": st.session_state.get("budget", ""),
                     "commentaires": st.session_state.get("commentaires", ""),
                     "notes_libres": st.session_state.get("notes_libres", "")
-                })
+                }
+                
+                # Charger les briefs existants depuis le fichier
+                existing_briefs = load_briefs()
+                if brief_name in existing_briefs:
+                    existing_briefs[brief_name].update(brief_data)
+                    st.session_state.saved_briefs = existing_briefs
+                else:
+                    st.session_state.saved_briefs[brief_name].update(brief_data)
                 
                 save_briefs()
                 st.session_state.avant_brief_completed = True
                 st.success("✅ Modifications sauvegardées")
+                st.rerun()
             else:
                 st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
     
@@ -1029,7 +1035,7 @@ with tabs[2]:
             <tr>
                 <td class="details-cell">Lien profil 2</td>
                 <td>{profil_link_2}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_17"></textarea></td>
+                <td><textarea class"info-textarea" placeholder="Commentaires..." key="manager_comment_17"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Lien profil 3</td>
@@ -1093,18 +1099,34 @@ with tabs[2]:
                         if comment_key in st.session_state:
                             manager_comments[comment_key] = st.session_state[comment_key]
                     
-                    st.session_state.saved_briefs[brief_name].update({
-                        "ksa_data": st.session_state.get("ksa_data", {}),
-                        "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict(),
-                        "manager_notes": st.session_state.get("manager_notes", ""),
-                        "manager_comments": manager_comments,
-                        "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
-                        "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
-                        "processus_evaluation": st.session_state.get("processus_evaluation", "")
-                    })
+                    # Charger les briefs existants depuis le fichier
+                    existing_briefs = load_briefs()
+                    if brief_name in existing_briefs:
+                        existing_briefs[brief_name].update({
+                            "ksa_data": st.session_state.get("ksa_data", {}),
+                            "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict(),
+                            "manager_notes": st.session_state.get("manager_notes", ""),
+                            "manager_comments": manager_comments,
+                            "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
+                            "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
+                            "processus_evaluation": st.session_state.get("processus_evaluation", "")
+                        })
+                        st.session_state.saved_briefs = existing_briefs
+                    else:
+                        st.session_state.saved_briefs[brief_name].update({
+                            "ksa_data": st.session_state.get("ksa_data", {}),
+                            "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict(),
+                            "manager_notes": st.session_state.get("manager_notes", ""),
+                            "manager_comments": manager_comments,
+                            "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
+                            "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
+                            "processus_evaluation": st.session_state.get("processus_evaluation", "")
+                        })
+                    
                     save_briefs()
                     st.session_state.reunion_completed = True
                     st.success("✅ Données de réunion sauvegardées")
+                    st.rerun()
                 else:
                     st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
         
