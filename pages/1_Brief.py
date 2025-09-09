@@ -292,17 +292,15 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 # ---------------- ONGLET GESTION ----------------
 with tab1:
-    # En-tête avec les deux titres sur la même ligne
-    col_title_left, col_title_right = st.columns(2)
+    # En-tête avec les deux titres alignés
+    col_title_left, col_title_right = st.columns([2, 1])
     with col_title_left:
-        # Titre "Informations de base" avec le type juste à côté
-        col_info, col_type = st.columns([2, 1])
-        with col_info:
-            st.subheader("Informations de base")
-        with col_type:
-            st.radio("Type", ["Brief", "Template"], key="brief_type", horizontal=True, label_visibility="collapsed")
+        # Titre "Informations de base" avec le type décalé vers la gauche et vers le bas
+        st.subheader("Informations de base")
+        st.radio("Type", ["Brief", "Template"], key="brief_type", horizontal=True)
     
     with col_title_right:
+        # Titre "Recherche & Chargement" aligné exactement au-dessus de la case Mois
         st.subheader("Recherche & Chargement")
     
     col_main, col_side = st.columns([2, 1])
@@ -413,7 +411,7 @@ with tab1:
                 st.session_state.filtered_briefs[name] = data
             
             if st.session_state.filtered_briefs:
-                st.info(f"ℹ️ {len(st.session_state.filtered_briefs)} brief(s) trouvé(s).")
+                st.info(f"ℹ️ {len(st.session_state.filtered_briefs)} résultats trouvés.")
             else:
                 st.error("❌ Aucun brief trouvé avec ces critères.")
 
@@ -446,11 +444,12 @@ with tab1:
                         **Type:** {data.get('brief_type', 'N/A')}  
                         **Manager:** {data.get('manager_nom', 'N/A')}  
                         **Recruteur:** {data.get('recruteur', 'N/A')}
+                        **Nom de l'affectation:** {data.get('affectation_nom', 'N/A')}
                         """)
                     
                     with col_right:
                         st.markdown(f"""
-                        **Affectation:** {data.get('affectation_type', 'N/A')} - {data.get('affectation_nom', 'N/A')}  
+                        **Affectation:** {data.get('affectation_type', 'N/A')}  
                         **Date:** {data.get('date_brief', 'N/A')}
                         """)
                     
