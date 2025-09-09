@@ -180,8 +180,8 @@ st.markdown("""
     <style>
     /* Style général pour l'application */
     .stApp {
-        background-color: white;
-        color: black;
+        background-color: #0E1117;
+        color: #FAFAFA;
     }
     
     /* Style pour les onglets de navigation */
@@ -249,31 +249,31 @@ st.markdown("""
     /* Correction pour les selectbox */
     div[data-baseweb="select"] > div {
         border: none !important;
-        background-color: #f0f0f0 !important;
-        color: black !important;
+        background-color: #262730 !important;
+        color: white !important;
         border-radius: 4px !important;
     }
     
     /* Correction pour les inputs */
     .stTextInput input {
-        background-color: #f0f0f0 !important;
-        color: black !important;
+        background-color: #262730 !important;
+        color: white !important;
         border-radius: 4px !important;
         border: none !important;
     }
     
     /* Correction pour les textareas */
     .stTextArea textarea {
-        background-color: #f0f0f0 !important;
-        color: black !important;
+        background-color: #262730 !important;
+        color: white !important;
         border-radius: 4px !important;
         border: none !important;
     }
     
     /* Correction pour les date inputs */
     .stDateInput input {
-        background-color: #f0f0f0 !important;
-        color: black !important;
+        background-color: #262730 !important;
+        color: white !important;
         border-radius: 4px !important;
         border: none !important;
     }
@@ -331,7 +331,7 @@ st.markdown("""
         width: 100%;
         border-collapse: collapse;
         margin-bottom: 20px;
-        background-color: white;
+        background-color: #0E1117;
     }
     
     .minimal-table th, .minimal-table td {
@@ -349,7 +349,7 @@ st.markdown("""
     }
     
     .minimal-table tr {
-        border-bottom: 1px solid #e0e0e0;
+        border-bottom: 1px solid #424242;
     }
     
     .minimal-table tr:last-child {
@@ -373,18 +373,23 @@ st.markdown("""
     }
     
     .info-cell {
-        background-color: white;
-        color: black;
+        background-color: #262730;
+        color: #FAFAFA;
         width: 65%;
-        border-left: 2px solid #FF4B4B;
+    }
+    
+    .manager-cell {
+        background-color: #262730;
+        color: #FAFAFA;
+        width: 35%;
     }
     
     .info-textarea {
         width: 100%;
         height: 80px;
-        background-color: white;
-        color: black;
-        border: 1px solid #d0d0d0;
+        background-color: #1E1E1E;
+        color: #FAFAFA;
+        border: 1px solid #424242;
         border-radius: 4px;
         padding: 8px;
         resize: vertical;
@@ -446,10 +451,10 @@ with tabs[0]:
     /* Style compact pour les radio buttons */
     .custom-radio {
         display: flex;
-        background-color: #f0f0f0;
+        background-color: #262730;
         padding: 3px;
         border-radius: 5px;
-        border: 1px solid #d0d0d0;
+        border: 1px solid #424242;
         margin-left: 10px;
     }
     .custom-radio input[type="radio"] {
@@ -536,13 +541,16 @@ with tabs[0]:
                     st.error("Veuillez remplir tous les champs obligatoires (*)")
                 else:
                     brief_name = generate_automatic_brief_name()
-                    if "saved_briefs" not in st.session_state:
-                        st.session_state.saved_briefs = {}
                     
-                    # Charger les briefs existants pour éviter de les écraser
+                    # Charger les briefs existants depuis le fichier
                     existing_briefs = load_briefs()
-                    st.session_state.saved_briefs = existing_briefs
+                    if "saved_briefs" not in st.session_state:
+                        st.session_state.saved_briefs = existing_briefs
+                    else:
+                        # Mettre à jour avec les briefs existants
+                        st.session_state.saved_briefs.update(existing_briefs)
                     
+                    # Créer ou mettre à jour le brief
                     st.session_state.saved_briefs[brief_name] = {
                         "manager_nom": st.session_state.manager_nom,
                         "recruteur": st.session_state.recruteur,
@@ -561,13 +569,14 @@ with tabs[0]:
                         "must_have_softskills": st.session_state.get("must_have_softskills", ""),
                         "nice_to_have_experience": st.session_state.get("nice_to_have_experience", ""),
                         "nice_to_have_diplomes": st.session_state.get("nice_to_have_diplomes", ""),
-                        "nice_to_have_competenses": st.session_state.get("nice_to_have_competences", ""),
+                        "nice_to_have_competences": st.session_state.get("nice_to_have_competences", ""),
                         "entreprises_profil": st.session_state.get("entreprises_profil", ""),
                         "canaux_profil": st.session_state.get("canaux_profil", ""),
                         "synonymes_poste": st.session_state.get("synonymes_poste", ""),
                         "budget": st.session_state.get("budget", ""),
                         "commentaires": st.session_state.get("commentaires", ""),
                         "notes_libres": st.session_state.get("notes_libres", ""),
+                        "profil_links": st.session_state.get("profil_links", ["", "", ""]),
                         "ksa_data": st.session_state.get("ksa_data", {}),
                         "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict() if hasattr(st.session_state, 'ksa_matrix') else {}
                     }
@@ -680,7 +689,7 @@ with tabs[0]:
                                                   "must_have_competences", "must_have_softskills", "nice_to_have_experience",
                                                   "nice_to_have_diplomes", "nice_to_have_competences", "entreprises_profil", 
                                                   "canaux_profil", "synonymes_poste", "budget", "commentaires", 
-                                                  "notes_libres", "brief_type"]
+                                                  "notes_libres", "brief_type", "profil_links"]
                                 
                                 for key in non_widget_keys:
                                     if key in data:
@@ -830,6 +839,20 @@ with tabs[1]:
             <td class="details-cell">Budget recrutement</td>
             <td class="info-cell"><textarea class="info-textarea" placeholder="Salaire indicatif, avantages, primes éventuelles" key="budget"></textarea></td>
         </tr>
+        <!-- Profils pertinents -->
+        <tr>
+            <td rowspan="3" class="section-header">Profils pertinents</td>
+            <td class="details-cell">Lien profil 1</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="URL du profil LinkedIn ou autre" key="profil_link_1"></textarea></td>
+        </tr>
+        <tr>
+            <td class="details-cell">Lien profil 2</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="URL du profil LinkedIn ou autre" key="profil_link_2"></textarea></td>
+        </tr>
+        <tr>
+            <td class="details-cell">Lien profil 3</td>
+            <td class="info-cell"><textarea class="info-textarea" placeholder="URL du profil LinkedIn ou autre" key="profil_link_3"></textarea></td>
+        </tr>
         <!-- Notes libres -->
         <tr>
             <td rowspan="2" class="section-header">Notes libres</td>
@@ -838,28 +861,10 @@ with tabs[1]:
         </tr>
         <tr>
             <td class="details-cell">Case libre</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="Pour tout point additionnel ou remarque spécifique" key="notes_libres"></textarea></td>
+            <td class"info-cell"><textarea class="info-textarea" placeholder="Pour tout point additionnel ou remarque spécifique" key="notes_libres"></textarea></td>
         </tr>
     </table>
     """, unsafe_allow_html=True)
-
-    # Section Profils pertinents
-    st.subheader("🔗 Profils pertinents")
-    
-    # Initialiser les liens s'ils n'existent pas
-    if "profil_links" not in st.session_state:
-        st.session_state.profil_links = ["", "", ""]
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.text_input("Lien profil 1", value=st.session_state.profil_links[0], key="profil_link_1")
-    
-    with col2:
-        st.text_input("Lien profil 2", value=st.session_state.profil_links[1], key="profil_link_2")
-    
-    with col3:
-        st.text_input("Lien profil 3", value=st.session_state.profil_links[2], key="profil_link_3")
 
     # Boutons Sauvegarder et Annuler
     col_save, col_cancel = st.columns([1, 1])
@@ -926,78 +931,110 @@ with tabs[2]:
     if step == 1:
         st.subheader("📋 Portrait robot candidat - Validation")
         
-        # Afficher le tableau complet du portrait robot
+        # Afficher le tableau complet du portrait robot avec colonne pour commentaires
         st.markdown("""
         <table class="minimal-table">
             <tr>
                 <th class="section-header">Section</th>
                 <th class="details-cell">Détails</th>
                 <th class="info-cell">Informations</th>
+                <th class="manager-cell">Commentaires du manager</th>
             </tr>
             <tr>
                 <td rowspan="3" class="section-header">Contexte du poste</td>
                 <td class="details-cell">Raison de l'ouverture</td>
                 <td>{raison_ouverture}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_1"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Mission globale</td>
                 <td>{mission_globale}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_2"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Tâches principales</td>
                 <td>{taches_principales}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_3"></textarea></td>
             </tr>
             <tr>
                 <td rowspan="4" class="section-header">Must-have (Indispensables)</td>
                 <td class="details-cell">Expérience</td>
                 <td>{must_have_experience}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_4"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Connaissances / Diplômes / Certifications</td>
                 <td>{must_have_diplomes}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_5"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Compétences / Outils</td>
                 <td>{must_have_competences}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_6"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Soft skills / aptitudes comportementales</td>
                 <td>{must_have_softskills}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_7"></textarea></td>
             </tr>
             <tr>
                 <td rowspan="3" class="section-header">Nice-to-have (Atouts)</td>
                 <td class="details-cell">Expérience additionnelle</td>
                 <td>{nice_to_have_experience}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_8"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Diplômes / Certifications valorisantes</td>
                 <td>{nice_to_have_diplomes}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_9"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Compétences complémentaires</td>
                 <td>{nice_to_have_competences}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_10"></textarea></td>
             </tr>
             <tr>
                 <td rowspan="3" class="section-header">Sourcing et marché</td>
                 <td class="details-cell">Entreprises où trouver ce profil</td>
                 <td>{entreprises_profil}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_11"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Synonymes / intitulés proches</td>
                 <td>{synonymes_poste}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_12"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Canaux à utiliser</td>
                 <td>{canaux_profil}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_13"></textarea></td>
             </tr>
             <tr>
                 <td rowspan="2" class="section-header">Conditions et contraintes</td>
                 <td class="details-cell">Localisation</td>
                 <td>{rattachement}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_14"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Budget recrutement</td>
                 <td>{budget}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_15"></textarea></td>
+            </tr>
+            <tr>
+                <td rowspan="3" class="section-header">Profils pertinents</td>
+                <td class="details-cell">Lien profil 1</td>
+                <td>{profil_link_1}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_16"></textarea></td>
+            </tr>
+            <tr>
+                <td class="details-cell">Lien profil 2</td>
+                <td>{profil_link_2}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_17"></textarea></td>
+            </tr>
+            <tr>
+                <td class="details-cell">Lien profil 3</td>
+                <td>{profil_link_3}</td>
+                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_18"></textarea></td>
             </tr>
         </table>
         """.format(
@@ -1015,7 +1052,10 @@ with tabs[2]:
             synonymes_poste=st.session_state.get("synonymes_poste", "Non renseigné"),
             canaux_profil=st.session_state.get("canaux_profil", "Non renseigné"),
             rattachement=st.session_state.get("rattachement", "Non renseigné"),
-            budget=st.session_state.get("budget", "Non renseigné")
+            budget=st.session_state.get("budget", "Non renseigné"),
+            profil_link_1=st.session_state.get("profil_links", ["", "", ""])[0] if st.session_state.get("profil_links") else "",
+            profil_link_2=st.session_state.get("profil_links", ["", "", ""])[1] if st.session_state.get("profil_links") else "",
+            profil_link_3=st.session_state.get("profil_links", ["", "", ""])[2] if st.session_state.get("profil_links") else ""
         ), unsafe_allow_html=True)
 
     elif step == 2:
@@ -1035,9 +1075,9 @@ with tabs[2]:
         st.text_area("Processus d'évaluation (détails)", key="processus_evaluation", height=100)
         
     elif step == 5:
-        st.subheader("📝 Notes du manager")
-        st.text_area("Notes et commentaires du manager", key="manager_notes", height=200, 
-                    placeholder="Ajoutez vos commentaires et notes sur le portrait robot candidat...")
+        st.subheader("📝 Notes générales du manager")
+        st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=200, 
+                    placeholder="Ajoutez vos commentaires et notes généraux...")
 
         # Boutons Enregistrer et Annuler
         col_save, col_cancel = st.columns([1, 1])
@@ -1045,10 +1085,19 @@ with tabs[2]:
             if st.button("💾 Enregistrer réunion", type="primary", use_container_width=True, key="save_reunion"):
                 if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
                     brief_name = st.session_state.current_brief_name
+                    
+                    # Récupérer tous les commentaires du manager
+                    manager_comments = {}
+                    for i in range(1, 19):
+                        comment_key = f"manager_comment_{i}"
+                        if comment_key in st.session_state:
+                            manager_comments[comment_key] = st.session_state[comment_key]
+                    
                     st.session_state.saved_briefs[brief_name].update({
                         "ksa_data": st.session_state.get("ksa_data", {}),
                         "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict(),
                         "manager_notes": st.session_state.get("manager_notes", ""),
+                        "manager_comments": manager_comments,
                         "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
                         "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
                         "processus_evaluation": st.session_state.get("processus_evaluation", "")
