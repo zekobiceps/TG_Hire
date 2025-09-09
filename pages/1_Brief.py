@@ -292,26 +292,56 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 # ---------------- ONGLET GESTION ----------------
 with tab1:
-    # En-tête avec "Informations de base" et le type sur la même ligne
-    st.markdown("""
-    <div style="display: flex; align-items: center; margin-bottom: 1rem;">
-        <h3 style="margin: 0; margin-right: 10px;">Informations de base</h3>
-        <div style="display: flex; align-items: center;">
-            <span style="margin-right: 5px;">Type:</span>
-            <div style="display: flex; background-color: #262730; padding: 5px; border-radius: 5px;">
-                <label style="margin-right: 10px;">
-                    <input type="radio" name="brief_type" value="Brief" checked> Brief
-                </label>
-                <label>
-                    <input type="radio" name="brief_type" value="Template"> Template
-                </label>
+    # En-tête avec les titres alignés
+    col_title_left, col_title_right = st.columns([2, 1])
+    with col_title_left:
+        # Titre "Informations de base" avec le type à droite
+        st.markdown("""
+        <div style="display: flex; align-items: center; margin-bottom: 1rem;">
+            <h3 style="margin: 0; margin-right: 15px;">Informations de base</h3>
+            <div style="display: flex; align-items: center;">
+                <span style="margin-right: 5px;">Type:</span>
+                <div class="custom-radio">
+                    <input type="radio" id="brief" name="brief_type" value="Brief" checked>
+                    <label for="brief">Brief</label>
+                    <input type="radio" id="template" name="brief_type" value="Template">
+                    <label for="template">Template</label>
+                </div>
             </div>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+        
+        # Radio button Streamlit caché pour la fonctionnalité
+        brief_type = st.radio("", ["Brief", "Template"], key="brief_type", horizontal=True, label_visibility="collapsed")
     
-    # Ajouter un espace pour l'état du radio button dans Streamlit
-    brief_type = st.radio("", ["Brief", "Template"], key="brief_type", horizontal=True, label_visibility="collapsed")
+    with col_title_right:
+        st.subheader("Recherche & Chargement")
+    
+    # Style CSS personnalisé pour les radio buttons
+    st.markdown("""
+    <style>
+    .custom-radio {
+        display: flex;
+        background-color: #262730;
+        padding: 5px;
+        border-radius: 5px;
+        border: 1px solid #424242;
+    }
+    .custom-radio input[type="radio"] {
+        display: none;
+    }
+    .custom-radio label {
+        padding: 5px 10px;
+        cursor: pointer;
+        border-radius: 3px;
+        margin: 0 5px;
+    }
+    .custom-radio input[type="radio"]:checked + label {
+        background-color: #FF4B4B;
+        color: white;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
     col_main, col_side = st.columns([2, 1])
     
@@ -367,8 +397,6 @@ with tab1:
                 st.session_state.current_brief_name = brief_name
 
     with col_side:
-        st.subheader("Recherche & Chargement")
-        
         # --- RECHERCHE & CHARGEMENT (6 cases organisées en 2 lignes de 3)
         # Première ligne
         col1, col2, col3 = st.columns(3)
@@ -498,6 +526,32 @@ with tab1:
                                     del st.session_state.filtered_briefs[name]
                                 st.warning(f"❌ Brief '{name}' supprimé.")
                                 st.rerun()
+
+# JavaScript pour synchroniser les radio buttons personnalisés avec Streamlit
+st.markdown("""
+<script>
+// Synchroniser les radio buttons personnalisés avec Streamlit
+document.querySelectorAll('.custom-radio input[type="radio"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        // Mettre à jour la valeur dans Streamlit
+        const value = this.value;
+        const streamlitRadio = parent.document.querySelector('input[type="radio"][value="' + value + '"]');
+        if (streamlitRadio) {
+            streamlitRadio.click();
+        }
+    });
+});
+
+// Synchroniser l'état initial
+document.addEventListener('DOMContentLoaded', function() {
+    const streamlitValue = parent.document.querySelector('input[type="radio"]:checked').value;
+    const customRadio = document.querySelector('.custom-radio input[value="' + streamlitValue + '"]');
+    if (customRadio) {
+        customRadio.checked = true;
+    }
+});
+</script>
+""", unsafe_allow_html=True)
 with tab2:
     # Vérification si un brief est chargé
     if "current_brief_name" not in st.session_state or st.session_state.current_brief_name == "":
