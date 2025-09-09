@@ -357,24 +357,24 @@ st.markdown("""
     }
     
     .section-header {
-        background-color: #FF4B4B !important;
-        color: white !important;
+        background-color: #f5f5f5 !important;
+        color: black !important;
         font-weight: bold;
         font-size: 0.95em;
         width: 15%;
     }
     
     .details-cell {
-        background-color: #FF4B4B;
-        color: white;
+        background-color: #f5f5f5 !important;
+        color: black !important;
         font-weight: 500;
         font-size: 0.9em;
         width: 20%;
     }
     
     .info-cell {
-        background-color: #262730;
-        color: #FAFAFA;
+        background-color: #696969;
+        color: white;
         width: 40%;
     }
     
@@ -512,7 +512,15 @@ with tabs[0]:
         st.markdown("<h3 style='margin-bottom: 0.5rem;'>Recherche & Chargement</h3>", unsafe_allow_html=True)
     
     # Radio button Streamlit caché pour la fonctionnalité
-    brief_type = st.radio("", ["Brief", "Canevas"], key="brief_type", horizontal=True, label_visibility="collapsed")
+    # Utilisation d'une clé différente pour éviter l'erreur de session state
+    if "gestion_brief_type" not in st.session_state:
+        st.session_state.gestion_brief_type = "Brief"
+    
+    brief_type = st.radio("", ["Brief", "Canevas"], key="gestion_brief_type", horizontal=True, label_visibility="collapsed")
+    
+    # Synchronisation avec la variable principale
+    if st.session_state.gestion_brief_type != st.session_state.get("brief_type", "Brief"):
+        st.session_state.brief_type = st.session_state.gestion_brief_type
     
     col_main, col_side = st.columns([2, 1])
     
@@ -555,7 +563,7 @@ with tabs[0]:
                     "recruteur": st.session_state.recruteur,
                     "date_brief": str(st.session_state.date_brief),
                     "niveau_hierarchique": st.session_state.niveau_hierarchique,
-                    "brief_type": st.session_state.brief_type,
+                    "brief_type": st.session_state.gestion_brief_type,
                     "affectation_type": st.session_state.affectation_type,
                     "affectation_nom": st.session_state.affectation_nom,
                     "raison_ouverture": st.session_state.get("raison_ouverture", ""),
@@ -580,7 +588,7 @@ with tabs[0]:
                     "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict() if hasattr(st.session_state, 'ksa_matrix') else {}
                 }
                 save_briefs()
-                st.success(f"✅ {st.session_state.brief_type} '{brief_name}' sauvegardé avec succès !")
+                st.success(f"✅ {st.session_state.gestion_brief_type} '{brief_name}' sauvegardé avec succès !")
                 st.session_state.current_brief_name = brief_name
                 st.session_state.avant_brief_completed = False
                 st.session_state.reunion_completed = False
@@ -688,11 +696,15 @@ with tabs[0]:
                                                   "must_have_competences", "must_have_softskills", "nice_to_have_experience",
                                                   "nice_to_have_diplomes", "nice_to_have_competences", "entreprises_profil", 
                                                   "canaux_profil", "synonymes_poste", "budget", "commentaires", 
-                                                  "notes_libres", "brief_type", "profil_links"]
+                                                  "notes_libres", "profil_links"]
                                 
                                 for key in non_widget_keys:
                                     if key in data:
                                         st.session_state[key] = data[key]
+                                
+                                # Mettre à jour le type de brief avec la clé de gestion
+                                if "brief_type" in data:
+                                    st.session_state.gestion_brief_type = data["brief_type"]
                                 
                                 # Gestion spéciale pour les données KSA
                                 if "ksa_data" in data:
