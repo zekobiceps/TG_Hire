@@ -292,15 +292,79 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 # ---------------- ONGLET GESTION ----------------
 with tab1:
-    # En-tête avec les titres alignés
+    # Style CSS personnalisé pour réduire les espaces
+    st.markdown("""
+    <style>
+    /* Réduire l'espace entre les éléments */
+    .st-emotion-cache-1r6slb0 {
+        margin-bottom: 0.2rem;
+    }
+    .st-emotion-cache-1r6slb0 p {
+        margin-bottom: 0.2rem;
+    }
+    /* Réduire l'espace entre les titres et les champs */
+    h3 {
+        margin-bottom: 0.5rem !important;
+    }
+    /* Réduire la hauteur des champs */
+    .stTextInput input, .stSelectbox select, .stDateInput input {
+        padding-top: 0.2rem !important;
+        padding-bottom: 0.2rem !important;
+        height: 2rem !important;
+    }
+    /* Réduire l'espace entre les lignes de formulaire */
+    .st-emotion-cache-ocqkz7 {
+        gap: 0.5rem !important;
+    }
+    /* Style compact pour les radio buttons */
+    .custom-radio {
+        display: flex;
+        background-color: #262730;
+        padding: 3px;
+        border-radius: 5px;
+        border: 1px solid #424242;
+        margin-left: 10px;
+    }
+    .custom-radio input[type="radio"] {
+        display: none;
+    }
+    .custom-radio label {
+        padding: 3px 8px;
+        cursor: pointer;
+        border-radius: 3px;
+        margin: 0 3px;
+        font-size: 0.9em;
+    }
+    .custom-radio input[type="radio"]:checked + label {
+        background-color: #FF4B4B;
+        color: white;
+    }
+    /* Cacher le radio button Streamlit */
+    div[data-testid="stRadio"] > div {
+        display: none;
+    }
+    /* Réduire l'espace entre les colonnes */
+    .st-emotion-cache-5rimss p {
+        margin-bottom: 0.3rem;
+    }
+    /* Style pour le titre compact */
+    .compact-title {
+        display: flex;
+        align-items: center;
+        margin-bottom: 0.5rem !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # En-tête avec les titres alignés - VERSION COMPACTE
     col_title_left, col_title_right = st.columns([2, 1])
     with col_title_left:
-        # Titre "Informations de base" avec le type à droite
+        # Titre "Informations de base" avec le type à droite - VERSION COMPACTE
         st.markdown("""
-        <div style="display: flex; align-items: center; margin-bottom: 1rem;">
-            <h3 style="margin: 0; margin-right: 15px;">Informations de base</h3>
+        <div class="compact-title">
+            <h3 style="margin: 0; margin-right: 10px;">Informations de base</h3>
             <div style="display: flex; align-items: center;">
-                <span style="margin-right: 5px;">Type:</span>
+                <span style="margin-right: 5px; font-size: 0.9em;">Type:</span>
                 <div class="custom-radio">
                     <input type="radio" id="brief" name="brief_type" value="Brief" checked>
                     <label for="brief">Brief</label>
@@ -312,37 +376,7 @@ with tab1:
         """, unsafe_allow_html=True)
     
     with col_title_right:
-        st.subheader("Recherche & Chargement")
-    
-    # Style CSS personnalisé pour les radio buttons
-    st.markdown("""
-    <style>
-    .custom-radio {
-        display: flex;
-        background-color: #262730;
-        padding: 5px;
-        border-radius: 5px;
-        border: 1px solid #424242;
-    }
-    .custom-radio input[type="radio"] {
-        display: none;
-    }
-    .custom-radio label {
-        padding: 5px 10px;
-        cursor: pointer;
-        border-radius: 3px;
-        margin: 0 5px;
-    }
-    .custom-radio input[type="radio"]:checked + label {
-        background-color: #FF4B4B;
-        color: white;
-    }
-    /* Cacher le radio button Streamlit */
-    div[data-testid="stRadio"] > div {
-        display: none;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+        st.markdown("<h3 style='margin-bottom: 0.5rem;'>Recherche & Chargement</h3>", unsafe_allow_html=True)
     
     # Radio button Streamlit caché pour la fonctionnalité
     brief_type = st.radio("", ["Brief", "Template"], key="brief_type", horizontal=True, label_visibility="collapsed")
@@ -460,7 +494,7 @@ with tab1:
                 st.error("❌ Aucun brief trouvé avec ces critères.")
 
         if st.session_state.filtered_briefs:
-            st.subheader("Résultats de recherche")
+            st.markdown("<h4 style='margin-bottom: 0.5rem;'>Résultats de recherche</h4>", unsafe_allow_html=True)
             
             # Afficher les résultats avec des expanders
             for name, data in st.session_state.filtered_briefs.items():
