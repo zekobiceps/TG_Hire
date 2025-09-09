@@ -292,20 +292,20 @@ tab1, tab2, tab3, tab4 = st.tabs([
 
 # ---------------- ONGLET GESTION ----------------
 with tab1:
-    # En-tête avec le titre et la date alignés à droite
-    col_title, col_date_header = st.columns([3, 1])
+    # En-tête avec le titre et le type de brief
+    col_title, col_type = st.columns([3, 1])
     with col_title:
         st.subheader("Informations de base")
-    with col_date_header:
-        st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date(), label_visibility="collapsed")
+    with col_type:
+        st.radio("Type", ["Brief", "Template"], key="brief_type", horizontal=True)
     
     col_main, col_side = st.columns([2, 1])
     
     with col_main:
-        # --- INFOS DE BASE (3 colonnes avec switch entre Type de brief et Nom du manager)
+        # --- INFOS DE BASE (3 colonnes)
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.selectbox("Type de brief", ["Brief", "Template"], key="brief_type")
+            st.text_input("Nom du manager *", key="manager_nom")
         with col2:
             st.text_input("Poste à recruter", key="niveau_hierarchique")
         with col3:
@@ -313,11 +313,11 @@ with tab1:
         
         col4, col5, col6 = st.columns(3)
         with col4:
-            st.text_input("Nom du manager *", key="manager_nom")
-        with col5:
             st.selectbox("Recruteur *", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="recruteur")
-        with col6:
+        with col5:
             st.text_input("Nom de l'affectation", key="affectation_nom")
+        with col6:
+            st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date())
         
         # --- SAUVEGARDE
         if st.button("💾 Sauvegarder le Brief", type="primary", use_container_width=True):
@@ -414,135 +414,82 @@ with tab1:
                 st.error("❌ Aucun brief trouvé avec ces critères.")
 
         if st.session_state.filtered_briefs:
-            # Étendre les résultats sur toute la largeur
+            # Ajuster le style pour que les résultats occupent toute la largeur
+            st.markdown("""
+            <style>
+            .brief-result {
+                border: 1px solid #424242;
+                border-radius: 5px;
+                padding: 10px;
+                margin-bottom: 10px;
+                background-color: #262730;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+            
             st.subheader("Résultats de recherche")
             
-            # Afficher les résultats en deux colonnes
-            briefs_list = list(st.session_state.filtered_briefs.items())
-            half = (len(briefs_list) + 1) // 2
-            
-            col_left, col_right = st.columns(2)
-            
-            with col_left:
-                for name, data in briefs_list[:half]:
-                    with st.expander(f"📌 {name}", expanded=False):
-                        st.markdown(f"""
-                        **Type:** {data.get('brief_type', 'N/A')}  
-                        **Manager:** {data.get('manager_nom', 'N/A')}  
-                        **Recruteur:** {data.get('recruteur', 'N/A')}  
-                        **Affectation:** {data.get('affectation_type', 'N/A')} - {data.get('affectation_nom', 'N/A')}  
-                        **Date:** {data.get('date_brief', 'N/A')}
-                        """)
+            # Afficher les résultats en pleine largeur
+            for name, data in st.session_state.filtered_briefs.items():
+                st.markdown(f"""
+                <div class="brief-result">
+                    <h4 style="margin:0; color:#FF4B4B">{name}</h4>
+                    <p style="margin:5px 0"><strong>Type:</strong> {data.get('brief_type', 'N/A')}</p>
+                    <p style="margin:5px 0"><strong>Manager:</strong> {data.get('manager_nom', 'N/A')}</p>
+                    <p style="margin:5px 0"><strong>Recruteur:</strong> {data.get('recruteur', 'N/A')}</p>
+                    <p style="margin:5px 0"><strong>Affectation:</strong> {data.get('affectation_type', 'N/A')} - {data.get('affectation_nom', 'N/A')}</p>
+                    <p style="margin:5px 0"><strong>Date:</strong> {data.get('date_brief', 'N/A')}</p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                colA, colB = st.columns(2)
+                with colA:
+                    if st.button(f"📂 Charger", key=f"load_{name}"):
+                        try:
+                            # Créer un nouveau brief sans écraser les widgets
+                            new_brief = {}
+                            
+                            # Copier toutes les données du brief
+                            for key, value in data.items():
+                                new_brief[key] = value
+                            
+                            # Stocker le brief chargé dans une clé spéciale
+                            st.session_state.loaded_brief = new_brief
+                            st.session_state.current_brief_name = name
+                            
+                            # Mettre à jour uniquement les champs non-widgets
+                            non_widget_keys = ["raison_ouverture", "impact_strategique", "rattachement", 
+                                              "defis_principaux", "entreprises_profil", "canaux_profil",
+                                              "synonymes_poste", "budget", "commentaires", "brief_type"]
+                            
+                            for key in non_widget_keys:
+                                if key in data:
+                                    st.session_state[key] = data[key]
+                            
+                            # Gestion spéciale pour les données KSA
+                            if "ksa_data" in data:
+                                st.session_state.ksa_data = data["ksa_data"]
+                            
+                            # Gestion spéciale pour la matrice KSA
+                            if "ksa_matrix" in data and data["ksa_matrix"]:
+                                st.session_state.ksa_matrix = pd.DataFrame(data["ksa_matrix"])
+                            
+                            st.success(f"✅ Brief '{name}' chargé avec succès!")
+                            st.rerun()
                         
-                        colA, colB = st.columns(2)
-                        with colA:
-                            if st.button(f"📂 Charger", key=f"load_{name}"):
-                                try:
-                                    # Créer un nouveau brief sans écraser les widgets
-                                    new_brief = {}
-                                    
-                                    # Copier toutes les données du brief
-                                    for key, value in data.items():
-                                        new_brief[key] = value
-                                    
-                                    # Stocker le brief chargé dans une clé spéciale
-                                    st.session_state.loaded_brief = new_brief
-                                    st.session_state.current_brief_name = name
-                                    
-                                    # Mettre à jour uniquement les champs non-widgets
-                                    non_widget_keys = ["raison_ouverture", "impact_strategique", "rattachement", 
-                                                      "defis_principaux", "entreprises_profil", "canaux_profil",
-                                                      "synonymes_poste", "budget", "commentaires", "brief_type"]
-                                    
-                                    for key in non_widget_keys:
-                                        if key in data:
-                                            st.session_state[key] = data[key]
-                                    
-                                    # Gestion spéciale pour les données KSA
-                                    if "ksa_data" in data:
-                                        st.session_state.ksa_data = data["ksa_data"]
-                                    
-                                    # Gestion spéciale pour la matrice KSA
-                                    if "ksa_matrix" in data and data["ksa_matrix"]:
-                                        st.session_state.ksa_matrix = pd.DataFrame(data["ksa_matrix"])
-                                    
-                                    st.success(f"✅ Brief '{name}' chargé avec succès!")
-                                    st.rerun()
-                                
-                                except Exception as e:
-                                    st.error(f"❌ Erreur lors du chargement: {str(e)}")
-                        with colB:
-                            if st.button(f"🗑️ Supprimer", key=f"del_{name}"):
-                                all_briefs = load_briefs()
-                                if name in all_briefs:
-                                    del all_briefs[name]
-                                    st.session_state.saved_briefs = all_briefs
-                                    save_briefs()
-                                    if name in st.session_state.filtered_briefs:
-                                        del st.session_state.filtered_briefs[name]
-                                    st.warning(f"❌ Brief '{name}' supprimé.")
-                                    st.rerun()
-            
-            with col_right:
-                for name, data in briefs_list[half:]:
-                    with st.expander(f"📌 {name}", expanded=False):
-                        st.markdown(f"""
-                        **Type:** {data.get('brief_type', 'N/A')}  
-                        **Manager:** {data.get('manager_nom', 'N/A')}  
-                        **Recruteur:** {data.get('recruteur', 'N/A')}  
-                        **Affectation:** {data.get('affectation_type', 'N/A')} - {data.get('affectation_nom', 'N/A')}  
-                        **Date:** {data.get('date_brief', 'N/A')}
-                        """)
-                        
-                        colA, colB = st.columns(2)
-                        with colA:
-                            if st.button(f"📂 Charger", key=f"load2_{name}"):
-                                try:
-                                    # Créer un nouveau brief sans écraser les widgets
-                                    new_brief = {}
-                                    
-                                    # Copier toutes les données du brief
-                                    for key, value in data.items():
-                                        new_brief[key] = value
-                                    
-                                    # Stocker le brief chargé dans une clé spéciale
-                                    st.session_state.loaded_brief = new_brief
-                                    st.session_state.current_brief_name = name
-                                    
-                                    # Mettre à jour uniquement les champs non-widgets
-                                    non_widget_keys = ["raison_ouverture", "impact_strategique", "rattachement", 
-                                                      "defis_principaux", "entreprises_profil", "canaux_profil",
-                                                      "synonymes_poste", "budget", "commentaires", "brief_type"]
-                                    
-                                    for key in non_widget_keys:
-                                        if key in data:
-                                            st.session_state[key] = data[key]
-                                    
-                                    # Gestion spéciale pour les données KSA
-                                    if "ksa_data" in data:
-                                        st.session_state.ksa_data = data["ksa_data"]
-                                    
-                                    # Gestion spéciale pour la matrice KSA
-                                    if "ksa_matrix" in data and data["ksa_matrix"]:
-                                        st.session_state.ksa_matrix = pd.DataFrame(data["ksa_matrix"])
-                                    
-                                    st.success(f"✅ Brief '{name}' chargé avec succès!")
-                                    st.rerun()
-                                
-                                except Exception as e:
-                                    st.error(f"❌ Erreur lors du chargement: {str(e)}")
-                        with colB:
-                            if st.button(f"🗑️ Supprimer", key=f"del2_{name}"):
-                                all_briefs = load_briefs()
-                                if name in all_briefs:
-                                    del all_briefs[name]
-                                    st.session_state.saved_briefs = all_briefs
-                                    save_briefs()
-                                    if name in st.session_state.filtered_briefs:
-                                        del st.session_state.filtered_briefs[name]
-                                    st.warning(f"❌ Brief '{name}' supprimé.")
-                                    st.rerun()
-
+                        except Exception as e:
+                            st.error(f"❌ Erreur lors du chargement: {str(e)}")
+                with colB:
+                    if st.button(f"🗑️ Supprimer", key=f"del_{name}"):
+                        all_briefs = load_briefs()
+                        if name in all_briefs:
+                            del all_briefs[name]
+                            st.session_state.saved_briefs = all_briefs
+                            save_briefs()
+                            if name in st.session_state.filtered_briefs:
+                                del st.session_state.filtered_briefs[name]
+                            st.warning(f"❌ Brief '{name}' supprimé.")
+                            st.rerun()
 # ---------------- AVANT-BRIEF ----------------
 with tab2:
     # Vérification si un brief est chargé
