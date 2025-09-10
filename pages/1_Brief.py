@@ -332,7 +332,7 @@ st.markdown("""
         border-collapse: collapse;
         margin-bottom: 20px;
         background-color: #0d1117; /* Fond noir pour le tableau */
-        font-size: 0.85em;
+        font-size: 0.9em; /* Augmentation de la taille du texte */
         border: 1px solid #ffffff; /* Bordure blanche */
     }
     
@@ -344,7 +344,7 @@ st.markdown("""
     }
     
     .dark-table th {
-        background-color: #FF0000 !important;  /* Rouge vif pour la première ligne */
+        background-color: #FF4B4B !important;  /* Rouge vif identique aux boutons */
         color: white !important;
         font-weight: 600;
         padding: 14px 16px;
@@ -355,7 +355,7 @@ st.markdown("""
     /* Largeur des colonnes */
     .dark-table th:nth-child(1),
     .dark-table td:nth-child(1) {
-        width: 20%;
+        width: 15%; /* Réduction de la première colonne */
     }
     
     .dark-table th:nth-child(2),
@@ -365,17 +365,23 @@ st.markdown("""
     
     .dark-table th:nth-child(3),
     .dark-table td:nth-child(3) {
-        width: 60%; /* Colonne Informations 60% plus large */
+        width: 65%; /* Colonne Informations plus large */
     }
     
-    /* Effet de survol */
-    .dark-table tr:hover {
-        background-color: #1a2230;
+    .dark-table th:nth-child(4),
+    .dark-table td:nth-child(4) {
+        width: 25%; /* Colonne Commentaires du manager */
     }
+    
+    /* Supprimer l'effet de survol */
+    /* .dark-table tr:hover {
+        background-color: #1a2230;
+    } */
     
     .section-title {
         font-weight: 600;
         color: #58a6ff; /* Couleur bleue pour les titres de section */
+        font-size: 0.95em; /* Augmentation de la taille du texte */
     }
     
     /* Style pour les textareas dans les tableaux */
@@ -387,14 +393,14 @@ st.markdown("""
         border: 1px solid #555;
         border-radius: 4px;
         padding: 6px;
-        font-size: 0.85em;
+        font-size: 0.9em; /* Augmentation de la taille du texte */
         resize: vertical;
     }
     
     /* Style pour les cellules de texte */
     .table-text {
         padding: 6px;
-        font-size: 0.85em;
+        font-size: 0.9em; /* Augmentation de la taille du texte */
         color: #e6edf3;
     }
     </style>
@@ -608,7 +614,8 @@ with tabs[0]:
         with col6:
             nom_affectation = st.text_input("Nom de l'affectation", key="search_nom_affectation")
 
-        if st.button("🔎 Rechercher", type="secondary", use_container_width=True, key="search_button"):
+        # Bouton Rechercher en rouge vif
+        if st.button("🔎 Rechercher", type="primary", use_container_width=True, key="search_button"):
             briefs = load_briefs()
             st.session_state.filtered_briefs = {}
             
@@ -912,7 +919,7 @@ with tabs[1]:
                 onchange="updateSessionState('profil_link_3', this.value)">""" + (st.session_state.get("profil_links", ["", "", ""])[2] if st.session_state.get("profil_links") else "") + """</textarea>
             </td>
         </tr>
-        <!-- Notes libres -->
+        <!-- Notes libres - seulement 2 lignes au lieu de 3 -->
         <tr>
             <td rowspan="2" class="section-title">Notes libres</td>
             <td>Points à discuter ou à clarifier avec le manager</td>
@@ -1134,7 +1141,7 @@ with tabs[2]:
                 <td class="table-text">""" + (st.session_state.get("profil_links", ["", "", ""])[2] if st.session_state.get("profil_links") else "") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_18"></textarea></td>
             </tr>
-            <!-- Notes libres -->
+            <!-- Notes libres - seulement 2 lignes au lieu de 3 -->
             <tr>
                 <td rowspan="2" class="section-title">Notes libres</td>
                 <td>Points à discuter ou à clarifier avec le manager</td>
