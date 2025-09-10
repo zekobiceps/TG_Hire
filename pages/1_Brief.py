@@ -5,7 +5,7 @@ import json
 import pandas as pd
 
 # ✅ permet d'accéder à utils.py à la racine
-sys.path.append(os.pathabspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from utils import (
     init_session_state,
