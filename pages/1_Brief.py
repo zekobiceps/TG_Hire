@@ -368,9 +368,25 @@ st.markdown("""
         width: 65%; /* Colonne Informations plus large */
     }
     
-    .dark-table th:nth-child(4),
-    .dark-table td:nth-child(4) {
-        width: 25%; /* Colonne Commentaires du manager */
+    /* Style pour les tableaux avec 4 colonnes (réunion de brief) */
+    .dark-table.four-columns th:nth-child(1),
+    .dark-table.four-columns td:nth-child(1) {
+        width: 15%;
+    }
+    
+    .dark-table.four-columns th:nth-child(2),
+    .dark-table.four-columns td:nth-child(2) {
+        width: 20%;
+    }
+    
+    .dark-table.four-columns th:nth-child(3),
+    .dark-table.four-columns td:nth-child(3) {
+        width: 40%; /* Réduit pour faire de la place à la colonne notes */
+    }
+    
+    .dark-table.four-columns th:nth-child(4),
+    .dark-table.four-columns td:nth-child(4) {
+        width: 25%; /* Colonne Commentaires du manager élargie */
     }
     
     /* Supprimer l'effet de survol */
@@ -402,6 +418,11 @@ st.markdown("""
         padding: 6px;
         font-size: 0.9em; /* Augmentation de la taille du texte */
         color: #e6edf3;
+    }
+    
+    /* Style pour les lignes vides - correction */
+    .empty-row {
+        display: none;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -1038,7 +1059,7 @@ with tabs[2]:
         
         # Afficher le tableau complet du portrait robot avec colonne pour commentaires
         st.markdown("""
-        <table class="dark-table">
+        <table class="dark-table four-columns">
             <tr>
                 <th>Section</th>
                 <th>Détails</th>
