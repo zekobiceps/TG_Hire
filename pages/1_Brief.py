@@ -332,24 +332,25 @@ st.markdown("""
         border-collapse: collapse;
         margin-bottom: 20px;
         background-color: #0E1117;
+        font-size: 0.85em;
     }
     
     .minimal-table th, .minimal-table td {
-        padding: 6px;
+        padding: 4px 6px;
         text-align: left;
         border: none;
     }
     
     .minimal-table th {
-        background-color: #FF4B4B;
-        color: white;
+        background-color: #FF0000 !important;  /* Rouge vif pour la première ligne */
+        color: white !important;
         font-weight: 600;
-        font-size: 0.9em;
-        padding: 8px;
+        padding: 6px 8px;
     }
     
     .minimal-table tr {
         border-bottom: 1px solid #424242;
+        color: black !important;  /* Texte en noir pour les autres lignes */
     }
     
     .minimal-table tr:last-child {
@@ -360,7 +361,7 @@ st.markdown("""
         background-color: #f5f5f5 !important;
         color: black !important;
         font-weight: bold;
-        font-size: 0.95em;
+        font-size: 0.85em;
         width: 15%;
     }
     
@@ -368,13 +369,13 @@ st.markdown("""
         background-color: #f5f5f5 !important;
         color: black !important;
         font-weight: 500;
-        font-size: 0.9em;
+        font-size: 0.85em;
         width: 20%;
     }
     
     .info-cell {
-        background-color: #696969;
-        color: white;
+        background-color: #696969 !important;  /* Gris foncé pour les cases à remplir */
+        color: white !important;
         width: 40%;
     }
     
@@ -395,13 +396,37 @@ st.markdown("""
         resize: vertical;
         font-family: inherit;
         transition: border-color 0.3s;
-        font-size: 0.9em;
+        font-size: 0.85em;
     }
     
     .info-textarea:focus {
         outline: none;
         border-color: #FF4B4B;
         box-shadow: 0 0 0 2px rgba(255, 75, 75, 0.2);
+    }
+    
+    /* Espacement réduit entre les lignes */
+    .minimal-table tr {
+        line-height: 1.2;
+    }
+    
+    /* Style pour les textareas dans les tableaux */
+    .table-textarea {
+        width: 100%;
+        min-height: 60px;
+        background-color: #2D2D2D;
+        color: white;
+        border: 1px solid #555;
+        border-radius: 4px;
+        padding: 6px;
+        font-size: 0.85em;
+        resize: vertical;
+    }
+    
+    /* Style pour les cellules de texte */
+    .table-text {
+        padding: 6px;
+        font-size: 0.85em;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -784,99 +809,185 @@ with tabs[1]:
         <tr>
             <td rowspan="3" class="section-header">Contexte du poste</td>
             <td class="details-cell">Raison de l'ouverture</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="Remplacement / Création / Évolution interne" key="raison_ouverture"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="Remplacement / Création / Évolution interne" 
+                onchange="updateSessionState('raison_ouverture', this.value)">""" + st.session_state.get("raison_ouverture", "") + """</textarea>
+            </td>
         </tr>
         <tr>
             <td class="details-cell">Mission globale</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="Résumé du rôle et objectif principal" key="impact_strategique"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="Résumé du rôle et objectif principal" 
+                onchange="updateSessionState('impact_strategique', this.value)">""" + st.session_state.get("impact_strategique", "") + """</textarea>
+            </td>
         </tr>
         <tr>
             <td class="details-cell">Tâches principales</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget" key="taches_principales"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget" 
+                onchange="updateSessionState('taches_principales', this.value)">""" + st.session_state.get("taches_principales", "") + """</textarea>
+            </td>
         </tr>
         <!-- Must-have (Indispensables) -->
         <tr>
             <td rowspan="4" class="section-header">Must-have (Indispensables)</td>
             <td class="details-cell">Expérience</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="Nombre d'années minimum, expériences similaires dans le secteur" key="must_have_experience"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="Nombre d'années minimum, expériences similaires dans le secteur" 
+                onchange="updateSessionState('must_have_experience', this.value)">""" + st.session_state.get("must_have_experience", "") + """</textarea>
+            </td>
         </tr>
         <tr>
             <td class="details-cell">Connaissances / Diplômes / Certifications</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="Diplômes exigés, certifications spécifiques" key="must_have_diplomes"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="Diplômes exigés, certifications spécifiques" 
+                onchange="updateSessionState('must_have_diplomes', this.value)">""" + st.session_state.get("must_have_diplomes", "") + """</textarea>
+            </td>
         </tr>
         <tr>
             <td class="details-cell">Compétences / Outils</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="Techniques, logiciels, méthodes à maîtriser" key="must_have_competences"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="Techniques, logiciels, méthodes à maîtriser" 
+                onchange="updateSessionState('must_have_competences', this.value)">""" + st.session_state.get("must_have_competences", "") + """</textarea>
+            </td>
         </tr>
         <tr>
             <td class="details-cell">Soft skills / aptitudes comportementales</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="Leadership, rigueur, communication, autonomie" key="must_have_softskills"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="Leadership, rigueur, communication, autonomie" 
+                onchange="updateSessionState('must_have_softskills', this.value)">""" + st.session_state.get("must_have_softskills", "") + """</textarea>
+            </td>
         </tr>
         <!-- Nice-to-have (Atouts) -->
         <tr>
             <td rowspan="3" class="section-header">Nice-to-have (Atouts)</td>
             <td class="details-cell">Expérience additionnelle</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="Ex. projets internationaux, multi-sites" key="nice_to_have_experience"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="Ex. projets internationaux, multi-sites" 
+                onchange="updateSessionState('nice_to_have_experience', this.value)">""" + st.session_state.get("nice_to_have_experience", "") + """</textarea>
+            </td>
         </tr>
         <tr>
             <td class="details-cell">Diplômes / Certifications valorisantes</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="Diplômes ou certifications supplémentaires appréciés" key="nice_to_have_diplomes"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="Diplômes ou certifications supplémentaires appréciés" 
+                onchange="updateSessionState('nice_to_have_diplomes', this.value)">""" + st.session_state.get("nice_to_have_diplomes", "") + """</textarea>
+            </td>
         </tr>
         <tr>
             <td class="details-cell">Compétences complémentaires</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="Compétences supplémentaires non essentielles mais appréciées" key="nice_to_have_competences"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="Compétences supplémentaires non essentielles mais appréciées" 
+                onchange="updateSessionState('nice_to_have_competences', this.value)">""" + st.session_state.get("nice_to_have_competences", "") + """</textarea>
+            </td>
         </tr>
         <!-- Sourcing et marché -->
         <tr>
             <td rowspan="3" class="section-header">Sourcing et marché</td>
             <td class="details-cell">Entreprises où trouver ce profil</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="Concurrents, secteurs similaires" key="entreprises_profil"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="Concurrents, secteurs similaires" 
+                onchange="updateSessionState('entreprises_profil', this.value)">""" + st.session_state.get("entreprises_profil", "") + """</textarea>
+            </td>
         </tr>
         <tr>
             <td class="details-cell">Synonymes / intitulés proches</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="Titres alternatifs pour affiner le sourcing" key="synonymes_poste"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="Titres alternatifs pour affiner le sourcing" 
+                onchange="updateSessionState('synonymes_poste', this.value)">""" + st.session_state.get("synonymes_poste", "") + """</textarea>
+            </td>
         </tr>
         <tr>
             <td class="details-cell">Canaux à utiliser</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels" key="canaux_profil"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels" 
+                onchange="updateSessionState('canaux_profil', this.value)">""" + st.session_state.get("canaux_profil", "") + """</textarea>
+            </td>
         </tr>
         <!-- Conditions et contraintes -->
         <tr>
             <td rowspan="2" class="section-header">Conditions et contraintes</td>
             <td class="details-cell">Localisation</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="Site principal, télétravail, déplacements" key="rattachement"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="Site principal, télétravail, déplacements" 
+                onchange="updateSessionState('rattachement', this.value)">""" + st.session_state.get("rattachement", "") + """</textarea>
+            </td>
         </tr>
         <tr>
             <td class="details-cell">Budget recrutement</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="Salaire indicatif, avantages, primes éventuelles" key="budget"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="Salaire indicatif, avantages, primes éventuelles" 
+                onchange="updateSessionState('budget', this.value)">""" + st.session_state.get("budget", "") + """</textarea>
+            </td>
         </tr>
         <!-- Profils pertinents -->
         <tr>
             <td rowspan="3" class="section-header">Profils pertinents</td>
             <td class="details-cell">Lien profil 1</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="URL du profil LinkedIn ou autre" key="profil_link_1"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="URL du profil LinkedIn ou autre" 
+                onchange="updateSessionState('profil_link_1', this.value)">""" + (st.session_state.get("profil_links", ["", "", ""])[0] if st.session_state.get("profil_links") else "") + """</textarea>
+            </td>
         </tr>
         <tr>
             <td class="details-cell">Lien profil 2</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="URL du profil LinkedIn ou autre" key="profil_link_2"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="URL du profil LinkedIn ou autre" 
+                onchange="updateSessionState('profil_link_2', this.value)">""" + (st.session_state.get("profil_links", ["", "", ""])[1] if st.session_state.get("profil_links") else "") + """</textarea>
+            </td>
         </tr>
         <tr>
             <td class="details-cell">Lien profil 3</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="URL du profil LinkedIn ou autre" key="profil_link_3"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="URL du profil LinkedIn ou autre" 
+                onchange="updateSessionState('profil_link_3', this.value)">""" + (st.session_state.get("profil_links", ["", "", ""])[2] if st.session_state.get("profil_links") else "") + """</textarea>
+            </td>
         </tr>
         <!-- Notes libres -->
         <tr>
             <td rowspan="2" class="section-header">Notes libres</td>
             <td class="details-cell">Points à discuter ou à clarifier avec le manager</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="Points à discuter ou à clarifier" key="commentaires"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="Points à discuter ou à clarifier" 
+                onchange="updateSessionState('commentaires', this.value)">""" + st.session_state.get("commentaires", "") + """</textarea>
+            </td>
         </tr>
         <tr>
             <td class="details-cell">Case libre</td>
-            <td class="info-cell"><textarea class="info-textarea" placeholder="Pour tout point additionnel ou remarque spécifique" key="notes_libres"></textarea></td>
+            <td class="info-cell">
+                <textarea class="table-textarea" placeholder="Pour tout point additionnel ou remarque spécifique" 
+                onchange="updateSessionState('notes_libres', this.value)">""" + st.session_state.get("notes_libres", "") + """</textarea>
+            </td>
         </tr>
     </table>
+    
+    <script>
+    function updateSessionState(key, value) {
+        // Cette fonction envoie la valeur au backend Streamlit
+        // Note: Cette approche nécessite un composant Streamlit personnalisé pour fonctionner complètement
+        // Pour l'instant, on utilise une solution temporaire avec des widgets cachés
+        const hiddenInput = document.getElementById('hidden_' + key);
+        if (hiddenInput) {
+            hiddenInput.value = value;
+        }
+    }
+    </script>
     """, unsafe_allow_html=True)
-
+    
+    # Créer des champs cachés pour chaque entrée du tableau
+    # Ces champs permettront à Streamlit de capturer les valeurs
+    hidden_fields = [
+        "raison_ouverture", "impact_strategique", "taches_principales",
+        "must_have_experience", "must_have_diplomes", "must_have_competences", "must_have_softskills",
+        "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences",
+        "entreprises_profil", "synonymes_poste", "canaux_profil",
+        "rattachement", "budget", "commentaires", "notes_libres",
+        "profil_link_1", "profil_link_2", "profil_link_3"
+    ]
+    
+    for field in hidden_fields:
+        st.text_input("", key=field, label_visibility="collapsed", value=st.session_state.get(field, ""))
+    
     # Boutons Sauvegarder et Annuler
     col_save, col_cancel = st.columns([1, 1])
     with col_save:
@@ -961,134 +1072,113 @@ with tabs[2]:
             <tr>
                 <td rowspan="3" class="section-header">Contexte du poste</td>
                 <td class="details-cell">Raison de l'ouverture</td>
-                <td>{raison_ouverture}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_1"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("raison_ouverture", "Non renseigné") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_1"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Mission globale</td>
-                <td>{mission_globale}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_2"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("impact_strategique", "Non renseigné") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_2"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Tâches principales</td>
-                <td>{taches_principales}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_3"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("taches_principales", "Non renseigné") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_3"></textarea></td>
             </tr>
             <tr>
                 <td rowspan="4" class="section-header">Must-have (Indispensables)</td>
                 <td class="details-cell">Expérience</td>
-                <td>{must_have_experience}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_4"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("must_have_experience", "Non renseigné") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_4"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Connaissances / Diplômes / Certifications</td>
-                <td>{must_have_diplomes}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_5"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("must_have_diplomes", "Non renseigné") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_5"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Compétences / Outils</td>
-                <td>{must_have_competences}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_6"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("must_have_competences", "Non renseigné") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_6"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Soft skills / aptitudes comportementales</td>
-                <td>{must_have_softskills}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_7"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("must_have_softskills", "Non renseigné") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_7"></textarea></td>
             </tr>
             <tr>
                 <td rowspan="3" class="section-header">Nice-to-have (Atouts)</td>
                 <td class="details-cell">Expérience additionnelle</td>
-                <td>{nice_to_have_experience}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_8"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("nice_to_have_experience", "Non renseigné") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_8"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Diplômes / Certifications valorisantes</td>
-                <td>{nice_to_have_diplomes}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_9"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("nice_to_have_diplomes", "Non renseigné") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_9"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Compétences complémentaires</td>
-                <td>{nice_to_have_competences}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_10"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("nice_to_have_competences", "Non renseigné") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_10"></textarea></td>
             </tr>
             <tr>
                 <td rowspan="3" class="section-header">Sourcing et marché</td>
                 <td class="details-cell">Entreprises où trouver ce profil</td>
-                <td>{entreprises_profil}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_11"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("entreprises_profil", "Non renseigné") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_11"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Synonymes / intitulés proches</td>
-                <td>{synonymes_poste}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_12"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("synonymes_poste", "Non renseigné") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_12"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Canaux à utiliser</td>
-                <td>{canaux_profil}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_13"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("canaux_profil", "Non renseigné") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_13"></textarea></td>
             </tr>
             <tr>
                 <td rowspan="2" class="section-header">Conditions et contraintes</td>
                 <td class="details-cell">Localisation</td>
-                <td>{rattachement}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_14"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("rattachement", "Non renseigné") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_14"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Budget recrutement</td>
-                <td>{budget}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_15"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("budget", "Non renseigné") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_15"></textarea></td>
             </tr>
             <tr>
                 <td rowspan="3" class="section-header">Profils pertinents</td>
                 <td class="details-cell">Lien profil 1</td>
-                <td>{profil_link_1}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_16"></textarea></td>
+                <td class="table-text">""" + (st.session_state.get("profil_links", ["", "", ""])[0] if st.session_state.get("profil_links") else "") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_16"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Lien profil 2</td>
-                <td>{profil_link_2}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_17"></textarea></td>
+                <td class="table-text">""" + (st.session_state.get("profil_links", ["", "", ""])[1] if st.session_state.get("profil_links") else "") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_17"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Lien profil 3</td>
-                <td>{profil_link_3}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_18"></textarea></td>
+                <td class="table-text">""" + (st.session_state.get("profil_links", ["", "", ""])[2] if st.session_state.get("profil_links") else "") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_18"></textarea></td>
             </tr>
             <!-- Notes libres -->
             <tr>
                 <td rowspan="2" class="section-header">Notes libres</td>
                 <td class="details-cell">Points à discuter ou à clarifier avec le manager</td>
-                <td>{commentaires}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_19"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("commentaires", "Non renseigné") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_19"></textarea></td>
             </tr>
             <tr>
                 <td class="details-cell">Case libre</td>
-                <td>{notes_libres}</td>
-                <td><textarea class="info-textarea" placeholder="Commentaires..." key="manager_comment_20"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("notes_libres", "Non renseigné") + """</td>
+                <td class="manager-cell"><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_20"></textarea></td>
             </tr>
         </table>
-        """.format(
-            raison_ouverture=st.session_state.get("raison_ouverture", "Non renseigné"),
-            mission_globale=st.session_state.get("impact_strategique", "Non renseigné"),
-            taches_principales=st.session_state.get("taches_principales", "Non renseigné"),
-            must_have_experience=st.session_state.get("must_have_experience", "Non renseigné"),
-            must_have_diplomes=st.session_state.get("must_have_diplomes", "Non renseigné"),
-            must_have_competences=st.session_state.get("must_have_competences", "Non renseigné"),
-            must_have_softskills=st.session_state.get("must_have_softskills", "Non renseigné"),
-            nice_to_have_experience=st.session_state.get("nice_to_have_experience", "Non renseigné"),
-            nice_to_have_diplomes=st.session_state.get("nice_to_have_diplomes", "Non renseigné"),
-            nice_to_have_competences=st.session_state.get("nice_to_have_competences", "Non renseigné"),
-            entreprises_profil=st.session_state.get("entreprises_profil", "Non renseigné"),
-            synonymes_poste=st.session_state.get("synonymes_poste", "Non renseigné"),
-            canaux_profil=st.session_state.get("canaux_profil", "Non renseigné"),
-            rattachement=st.session_state.get("rattachement", "Non renseigné"),
-            budget=st.session_state.get("budget", "Non renseigné"),
-            profil_link_1=st.session_state.get("profil_links", ["", "", ""])[0] if st.session_state.get("profil_links") else "",
-            profil_link_2=st.session_state.get("profil_links", ["", "", ""])[1] if st.session_state.get("profil_links") else "",
-            profil_link_3=st.session_state.get("profil_links", ["", "", ""])[2] if st.session_state.get("profil_links") else "",
-            commentaires=st.session_state.get("commentaires", "Non renseigné"),
-            notes_libres=st.session_state.get("notes_libres", "Non renseigné")
-        ), unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
     elif step == 2:
         st.subheader("2️⃣ Questions Comportementales")
