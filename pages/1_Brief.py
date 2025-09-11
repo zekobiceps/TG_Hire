@@ -344,7 +344,7 @@ st.markdown("""
     }
     
     .dark-table th {
-        background-color: #FF4B4B !important;  /* Rouge vif identique aux boutons */
+        background-color: #FF4B4B !important; /* Rouge vif pour les en-têtes */
         color: white !important;
         font-weight: 600;
         padding: 14px 16px;
@@ -406,6 +406,7 @@ st.markdown("""
         padding: 6px;
         font-size: 0.9em; /* Augmentation de la taille du texte */
         resize: vertical;
+        white-space: pre-wrap; /* Permet les retours à la ligne */
     }
     
     /* Style pour les cellules de texte */
@@ -413,6 +414,7 @@ st.markdown("""
         padding: 6px;
         font-size: 0.9em; /* Augmentation de la taille du texte */
         color: #e6edf3;
+        white-space: pre-wrap; /* Permet les retours à la ligne */
     }
     
     /* Supprimer complètement les lignes vides */
@@ -430,20 +432,20 @@ st.markdown("""
         border: 1px solid #ffffff;
     }
     
-    .stDataFrame th, .stDataFrame td {
-        padding: 12px 16px;
-        text-align: left;
-        border: 1px solid #ffffff;
-        color: #e6edf3;
-    }
-    
     .stDataFrame th {
-        background-color: #FF4B4B !important;
+        background-color: #FF4B4B !important; /* Rouge vif pour les en-têtes */
         color: white !important;
         font-weight: 600;
         padding: 14px 16px;
         font-size: 16px;
         border: 1px solid #ffffff;
+    }
+    
+    .stDataFrame td {
+        padding: 12px 16px;
+        text-align: left;
+        border: 1px solid #ffffff;
+        color: #e6edf3;
     }
     
     .stDataFrame td:first-child {
@@ -464,7 +466,8 @@ st.markdown("""
     }
     
     /* Style pour les cellules éditables (Informations) */
-    .stDataFrame td:nth-child(3) textarea {
+    .stDataFrame td:nth-child(3) textarea,
+    .stDataFrame td:nth-child(4) textarea {
         background-color: #2D2D2D !important;
         color: white !important;
         border: 1px solid #555 !important;
@@ -472,6 +475,12 @@ st.markdown("""
         padding: 6px !important;
         min-height: 60px !important;
         resize: vertical !important;
+        white-space: pre-wrap !important; /* Permet les retours à la ligne */
+    }
+    
+    /* Style pour les tableaux avec 4 colonnes (Réunion de brief) */
+    .stDataFrame.four-columns td:nth-child(4) {
+        width: 25%;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -901,13 +910,17 @@ with tabs[1]:
         },
     ]
 
-    # Construire le DataFrame avec une seule occurrence par section
+    # Construire le DataFrame avec fusion des sections
     data = []
     field_keys = []
     for section in sections:
-        data.append([section["title"], "", ""])  # Ajouter la section une seule fois
-        for field_name, field_key, placeholder in section["fields"]:
-            data.append(["", field_name, st.session_state.get(field_key, "")])
+        # Ajouter la section avec rowspan implicite (répétée pour chaque ligne de la section)
+        section_rows = len(section["fields"])
+        for i, (field_name, field_key, placeholder) in enumerate(section["fields"]):
+            if i == 0:
+                data.append([section["title"], field_name, st.session_state.get(field_key, "")])
+            else:
+                data.append([section["title"], field_name, st.session_state.get(field_key, "")])
             field_keys.append(field_key)
 
     df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
@@ -933,13 +946,9 @@ with tabs[1]:
                 brief_name = st.session_state.current_brief_name
                 
                 # Mettre à jour st.session_state à partir de l'edited_df
-                section_index = 0
                 for i in range(len(edited_df)):
-                    if edited_df["Section"].iloc[i] != "":
-                        section_index += 1
-                    else:
-                        field_key = field_keys[i - section_index]
-                        st.session_state[field_key] = edited_df["Informations"].iloc[i]
+                    field_key = field_keys[i]
+                    st.session_state[field_key] = edited_df["Informations"].iloc[i]
                 
                 # Sauvegarder les liens de profils (si applicable)
                 st.session_state.profil_links = [
@@ -1065,15 +1074,15 @@ with tabs[2]:
             },
         ]
 
-        # Construire le DataFrame avec une seule occurrence par section
+        # Construire le DataFrame avec fusion des sections
         data = []
         field_keys = []
         comment_keys = []
         k = 1
         for section in sections:
-            data.append([section["title"], "", "", ""])  # Ajouter la section une seule fois
-            for field_name, field_key, placeholder in section["fields"]:
-                data.append(["", field_name, st.session_state.get(field_key, ""), ""])
+            section_rows = len(section["fields"])
+            for i, (field_name, field_key, placeholder) in enumerate(section["fields"]):
+                data.append([section["title"] if i == 0 else "", field_name, st.session_state.get(field_key, ""), ""])
                 field_keys.append(field_key)
                 comment_keys.append(f"manager_comment_{k}")
                 k += 1
@@ -1135,7 +1144,7 @@ with tabs[2]:
                     
                     # Récupérer tous les commentaires du manager
                     manager_comments = {}
-                    for i in range(1, 21):  # 20 commentaires maintenant
+                    for i in range(1, 21):  # 20 commentaires possibles
                         comment_key = f"manager_comment_{i}"
                         if comment_key in st.session_state:
                             manager_comments[comment_key] = st.session_state[comment_key]
