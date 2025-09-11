@@ -4,7 +4,7 @@ import streamlit as st
 from datetime import datetime
 import json
 import pandas as pd
-import html  # Added for escaping HTML characters
+import html  # For escaping HTML characters
 
 # ✅ permet d'accéder à utils.py à la racine
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -420,7 +420,7 @@ st.markdown("""
     }
     
     .dark-table.four-columns th:nth-child(3),
-    .dark-table.four-columns td:nth-child(3) {
+    .dark-table td:nth-child(3) {
         width: 40%; /* Réduit pour faire de la place à la colonne notes */
     }
     
@@ -866,30 +866,74 @@ with tabs[2]:
     if step == 1:
         st.subheader("📋 Portrait robot candidat - Validation")
         
-        # Afficher le tableau complet du portrait robot avec colonne pour commentaires
-        # Échapper les valeurs de session_state pour éviter les erreurs de syntaxe
-        raison_ouverture = html.escape(st.session_state.get("raison_ouverture", "Non renseigné"))
-        impact_strategique = html.escape(st.session_state.get("impact_strategique", "Non renseigné"))
-        taches_principales = html.escape(st.session_state.get("taches_principales", "Non renseigné"))
-        must_have_experience = html.escape(st.session_state.get("must_have_experience", "Non renseigné"))
-        must_have_diplomes = html.escape(st.session_state.get("must_have_diplomes", "Non renseigné"))
-        must_have_competences = html.escape(st.session_state.get("must_have_competences", "Non renseigné"))
-        must_have_softskills = html.escape(st.session_state.get("must_have_softskills", "Non renseigné"))
-        nice_to_have_experience = html.escape(st.session_state.get("nice_to_have_experience", "Non renseigné"))
-        nice_to_have_diplomes = html.escape(st.session_state.get("nice_to_have_diplomes", "Non renseigné"))
-        nice_to_have_competences = html.escape(st.session_state.get("nice_to_have_competences", "Non renseigné"))
-        entreprises_profil = html.escape(st.session_state.get("entreprises_profil", "Non renseigné"))
-        synonymes_poste = html.escape(st.session_state.get("synonymes_poste", "Non renseigné"))
-        canaux_profil = html.escape(st.session_state.get("canaux_profil", "Non renseigné"))
-        rattachement = html.escape(st.session_state.get("rattachement", "Non renseigné"))
-        budget = html.escape(st.session_state.get("budget", "Non renseigné"))
-        profil_link_1 = html.escape(st.session_state.get("profil_link_1", "Non renseigné"))
-        profil_link_2 = html.escape(st.session_state.get("profil_link_2", "Non renseigné"))
-        profil_link_3 = html.escape(st.session_state.get("profil_link_3", "Non renseigné"))
-        commentaires = html.escape(st.session_state.get("commentaires", "Non renseigné"))
-        notes_libres = html.escape(st.session_state.get("notes_libres", "Non renseigné"))
+        # Définir les sections et leurs champs
+        sections = [
+            {
+                "title": "Contexte du poste",
+                "rows": [
+                    ("Raison de l'ouverture", "raison_ouverture", "manager_comment_1"),
+                    ("Mission globale", "impact_strategique", "manager_comment_2"),
+                    ("Tâches principales", "taches_principales", "manager_comment_3")
+                ],
+                "rowspan": 3
+            },
+            {
+                "title": "Must-have (Indispensables)",
+                "rows": [
+                    ("Expérience", "must_have_experience", "manager_comment_4"),
+                    ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "manager_comment_5"),
+                    ("Compétences / Outils", "must_have_competences", "manager_comment_6"),
+                    ("Soft skills / aptitudes comportementales", "must_have_softskills", "manager_comment_7")
+                ],
+                "rowspan": 4
+            },
+            {
+                "title": "Nice-to-have (Atouts)",
+                "rows": [
+                    ("Expérience additionnelle", "nice_to_have_experience", "manager_comment_8"),
+                    ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "manager_comment_9"),
+                    ("Compétences complémentaires", "nice_to_have_competences", "manager_comment_10")
+                ],
+                "rowspan": 3
+            },
+            {
+                "title": "Sourcing et marché",
+                "rows": [
+                    ("Entreprises où trouver ce profil", "entreprises_profil", "manager_comment_11"),
+                    ("Synonymes / intitulés proches", "synonymes_poste", "manager_comment_12"),
+                    ("Canaux à utiliser", "canaux_profil", "manager_comment_13")
+                ],
+                "rowspan": 3
+            },
+            {
+                "title": "Conditions et contraintes",
+                "rows": [
+                    ("Localisation", "rattachement", "manager_comment_14"),
+                    ("Budget recrutement", "budget", "manager_comment_15")
+                ],
+                "rowspan": 2
+            },
+            {
+                "title": "Profils pertinents",
+                "rows": [
+                    ("Lien profil 1", "profil_link_1", "manager_comment_16"),
+                    ("Lien profil 2", "profil_link_2", "manager_comment_17"),
+                    ("Lien profil 3", "profil_link_3", "manager_comment_18")
+                ],
+                "rowspan": 3
+            },
+            {
+                "title": "Notes libres",
+                "rows": [
+                    ("Points à discuter ou à clarifier avec le manager", "commentaires", "manager_comment_19"),
+                    ("Case libre", "notes_libres", "manager_comment_20")
+                ],
+                "rowspan": 2
+            }
+        ]
 
-        st.markdown(f"""
+        # Afficher le tableau
+        st.markdown("""
         <table class="dark-table four-columns">
             <tr>
                 <th>Section</th>
@@ -897,115 +941,23 @@ with tabs[2]:
                 <th>Informations</th>
                 <th>Commentaires du manager</th>
             </tr>
-            <tr>
-                <td rowspan="3" class="section-title">Contexte du poste</td>
-                <td>Raison de l'ouverture</td>
-                <td class="table-text">{raison_ouverture}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_1"></textarea></td>
-            </tr>
-            <tr>
-                <td>Mission globale</td>
-                <td class="table-text">{impact_strategique}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_2"></textarea></td>
-            </tr>
-            <tr>
-                <td>Tâches principales</td>
-                <td class="table-text">{taches_principales}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_3"></textarea></td>
-            </tr>
-            <tr>
-                <td rowspan="4" class="section-title">Must-have (Indispensables)</td>
-                <td>Expérience</td>
-                <td class="table-text">{must_have_experience}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_4"></textarea></td>
-            </tr>
-            <tr>
-                <td>Connaissances / Diplômes / Certifications</td>
-                <td class="table-text">{must_have_diplomes}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_5"></textarea></td>
-            </tr>
-            <tr>
-                <td>Compétences / Outils</td>
-                <td class="table-text">{must_have_competences}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_6"></textarea></td>
-            </tr>
-            <tr>
-                <td>Soft skills / aptitudes comportementales</td>
-                <td class="table-text">{must_have_softskills}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_7"></textarea></td>
-            </tr>
-            <tr>
-                <td rowspan="3" class="section-title">Nice-to-have (Atouts)</td>
-                <td>Expérience additionnelle</td>
-                <td class="table-text">{nice_to_have_experience}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_8"></textarea></td>
-            </tr>
-            <tr>
-                <td>Diplômes / Certifications valorisantes</td>
-                <td class="table-text">{nice_to_have_diplomes}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_9"></textarea></td>
-            </tr>
-            <tr>
-                <td>Compétences complémentaires</td>
-                <td class="table-text">{nice_to_have_competences}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_10"></textarea></td>
-            </tr>
-            <tr>
-                <td rowspan="3" class="section-title">Sourcing et marché</td>
-                <td>Entreprises où trouver ce profil</td>
-                <td class="table-text">{entreprises_profil}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_11"></textarea></td>
-            </tr>
-            <tr>
-                <td>Synonymes / intitulés proches</td>
-                <td class="table-text">{synonymes_poste}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_12"></textarea></td>
-            </tr>
-            <tr>
-                <td>Canaux à utiliser</td>
-                <td class="table-text">{canaux_profil}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_13"></textarea></td>
-            </tr>
-            <tr>
-                <td rowspan="2" class="section-title">Conditions et contraintes</td>
-                <td>Localisation</td>
-                <td class="table-text">{rattachement}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_14"></textarea></td>
-            </tr>
-            <tr>
-                <td>Budget recrutement</td>
-                <td class="table-text">{budget}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_15"></textarea></td>
-            </tr>
-            <tr>
-                <td rowspan="3" class="section-title">Profils pertinents</td>
-                <td>Lien profil 1</td>
-                <td class="table-text">{profil_link_1}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_16"></textarea></td>
-            </tr>
-            <tr>
-                <td>Lien profil 2</td>
-                <td class="table-text">{profil_link_2}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_17"></textarea></td>
-            </tr>
-            <tr>
-                <td>Lien profil 3</td>
-                <td class="table-text">{profil_link_3}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_18"></textarea></td>
-            </tr>
-            <tr>
-                <td rowspan="2" class="section-title">Notes libres</td>
-                <td>Points à discuter ou à clarifier avec le manager</td>
-                <td class="table-text">{commentaires}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_19"></textarea></td>
-            </tr>
-            <tr>
-                <td>Case libre</td>
-                <td class="table-text">{notes_libres}</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_20"></textarea></td>
-            </tr>
-        </table>
         """, unsafe_allow_html=True)
+
+        for section in sections:
+            for i, (detail, key, comment_key) in enumerate(section["rows"]):
+                value = html.escape(str(st.session_state.get(key, "Non renseigné")))
+                rowspan = f' rowspan="{section["rowspan"]}"' if i == 0 else ""
+                st.markdown(f"""
+                <tr>
+                    {"<td class='section-title'{rowspan}>{section['title']}</td>" if i == 0 else ""}
+                    <td>{detail}</td>
+                    <td class="table-text">{value}</td>
+                    <td>
+                """, unsafe_allow_html=True)
+                st.text_area("", placeholder="Commentaires...", key=comment_key, height=60, label_visibility="collapsed")
+                st.markdown("</td></tr>", unsafe_allow_html=True)
+
+        st.markdown("</table>", unsafe_allow_html=True)
 
     elif step == 2:
         st.subheader("2️⃣ Questions Comportementales")
