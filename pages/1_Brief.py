@@ -133,29 +133,40 @@ def delete_current_brief():
             st.rerun()
 
 def sync_brief_data():
-    """Synchronise les données du brief entre les onglets"""
-    if "current_brief_name" in st.session_state and st.session_state.current_brief_name:
-        brief_name = st.session_state.current_brief_name
-        # Charger les briefs depuis le fichier pour avoir les données à jour
-        all_briefs = load_briefs()
-        if brief_name in all_briefs:
-            brief_data = all_briefs[brief_name]
-            
-            # Synchroniser les données dans session_state
-            for key, value in brief_data.items():
-                if key not in ["brief_type", "ksa_data", "ksa_matrix", "manager_comments", 
-                              "canaux_prioritaires", "criteres_exclusion", "processus_evaluation",
-                              "manager_notes"]:
-                    if key not in st.session_state or st.session_state[key] != value:
-                        st.session_state[key] = value
-            
-            # Synchroniser les liens de profils
-            if "profil_links" in brief_data and brief_data["profil_links"]:
-                if len(brief_data["profil_links"]) >= 3:
-                    st.session_state.profil_link_1 = brief_data["profil_links"][0]
-                    st.session_state.profil_link_2 = brief_data["profil_links"][1]
-                    st.session_state.profil_link_3 = brief_data["profil_links"][2]
-
+    """Synchronise les données du brief entre les onglets (version sécurisée)"""
+    if "current_brief_name" not in st.session_state or not st.session_state.current_brief_name:
+        return
+        
+    brief_name = st.session_state.current_brief_name
+    all_briefs = load_briefs()
+    
+    if brief_name not in all_briefs:
+        return
+        
+    brief_data = all_briefs[brief_name]
+    
+    # Seules les clés de données (pas les widgets) peuvent être synchronisées
+    data_keys = [
+        "raison_ouverture", "impact_strategique", "rattachement", "taches_principales",
+        "must_have_experience", "must_have_diplomes", "must_have_competences", "must_have_softskills",
+        "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences",
+        "entreprises_profil", "synonymes_poste", "canaux_profil", "budget", 
+        "commentaires", "notes_libres"
+    ]
+    
+    for key in data_keys:
+        if key in brief_data and (key not in st.session_state or st.session_state[key] != brief_data[key]):
+            st.session_state[key] = brief_data[key]
+    
+    # Gestion spéciale pour les liens de profils
+    if "profil_links" in brief_data and brief_data["profil_links"]:
+        links = brief_data["profil_links"]
+        if len(links) >= 1 and ("profil_link_1" not in st.session_state or st.session_state.profil_link_1 != links[0]):
+            st.session_state.profil_link_1 = links[0]
+        if len(links) >= 2 and ("profil_link_2" not in st.session_state or st.session_state.profil_link_2 != links[1]):
+            st.session_state.profil_link_2 = links[1]
+        if len(links) >= 3 and ("profil_link_3" not in st.session_state or st.session_state.profil_link_3 != links[2]):
+            st.session_state.profil_link_3 = links[2]
 # ---------------- INIT ----------------
 init_session_state()
 st.set_page_config(
