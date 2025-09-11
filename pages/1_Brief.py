@@ -780,215 +780,331 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 """, unsafe_allow_html=True)
 
+import sys, os
+import streamlit as st
+from datetime import datetime
+import pandas as pd
+
+# ✅ permet d'accéder à utils.py à la racine
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from utils import (
+    init_session_state,
+    save_briefs,
+    load_briefs,
+)
+
+# ---------------- INIT ----------------
+init_session_state()
+st.set_page_config(
+    page_title="TG-Hire IA - Brief",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# ---------------- Sidebar ----------------
+with st.sidebar:
+    st.title("📊 Statistiques Brief")
+    
+    # Calculer quelques statistiques
+    total_briefs = len(st.session_state.get("saved_briefs", {}))
+    completed_briefs = sum(1 for b in st.session_state.get("saved_briefs", {}).values() 
+                          if b.get("ksa_data") and any(b["ksa_data"].values()))
+    
+    st.metric("📋 Briefs créés", total_briefs)
+    st.metric("✅ Briefs complétés", completed_briefs)
+
+# ---------------- NAVIGATION PRINCIPALE ----------------
+st.title("🤖 TG-Hire IA - Brief")
+
+tabs = st.tabs([
+    "📁 Gestion", 
+    "🔄 Avant-brief", 
+    "✅ Réunion de brief", 
+    "📝 Synthèse"
+])
+
+# Style CSS pour les onglets personnalisés
+st.markdown("""
+    <style>
+    /* Style global pour l'application */
+    .stApp {
+        background-color: #0E1117;
+        color: #FAFAFA;
+    }
+    
+    /* Style du tableau */
+    .dark-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+        background-color: #0d1117;
+        font-size: 0.9em;
+        border: 1px solid #ffffff;
+    }
+
+    .dark-table th, .dark-table td {
+        padding: 12px 16px;
+        text-align: left;
+        border: 1px solid #ffffff;
+        color: #e6edf3;
+    }
+
+    .dark-table th {
+        background-color: #FF4B4B;
+        font-weight: 600;
+        padding: 14px 16px;
+        font-size: 16px;
+        border: 1px solid #ffffff;
+    }
+
+    .dark-table th:nth-child(1),
+    .dark-table td:nth-child(1) {
+        width: 15%;
+    }
+
+    .dark-table th:nth-child(2),
+    .dark-table td:nth-child(2) {
+        width: 20%;
+    }
+
+    .dark-table th:nth-child(3),
+    .dark-table td:nth-child(3) {
+        width: 65%;
+    }
+
+    /* Style pour les zones de texte */
+    .table-textarea {
+        width: 100%;
+        min-height: 60px;
+        background-color: #2D2D2D;
+        color: white;
+        border: 1px solid #555;
+        border-radius: 4px;
+        padding: 6px;
+        font-size: 0.9em;
+        resize: vertical;
+    }
+
+    .table-text {
+        padding: 6px;
+        font-size: 0.9em;
+        color: #e6edf3;
+    }
+
+    /* Section Title */
+    .section-title {
+        font-weight: 600;
+        color: #58a6ff;
+        font-size: 0.95em;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
 # ---------------- ONGLET AVANT-BRIEF ----------------
 with tabs[1]:
     # Vérification si un brief est chargé
-    if not can_access_avant_brief:
+    if "current_brief_name" not in st.session_state or not st.session_state.current_brief_name:
         st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
         st.stop()
 
     st.markdown(f"<h3>🔄 Avant-brief (Préparation)</h3>", unsafe_allow_html=True)
+
+    # Titre pour le tableau
     st.subheader("📋 Portrait robot candidat")
 
-    # Ajouter le style CSS pour un tableau moderne et élégant
+    # Nouveau tableau avec style sombre et bordures blanches
     st.markdown("""
-    <style>
-      /* Style général du tableau */
-      .custom-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 1rem;
-        font-family: 'Arial', sans-serif;
-      }
-
-      /* Style des cellules */
-      .custom-table th, .custom-table td {
-        padding: 12px 20px;
-        text-align: left;
-        border: 1px solid #333; /* Bordure plus subtile */
-        color: #D1D1D1; /* Texte clair mais doux */
-      }
-
-      /* En-tête */
-      .custom-table th {
-        background-color: #4C6A92; /* Bleu calme */
-        font-weight: bold;
-        color: #FFFFFF;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-
-      /* Lignes paires et impaires */
-      .custom-table tr:nth-child(even) {
-        background-color: #1C1F26; /* Fond sombre pour les lignes paires */
-      }
-      .custom-table tr:nth-child(odd) {
-        background-color: #13161C; /* Fond légèrement plus clair pour les lignes impaires */
-      }
-
-      /* Effet au survol de la ligne */
-      .custom-table tr:hover {
-        background-color: #333; /* Fond plus clair lors du survol */
-      }
-
-      /* Mise en forme des sections */
-      .ab-section {
-        font-weight: 600;
-        color: #A6D0D9;
-        margin-top: 0.5rem;
-        font-size: 1rem;
-      }
-
-      /* Mise en forme des lignes */
-      .ab-row {
-        padding: 6px 0;
-        border-bottom: 1px solid #333;
-      }
-
-      .ab-detail {
-        opacity: 0.9;
-        font-size: 1rem;
-      }
-
-      /* Fixer la taille des colonnes */
-      .custom-table th:nth-child(1), .custom-table td:nth-child(1) {
-        width: 20%; /* Section */
-      }
-      .custom-table th:nth-child(2), .custom-table td:nth-child(2) {
-        width: 30%; /* Détails */
-      }
-      .custom-table th:nth-child(3), .custom-table td:nth-child(3) {
-        width: 50%; /* Informations */
-      }
-
-      /* Ajustements pour les petites tailles d'écran */
-      @media (max-width: 768px) {
-        .custom-table th, .custom-table td {
-          padding: 10px;
-        }
-
-        .custom-table th:nth-child(1), .custom-table td:nth-child(1) {
-          width: 25%;
-        }
-        .custom-table th:nth-child(2), .custom-table td:nth-child(2) {
-          width: 25%;
-        }
-        .custom-table th:nth-child(3), .custom-table td:nth-child(3) {
-          width: 50%;
-        }
-      }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # Utilitaires d'affichage d'une "ligne" type tableau (3 colonnes)
-    def ab_row(section_label, detail_label, key, placeholder="", show_section=False, height=100):
-        c1, c2, c3 = st.columns([2, 3, 7])  # Ajustement des colonnes
-        with c1:
-            if show_section:
-                st.markdown(f"<div class='ab-section'>{section_label}</div>", unsafe_allow_html=True)
-            else:
-                st.markdown("&nbsp;", unsafe_allow_html=True)
-        with c2:
-            st.markdown(f"<div class='ab-detail'>{detail_label}</div>", unsafe_allow_html=True)
-        with c3:
-            st.text_area(
-                label="",
-                key=key,
-                value=st.session_state.get(key, ""),
-                placeholder=placeholder,
-                height=height,
-                label_visibility="collapsed"
-            )
-
-    # ---------- CONTENU ----------
-    # En-tête du tableau avec la première ligne bleu calme
-    st.markdown("""
-    <table class="custom-table">
-      <thead>
+    <table class="dark-table">
         <tr>
-          <th>Section</th>
-          <th>Détails</th>
-          <th>Informations</th>
+            <th>Section</th>
+            <th>Détails</th>
+            <th>Informations</th>
         </tr>
-      </thead>
-      <tbody>
+        <!-- Contexte du poste -->
+        <tr>
+            <td rowspan="3" class="section-title">Contexte du poste</td>
+            <td>Raison de l'ouverture</td>
+            <td>
+                <textarea class="table-textarea" placeholder="Remplacement / Création / Évolution interne" 
+                onchange="updateSessionState('raison_ouverture', this.value)">""" + st.session_state.get("raison_ouverture", "") + """</textarea>
+            </td>
+        </tr>
+        <tr>
+            <td>Mission globale</td>
+            <td>
+                <textarea class="table-textarea" placeholder="Résumé du rôle et objectif principal" 
+                onchange="updateSessionState('impact_strategique', this.value)">""" + st.session_state.get("impact_strategique", "") + """</textarea>
+            </td>
+        </tr>
+        <tr>
+            <td>Tâches principales</td>
+            <td>
+                <textarea class="table-textarea" placeholder="Ex. gestion de projet complexe, coordination multi-sites" 
+                onchange="updateSessionState('taches_principales', this.value)">""" + st.session_state.get("taches_principales", "") + """</textarea>
+            </td>
+        </tr>
+        <!-- Must-have (Indispensables) -->
+        <tr>
+            <td rowspan="4" class="section-title">Must-have (Indispensables)</td>
+            <td>Expérience</td>
+            <td>
+                <textarea class="table-textarea" placeholder="Nombre d'années minimum, expériences similaires dans le secteur" 
+                onchange="updateSessionState('must_have_experience', this.value)">""" + st.session_state.get("must_have_experience", "") + """</textarea>
+            </td>
+        </tr>
+        <tr>
+            <td>Connaissances / Diplômes / Certifications</td>
+            <td>
+                <textarea class="table-textarea" placeholder="Diplômes exigés, certifications spécifiques" 
+                onchange="updateSessionState('must_have_diplomes', this.value)">""" + st.session_state.get("must_have_diplomes", "") + """</textarea>
+            </td>
+        </tr>
+        <tr>
+            <td>Compétences / Outils</td>
+            <td>
+                <textarea class="table-textarea" placeholder="Techniques, logiciels, méthodes à maîtriser" 
+                onchange="updateSessionState('must_have_competences', this.value)">""" + st.session_state.get("must_have_competences", "") + """</textarea>
+            </td>
+        </tr>
+        <tr>
+            <td>Soft skills / aptitudes comportementales</td>
+            <td>
+                <textarea class="table-textarea" placeholder="Leadership, rigueur, communication, autonomie" 
+                onchange="updateSessionState('must_have_softskills', this.value)">""" + st.session_state.get("must_have_softskills", "") + """</textarea>
+            </td>
+        </tr>
+        <!-- Nice-to-have (Atouts) -->
+        <tr>
+            <td rowspan="3" class="section-title">Nice-to-have (Atouts)</td>
+            <td>Expérience additionnelle</td>
+            <td>
+                <textarea class="table-textarea" placeholder="Ex. projets internationaux, multi-sites" 
+                onchange="updateSessionState('nice_to_have_experience', this.value)">""" + st.session_state.get("nice_to_have_experience", "") + """</textarea>
+            </td>
+        </tr>
+        <tr>
+            <td>Diplômes / Certifications valorisantes</td>
+            <td>
+                <textarea class="table-textarea" placeholder="Diplômes ou certifications supplémentaires appréciés" 
+                onchange="updateSessionState('nice_to_have_diplomes', this.value)">""" + st.session_state.get("nice_to_have_diplomes", "") + """</textarea>
+            </td>
+        </tr>
+        <tr>
+            <td>Compétences complémentaires</td>
+            <td>
+                <textarea class="table-textarea" placeholder="Compétences supplémentaires non essentielles mais appréciées" 
+                onchange="updateSessionState('nice_to_have_competences', this.value)">""" + st.session_state.get("nice_to_have_competences", "") + """</textarea>
+            </td>
+        </tr>
+        <!-- Sourcing et marché -->
+        <tr>
+            <td rowspan="3" class="section-title">Sourcing et marché</td>
+            <td>Entreprises où trouver ce profil</td>
+            <td>
+                <textarea class="table-textarea" placeholder="Concurrents, secteurs similaires" 
+                onchange="updateSessionState('entreprises_profil', this.value)">""" + st.session_state.get("entreprises_profil", "") + """</textarea>
+            </td>
+        </tr>
+        <tr>
+            <td>Synonymes / intitulés proches</td>
+            <td>
+                <textarea class="table-textarea" placeholder="Titres alternatifs pour affiner le sourcing" 
+                onchange="updateSessionState('synonymes_poste', this.value)">""" + st.session_state.get("synonymes_poste", "") + """</textarea>
+            </td>
+        </tr>
+        <tr>
+            <td>Canaux à utiliser</td>
+            <td>
+                <textarea class="table-textarea" placeholder="LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels" 
+                onchange="updateSessionState('canaux_profil', this.value)">""" + st.session_state.get("canaux_profil", "") + """</textarea>
+            </td>
+        </tr>
+        <!-- Conditions et contraintes -->
+        <tr>
+            <td rowspan="2" class="section-title">Conditions et contraintes</td>
+            <td>Localisation</td>
+            <td>
+                <textarea class="table-textarea" placeholder="Site principal, télétravail, déplacements" 
+                onchange="updateSessionState('rattachement', this.value)">""" + st.session_state.get("rattachement", "") + """</textarea>
+            </td>
+        </tr>
+        <tr>
+            <td>Budget recrutement</td>
+            <td>
+                <textarea class="table-textarea" placeholder="Salaire indicatif, avantages, primes éventuelles" 
+                onchange="updateSessionState('budget', this.value)">""" + st.session_state.get("budget", "") + """</textarea>
+            </td>
+        </tr>
+        <tr>
+            <td rowspan="3" class="section-title">Profils pertinents</td>
+            <td>Lien profil 1</td>
+            <td>
+                <textarea class="table-textarea" placeholder="URL du profil LinkedIn ou autre" 
+                onchange="updateSessionState('profil_link_1', this.value)">""" + (st.session_state.get("profil_links", ["", "", ""])[0] if st.session_state.get("profil_links") else "") + """</textarea>
+            </td>
+        </tr>
+        <tr>
+            <td>Lien profil 2</td>
+            <td>
+                <textarea class="table-textarea" placeholder="URL du profil LinkedIn ou autre" 
+                onchange="updateSessionState('profil_link_2', this.value)">""" + (st.session_state.get("profil_links", ["", "", ""])[1] if st.session_state.get("profil_links") else "") + """</textarea>
+            </td>
+        </tr>
+        <tr>
+            <td>Lien profil 3</td>
+            <td>
+                <textarea class="table-textarea" placeholder="URL du profil LinkedIn ou autre" 
+                onchange="updateSessionState('profil_link_3', this.value)">""" + (st.session_state.get("profil_links", ["", "", ""])[2] if st.session_state.get("profil_links") else "") + """</textarea>
+            </td>
+        </tr>
+        <tr>
+            <td rowspan="2" class="section-title">Notes libres</td>
+            <td>Points à discuter ou à clarifier avec le manager</td>
+            <td>
+                <textarea class="table-textarea" placeholder="Points à discuter ou à clarifier" 
+                onchange="updateSessionState('commentaires', this.value)">""" + st.session_state.get("commentaires", "") + """</textarea>
+            </td>
+        </tr>
+        <tr>
+            <td>Case libre</td>
+            <td>
+                <textarea class="table-textarea" placeholder="Pour tout point additionnel ou remarque spécifique" 
+                onchange="updateSessionState('notes_libres', this.value)">""" + st.session_state.get("notes_libres", "") + """</textarea>
+            </td>
+        </tr>
+    </table>
     """, unsafe_allow_html=True)
 
-    # Contexte du poste
-    ab_row("Contexte du poste", "Raison de l'ouverture", "raison_ouverture",
-           "Remplacement / Création / Évolution interne", show_section=True)
-    ab_row("Contexte du poste", "Mission globale", "impact_strategique",
-           "Résumé du rôle et objectif principal")
-    ab_row("Contexte du poste", "Tâches principales", "taches_principales",
-           "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget")
+    # Créer des champs cachés pour chaque entrée du tableau
+    hidden_fields = [
+        "raison_ouverture", "impact_strategique", "taches_principales",
+        "must_have_experience", "must_have_diplomes", "must_have_competences", "must_have_softskills",
+        "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences",
+        "entreprises_profil", "synonymes_poste", "canaux_profil",
+        "rattachement", "budget", "commentaires", "notes_libres",
+        "profil_link_1", "profil_link_2", "profil_link_3"
+    ]
+    
+    for field in hidden_fields:
+        st.text_input("", key=field, label_visibility="collapsed", value=st.session_state.get(field, ""))
 
-    # Must-have
-    ab_row("Must-have (Indispensables)", "Expérience", "must_have_experience",
-           "Nombre d'années minimum, expériences similaires dans le secteur", show_section=True)
-    ab_row("Must-have (Indispensables)", "Connaissances / Diplômes / Certifications",
-           "must_have_diplomes", "Diplômes exigés, certifications spécifiques")
-    ab_row("Must-have (Indispensables)", "Compétences / Outils", "must_have_competences",
-           "Techniques, logiciels, méthodes à maîtriser")
-    ab_row("Must-have (Indispensables)", "Soft skills / aptitudes comportementales",
-           "must_have_softskills", "Leadership, rigueur, communication, autonomie")
-
-    # Nice-to-have
-    ab_row("Nice-to-have (Atouts)", "Expérience additionnelle",
-           "nice_to_have_experience", "Ex. projets internationaux, multi-sites", show_section=True)
-    ab_row("Nice-to-have (Atouts)", "Diplômes / Certifications valorisantes",
-           "nice_to_have_diplomes", "Diplômes/certifications supplémentaires appréciés")
-    ab_row("Nice-to-have (Atouts)", "Compétences complémentaires",
-           "nice_to_have_competences", "Compétences non essentielles mais appréciées")
-
-    # Sourcing et marché
-    ab_row("Sourcing et marché", "Entreprises où trouver ce profil",
-           "entreprises_profil", "Concurrents, secteurs similaires", show_section=True)
-    ab_row("Sourcing et marché", "Synonymes / intitulés proches",
-           "synonymes_poste", "Titres alternatifs pour affiner le sourcing")
-    ab_row("Sourcing et marché", "Canaux à utiliser",
-           "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels")
-
-    # Conditions et contraintes
-    ab_row("Conditions et contraintes", "Localisation",
-           "rattachement", "Site principal, télétravail, déplacements", show_section=True)
-    ab_row("Conditions et contraintes", "Budget recrutement",
-           "budget", "Salaire indicatif, avantages, primes éventuelles")
-
-    # Profils pertinents
-    # Pré-remplir depuis profil_links si présent
-    _pl = st.session_state.get("profil_links", ["", "", ""])
-    if "profil_link_1" not in st.session_state: st.session_state.profil_link_1 = (_pl[0] if len(_pl) > 0 else "")
-    if "profil_link_2" not in st.session_state: st.session_state.profil_link_2 = (_pl[1] if len(_pl) > 1 else "")
-    if "profil_link_3" not in st.session_state: st.session_state.profil_link_3 = (_pl[2] if len(_pl) > 2 else "")
-
-    ab_row("Profils pertinents", "Lien profil 1", "profil_link_1",
-           "URL du profil LinkedIn ou autre", show_section=True, height=70)
-    ab_row("Profils pertinents", "Lien profil 2", "profil_link_2",
-           "URL du profil LinkedIn ou autre", height=70)
-    ab_row("Profils pertinents", "Lien profil 3", "profil_link_3",
-           "URL du profil LinkedIn ou autre", height=70)
-
-    # Notes libres
-    ab_row("Notes libres", "Points à discuter ou à clarifier avec le manager",
-           "commentaires", "Points à discuter ou à clarifier", show_section=True)
-    ab_row("Notes libres", "Case libre", "notes_libres",
-           "Pour tout point additionnel ou remarque spécifique")
-
-    st.markdown("</tbody></table>", unsafe_allow_html=True)
-
-    # ---------- Actions ----------
+    # Sauvegarde des modifications
     col_save, col_cancel = st.columns([1, 1])
     with col_save:
         if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True, key="save_avant_brief"):
             if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
                 brief_name = st.session_state.current_brief_name
-
+                
+                # Sauvegarder les liens de profils
                 st.session_state.profil_links = [
                     st.session_state.get("profil_link_1", ""),
                     st.session_state.get("profil_link_2", ""),
                     st.session_state.get("profil_link_3", "")
                 ]
-
+                
+                # Mettre à jour le brief avec les données
                 brief_data = {
                     "profil_links": st.session_state.profil_links,
                     "raison_ouverture": st.session_state.get("raison_ouverture", ""),
@@ -1009,21 +1125,22 @@ with tabs[1]:
                     "commentaires": st.session_state.get("commentaires", ""),
                     "notes_libres": st.session_state.get("notes_libres", "")
                 }
-
+                
+                # Charger les briefs existants depuis le fichier
                 existing_briefs = load_briefs()
                 if brief_name in existing_briefs:
                     existing_briefs[brief_name].update(brief_data)
                     st.session_state.saved_briefs = existing_briefs
                 else:
                     st.session_state.saved_briefs[brief_name].update(brief_data)
-
+                
                 save_briefs()
                 st.session_state.avant_brief_completed = True
                 st.success("✅ Modifications sauvegardées")
                 st.rerun()
             else:
                 st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
-
+    
     with col_cancel:
         if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_avant_brief"):
             delete_current_brief()
