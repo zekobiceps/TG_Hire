@@ -780,6 +780,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 """, unsafe_allow_html=True)
 
+
 # ---------------- ONGLET AVANT-BRIEF (SANS BINDERS NI JS) ----------------
 with tabs[1]:
     # Vérification si un brief est chargé
@@ -845,6 +846,19 @@ with tabs[1]:
             )
 
     # ---------- CONTENU ----------
+    # En-tête du tableau avec la première ligne rouge vif
+    st.markdown("""
+    <table class="custom-table">
+      <thead>
+        <tr>
+          <th>Section</th>
+          <th>Détails</th>
+          <th>Informations</th>
+        </tr>
+      </thead>
+      <tbody>
+    """, unsafe_allow_html=True)
+
     # Contexte du poste
     ab_row("Contexte du poste", "Raison de l'ouverture", "raison_ouverture",
            "Remplacement / Création / Évolution interne", show_section=True)
@@ -905,6 +919,8 @@ with tabs[1]:
     ab_row("Notes libres", "Case libre", "notes_libres",
            "Pour tout point additionnel ou remarque spécifique")
 
+    st.markdown("</tbody></table>", unsafe_allow_html=True)
+
     # ---------- Actions ----------
     col_save, col_cancel = st.columns([1, 1])
     with col_save:
@@ -956,6 +972,7 @@ with tabs[1]:
     with col_cancel:
         if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_avant_brief"):
             delete_current_brief()
+
 
 # ---------------- RÉUNION (Wizard interne) — SANS BINDERS NI JS ----------------
 with tabs[2]:
