@@ -858,15 +858,16 @@ with tabs[1]:
         for i, (field_name, field_key, placeholder) in enumerate(fields):
             row_span = len(fields) if i == 0 else 1
             section_html = f'<td rowspan="{row_span}" class="section-title">{section_title}</td>' if i == 0 else ""
-            # Utiliser un conteneur temporaire pour capturer la sortie du text_area
+            # Utiliser un conteneur pour encapsuler le widget
             with st.container():
-                text_area_value = st.text_area("", key=field_key, placeholder=placeholder, height=60, value=st.session_state.get(field_key, ""))
+                text_area = st.text_area("", key=field_key, placeholder=placeholder, height=60, value=st.session_state.get(field_key, ""))
+                # Rendre le widget dans une cellule HTML avec style ajusté
                 st.markdown(
                     f"""
                     <tr>
                         {section_html}
                         <td>{field_name}</td>
-                        <td><div class="table-textarea" style="min-height: 60px;">{text_area_value}</div></td>
+                        <td><div class="table-textarea" style="min-height: 60px; display: flex; align-items: center;">{text_area}</div></td>
                     </tr>
                     """,
                     unsafe_allow_html=True
