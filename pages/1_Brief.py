@@ -1,3 +1,4 @@
+```python
 import sys, os
 import streamlit as st
 from datetime import datetime
@@ -582,24 +583,21 @@ with tabs[1]:
             st.markdown("**Raison de l'ouverture**")
         with col2:
             st.text_area("", placeholder="Remplacement / Création / Évolution interne", 
-                        key="raison_ouverture_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("raison_ouverture", ""))
+                        key="raison_ouverture_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Mission globale**")
         with col2:
             st.text_area("", placeholder="Résumé du rôle et objectif principal", 
-                        key="impact_strategique_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("impact_strategique", ""))
+                        key="impact_strategique_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Tâches principales**")
         with col2:
             st.text_area("", placeholder="Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget", 
-                        key="taches_principales_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("taches_principales", ""))
+                        key="taches_principales_input", label_visibility="collapsed", height=100)
     
     # Section Must-have (Indispensables)
     with st.container():
@@ -610,32 +608,28 @@ with tabs[1]:
             st.markdown("**Expérience**")
         with col2:
             st.text_area("", placeholder="Nombre d'années minimum, expériences similaires dans le secteur", 
-                        key="must_have_experience_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("must_have_experience", ""))
+                        key="must_have_experience_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Connaissances / Diplômes / Certifications**")
         with col2:
             st.text_area("", placeholder="Diplômes exigés, certifications spécifiques", 
-                        key="must_have_diplomes_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("must_have_diplomes", ""))
+                        key="must_have_diplomes_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Compétences / Outils**")
         with col2:
             st.text_area("", placeholder="Techniques, logiciels, méthodes à maîtriser", 
-                        key="must_have_competences_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("must_have_competences", ""))
+                        key="must_have_competences_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Soft skills / aptitudes comportementales**")
         with col2:
             st.text_area("", placeholder="Leadership, rigueur, communication, autonomie", 
-                        key="must_have_softskills_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("must_have_softskills", ""))
+                        key="must_have_softskills_input", label_visibility="collapsed", height=100)
     
     # Section Nice-to-have (Atouts)
     with st.container():
@@ -646,24 +640,21 @@ with tabs[1]:
             st.markdown("**Expérience additionnelle**")
         with col2:
             st.text_area("", placeholder="Ex. projets internationaux, multi-sites", 
-                        key="nice_to_have_experience_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("nice_to_have_experience", ""))
+                        key="nice_to_have_experience_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Diplômes / Certifications valorisantes**")
         with col2:
             st.text_area("", placeholder="Diplômes ou certifications supplémentaires appréciés", 
-                        key="nice_to_have_diplomes_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("nice_to_have_diplomes", ""))
+                        key="nice_to_have_diplomes_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Compétences complémentaires**")
         with col2:
             st.text_area("", placeholder="Compétences supplémentaires non essentielles mais appréciées", 
-                        key="nice_to_have_competences_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("nice_to_have_competences", ""))
+                        key="nice_to_have_competences_input", label_visibility="collapsed", height=100)
     
     # Section Sourcing et marché
     with st.container():
@@ -674,24 +665,21 @@ with tabs[1]:
             st.markdown("**Entreprises où trouver ce profil**")
         with col2:
             st.text_area("", placeholder="Concurrents, secteurs similaires", 
-                        key="entreprises_profil_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("entreprises_profil", ""))
+                        key="entreprises_profil_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Synonymes / intitulés proches**")
         with col2:
             st.text_area("", placeholder="Titres alternatifs pour affiner le sourcing", 
-                        key="synonymes_poste_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("synonymes_poste", ""))
+                        key="synonymes_poste_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Canaux à utiliser**")
         with col2:
             st.text_area("", placeholder="LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels", 
-                        key="canaux_profil_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("canaux_profil", ""))
+                        key="canaux_profil_input", label_visibility="collapsed", height=100)
     
     # Section Conditions et contraintes
     with st.container():
@@ -702,16 +690,14 @@ with tabs[1]:
             st.markdown("**Localisation**")
         with col2:
             st.text_area("", placeholder="Site principal, télétravail, déplacements", 
-                        key="rattachement_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("rattachement", ""))
+                        key="rattachement_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Budget recrutement**")
         with col2:
             st.text_area("", placeholder="Salaire indicatif, avantages, primes éventuelles", 
-                        key="budget_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("budget", ""))
+                        key="budget_input", label_visibility="collapsed", height=100)
     
     # Section Profils pertinents
     with st.container():
@@ -722,24 +708,21 @@ with tabs[1]:
             st.markdown("**Lien profil 1**")
         with col2:
             st.text_input("", placeholder="URL du profil LinkedIn ou autre", 
-                         key="profil_link_1_input", label_visibility="collapsed",
-                         value=st.session_state.get("profil_link_1", ""))
+                         key="profil_link_1_input", label_visibility="collapsed")
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Lien profil 2**")
         with col2:
             st.text_input("", placeholder="URL du profil LinkedIn ou autre", 
-                         key="profil_link_2_input", label_visibility="collapsed",
-                         value=st.session_state.get("profil_link_2", ""))
+                         key="profil_link_2_input", label_visibility="collapsed")
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Lien profil 3**")
         with col2:
             st.text_input("", placeholder="URL du profil LinkedIn ou autre", 
-                         key="profil_link_3_input", label_visibility="collapsed",
-                         value=st.session_state.get("profil_link_3", ""))
+                         key="profil_link_3_input", label_visibility="collapsed")
     
     # Section Notes libres
     with st.container():
@@ -750,16 +733,14 @@ with tabs[1]:
             st.markdown("**Points à discuter ou à clarifier avec le manager**")
         with col2:
             st.text_area("", placeholder="Points à discuter ou à clarifier", 
-                        key="commentaires_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("commentaires", ""))
+                        key="commentaires_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Case libre**")
         with col2:
             st.text_area("", placeholder="Pour tout point additionnel ou remarque spécifique", 
-                        key="notes_libres_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("notes_libres", ""))
+                        key="notes_libres_input", label_visibility="collapsed", height=100)
     
     # --- Boutons Sauvegarder et Réinitialiser ---
     col_save, col_reset = st.columns([1, 1])
@@ -1183,3 +1164,21 @@ with tabs[3]:
                 st.info("ℹ️ Créez d'abord un brief pour l'exporter")
         else:
             st.info("⚠️ Word non dispo (pip install python-docx)")
+
+# JavaScript pour désactiver les onglets non accessibles
+st.markdown(f"""
+<script>
+// Désactiver les onglets selon les permissions
+const tabs = parent.document.querySelectorAll('[data-baseweb="tab"]');
+if (!{str(can_access_avant_brief).lower()}) {{
+    tabs[1].classList.add('disabled-tab');
+}}
+if (!{str(can_access_reunion).lower()}) {{
+    tabs[2].classList.add('disabled-tab');
+}}
+if (!{str(can_access_synthese).lower()}) {{
+    tabs[3].classList.add('disabled-tab');
+}}
+</script>
+""", unsafe_allow_html=True)
+```
