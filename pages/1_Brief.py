@@ -1,4 +1,3 @@
-
 import sys, os 
 import streamlit as st
 from datetime import datetime
@@ -407,6 +406,7 @@ st.markdown("""
         padding: 6px;
         font-size: 0.9em; /* Augmentation de la taille du texte */
         resize: vertical;
+        box-sizing: border-box; /* Assure que padding et border sont inclus dans la largeur */
     }
     
     /* Style pour les cellules de texte */
@@ -419,6 +419,19 @@ st.markdown("""
     /* Supprimer complètement les lignes vides */
     .empty-row {
         display: none;
+    }
+    
+    /* Ajustements pour les cellules contenant des widgets Streamlit */
+    .dark-table td {
+        vertical-align: middle !important;
+        padding: 6px !important;
+    }
+    
+    .table-textarea .stTextArea {
+        width: 100% !important;
+        height: 60px !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -929,6 +942,7 @@ with tabs[1]:
     with col_reset:
         if st.button("🗑️ Réinitialiser le Brief", type="secondary", use_container_width=True, key="reset_avant_brief"):
             delete_current_brief()
+
 
 # ---------------- RÉUNION (Wizard interne) ----------------
 with tabs[2]:
