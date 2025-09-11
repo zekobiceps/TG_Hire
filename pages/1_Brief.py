@@ -780,7 +780,7 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 """, unsafe_allow_html=True)
 
-# ---------------- ONGLET AVANT-BRIEF (SANS BINDERS NI JS) ----------------
+# ---------------- ONGLET AVANT-BRIEF ----------------
 with tabs[1]:
     # Vérification si un brief est chargé
     if not can_access_avant_brief:
@@ -790,7 +790,7 @@ with tabs[1]:
     st.markdown(f"<h3>🔄 Avant-brief (Préparation)</h3>", unsafe_allow_html=True)
     st.subheader("📋 Portrait robot candidat")
 
-    # Ajouter le style CSS pour le tableau avec les bordures et couleurs spécifiées
+    # Ajouter le style CSS pour un tableau propre et moderne
     st.markdown("""
     <style>
       /* Style général du tableau */
@@ -800,52 +800,86 @@ with tabs[1]:
         margin-bottom: 1rem;
       }
       .custom-table th, .custom-table td {
-        padding: 8px;
+        padding: 12px;
         text-align: left;
-        border: 1px solid #ffffff; /* Bordure blanche */
+        border: 1px solid #444; /* Bordure sombre */
         color: #e6edf3; /* Texte clair */
       }
+
+      /* En-tête */
       .custom-table th {
-        background-color: #FF4B4B; /* Rouge vif pour l'entête */
+        background-color: #FF4B4B; /* Rouge vif */
         font-weight: bold;
+        text-transform: uppercase;
+        letter-spacing: 1px;
       }
+
+      /* Lignes paires et impaires */
       .custom-table tr:nth-child(even) {
-        background-color: #1a2230; /* Fond noir pour les lignes paires */
+        background-color: #2E3338; /* Fond légèrement plus clair */
       }
       .custom-table tr:nth-child(odd) {
-        background-color: #0d1117; /* Fond plus foncé pour les lignes impaires */
+        background-color: #1A1D21; /* Fond plus foncé */
       }
+      
+      /* Effet au survol de la ligne */
       .custom-table tr:hover {
-        background-color: #333;
+        background-color: #333; /* Fond sombre au survol */
       }
+
+      /* Mise en forme des sections (en bleu) */
       .ab-section {
         font-weight: 600;
         color: #58a6ff;
-        margin-top: 0.25rem;
+        margin-top: 0.5rem;
+        font-size: 1rem;
       }
+
+      /* Mise en forme des lignes */
       .ab-row {
         padding: 6px 0;
-        border-bottom: 1px solid #424242;
+        border-bottom: 1px solid #444;
       }
+
+      /* Colonne avec plus de contenu */
       .ab-detail {
         opacity: 0.9;
+        font-size: 1rem;
       }
+
       /* Fixer la taille des colonnes */
       .custom-table th:nth-child(1), .custom-table td:nth-child(1) {
-        width: 15%; /* Section */
+        width: 20%; /* Section */
       }
       .custom-table th:nth-child(2), .custom-table td:nth-child(2) {
-        width: 25%; /* Détails */
+        width: 30%; /* Détails */
       }
       .custom-table th:nth-child(3), .custom-table td:nth-child(3) {
-        width: 60%; /* Informations */
+        width: 50%; /* Informations */
+      }
+
+      /* Ajustements pour les petites tailles d'écran */
+      @media (max-width: 768px) {
+        .custom-table th, .custom-table td {
+          padding: 8px;
+        }
+
+        .custom-table th:nth-child(1), .custom-table td:nth-child(1) {
+          width: 25%;
+        }
+        .custom-table th:nth-child(2), .custom-table td:nth-child(2) {
+          width: 25%;
+        }
+        .custom-table th:nth-child(3), .custom-table td:nth-child(3) {
+          width: 50%;
+        }
       }
     </style>
     """, unsafe_allow_html=True)
 
     # Utilitaires d'affichage d'une "ligne" type tableau (3 colonnes)
     def ab_row(section_label, detail_label, key, placeholder="", show_section=False, height=100):
-        c1, c2, c3 = st.columns([1.5, 2, 6.5])  # Ajustement des colonnes
+        c1, c2, c3 = st.columns([2, 3, 7])  # Ajustement des colonnes
         with c1:
             if show_section:
                 st.markdown(f"<div class='ab-section'>{section_label}</div>", unsafe_allow_html=True)
