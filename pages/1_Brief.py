@@ -929,13 +929,13 @@ with tabs[1]:
 
     df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
 
-    # Afficher le data_editor stylé
+    # Afficher le data_editor stylé with initial placeholders
     edited_df = st.data_editor(
         df,
         column_config={
             "Section": st.column_config.TextColumn("Section", disabled=True),
             "Détails": st.column_config.TextColumn("Détails", disabled=True),
-            "Informations": st.column_config.TextColumn("Informations", width="large", default=edited_df["Informations"])
+            "Informations": st.column_config.TextColumn("Informations", width="large", default=df["Informations"])
         },
         use_container_width=True,
         hide_index=True,
