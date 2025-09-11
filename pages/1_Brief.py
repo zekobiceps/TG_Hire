@@ -957,8 +957,6 @@ with tabs[1]:
         if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_avant_brief"):
             delete_current_brief()
 
-
-
 # ---------------- RÉUNION (Wizard interne) — SANS BINDERS NI JS ----------------
 with tabs[2]:
     if not can_access_reunion:
