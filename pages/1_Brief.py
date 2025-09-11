@@ -886,6 +886,117 @@ with tabs[1]:
         if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_avant_brief"):
             delete_current_brief()
 
+# ---------------- ONGLET AVANT-BRIEF ----------------
+with tabs[1]:
+    # Vérification si un brief est chargé
+    if not can_access_avant_brief:
+        st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
+        st.stop()  # Arrête le rendu de cet onglet
+    
+    # Initialiser les données si elles n'existent pas
+    if "avant_brief_data" not in st.session_state:
+        st.session_state.avant_brief_data = pd.DataFrame(columns=[
+            "Raison d'ouverture", "Mission globale", "Tâches principales", 
+            "Must-have expérience", "Must-have compétences", "Nice-to-have"
+        ])
+
+    # Afficher les informations du brief en cours avec Manager/Recruteur à gauche
+    st.markdown(f"<h3>🔄 Avant-brief (Préparation)</h3>", unsafe_allow_html=True)
+
+    # Titre pour le tableau
+    st.subheader("📋 Portrait robot candidat")
+
+    # Formulaire pour ajouter une nouvelle ligne
+    with st.expander("➕ Ajouter un critère"):
+        col1, col2, col3, col4, col5, col6 = st.columns(6)
+
+        with col1:
+            raison_ouverture = st.text_input("Raison d'ouverture", key="raison_ouverture")
+        with col2:
+            mission_globale = st.text_input("Mission globale", key="mission_globale")
+        with col3:
+            taches_principales = st.text_input("Tâches principales", key="taches_principales")
+        with col4:
+            must_have_experience = st.text_input("Must-have expérience", key="must_have_experience")
+        with col5:
+            must_have_competences = st.text_input("Must-have compétences", key="must_have_competences")
+        with col6:
+            nice_to_have = st.text_input("Nice-to-have", key="nice_to_have")
+
+        if st.button("Ajouter", key="add_avant_brief"):
+            # Ajouter la nouvelle ligne si tous les champs sont remplis
+            if all([raison_ouverture, mission_globale, taches_principales, 
+                    must_have_experience, must_have_competences, nice_to_have]):
+                
+                new_row = {
+                    "Raison d'ouverture": raison_ouverture,
+                    "Mission globale": mission_globale,
+                    "Tâches principales": taches_principales,
+                    "Must-have expérience": must_have_experience,
+                    "Must-have compétences": must_have_competences,
+                    "Nice-to-have": nice_to_have
+                }
+                
+                # Ajouter la ligne au DataFrame
+                st.session_state.avant_brief_data = pd.concat([
+                    st.session_state.avant_brief_data,
+                    pd.DataFrame([new_row])
+                ], ignore_index=True)
+                
+                st.success("✅ Critère ajouté avec succès")
+                st.rerun()
+
+    # -------------------- Suppression des lignes vides --------------------
+    # Supprimer uniquement les lignes vides (lignes dont toutes les colonnes sont vides)
+    st.session_state.avant_brief_data.dropna(how='all', inplace=True)
+
+    # Afficher le tableau des données
+    if not st.session_state.avant_brief_data.empty:
+        st.dataframe(
+            st.session_state.avant_brief_data,
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        st.info("Aucune donnée ajoutée. Ajoutez des informations pour commencer.")
+    
+    # Sauvegarde des données et annulation
+    col_save, col_cancel = st.columns([1, 1])
+    with col_save:
+        if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True, key="save_avant_brief"):
+            if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
+                brief_name = st.session_state.current_brief_name
+                
+                # Sauvegarder les données dans le brief
+                brief_data = {
+                    "raison_ouverture": st.session_state.get("raison_ouverture", ""),
+                    "mission_globale": st.session_state.get("mission_globale", ""),
+                    "taches_principales": st.session_state.get("taches_principales", ""),
+                    "must_have_experience": st.session_state.get("must_have_experience", ""),
+                    "must_have_competences": st.session_state.get("must_have_competences", ""),
+                    "nice_to_have": st.session_state.get("nice_to_have", ""),
+                    "avant_brief_data": st.session_state.avant_brief_data.to_dict()  # Sauver le tableau
+                }
+                
+                # Charger les briefs existants
+                existing_briefs = load_briefs()
+                if brief_name in existing_briefs:
+                    existing_briefs[brief_name].update(brief_data)
+                    st.session_state.saved_briefs = existing_briefs
+                else:
+                    st.session_state.saved_briefs[brief_name] = brief_data
+                
+                save_briefs()
+                st.session_state.avant_brief_completed = True
+                st.success("✅ Avant-brief sauvegardé avec succès")
+                st.rerun()
+            else:
+                st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
+
+    with col_cancel:
+        if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_avant_brief"):
+            delete_current_brief()
+
 
 # ---------------- RÉUNION (Wizard interne) ----------------
 with tabs[2]:
