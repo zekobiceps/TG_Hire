@@ -788,13 +788,6 @@ with tabs[1]:
     # Titre pour le tableau
     st.subheader("📋 Portrait robot candidat")
 
-    # Initialiser les données dans la session si elles n'existent pas
-    if "avant_brief_data" not in st.session_state:
-        st.session_state.avant_brief_data = pd.DataFrame(columns=[
-            "Raison d'ouverture", "Mission globale", "Tâches principales", 
-            "Must-have expérience", "Must-have compétences", "Nice-to-have"
-        ])
-
     # Formulaire pour ajouter une nouvelle ligne
     with st.expander("➕ Ajouter un critère"):
         col1, col2, col3, col4, col5, col6 = st.columns(6)
@@ -835,7 +828,8 @@ with tabs[1]:
                 st.success("✅ Critère ajouté avec succès")
                 st.rerun()
 
-    # Suppression des lignes vides (ou non utilisées) en bas du tableau
+    # -------------------- Suppression des lignes vides --------------------
+    # Supprimer uniquement les lignes vides (lignes dont toutes les colonnes sont vides)
     st.session_state.avant_brief_data.dropna(how='all', inplace=True)
 
     # Afficher le tableau des données
@@ -848,7 +842,7 @@ with tabs[1]:
     else:
         st.info("Aucune donnée ajoutée. Ajoutez des informations pour commencer.")
     
-    # Si un brief existe, on permet de sauvegarder ou annuler
+    # Sauvegarde des données et annulation
     col_save, col_cancel = st.columns([1, 1])
     with col_save:
         if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True, key="save_avant_brief"):
