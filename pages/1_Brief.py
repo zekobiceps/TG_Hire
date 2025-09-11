@@ -790,7 +790,7 @@ with tabs[1]:
     st.markdown(f"<h3>🔄 Avant-brief (Préparation)</h3>", unsafe_allow_html=True)
     st.subheader("📋 Portrait robot candidat")
 
-    # Ajouter le style CSS pour un tableau propre et moderne
+    # Ajouter le style CSS pour un tableau moderne et élégant
     st.markdown("""
     <style>
       /* Style général du tableau */
@@ -798,39 +798,43 @@ with tabs[1]:
         width: 100%;
         border-collapse: collapse;
         margin-bottom: 1rem;
+        font-family: 'Arial', sans-serif;
       }
+
+      /* Style des cellules */
       .custom-table th, .custom-table td {
-        padding: 12px;
+        padding: 12px 20px;
         text-align: left;
-        border: 1px solid #444; /* Bordure sombre */
-        color: #e6edf3; /* Texte clair */
+        border: 1px solid #333; /* Bordure plus subtile */
+        color: #D1D1D1; /* Texte clair mais doux */
       }
 
       /* En-tête */
       .custom-table th {
-        background-color: #FF4B4B; /* Rouge vif */
+        background-color: #4C6A92; /* Bleu calme */
         font-weight: bold;
+        color: #FFFFFF;
         text-transform: uppercase;
-        letter-spacing: 1px;
+        letter-spacing: 0.5px;
       }
 
       /* Lignes paires et impaires */
       .custom-table tr:nth-child(even) {
-        background-color: #2E3338; /* Fond légèrement plus clair */
+        background-color: #1C1F26; /* Fond sombre pour les lignes paires */
       }
       .custom-table tr:nth-child(odd) {
-        background-color: #1A1D21; /* Fond plus foncé */
-      }
-      
-      /* Effet au survol de la ligne */
-      .custom-table tr:hover {
-        background-color: #333; /* Fond sombre au survol */
+        background-color: #13161C; /* Fond légèrement plus clair pour les lignes impaires */
       }
 
-      /* Mise en forme des sections (en bleu) */
+      /* Effet au survol de la ligne */
+      .custom-table tr:hover {
+        background-color: #333; /* Fond plus clair lors du survol */
+      }
+
+      /* Mise en forme des sections */
       .ab-section {
         font-weight: 600;
-        color: #58a6ff;
+        color: #A6D0D9;
         margin-top: 0.5rem;
         font-size: 1rem;
       }
@@ -838,10 +842,9 @@ with tabs[1]:
       /* Mise en forme des lignes */
       .ab-row {
         padding: 6px 0;
-        border-bottom: 1px solid #444;
+        border-bottom: 1px solid #333;
       }
 
-      /* Colonne avec plus de contenu */
       .ab-detail {
         opacity: 0.9;
         font-size: 1rem;
@@ -861,7 +864,7 @@ with tabs[1]:
       /* Ajustements pour les petites tailles d'écran */
       @media (max-width: 768px) {
         .custom-table th, .custom-table td {
-          padding: 8px;
+          padding: 10px;
         }
 
         .custom-table th:nth-child(1), .custom-table td:nth-child(1) {
@@ -898,7 +901,7 @@ with tabs[1]:
             )
 
     # ---------- CONTENU ----------
-    # En-tête du tableau avec la première ligne rouge vif
+    # En-tête du tableau avec la première ligne bleu calme
     st.markdown("""
     <table class="custom-table">
       <thead>
