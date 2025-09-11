@@ -132,6 +132,30 @@ def delete_current_brief():
             st.session_state.brief_phase = "📁 Gestion"
             st.rerun()
 
+def sync_brief_data():
+    """Synchronise les données du brief entre les onglets"""
+    if "current_brief_name" in st.session_state and st.session_state.current_brief_name:
+        brief_name = st.session_state.current_brief_name
+        # Charger les briefs depuis le fichier pour avoir les données à jour
+        all_briefs = load_briefs()
+        if brief_name in all_briefs:
+            brief_data = all_briefs[brief_name]
+            
+            # Synchroniser les données dans session_state
+            for key, value in brief_data.items():
+                if key not in ["brief_type", "ksa_data", "ksa_matrix", "manager_comments", 
+                              "canaux_prioritaires", "criteres_exclusion", "processus_evaluation",
+                              "manager_notes"]:
+                    if key not in st.session_state or st.session_state[key] != value:
+                        st.session_state[key] = value
+            
+            # Synchroniser les liens de profils
+            if "profil_links" in brief_data and brief_data["profil_links"]:
+                if len(brief_data["profil_links"]) >= 3:
+                    st.session_state.profil_link_1 = brief_data["profil_links"][0]
+                    st.session_state.profil_link_2 = brief_data["profil_links"][1]
+                    st.session_state.profil_link_3 = brief_data["profil_links"][2]
+
 # ---------------- INIT ----------------
 init_session_state()
 st.set_page_config(
@@ -809,7 +833,7 @@ with tabs[1]:
         <tr>
             <td>Mission globale</td>
             <td>
-                <textarea class="table-textarea" placeholder="Résumé du rôle et objectiprincipal" 
+                <textarea class="table-textarea" placeholder="Résumé du rôle et objectif principal" 
                 onchange="updateSessionState('impact_strategique', this.value)">""" + st.session_state.get("impact_strategique", "") + """</textarea>
             </td>
         </tr>
@@ -958,7 +982,7 @@ with tabs[1]:
     col_save, col_reset = st.columns([1, 1])
     with col_save:
         if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True, key="save_avant_brief"):
-            if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
+            if "current_brief_name" in st.session_state and st.session_state.current_brief_name:
                 brief_name = st.session_state.current_brief_name
                 
                 # Sauvegarder les liens de profils
@@ -996,11 +1020,21 @@ with tabs[1]:
                     existing_briefs[brief_name].update(brief_data)
                     st.session_state.saved_briefs = existing_briefs
                 else:
-                    st.session_state.saved_briefs[brief_name] = brief_data
+                    # Si le brief n'existe pas encore, le créer
+                    st.session_state.saved_briefs[brief_name] = {
+                        "manager_nom": st.session_state.get("manager_nom", ""),
+                        "recruteur": st.session_state.get("recruteur", ""),
+                        "date_brief": str(st.session_state.get("date_brief", "")),
+                        "niveau_hierarchique": st.session_state.get("niveau_hierarchique", ""),
+                        "brief_type": st.session_state.get("gestion_brief_type", "Brief"),
+                        "affectation_type": st.session_state.get("affectation_type", ""),
+                        "affectation_nom": st.session_state.get("affectation_nom", ""),
+                        **brief_data
+                    }
                 
                 save_briefs()
                 st.session_state.avant_brief_completed = True
-                st.success("✅ Modifications sauvegardées")
+                st.success("✅ Modifications sauvegardées avec succès!")
                 st.rerun()
             else:
                 st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
@@ -1012,6 +1046,10 @@ with tabs[1]:
 
 # ---------------- RÉUNION (Wizard interne) ----------------
 with tabs[2]:
+    # Synchroniser les données d'abord
+    if "current_brief_name" in st.session_state and st.session_state.current_brief_name:
+        sync_brief_data()
+    
     # Vérification si l'onglet est accessible
     if not can_access_reunion:
         st.warning("⚠️ Veuillez d'abord compléter et sauvegarder l'onglet Avant-brief")
@@ -1039,109 +1077,109 @@ with tabs[2]:
             <tr>
                 <td rowspan="3" class="section-title">Contexte du poste</td>
                 <td>Raison de l'ouverture</td>
-                <td class="table-text">""" + st.session_state.get("raison_ouverture", "Non renseigné") + """</td>
+                <td class="table-text">""" + (st.session_state.get("raison_ouverture") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_1"></textarea></td>
             </tr>
             <tr>
                 <td>Mission globale</td>
-                <td class="table-text">""" + st.session_state.get("impact_strategique", "Non renseigné") + """</td>
+                <td class="table-text">""" + (st.session_state.get("impact_strategique") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_2"></textarea></td>
             </tr>
             <tr>
                 <td>Tâches principales</td>
-                <td class="table-text">""" + st.session_state.get("taches_principales", "Non renseigné") + """</td>
+                <td class="table-text">""" + (st.session_state.get("taches_principales") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_3"></textarea></td>
             </tr>
             <tr>
                 <td rowspan="4" class="section-title">Must-have (Indispensables)</td>
                 <td>Expérience</td>
-                <td class="table-text">""" + st.session_state.get("must_have_experience", "Non renseigné") + """</td>
+                <td class="table-text">""" + (st.session_state.get("must_have_experience") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_4"></textarea></td>
             </tr>
             <tr>
                 <td>Connaissances / Diplômes / Certifications</td>
-                <td class="table-text">""" + st.session_state.get("must_have_diplomes", "Non renseigné") + """</td>
+                <td class="table-text">""" + (st.session_state.get("must_have_diplomes") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_5"></textarea></td>
             </tr>
             <tr>
                 <td>Compétences / Outils</td>
-                <td class="table-text">""" + st.session_state.get("must_have_competences", "Non renseigné") + """</td>
+                <td class="table-text">""" + (st.session_state.get("must_have_competences") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_6"></textarea></td>
             </tr>
             <tr>
                 <td>Soft skills / aptitudes comportementales</td>
-                <td class="table-text">""" + st.session_state.get("must_have_softskills", "Non renseigné") + """</td>
+                <td class="table-text">""" + (st.session_state.get("must_have_softskills") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_7"></textarea></td>
             </tr>
             <tr>
                 <td rowspan="3" class="section-title">Nice-to-have (Atouts)</td>
                 <td>Expérience additionnelle</td>
-                <td class="table-text">""" + st.session_state.get("nice_to_have_experience", "Non renseigné") + """</td>
+                <td class="table-text">""" + (st.session_state.get("nice_to_have_experience") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_8"></textarea></td>
             </tr>
             <tr>
                 <td>Diplômes / Certifications valorisantes</td>
-                <td class="table-text">""" + st.session_state.get("nice_to_have_diplomes", "Non renseigné") + """</td>
+                <td class="table-text">""" + (st.session_state.get("nice_to_have_diplomes") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_9"></textarea></td>
             </tr>
             <tr>
                 <td>Compétences complémentaires</td>
-                <td class="table-text">""" + st.session_state.get("nice_to_have_competences", "Non renseigné") + """</td>
+                <td class="table-text">""" + (st.session_state.get("nice_to_have_competences") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_10"></textarea></td>
             </tr>
             <tr>
                 <td rowspan="3" class="section-title">Sourcing et marché</td>
                 <td>Entreprises où trouver ce profil</td>
-                <td class="table-text">""" + st.session_state.get("entreprises_profil", "Non renseigné") + """</td>
+                <td class="table-text">""" + (st.session_state.get("entreprises_profil") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_11"></textarea></td>
             </tr>
             <tr>
                 <td>Synonymes / intitulés proches</td>
-                <td class="table-text">""" + st.session_state.get("synonymes_poste", "Non renseigné") + """</td>
+                <td class="table-text">""" + (st.session_state.get("synonymes_poste") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_12"></textarea></td>
             </tr>
             <tr>
                 <td>Canaux à utiliser</td>
-                <td class="table-text">""" + st.session_state.get("canaux_profil", "Non renseigné") + """</td>
+                <td class="table-text">""" + (st.session_state.get("canaux_profil") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_13"></textarea></td>
             </tr>
             <tr>
                 <td rowspan="2" class="section-title">Conditions et contraintes</td>
                 <td>Localisation</td>
-                <td class="table-text">""" + st.session_state.get("rattachement", "Non renseigné") + """</td>
+                <td class="table-text">""" + (st.session_state.get("rattachement") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_14"></textarea></td>
             </tr>
             <tr>
                 <td>Budget recrutement</td>
-                <td class="table-text">""" + st.session_state.get("budget", "Non renseigné") + """</td>
+                <td class="table-text">""" + (st.session_state.get("budget") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_15"></textarea></td>
             </tr>
             <tr>
                 <td rowspan="3" class="section-title">Profils pertinents</td>
                 <td>Lien profil 1</td>
-                <td class="table-text">""" + (st.session_state.get("profil_links", ["", "", ""])[0] if st.session_state.get("profil_links") else "") + """</td>
+                <td class="table-text">""" + (st.session_state.get("profil_link_1") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_16"></textarea></td>
             </tr>
             <tr>
                 <td>Lien profil 2</td>
-                <td class="table-text">""" + (st.session_state.get("profil_links", ["", "", ""])[1] if st.session_state.get("profil_links") else "") + """</td>
+                <td class="table-text">""" + (st.session_state.get("profil_link_2") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_17"></textarea></td>
             </tr>
             <tr>
                 <td>Lien profil 3</td>
-                <td class="table-text">""" + (st.session_state.get("profil_links", ["", "", ""])[2] if st.session_state.get("profil_links") else "") + """</td>
+                <td class="table-text">""" + (st.session_state.get("profil_link_3") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_18"></textarea></td>
             </tr>
             <!-- Notes libres - seulement 2 lignes -->
             <tr>
                 <td rowspan="2" class="section-title">Notes libres</td>
                 <td>Points à discuter ou à clarifier avec le manager</td>
-                <td class="table-text">""" + st.session_state.get("commentaires", "Non renseigné") + """</td>
+                <td class="table-text">""" + (st.session_state.get("commentaires") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_19"></textarea></td>
             </tr>
             <tr>
                 <td>Case libre</td>
-                <td class="table-text">""" + st.session_state.get("notes_libres", "Non renseigné") + """</td>
+                <td class="table-text">""" + (st.session_state.get("notes_libres") or "Non renseigné") + """</td>
                 <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_20"></textarea></td>
             </tr>
         </table>
@@ -1247,7 +1285,7 @@ with tabs[3]:
     st.json({
         "Poste": st.session_state.get("niveau_hierarchique", ""),
         "Manager": st.session_state.get("manager_nom", ""),
-        "Recruteur": st.session_state.get("recruteur", ""),  # CORRECTION ICI: virgule mal placée
+        "Recruteur": st.session_state.get("recruteur", ""),
         "Type": st.session_state.get("brief_type", ""),
         "Affectation": f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}",
         "Date": str(st.session_state.get("date_brief", "")),
