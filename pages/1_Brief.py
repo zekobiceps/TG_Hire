@@ -780,7 +780,6 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 """, unsafe_allow_html=True)
 
-
 # ---------------- ONGLET AVANT-BRIEF (SANS BINDERS NI JS) ----------------
 with tabs[1]:
     # Vérification si un brief est chargé
@@ -819,15 +818,34 @@ with tabs[1]:
       .custom-table tr:hover {
         background-color: #333;
       }
-      .ab-section{font-weight:600;color:#58a6ff;margin-top:0.25rem}
-      .ab-row{padding:6px 0;border-bottom:1px solid #424242}
-      .ab-detail{opacity:0.9}
+      .ab-section {
+        font-weight: 600;
+        color: #58a6ff;
+        margin-top: 0.25rem;
+      }
+      .ab-row {
+        padding: 6px 0;
+        border-bottom: 1px solid #424242;
+      }
+      .ab-detail {
+        opacity: 0.9;
+      }
+      /* Fixer la taille des colonnes */
+      .custom-table th:nth-child(1), .custom-table td:nth-child(1) {
+        width: 15%; /* Section */
+      }
+      .custom-table th:nth-child(2), .custom-table td:nth-child(2) {
+        width: 25%; /* Détails */
+      }
+      .custom-table th:nth-child(3), .custom-table td:nth-child(3) {
+        width: 60%; /* Informations */
+      }
     </style>
     """, unsafe_allow_html=True)
 
     # Utilitaires d'affichage d'une "ligne" type tableau (3 colonnes)
     def ab_row(section_label, detail_label, key, placeholder="", show_section=False, height=100):
-        c1, c2, c3 = st.columns([1.5, 2, 6.5])
+        c1, c2, c3 = st.columns([1.5, 2, 6.5])  # Ajustement des colonnes
         with c1:
             if show_section:
                 st.markdown(f"<div class='ab-section'>{section_label}</div>", unsafe_allow_html=True)
