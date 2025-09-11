@@ -1027,12 +1027,13 @@ with tabs[1]:
                 
                 # Charger les briefs existants depuis le fichier
                 existing_briefs = load_briefs()
+                
+                # Créer ou mettre à jour le brief
                 if brief_name in existing_briefs:
                     existing_briefs[brief_name].update(brief_data)
-                    st.session_state.saved_briefs = existing_briefs
                 else:
-                    # Si le brief n'existe pas encore, le créer
-                    st.session_state.saved_briefs[brief_name] = {
+                    # Ajouter les informations de base si le brief n'existe pas encore
+                    existing_briefs[brief_name] = {
                         "manager_nom": st.session_state.get("manager_nom", ""),
                         "recruteur": st.session_state.get("recruteur", ""),
                         "date_brief": str(st.session_state.get("date_brief", "")),
@@ -1043,6 +1044,8 @@ with tabs[1]:
                         **brief_data
                     }
                 
+                # Sauvegarder les briefs
+                st.session_state.saved_briefs = existing_briefs
                 save_briefs()
                 st.session_state.avant_brief_completed = True
                 st.success("✅ Modifications sauvegardées avec succès!")
@@ -1054,12 +1057,10 @@ with tabs[1]:
         if st.button("🗑️ Réinitialiser le Brief", type="secondary", use_container_width=True, key="reset_avant_brief"):
             delete_current_brief()
 
-
 # ---------------- RÉUNION (Wizard interne) ----------------
 with tabs[2]:
     # Synchroniser les données d'abord
-    if "current_brief_name" in st.session_state and st.session_state.current_brief_name:
-        sync_brief_data()
+    sync_brief_data()
     
     # Vérification si l'onglet est accessible
     if not can_access_reunion:
@@ -1221,7 +1222,7 @@ with tabs[2]:
         col_save, col_cancel = st.columns([1, 1])
         with col_save:
             if st.button("💾 Enregistrer réunion", type="primary", use_container_width=True, key="save_reunion"):
-                if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
+                if "current_brief_name" in st.session_state and st.session_state.current_brief_name:
                     brief_name = st.session_state.current_brief_name
                     
                     # Récupérer tous les commentaires du manager
@@ -1245,7 +1246,33 @@ with tabs[2]:
                         })
                         st.session_state.saved_briefs = existing_briefs
                     else:
-                        st.session_state.saved_briefs[brief_name].update({
+                        # Créer le brief s'il n'existe pas
+                        st.session_state.saved_briefs[brief_name] = {
+                            "manager_nom": st.session_state.get("manager_nom", ""),
+                            "recruteur": st.session_state.get("recruteur", ""),
+                            "date_brief": str(st.session_state.get("date_brief", "")),
+                            "niveau_hierarchique": st.session_state.get("niveau_hierarchique", ""),
+                            "brief_type": st.session_state.get("gestion_brief_type", "Brief"),
+                            "affectation_type": st.session_state.get("affectation_type", ""),
+                            "affectation_nom": st.session_state.get("affectation_nom", ""),
+                            "raison_ouverture": st.session_state.get("raison_ouverture", ""),
+                            "impact_strategique": st.session_state.get("impact_strategique", ""),
+                            "taches_principales": st.session_state.get("taches_principales", ""),
+                            "must_have_experience": st.session_state.get("must_have_experience", ""),
+                            "must_have_diplomes": st.session_state.get("must_have_diplomes", ""),
+                            "must_have_competences": st.session_state.get("must_have_competences", ""),
+                            "must_have_softskills": st.session_state.get("must_have_softskills", ""),
+                            "nice_to_have_experience": st.session_state.get("nice_to_have_experience", ""),
+                            "nice_to_have_diplomes": st.session_state.get("nice_to_have_diplomes", ""),
+                            "nice_to_have_competences": st.session_state.get("nice_to_have_competences", ""),
+                            "entreprises_profil": st.session_state.get("entreprises_profil", ""),
+                            "synonymes_poste": st.session_state.get("synonymes_poste", ""),
+                            "canaux_profil": st.session_state.get("canaux_profil", ""),
+                            "rattachement": st.session_state.get("rattachement", ""),
+                            "budget": st.session_state.get("budget", ""),
+                            "commentaires": st.session_state.get("commentaires", ""),
+                            "notes_libres": st.session_state.get("notes_libres", ""),
+                            "profil_links": st.session_state.get("profil_links", ["", "", ""]),
                             "ksa_data": st.session_state.get("ksa_data", {}),
                             "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict(),
                             "manager_notes": st.session_state.get("manager_notes", ""),
@@ -1253,11 +1280,11 @@ with tabs[2]:
                             "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
                             "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
                             "processus_evaluation": st.session_state.get("processus_evaluation", "")
-                        })
+                        }
                     
                     save_briefs()
                     st.session_state.reunion_completed = True
-                    st.success("✅ Données de réunion sauvegardées")
+                    st.success("✅ Données de réunion sauvegardées avec succès!")
                     st.rerun()
                 else:
                     st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
