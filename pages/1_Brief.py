@@ -441,6 +441,11 @@ st.markdown("""
         border: 1px solid #ffffff;
     }
     
+    .stDataFrame th {
+        background-color: #FF4B4B !important; /* Redondance pour renforcer */
+        style="background-color: #FF4B4B !important;" /* Inline fallback */
+    }
+    
     .stDataFrame td {
         padding: 12px 16px;
         text-align: left;
@@ -910,17 +915,16 @@ with tabs[1]:
         },
     ]
 
-    # Construire le DataFrame avec fusion des sections
+    # Construire le DataFrame avec fusion des sections (Contexte sur 3 lignes)
     data = []
     field_keys = []
     for section in sections:
-        # Ajouter la section avec rowspan implicite (répétée pour chaque ligne de la section)
         section_rows = len(section["fields"])
         for i, (field_name, field_key, placeholder) in enumerate(section["fields"]):
-            if i == 0:
-                data.append([section["title"], field_name, st.session_state.get(field_key, "")])
+            if section["title"] == "Contexte du poste" and i >= 0 and i < 3:  # Merge "Contexte du poste" for rows 2-3-4
+                data.append(["Contexte du poste" if i == 0 else "", field_name, st.session_state.get(field_key, placeholder)])
             else:
-                data.append([section["title"], field_name, st.session_state.get(field_key, "")])
+                data.append([section["title"] if i == 0 else "", field_name, st.session_state.get(field_key, placeholder)])
             field_keys.append(field_key)
 
     df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
@@ -931,7 +935,7 @@ with tabs[1]:
         column_config={
             "Section": st.column_config.TextColumn("Section", disabled=True),
             "Détails": st.column_config.TextColumn("Détails", disabled=True),
-            "Informations": st.column_config.TextColumn("Informations", width="large")
+            "Informations": st.column_config.TextColumn("Informations", width="large", default=edited_df["Informations"])
         },
         use_container_width=True,
         hide_index=True,
@@ -1082,7 +1086,10 @@ with tabs[2]:
         for section in sections:
             section_rows = len(section["fields"])
             for i, (field_name, field_key, placeholder) in enumerate(section["fields"]):
-                data.append([section["title"] if i == 0 else "", field_name, st.session_state.get(field_key, ""), ""])
+                if section["title"] == "Contexte du poste" and i >= 0 and i < 3:  # Merge "Contexte du poste" for rows 2-3-4
+                    data.append(["Contexte du poste" if i == 0 else "", field_name, st.session_state.get(field_key, placeholder), ""])
+                else:
+                    data.append([section["title"] if i == 0 else "", field_name, st.session_state.get(field_key, placeholder), ""])
                 field_keys.append(field_key)
                 comment_keys.append(f"manager_comment_{k}")
                 k += 1
@@ -1095,7 +1102,7 @@ with tabs[2]:
             column_config={
                 "Section": st.column_config.TextColumn("Section", disabled=True),
                 "Détails": st.column_config.TextColumn("Détails", disabled=True),
-                "Informations": st.column_config.TextColumn("Informations", width="medium", disabled=True),
+                "Informations": st.column_config.TextColumn("Informations", width="medium", default=edited_df["Informations"]),
                 "Commentaires du manager": st.column_config.TextColumn("Commentaires du manager", width="medium")
             },
             use_container_width=True,
