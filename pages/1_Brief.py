@@ -783,257 +783,108 @@ with tabs[1]:
         st.stop()  # Arrête le rendu de cet onglet
     
     # Afficher les informations du brief en cours avec Manager/Recruteur à gauche
-    st.markdown(f"<h3>🔄 Avant-brief (Préparation)</h3>", 
-                unsafe_allow_html=True)
+    st.markdown(f"<h3>🔄 Avant-brief (Préparation)</h3>", unsafe_allow_html=True)
 
     # Titre pour le tableau
     st.subheader("📋 Portrait robot candidat")
 
-    # Nouveau tableau avec style sombre et bordures blanches
-    st.markdown("""
-    <table class="dark-table">
-        <tr>
-            <th>Section</th>
-            <th>Détails</th>
-            <th>Informations</th>
-        </tr>
-        <!-- Contexte du poste -->
-        <tr>
-            <td rowspan="3" class="section-title">Contexte du poste</td>
-            <td>Raison de l'ouverture</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Remplacement / Création / Évolution interne" 
-                onchange="updateSessionState('raison_ouverture', this.value)">""" + st.session_state.get("raison_ouverture", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Mission globale</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Résumé du rôle et objectif principal" 
-                onchange="updateSessionState('impact_strategique', this.value)">""" + st.session_state.get("impact_strategique", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Tâches principales</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget" 
-                onchange="updateSessionState('taches_principales', this.value)">""" + st.session_state.get("taches_principales", "") + """</textarea>
-            </td>
-        </tr>
-        <!-- Must-have (Indispensables) -->
-        <tr>
-            <td rowspan="4" class="section-title">Must-have (Indispensables)</td>
-            <td>Expérience</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Nombre d'années minimum, expériences similaires dans le secteur" 
-                onchange="updateSessionState('must_have_experience', this.value)">""" + st.session_state.get("must_have_experience", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Connaissances / Diplômes / Certifications</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Diplômes exigés, certifications spécifiques" 
-                onchange="updateSessionState('must_have_diplomes', this.value)">""" + st.session_state.get("must_have_diplomes", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Compétences / Outils</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Techniques, logiciels, méthodes à maîtriser" 
-                onchange="updateSessionState('must_have_competences', this.value)">""" + st.session_state.get("must_have_competences", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Soft skills / aptitudes comportementales</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Leadership, rigueur, communication, autonomie" 
-                onchange="updateSessionState('must_have_softskills', this.value)">""" + st.session_state.get("must_have_softskills", "") + """</textarea>
-            </td>
-        </tr>
-        <!-- Nice-to-have (Atouts) -->
-        <tr>
-            <td rowspan="3" class="section-title">Nice-to-have (Atouts)</td>
-            <td>Expérience additionnelle</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Ex. projets internationaux, multi-sites" 
-                onchange="updateSessionState('nice_to_have_experience', this.value)">""" + st.session_state.get("nice_to_have_experience", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Diplômes / Certifications valorisantes</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Diplômes ou certifications supplémentaires appréciés" 
-                onchange="updateSessionState('nice_to_have_diplomes', this.value)">""" + st.session_state.get("nice_to_have_diplomes", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Compétences complémentaires</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Compétences supplémentaires non essentielles mais appréciées" 
-                onchange="updateSessionState('nice_to_have_competences', this.value)">""" + st.session_state.get("nice_to_have_competences", "") + """</textarea>
-            </td>
-        </tr>
-        <!-- Sourcing et marché -->
-        <tr>
-            <td rowspan="3" class="section-title">Sourcing et marché</td>
-            <td>Entreprises où trouver ce profil</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Concurrents, secteurs similaires" 
-                onchange="updateSessionState('entreprises_profil', this.value)">""" + st.session_state.get("entreprises_profil", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Synonymes / intitulés proches</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Titres alternatifs pour affiner le sourcing" 
-                onchange="updateSessionState('synonymes_poste', this.value)">""" + st.session_state.get("synonymes_poste", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Canaux à utiliser</td>
-            <td>
-                <textarea class="table-textarea" placeholder="LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels" 
-                onchange="updateSessionState('canaux_profil', this.value)">""" + st.session_state.get("canaux_profil", "") + """</textarea>
-            </td>
-        </tr>
-        <!-- Conditions et contraintes -->
-        <tr>
-            <td rowspan="2" class="section-title">Conditions et contraintes</td>
-            <td>Localisation</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Site principal, télétravail, déplacements" 
-                onchange="updateSessionState('rattachement', this.value)">""" + st.session_state.get("rattachement", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Budget recrutement</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Salaire indicatif, avantages, primes éventuelles" 
-                onchange="updateSessionState('budget', this.value)">""" + st.session_state.get("budget", "") + """</textarea>
-            </td>
-        </tr>
-        <!-- Profils pertinents -->
-        <tr>
-            <td rowspan="3" class="section-title">Profils pertinents</td>
-            <td>Lien profil 1</td>
-            <td>
-                <textarea class="table-textarea" placeholder="URL du profil LinkedIn ou autre" 
-                onchange="updateSessionState('profil_link_1', this.value)">""" + (st.session_state.get("profil_links", ["", "", ""])[0] if st.session_state.get("profil_links") else "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Lien profil 2</td>
-            <td>
-                <textarea class="table-textarea" placeholder="URL du profil LinkedIn ou autre" 
-                onchange="updateSessionState('profil_link_2', this.value)">""" + (st.session_state.get("profil_links", ["", "", ""])[1] if st.session_state.get("profil_links") else "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Lien profil 3</td>
-            <td>
-                <textarea class="table-textarea" placeholder="URL du profil LinkedIn ou autre" 
-                onchange="updateSessionState('profil_link_3', this.value)">""" + (st.session_state.get("profil_links", ["", "", ""])[2] if st.session_state.get("profil_links") else "") + """</textarea>
-            </td>
-        </tr>
-        <!-- Notes libres - seulement 2 lignes -->
-        <tr>
-            <td rowspan="2" class="section-title">Notes libres</td>
-            <td>Points à discuter ou à clarifier avec le manager</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Points à discuter ou à clarifier" 
-                onchange="updateSessionState('commentaires', this.value)">""" + st.session_state.get("commentaires", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Case libre</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Pour tout point additionnel ou remarque spécifique" 
-                onchange="updateSessionState('notes_libres', this.value)">""" + st.session_state.get("notes_libres", "") + """</textarea>
-            </td>
-        </tr>
-    </table>
+    # Initialiser les données dans la session si elles n'existent pas
+    if "avant_brief_data" not in st.session_state:
+        st.session_state.avant_brief_data = pd.DataFrame(columns=[
+            "Raison d'ouverture", "Mission globale", "Tâches principales", 
+            "Must-have expérience", "Must-have compétences", "Nice-to-have"
+        ])
+
+    # Formulaire pour ajouter une nouvelle ligne
+    with st.expander("➕ Ajouter un critère"):
+        col1, col2, col3, col4, col5, col6 = st.columns(6)
+
+        with col1:
+            raison_ouverture = st.text_input("Raison d'ouverture", key="raison_ouverture")
+        with col2:
+            mission_globale = st.text_input("Mission globale", key="mission_globale")
+        with col3:
+            taches_principales = st.text_input("Tâches principales", key="taches_principales")
+        with col4:
+            must_have_experience = st.text_input("Must-have expérience", key="must_have_experience")
+        with col5:
+            must_have_competences = st.text_input("Must-have compétences", key="must_have_competences")
+        with col6:
+            nice_to_have = st.text_input("Nice-to-have", key="nice_to_have")
+
+        if st.button("Ajouter", key="add_avant_brief"):
+            # Ajouter la nouvelle ligne si tous les champs sont remplis
+            if all([raison_ouverture, mission_globale, taches_principales, 
+                    must_have_experience, must_have_competences, nice_to_have]):
+                
+                new_row = {
+                    "Raison d'ouverture": raison_ouverture,
+                    "Mission globale": mission_globale,
+                    "Tâches principales": taches_principales,
+                    "Must-have expérience": must_have_experience,
+                    "Must-have compétences": must_have_competences,
+                    "Nice-to-have": nice_to_have
+                }
+                
+                # Ajouter la ligne au DataFrame
+                st.session_state.avant_brief_data = pd.concat([
+                    st.session_state.avant_brief_data,
+                    pd.DataFrame([new_row])
+                ], ignore_index=True)
+                
+                st.success("✅ Critère ajouté avec succès")
+                st.rerun()
+
+    # Suppression des lignes vides (ou non utilisées) en bas du tableau
+    st.session_state.avant_brief_data.dropna(how='all', inplace=True)
+
+    # Afficher le tableau des données
+    if not st.session_state.avant_brief_data.empty:
+        st.dataframe(
+            st.session_state.avant_brief_data,
+            use_container_width=True,
+            hide_index=True
+        )
+    else:
+        st.info("Aucune donnée ajoutée. Ajoutez des informations pour commencer.")
     
-    <script>
-    function updateSessionState(key, value) {
-        // Cette fonction envoie la valeur au backend Streamlit
-        // Note: Cette approche nécessite un composant Streamlit personnalisé pour fonctionner complètement
-        // Pour l'instant, on utilise une solution temporaire avec des widgets cachés
-        const hiddenInput = document.getElementById('hidden_' + key);
-        if (hiddenInput) {
-            hiddenInput.value = value;
-        }
-    }
-    </script>
-    """, unsafe_allow_html=True)
-    
-    # Créer des champs cachés pour chaque entrée du tableau
-    # Ces champs permettront à Streamlit de capturer les valeurs
-    hidden_fields = [
-        "raison_ouverture", "impact_strategique", "taches_principales",
-        "must_have_experience", "must_have_diplomes", "must_have_competences", "must_have_softskills",
-        "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences",
-        "entreprises_profil", "synonymes_poste", "canaux_profil",
-        "rattachement", "budget", "commentaires", "notes_libres",
-        "profil_link_1", "profil_link_2", "profil_link_3"
-    ]
-    
-    for field in hidden_fields:
-        st.text_input("", key=field, label_visibility="collapsed", value=st.session_state.get(field, ""))
-    
-    # Boutons Sauvegarder et Annuler
+    # Si un brief existe, on permet de sauvegarder ou annuler
     col_save, col_cancel = st.columns([1, 1])
     with col_save:
         if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True, key="save_avant_brief"):
             if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
                 brief_name = st.session_state.current_brief_name
                 
-                # Sauvegarder les liens de profils
-                st.session_state.profil_links = [
-                    st.session_state.get("profil_link_1", ""),
-                    st.session_state.get("profil_link_2", ""),
-                    st.session_state.get("profil_link_3", "")
-                ]
-                
-                # Mettre à jour le brief avec les données
+                # Sauvegarder les données dans le brief
                 brief_data = {
-                    "profil_links": st.session_state.profil_links,
                     "raison_ouverture": st.session_state.get("raison_ouverture", ""),
-                    "impact_strategique": st.session_state.get("impact_strategique", ""),
+                    "mission_globale": st.session_state.get("mission_globale", ""),
                     "taches_principales": st.session_state.get("taches_principales", ""),
                     "must_have_experience": st.session_state.get("must_have_experience", ""),
-                    "must_have_diplomes": st.session_state.get("must_have_diplomes", ""),
                     "must_have_competences": st.session_state.get("must_have_competences", ""),
-                    "must_have_softskills": st.session_state.get("must_have_softskills", ""),
-                    "nice_to_have_experience": st.session_state.get("nice_to_have_experience", ""),
-                    "nice_to_have_diplomes": st.session_state.get("nice_to_have_diplomes", ""),
-                    "nice_to_have_competences": st.session_state.get("nice_to_have_competences", ""),
-                    "entreprises_profil": st.session_state.get("entreprises_profil", ""),
-                    "synonymes_poste": st.session_state.get("synonymes_poste", ""),
-                    "canaux_profil": st.session_state.get("canaux_profil", ""),
-                    "rattachement": st.session_state.get("rattachement", ""),
-                    "budget": st.session_state.get("budget", ""),
-                    "commentaires": st.session_state.get("commentaires", ""),
-                    "notes_libres": st.session_state.get("notes_libres", "")
+                    "nice_to_have": st.session_state.get("nice_to_have", ""),
+                    "avant_brief_data": st.session_state.avant_brief_data.to_dict()  # Sauver le tableau
                 }
                 
-                # Charger les briefs existants depuis le fichier
+                # Charger les briefs existants
                 existing_briefs = load_briefs()
                 if brief_name in existing_briefs:
                     existing_briefs[brief_name].update(brief_data)
                     st.session_state.saved_briefs = existing_briefs
                 else:
-                    st.session_state.saved_briefs[brief_name].update(brief_data)
+                    st.session_state.saved_briefs[brief_name] = brief_data
                 
                 save_briefs()
                 st.session_state.avant_brief_completed = True
-                st.success("✅ Modifications sauvegardées")
+                st.success("✅ Avant-brief sauvegardé avec succès")
                 st.rerun()
             else:
                 st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
-    
+
     with col_cancel:
         if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_avant_brief"):
             delete_current_brief()
+
 
 # ---------------- RÉUNION (Wizard interne) ----------------
 with tabs[2]:
