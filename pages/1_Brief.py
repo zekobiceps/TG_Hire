@@ -848,7 +848,7 @@ with tabs[1]:
         },
     ]
 
-    # Afficher le tableau avec Streamlit
+    # Afficher le tableau avec une structure corrigée
     st.markdown('<table class="dark-table">', unsafe_allow_html=True)
     st.markdown('<tr><th>Section</th><th>Détails</th><th>Informations</th></tr>', unsafe_allow_html=True)
 
@@ -856,18 +856,21 @@ with tabs[1]:
         section_title = section["title"]
         fields = section["fields"]
         for i, (field_name, field_key, placeholder) in enumerate(fields):
-            row_span = len(fields) if i == 0 else None
+            row_span = len(fields) if i == 0 else 1
             section_html = f'<td rowspan="{row_span}" class="section-title">{section_title}</td>' if i == 0 else ""
-            st.markdown(
-                f"""
-                <tr>
-                    {section_html}
-                    <td>{field_name}</td>
-                    <td><div class="table-textarea">{st.text_area("", key=field_key, placeholder=placeholder, height=60, value=st.session_state.get(field_key, ""))}</div></td>
-                </tr>
-                """,
-                unsafe_allow_html=True
-            )
+            # Utiliser un conteneur temporaire pour capturer la sortie du text_area
+            with st.container():
+                text_area_value = st.text_area("", key=field_key, placeholder=placeholder, height=60, value=st.session_state.get(field_key, ""))
+                st.markdown(
+                    f"""
+                    <tr>
+                        {section_html}
+                        <td>{field_name}</td>
+                        <td><div class="table-textarea" style="min-height: 60px;">{text_area_value}</div></td>
+                    </tr>
+                    """,
+                    unsafe_allow_html=True
+                )
 
     st.markdown('</table>', unsafe_allow_html=True)
 
