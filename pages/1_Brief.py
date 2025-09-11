@@ -1,10 +1,14 @@
-```python
-import sys, os
+apporte cette solution au code en bas et donne moi le code complet à jour : 
+1. JavaScript non fonctionnel avec Streamlit
+Le code JavaScript avec onchange="updateSessionState()" dans le tableau HTML ne fonctionne pas avec Streamlit. Streamlit ne permet pas d'exécuter du JavaScript personnalisé pour modifier directement session_state.
+2. Synchronisation des données manquante
+La fonction sync_brief_data() n'est appelée qu'au début de l'onglet réunion, mais pas après la sauvegarde de l'avant-brief.Code corrigé - Onglet Avant-brief fonctionnelCode # Remplacez la section "ONGLET AVANT-BRIEF".
+
+Code :import sys, os 
 import streamlit as st
 from datetime import datetime
 import json
 import pandas as pd
-import html  # For escaping HTML characters
 
 # ✅ permet d'accéder à utils.py à la racine
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -420,7 +424,7 @@ st.markdown("""
     }
     
     .dark-table.four-columns th:nth-child(3),
-    .dark-table td:nth-child(3) {
+    .dark-table.four-columns td:nth-child(3) {
         width: 40%; /* Réduit pour faire de la place à la colonne notes */
     }
     
@@ -502,69 +506,9 @@ can_access_synthese = can_access_reunion and st.session_state.reunion_completed
 
 # ---------------- ONGLET GESTION ----------------
 with tabs[0]:
-    st.subheader("📁 Gestion des Briefs")
-    
-    # Formulaire pour créer un nouveau brief
-    with st.expander("➕ Créer un nouveau brief"):
-        col1, col2 = st.columns(2)
-        with col1:
-            st.text_input("Nom du manager", key="manager_nom")
-            st.text_input("Niveau hiérarchique", key="niveau_hierarchique")
-            st.selectbox("Type d'affectation", ["CDI", "CDD", "Freelance", "Stage"], key="affectation_type")
-        with col2:
-            st.text_input("Nom du recruteur", key="recruteur")
-            st.text_input("Nom de l'affectation", key="affectation_nom")
-            st.date_input("Date du brief", key="date_brief")
-        
-        if st.button("Créer", key="create_brief"):
-            if st.session_state.manager_nom and st.session_state.niveau_hierarchique:
-                brief_name = generate_automatic_brief_name()
-                st.session_state.current_brief_name = brief_name
-                st.session_state.saved_briefs[brief_name] = {
-                    "manager_nom": st.session_state.manager_nom,
-                    "recruteur": st.session_state.recruteur,
-                    "date_brief": str(st.session_state.date_brief),
-                    "niveau_hierarchique": st.session_state.niveau_hierarchique,
-                    "brief_type": "Brief",
-                    "affectation_type": st.session_state.affectation_type,
-                    "affectation_nom": st.session_state.affectation_nom
-                }
-                save_briefs()
-                st.success(f"✅ Brief '{brief_name}' créé avec succès")
-                st.rerun()
-            else:
-                st.error("❌ Veuillez remplir tous les champs obligatoires")
+    # ... (le code de l'onglet Gestion reste inchangé) ...
 
-    # Afficher les briefs existants
-    st.subheader("📋 Briefs existants")
-    filter_text = st.text_input("Filtrer les briefs", key="filter_briefs")
-    if filter_text:
-        st.session_state.filtered_briefs = filter_briefs(filter_text)
-    else:
-        st.session_state.filtered_briefs = st.session_state.saved_briefs
-
-    if st.session_state.filtered_briefs:
-        for brief_name, brief_data in st.session_state.filtered_briefs.items():
-            with st.expander(f"Brief: {brief_name}"):
-                st.write(f"Manager: {brief_data.get('manager_nom', 'N/A')}")
-                st.write(f"Niveau: {brief_data.get('niveau_hierarchique', 'N/A')}")
-                st.write(f"Date: {brief_data.get('date_brief', 'N/A')}")
-                if st.button("Charger", key=f"load_{brief_name}"):
-                    st.session_state.current_brief_name = brief_name
-                    sync_brief_data()
-                    st.rerun()
-                if st.button("Supprimer", key=f"delete_{brief_name}", type="secondary"):
-                    del st.session_state.saved_briefs[brief_name]
-                    save_briefs()
-                    if st.session_state.current_brief_name == brief_name:
-                        st.session_state.current_brief_name = ""
-                        st.session_state.avant_brief_completed = False
-                        st.session_state.reunion_completed = False
-                    st.rerun()
-    else:
-        st.info("Aucun brief trouvé.")
-
-# ---------------- ONGLET AVANT-BRIEF ----------------
+# ---------------- ONGLET AVANT-BRIEF CORRIGÉ ----------------
 with tabs[1]:
     # Vérification si un brief est chargé
     if not can_access_avant_brief:
@@ -584,24 +528,21 @@ with tabs[1]:
             st.markdown("**Raison de l'ouverture**")
         with col2:
             st.text_area("", placeholder="Remplacement / Création / Évolution interne", 
-                        key="raison_ouverture_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("raison_ouverture", ""))
+                        key="raison_ouverture_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Mission globale**")
         with col2:
             st.text_area("", placeholder="Résumé du rôle et objectif principal", 
-                        key="impact_strategique_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("impact_strategique", ""))
+                        key="impact_strategique_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Tâches principales**")
         with col2:
             st.text_area("", placeholder="Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget", 
-                        key="taches_principales_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("taches_principales", ""))
+                        key="taches_principales_input", label_visibility="collapsed", height=100)
     
     # Section Must-have (Indispensables)
     with st.container():
@@ -612,32 +553,28 @@ with tabs[1]:
             st.markdown("**Expérience**")
         with col2:
             st.text_area("", placeholder="Nombre d'années minimum, expériences similaires dans le secteur", 
-                        key="must_have_experience_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("must_have_experience", ""))
+                        key="must_have_experience_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Connaissances / Diplômes / Certifications**")
         with col2:
             st.text_area("", placeholder="Diplômes exigés, certifications spécifiques", 
-                        key="must_have_diplomes_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("must_have_diplomes", ""))
+                        key="must_have_diplomes_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Compétences / Outils**")
         with col2:
             st.text_area("", placeholder="Techniques, logiciels, méthodes à maîtriser", 
-                        key="must_have_competences_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("must_have_competences", ""))
+                        key="must_have_competences_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Soft skills / aptitudes comportementales**")
         with col2:
             st.text_area("", placeholder="Leadership, rigueur, communication, autonomie", 
-                        key="must_have_softskills_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("must_have_softskills", ""))
+                        key="must_have_softskills_input", label_visibility="collapsed", height=100)
     
     # Section Nice-to-have (Atouts)
     with st.container():
@@ -648,24 +585,21 @@ with tabs[1]:
             st.markdown("**Expérience additionnelle**")
         with col2:
             st.text_area("", placeholder="Ex. projets internationaux, multi-sites", 
-                        key="nice_to_have_experience_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("nice_to_have_experience", ""))
+                        key="nice_to_have_experience_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Diplômes / Certifications valorisantes**")
         with col2:
             st.text_area("", placeholder="Diplômes ou certifications supplémentaires appréciés", 
-                        key="nice_to_have_diplomes_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("nice_to_have_diplomes", ""))
+                        key="nice_to_have_diplomes_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Compétences complémentaires**")
         with col2:
             st.text_area("", placeholder="Compétences supplémentaires non essentielles mais appréciées", 
-                        key="nice_to_have_competences_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("nice_to_have_competences", ""))
+                        key="nice_to_have_competences_input", label_visibility="collapsed", height=100)
     
     # Section Sourcing et marché
     with st.container():
@@ -676,24 +610,21 @@ with tabs[1]:
             st.markdown("**Entreprises où trouver ce profil**")
         with col2:
             st.text_area("", placeholder="Concurrents, secteurs similaires", 
-                        key="entreprises_profil_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("entreprises_profil", ""))
+                        key="entreprises_profil_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Synonymes / intitulés proches**")
         with col2:
             st.text_area("", placeholder="Titres alternatifs pour affiner le sourcing", 
-                        key="synonymes_poste_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("synonymes_poste", ""))
+                        key="synonymes_poste_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Canaux à utiliser**")
         with col2:
             st.text_area("", placeholder="LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels", 
-                        key="canaux_profil_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("canaux_profil", ""))
+                        key="canaux_profil_input", label_visibility="collapsed", height=100)
     
     # Section Conditions et contraintes
     with st.container():
@@ -704,16 +635,14 @@ with tabs[1]:
             st.markdown("**Localisation**")
         with col2:
             st.text_area("", placeholder="Site principal, télétravail, déplacements", 
-                        key="rattachement_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("rattachement", ""))
+                        key="rattachement_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Budget recrutement**")
         with col2:
             st.text_area("", placeholder="Salaire indicatif, avantages, primes éventuelles", 
-                        key="budget_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("budget", ""))
+                        key="budget_input", label_visibility="collapsed", height=100)
     
     # Section Profils pertinents
     with st.container():
@@ -724,24 +653,21 @@ with tabs[1]:
             st.markdown("**Lien profil 1**")
         with col2:
             st.text_input("", placeholder="URL du profil LinkedIn ou autre", 
-                         key="profil_link_1_input", label_visibility="collapsed",
-                         value=st.session_state.get("profil_link_1", ""))
+                         key="profil_link_1_input", label_visibility="collapsed")
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Lien profil 2**")
         with col2:
             st.text_input("", placeholder="URL du profil LinkedIn ou autre", 
-                         key="profil_link_2_input", label_visibility="collapsed",
-                         value=st.session_state.get("profil_link_2", ""))
+                         key="profil_link_2_input", label_visibility="collapsed")
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Lien profil 3**")
         with col2:
             st.text_input("", placeholder="URL du profil LinkedIn ou autre", 
-                         key="profil_link_3_input", label_visibility="collapsed",
-                         value=st.session_state.get("profil_link_3", ""))
+                         key="profil_link_3_input", label_visibility="collapsed")
     
     # Section Notes libres
     with st.container():
@@ -752,16 +678,14 @@ with tabs[1]:
             st.markdown("**Points à discuter ou à clarifier avec le manager**")
         with col2:
             st.text_area("", placeholder="Points à discuter ou à clarifier", 
-                        key="commentaires_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("commentaires", ""))
+                        key="commentaires_input", label_visibility="collapsed", height=100)
         
         col1, col2 = st.columns([1, 3])
         with col1:
             st.markdown("**Case libre**")
         with col2:
             st.text_area("", placeholder="Pour tout point additionnel ou remarque spécifique", 
-                        key="notes_libres_input", label_visibility="collapsed", height=100,
-                        value=st.session_state.get("notes_libres", ""))
+                        key="notes_libres_input", label_visibility="collapsed", height=100)
     
     # --- Boutons Sauvegarder et Réinitialiser ---
     col_save, col_reset = st.columns([1, 1])
@@ -836,7 +760,6 @@ with tabs[1]:
                 st.session_state.saved_briefs = existing_briefs
                 save_briefs()
                 st.session_state.avant_brief_completed = True
-                sync_brief_data()  # Synchroniser les données après sauvegarde
                 st.success("✅ Modifications sauvegardées avec succès!")
                 st.rerun()
             else:
@@ -846,7 +769,7 @@ with tabs[1]:
         if st.button("🗑️ Réinitialiser le Brief", type="secondary", use_container_width=True, key="reset_avant_brief"):
             delete_current_brief()
 
-# ---------------- RÉUNION DE BRIEF ----------------
+# ---------------- RÉUNION DE BRIEF CORRIGÉ ----------------
 with tabs[2]:
     # Synchroniser les données d'abord
     sync_brief_data()
@@ -859,80 +782,14 @@ with tabs[2]:
     # Afficher les informations du brief en cours
     st.subheader(f"✅ Réunion de brief avec le Manager - {st.session_state.get('niveau_hierarchique', '')}")
 
-    total_steps = 5
+    total_steps = 5  # Augmenté à 5 étapes pour inclure les notes du manager
     step = st.session_state.reunion_step
     st.progress(int((step / total_steps) * 100), text=f"Étape {step}/{total_steps}")
 
     if step == 1:
         st.subheader("📋 Portrait robot candidat - Validation")
         
-        # Définir les sections et leurs champs
-        sections = [
-            {
-                "title": "Contexte du poste",
-                "rows": [
-                    ("Raison de l'ouverture", "raison_ouverture", "manager_comment_1"),
-                    ("Mission globale", "impact_strategique", "manager_comment_2"),
-                    ("Tâches principales", "taches_principales", "manager_comment_3")
-                ],
-                "rowspan": 3
-            },
-            {
-                "title": "Must-have (Indispensables)",
-                "rows": [
-                    ("Expérience", "must_have_experience", "manager_comment_4"),
-                    ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "manager_comment_5"),
-                    ("Compétences / Outils", "must_have_competences", "manager_comment_6"),
-                    ("Soft skills / aptitudes comportementales", "must_have_softskills", "manager_comment_7")
-                ],
-                "rowspan": 4
-            },
-            {
-                "title": "Nice-to-have (Atouts)",
-                "rows": [
-                    ("Expérience additionnelle", "nice_to_have_experience", "manager_comment_8"),
-                    ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "manager_comment_9"),
-                    ("Compétences complémentaires", "nice_to_have_competences", "manager_comment_10")
-                ],
-                "rowspan": 3
-            },
-            {
-                "title": "Sourcing et marché",
-                "rows": [
-                    ("Entreprises où trouver ce profil", "entreprises_profil", "manager_comment_11"),
-                    ("Synonymes / intitulés proches", "synonymes_poste", "manager_comment_12"),
-                    ("Canaux à utiliser", "canaux_profil", "manager_comment_13")
-                ],
-                "rowspan": 3
-            },
-            {
-                "title": "Conditions et contraintes",
-                "rows": [
-                    ("Localisation", "rattachement", "manager_comment_14"),
-                    ("Budget recrutement", "budget", "manager_comment_15")
-                ],
-                "rowspan": 2
-            },
-            {
-                "title": "Profils pertinents",
-                "rows": [
-                    ("Lien profil 1", "profil_link_1", "manager_comment_16"),
-                    ("Lien profil 2", "profil_link_2", "manager_comment_17"),
-                    ("Lien profil 3", "profil_link_3", "manager_comment_18")
-                ],
-                "rowspan": 3
-            },
-            {
-                "title": "Notes libres",
-                "rows": [
-                    ("Points à discuter ou à clarifier avec le manager", "commentaires", "manager_comment_19"),
-                    ("Case libre", "notes_libres", "manager_comment_20")
-                ],
-                "rowspan": 2
-            }
-        ]
-
-        # Afficher le tableau
+        # Afficher le tableau complet du portrait robot avec colonne pour commentaires
         st.markdown("""
         <table class="dark-table four-columns">
             <tr>
@@ -941,23 +798,116 @@ with tabs[2]:
                 <th>Informations</th>
                 <th>Commentaires du manager</th>
             </tr>
+            <tr>
+                <td rowspan="3" class="section-title">Contexte du poste</td>
+                <td>Raison de l'ouverture</td>
+                <td class="table-text">""" + (st.session_state.get("raison_ouverture") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_1"></textarea></td>
+            </tr>
+            <tr>
+                <td>Mission globale</td>
+                <td class="table-text">""" + (st.session_state.get("impact_strategique") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_2"></textarea></td>
+            </tr>
+            <tr>
+                <td>Tâches principales</td>
+                <td class="table-text">""" + (st.session_state.get("taches_principales") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_3"></textarea></td>
+            </tr>
+            <tr>
+                <td rowspan="4" class="section-title">Must-have (Indispensables)</td>
+                <td>Expérience</td>
+                <td class="table-text">""" + (st.session_state.get("must_have_experience") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_4"></textarea></td>
+            </tr>
+            <tr>
+                <td>Connaissances / Diplômes / Certifications</td>
+                <td class="table-text">""" + (st.session_state.get("must_have_diplomes") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_5"></textarea></td>
+            </tr>
+            <tr>
+                <td>Compétences / Outils</td>
+                <td class="table-text">""" + (st.session_state.get("must_have_competences") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_6"></textarea></td>
+            </tr>
+            <tr>
+                <td>Soft skills / aptitudes comportementales</td>
+                <td class="table-text">""" + (st.session_state.get("must_have_softskills") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_7"></textarea></td>
+            </tr>
+            <tr>
+                <td rowspan="3" class="section-title">Nice-to-have (Atouts)</td>
+                <td>Expérience additionnelle</td>
+                <td class="table-text">""" + (st.session_state.get("nice_to_have_experience") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_8"></textarea></td>
+            </tr>
+            <tr>
+                <td>Diplômes / Certifications valorisantes</td>
+                <td class="table-text">""" + (st.session_state.get("nice_to_have_diplomes") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_9"></textarea></td>
+            </tr>
+            <tr>
+                <td>Compétences complémentaires</td>
+                <td class="table-text">""" + (st.session_state.get("nice_to_have_competences") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_10"></textarea></td>
+            </tr>
+            <tr>
+                <td rowspan="3" class="section-title">Sourcing et marché</td>
+                <td>Entreprises où trouver ce profil</td>
+                <td class="table-text">""" + (st.session_state.get("entreprises_profil") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_11"></textarea></td>
+            </tr>
+            <tr>
+                <td>Synonymes / intitulés proches</td>
+                <td class="table-text">""" + (st.session_state.get("synonymes_poste") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_12"></textarea></td>
+            </tr>
+            <tr>
+                <td>Canaux à utiliser</td>
+                <td class="table-text">""" + (st.session_state.get("canaux_profil") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_13"></textarea></td>
+            </tr>
+            <tr>
+                <td rowspan="2" class="section-title">Conditions et contraintes</td>
+                <td>Localisation</td>
+                <td class="table-text">""" + (st.session_state.get("rattachement") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_14"></textarea></td>
+            </tr>
+            <tr>
+                <td>Budget recrutement</td>
+                <td class="table-text">""" + (st.session_state.get("budget") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_15"></textarea></td>
+            </tr>
+            <tr>
+                <td rowspan="3" class="section-title">Profils pertinents</td>
+                <td>Lien profil 1</td>
+                <td class="table-text">""" + (st.session_state.get("profil_link_1") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_16"></textarea></td>
+            </tr>
+            <tr>
+                <td>Lien profil 2</td>
+                <td class="table-text">""" + (st.session_state.get("profil_link_2") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_17"></textarea></td>
+            </tr>
+            <tr>
+                <td>Lien profil 3</td>
+                <td class="table-text">""" + (st.session_state.get("profil_link_3") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_18"></textarea></td>
+            </tr>
+            <!-- Notes libres - seulement 2 lignes -->
+            <tr>
+                <td rowspan="2" class="section-title">Notes libres</td>
+                <td>Points à discuter ou à clarifier avec le manager</td>
+                <td class="table-text">""" + (st.session_state.get("commentaires") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_19"></textarea></td>
+            </tr>
+            <tr>
+                <td>Case libre</td>
+                <td class="table-text">""" + (st.session_state.get("notes_libres") or "Non renseigné") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_20"></textarea></td>
+            </tr>
+        </table>
         """, unsafe_allow_html=True)
-
-        for section in sections:
-            for i, (detail, key, comment_key) in enumerate(section["rows"]):
-                value = html.escape(str(st.session_state.get(key, "Non renseigné")))
-                rowspan = f' rowspan="{section["rowspan"]}"' if i == 0 else ""
-                st.markdown(f"""
-                <tr>
-                    {"<td class='section-title'{rowspan}>{section['title']}</td>" if i == 0 else ""}
-                    <td>{detail}</td>
-                    <td class="table-text">{value}</td>
-                    <td>
-                """, unsafe_allow_html=True)
-                st.text_area("", placeholder="Commentaires...", key=comment_key, height=60, label_visibility="collapsed")
-                st.markdown("</td></tr>", unsafe_allow_html=True)
-
-        st.markdown("</table>", unsafe_allow_html=True)
 
     elif step == 2:
         st.subheader("2️⃣ Questions Comportementales")
@@ -989,7 +939,7 @@ with tabs[2]:
                     
                     # Récupérer tous les commentaires du manager
                     manager_comments = {}
-                    for i in range(1, 21):
+                    for i in range(1, 21):  # 20 commentaires maintenant
                         comment_key = f"manager_comment_{i}"
                         if comment_key in st.session_state:
                             manager_comments[comment_key] = st.session_state[comment_key]
@@ -1046,7 +996,6 @@ with tabs[2]:
                     
                     save_briefs()
                     st.session_state.reunion_completed = True
-                    sync_brief_data()  # Synchroniser les données après sauvegarde
                     st.success("✅ Données de réunion sauvegardées avec succès!")
                     st.rerun()
                 else:
@@ -1069,7 +1018,7 @@ with tabs[2]:
                 st.session_state.reunion_step += 1
                 st.rerun()
 
-# ---------------- SYNTHÈSE ----------------
+                # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
     # Vérification si l'onglet est accessible
     if not can_access_synthese:
@@ -1159,3 +1108,20 @@ with tabs[3]:
                 st.info("ℹ️ Créez d'abord un brief pour l'exporter")
         else:
             st.info("⚠️ Word non dispo (pip install python-docx)")
+
+# JavaScript pour désactiver les onglets non accessibles
+st.markdown(f"""
+<script>
+// Désactiver les onglets selon les permissions
+const tabs = parent.document.querySelectorAll('[data-baseweb="tab"]');
+if (!{str(can_access_avant_brief).lower()}) {{
+    tabs[1].classList.add('disabled-tab');
+}}
+if (!{str(can_access_reunion).lower()}) {{
+    tabs[2].classList.add('disabled-tab');
+}}
+if (!{str(can_access_synthese).lower()}) {{
+    tabs[3].classList.add('disabled-tab');
+}}
+</script>
+""", unsafe_allow_html=True)
