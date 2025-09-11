@@ -782,6 +782,13 @@ with tabs[1]:
         st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
         st.stop()  # Arrête le rendu de cet onglet
     
+    # Initialiser les données si elles n'existent pas
+    if "avant_brief_data" not in st.session_state:
+        st.session_state.avant_brief_data = pd.DataFrame(columns=[
+            "Raison d'ouverture", "Mission globale", "Tâches principales", 
+            "Must-have expérience", "Must-have compétences", "Nice-to-have"
+        ])
+
     # Afficher les informations du brief en cours avec Manager/Recruteur à gauche
     st.markdown(f"<h3>🔄 Avant-brief (Préparation)</h3>", unsafe_allow_html=True)
 
