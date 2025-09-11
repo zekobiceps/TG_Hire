@@ -1,4 +1,3 @@
-
 import sys, os 
 import streamlit as st
 from datetime import datetime
@@ -420,6 +419,60 @@ st.markdown("""
     .empty-row {
         display: none;
     }
+    
+    /* Style pour le data_editor afin de le faire ressembler au dark-table */
+    .stDataFrame {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+        background-color: #0d1117;
+        font-size: 0.9em;
+        border: 1px solid #ffffff;
+    }
+    
+    .stDataFrame th, .stDataFrame td {
+        padding: 12px 16px;
+        text-align: left;
+        border: 1px solid #ffffff;
+        color: #e6edf3;
+    }
+    
+    .stDataFrame th {
+        background-color: #FF4B4B !important;
+        color: white !important;
+        font-weight: 600;
+        padding: 14px 16px;
+        font-size: 16px;
+        border: 1px solid #ffffff;
+    }
+    
+    .stDataFrame td:first-child {
+        font-weight: 600;
+        color: #58a6ff; /* Couleur bleue pour les titres de section */
+    }
+    
+    .stDataFrame td:nth-child(1) {
+        width: 15%;
+    }
+    
+    .stDataFrame td:nth-child(2) {
+        width: 20%;
+    }
+    
+    .stDataFrame td:nth-child(3) {
+        width: 65%;
+    }
+    
+    /* Style pour les cellules éditables (Informations) */
+    .stDataFrame td:nth-child(3) textarea {
+        background-color: #2D2D2D !important;
+        color: white !important;
+        border: 1px solid #555 !important;
+        border-radius: 4px !important;
+        padding: 6px !important;
+        min-height: 60px !important;
+        resize: vertical !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -783,177 +836,94 @@ with tabs[1]:
         st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
         st.stop()  # Arrête le rendu de cet onglet
     
-    # Afficher les informations du brief en cours avec Manager/Recruteur à gauche
-    st.markdown(f"<h3>🔄 Avant-brief (Préparation)</h3>", 
-                unsafe_allow_html=True)
+    # Afficher les informations du brief en cours
+    st.markdown(f"<h3>🔄 Avant-brief (Préparation)</h3>", unsafe_allow_html=True)
 
     # Titre pour le tableau
     st.subheader("📋 Portrait robot candidat")
 
-    # Nouveau tableau avec style sombre et bordures blanches
-    st.markdown("""
-    <table class="dark-table">
-        <tr>
-            <th>Section</th>
-            <th>Détails</th>
-            <th>Informations</th>
-        </tr>
-        <!-- Contexte du poste -->
-        <tr>
-            <td rowspan="3" class="section-title">Contexte du poste</td>
-            <td>Raison de l'ouverture</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Remplacement / Création / Évolution interne" 
-                onchange="updateSessionState('raison_ouverture', this.value)">""" + st.session_state.get("raison_ouverture", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Mission globale</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Résumé du rôle et objectif principal" 
-                onchange="updateSessionState('impact_strategique', this.value)">""" + st.session_state.get("impact_strategique", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Tâches principales</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget" 
-                onchange="updateSessionState('taches_principales', this.value)">""" + st.session_state.get("taches_principales", "") + """</textarea>
-            </td>
-        </tr>
-        <!-- Must-have (Indispensables) -->
-        <tr>
-            <td rowspan="4" class="section-title">Must-have (Indispensables)</td>
-            <td>Expérience</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Nombre d'années minimum, expériences similaires dans le secteur" 
-                onchange="updateSessionState('must_have_experience', this.value)">""" + st.session_state.get("must_have_experience", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Connaissances / Diplômes / Certifications</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Diplômes exigés, certifications spécifiques" 
-                onchange="updateSessionState('must_have_diplomes', this.value)">""" + st.session_state.get("must_have_diplomes", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Compétences / Outils</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Techniques, logiciels, méthodes à maîtriser" 
-                onchange="updateSessionState('must_have_competences', this.value)">""" + st.session_state.get("must_have_competences", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Soft skills / aptitudes comportementales</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Leadership, rigueur, communication, autonomie" 
-                onchange="updateSessionState('must_have_softskills', this.value)">""" + st.session_state.get("must_have_softskills", "") + """</textarea>
-            </td>
-        </tr>
-        <!-- Nice-to-have (Atouts) -->
-        <tr>
-            <td rowspan="3" class="section-title">Nice-to-have (Atouts)</td>
-            <td>Expérience additionnelle</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Ex. projets internationaux, multi-sites" 
-                onchange="updateSessionState('nice_to_have_experience', this.value)">""" + st.session_state.get("nice_to_have_experience", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Diplômes / Certifications valorisantes</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Diplômes ou certifications supplémentaires appréciés" 
-                onchange="updateSessionState('nice_to_have_diplomes', this.value)">""" + st.session_state.get("nice_to_have_diplomes", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Compétences complémentaires</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Compétences supplémentaires non essentielles mais appréciées" 
-                onchange="updateSessionState('nice_to_have_competences', this.value)">""" + st.session_state.get("nice_to_have_competences", "") + """</textarea>
-            </td>
-        </tr>
-        <!-- Sourcing et marché -->
-        <tr>
-            <td rowspan="3" class="section-title">Sourcing et marché</td>
-            <td>Entreprises où trouver ce profil</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Concurrents, secteurs similaires" 
-                onchange="updateSessionState('entreprises_profil', this.value)">""" + st.session_state.get("entreprises_profil", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Synonymes / intitulés proches</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Titres alternatifs pour affiner le sourcing" 
-                onchange="updateSessionState('synonymes_poste', this.value)">""" + st.session_state.get("synonymes_poste", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Canaux à utiliser</td>
-            <td>
-                <textarea class="table-textarea" placeholder="LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels" 
-                onchange="updateSessionState('canaux_profil', this.value)">""" + st.session_state.get("canaux_profil", "") + """</textarea>
-            </td>
-        </tr>
-        <!-- Conditions et contraintes -->
-        <tr>
-            <td rowspan="2" class="section-title">Conditions et contraintes</td>
-            <td>Localisation</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Site principal, télétravail, déplacements" 
-                onchange="updateSessionState('rattachement', this.value)">""" + st.session_state.get("rattachement", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Budget recrutement</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Salaire indicatif, avantages, primes éventuelles" 
-                onchange="updateSessionState('budget', this.value)">""" + st.session_state.get("budget", "") + """</textarea>
-            </td>
-        </tr>
-        <!-- Profils pertinents -->
-        <tr>
-            <td rowspan="3" class="section-title">Profils pertinents</td>
-            <td>Lien profil 1</td>
-            <td>
-                <textarea class="table-textarea" placeholder="URL du profil LinkedIn ou autre" 
-                onchange="updateSessionState('profil_link_1', this.value)">""" + (st.session_state.get("profil_links", ["", "", ""])[0] if st.session_state.get("profil_links") else "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Lien profil 2</td>
-            <td>
-                <textarea class="table-textarea" placeholder="URL du profil LinkedIn ou autre" 
-                onchange="updateSessionState('profil_link_2', this.value)">""" + (st.session_state.get("profil_links", ["", "", ""])[1] if st.session_state.get("profil_links") else "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Lien profil 3</td>
-            <td>
-                <textarea class="table-textarea" placeholder="URL du profil LinkedIn ou autre" 
-                onchange="updateSessionState('profil_link_3', this.value)">""" + (st.session_state.get("profil_links", ["", "", ""])[2] if st.session_state.get("profil_links") else "") + """</textarea>
-            </td>
-        </tr>
-        <!-- Notes libres - seulement 2 lignes -->
-        <tr>
-            <td rowspan="2" class="section-title">Notes libres</td>
-            <td>Points à discuter ou à clarifier avec le manager</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Points à discuter ou à clarifier" 
-                onchange="updateSessionState('commentaires', this.value)">""" + st.session_state.get("commentaires", "") + """</textarea>
-            </td>
-        </tr>
-        <tr>
-            <td>Case libre</td>
-            <td>
-                <textarea class="table-textarea" placeholder="Pour tout point additionnel ou remarque spécifique" 
-                onchange="updateSessionState('notes_libres', this.value)">""" + st.session_state.get("notes_libres", "") + """</textarea>
-            </td>
-        </tr>
-    </table>
-    """, unsafe_allow_html=True)
+    # Liste des sections et champs pour le tableau
+    sections = [
+        {
+            "title": "Contexte du poste",
+            "fields": [
+                ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"),
+                ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"),
+                ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"),
+            ]
+        },
+        {
+            "title": "Must-have (Indispensables)",
+            "fields": [
+                ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
+                ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
+                ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"),
+                ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"),
+            ]
+        },
+        {
+            "title": "Nice-to-have (Atouts)",
+            "fields": [
+                ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
+                ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
+                ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
+            ]
+        },
+        {
+            "title": "Sourcing et marché",
+            "fields": [
+                ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
+                ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
+                ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
+            ]
+        },
+        {
+            "title": "Conditions et contraintes",
+            "fields": [
+                ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
+                ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
+            ]
+        },
+        {
+            "title": "Profils pertinents",
+            "fields": [
+                ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
+                ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
+                ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
+            ]
+        },
+        {
+            "title": "Notes libres",
+            "fields": [
+                ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
+                ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
+            ]
+        },
+    ]
+
+    # Construire le DataFrame et la liste des clés pour mapping
+    data = []
+    field_keys = []
+    for section in sections:
+        for field_name, field_key, placeholder in section["fields"]:
+            # Répéter le titre de section pour chaque ligne
+            data.append([section["title"], field_name, st.session_state.get(field_key, "")])
+            field_keys.append(field_key)
+
+    df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
+
+    # Afficher le data_editor stylé comme le dark-table
+    edited_df = st.data_editor(
+        df,
+        column_config={
+            "Section": st.column_config.TextColumn("Section", disabled=True),
+            "Détails": st.column_config.TextColumn("Détails", disabled=True),
+            "Informations": st.column_config.TextColumn("Informations", width="large")
+        },
+        use_container_width=True,
+        hide_index=True,
+        num_rows="fixed"  # Empêche l'ajout/suppression de lignes
+    )
 
     # --- Boutons Sauvegarder et Réinitialiser ---
     col_save, col_reset = st.columns([1, 1])
@@ -962,7 +932,11 @@ with tabs[1]:
             if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
                 brief_name = st.session_state.current_brief_name
                 
-                # Sauvegarder les liens de profils
+                # Mettre à jour st.session_state à partir de l'edited_df
+                for i, field_key in enumerate(field_keys):
+                    st.session_state[field_key] = edited_df["Informations"].iloc[i]
+                
+                # Sauvegarder les liens de profils (si applicable)
                 st.session_state.profil_links = [
                     st.session_state.get("profil_link_1", ""),
                     st.session_state.get("profil_link_2", ""),
@@ -1009,7 +983,6 @@ with tabs[1]:
     with col_reset:
         if st.button("🗑️ Réinitialiser le Brief", type="secondary", use_container_width=True, key="reset_avant_brief"):
             delete_current_brief()
-
 
 # ---------------- RÉUNION (Wizard interne) ----------------
 with tabs[2]:
