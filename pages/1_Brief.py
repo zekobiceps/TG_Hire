@@ -790,9 +790,34 @@ with tabs[1]:
     st.markdown(f"<h3>🔄 Avant-brief (Préparation)</h3>", unsafe_allow_html=True)
     st.subheader("📋 Portrait robot candidat")
 
-    # Petits styles pour un rendu net
+    # Ajouter le style CSS pour le tableau avec les bordures et couleurs spécifiées
     st.markdown("""
     <style>
+      /* Style général du tableau */
+      .custom-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1rem;
+      }
+      .custom-table th, .custom-table td {
+        padding: 8px;
+        text-align: left;
+        border: 1px solid #ffffff; /* Bordure blanche */
+        color: #e6edf3; /* Texte clair */
+      }
+      .custom-table th {
+        background-color: #FF4B4B; /* Rouge vif pour l'entête */
+        font-weight: bold;
+      }
+      .custom-table tr:nth-child(even) {
+        background-color: #1a2230; /* Fond noir pour les lignes paires */
+      }
+      .custom-table tr:nth-child(odd) {
+        background-color: #0d1117; /* Fond plus foncé pour les lignes impaires */
+      }
+      .custom-table tr:hover {
+        background-color: #333;
+      }
       .ab-section{font-weight:600;color:#58a6ff;margin-top:0.25rem}
       .ab-row{padding:6px 0;border-bottom:1px solid #424242}
       .ab-detail{opacity:0.9}
@@ -931,6 +956,7 @@ with tabs[1]:
     with col_cancel:
         if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_avant_brief"):
             delete_current_brief()
+
 
 
 # ---------------- RÉUNION (Wizard interne) — SANS BINDERS NI JS ----------------
