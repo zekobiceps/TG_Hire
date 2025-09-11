@@ -780,21 +780,34 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 """, unsafe_allow_html=True)
 
-# ---------------- ONGLET AVANT-BRIEF ----------------
+# ---------------- ONGLET AVANT-BRIEF (MIS À JOUR) ----------------
 with tabs[1]:
     # Vérification si un brief est chargé
     if not can_access_avant_brief:
         st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
         st.stop()  # Arrête le rendu de cet onglet
     
-    # Afficher les informations du brief en cours avec Manager/Recruteur à gauche
-    st.markdown(f"<h3>🔄 Avant-brief (Préparation)</h3>", 
-                unsafe_allow_html=True)
+    # Pré-remplissage des champs profil_link_{1..3} depuis profil_links si présents
+    _pl = st.session_state.get("profil_links", ["", "", ""])
+    for i in range(3):
+        k = f"profil_link_{i+1}"
+        if k not in st.session_state or st.session_state.get(k, "") == "":
+            st.session_state[k] = (_pl[i] if i < len(_pl) else "") or ""
 
-    # Titre pour le tableau
+    st.markdown(f"<h3>🔄 Avant-brief (Préparation)</h3>", unsafe_allow_html=True)
     st.subheader("📋 Portrait robot candidat")
 
-    # Nouveau tableau avec style sombre et bordures blanches
+    # Liste des champs gérés par le tableau (bindings invisibles)
+    AVANT_BRIEF_FIELDS = [
+        "raison_ouverture", "impact_strategique", "taches_principales",
+        "must_have_experience", "must_have_diplomes", "must_have_competences", "must_have_softskills",
+        "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences",
+        "entreprises_profil", "synonymes_poste", "canaux_profil",
+        "rattachement", "budget", "commentaires", "notes_libres",
+        "profil_link_1", "profil_link_2", "profil_link_3"
+    ]
+
+    # Tableau HTML + synchronisation (oninput + onchange -> updateSessionState)
     st.markdown("""
     <table class="dark-table">
         <tr>
@@ -808,6 +821,7 @@ with tabs[1]:
             <td>Raison de l'ouverture</td>
             <td>
                 <textarea class="table-textarea" placeholder="Remplacement / Création / Évolution interne" 
+                oninput="updateSessionState('raison_ouverture', this.value)" 
                 onchange="updateSessionState('raison_ouverture', this.value)">""" + st.session_state.get("raison_ouverture", "") + """</textarea>
             </td>
         </tr>
@@ -815,6 +829,7 @@ with tabs[1]:
             <td>Mission globale</td>
             <td>
                 <textarea class="table-textarea" placeholder="Résumé du rôle et objectif principal" 
+                oninput="updateSessionState('impact_strategique', this.value)" 
                 onchange="updateSessionState('impact_strategique', this.value)">""" + st.session_state.get("impact_strategique", "") + """</textarea>
             </td>
         </tr>
@@ -822,6 +837,7 @@ with tabs[1]:
             <td>Tâches principales</td>
             <td>
                 <textarea class="table-textarea" placeholder="Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget" 
+                oninput="updateSessionState('taches_principales', this.value)" 
                 onchange="updateSessionState('taches_principales', this.value)">""" + st.session_state.get("taches_principales", "") + """</textarea>
             </td>
         </tr>
@@ -831,6 +847,7 @@ with tabs[1]:
             <td>Expérience</td>
             <td>
                 <textarea class="table-textarea" placeholder="Nombre d'années minimum, expériences similaires dans le secteur" 
+                oninput="updateSessionState('must_have_experience', this.value)" 
                 onchange="updateSessionState('must_have_experience', this.value)">""" + st.session_state.get("must_have_experience", "") + """</textarea>
             </td>
         </tr>
@@ -838,6 +855,7 @@ with tabs[1]:
             <td>Connaissances / Diplômes / Certifications</td>
             <td>
                 <textarea class="table-textarea" placeholder="Diplômes exigés, certifications spécifiques" 
+                oninput="updateSessionState('must_have_diplomes', this.value)" 
                 onchange="updateSessionState('must_have_diplomes', this.value)">""" + st.session_state.get("must_have_diplomes", "") + """</textarea>
             </td>
         </tr>
@@ -845,6 +863,7 @@ with tabs[1]:
             <td>Compétences / Outils</td>
             <td>
                 <textarea class="table-textarea" placeholder="Techniques, logiciels, méthodes à maîtriser" 
+                oninput="updateSessionState('must_have_competences', this.value)" 
                 onchange="updateSessionState('must_have_competences', this.value)">""" + st.session_state.get("must_have_competences", "") + """</textarea>
             </td>
         </tr>
@@ -852,6 +871,7 @@ with tabs[1]:
             <td>Soft skills / aptitudes comportementales</td>
             <td>
                 <textarea class="table-textarea" placeholder="Leadership, rigueur, communication, autonomie" 
+                oninput="updateSessionState('must_have_softskills', this.value)" 
                 onchange="updateSessionState('must_have_softskills', this.value)">""" + st.session_state.get("must_have_softskills", "") + """</textarea>
             </td>
         </tr>
@@ -861,6 +881,7 @@ with tabs[1]:
             <td>Expérience additionnelle</td>
             <td>
                 <textarea class="table-textarea" placeholder="Ex. projets internationaux, multi-sites" 
+                oninput="updateSessionState('nice_to_have_experience', this.value)" 
                 onchange="updateSessionState('nice_to_have_experience', this.value)">""" + st.session_state.get("nice_to_have_experience", "") + """</textarea>
             </td>
         </tr>
@@ -868,6 +889,7 @@ with tabs[1]:
             <td>Diplômes / Certifications valorisantes</td>
             <td>
                 <textarea class="table-textarea" placeholder="Diplômes ou certifications supplémentaires appréciés" 
+                oninput="updateSessionState('nice_to_have_diplomes', this.value)" 
                 onchange="updateSessionState('nice_to_have_diplomes', this.value)">""" + st.session_state.get("nice_to_have_diplomes", "") + """</textarea>
             </td>
         </tr>
@@ -875,6 +897,7 @@ with tabs[1]:
             <td>Compétences complémentaires</td>
             <td>
                 <textarea class="table-textarea" placeholder="Compétences supplémentaires non essentielles mais appréciées" 
+                oninput="updateSessionState('nice_to_have_competences', this.value)" 
                 onchange="updateSessionState('nice_to_have_competences', this.value)">""" + st.session_state.get("nice_to_have_competences", "") + """</textarea>
             </td>
         </tr>
@@ -884,6 +907,7 @@ with tabs[1]:
             <td>Entreprises où trouver ce profil</td>
             <td>
                 <textarea class="table-textarea" placeholder="Concurrents, secteurs similaires" 
+                oninput="updateSessionState('entreprises_profil', this.value)" 
                 onchange="updateSessionState('entreprises_profil', this.value)">""" + st.session_state.get("entreprises_profil", "") + """</textarea>
             </td>
         </tr>
@@ -891,6 +915,7 @@ with tabs[1]:
             <td>Synonymes / intitulés proches</td>
             <td>
                 <textarea class="table-textarea" placeholder="Titres alternatifs pour affiner le sourcing" 
+                oninput="updateSessionState('synonymes_poste', this.value)" 
                 onchange="updateSessionState('synonymes_poste', this.value)">""" + st.session_state.get("synonymes_poste", "") + """</textarea>
             </td>
         </tr>
@@ -898,6 +923,7 @@ with tabs[1]:
             <td>Canaux à utiliser</td>
             <td>
                 <textarea class="table-textarea" placeholder="LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels" 
+                oninput="updateSessionState('canaux_profil', this.value)" 
                 onchange="updateSessionState('canaux_profil', this.value)">""" + st.session_state.get("canaux_profil", "") + """</textarea>
             </td>
         </tr>
@@ -907,6 +933,7 @@ with tabs[1]:
             <td>Localisation</td>
             <td>
                 <textarea class="table-textarea" placeholder="Site principal, télétravail, déplacements" 
+                oninput="updateSessionState('rattachement', this.value)" 
                 onchange="updateSessionState('rattachement', this.value)">""" + st.session_state.get("rattachement", "") + """</textarea>
             </td>
         </tr>
@@ -914,6 +941,7 @@ with tabs[1]:
             <td>Budget recrutement</td>
             <td>
                 <textarea class="table-textarea" placeholder="Salaire indicatif, avantages, primes éventuelles" 
+                oninput="updateSessionState('budget', this.value)" 
                 onchange="updateSessionState('budget', this.value)">""" + st.session_state.get("budget", "") + """</textarea>
             </td>
         </tr>
@@ -923,29 +951,33 @@ with tabs[1]:
             <td>Lien profil 1</td>
             <td>
                 <textarea class="table-textarea" placeholder="URL du profil LinkedIn ou autre" 
-                onchange="updateSessionState('profil_link_1', this.value)">""" + (st.session_state.get("profil_links", ["", "", ""])[0] if st.session_state.get("profil_links") else "") + """</textarea>
+                oninput="updateSessionState('profil_link_1', this.value)" 
+                onchange="updateSessionState('profil_link_1', this.value)">""" + st.session_state.get("profil_link_1", "") + """</textarea>
             </td>
         </tr>
         <tr>
             <td>Lien profil 2</td>
             <td>
                 <textarea class="table-textarea" placeholder="URL du profil LinkedIn ou autre" 
-                onchange="updateSessionState('profil_link_2', this.value)">""" + (st.session_state.get("profil_links", ["", "", ""])[1] if st.session_state.get("profil_links") else "") + """</textarea>
+                oninput="updateSessionState('profil_link_2', this.value)" 
+                onchange="updateSessionState('profil_link_2', this.value)">""" + st.session_state.get("profil_link_2", "") + """</textarea>
             </td>
         </tr>
         <tr>
             <td>Lien profil 3</td>
             <td>
                 <textarea class="table-textarea" placeholder="URL du profil LinkedIn ou autre" 
-                onchange="updateSessionState('profil_link_3', this.value)">""" + (st.session_state.get("profil_links", ["", "", ""])[2] if st.session_state.get("profil_links") else "") + """</textarea>
+                oninput="updateSessionState('profil_link_3', this.value)" 
+                onchange="updateSessionState('profil_link_3', this.value)">""" + st.session_state.get("profil_link_3", "") + """</textarea>
             </td>
         </tr>
-        <!-- Notes libres - seulement 2 lignes au lieu de 3 -->
+        <!-- Notes libres -->
         <tr>
             <td rowspan="2" class="section-title">Notes libres</td>
             <td>Points à discuter ou à clarifier avec le manager</td>
             <td>
                 <textarea class="table-textarea" placeholder="Points à discuter ou à clarifier" 
+                oninput="updateSessionState('commentaires', this.value)" 
                 onchange="updateSessionState('commentaires', this.value)">""" + st.session_state.get("commentaires", "") + """</textarea>
             </td>
         </tr>
@@ -953,52 +985,54 @@ with tabs[1]:
             <td>Case libre</td>
             <td>
                 <textarea class="table-textarea" placeholder="Pour tout point additionnel ou remarque spécifique" 
+                oninput="updateSessionState('notes_libres', this.value)" 
                 onchange="updateSessionState('notes_libres', this.value)">""" + st.session_state.get("notes_libres", "") + """</textarea>
             </td>
         </tr>
     </table>
-    
+
     <script>
     function updateSessionState(key, value) {
-        // Cette fonction envoie la valeur au backend Streamlit
-        // Note: Cette approche nécessite un composant Streamlit personnalisé pour fonctionner complètement
-        // Pour l'instant, on utilise une solution temporaire avec des widgets cachés
-        const hiddenInput = document.getElementById('hidden_' + key);
-        if (hiddenInput) {
-            hiddenInput.value = value;
+        // Pousse la valeur dans le widget Streamlit masqué porteur de la même aria-label (= label Python)
+        const doc = parent.document;
+        const input = doc.querySelector(`textarea[aria-label="${key}"], input[aria-label="${key}"]`);
+        if (input) {
+            input.value = value;
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
         }
     }
     </script>
     """, unsafe_allow_html=True)
-    
-    # Créer des champs cachés pour chaque entrée du tableau
-    # Ces champs permettront à Streamlit de capturer les valeurs
-    hidden_fields = [
-        "raison_ouverture", "impact_strategique", "taches_principales",
-        "must_have_experience", "must_have_diplomes", "must_have_competences", "must_have_softskills",
-        "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences",
-        "entreprises_profil", "synonymes_poste", "canaux_profil",
-        "rattachement", "budget", "commentaires", "notes_libres",
-        "profil_link_1", "profil_link_2", "profil_link_3"
-    ]
-    
-    for field in hidden_fields:
-        st.text_input("", key=field, label_visibility="collapsed", value=st.session_state.get(field, ""))
-    
+
+    # Widgets "binders" invisibles (un par champ) — pour synchroniser session_state proprement
+    with st.container():
+        st.markdown('<div id="avant-brief-binders">', unsafe_allow_html=True)
+        for field in AVANT_BRIEF_FIELDS:
+            st.text_area(field, key=field, label_visibility="collapsed", value=st.session_state.get(field, ""))
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # Cache visuel des binders
+    st.markdown("""
+    <style>
+    #avant-brief-binders [data-testid="stTextArea"] { display: none !important; }
+    </style>
+    """, unsafe_allow_html=True)
+
     # Boutons Sauvegarder et Annuler
     col_save, col_cancel = st.columns([1, 1])
     with col_save:
         if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True, key="save_avant_brief"):
             if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
                 brief_name = st.session_state.current_brief_name
-                
-                # Sauvegarder les liens de profils
+
+                # Sauvegarder les liens de profils depuis les binders
                 st.session_state.profil_links = [
                     st.session_state.get("profil_link_1", ""),
                     st.session_state.get("profil_link_2", ""),
                     st.session_state.get("profil_link_3", "")
                 ]
-                
+
                 # Mettre à jour le brief avec les données
                 brief_data = {
                     "profil_links": st.session_state.profil_links,
@@ -1020,15 +1054,14 @@ with tabs[1]:
                     "commentaires": st.session_state.get("commentaires", ""),
                     "notes_libres": st.session_state.get("notes_libres", "")
                 }
-                
-                # Charger les briefs existants depuis le fichier
+
                 existing_briefs = load_briefs()
                 if brief_name in existing_briefs:
                     existing_briefs[brief_name].update(brief_data)
                     st.session_state.saved_briefs = existing_briefs
                 else:
                     st.session_state.saved_briefs[brief_name].update(brief_data)
-                
+
                 save_briefs()
                 st.session_state.avant_brief_completed = True
                 st.success("✅ Modifications sauvegardées")
@@ -1040,24 +1073,46 @@ with tabs[1]:
         if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_avant_brief"):
             delete_current_brief()
 
-# ---------------- RÉUNION (Wizard interne) ----------------
+# ---------------- RÉUNION (Wizard interne) — MIS À JOUR ----------------
 with tabs[2]:
     # Vérification si l'onglet est accessible
     if not can_access_reunion:
         st.warning("⚠️ Veuillez d'abord compléter et sauvegarder l'onglet Avant-brief")
         st.stop()  # Arrête le rendu de cet onglet
-    
+
+    # Charge une seule fois les commentaires manager sauvegardés (si existants)
+    if "current_brief_name" in st.session_state and st.session_state.current_brief_name and not st.session_state.get("_comments_loaded", False):
+        _saved = load_briefs().get(st.session_state.current_brief_name, {})
+        for k, v in (_saved.get("manager_comments") or {}).items():
+            st.session_state[k] = v
+        st.session_state["_comments_loaded"] = True
+
     # Afficher les informations du brief en cours
     st.subheader(f"✅ Réunion de brief avec le Manager - {st.session_state.get('niveau_hierarchique', '')}")
 
-    total_steps = 5  # Augmenté à 5 étapes pour inclure les notes du manager
+    total_steps = 5
     step = st.session_state.reunion_step
     st.progress(int((step / total_steps) * 100), text=f"Étape {step}/{total_steps}")
 
     if step == 1:
         st.subheader("📋 Portrait robot candidat - Validation")
-        
-        # Afficher le tableau complet du portrait robot avec colonne pour commentaires
+
+        # Clés pour les commentaires manager (binders invisibles)
+        MANAGER_COMMENT_KEYS = [f"manager_comment_{i}" for i in range(1, 21)]
+        with st.container():
+            st.markdown('<div id="manager-comments-binders">', unsafe_allow_html=True)
+            for k in MANAGER_COMMENT_KEYS:
+                st.text_area(k, key=k, label_visibility="collapsed", value=st.session_state.get(k, ""))
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        # Cache visuel des binders
+        st.markdown("""
+        <style>
+        #manager-comments-binders [data-testid="stTextArea"] { display: none !important; }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # Tableau HTML avec textareas reliés (oninput + onchange)
         st.markdown("""
         <table class="dark-table four-columns">
             <tr>
@@ -1070,111 +1125,122 @@ with tabs[2]:
                 <td rowspan="3" class="section-title">Contexte du poste</td>
                 <td>Raison de l'ouverture</td>
                 <td class="table-text">""" + st.session_state.get("raison_ouverture", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_1"></textarea></td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_1', this.value)" onchange="updateSessionState('manager_comment_1', this.value)">""" + st.session_state.get("manager_comment_1", "") + """</textarea></td>
             </tr>
             <tr>
                 <td>Mission globale</td>
                 <td class="table-text">""" + st.session_state.get("impact_strategique", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_2"></textarea></td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_2', this.value)" onchange="updateSessionState('manager_comment_2', this.value)">""" + st.session_state.get("manager_comment_2", "") + """</textarea></td>
             </tr>
             <tr>
                 <td>Tâches principales</td>
                 <td class="table-text">""" + st.session_state.get("taches_principales", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_3"></textarea></td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_3', this.value)" onchange="updateSessionState('manager_comment_3', this.value)">""" + st.session_state.get("manager_comment_3", "") + """</textarea></td>
             </tr>
             <tr>
                 <td rowspan="4" class="section-title">Must-have (Indispensables)</td>
                 <td>Expérience</td>
                 <td class="table-text">""" + st.session_state.get("must_have_experience", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_4"></textarea></td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_4', this.value)" onchange="updateSessionState('manager_comment_4', this.value)">""" + st.session_state.get("manager_comment_4", "") + """</textarea></td>
             </tr>
             <tr>
                 <td>Connaissances / Diplômes / Certifications</td>
                 <td class="table-text">""" + st.session_state.get("must_have_diplomes", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_5"></textarea></td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_5', this.value)" onchange="updateSessionState('manager_comment_5', this.value)">""" + st.session_state.get("manager_comment_5", "") + """</textarea></td>
             </tr>
             <tr>
                 <td>Compétences / Outils</td>
                 <td class="table-text">""" + st.session_state.get("must_have_competences", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_6"></textarea></td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_6', this.value)" onchange="updateSessionState('manager_comment_6', this.value)">""" + st.session_state.get("manager_comment_6", "") + """</textarea></td>
             </tr>
             <tr>
                 <td>Soft skills / aptitudes comportementales</td>
                 <td class="table-text">""" + st.session_state.get("must_have_softskills", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_7"></textarea></td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_7', this.value)" onchange="updateSessionState('manager_comment_7', this.value)">""" + st.session_state.get("manager_comment_7", "") + """</textarea></td>
             </tr>
             <tr>
                 <td rowspan="3" class="section-title">Nice-to-have (Atouts)</td>
                 <td>Expérience additionnelle</td>
                 <td class="table-text">""" + st.session_state.get("nice_to_have_experience", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_8"></textarea></td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_8', this.value)" onchange="updateSessionState('manager_comment_8', this.value)">""" + st.session_state.get("manager_comment_8", "") + """</textarea></td>
             </tr>
             <tr>
                 <td>Diplômes / Certifications valorisantes</td>
                 <td class="table-text">""" + st.session_state.get("nice_to_have_diplomes", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_9"></textarea></td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_9', this.value)" onchange="updateSessionState('manager_comment_9', this.value)">""" + st.session_state.get("manager_comment_9", "") + """</textarea></td>
             </tr>
             <tr>
                 <td>Compétences complémentaires</td>
                 <td class="table-text">""" + st.session_state.get("nice_to_have_competences", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_10"></textarea></td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_10', this.value)" onchange="updateSessionState('manager_comment_10', this.value)">""" + st.session_state.get("manager_comment_10", "") + """</textarea></td>
             </tr>
             <tr>
                 <td rowspan="3" class="section-title">Sourcing et marché</td>
                 <td>Entreprises où trouver ce profil</td>
                 <td class="table-text">""" + st.session_state.get("entreprises_profil", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_11"></textarea></td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_11', this.value)" onchange="updateSessionState('manager_comment_11', this.value)">""" + st.session_state.get("manager_comment_11", "") + """</textarea></td>
             </tr>
             <tr>
                 <td>Synonymes / intitulés proches</td>
                 <td class="table-text">""" + st.session_state.get("synonymes_poste", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_12"></textarea></td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_12', this.value)" onchange="updateSessionState('manager_comment_12', this.value)">""" + st.session_state.get("manager_comment_12", "") + """</textarea></td>
             </tr>
             <tr>
                 <td>Canaux à utiliser</td>
                 <td class="table-text">""" + st.session_state.get("canaux_profil", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_13"></textarea></td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_13', this.value)" onchange="updateSessionState('manager_comment_13', this.value)">""" + st.session_state.get("manager_comment_13", "") + """</textarea></td>
             </tr>
             <tr>
                 <td rowspan="2" class="section-title">Conditions et contraintes</td>
                 <td>Localisation</td>
                 <td class="table-text">""" + st.session_state.get("rattachement", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_14"></textarea></td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_14', this.value)" onchange="updateSessionState('manager_comment_14', this.value)">""" + st.session_state.get("manager_comment_14", "") + """</textarea></td>
             </tr>
             <tr>
                 <td>Budget recrutement</td>
                 <td class="table-text">""" + st.session_state.get("budget", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_15"></textarea></td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_15', this.value)" onchange="updateSessionState('manager_comment_15', this.value)">""" + st.session_state.get("manager_comment_15", "") + """</textarea></td>
             </tr>
             <tr>
                 <td rowspan="3" class="section-title">Profils pertinents</td>
                 <td>Lien profil 1</td>
-                <td class="table-text">""" + (st.session_state.get("profil_links", ["", "", ""])[0] if st.session_state.get("profil_links") else "") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_16"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("profil_link_1", "") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_16', this.value)" onchange="updateSessionState('manager_comment_16', this.value)">""" + st.session_state.get("manager_comment_16", "") + """</textarea></td>
             </tr>
             <tr>
                 <td>Lien profil 2</td>
-                <td class="table-text">""" + (st.session_state.get("profil_links", ["", "", ""])[1] if st.session_state.get("profil_links") else "") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_17"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("profil_link_2", "") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_17', this.value)" onchange="updateSessionState('manager_comment_17', this.value)">""" + st.session_state.get("manager_comment_17", "") + """</textarea></td>
             </tr>
             <tr>
                 <td>Lien profil 3</td>
-                <td class="table-text">""" + (st.session_state.get("profil_links", ["", "", ""])[2] if st.session_state.get("profil_links") else "") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_18"></textarea></td>
+                <td class="table-text">""" + st.session_state.get("profil_link_3", "") + """</td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_18', this.value)" onchange="updateSessionState('manager_comment_18', this.value)">""" + st.session_state.get("manager_comment_18", "") + """</textarea></td>
             </tr>
-            <!-- Notes libres - seulement 2 lignes au lieu de 3 -->
             <tr>
                 <td rowspan="2" class="section-title">Notes libres</td>
                 <td>Points à discuter ou à clarifier avec le manager</td>
                 <td class="table-text">""" + st.session_state.get("commentaires", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_19"></textarea></td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_19', this.value)" onchange="updateSessionState('manager_comment_19', this.value)">""" + st.session_state.get("manager_comment_19", "") + """</textarea></td>
             </tr>
             <tr>
                 <td>Case libre</td>
                 <td class="table-text">""" + st.session_state.get("notes_libres", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_20"></textarea></td>
+                <td><textarea class="table-textarea" placeholder="Commentaires..." oninput="updateSessionState('manager_comment_20', this.value)" onchange="updateSessionState('manager_comment_20', this.value)">""" + st.session_state.get("manager_comment_20", "") + """</textarea></td>
             </tr>
         </table>
+
+        <script>
+        function updateSessionState(key, value) {
+            const doc = parent.document;
+            const input = doc.querySelector(`textarea[aria-label="${key}"], input[aria-label="${key}"]`);
+            if (input) {
+                input.value = value;
+                input.dispatchEvent(new Event('input', { bubbles: true }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+        </script>
         """, unsafe_allow_html=True)
 
     elif step == 2:
@@ -1205,36 +1271,28 @@ with tabs[2]:
                 if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
                     brief_name = st.session_state.current_brief_name
                     
-                    # Récupérer tous les commentaires du manager
+                    # Récupérer tous les commentaires du manager (1..20)
                     manager_comments = {}
-                    for i in range(1, 21):  # 20 commentaires maintenant
+                    for i in range(1, 21):
                         comment_key = f"manager_comment_{i}"
                         if comment_key in st.session_state:
                             manager_comments[comment_key] = st.session_state[comment_key]
                     
-                    # Charger les briefs existants depuis le fichier
                     existing_briefs = load_briefs()
+                    payload = {
+                        "ksa_data": st.session_state.get("ksa_data", {}),
+                        "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict(),
+                        "manager_notes": st.session_state.get("manager_notes", ""),
+                        "manager_comments": manager_comments,
+                        "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
+                        "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
+                        "processus_evaluation": st.session_state.get("processus_evaluation", "")
+                    }
                     if brief_name in existing_briefs:
-                        existing_briefs[brief_name].update({
-                            "ksa_data": st.session_state.get("ksa_data", {}),
-                            "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict(),
-                            "manager_notes": st.session_state.get("manager_notes", ""),
-                            "manager_comments": manager_comments,
-                            "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
-                            "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
-                            "processus_evaluation": st.session_state.get("processus_evaluation", "")
-                        })
+                        existing_briefs[brief_name].update(payload)
                         st.session_state.saved_briefs = existing_briefs
                     else:
-                        st.session_state.saved_briefs[brief_name].update({
-                            "ksa_data": st.session_state.get("ksa_data", {}),
-                            "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict(),
-                            "manager_notes": st.session_state.get("manager_notes", ""),
-                            "manager_comments": manager_comments,
-                            "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
-                            "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
-                            "processus_evaluation": st.session_state.get("processus_evaluation", "")
-                        })
+                        st.session_state.saved_briefs[brief_name].update(payload)
                     
                     save_briefs()
                     st.session_state.reunion_completed = True
@@ -1259,6 +1317,7 @@ with tabs[2]:
             if st.button("Suivant ➡️", key="next_step"):
                 st.session_state.reunion_step += 1
                 st.rerun()
+
 
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
