@@ -953,22 +953,13 @@ with tabs[1]:
             </td>
         </tr>
     </table>
-    
-    <script>
-    function updateSessionState(key, value) {
-        // Cette fonction envoie la valeur au backend Streamlit
-        // Note: Cette approche nécessite un composant Streamlit personnalisé pour fonctionner complètement
-        // Pour l'instant, on utilise une solution temporaire avec des widgets cachés
-        const hiddenInput = document.getElementById('hidden_' + key);
-        if (hiddenInput) {
-            hiddenInput.value = value;
-        }
-    }
-    </script>
     """, unsafe_allow_html=True)
+
+    # Commenter la boucle des st.text_input pour enlever les "cases vides"
+    # for field in hidden_fields:
+    #     st.text_input("", key=field, label_visibility="collapsed", value=st.session_state.get(field, ""))
     
     # Créer des champs cachés pour chaque entrée du tableau
-    # Ces champs permettront à Streamlit de capturer les valeurs
     hidden_fields = [
         "raison_ouverture", "impact_strategique", "taches_principales",
         "must_have_experience", "must_have_diplomes", "must_have_competences", "must_have_softskills",
@@ -977,64 +968,10 @@ with tabs[1]:
         "rattachement", "budget", "commentaires", "notes_libres",
         "profil_link_1", "profil_link_2", "profil_link_3"
     ]
-    
-    for field in hidden_fields:
-        st.text_input("", key=field, label_visibility="collapsed", value=st.session_state.get(field, ""))
-    
-    # Boutons Sauvegarder et Annuler
-    col_save, col_cancel = st.columns([1, 1])
-    with col_save:
-        if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True, key="save_avant_brief"):
-            if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
-                brief_name = st.session_state.current_brief_name
-                
-                # Sauvegarder les liens de profils
-                st.session_state.profil_links = [
-                    st.session_state.get("profil_link_1", ""),
-                    st.session_state.get("profil_link_2", ""),
-                    st.session_state.get("profil_link_3", "")
-                ]
-                
-                # Mettre à jour le brief avec les données
-                brief_data = {
-                    "profil_links": st.session_state.profil_links,
-                    "raison_ouverture": st.session_state.get("raison_ouverture", ""),
-                    "impact_strategique": st.session_state.get("impact_strategique", ""),
-                    "taches_principales": st.session_state.get("taches_principales", ""),
-                    "must_have_experience": st.session_state.get("must_have_experience", ""),
-                    "must_have_diplomes": st.session_state.get("must_have_diplomes", ""),
-                    "must_have_competences": st.session_state.get("must_have_competences", ""),
-                    "must_have_softskills": st.session_state.get("must_have_softskills", ""),
-                    "nice_to_have_experience": st.session_state.get("nice_to_have_experience", ""),
-                    "nice_to_have_diplomes": st.session_state.get("nice_to_have_diplomes", ""),
-                    "nice_to_have_competences": st.session_state.get("nice_to_have_competences", ""),
-                    "entreprises_profil": st.session_state.get("entreprises_profil", ""),
-                    "synonymes_poste": st.session_state.get("synonymes_poste", ""),
-                    "canaux_profil": st.session_state.get("canaux_profil", ""),
-                    "rattachement": st.session_state.get("rattachement", ""),
-                    "budget": st.session_state.get("budget", ""),
-                    "commentaires": st.session_state.get("commentaires", ""),
-                    "notes_libres": st.session_state.get("notes_libres", "")
-                }
-                
-                # Charger les briefs existants depuis le fichier
-                existing_briefs = load_briefs()
-                if brief_name in existing_briefs:
-                    existing_briefs[brief_name].update(brief_data)
-                    st.session_state.saved_briefs = existing_briefs
-                else:
-                    st.session_state.saved_briefs[brief_name].update(brief_data)
-                
-                save_briefs()
-                st.session_state.avant_brief_completed = True
-                st.success("✅ Modifications sauvegardées")
-                st.rerun()
-            else:
-                st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
-    
-    with col_cancel:
-        if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_avant_brief"):
-            delete_current_brief()
+
+    # Commenté pour supprimer les cases vides
+    # for field in hidden_fields:
+    #     st.text_input("", key=field, label_visibility="collapsed", value=st.session_state.get(field, ""))
 
 # ---------------- RÉUNION (Wizard interne) ----------------
 with tabs[2]:
