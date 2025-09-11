@@ -1247,7 +1247,7 @@ with tabs[3]:
     st.json({
         "Poste": st.session_state.get("niveau_hierarchique", ""),
         "Manager": st.session_state.get("manager_nom", ""),
-        "Recruteur": st.session_state.get("recruteur, ""),
+        "Recruteur": st.session_state.get("recruteur", ""),  # CORRECTION ICI: virgule mal placée
         "Type": st.session_state.get("brief_type", ""),
         "Affectation": f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}",
         "Date": str(st.session_state.get("date_brief", "")),
