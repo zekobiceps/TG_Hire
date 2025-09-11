@@ -326,42 +326,129 @@ st.markdown("""
         cursor: not-allowed;
     }
     
-    /* Style amélioré pour les tableaux (Avant-brief et Réunion de brief) */
+    /* Nouveau style pour le tableau amélioré - TABLEAU SOMBRE */
+    .dark-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+        background-color: #0d1117; /* Fond noir pour le tableau */
+        font-size: 0.9em; /* Augmentation de la taille du texte */
+        border: 1px solid #ffffff; /* Bordure blanche */
+    }
+    
+    .dark-table th, .dark-table td {
+        padding: 12px 16px;
+        text-align: left;
+        border: 1px solid #ffffff; /* Bordures blanches */
+        color: #e6edf3; /* Texte clair sur fond sombre */
+    }
+    
+    .dark-table th {
+        background-color: #FF4B4B !important;  /* Rouge vif identique aux boutons */
+        color: white !important;
+        font-weight: 600;
+        padding: 14px 16px;
+        font-size: 16px;
+        border: 1px solid #ffffff; /* Bordure blanche */
+    }
+    
+    /* Largeur des colonnes */
+    .dark-table th:nth-child(1),
+    .dark-table td:nth-child(1) {
+        width: 15%; /* Réduction de la première colonne */
+    }
+    
+    .dark-table th:nth-child(2),
+    .dark-table td:nth-child(2) {
+        width: 20%;
+    }
+    
+    .dark-table th:nth-child(3),
+    .dark-table td:nth-child(3) {
+        width: 65%; /* Colonne Informations plus large */
+    }
+    
+    /* Style pour les tableaux avec 4 colonnes (réunion de brief) */
+    .dark-table.four-columns th:nth-child(1),
+    .dark-table.four-columns td:nth-child(1) {
+        width: 15%;
+    }
+    
+    .dark-table.four-columns th:nth-child(2),
+    .dark-table.four-columns td:nth-child(2) {
+        width: 20%;
+    }
+    
+    .dark-table.four-columns th:nth-child(3),
+    .dark-table.four-columns td:nth-child(3) {
+        width: 40%; /* Réduit pour faire de la place à la colonne notes */
+    }
+    
+    .dark-table.four-columns th:nth-child(4),
+    .dark-table.four-columns td:nth-child(4) {
+        width: 25%; /* Colonne Commentaires du manager élargie */
+    }
+    
+    .section-title {
+        font-weight: 600;
+        color: #58a6ff; /* Couleur bleue pour les titres de section */
+        font-size: 0.95em; /* Augmentation de la taille du texte */
+    }
+    
+    /* Style pour les textareas dans les tableaux */
+    .table-textarea {
+        width: 100%;
+        min-height: 60px;
+        background-color: #2D2D2D;
+        color: white;
+        border: 1px solid #555;
+        border-radius: 4px;
+        padding: 6px;
+        font-size: 0.9em; /* Augmentation de la taille du texte */
+        resize: vertical;
+    }
+    
+    /* Style pour les cellules de texte */
+    .table-text {
+        padding: 6px;
+        font-size: 0.9em; /* Augmentation de la taille du texte */
+        color: #e6edf3;
+    }
+    
+    /* Supprimer complètement les lignes vides */
+    .empty-row {
+        display: none;
+    }
+    
+    /* Style pour le data_editor afin de le faire ressembler au dark-table */
     .stDataFrame {
         width: 100%;
         border-collapse: collapse;
         margin-bottom: 20px;
         background-color: #0d1117;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        font-size: 0.95em;
-        border: 2px solid #ffffff;
+        font-size: 0.9em;
+        border: 1px solid #ffffff;
+    }
+    
+    .stDataFrame th, .stDataFrame td {
+        padding: 12px 16px;
+        text-align: left;
+        border: 1px solid #ffffff;
+        color: #e6edf3;
     }
     
     .stDataFrame th {
         background-color: #FF4B4B !important;
         color: white !important;
         font-weight: 600;
-        padding: 12px 16px;
-        font-size: 1em;
-        border: 2px solid #ffffff;
-        text-align: left;
-    }
-    
-    .stDataFrame td {
-        padding: 10px 16px;
-        border: 1px solid #555;
-        color: #e6edf3;
-        background-color: #1a1e28;
-    }
-    
-    .stDataFrame tr:nth-child(even) td {
-        background-color: #1c222e; /* Alternance de fond pour lisibilité */
+        padding: 14px 16px;
+        font-size: 16px;
+        border: 1px solid #ffffff;
     }
     
     .stDataFrame td:first-child {
         font-weight: 600;
-        color: #58a6ff;
-        background-color: #16202c;
+        color: #58a6ff; /* Couleur bleue pour les titres de section */
     }
     
     .stDataFrame td:nth-child(1) {
@@ -376,32 +463,15 @@ st.markdown("""
         width: 65%;
     }
     
-    .stDataFrame.four-columns td:nth-child(4) {
-        width: 25%;
-    }
-    
-    /* Style pour les cellules éditables (Informations et Commentaires) */
-    .stDataFrame td:nth-child(3) textarea,
-    .stDataFrame td:nth-child(4) textarea {
+    /* Style pour les cellules éditables (Informations) */
+    .stDataFrame td:nth-child(3) textarea {
         background-color: #2D2D2D !important;
         color: white !important;
-        border: 1px solid #777 !important;
+        border: 1px solid #555 !important;
         border-radius: 4px !important;
-        padding: 8px !important;
-        min-height: 80px !important;
+        padding: 6px !important;
+        min-height: 60px !important;
         resize: vertical !important;
-        font-size: 0.95em;
-        line-height: 1.4;
-    }
-    
-    /* Assurer que les sections ne se répètent pas visuellement */
-    .stDataFrame td:first-child.section-title {
-        border-bottom: none;
-        padding-bottom: 0;
-    }
-    
-    .stDataFrame td:first-child + td {
-        border-left: none;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -999,12 +1069,14 @@ with tabs[2]:
         data = []
         field_keys = []
         comment_keys = []
+        k = 1
         for section in sections:
             data.append([section["title"], "", "", ""])  # Ajouter la section une seule fois
             for field_name, field_key, placeholder in section["fields"]:
                 data.append(["", field_name, st.session_state.get(field_key, ""), ""])
                 field_keys.append(field_key)
-                comment_keys.append(f"manager_comment_{len(comment_keys) + 1}")
+                comment_keys.append(f"manager_comment_{k}")
+                k += 1
 
         df = pd.DataFrame(data, columns=["Section", "Détails", "Informations", "Commentaires du manager"])
 
@@ -1014,7 +1086,7 @@ with tabs[2]:
             column_config={
                 "Section": st.column_config.TextColumn("Section", disabled=True),
                 "Détails": st.column_config.TextColumn("Détails", disabled=True),
-                "Informations": st.column_config.TextColumn("Informations", width="medium"),
+                "Informations": st.column_config.TextColumn("Informations", width="medium", disabled=True),
                 "Commentaires du manager": st.column_config.TextColumn("Commentaires du manager", width="medium")
             },
             use_container_width=True,
@@ -1024,9 +1096,13 @@ with tabs[2]:
 
         # Sauvegarde des commentaires
         if st.button("💾 Sauvegarder commentaires", type="primary", key="save_comments_step1"):
-            for i, comment_key in enumerate(comment_keys):
-                if i < len(edited_df) - len(sections):  # Éviter les sections
-                    st.session_state[comment_key] = edited_df["Commentaires du manager"].iloc[i + len(sections)]
+            section_index = 0
+            for i in range(len(edited_df)):
+                if edited_df["Section"].iloc[i] != "":
+                    section_index += 1
+                else:
+                    comment_key = comment_keys[i - section_index]
+                    st.session_state[comment_key] = edited_df["Commentaires du manager"].iloc[i]
             st.success("✅ Commentaires sauvegardés")
 
     elif step == 2:
@@ -1059,7 +1135,7 @@ with tabs[2]:
                     
                     # Récupérer tous les commentaires du manager
                     manager_comments = {}
-                    for i in range(1, 21):  # 20 commentaires possibles
+                    for i in range(1, 21):  # 20 commentaires maintenant
                         comment_key = f"manager_comment_{i}"
                         if comment_key in st.session_state:
                             manager_comments[comment_key] = st.session_state[comment_key]
