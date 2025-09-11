@@ -921,16 +921,20 @@ with tabs[1]:
     for section in sections:
         section_rows = len(section["fields"])
         for i, (field_name, field_key, placeholder) in enumerate(section["fields"]):
+            # Ensure the value from session_state is a string
+            value = st.session_state.get(field_key, placeholder)
+            if value is not None and not isinstance(value, str):
+                value = str(value)
             if section["title"] == "Contexte du poste" and i >= 0 and i < 3:  # Merge "Contexte du poste" for rows 2-3-4
-                data.append(["Contexte du poste" if i == 0 else "", field_name, st.session_state.get(field_key, placeholder)])
+                data.append(["Contexte du poste" if i == 0 else "", field_name, value])
             else:
-                data.append([section["title"] if i == 0 else "", field_name, st.session_state.get(field_key, placeholder)])
+                data.append([section["title"] if i == 0 else "", field_name, value])
             field_keys.append(field_key)
 
     df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
 
-    # Extract Informations column as a list for default
-    default_informations = df["Informations"].tolist()
+    # Extract Informations column as a list with explicit string conversion
+    default_informations = [str(x) if x is not None else "" for x in df["Informations"]]
 
     # Afficher le data_editor stylé with initial placeholders
     edited_df = st.data_editor(
@@ -955,13 +959,16 @@ with tabs[1]:
                 # Mettre à jour st.session_state à partir de l'edited_df
                 for i in range(len(edited_df)):
                     field_key = field_keys[i]
-                    st.session_state[field_key] = edited_df["Informations"].iloc[i]
+                    value = edited_df["Informations"].iloc[i]
+                    if value is not None and not isinstance(value, str):
+                        value = str(value)
+                    st.session_state[field_key] = value
                 
                 # Sauvegarder les liens de profils (si applicable)
                 st.session_state.profil_links = [
-                    st.session_state.get("profil_link_1", ""),
-                    st.session_state.get("profil_link_2", ""),
-                    st.session_state.get("profil_link_3", "")
+                    str(st.session_state.get("profil_link_1", "")),
+                    str(st.session_state.get("profil_link_2", "")),
+                    str(st.session_state.get("profil_link_3", ""))
                 ]
                 
                 # Mettre à jour le brief avec les données
