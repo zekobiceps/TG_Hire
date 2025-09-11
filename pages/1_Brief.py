@@ -175,7 +175,7 @@ with st.sidebar:
 # ---------------- NAVIGATION PRINCIPALE ----------------
 st.title("🤖 TG-Hire IA - Brief")
 
-# Style CSS pour les onglets personnalisés
+# Style CSS pour les onglets personnalisés et les tableaux améliorés
 st.markdown("""
     <style>
     /* Style général pour l'application */
@@ -326,129 +326,42 @@ st.markdown("""
         cursor: not-allowed;
     }
     
-    /* Nouveau style pour le tableau amélioré - TABLEAU SOMBRE */
-    .dark-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 20px;
-        background-color: #0d1117; /* Fond noir pour le tableau */
-        font-size: 0.9em; /* Augmentation de la taille du texte */
-        border: 1px solid #ffffff; /* Bordure blanche */
-    }
-    
-    .dark-table th, .dark-table td {
-        padding: 12px 16px;
-        text-align: left;
-        border: 1px solid #ffffff; /* Bordures blanches */
-        color: #e6edf3; /* Texte clair sur fond sombre */
-    }
-    
-    .dark-table th {
-        background-color: #FF4B4B !important;  /* Rouge vif identique aux boutons */
-        color: white !important;
-        font-weight: 600;
-        padding: 14px 16px;
-        font-size: 16px;
-        border: 1px solid #ffffff; /* Bordure blanche */
-    }
-    
-    /* Largeur des colonnes */
-    .dark-table th:nth-child(1),
-    .dark-table td:nth-child(1) {
-        width: 15%; /* Réduction de la première colonne */
-    }
-    
-    .dark-table th:nth-child(2),
-    .dark-table td:nth-child(2) {
-        width: 20%;
-    }
-    
-    .dark-table th:nth-child(3),
-    .dark-table td:nth-child(3) {
-        width: 65%; /* Colonne Informations plus large */
-    }
-    
-    /* Style pour les tableaux avec 4 colonnes (réunion de brief) */
-    .dark-table.four-columns th:nth-child(1),
-    .dark-table.four-columns td:nth-child(1) {
-        width: 15%;
-    }
-    
-    .dark-table.four-columns th:nth-child(2),
-    .dark-table.four-columns td:nth-child(2) {
-        width: 20%;
-    }
-    
-    .dark-table.four-columns th:nth-child(3),
-    .dark-table.four-columns td:nth-child(3) {
-        width: 40%; /* Réduit pour faire de la place à la colonne notes */
-    }
-    
-    .dark-table.four-columns th:nth-child(4),
-    .dark-table.four-columns td:nth-child(4) {
-        width: 25%; /* Colonne Commentaires du manager élargie */
-    }
-    
-    .section-title {
-        font-weight: 600;
-        color: #58a6ff; /* Couleur bleue pour les titres de section */
-        font-size: 0.95em; /* Augmentation de la taille du texte */
-    }
-    
-    /* Style pour les textareas dans les tableaux */
-    .table-textarea {
-        width: 100%;
-        min-height: 60px;
-        background-color: #2D2D2D;
-        color: white;
-        border: 1px solid #555;
-        border-radius: 4px;
-        padding: 6px;
-        font-size: 0.9em; /* Augmentation de la taille du texte */
-        resize: vertical;
-    }
-    
-    /* Style pour les cellules de texte */
-    .table-text {
-        padding: 6px;
-        font-size: 0.9em; /* Augmentation de la taille du texte */
-        color: #e6edf3;
-    }
-    
-    /* Supprimer complètement les lignes vides */
-    .empty-row {
-        display: none;
-    }
-    
-    /* Style pour le data_editor afin de le faire ressembler au dark-table */
+    /* Style amélioré pour les tableaux (Avant-brief et Réunion de brief) */
     .stDataFrame {
         width: 100%;
         border-collapse: collapse;
         margin-bottom: 20px;
         background-color: #0d1117;
-        font-size: 0.9em;
-        border: 1px solid #ffffff;
-    }
-    
-    .stDataFrame th, .stDataFrame td {
-        padding: 12px 16px;
-        text-align: left;
-        border: 1px solid #ffffff;
-        color: #e6edf3;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        font-size: 0.95em;
+        border: 2px solid #ffffff;
     }
     
     .stDataFrame th {
         background-color: #FF4B4B !important;
         color: white !important;
         font-weight: 600;
-        padding: 14px 16px;
-        font-size: 16px;
-        border: 1px solid #ffffff;
+        padding: 12px 16px;
+        font-size: 1em;
+        border: 2px solid #ffffff;
+        text-align: left;
+    }
+    
+    .stDataFrame td {
+        padding: 10px 16px;
+        border: 1px solid #555;
+        color: #e6edf3;
+        background-color: #1a1e28;
+    }
+    
+    .stDataFrame tr:nth-child(even) td {
+        background-color: #1c222e; /* Alternance de fond pour lisibilité */
     }
     
     .stDataFrame td:first-child {
         font-weight: 600;
-        color: #58a6ff; /* Couleur bleue pour les titres de section */
+        color: #58a6ff;
+        background-color: #16202c;
     }
     
     .stDataFrame td:nth-child(1) {
@@ -463,15 +376,32 @@ st.markdown("""
         width: 65%;
     }
     
-    /* Style pour les cellules éditables (Informations) */
-    .stDataFrame td:nth-child(3) textarea {
+    .stDataFrame.four-columns td:nth-child(4) {
+        width: 25%;
+    }
+    
+    /* Style pour les cellules éditables (Informations et Commentaires) */
+    .stDataFrame td:nth-child(3) textarea,
+    .stDataFrame td:nth-child(4) textarea {
         background-color: #2D2D2D !important;
         color: white !important;
-        border: 1px solid #555 !important;
+        border: 1px solid #777 !important;
         border-radius: 4px !important;
-        padding: 6px !important;
-        min-height: 60px !important;
+        padding: 8px !important;
+        min-height: 80px !important;
         resize: vertical !important;
+        font-size: 0.95em;
+        line-height: 1.4;
+    }
+    
+    /* Assurer que les sections ne se répètent pas visuellement */
+    .stDataFrame td:first-child.section-title {
+        border-bottom: none;
+        padding-bottom: 0;
+    }
+    
+    .stDataFrame td:first-child + td {
+        border-left: none;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -901,18 +831,18 @@ with tabs[1]:
         },
     ]
 
-    # Construire le DataFrame et la liste des clés pour mapping
+    # Construire le DataFrame avec une seule occurrence par section
     data = []
     field_keys = []
     for section in sections:
+        data.append([section["title"], "", ""])  # Ajouter la section une seule fois
         for field_name, field_key, placeholder in section["fields"]:
-            # Répéter le titre de section pour chaque ligne
-            data.append([section["title"], field_name, st.session_state.get(field_key, "")])
+            data.append(["", field_name, st.session_state.get(field_key, "")])
             field_keys.append(field_key)
 
     df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
 
-    # Afficher le data_editor stylé comme le dark-table
+    # Afficher le data_editor stylé
     edited_df = st.data_editor(
         df,
         column_config={
@@ -922,7 +852,7 @@ with tabs[1]:
         },
         use_container_width=True,
         hide_index=True,
-        num_rows="fixed"  # Empêche l'ajout/suppression de lignes
+        num_rows="fixed"
     )
 
     # --- Boutons Sauvegarder et Réinitialiser ---
@@ -933,8 +863,13 @@ with tabs[1]:
                 brief_name = st.session_state.current_brief_name
                 
                 # Mettre à jour st.session_state à partir de l'edited_df
-                for i, field_key in enumerate(field_keys):
-                    st.session_state[field_key] = edited_df["Informations"].iloc[i]
+                section_index = 0
+                for i in range(len(edited_df)):
+                    if edited_df["Section"].iloc[i] != "":
+                        section_index += 1
+                    else:
+                        field_key = field_keys[i - section_index]
+                        st.session_state[field_key] = edited_df["Informations"].iloc[i]
                 
                 # Sauvegarder les liens de profils (si applicable)
                 st.session_state.profil_links = [
@@ -1000,126 +935,99 @@ with tabs[2]:
 
     if step == 1:
         st.subheader("📋 Portrait robot candidat - Validation")
-        
-        # Afficher le tableau complet du portrait robot avec colonne pour commentaires
-        st.markdown("""
-        <table class="dark-table four-columns">
-            <tr>
-                <th>Section</th>
-                <th>Détails</th>
-                <th>Informations</th>
-                <th>Commentaires du manager</th>
-            </tr>
-            <tr>
-                <td rowspan="3" class="section-title">Contexte du poste</td>
-                <td>Raison de l'ouverture</td>
-                <td class="table-text">""" + st.session_state.get("raison_ouverture", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_1"></textarea></td>
-            </tr>
-            <tr>
-                <td>Mission globale</td>
-                <td class="table-text">""" + st.session_state.get("impact_strategique", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_2"></textarea></td>
-            </tr>
-            <tr>
-                <td>Tâches principales</td>
-                <td class="table-text">""" + st.session_state.get("taches_principales", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_3"></textarea></td>
-            </tr>
-            <tr>
-                <td rowspan="4" class="section-title">Must-have (Indispensables)</td>
-                <td>Expérience</td>
-                <td class="table-text">""" + st.session_state.get("must_have_experience", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_4"></textarea></td>
-            </tr>
-            <tr>
-                <td>Connaissances / Diplômes / Certifications</td>
-                <td class="table-text">""" + st.session_state.get("must_have_diplomes", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_5"></textarea></td>
-            </tr>
-            <tr>
-                <td>Compétences / Outils</td>
-                <td class="table-text">""" + st.session_state.get("must_have_competences", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_6"></textarea></td>
-            </tr>
-            <tr>
-                <td>Soft skills / aptitudes comportementales</td>
-                <td class="table-text">""" + st.session_state.get("must_have_softskills", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_7"></textarea></td>
-            </tr>
-            <tr>
-                <td rowspan="3" class="section-title">Nice-to-have (Atouts)</td>
-                <td>Expérience additionnelle</td>
-                <td class="table-text">""" + st.session_state.get("nice_to_have_experience", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_8"></textarea></td>
-            </tr>
-            <tr>
-                <td>Diplômes / Certifications valorisantes</td>
-                <td class="table-text">""" + st.session_state.get("nice_to_have_diplomes", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_9"></textarea></td>
-            </tr>
-            <tr>
-                <td>Compétences complémentaires</td>
-                <td class="table-text">""" + st.session_state.get("nice_to_have_competences", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_10"></textarea></td>
-            </tr>
-            <tr>
-                <td rowspan="3" class="section-title">Sourcing et marché</td>
-                <td>Entreprises où trouver ce profil</td>
-                <td class="table-text">""" + st.session_state.get("entreprises_profil", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_11"></textarea></td>
-            </tr>
-            <tr>
-                <td>Synonymes / intitulés proches</td>
-                <td class="table-text">""" + st.session_state.get("synonymes_poste", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_12"></textarea></td>
-            </tr>
-            <tr>
-                <td>Canaux à utiliser</td>
-                <td class="table-text">""" + st.session_state.get("canaux_profil", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_13"></textarea></td>
-            </tr>
-            <tr>
-                <td rowspan="2" class="section-title">Conditions et contraintes</td>
-                <td>Localisation</td>
-                <td class="table-text">""" + st.session_state.get("rattachement", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_14"></textarea></td>
-            </tr>
-            <tr>
-                <td>Budget recrutement</td>
-                <td class="table-text">""" + st.session_state.get("budget", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_15"></textarea></td>
-            </tr>
-            <tr>
-                <td rowspan="3" class="section-title">Profils pertinents</td>
-                <td>Lien profil 1</td>
-                <td class="table-text">""" + (st.session_state.get("profil_links", ["", "", ""])[0] if st.session_state.get("profil_links") else "") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_16"></textarea></td>
-            </tr>
-            <tr>
-                <td>Lien profil 2</td>
-                <td class="table-text">""" + (st.session_state.get("profil_links", ["", "", ""])[1] if st.session_state.get("profil_links") else "") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_17"></textarea></td>
-            </tr>
-            <tr>
-                <td>Lien profil 3</td>
-                <td class="table-text">""" + (st.session_state.get("profil_links", ["", "", ""])[2] if st.session_state.get("profil_links") else "") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_18"></textarea></td>
-            </tr>
-            <!-- Notes libres - seulement 2 lignes -->
-            <tr>
-                <td rowspan="2" class="section-title">Notes libres</td>
-                <td>Points à discuter ou à clarifier avec le manager</td>
-                <td class="table-text">""" + st.session_state.get("commentaires", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_19"></textarea></td>
-            </tr>
-            <tr>
-                <td>Case libre</td>
-                <td class="table-text">""" + st.session_state.get("notes_libres", "Non renseigné") + """</td>
-                <td><textarea class="table-textarea" placeholder="Commentaires..." key="manager_comment_20"></textarea></td>
-            </tr>
-        </table>
-        """, unsafe_allow_html=True)
+
+        # Liste des sections et champs pour le tableau (même structure qu'Avant-brief)
+        sections = [
+            {
+                "title": "Contexte du poste",
+                "fields": [
+                    ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"),
+                    ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"),
+                    ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"),
+                ]
+            },
+            {
+                "title": "Must-have (Indispensables)",
+                "fields": [
+                    ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
+                    ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
+                    ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"),
+                    ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"),
+                ]
+            },
+            {
+                "title": "Nice-to-have (Atouts)",
+                "fields": [
+                    ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
+                    ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
+                    ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
+                ]
+            },
+            {
+                "title": "Sourcing et marché",
+                "fields": [
+                    ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
+                    ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
+                    ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
+                ]
+            },
+            {
+                "title": "Conditions et contraintes",
+                "fields": [
+                    ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
+                    ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
+                ]
+            },
+            {
+                "title": "Profils pertinents",
+                "fields": [
+                    ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
+                    ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
+                    ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
+                ]
+            },
+            {
+                "title": "Notes libres",
+                "fields": [
+                    ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
+                    ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
+                ]
+            },
+        ]
+
+        # Construire le DataFrame avec une seule occurrence par section
+        data = []
+        field_keys = []
+        comment_keys = []
+        for section in sections:
+            data.append([section["title"], "", "", ""])  # Ajouter la section une seule fois
+            for field_name, field_key, placeholder in section["fields"]:
+                data.append(["", field_name, st.session_state.get(field_key, ""), ""])
+                field_keys.append(field_key)
+                comment_keys.append(f"manager_comment_{len(comment_keys) + 1}")
+
+        df = pd.DataFrame(data, columns=["Section", "Détails", "Informations", "Commentaires du manager"])
+
+        # Afficher le data_editor stylé avec 4 colonnes
+        edited_df = st.data_editor(
+            df,
+            column_config={
+                "Section": st.column_config.TextColumn("Section", disabled=True),
+                "Détails": st.column_config.TextColumn("Détails", disabled=True),
+                "Informations": st.column_config.TextColumn("Informations", width="medium"),
+                "Commentaires du manager": st.column_config.TextColumn("Commentaires du manager", width="medium")
+            },
+            use_container_width=True,
+            hide_index=True,
+            num_rows="fixed"
+        )
+
+        # Sauvegarde des commentaires
+        if st.button("💾 Sauvegarder commentaires", type="primary", key="save_comments_step1"):
+            for i, comment_key in enumerate(comment_keys):
+                if i < len(edited_df) - len(sections):  # Éviter les sections
+                    st.session_state[comment_key] = edited_df["Commentaires du manager"].iloc[i + len(sections)]
+            st.success("✅ Commentaires sauvegardés")
 
     elif step == 2:
         st.subheader("2️⃣ Questions Comportementales")
@@ -1151,7 +1059,7 @@ with tabs[2]:
                     
                     # Récupérer tous les commentaires du manager
                     manager_comments = {}
-                    for i in range(1, 21):  # 20 commentaires maintenant
+                    for i in range(1, 21):  # 20 commentaires possibles
                         comment_key = f"manager_comment_{i}"
                         if comment_key in st.session_state:
                             manager_comments[comment_key] = st.session_state[comment_key]
