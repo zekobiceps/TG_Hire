@@ -610,7 +610,7 @@ with tabs[0]:
         with col5:
             st.text_input("Nom de l'affectation", key="affectation_nom")
         with col6:
-            st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date())
+            st.date_input("Date du Brief *", key="date_brief", value=st.session_state.get("date_brief", datetime.today().date()))
         
         # --- SAUVEGARDE - Bouton étendu
         if st.button("💾 Sauvegarder", type="primary", use_container_width=True, key="save_gestion"):
