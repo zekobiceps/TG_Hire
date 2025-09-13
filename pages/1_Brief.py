@@ -452,15 +452,15 @@ st.markdown("""
     }
     
     .stDataFrame td:nth-child(1) {
-        width: 15%;
+        width: 10%;
     }
     
     .stDataFrame td:nth-child(2) {
-        width: 20%;
+        width: 15%;
     }
     
     .stDataFrame td:nth-child(3) {
-        width: 65%;
+        width: 75%;
     }
     
     /* Style pour les cellules éditables (Informations) */
@@ -829,164 +829,6 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 """, unsafe_allow_html=True)
 
-# ---------------- ONGLET AVANT-BRIEF ----------------
-with tabs[1]:
-    # Vérification si un brief est chargé
-    if not can_access_avant_brief:
-        st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
-        st.stop()  # Arrête le rendu de cet onglet
-    
-    # Afficher les informations du brief en cours
-    st.markdown(f"<h3>🔄 Avant-brief (Préparation)</h3>", unsafe_allow_html=True)
-
-    # Titre pour le tableau
-    st.subheader("📋 Portrait robot candidat")
-
-    # Liste des sections et champs pour le tableau
-    sections = [
-        {
-            "title": "Contexte du poste",
-            "fields": [
-                ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"),
-                ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"),
-                ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"),
-            ]
-        },
-        {
-            "title": "Must-have (Indispensables)",
-            "fields": [
-                ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
-                ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
-                ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"),
-                ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"),
-            ]
-        },
-        {
-            "title": "Nice-to-have (Atouts)",
-            "fields": [
-                ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
-                ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
-                ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
-            ]
-        },
-        {
-            "title": "Sourcing et marché",
-            "fields": [
-                ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
-                ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
-                ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
-            ]
-        },
-        {
-            "title": "Conditions et contraintes",
-            "fields": [
-                ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
-                ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
-            ]
-        },
-        {
-            "title": "Profils pertinents",
-            "fields": [
-                ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
-                ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
-                ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
-            ]
-        },
-        {
-            "title": "Notes libres",
-            "fields": [
-                ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
-                ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
-            ]
-        },
-    ]
-
-    # Construire le DataFrame with section titles integrated into the first field row
-    data = []
-    field_keys = []
-    for section in sections:
-        # Use the section title only for the first field row
-        first_field = True
-        for field_name, field_key, placeholder in section["fields"]:
-            data.append([section["title"] if first_field else "", field_name, st.session_state.get(field_key, "")])
-            field_keys.append(field_key)
-            first_field = False
-
-    df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
-
-    # Afficher le data_editor stylé
-    edited_df = st.data_editor(
-        df,
-        column_config={
-            "Section": st.column_config.TextColumn("Section", disabled=True),
-            "Détails": st.column_config.TextColumn("Détails", disabled=True),
-            "Informations": st.column_config.TextColumn("Informations", width="large")
-        },
-        use_container_width=True,
-        hide_index=True,
-        num_rows="fixed"
-    )
-
-    # --- Boutons Sauvegarder et Réinitialiser ---
-    col_save, col_reset = st.columns([1, 1])
-    with col_save:
-        if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True, key="save_avant_brief"):
-            if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
-                brief_name = st.session_state.current_brief_name
-                
-                # Mettre à jour st.session_state à partir de l'edited_df
-                for i in range(len(edited_df)):
-                    field_key = field_keys[i]
-                    st.session_state[field_key] = edited_df["Informations"].iloc[i]
-                
-                # Sauvegarder les liens de profils (si applicable)
-                st.session_state.profil_links = [
-                    st.session_state.get("profil_link_1", ""),
-                    st.session_state.get("profil_link_2", ""),
-                    st.session_state.get("profil_link_3", "")
-                ]
-                
-                # Mettre à jour le brief avec les données
-                brief_data = {
-                    "profil_links": st.session_state.profil_links,
-                    "raison_ouverture": st.session_state.get("raison_ouverture", ""),
-                    "impact_strategique": st.session_state.get("impact_strategique", ""),
-                    "taches_principales": st.session_state.get("taches_principales", ""),
-                    "must_have_experience": st.session_state.get("must_have_experience", ""),
-                    "must_have_diplomes": st.session_state.get("must_have_diplomes", ""),
-                    "must_have_competences": st.session_state.get("must_have_competences", ""),
-                    "must_have_softskills": st.session_state.get("must_have_softskills", ""),
-                    "nice_to_have_experience": st.session_state.get("nice_to_have_experience", ""),
-                    "nice_to_have_diplomes": st.session_state.get("nice_to_have_diplomes", ""),
-                    "nice_to_have_competences": st.session_state.get("nice_to_have_competences", ""),
-                    "entreprises_profil": st.session_state.get("entreprises_profil", ""),
-                    "synonymes_poste": st.session_state.get("synonymes_poste", ""),
-                    "canaux_profil": st.session_state.get("canaux_profil", ""),
-                    "rattachement": st.session_state.get("rattachement", ""),
-                    "budget": st.session_state.get("budget", ""),
-                    "commentaires": st.session_state.get("commentaires", ""),
-                    "notes_libres": st.session_state.get("notes_libres", "")
-                }
-                
-                # Charger les briefs existants depuis le fichier
-                existing_briefs = load_briefs()
-                if brief_name in existing_briefs:
-                    existing_briefs[brief_name].update(brief_data)
-                    st.session_state.saved_briefs = existing_briefs
-                else:
-                    st.session_state.saved_briefs[brief_name] = brief_data
-                
-                save_briefs()
-                st.session_state.avant_brief_completed = True
-                st.success("✅ Modifications sauvegardées")
-                st.rerun()
-            else:
-                st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
-    
-    with col_reset:
-        if st.button("🗑️ Réinitialiser le Brief", type="secondary", use_container_width=True, key="reset_avant_brief"):
-            delete_current_brief()
-
 # ---------------- RÉUNION (Wizard interne) ----------------
 with tabs[2]:
     # Vérification si l'onglet est accessible
@@ -1196,7 +1038,7 @@ with tabs[2]:
             if st.button("Suivant ➡️", key="next_step"):
                 st.session_state.reunion_step += 1
                 st.rerun()
-                
+
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
     # Vérification si l'onglet est accessible
