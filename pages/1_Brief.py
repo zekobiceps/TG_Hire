@@ -127,6 +127,7 @@ def delete_current_brief():
             st.rerun()
 
 # Fonction pour appeler l'IA et extraire les informations (À ADAPTER)
+# Fonction pour appeler l'IA et extraire les informations (MISE À JOUR)
 def extract_info_with_deepseek(text, job_title):
     """
     Appelle l'API DeepSeek pour extraire les critères d'une fiche de poste.
@@ -138,8 +139,12 @@ def extract_info_with_deepseek(text, job_title):
     RETOURNE:
     dict: Un dictionnaire contenant les informations extraites, ou un dictionnaire vide en cas d'erreur.
     """
-    # Votre clé API DeepSeek (remplacez par votre clé réelle)
-    DEEPSEEK_API_KEY = "VOTRE_CLE_API_DEEPSEEK"
+    # Votre clé API DeepSeek, récupérée de st.secrets
+    if "DEEPSEEK_API_KEY" not in st.secrets:
+        st.error("Clé API DeepSeek non trouvée dans les secrets de Streamlit. Veuillez la configurer.")
+        return {}
+        
+    DEEPSEEK_API_KEY = st.secrets["DEEPSEEK_API_KEY"]
     DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions" # URL de l'endpoint
     
     # Instruction à donner à l'IA
