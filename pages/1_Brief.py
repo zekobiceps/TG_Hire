@@ -1,17 +1,13 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-```python
-import sys, os 
+import sys, os
 import streamlit as st
 from datetime import datetime
 import json
 import pandas as pd
 import requests
-import pdfplumber
 
-# Permet d'accéder à utils.py à la racine
+# Ajustement du chemin pour utils.py
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from utils import (
     init_session_state,
     PDF_AVAILABLE,
