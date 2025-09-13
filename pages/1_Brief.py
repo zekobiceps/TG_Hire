@@ -1063,22 +1063,23 @@ with tabs[2]:
             },
         ]
 
-        # Construire le DataFrame avec une seule occurrence par section
+        # Construire le DataFrame with section titles integrated into the first field row
         data = []
         field_keys = []
         comment_keys = []
         k = 1
         for section in sections:
-            data.append([section["title"], "", "", ""])  # Ajouter la section une seule fois
+            # Use the section title only for the first field row
+            first_field = True
             for field_name, field_key, placeholder in section["fields"]:
-                data.append(["", field_name, st.session_state.get(field_key, ""), ""])
+                data.append([section["title"] if first_field else "", field_name, st.session_state.get(field_key, ""), ""])
                 field_keys.append(field_key)
                 comment_keys.append(f"manager_comment_{k}")
                 k += 1
 
         df = pd.DataFrame(data, columns=["Section", "Détails", "Informations", "Commentaires du manager"])
 
-        # Afficher le data_editor stylé avec 4 colonnes
+        # Afficher le data_editor stylé with 4 columns
         edited_df = st.data_editor(
             df,
             column_config={
@@ -1094,13 +1095,9 @@ with tabs[2]:
 
         # Sauvegarde des commentaires
         if st.button("💾 Sauvegarder commentaires", type="primary", key="save_comments_step1"):
-            section_index = 0
             for i in range(len(edited_df)):
-                if edited_df["Section"].iloc[i] != "":
-                    section_index += 1
-                else:
-                    comment_key = comment_keys[i - section_index]
-                    st.session_state[comment_key] = edited_df["Commentaires du manager"].iloc[i]
+                comment_key = comment_keys[i]
+                st.session_state[comment_key] = edited_df["Commentaires du manager"].iloc[i]
             st.success("✅ Commentaires sauvegardés")
 
     elif step == 2:
@@ -1185,7 +1182,7 @@ with tabs[2]:
             if st.button("Suivant ➡️", key="next_step"):
                 st.session_state.reunion_step += 1
                 st.rerun()
-
+                
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
     # Vérification si l'onglet est accessible
