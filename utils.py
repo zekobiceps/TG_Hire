@@ -178,7 +178,7 @@ def filter_briefs(briefs, month, recruteur, brief_type, manager, affectation, no
     for name, data in briefs.items():
         match = True
         try:
-            if month and month != "" and datetime.strptime(data.get("date_brief", ""), "%Y-%m-%d").strftime("%m") != month:
+            if month and month != "" and datetime.strptime(data.get("date_brief", datetime.today), "%Y-%m-%d").strftime("%m") != month:
                 match = False
             if recruteur and recruteur != "" and recruteur.lower() not in data.get("recruteur", "").lower():
                 match = False
