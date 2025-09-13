@@ -1,4 +1,4 @@
-import sys, os 
+import sys, os
 import streamlit as st
 from datetime import datetime
 import json
@@ -28,7 +28,7 @@ def render_ksa_matrix():
     # Initialiser les données KSA si elles n'existent pas
     if "ksa_matrix" not in st.session_state:
         st.session_state.ksa_matrix = pd.DataFrame(columns=[
-            "Rubrique", "Critère", "Cible / Standard attendu", 
+            "Rubrique", "Critère", "Cible / Standard attendu",
             "Échelle d'évaluation (1-5)", "Évaluateur"
         ])
     
@@ -59,7 +59,7 @@ def render_ksa_matrix():
                 
                 # Ajouter la nouvelle ligne au DataFrame
                 st.session_state.ksa_matrix = pd.concat([
-                    st.session_state.ksa_matrix, 
+                    st.session_state.ksa_matrix,
                     pd.DataFrame([new_row])
                 ], ignore_index=True)
                 
@@ -110,11 +110,10 @@ def delete_current_brief():
             st.session_state.current_brief_name = ""
             st.session_state.avant_brief_completed = False
             st.session_state.reunion_completed = False
-            st.session_state.reunion_step = 1
             
             # Réinitialiser les champs du formulaire
             keys_to_reset = [
-                "manager_nom", "niveau_hierarchique", "affectation_type", 
+                "manager_nom", "niveau_hierarchique", "affectation_type",
                 "recruteur", "affectation_nom", "date_brief", "raison_ouverture",
                 "impact_strategique", "rattachement", "taches_principales",
                 "must_have_experience", "must_have_diplomes", "must_have_competences",
@@ -163,8 +162,8 @@ with st.sidebar:
     
     # Calculer quelques statistiques
     total_briefs = len(st.session_state.get("saved_briefs", {}))
-    completed_briefs = sum(1 for b in st.session_state.get("saved_briefs", {}).values() 
-                          if b.get("ksa_data") and any(b["ksa_data"].values()))
+    completed_briefs = sum(1 for b in st.session_state.get("saved_briefs", {}).values()
+                              if b.get("ksa_data") and any(b["ksa_data"].values()))
     
     st.metric("📋 Briefs créés", total_briefs)
     st.metric("✅ Briefs complétés", completed_briefs)
@@ -482,9 +481,9 @@ if "current_brief_name" not in st.session_state:
 
 # Création des onglets avec gestion des accès
 tabs = st.tabs([
-    "📁 Gestion", 
-    "🔄 Avant-brief", 
-    "✅ Réunion de brief", 
+    "📁 Gestion",
+    "🔄 Avant-brief",
+    "✅ Réunion de brief",
     "📝 Synthèse"
 ])
 
@@ -762,12 +761,12 @@ with tabs[0]:
                                 st.session_state.current_brief_name = name
                                 
                                 # Mettre à jour uniquement les champs non-widgets
-                                non_widget_keys = ["raison_ouverture", "impact_strategique", "rattachement", 
-                                                  "taches_principales", "must_have_experience", "must_have_diplomes",
-                                                  "must_have_competences", "must_have_softskills", "nice_to_have_experience",
-                                                  "nice_to_have_diplomes", "nice_to_have_competences", "entreprises_profil", 
-                                                  "canaux_profil", "synonymes_poste", "budget", "commentaires", 
-                                                  "notes_libres", "profil_links"]
+                                non_widget_keys = ["raison_ouverture", "impact_strategique", "rattachement",
+                                                    "taches_principales", "must_have_experience", "must_have_diplomes",
+                                                    "must_have_competences", "must_have_softskills", "nice_to_have_experience",
+                                                    "nice_to_have_diplomes", "nice_to_have_competences", "entreprises_profil",
+                                                    "canaux_profil", "synonymes_poste", "budget", "commentaires",
+                                                    "notes_libres", "profil_links"]
                                 
                                 for key in non_widget_keys:
                                     if key in data:
@@ -988,310 +987,3 @@ with tabs[1]:
     with col_reset:
         if st.button("🗑️ Réinitialiser le Brief", type="secondary", use_container_width=True, key="reset_avant_brief"):
             delete_current_brief()
-
-# ---------------- RÉUNION (Wizard interne) ----------------
-with tabs[2]:
-    # Vérification si l'onglet est accessible
-    if not can_access_reunion:
-        st.warning("⚠️ Veuillez d'abord compléter et sauvegarder l'onglet Avant-brief")
-        st.stop()  # Arrête le rendu de cet onglet
-    
-    # Afficher les informations du brief en cours
-    st.subheader(f"✅ Réunion de brief avec le Manager - {st.session_state.get('niveau_hierarchique', '')}")
-
-    total_steps = 5  # Augmenté à 5 étapes pour inclure les notes du manager
-    step = st.session_state.reunion_step
-    st.progress(int((step / total_steps) * 100), text=f"Étape {step}/{total_steps}")
-
-    if step == 1:
-        st.subheader("📋 Portrait robot candidat - Validation")
-
-        # Liste des sections et champs pour le tableau (même structure qu'Avant-brief)
-        sections = [
-            {
-                "title": "Contexte du poste",
-                "fields": [
-                    ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"),
-                    ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"),
-                    ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"),
-                ]
-            },
-            {
-                "title": "Must-have (Indispensables)",
-                "fields": [
-                    ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
-                    ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
-                    ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"),
-                    ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"),
-                ]
-            },
-            {
-                "title": "Nice-to-have (Atouts)",
-                "fields": [
-                    ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
-                    ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
-                    ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
-                ]
-            },
-            {
-                "title": "Sourcing et marché",
-                "fields": [
-                    ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
-                    ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
-                    ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
-                ]
-            },
-            {
-                "title": "Conditions et contraintes",
-                "fields": [
-                    ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
-                    ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
-                ]
-            },
-            {
-                "title": "Profils pertinents",
-                "fields": [
-                    ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
-                    ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
-                    ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
-                ]
-            },
-            {
-                "title": "Notes libres",
-                "fields": [
-                    ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
-                    ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
-                ]
-            },
-        ]
-
-        # Construire le DataFrame avec une seule occurrence par section
-        data = []
-        field_keys = []
-        comment_keys = []
-        k = 1
-        for section in sections:
-            data.append([section["title"], "", "", ""])  # Ajouter la section une seule fois
-            for field_name, field_key, placeholder in section["fields"]:
-                data.append(["", field_name, st.session_state.get(field_key, ""), ""])
-                field_keys.append(field_key)
-                comment_keys.append(f"manager_comment_{k}")
-                k += 1
-
-        df = pd.DataFrame(data, columns=["Section", "Détails", "Informations", "Commentaires du manager"])
-
-        # Afficher le data_editor stylé avec 4 colonnes
-        edited_df = st.data_editor(
-            df,
-            column_config={
-                "Section": st.column_config.TextColumn("Section", disabled=True),
-                "Détails": st.column_config.TextColumn("Détails", disabled=True),
-                "Informations": st.column_config.TextColumn("Informations", width="medium", disabled=True),
-                "Commentaires du manager": st.column_config.TextColumn("Commentaires du manager", width="medium")
-            },
-            use_container_width=True,
-            hide_index=True,
-            num_rows="fixed"
-        )
-
-        # Sauvegarde des commentaires
-        if st.button("💾 Sauvegarder commentaires", type="primary", key="save_comments_step1"):
-            section_index = 0
-            for i in range(len(edited_df)):
-                if edited_df["Section"].iloc[i] != "":
-                    section_index += 1
-                else:
-                    comment_key = comment_keys[i - section_index]
-                    st.session_state[comment_key] = edited_df["Commentaires du manager"].iloc[i]
-            st.success("✅ Commentaires sauvegardés")
-
-    elif step == 2:
-        st.subheader("2️⃣ Questions Comportementales")
-        st.text_area("Comment le candidat devrait-il gérer [situation difficile] ?", key="comp_q1", height=100)
-        st.text_area("Réponse attendue", key="comp_rep1", height=100)
-        st.text_area("Compétences évaluées", key="comp_eval1", height=100)
-
-    elif step == 3:
-        st.subheader("📊 Matrice KSA - Validation manager")
-        render_ksa_matrix()
-
-    elif step == 4:
-        st.subheader("4️⃣ Stratégie Recrutement")
-        st.multiselect("Canaux prioritaires", ["LinkedIn", "Jobboards", "Cooptation", "Réseaux sociaux", "Chasse de tête"], key="canaux_prioritaires")
-        st.text_area("Critères d'exclusion", key="criteres_exclusion", height=100)
-        st.text_area("Processus d'évaluation (détails)", key="processus_evaluation", height=100)
-        
-    elif step == 5:
-        st.subheader("📝 Notes générales du manager")
-        st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=200, 
-                    placeholder="Ajoutez vos commentaires et notes généraux...")
-
-        # Boutons Enregistrer et Annuler
-        col_save, col_cancel = st.columns([1, 1])
-        with col_save:
-            if st.button("💾 Enregistrer réunion", type="primary", use_container_width=True, key="save_reunion"):
-                if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
-                    brief_name = st.session_state.current_brief_name
-                    
-                    # Récupérer tous les commentaires du manager
-                    manager_comments = {}
-                    for i in range(1, 21):  # 20 commentaires maintenant
-                        comment_key = f"manager_comment_{i}"
-                        if comment_key in st.session_state:
-                            manager_comments[comment_key] = st.session_state[comment_key]
-                    
-                    # Charger les briefs existants depuis le fichier
-                    existing_briefs = load_briefs()
-                    if brief_name in existing_briefs:
-                        existing_briefs[brief_name].update({
-                            "ksa_data": st.session_state.get("ksa_data", {}),
-                            "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict(),
-                            "manager_notes": st.session_state.get("manager_notes", ""),
-                            "manager_comments": manager_comments,
-                            "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
-                            "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
-                            "processus_evaluation": st.session_state.get("processus_evaluation", "")
-                        })
-                        st.session_state.saved_briefs = existing_briefs
-                    else:
-                        st.session_state.saved_briefs[brief_name].update({
-                            "ksa_data": st.session_state.get("ksa_data", {}),
-                            "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict(),
-                            "manager_notes": st.session_state.get("manager_notes", ""),
-                            "manager_comments": manager_comments,
-                            "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
-                            "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
-                            "processus_evaluation": st.session_state.get("processus_evaluation", "")
-                        })
-                    
-                    save_briefs()
-                    st.session_state.reunion_completed = True
-                    st.success("✅ Données de réunion sauvegardées")
-                    st.rerun()
-                else:
-                    st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
-        
-        with col_cancel:
-            if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion"):
-                delete_current_brief()
-
-    # ---- Navigation wizard ----
-    col1, col2, col3 = st.columns([1, 6, 1])
-    with col1:
-        if step > 1:
-            if st.button("⬅️ Précédent", key="prev_step"):
-                st.session_state.reunion_step -= 1
-                st.rerun()
-    with col3:
-        if step < total_steps:
-            if st.button("Suivant ➡️", key="next_step"):
-                st.session_state.reunion_step += 1
-                st.rerun()
-
-# ---------------- SYNTHÈSE ----------------
-with tabs[3]:
-    # Vérification si l'onglet est accessible
-    if not can_access_synthese:
-        st.warning("⚠️ Veuillez d'abord compléter et sauvegarder l'onglet Réunion de brief")
-        st.stop()  # Arrête le rendu de cet onglet
-    
-    # Afficher les informations du brief en cours
-    st.subheader(f"📝 Synthèse du Brief - {st.session_state.get('niveau_hierarchique', '')}")
-    
-    if "current_brief_name" in st.session_state:
-        st.success(f"Brief actuel: {st.session_state.current_brief_name}")
-    
-    st.subheader("Résumé des informations")
-    st.json({
-        "Poste": st.session_state.get("niveau_hierarchique", ""),
-        "Manager": st.session_state.get("manager_nom", ""),
-        "Recruteur": st.session_state.get("recruteur", ""),
-        "Type": st.session_state.get("brief_type", ""),
-        "Affectation": f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}",
-        "Date": str(st.session_state.get("date_brief", "")),
-        "Raison ouverture": st.session_state.get("raison_ouverture", ""),
-        "Tâches principales": st.session_state.get("taches_principales", ""),
-        "Entreprises profil": st.session_state.get("entreprises_profil", ""),
-        "Canaux": st.session_state.get("canaux_profil", ""),
-        "Budget": st.session_state.get("budget", ""),
-    })
-
-    st.subheader("📊 Calcul automatique du Score Global")
-    score_total = 0
-    count = 0
-    
-    # Calcul basé sur la matrice KSA
-    if hasattr(st.session_state, 'ksa_matrix') and not st.session_state.ksa_matrix.empty:
-        if "Échelle d'évaluation (1-5)" in st.session_state.ksa_matrix.columns:
-            scores = st.session_state.ksa_matrix["Échelle d'évaluation (1-5)"].astype(int)
-            score_global = scores.mean()
-            st.metric("Score Global Cible", f"{score_global:.2f}/5")
-    
-    # Calcul de secours basé sur l'ancien système KSA
-    elif "ksa_data" in st.session_state:
-        for cat, comps in st.session_state.ksa_data.items():
-            for comp, details in comps.items():
-                score_total += int(details.get("score") or 0)
-                count += 1
-        score_global = (score_total / count) if count else 0
-        st.metric("Score Global Cible", f"{score_global:.2f}/5")
-    else:
-        st.info("ℹ️ Aucune donnée KSA disponible pour calculer le score")
-
-    # Boutons Confirmer et Annuler
-    col_save, col_cancel = st.columns([1, 1])
-    with col_save:
-        if st.button("💾 Confirmer sauvegarde", type="primary", use_container_width=True, key="save_synthese"):
-            if "current_brief_name" in st.session_state:
-                save_briefs()
-                st.success(f"✅ Brief '{st.session_state.current_brief_name}' sauvegardé avec succès !")
-            else:
-                st.error("❌ Aucun brief à sauvegarder. Veuillez d'abord créer un brief.")
-    
-    with col_cancel:
-        if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_synthese"):
-            delete_current_brief()
-
-    # -------- EXPORT PDF/WORD --------
-    st.subheader("📄 Export du Brief complet")
-    col1, col2 = st.columns(2)
-    with col1:
-        if PDF_AVAILABLE:
-            if "current_brief_name" in st.session_state:
-                pdf_buf = export_brief_pdf()
-                if pdf_buf:
-                    st.download_button("⬇️ Télécharger PDF", data=pdf_buf,
-                                     file_name=f"{st.session_state.current_brief_name}.pdf", mime="application/pdf")
-            else:
-                st.info("ℹ️ Créez d'abord un brief pour l'exporter")
-        else:
-            st.info("⚠️ PDF non dispo (pip install reportlab)")
-    with col2:
-        if WORD_AVAILABLE:
-            if "current_brief_name" in st.session_state:
-                word_buf = export_brief_word()
-                if word_buf:
-                    st.download_button("⬇️ Télécharger Word", data=word_buf,
-                                     file_name=f"{st.session_state.current_brief_name}.docx",
-                                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-            else:
-                st.info("ℹ️ Créez d'abord un brief pour l'exporter")
-        else:
-            st.info("⚠️ Word non dispo (pip install python-docx)")
-
-# JavaScript pour désactiver les onglets non accessibles
-st.markdown(f"""
-<script>
-// Désactiver les onglets selon les permissions
-const tabs = parent.document.querySelectorAll('[data-baseweb="tab"]');
-if (!{str(can_access_avant_brief).lower()}) {{
-    tabs[1].classList.add('disabled-tab');
-}}
-if (!{str(can_access_reunion).lower()}) {{
-    tabs[2].classList.add('disabled-tab');
-}}
-if (!{str(can_access_synthese).lower()}) {{
-    tabs[3].classList.add('disabled-tab');
-}}
-</script>
-""", unsafe_allow_html=True)
