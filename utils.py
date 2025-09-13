@@ -1,4 +1,3 @@
-# utils.py
 # -*- coding: utf-8 -*-
 import streamlit as st
 import os
@@ -27,6 +26,31 @@ try:
     WORD_AVAILABLE = True
 except ImportError:
     WORD_AVAILABLE = False
+
+# -------------------- Gestion de la Bibliothèque de fiches de poste --------------------
+LIBRARY_FILE = "job_library.json"
+
+def load_library():
+    """Charge les fiches de poste depuis le fichier de la bibliothèque."""
+    if os.path.exists(LIBRARY_FILE):
+        with open(LIBRARY_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return []
+
+def save_library(library_data):
+    """Sauvegarde les fiches de poste dans le fichier de la bibliothèque."""
+    with open(LIBRARY_FILE, "w", encoding="utf-8") as f:
+        json.dump(library_data, f, indent=4, ensure_ascii=False)
+
+def prefill_from_library(job_title):
+    """Pré-remplit les champs en fonction du titre de poste en utilisant la bibliothèque."""
+    library = load_library()
+    
+    for job in library:
+        if job["title"].lower() == job_title.lower():
+            return job["description"]
+    
+    return ""
 
 # -------------------- Initialisation Session --------------------
 def init_session_state():
@@ -77,7 +101,7 @@ def init_session_state():
         "processus_evaluation": "",
         "manager_comments": {},
         "manager_notes": "",
-        "job_library": load_library(),
+        "job_library": load_library(),  # Charger la bibliothèque au début
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -140,7 +164,7 @@ def generate_checklist_advice(category, item):
         if "Raison" in item:
             return "- Clarifier si remplacement, création ou évolution interne.\n- Identifier le niveau d'urgence.\n- Relier au contexte business."
         elif "Mission" in item or "impact" in item:
-            return "- Détailler la valeur ajoutée stratégique du poste.\n- Relier les missions aux objectifs de l’entreprise."
+            return "- Détailler la valeur ajoutée stratégique du poste.\n- Relier les missions aux objectifs de l'entreprise."
         elif "Tâches" in item:
             return "- Lister les tâches principales avec des verbes d'action concrets.\n- Inclure les responsabilités clés et les livrables attendus."
     elif "must-have" in category.lower() or "nice-to-have" in category.lower():
@@ -368,18 +392,3 @@ def generate_automatic_brief_name():
     now = datetime.now()
     job_title = st.session_state.get("poste_intitule", "Nouveau")
     return f"{now.strftime('%Y-%m-%d')}_{job_title.replace(' ', '_')}"
-
-# -------------------- Gestion de la Bibliothèque de fiches de poste --------------------
-LIBRARY_FILE = "job_library.json"
-
-def load_library():
-    """Charge les fiches de poste depuis le fichier de la bibliothèque."""
-    if os.path.exists(LIBRARY_FILE):
-        with open(LIBRARY_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
-
-def save_library(library_data):
-    """Sauvegarde les fiches de poste dans le fichier de la bibliothèque."""
-    with open(LIBRARY_FILE, "w", encoding="utf-8") as f:
-        json.dump(library_data, f, indent=4, ensure_ascii=False)
