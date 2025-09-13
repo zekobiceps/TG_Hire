@@ -3,6 +3,7 @@ import streamlit as st
 from datetime import datetime
 import json
 import pandas as pd
+import numpy as np
 
 # ✅ permet d'accéder à utils.py à la racine
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -418,6 +419,31 @@ st.markdown("""
     }
     
     .stDataFrame tr:hover {
+        background-color: #2D2D2D;
+    }
+
+    /* Style spécifique pour le data_editor */
+    div[data-testid="stDataFrameContainer"] th {
+        background-color: #FF4B4B !important;
+        color: white !important;
+    }
+    
+    div[data-testid="stDataFrameContainer"] td {
+        padding: 14px 16px;
+        border: none;
+        color: #E0E0E0;
+        border-bottom: 1px solid #333;
+    }
+    
+    div[data-testid="stDataFrameContainer"] tr:last-child td {
+        border-bottom: none;
+    }
+    
+    div[data-testid="stDataFrameContainer"] tr:nth-child(even) {
+        background-color: #252525;
+    }
+    
+    div[data-testid="stDataFrameContainer"] tr:hover {
         background-color: #2D2D2D;
     }
     </style>
@@ -877,20 +903,18 @@ with tabs[1]:
 
     df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
 
-    # Extract Informations column as a list with explicit string conversion
-    default_informations = [str(x) if x is not None else "" for x in df["Informations"]]
-
     # Afficher le data_editor stylé with initial placeholders
     edited_df = st.data_editor(
         df,
         column_config={
             "Section": st.column_config.TextColumn("Section", disabled=True),
             "Détails": st.column_config.TextColumn("Détails", disabled=True),
-            "Informations": st.column_config.TextColumn("Informations", width="large", default=default_informations)
+            "Informations": st.column_config.TextColumn("Informations", width="large")
         },
         use_container_width=True,
         hide_index=True,
-        num_rows="fixed"
+        num_rows="fixed",
+        key="avant_brief_editor"
     )
 
     # --- Boutons Sauvegarder et Réinitialiser ---
@@ -1067,12 +1091,13 @@ with tabs[2]:
             column_config={
                 "Section": st.column_config.TextColumn("Section", disabled=True),
                 "Détails": st.column_config.TextColumn("Détails", disabled=True),
-                "Informations": st.column_config.TextColumn("Informations", width="medium", default=edited_df["Informations"]),
+                "Informations": st.column_config.TextColumn("Informations", width="medium"),
                 "Commentaires du manager": st.column_config.TextColumn("Commentaires du manager", width="medium")
             },
             use_container_width=True,
             hide_index=True,
-            num_rows="fixed"
+            num_rows="fixed",
+            key="reunion_step1_editor"
         )
 
         # Sauvegarde des commentaires
