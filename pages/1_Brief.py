@@ -3,6 +3,10 @@ import streamlit as st
 from datetime import datetime
 import json
 import pandas as pd
+import requests # Bibliothèque pour faire des appels API
+
+# Pour la lecture des fichiers PDF
+import pdfplumber
 
 # ✅ permet d'accéder à utils.py à la racine
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -121,6 +125,78 @@ def delete_current_brief():
             # Rediriger vers l'onglet Gestion
             st.session_state.brief_phase = "📁 Gestion"
             st.rerun()
+
+# Fonction pour appeler l'IA et extraire les informations (À ADAPTER)
+def extract_info_with_deepseek(text, job_title):
+    """
+    Appelle l'API DeepSeek pour extraire les critères d'une fiche de poste.
+    
+    PARAMÈTRES:
+    text (str): Le contenu textuel de la fiche de poste.
+    job_title (str): L'intitulé du poste à recruter.
+    
+    RETOURNE:
+    dict: Un dictionnaire contenant les informations extraites, ou un dictionnaire vide en cas d'erreur.
+    """
+    # Votre clé API DeepSeek (remplacez par votre clé réelle)
+    DEEPSEEK_API_KEY = "VOTRE_CLE_API_DEEPSEEK"
+    DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions" # URL de l'endpoint
+    
+    # Instruction à donner à l'IA
+    system_prompt = f"""
+    Vous êtes un expert en recrutement. Votre tâche est d'analyser une fiche de poste et d'extraire les informations clés pour créer un brief de recrutement. 
+    Les informations à extraire sont :
+    - raison_ouverture : La raison de la création du poste (remplacement, création, etc.).
+    - impact_strategique : La mission principale et l'impact du rôle.
+    - taches_principales : Les responsabilités et tâches les plus importantes.
+    - must_have_experience : L'expérience minimale requise.
+    - must_have_diplomes : Les diplômes ou certifications obligatoires.
+    - must_have_competences : Les compétences techniques (hard skills) essentielles.
+    - must_have_softskills : Les soft skills ou aptitudes comportementales incontournables.
+    - nice_to_have_experience : L'expérience souhaitée mais non obligatoire.
+    - nice_to_have_diplomes : Les diplômes ou certifications appréciés mais non essentiels.
+    - nice_to_have_competences : Les compétences techniques additionnelles.
+    - entreprises_profil : Les types d'entreprises ou les secteurs où trouver ce profil.
+    - synonymes_poste : Les titres de poste alternatifs.
+    - canaux_profil : Les meilleurs canaux de sourcing.
+    - budget : Le budget ou la fourchette salariale.
+    - commentaires : Des notes additionnelles ou des points à clarifier.
+    
+    Répondez uniquement avec un objet JSON contenant ces clés et les valeurs extraites. Ne donnez aucune autre explication ou texte avant ou après le JSON. Si une information n'est pas trouvée, la valeur correspondante doit être une chaîne vide.
+    """
+
+    # La requête à envoyer à l'API
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
+    }
+
+    payload = {
+        "model": "deepseek-coder", # Ou un autre modèle pertinent pour le texte
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": f"Analyse la fiche de poste pour le poste de '{job_title}' :\n\n{text}"}
+        ],
+        "temperature": 0.5
+    }
+
+    try:
+        response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload)
+        response.raise_for_status() # Lève une exception si le statut HTTP n'est pas 2xx
+        
+        response_data = response.json()
+        raw_content = response_data['choices'][0]['message']['content']
+        
+        # L'IA doit répondre en JSON, on le parse directement
+        parsed_data = json.loads(raw_content)
+        return parsed_data
+        
+    except requests.exceptions.RequestException as e:
+        st.error(f"Erreur lors de l'appel à l'API DeepSeek : {e}")
+        return {}
+    except json.JSONDecodeError:
+        st.error("Erreur de format de réponse de l'API. La réponse n'est pas un JSON valide.")
+        return {}
 
 # ---------------- INIT ----------------
 init_session_state()
@@ -475,13 +551,15 @@ tabs = st.tabs([
     "📁 Gestion", 
     "🔄 Avant-brief", 
     "✅ Réunion de brief", 
-    "📝 Synthèse"
+    "📝 Synthèse",
+    "📚 Bibliothèque"
 ])
 
 # Déterminer quels onglets sont accessibles
 can_access_avant_brief = st.session_state.current_brief_name != ""
 can_access_reunion = can_access_avant_brief and st.session_state.avant_brief_completed
 can_access_synthese = can_access_reunion and st.session_state.reunion_completed
+can_access_bibliotheque = can_access_avant_brief
 
 # ---------------- ONGLET GESTION ----------------
 with tabs[0]:
@@ -1248,7 +1326,7 @@ with tabs[3]:
     
     # Calcul de secours basé sur l'ancien système KSA
     elif "ksa_data" in st.session_state:
-        for cat, comps in st.session_state.ksa_data.items():
+        for cat, comps in st.session_state.get("ksa_data", {}).items():
             for comp, details in comps.items():
                 score_total += int(details.get("score") or 0)
                 count += 1
@@ -1298,6 +1376,59 @@ with tabs[3]:
         else:
             st.info("⚠️ Word non dispo (pip install python-docx)")
 
+
+# ---------------- NOUVEL ONGLET BIBLIOTHÈQUE ----------------
+with tabs[4]:
+    if not can_access_bibliotheque:
+        st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
+        st.stop()
+
+    st.header("📚 Bibliothèque de fiches de poste")
+    st.info("Chargez une fiche de poste et l'IA extraira automatiquement les informations pour pré-remplir le brief.")
+    
+    col_upload, col_action = st.columns([1, 2])
+    
+    with col_upload:
+        uploaded_file = st.file_uploader(
+            "Télécharger une fiche de poste (PDF uniquement)",
+            type=["pdf"],
+            help="L'IA analysera le contenu pour vous."
+        )
+    
+    with col_action:
+        # Le bouton d'analyse est conditionnel
+        if uploaded_file and st.session_state.get("niveau_hierarchique"):
+            if st.button("🚀 Analyser la fiche de poste", type="primary", use_container_width=True):
+                with st.spinner("L'IA analyse le document..."):
+                    # Extraire le texte du PDF
+                    try:
+                        with pdfplumber.open(uploaded_file) as pdf:
+                            full_text = ""
+                            for page in pdf.pages:
+                                full_text += page.extract_text() or ""
+                    except Exception as e:
+                        st.error(f"Erreur lors de la lecture du PDF: {e}")
+                        st.stop()
+
+                    # Appeler la fonction d'extraction de l'IA
+                    extracted_data = extract_info_with_deepseek(full_text, st.session_state.niveau_hierarchique)
+                    
+                    if extracted_data:
+                        # Mettre à jour l'état de la session avec les données extraites
+                        for key, value in extracted_data.items():
+                            if key in st.session_state:
+                                st.session_state[key] = value
+                        
+                        st.success("✅ Informations extraites avec succès. Les champs du brief ont été mis à jour.")
+                        st.session_state.brief_phase = "🔄 Avant-brief" # Rediriger l'utilisateur
+                        st.rerun()
+                    else:
+                        st.error("❌ L'extraction a échoué. Veuillez vérifier la réponse de l'API.")
+        elif not uploaded_file:
+            st.warning("⚠️ Veuillez télécharger une fiche de poste pour continuer.")
+        elif not st.session_state.get("niveau_hierarchique"):
+            st.warning("⚠️ Veuillez d'abord remplir le champ 'Poste à recruter' dans l'onglet 'Gestion'.")
+
 # JavaScript pour désactiver les onglets non accessibles
 st.markdown(f"""
 <script>
@@ -1311,6 +1442,9 @@ if (!{str(can_access_reunion).lower()}) {{
 }}
 if (!{str(can_access_synthese).lower()}) {{
     tabs[3].classList.add('disabled-tab');
+}}
+if (!{str(can_access_bibliotheque).lower()}) {{
+    tabs[4].classList.add('disabled-tab');
 }}
 </script>
 """, unsafe_allow_html=True)
