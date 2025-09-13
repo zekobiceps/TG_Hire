@@ -578,89 +578,96 @@ with tabs[0]:
     </style>
     """, unsafe_allow_html=True)
     
-    # Trois colonnes: Informations de base, Filtrage et Actions
-    col_info, col_filter, col_actions = st.columns([2, 1, 1])
+    # Deux colonnes principales: Informations de base et Filtrage
+    col_left, col_right = st.columns([2, 1])
     
-    with col_info:
-        # En-tête avec les titres alignés - VERSION COMPACTE
+    with col_left:
+        # En-tête Informations de base
         st.markdown('<div class="compact-title"><h3>Informations de base</h3></div>', unsafe_allow_html=True)
         
-        # Ligne 1: Poste à recruter | Manager
-        col1, col2 = st.columns(2)
+        # 3 colonnes et 2 lignes pour les informations de base
+        # Ligne 1
+        col1, col2, col3 = st.columns(3)
         with col1:
             st.text_input("Poste à recruter", key="poste_intitule")
         with col2:
             st.text_input("Manager", key="manager_nom")
-        
-        # Ligne 2: Recruteur | Type d'affectation
-        col3, col4 = st.columns(2)
         with col3:
             st.selectbox("Recruteur", ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"], key="recruteur")
+        
+        # Ligne 2
+        col4, col5, col6 = st.columns(3)
         with col4:
             st.selectbox("Type d'affectation", ["Chantier", "Siège", "Dépôt"], key="affectation_type")
-        
-        # Ligne 3: Nom affectation | Date du brief
-        col5, col6 = st.columns(2)
         with col5:
             st.text_input("Nom affectation", key="affectation_nom")
         with col6:
             st.date_input("Date du brief", key="date_brief", value=datetime.today())
+        
+        # Type de brief et boutons
+        col7, col8, col9 = st.columns(3)
+        with col7:
+            brief_type = st.radio("Type de brief", ["Standard", "Méthode complète"], horizontal=True, key="brief_type")
+        with col8:
+            if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
+                # Générer un nom unique avec timestamp
+                now = datetime.now()
+                job_title = st.session_state.get("poste_intitule", "Nouveau")
+                brief_name = f"{now.strftime('%Y-%m-%d_%H-%M-%S')}_{job_title.replace(' ', '_')}"
+                
+                if brief_name not in st.session_state.saved_briefs:
+                    st.session_state.saved_briefs[brief_name] = {
+                        "poste_intitule": st.session_state.poste_intitule,
+                        "manager_nom": st.session_state.manager_nom,
+                        "recruteur": st.session_state.recruteur,
+                        "affectation_type": st.session_state.affectation_type,
+                        "affectation_nom": st.session_state.affectation_nom,
+                        "date_brief": str(st.session_state.date_brief),
+                        "brief_type": st.session_state.brief_type
+                    }
+                    save_briefs()
+                    st.session_state.current_brief_name = brief_name
+                    st.session_state.save_message = f"✅ Brief '{brief_name}' créé avec succès"
+                    st.rerun()
+                else:
+                    st.warning("⚠️ Un brief avec ce nom existe déjà")
+        with col9:
+            if st.button("🗑️ Annuler", type="secondary", use_container_width=True, key="cancel_brief"):
+                # Reset fields
+                st.session_state.poste_intitule = ""
+                st.session_state.manager_nom = ""
+                st.session_state.recruteur = ""
+                st.session_state.affectation_type = ""
+                st.session_state.affectation_nom = ""
+                st.session_state.date_brief = datetime.today()
+                st.session_state.brief_type = "Standard"
+                st.rerun()
     
-    with col_filter:
-        # Section Filtrage - VERSION COMPACTE
+    with col_right:
+        # Section Filtrage - 3 colonnes et 2 lignes
         st.markdown('<h3 style="margin-bottom: 0.3rem;">🔍 Filtrer les briefs</h3>', unsafe_allow_html=True)
         
-        month = st.selectbox("Mois", ["", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"], key="filter_month")
-        brief_type_filter = st.selectbox("Type de brief", ["", "Standard", "Méthode complète"], key="filter_brief_type")
-        recruteur_filter = st.text_input("Recruteur", key="filter_recruteur")
-        manager_filter = st.text_input("Manager", key="filter_manager")
-        affectation_filter = st.selectbox("Affectation", ["", "Chantier", "Siège", "Dépôt"], key="filter_affectation")
-        nom_affectation_filter = st.text_input("Nom affectation", key="filter_nom_affectation")
+        # Ligne 1
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            month = st.selectbox("Mois", ["", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"], key="filter_month")
+        with col2:
+            brief_type_filter = st.selectbox("Type", ["", "Standard", "Méthode complète"], key="filter_brief_type")
+        with col3:
+            recruteur_filter = st.text_input("Recruteur", key="filter_recruteur")
+        
+        # Ligne 2
+        col4, col5, col6 = st.columns(3)
+        with col4:
+            manager_filter = st.text_input("Manager", key="filter_manager")
+        with col5:
+            affectation_filter = st.selectbox("Affectation", ["", "Chantier", "Siège", "Dépôt"], key="filter_affectation")
+        with col6:
+            nom_affectation_filter = st.text_input("Nom affectation", key="filter_nom_affectation")
         
         if st.button("🔎 Filtrer", use_container_width=True, key="apply_filter"):
             st.session_state.filtered_briefs = filter_briefs(st.session_state.saved_briefs, month, recruteur_filter, brief_type_filter, manager_filter, affectation_filter, nom_affectation_filter)
             st.session_state.show_filtered_results = True
-    
-    with col_actions:
-        # Section Type de brief et boutons
-        st.markdown('<h3 style="margin-bottom: 0.3rem;">⚙️ Actions</h3>', unsafe_allow_html=True)
-        
-        brief_type = st.radio("Type de brief", ["Standard", "Méthode complète"], horizontal=False, key="brief_type")
-        
-        # Boutons Créer et Annuler - VERSION COMPACTE
-        if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
-            # Générer un nom unique avec timestamp
-            now = datetime.now()
-            job_title = st.session_state.get("poste_intitule", "Nouveau")
-            brief_name = f"{now.strftime('%Y-%m-%d_%H-%M-%S')}_{job_title.replace(' ', '_')}"
-            
-            if brief_name not in st.session_state.saved_briefs:
-                st.session_state.saved_briefs[brief_name] = {
-                    "poste_intitule": st.session_state.poste_intitule,
-                    "manager_nom": st.session_state.manager_nom,
-                    "recruteur": st.session_state.recruteur,
-                    "affectation_type": st.session_state.affectation_type,
-                    "affectation_nom": st.session_state.affectation_nom,
-                    "date_brief": str(st.session_state.date_brief),
-                    "brief_type": st.session_state.brief_type
-                }
-                save_briefs()
-                st.session_state.current_brief_name = brief_name
-                st.session_state.save_message = f"✅ Brief '{brief_name}' créé avec succès"
-                st.rerun()
-            else:
-                st.warning("⚠️ Un brief avec ce nom existe déjà")
-        
-        if st.button("🗑️ Annuler", type="secondary", use_container_width=True, key="cancel_brief"):
-            # Reset fields
-            st.session_state.poste_intitule = ""
-            st.session_state.manager_nom = ""
-            st.session_state.recruteur = ""
-            st.session_state.affectation_type = ""
-            st.session_state.affectation_nom = ""
-            st.session_state.date_brief = datetime.today()
-            st.session_state.brief_type = "Standard"
-            st.rerun()
     
     st.divider()
     
@@ -699,59 +706,116 @@ with tabs[1]:
     if "current_brief_name" in st.session_state:
         st.success(f"Brief actuel: {st.session_state.current_brief_name}")
     
-    # Ajouter ce style CSS pour réduire la largeur des colonnes
+    # Ajouter ce style CSS pour réduire la largeur des colonnes Section et Détails
     st.markdown("""
     <style>
     /* Réduire la largeur des colonnes Section et Détails */
     .stDataFrame th:nth-child(1), .stDataFrame td:nth-child(1) {
-        width: 15% !important;
-        max-width: 15% !important;
+        width: 10% !important;
+        max-width: 10% !important;
     }
     .stDataFrame th:nth-child(2), .stDataFrame td:nth-child(2) {
         width: 20% !important;
         max-width: 20% !important;
     }
     .stDataFrame th:nth-child(3), .stDataFrame td:nth-child(3) {
-        width: 65% !important;
-        max-width: 65% !important;
+        width: 70% !important;
+        max-width: 70% !important;
     }
-    /* Supprimer complètement les lignes vides */
-    .empty-row {
-        display: none;
+    /* Permettre le retour à la ligne avec Alt+Enter */
+    .stTextArea textarea {
+        white-space: pre-wrap !important;
     }
     </style>
     """, unsafe_allow_html=True)
     
     # Liste des sections et champs pour le tableau
     sections = [
-        # ... (le reste de la définition des sections reste inchangé)
+        {
+            "title": "Contexte du poste",
+            "fields": [
+                ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"),
+                ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"),
+                ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"),
+            ]
+        },
+        {
+            "title": "Must-have (Indispensables)",
+            "fields": [
+                ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
+                ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
+                ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"),
+                ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"),
+            ]
+        },
+        {
+            "title": "Nice-to-have (Atouts)",
+            "fields": [
+                ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
+                ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
+                ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
+            ]
+        },
+        {
+            "title": "Sourcing et marché",
+            "fields": [
+                ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
+                ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
+                ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
+            ]
+        },
+        {
+            "title": "Conditions et contraintes",
+            "fields": [
+                ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
+                ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
+            ]
+        },
+        {
+            "title": "Profils pertinents",
+            "fields": [
+                ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
+                ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
+                ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
+            ]
+        },
+        {
+            "title": "Notes libres",
+            "fields": [
+                ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
+                ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
+            ]
+        },
     ]
 
-    # Construire le DataFrame sans lignes vides
+    # Récupérer les données du brief actuel
+    brief_data = {}
+    if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
+        brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
+
+    # Construire le DataFrame avec les données du brief actuel
     data = []
     for section in sections:
-        # Ajouter la section seulement (pas de ligne vide après)
         data.append([section["title"], "", ""])
         for field_name, field_key, placeholder in section["fields"]:
-            value = st.session_state.get(field_key, "")
+            # Prendre la valeur depuis brief_data si disponible, sinon depuis session_state
+            value = brief_data.get(field_key, st.session_state.get(field_key, ""))
             data.append(["", field_name, value])
 
     df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
 
-    # Afficher le data_editor stylé avec des colonnes réduites
+    # Afficher le data_editor stylé
     edited_df = st.data_editor(
         df,
         column_config={
-            "Section": st.column_config.TextColumn("Section", disabled=True, width="small"),
-            "Détails": st.column_config.TextColumn("Détails", disabled=True, width="small"),
+            "Section": st.column_config.TextColumn("Section", disabled=True),
+            "Détails": st.column_config.TextColumn("Détails", disabled=True),
             "Informations": st.column_config.TextColumn("Informations", width="large")
         },
         use_container_width=True,
         hide_index=True,
         num_rows="fixed"
     )
-    
-    # ... (le reste du code reste inchangé)
 
     # Boutons Enregistrer et Pré-rédiger par IA
     col_save, col_reset = st.columns(2)
