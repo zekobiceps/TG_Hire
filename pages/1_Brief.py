@@ -1063,30 +1063,44 @@ with tabs[2]:
             },
         ]
 
-        # Construire le DataFrame with section titles integrated into the first field row
+        # Construire le DataFrame with section titles integrated into the first field row only
         data = []
         field_keys = []
         comment_keys = []
         k = 1
         for section in sections:
-            # Use the section title only for the first field row
-            first_field = True
-            for field_name, field_key, placeholder in section["fields"]:
-                data.append([section["title"] if first_field else "", field_name, st.session_state.get(field_key, ""), ""])
+            # Add only the first field with the section title
+            field_name, field_key, placeholder = section["fields"][0]
+            data.append([section["title"], field_name, st.session_state.get(field_key, placeholder), ""])
+            field_keys.append(field_key)
+            comment_keys.append(f"manager_comment_{k}")
+            k += 1
+            # Add remaining fields without repeating the section title
+            for field_name, field_key, placeholder in section["fields"][1:]:
+                data.append(["", field_name, st.session_state.get(field_key, placeholder), ""])
                 field_keys.append(field_key)
                 comment_keys.append(f"manager_comment_{k}")
                 k += 1
 
         df = pd.DataFrame(data, columns=["Section", "Détails", "Informations", "Commentaires du manager"])
 
-        # Afficher le data_editor stylé with 4 columns
+        # Afficher le data_editor stylé with 4 columns and placeholders
         edited_df = st.data_editor(
             df,
             column_config={
                 "Section": st.column_config.TextColumn("Section", disabled=True),
                 "Détails": st.column_config.TextColumn("Détails", disabled=True),
-                "Informations": st.column_config.TextColumn("Informations", width="medium", disabled=True),
-                "Commentaires du manager": st.column_config.TextColumn("Commentaires du manager", width="medium")
+                "Informations": st.column_config.TextColumn(
+                    "Informations", 
+                    width="medium", 
+                    disabled=True,
+                    default=[f"Entrez {placeholder.lower()}" for placeholder in df["Informations"]]
+                ),
+                "Commentaires du manager": st.column_config.TextColumn(
+                    "Commentaires du manager", 
+                    width="medium",
+                    default=[f"Ajoutez vos commentaires sur {field_name.lower()}" for field_name in df["Détails"]]
+                )
             },
             use_container_width=True,
             hide_index=True,
@@ -1130,7 +1144,7 @@ with tabs[2]:
                     
                     # Récupérer tous les commentaires du manager
                     manager_comments = {}
-                    for i in range(1, 21):  # 20 commentaires maintenant
+                    for i in range(1, 21):  # 20 commentaires now
                         comment_key = f"manager_comment_{i}"
                         if comment_key in st.session_state:
                             manager_comments[comment_key] = st.session_state[comment_key]
