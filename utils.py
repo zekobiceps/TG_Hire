@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 import os
-import json
-import io
-import pandas as pd
+import pickle
 from datetime import datetime
-import requests
+import io
+import json
+import pandas as pd
+from docx import Document
+from docx.shared import Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.shared import Pt
 
 # -------------------- Disponibilité PDF & Word --------------------
 try:
@@ -25,13 +29,19 @@ except ImportError:
 
 # -------------------- Initialisation Session --------------------
 def init_session_state():
+    """Initialise l'état de la session Streamlit avec des valeurs par défaut."""
     defaults = {
-        "manager_nom": "",
+        "poste_intitule": "",
+        "service": "",
         "niveau_hierarchique": "",
-        "affectation_type": "",
+        "type_contrat": "",
+        "localisation": "",
+        "budget_salaire": "",
+        "date_prise_poste": "",
         "recruteur": "",
+        "manager_nom": "",
+        "affectation_type": "",
         "affectation_nom": "",
-        "date_brief": "",
         "raison_ouverture": "",
         "impact_strategique": "",
         "rattachement": "",
@@ -46,19 +56,18 @@ def init_session_state():
         "entreprises_profil": "",
         "synonymes_poste": "",
         "canaux_profil": "",
-        "budget": "",
         "commentaires": "",
         "notes_libres": "",
         "profil_links": ["", "", ""],
-        "ksa_data": {},
-        "ksa_matrix": pd.DataFrame(),
+        "ksa_data": {}, # Ancienne structure
+        "ksa_matrix": pd.DataFrame(), # Nouvelle structure, plus robuste
         "saved_briefs": {},
-        "current_brief_name": "",
+        "current_brief_name": None,
         "filtered_briefs": {},
-        "brief_type": "Brief",
-        "avant_brief_completed": False,
-        "reunion_completed": False,
-        "reunion_step": 1,
+        "show_filtered_results": False,
+        "brief_data": {},
+        "comment_libre": "",
+        "brief_phase": "Gestion",
         "saved_job_descriptions": {},
         "temp_extracted_data": None,
         "temp_job_title": "",
@@ -66,38 +75,56 @@ def init_session_state():
         "criteres_exclusion": "",
         "processus_evaluation": "",
         "manager_comments": {},
-        "manager_notes": ""
+        "manager_notes": "",
     }
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
 
-# -------------------- Persistence --------------------
+# -------------------- Persistance --------------------
 def save_briefs():
-    """Sauvegarde les briefs dans briefs.json"""
-    with open("briefs.json", "w") as f:
-        json.dump(st.session_state.saved_briefs, f, indent=4, default=str)
+    """Sauvegarde les briefs dans un fichier pickle."""
+    try:
+        # Convertir le DataFrame en une structure sérialisable
+        serializable_briefs = {
+            name: {
+                key: value.to_dict() if isinstance(value, pd.DataFrame) else value
+                for key, value in data.items()
+            }
+            for name, data in st.session_state.saved_briefs.items()
+        }
+        with open("briefs.json", "w") as f:
+            json.dump(serializable_briefs, f, indent=4)
+    except Exception as e:
+        st.error(f"Erreur lors de la sauvegarde des briefs: {e}")
 
 def load_briefs():
-    """Charge les briefs depuis briefs.json"""
+    """Charge les briefs depuis un fichier pickle."""
     try:
         with open("briefs.json", "r") as f:
             data = json.load(f)
-            # Convertir ksa_matrix en DataFrame si présent
-            for brief_name, brief_data in data.items():
-                if "ksa_matrix" in brief_data and brief_data["ksa_matrix"]:
-                    brief_data["ksa_matrix"] = pd.DataFrame(brief_data["ksa_matrix"])
-            return data
+            # Reconvertir les dictionnaires en DataFrames
+            loaded_briefs = {
+                name: {
+                    key: pd.DataFrame.from_dict(value) if key == "ksa_matrix" else value
+                    for key, value in brief_data.items()
+                }
+                for name, brief_data in data.items()
+            }
+            return loaded_briefs
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
 def save_job_descriptions():
-    """Sauvegarde les fiches de poste dans job_descriptions.json"""
-    with open("job_descriptions.json", "w") as f:
-        json.dump(st.session_state.saved_job_descriptions, f, indent=4)
+    """Sauvegarde les fiches de poste dans job_descriptions.json."""
+    try:
+        with open("job_descriptions.json", "w") as f:
+            json.dump(st.session_state.saved_job_descriptions, f, indent=4)
+    except Exception as e:
+        st.error(f"Erreur lors de la sauvegarde des fiches de poste: {e}")
 
 def load_job_descriptions():
-    """Charge les fiches de poste depuis job_descriptions.json"""
+    """Charge les fiches de poste depuis job_descriptions.json."""
     try:
         with open("job_descriptions.json", "r") as f:
             return json.load(f)
@@ -107,7 +134,6 @@ def load_job_descriptions():
 # -------------------- Conseils IA --------------------
 def generate_checklist_advice(category, item):
     """Génère un conseil IA pour les champs du brief."""
-    
     if "contexte" in category.lower():
         if "Raison" in item:
             return "- Clarifier si remplacement, création ou évolution interne.\n- Identifier le niveau d'urgence.\n- Relier au contexte business."
@@ -115,7 +141,6 @@ def generate_checklist_advice(category, item):
             return "- Détailler la valeur ajoutée stratégique du poste.\n- Relier les missions aux objectifs de l’entreprise."
         elif "Tâches" in item:
             return "- Lister les tâches principales avec des verbes d'action concrets.\n- Inclure les responsabilités clés et les livrables attendus."
-
     elif "must-have" in category.lower() or "nice-to-have" in category.lower():
         if "Expérience" in item:
             return "- Spécifier le nombre d'années d'expérience requis et le secteur d'activité ciblé.\n- Mentionner les types de projets ou de missions spécifiques."
@@ -125,7 +150,6 @@ def generate_checklist_advice(category, item):
             return "- Suggérer des compétences techniques (hard skills) et des outils à maîtriser.\n- Exemple : 'Maîtrise de Python', 'Expertise en gestion de projet Agile'."
         elif "Soft skills" in item:
             return "- Suggérer des aptitudes comportementales clés.\n- Exemple : 'Leadership', 'Communication', 'Rigueur', 'Autonomie'."
-
     elif "sourcing" in category.lower():
         if "Entreprises" in item:
             return "- Suggérer des entreprises similaires ou concurrents où trouver des profils.\n- Exemples : 'Entreprises du secteur de la construction', 'Startups technologiques'."
@@ -133,22 +157,18 @@ def generate_checklist_advice(category, item):
             return "- Suggérer des titres de poste alternatifs pour la recherche.\n- Exemples : 'Chef de projet', 'Project Manager', 'Responsable de programme'."
         elif "Canaux" in item:
             return "- Proposer des canaux de sourcing pertinents.\n- Exemples : 'LinkedIn', 'Jobboards spécialisés', 'Cooptation', 'Chasse de tête'."
-
     elif "conditions" in category.lower():
         if "Localisation" in item or "Rattachement" in item:
             return "- Préciser l'emplacement exact du poste, la possibilité de télétravail et la fréquence des déplacements."
         elif "Budget" in item:
             return "- Indiquer une fourchette de salaire réaliste et les avantages ou primes éventuelles."
-
     elif "profils" in category.lower():
         return "- Ajouter des URLs de profils LinkedIn ou autres sources pertinentes."
-
     elif "notes" in category.lower():
         if "Points à discuter" in item or "Commentaires" in item:
             return "- Proposer des questions pour clarifier le brief avec le manager.\n- Exemple : 'Priorité des compétences', 'Culture d'équipe'."
         elif "Case libre" in item or "Notes libres" in item:
             return "- Suggérer des points additionnels à considérer.\n- Exemple : 'Points de motivation spécifiques pour ce poste'."
-
     return f"- Fournir des détails pratiques pour {item}\n- Exemple concret\n- Piège à éviter"
 
 # -------------------- Filtre --------------------
@@ -157,27 +177,30 @@ def filter_briefs(briefs, month, recruteur, brief_type, manager, affectation, no
     filtered = {}
     for name, data in briefs.items():
         match = True
-        if month and month != "" and data.get("date_brief", "").split("-")[1] != month:
-            match = False
-        if recruteur and recruteur != "" and recruteur.lower() not in data.get("recruteur", "").lower():
-            match = False
-        if brief_type and brief_type != "" and data.get("brief_type", "") != brief_type:
-            match = False
-        if manager and manager != "" and manager.lower() not in data.get("manager_nom", "").lower():
-            match = False
-        if affectation and affectation != "" and data.get("affectation_type", "") != affectation:
-            match = False
-        if nom_affectation and nom_affectation != "" and nom_affectation.lower() not in data.get("affectation_nom", "").lower():
-            match = False
-        if match:
-            filtered[name] = data
+        try:
+            if month and month != "" and datetime.strptime(data.get("date_brief", ""), "%Y-%m-%d").strftime("%m") != month:
+                match = False
+            if recruteur and recruteur != "" and recruteur.lower() not in data.get("recruteur", "").lower():
+                match = False
+            if brief_type and brief_type != "" and data.get("brief_type", "") != brief_type:
+                match = False
+            if manager and manager != "" and manager.lower() not in data.get("manager_nom", "").lower():
+                match = False
+            if affectation and affectation != "" and data.get("affectation_type", "") != affectation:
+                match = False
+            if nom_affectation and nom_affectation != "" and nom_affectation.lower() not in data.get("affectation_nom", "").lower():
+                match = False
+            if match:
+                filtered[name] = data
+        except ValueError: # Gère les dates non valides
+            continue
     return filtered
 
 # -------------------- Export PDF --------------------
 def export_brief_pdf():
     if not PDF_AVAILABLE:
         return None
-
+    
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     styles = getSampleStyleSheet()
@@ -189,21 +212,22 @@ def export_brief_pdf():
     # --- SECTION 1: Identité
     story.append(Paragraph("1. Identité du poste", styles['Heading2']))
     infos = [
-        ["Intitulé", st.session_state.get("niveau_hierarchique", "")],
-        ["Manager", st.session_state.get("manager_nom", "")],
-        ["Recruteur", st.session_state.get("recruteur", "")],
-        ["Type", st.session_state.get("brief_type", "")],
-        ["Affectation", f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}"],
-        ["Date", str(st.session_state.get("date_brief", ""))]
+        ["Intitulé", st.session_state.get("poste_intitule", "")],
+        ["Service", st.session_state.get("service", "")],
+        ["Niveau Hiérarchique", st.session_state.get("niveau_hierarchique", "")],
+        ["Type de Contrat", st.session_state.get("type_contrat", "")],
+        ["Localisation", st.session_state.get("localisation", "")],
+        ["Budget Salaire", st.session_state.get("budget_salaire", "")],
+        ["Date Prise de Poste", str(st.session_state.get("date_prise_poste", ""))]
     ]
     story.append(Table(infos, colWidths=[150, 300], style=[("GRID", (0, 0), (-1, -1), 1, colors.black)]))
     story.append(Spacer(1, 15))
 
-    # --- SECTION 2: Contexte
+    # --- SECTION 2: Contexte & Enjeux
     story.append(Paragraph("2. Contexte & Enjeux", styles['Heading2']))
     for field in ["raison_ouverture", "impact_strategique", "rattachement", "taches_principales"]:
         if field in st.session_state and st.session_state[field]:
-            story.append(Paragraph(f"**{field.replace('_', ' ').title()}:** {st.session_state[field]}", styles['Normal']))
+            story.append(Paragraph(f"<b>{field.replace('_', ' ').title()}:</b> {st.session_state[field]}", styles['Normal']))
             story.append(Spacer(1, 5))
     story.append(Spacer(1, 15))
 
@@ -214,63 +238,41 @@ def export_brief_pdf():
         "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences"
     ]:
         if field in st.session_state and st.session_state[field]:
-            story.append(Paragraph(f"**{field.replace('_', ' ').title()}:** {st.session_state[field]}", styles['Normal']))
+            story.append(Paragraph(f"<b>{field.replace('_', ' ').title()}:</b> {st.session_state[field]}", styles['Normal']))
             story.append(Spacer(1, 5))
     story.append(Spacer(1, 15))
 
-    # --- SECTION 4: Sourcing
-    story.append(Paragraph("4. Sourcing", styles['Heading2']))
-    for field in ["entreprises_profil", "synonymes_poste", "canaux_profil"]:
-        if field in st.session_state and st.session_state[field]:
-            story.append(Paragraph(f"**{field.replace('_', ' ').title()}:** {st.session_state[field]}", styles['Normal']))
-            story.append(Spacer(1, 5))
-    story.append(Spacer(1, 15))
-
-    # --- SECTION 5: Conditions
-    story.append(Paragraph("5. Conditions", styles['Heading2']))
-    for field in ["budget", "commentaires", "notes_libres"]:
-        if field in st.session_state and st.session_state[field]:
-            story.append(Paragraph(f"**{field.replace('_', ' ').title()}:** {st.session_state[field]}", styles['Normal']))
-            story.append(Spacer(1, 5))
-    story.append(Spacer(1, 15))
-
-    # --- SECTION 6: Profils
-    story.append(Paragraph("6. Profils Pertinents", styles['Heading2']))
-    for i, link in enumerate(st.session_state.get("profil_links", ["", "", ""]), 1):
-        if link:
-            story.append(Paragraph(f"**Profil {i}:** {link}", styles['Normal']))
-            story.append(Spacer(1, 5))
-    story.append(Spacer(1, 15))
-
-    # --- SECTION 7: Matrice KSA
-    story.append(Paragraph("7. Matrice KSA", styles['Heading2']))
-    if hasattr(st.session_state, 'ksa_matrix') and not st.session_state.ksa_matrix.empty:
+    # --- SECTION 4: Matrice KSA
+    story.append(Paragraph("4. Matrice KSA", styles['Heading2']))
+    if not st.session_state.ksa_matrix.empty:
         header = ["Rubrique", "Critère", "Cible / Standard attendu", "Échelle (1-5)", "Évaluateur"]
         table_data = [header] + st.session_state.ksa_matrix.values.tolist()
-        story.append(Table(table_data, style=[('GRID', (0,0), (-1,-1), 1, colors.black), ('BACKGROUND', (0,0), (-1,0), colors.grey)]))
+        t = Table(table_data, style=[('GRID', (0,0), (-1,-1), 1, colors.black), ('BACKGROUND', (0,0), (-1,0), colors.grey)])
+        story.append(t)
     story.append(Spacer(1, 15))
 
-    # --- SECTION 8: Stratégie Recrutement
-    story.append(Paragraph("8. Stratégie Recrutement", styles['Heading2']))
-    for field in ["canaux_prioritaires", "criteres_exclusion", "processus_evaluation"]:
+    # --- SECTION 5: Stratégie Recrutement
+    story.append(Paragraph("5. Stratégie Recrutement", styles['Heading2']))
+    strategy_fields = ["canaux_prioritaires", "criteres_exclusion", "processus_evaluation"]
+    for field in strategy_fields:
         if field in st.session_state and st.session_state[field]:
             value = ", ".join(st.session_state[field]) if field == "canaux_prioritaires" else st.session_state[field]
-            story.append(Paragraph(f"**{field.replace('_', ' ').title()}:** {value}", styles['Normal']))
+            story.append(Paragraph(f"<b>{field.replace('_', ' ').title()}:</b> {value}", styles['Normal']))
             story.append(Spacer(1, 5))
     story.append(Spacer(1, 15))
 
-    # --- SECTION 9: Notes Manager
-    story.append(Paragraph("9. Notes du Manager", styles['Heading2']))
+    # --- SECTION 6: Notes du Manager
+    story.append(Paragraph("6. Notes du Manager", styles['Heading2']))
     if st.session_state.get("manager_notes"):
-        story.append(Paragraph(f"**Notes Générales:** {st.session_state.manager_notes}", styles['Normal']))
+        story.append(Paragraph(f"<b>Notes Générales:</b> {st.session_state.manager_notes}", styles['Normal']))
         story.append(Spacer(1, 5))
     for i in range(1, 21):
         comment_key = f"manager_comment_{i}"
         if comment_key in st.session_state.get("manager_comments", {}) and st.session_state.manager_comments[comment_key]:
-            story.append(Paragraph(f"**Commentaire {i}:** {st.session_state.manager_comments[comment_key]}", styles['Normal']))
+            story.append(Paragraph(f"<b>Commentaire {i}:</b> {st.session_state.manager_comments[comment_key]}", styles['Normal']))
             story.append(Spacer(1, 5))
+    story.append(Spacer(1, 15))
 
-    # Générer le PDF
     doc.build(story)
     buffer.seek(0)
     return buffer
@@ -286,24 +288,26 @@ def export_brief_word():
     # --- SECTION 1: Identité
     doc.add_heading("1. Identité du poste", level=2)
     info_table = doc.add_table(rows=0, cols=2)
+    info_table.autofit = True
     for label, value in [
-        ["Intitulé", st.session_state.get("niveau_hierarchique", "")],
-        ["Manager", st.session_state.get("manager_nom", "")],
-        ["Recruteur", st.session_state.get("recruteur", "")],
-        ["Type", st.session_state.get("brief_type", "")],
-        ["Affectation", f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}"],
-        ["Date", str(st.session_state.get("date_brief", ""))]
+        ["Intitulé", st.session_state.get("poste_intitule", "")],
+        ["Service", st.session_state.get("service", "")],
+        ["Niveau Hiérarchique", st.session_state.get("niveau_hierarchique", "")],
+        ["Type de Contrat", st.session_state.get("type_contrat", "")],
+        ["Localisation", st.session_state.get("localisation", "")],
+        ["Budget Salaire", st.session_state.get("budget_salaire", "")],
+        ["Date Prise de Poste", str(st.session_state.get("date_prise_poste", ""))]
     ]:
-        row = info_table.add_row().cells
-        row[0].text = label
-        row[1].text = value
+        row_cells = info_table.add_row().cells
+        row_cells[0].text = label
+        row_cells[1].text = value
     doc.add_paragraph()
 
-    # --- SECTION 2: Contexte
+    # --- SECTION 2: Contexte & Enjeux
     doc.add_heading("2. Contexte & Enjeux", level=2)
     for field in ["raison_ouverture", "impact_strategique", "rattachement", "taches_principales"]:
         if field in st.session_state and st.session_state[field]:
-            doc.add_paragraph(f"{field.replace('_', ' ').title()}: {st.session_state[field]}")
+            doc.add_paragraph(f"<b>{field.replace('_', ' ').title()}:</b> {st.session_state[field]}")
     doc.add_paragraph()
 
     # --- SECTION 3: Exigences
@@ -313,33 +317,12 @@ def export_brief_word():
         "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences"
     ]:
         if field in st.session_state and st.session_state[field]:
-            doc.add_paragraph(f"{field.replace('_', ' ').title()}: {st.session_state[field]}")
+            doc.add_paragraph(f"<b>{field.replace('_', ' ').title()}:</b> {st.session_state[field]}")
     doc.add_paragraph()
 
-    # --- SECTION 4: Sourcing
-    doc.add_heading("4. Sourcing", level=2)
-    for field in ["entreprises_profil", "synonymes_poste", "canaux_profil"]:
-        if field in st.session_state and st.session_state[field]:
-            doc.add_paragraph(f"{field.replace('_', ' ').title()}: {st.session_state[field]}")
-    doc.add_paragraph()
-
-    # --- SECTION 5: Conditions
-    doc.add_heading("5. Conditions", level=2)
-    for field in ["budget", "commentaires", "notes_libres"]:
-        if field in st.session_state and st.session_state[field]:
-            doc.add_paragraph(f"{field.replace('_', ' ').title()}: {st.session_state[field]}")
-    doc.add_paragraph()
-
-    # --- SECTION 6: Profils
-    doc.add_heading("6. Profils Pertinents", level=2)
-    for i, link in enumerate(st.session_state.get("profil_links", ["", "", ""]), 1):
-        if link:
-            doc.add_paragraph(f"Profil {i}: {link}")
-    doc.add_paragraph()
-
-    # --- SECTION 7: Matrice KSA
-    doc.add_heading("7. Matrice KSA", level=2)
-    if hasattr(st.session_state, 'ksa_matrix') and not st.session_state.ksa_matrix.empty:
+    # --- SECTION 4: Matrice KSA
+    doc.add_heading("4. Matrice KSA", level=2)
+    if not st.session_state.ksa_matrix.empty:
         ksa_table = doc.add_table(rows=1, cols=5)
         ksa_table.autofit = True
         header_cells = ksa_table.rows[0].cells
@@ -348,33 +331,38 @@ def export_brief_word():
             header_cells[i].text = label
         for _, row in st.session_state.ksa_matrix.iterrows():
             row_cells = ksa_table.add_row().cells
-            for i, col in enumerate(["Rubrique", "Critère", "Cible / Standard attendu", "Échelle d'évaluation (1-5)", "Évaluateur"]):
-                row_cells[i].text = str(row[col])
+            row_cells[0].text = str(row["Rubrique"])
+            row_cells[1].text = str(row["Critère"])
+            row_cells[2].text = str(row["Cible / Standard attendu"])
+            row_cells[3].text = str(row["Échelle d'évaluation (1-5)"])
+            row_cells[4].text = str(row["Évaluateur"])
     doc.add_paragraph()
 
-    # --- SECTION 8: Stratégie Recrutement
-    doc.add_heading("8. Stratégie Recrutement", level=2)
-    for field in ["canaux_prioritaires", "criteres_exclusion", "processus_evaluation"]:
+    # --- SECTION 5: Stratégie Recrutement
+    doc.add_heading("5. Stratégie Recrutement", level=2)
+    strategy_fields = ["canaux_prioritaires", "criteres_exclusion", "processus_evaluation"]
+    for field in strategy_fields:
         if field in st.session_state and st.session_state[field]:
             value = ", ".join(st.session_state[field]) if field == "canaux_prioritaires" else st.session_state[field]
-            doc.add_paragraph(f"{field.replace('_', ' ').title()}: {value}")
+            doc.add_paragraph(f"<b>{field.replace('_', ' ').title()}:</b> {value}")
     doc.add_paragraph()
 
-    # --- SECTION 9: Notes Manager
-    doc.add_heading("9. Notes du Manager", level=2)
+    # --- SECTION 6: Notes du Manager
+    doc.add_heading("6. Notes du Manager", level=2)
     if st.session_state.get("manager_notes"):
-        doc.add_paragraph(f"Notes Générales: {st.session_state.manager_notes}")
+        doc.add_paragraph(f"<b>Notes Générales:</b> {st.session_state.manager_notes}")
     for i in range(1, 21):
         comment_key = f"manager_comment_{i}"
         if comment_key in st.session_state.get("manager_comments", {}) and st.session_state.manager_comments[comment_key]:
-            doc.add_paragraph(f"Commentaire {i}: {st.session_state.manager_comments[comment_key]}")
+            doc.add_paragraph(f"<b>Commentaire {i}:</b> {st.session_state.manager_comments[comment_key]}")
 
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer
-
-# -------------------- Génération nom automatique --------------------
+    
 def generate_automatic_brief_name():
+    """Génère un nom de brief automatique basé sur la date et l'intitulé du poste."""
     now = datetime.now()
-    return f"{now.strftime('%Y-%m-%d')}_{st.session_state.get('niveau_hierarchique', 'Nouveau')}"
+    job_title = st.session_state.get("poste_intitule", "Nouveau")
+    return f"{now.strftime('%Y-%m-%d')}_{job_title.replace(' ', '_')}"
