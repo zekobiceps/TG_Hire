@@ -88,16 +88,6 @@ def render_ksa_matrix():
     else:
         st.info("Aucun critère défini. Ajoutez des critères pour commencer.")
 
-def conseil_button(titre, categorie, conseil, key):
-    """Crée un bouton avec conseil pour un champ"""
-    col1, col2 = st.columns([4, 1])
-    with col1:
-        st.text_area(titre, key=key)
-    with col2:
-        if st.button("💡", key=f"btn_{key}"):
-            st.session_state[key] = generate_checklist_advice(categorie, titre)
-            st.rerun()
-
 def delete_current_brief():
     """Supprime le brief actuel et retourne à l'onglet Gestion"""
     if "current_brief_name" in st.session_state and st.session_state.current_brief_name:
@@ -846,6 +836,7 @@ with tabs[1]:
     sections = [
         {
             "title": "Contexte du poste",
+            "category": "contexte",
             "fields": [
                 ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"),
                 ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"),
@@ -854,6 +845,7 @@ with tabs[1]:
         },
         {
             "title": "Must-have (Indispensables)",
+            "category": "must-have",
             "fields": [
                 ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
                 ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
@@ -863,6 +855,7 @@ with tabs[1]:
         },
         {
             "title": "Nice-to-have (Atouts)",
+            "category": "nice-to-have",
             "fields": [
                 ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
                 ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
@@ -871,6 +864,7 @@ with tabs[1]:
         },
         {
             "title": "Sourcing et marché",
+            "category": "sourcing",
             "fields": [
                 ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
                 ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
@@ -879,6 +873,7 @@ with tabs[1]:
         },
         {
             "title": "Conditions et contraintes",
+            "category": "conditions",
             "fields": [
                 ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
                 ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
@@ -886,6 +881,7 @@ with tabs[1]:
         },
         {
             "title": "Profils pertinents",
+            "category": "profils",
             "fields": [
                 ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
                 ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
@@ -894,12 +890,26 @@ with tabs[1]:
         },
         {
             "title": "Notes libres",
+            "category": "notes",
             "fields": [
                 ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
                 ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
             ]
         },
     ]
+
+    # Bouton pour l'assistance IA
+    if st.button("💡 Prérédiger avec l'IA", type="secondary", use_container_width=True, key="ai_fill_button"):
+        with st.spinner("L'IA génère les suggestions..."):
+            for section in sections:
+                # Les liens de profils n'ont pas de conseils IA
+                if section["category"] == "profils":
+                    continue
+                for field_name, field_key, _ in section["fields"]:
+                    advice = generate_checklist_advice(section["category"], field_name)
+                    st.session_state[field_key] = advice
+            st.success("✅ Suggestions IA ajoutées. Vous pouvez maintenant les modifier.")
+            st.rerun()
 
     # Construire le DataFrame with section titles integrated into the first field row
     data = []
