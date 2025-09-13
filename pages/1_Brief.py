@@ -3,6 +3,7 @@ import streamlit as st
 from datetime import datetime
 import json
 import pandas as pd
+import base64
 
 # ✅ permet d'accéder à utils.py à la racine
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -21,79 +22,125 @@ from utils import (
 )
 
 # ---------------- NOUVELLES FONCTIONS ----------------
-def render_interactive_brief_table(brief_data, tab_key, is_editable=True):
-    """
-    Affiche un tableau interactif pour les données du brief.
-    Permet l'édition si is_editable est True.
-    """
-    # Créer un DataFrame à partir des données structurées pour un affichage en tableau
-    df_data = [
-        {"Catégorie": "Informations de poste", "Critère": "Raison de l'ouverture", "Description": brief_data.get("raison_ouverture", "")},
-        {"Catégorie": "Informations de poste", "Critère": "Impact stratégique", "Description": brief_data.get("impact_strategique", "")},
-        {"Catégorie": "Informations de poste", "Critère": "Rattachement", "Description": brief_data.get("rattachement", "")},
-        {"Catégorie": "Informations de poste", "Critère": "Tâches principales", "Description": brief_data.get("taches_principales", "")},
-        {"Catégorie": "Profil Must-Have", "Critère": "Expérience", "Description": brief_data.get("must_have_experience", "")},
-        {"Catégorie": "Profil Must-Have", "Critère": "Diplômes & Certifications", "Description": brief_data.get("must_have_diplomes", "")},
-        {"Catégorie": "Profil Must-Have", "Critère": "Compétences techniques", "Description": brief_data.get("must_have_competences", "")},
-        {"Catégorie": "Profil Must-Have", "Critère": "Soft Skills", "Description": brief_data.get("must_have_softskills", "")},
-        {"Catégorie": "Profil Nice-to-Have", "Critère": "Expérience", "Description": brief_data.get("nice_to_have_experience", "")},
-        {"Catégorie": "Profil Nice-to-Have", "Critère": "Diplômes & Certifications", "Description": brief_data.get("nice_to_have_diplomes", "")},
-        {"Catégorie": "Profil Nice-to-Have", "Critère": "Compétences techniques", "Description": brief_data.get("nice_to_have_competences", "")},
-        {"Catégorie": "Sources & Marché", "Critère": "Entreprises et profils cibles", "Description": brief_data.get("entreprises_profil", "")},
-        {"Catégorie": "Sources & Marché", "Critère": "Synonymes de poste", "Description": brief_data.get("synonymes_poste", "")},
-        {"Catégorie": "Sources & Marché", "Critère": "Canaux de sourcing", "Description": brief_data.get("canaux_profil", "")},
-        {"Catégorie": "Informations complémentaires", "Critère": "Budget", "Description": brief_data.get("budget", "")},
-        {"Catégorie": "Informations complémentaires", "Critère": "Notes libres", "Description": brief_data.get("notes_libres", "")},
-        {"Catégorie": "Informations complémentaires", "Critère": "Commentaires du manager", "Description": brief_data.get("commentaires", "")},
-    ]
+def get_table_download_link_html(df, filename, text):
+    """Génère un lien HTML pour télécharger un DataFrame en tant que fichier CSV."""
+    csv = df.to_csv(index=False)
+    b64 = base64.b64encode(csv.encode()).decode()
+    href = f'<a href="data:file/csv;base64,{b64}" download="{filename}">{text}</a>'
+    return href
 
-    df = pd.DataFrame(df_data)
+def render_styled_brief_table(brief_data, tab_key, is_editable=True):
+    """
+    Affiche un tableau stylisé pour les données du brief, avec une ligne d'en-tête rouge vif.
+    """
+    # Données du tableau structurées par catégorie
+    table_structure = {
+        "Informations de poste": [
+            "Raison de l'ouverture", "Impact stratégique", "Rattachement", "Tâches principales"
+        ],
+        "Profil Must-Have": [
+            "Expérience", "Diplômes & Certifications", "Compétences techniques", "Soft Skills"
+        ],
+        "Profil Nice-to-Have": [
+            "Expérience", "Diplômes & Certifications", "Compétences techniques"
+        ],
+        "Sources & Marché": [
+            "Entreprises et profils cibles", "Synonymes de poste", "Canaux de sourcing"
+        ],
+        "Informations complémentaires": [
+            "Budget", "Notes libres", "Commentaires du manager"
+        ]
+    }
 
-    if is_editable:
-        edited_df = st.data_editor(
-            df,
-            column_config={
-                "Catégorie": st.column_config.TextColumn(
-                    "Catégorie", disabled=True
-                ),
-                "Critère": st.column_config.TextColumn(
-                    "Critère", disabled=True
-                ),
-                "Description": st.column_config.TextColumn(
-                    "Description", help="Ajoutez vos informations ici"
-                )
-            },
-            hide_index=True,
-            use_container_width=True,
-            num_rows="fixed",
-            key=f"brief_data_editor_{tab_key}"
-        )
-        return edited_df
-    else:
-        st.dataframe(
-            df,
-            hide_index=True,
-            use_container_width=True,
-            column_config={
-                "Catégorie": st.column_config.TextColumn("Catégorie"),
-                "Critère": st.column_config.TextColumn("Critère"),
-                "Description": st.column_config.TextColumn("Description")
-            }
-        )
-        return df
+    st.markdown("""
+        <style>
+        .red-header {
+            background-color: #FF4B4B;
+            color: white;
+            padding: 12px;
+            font-weight: bold;
+            font-size: 1.1em;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            text-align: center;
+        }
+        .table-row {
+            display: flex;
+            border-bottom: 1px solid #424242;
+            padding: 8px 0;
+        }
+        .table-row:last-child {
+            border-bottom: none;
+        }
+        .table-cell {
+            padding: 8px;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            hyphens: auto;
+        }
+        .table-category {
+            font-weight: bold;
+            color: #ff4b4b;
+        }
+        .category-header {
+            background-color: #262730;
+            padding: 8px;
+            font-weight: bold;
+            margin-top: 10px;
+            border-radius: 4px;
+        }
+        .stTextArea textarea {
+            background-color: #2D2D2D !important;
+            color: white !important;
+            border: 1px solid #555 !important;
+            border-radius: 4px !important;
+            padding: 6px !important;
+            min-height: 100px !important;
+            resize: vertical !important;
+        }
+        .stMarkdown p {
+            margin: 0;
+            padding: 0;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns([1, 1, 3])
+    with col1: st.markdown("<div class='red-header' style='border-top-right-radius: 0;'>Catégorie</div>", unsafe_allow_html=True)
+    with col2: st.markdown("<div class='red-header' style='border-radius: 0;'>Critère</div>", unsafe_allow_html=True)
+    with col3: st.markdown("<div class='red-header' style='border-top-left-radius: 0;'>Description</div>", unsafe_allow_html=True)
+    
+    for category, criteria in table_structure.items():
+        st.markdown(f"<div class='category-header'>{category}</div>", unsafe_allow_html=True)
+        for i, criterion in enumerate(criteria):
+            mapping_key = f"{category}_{criterion}"
+            current_value = brief_data.get(mapping_key, "")
+
+            col_cat, col_crit, col_desc = st.columns([1, 1, 3])
+            
+            with col_cat:
+                if i == 0:
+                    st.markdown(f"<p class='table-category'>{category}</p>", unsafe_allow_html=True)
+            with col_crit:
+                st.markdown(f"<p>{criterion}</p>", unsafe_allow_html=True)
+            with col_desc:
+                if is_editable:
+                    new_value = st.text_area(label="", value=current_value, key=f"{tab_key}_{mapping_key}", label_visibility="collapsed")
+                    brief_data[mapping_key] = new_value
+                else:
+                    st.markdown(f"<p>{current_value}</p>", unsafe_allow_html=True)
+    return brief_data
 
 def render_ksa_matrix():
     """Affiche la matrice KSA sous forme de tableau interactif et stylisé"""
     st.subheader("📊 Matrice KSA (Knowledge, Skills, Abilities)")
     
-    # Initialiser les données KSA si elles n'existent pas
     if "ksa_matrix" not in st.session_state or st.session_state.ksa_matrix.empty:
         st.session_state.ksa_matrix = pd.DataFrame(columns=[
             "Rubrique", "Critère", "Cible / Standard attendu", 
             "Échelle d'évaluation (1-5)", "Évaluateur"
         ])
-    
-    # Formulaire pour ajouter une nouvelle ligne
+
     with st.expander("➕ Ajouter un critère"):
         col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
         
@@ -153,17 +200,6 @@ def render_ksa_matrix():
     else:
         st.info("Aucun critère défini. Ajoutez des critères pour commencer.")
 
-
-def conseil_button(titre, categorie, conseil, key):
-    """Crée un bouton avec conseil pour un champ"""
-    col1, col2 = st.columns([4, 1])
-    with col1:
-        st.text_area(titre, key=key)
-    with col2:
-        if st.button("💡", key=f"btn_{key}"):
-            st.session_state[key] = generate_checklist_advice(categorie, titre)
-            st.rerun()
-
 def delete_current_brief():
     """Supprime le brief actuel et retourne à l'onglet Gestion"""
     if "current_brief_name" in st.session_state and st.session_state.current_brief_name:
@@ -179,13 +215,8 @@ def delete_current_brief():
             
             keys_to_reset = [
                 "manager_nom", "niveau_hierarchique", "affectation_type", 
-                "recruteur", "affectation_nom", "date_brief", "raison_ouverture",
-                "impact_strategique", "rattachement", "taches_principales",
-                "must_have_experience", "must_have_diplomes", "must_have_competences",
-                "must_have_softskills", "nice_to_have_experience", "nice_to_have_diplomes",
-                "nice_to_have_competences", "entreprises_profil", "synonymes_poste",
-                "canaux_profil", "budget", "commentaires", "notes_libres",
-                "ksa_matrix", "avant_brief_data", "reunion_data"
+                "recruteur", "affectation_nom", "date_brief", 
+                "avant_brief_data", "reunion_data", "ksa_matrix"
             ]
             
             for key in keys_to_reset:
@@ -208,8 +239,8 @@ st.set_page_config(
 if "brief_phase" not in st.session_state:
     st.session_state.brief_phase = "📁 Gestion"
 
-if "reunion_step" not in st.session_state:
-    st.session_state.reunion_step = 1
+if "avant_brief_step" not in st.session_state:
+    st.session_state.avant_brief_step = 1
 
 if "filtered_briefs" not in st.session_state:
     st.session_state.filtered_briefs = {}
@@ -232,7 +263,7 @@ with st.sidebar:
     
     total_briefs = len(st.session_state.get("saved_briefs", {}))
     completed_briefs = sum(1 for b in st.session_state.get("saved_briefs", {}).values() 
-                           if b.get("ksa_data") and any(b["ksa_data"].values()))
+                           if b.get("ksa_matrix") and len(b.get("ksa_matrix")) > 0)
     
     st.metric("📋 Briefs créés", total_briefs)
     st.metric("✅ Briefs complétés", completed_briefs)
@@ -243,7 +274,6 @@ with st.sidebar:
 # ---------------- NAVIGATION PRINCIPALE ----------------
 st.title("🤖 TG-Hire IA - Brief")
 
-# Style CSS pour les onglets personnalisés et les tableaux améliorés
 st.markdown("""
     <style>
     /* Style général pour l'application */
@@ -346,45 +376,10 @@ st.markdown("""
         border: none !important;
     }
     
-    /* Réduire la hauteur de la section avant-brief */
-    .stTextArea textarea {
-        height: 100px !important;
-    }
-    
-    /* Ajustement pour le message de confirmation */
-    .message-container {
-        margin-top: 10px;
-        padding: 10px;
-        border-radius: 5px;
-    }
-    
     /* Style pour les messages d'alerte */
     .stAlert {
         padding: 10px;
         margin-top: 10px;
-    }
-    
-    /* Style pour le tableau de méthode complète */
-    .comparison-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 1rem;
-    }
-    
-    .comparison-table th, .comparison-table td {
-        border: 1px solid #424242;
-        padding: 8px;
-        text-align: left;
-    }
-    
-    .comparison-table th {
-        background-color: #262730;
-        font-weight: bold;
-    }
-
-    /* Style pour la matrice KSA */
-    .dataframe {
-        width: 100%;
     }
     
     /* Style pour les onglets désactivés */
@@ -456,7 +451,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Vérification si un brief est chargé au début de l'application
 if "current_brief_name" not in st.session_state:
     st.session_state.current_brief_name = ""
 
@@ -475,59 +469,6 @@ can_access_synthese = can_access_reunion and st.session_state.reunion_completed
 with tabs[0]:
     st.markdown("""
     <style>
-    /* Réduire l'espace entre les éléments */
-    .st-emotion-cache-1r6slb0 {
-        margin-bottom: 0.2rem;
-    }
-    .st-emotion-cache-1r6slb0 p {
-        margin-bottom: 0.2rem;
-    }
-    /* Réduire l'espace entre les titres et les champs */
-    h3 {
-        margin-bottom: 0.5rem !important;
-    }
-    /* Réduire la hauteur des champs */
-    .stTextInput input, .stSelectbox select, .stDateInput input {
-        padding-top: 0.2rem !important;
-        padding-bottom: 0.2rem !important;
-        height: 2rem !important;
-    }
-    /* Réduire l'espace entre les lignes de formulaire */
-    .st-emotion-cache-ocqkz7 {
-        gap: 0.5rem !important;
-    }
-    /* Style compact pour les radio buttons */
-    .custom-radio {
-        display: flex;
-        background-color: #262730;
-        padding: 3px;
-        border-radius: 5px;
-        border: 1px solid #424242;
-        margin-left: 10px;
-    }
-    .custom-radio input[type="radio"] {
-        display: none;
-    }
-    .custom-radio label {
-        padding: 3px 8px;
-        cursor: pointer;
-        border-radius: 3px;
-        margin: 0 3px;
-        font-size: 0.9em;
-    }
-    .custom-radio input[type="radio"]:checked + label {
-        background-color: #FF4B4B;
-        color: white;
-    }
-    /* Cacher le radio button Streamlit */
-    div[data-testid="stRadio"] > div {
-        display: none;
-    }
-    /* Réduire l'espace entre les colonnes */
-    .st-emotion-cache-5rimss p {
-        margin-bottom: 0.3rem;
-    }
-    /* Style pour le titre compact */
     .compact-title {
         display: flex;
         align-items: center;
@@ -538,31 +479,9 @@ with tabs[0]:
     
     col_title_left, col_title_right = st.columns([2, 1])
     with col_title_left:
-        st.markdown("""
-        <div class="compact-title">
-            <h3 style="margin: 0; margin-right: 10px;">Informations de base</h3>
-            <div style="display: flex; align-items: center;">
-                <span style="margin-right: 5px; font-size: 0.9em;">Type:</span>
-                <div class="custom-radio">
-                    <input type="radio" id="brief" name="brief_type" value="Brief" checked>
-                    <label for="brief">Brief</label>
-                    <input type="radio" id="template" name="brief_type" value="Canevas">
-                    <label for="template">Canevas</label>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-    
+        st.markdown("<h3 style='margin: 0; margin-right: 10px;'>Informations de base</h3>", unsafe_allow_html=True)
     with col_title_right:
         st.markdown("<h3 style='margin-bottom: 0.5rem;'>Recherche & Chargement</h3>", unsafe_allow_html=True)
-    
-    if "gestion_brief_type" not in st.session_state:
-        st.session_state.gestion_brief_type = "Brief"
-    
-    brief_type = st.radio("", ["Brief", "Canevas"], key="gestion_brief_type", horizontal=True, label_visibility="collapsed")
-    
-    if st.session_state.gestion_brief_type != st.session_state.get("brief_type", "Brief"):
-        st.session_state.brief_type = st.session_state.gestion_brief_type
     
     col_main, col_side = st.columns([2, 1])
     
@@ -588,19 +507,17 @@ with tabs[0]:
                 st.error("Veuillez remplir tous les champs obligatoires (*)")
             else:
                 brief_name = generate_automatic_brief_name()
-                
                 existing_briefs = load_briefs()
                 if "saved_briefs" not in st.session_state:
                     st.session_state.saved_briefs = existing_briefs
                 else:
                     st.session_state.saved_briefs.update(existing_briefs)
-                
+
                 st.session_state.saved_briefs[brief_name] = {
                     "manager_nom": st.session_state.manager_nom,
                     "recruteur": st.session_state.recruteur,
                     "date_brief": str(st.session_state.date_brief),
                     "niveau_hierarchique": st.session_state.niveau_hierarchique,
-                    "brief_type": st.session_state.gestion_brief_type,
                     "affectation_type": st.session_state.affectation_type,
                     "affectation_nom": st.session_state.affectation_nom,
                     "avant_brief_data": st.session_state.get("avant_brief_data", {}),
@@ -608,7 +525,7 @@ with tabs[0]:
                     "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict('records')
                 }
                 save_briefs()
-                st.success(f"✅ {st.session_state.gestion_brief_type} '{brief_name}' sauvegardé avec succès !")
+                st.success(f"✅ Brief '{brief_name}' sauvegardé avec succès !")
                 st.session_state.current_brief_name = brief_name
                 st.session_state.avant_brief_completed = False
                 st.session_state.reunion_completed = False
@@ -633,26 +550,7 @@ with tabs[0]:
 
         if st.button("🔎 Rechercher", type="primary", use_container_width=True, key="search_button"):
             briefs = load_briefs()
-            st.session_state.filtered_briefs = {}
-            
-            for name, data in briefs.items():
-                if month and month != "":
-                    brief_date = data.get("date_brief", "")
-                    if not (brief_date and brief_date.split("-")[1] == month):
-                        continue
-                if brief_type_filter and brief_type_filter != "" and data.get("brief_type") != brief_type_filter:
-                    continue
-                if recruteur and recruteur != "" and data.get("recruteur") != recruteur:
-                    continue
-                if manager and manager != "" and manager.lower() not in data.get("manager_nom", "").lower():
-                    continue
-                if affectation and affectation != "" and data.get("affectation_type") != affectation:
-                    continue
-                if nom_affectation and nom_affectation != "" and nom_affectation.lower() not in data.get("affectation_nom", "").lower():
-                    continue
-                
-                st.session_state.filtered_briefs[name] = data
-            
+            st.session_state.filtered_briefs = filter_briefs(briefs, month, brief_type_filter, recruteur, manager, affectation, nom_affectation)
             if st.session_state.filtered_briefs:
                 st.info(f"ℹ️ {len(st.session_state.filtered_briefs)} résultats trouvés.")
             else:
@@ -701,7 +599,7 @@ with tabs[0]:
                                         st.session_state.ksa_matrix = pd.DataFrame() # Réinitialiser si vide
 
                                     st.session_state.current_brief_name = name
-                                    st.session_state.avant_brief_completed = True
+                                    st.session_state.avant_brief_completed = loaded_brief.get("avant_brief_data", {}) != {}
                                     st.session_state.reunion_completed = loaded_brief.get("reunion_data", {}) != {}
                                     
                                     st.success(f"✅ Brief '{name}' chargé avec succès!")
@@ -728,64 +626,51 @@ with tabs[1]:
         st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet 'Gestion'.")
     else:
         st.header("🔄 Avant-brief")
-        st.markdown("Complétez ce tableau avant la réunion de brief pour optimiser l'échange.")
         
-        # Affiche le tableau interactif
-        edited_df = render_interactive_brief_table(st.session_state.avant_brief_data, "avant_brief")
-        
-        # Capture les modifications du tableau et les stocke
-        if not edited_df.empty:
-            for index, row in edited_df.iterrows():
-                critere = row["Critère"]
-                description = row["Description"]
-                
-                # Mapping des critères aux clés de session state
-                if critere == "Raison de l'ouverture":
-                    st.session_state.avant_brief_data["raison_ouverture"] = description
-                elif critere == "Impact stratégique":
-                    st.session_state.avant_brief_data["impact_strategique"] = description
-                elif critere == "Rattachement":
-                    st.session_state.avant_brief_data["rattachement"] = description
-                elif critere == "Tâches principales":
-                    st.session_state.avant_brief_data["taches_principales"] = description
-                elif critere == "Expérience":
-                    st.session_state.avant_brief_data["must_have_experience"] = description
-                elif critere == "Diplômes & Certifications":
-                    st.session_state.avant_brief_data["must_have_diplomes"] = description
-                elif critere == "Compétences techniques":
-                    st.session_state.avant_brief_data["must_have_competences"] = description
-                elif critere == "Soft Skills":
-                    st.session_state.avant_brief_data["must_have_softskills"] = description
-                elif critere == "Expérience" and row["Catégorie"] == "Profil Nice-to-Have":
-                    st.session_state.avant_brief_data["nice_to_have_experience"] = description
-                elif critere == "Diplômes & Certifications" and row["Catégorie"] == "Profil Nice-to-Have":
-                    st.session_state.avant_brief_data["nice_to_have_diplomes"] = description
-                elif critere == "Compétences techniques" and row["Catégorie"] == "Profil Nice-to-Have":
-                    st.session_state.avant_brief_data["nice_to_have_competences"] = description
-                elif critere == "Entreprises et profils cibles":
-                    st.session_state.avant_brief_data["entreprises_profil"] = description
-                elif critere == "Synonymes de poste":
-                    st.session_state.avant_brief_data["synonymes_poste"] = description
-                elif critere == "Canaux de sourcing":
-                    st.session_state.avant_brief_data["canaux_profil"] = description
-                elif critere == "Budget":
-                    st.session_state.avant_brief_data["budget"] = description
-                elif critere == "Notes libres":
-                    st.session_state.avant_brief_data["notes_libres"] = description
-                elif critere == "Commentaires du manager":
-                    st.session_state.avant_brief_data["commentaires"] = description
+        # Affiche le wizard
+        if "avant_brief_step" not in st.session_state:
+            st.session_state.avant_brief_step = 1
 
-        st.markdown("---")
-        col_buttons = st.columns([1, 1, 1, 1])
-        with col_buttons[0]:
-            if st.button("Sauvegarder", type="primary"):
-                st.session_state.avant_brief_completed = True
-                st.success("✅ Données Avant-brief sauvegardées ! Vous pouvez passer à l'étape suivante.")
+        if st.session_state.avant_brief_step == 1:
+            st.subheader("Informations de poste")
+            st.text_area("Raison de l'ouverture", key="raison_ouverture")
+            st.text_area("Impact stratégique", key="impact_strategique")
+            st.text_area("Rattachement", key="rattachement")
+            st.text_area("Tâches principales", key="taches_principales")
+            
+            st.markdown("---")
+            if st.button("Étape suivante", use_container_width=True, type="primary", key="next_step_avant_brief"):
+                st.session_state.avant_brief_step = 2
                 st.rerun()
-        with col_buttons[3]:
-            if st.button("Générer conseil IA", type="secondary"):
-                st.info("Fonctionnalité non implémentée.")
 
+        elif st.session_state.avant_brief_step == 2:
+            st.subheader("Profil Must-Have")
+            st.text_area("Expérience", key="must_have_experience")
+            st.text_area("Diplômes & Certifications", key="must_have_diplomes")
+            st.text_area("Compétences techniques", key="must_have_competences")
+            st.text_area("Soft Skills", key="must_have_softskills")
+
+            st.markdown("---")
+            cols = st.columns([1, 1, 1])
+            with cols[0]:
+                if st.button("Étape précédente", use_container_width=True, key="prev_step_avant_brief"):
+                    st.session_state.avant_brief_step = 1
+                    st.rerun()
+            with cols[2]:
+                if st.button("Sauvegarder", type="primary", use_container_width=True, key="save_avant_brief"):
+                    st.session_state.avant_brief_completed = True
+                    # Transférer les données du wizard vers le dictionnaire de données
+                    st.session_state.avant_brief_data["Informations de poste_Raison de l'ouverture"] = st.session_state.get("raison_ouverture", "")
+                    st.session_state.avant_brief_data["Informations de poste_Impact stratégique"] = st.session_state.get("impact_strategique", "")
+                    st.session_state.avant_brief_data["Informations de poste_Rattachement"] = st.session_state.get("rattachement", "")
+                    st.session_state.avant_brief_data["Informations de poste_Tâches principales"] = st.session_state.get("taches_principales", "")
+                    st.session_state.avant_brief_data["Profil Must-Have_Expérience"] = st.session_state.get("must_have_experience", "")
+                    st.session_state.avant_brief_data["Profil Must-Have_Diplômes & Certifications"] = st.session_state.get("must_have_diplomes", "")
+                    st.session_state.avant_brief_data["Profil Must-Have_Compétences techniques"] = st.session_state.get("must_have_competences", "")
+                    st.session_state.avant_brief_data["Profil Must-Have_Soft Skills"] = st.session_state.get("must_have_softskills", "")
+                    st.success("✅ Données Avant-brief sauvegardées ! Vous pouvez passer à l'étape suivante.")
+                    st.rerun()
+        
 # ---------------- ONGLET RÉUNION DE BRIEF ----------------
 with tabs[2]:
     if not can_access_reunion:
@@ -796,21 +681,9 @@ with tabs[2]:
         
         # Initialise le dictionnaire de réunion avec les données de l'avant-brief
         if st.session_state.reunion_data == {}:
-            st.session_state.reunion_data = st.session_state.avant_brief_data
+            st.session_state.reunion_data = st.session_state.avant_brief_data.copy()
         
-        # Affiche le tableau de l'onglet Réunion
-        edited_df = render_interactive_brief_table(st.session_state.reunion_data, "reunion_brief")
-        
-        # Met à jour les données de la session avec les modifications du tableau
-        if not edited_df.empty:
-            for index, row in edited_df.iterrows():
-                critere = row["Critère"]
-                description = row["Description"]
-
-                # Mapping des critères aux clés de session state pour les données de réunion
-                if critere == "Raison de l'ouverture":
-                    st.session_state.reunion_data["raison_ouverture"] = description
-                # ... et ainsi de suite pour tous les critères
+        st.session_state.reunion_data = render_styled_brief_table(st.session_state.reunion_data, "reunion", is_editable=True)
 
         st.markdown("---")
         st.subheader("💡 Critères KSA (Knowledge, Skills, Abilities)")
@@ -826,7 +699,7 @@ with tabs[2]:
         with col_buttons[3]:
             if st.button("Générer synthèse", type="secondary", key="generer_synthese_button"):
                 st.info("Fonctionnalité non implémentée.")
-        
+
 # ---------------- ONGLET SYNTHÈSE ----------------
 with tabs[3]:
     if not can_access_synthese:
@@ -840,25 +713,21 @@ with tabs[3]:
         if st.session_state.get("current_brief_name"):
             st.markdown(f"**Brief actuel :** {st.session_state.current_brief_name}")
             
-            # Afficher les informations de base
             st.subheader("Informations de base")
             st.write(f"**Manager :** {st.session_state.get('manager_nom', 'N/A')}")
             st.write(f"**Recruteur :** {st.session_state.get('recruteur', 'N/A')}")
             st.write(f"**Poste :** {st.session_state.get('niveau_hierarchique', 'N/A')}")
             st.write(f"**Date :** {st.session_state.get('date_brief', 'N/A')}")
             
-            # Afficher le tableau de la réunion de brief
             st.subheader("Détails de la réunion de brief")
-            render_interactive_brief_table(st.session_state.reunion_data, "synthese", is_editable=False)
+            render_styled_brief_table(st.session_state.reunion_data, "synthese", is_editable=False)
             
-            # Afficher la matrice KSA
             st.subheader("Matrice KSA")
             if hasattr(st.session_state, 'ksa_matrix') and not st.session_state.ksa_matrix.empty:
                 st.dataframe(st.session_state.ksa_matrix, hide_index=True, use_container_width=True)
             else:
                 st.info("Aucune matrice KSA disponible.")
                 
-            # Boutons d'exportation
             st.markdown("---")
             st.subheader("Exportations")
             col_export = st.columns(2)
@@ -867,10 +736,8 @@ with tabs[3]:
                 with col_export[0]:
                     if st.button("Exporter au format Word", use_container_width=True):
                         st.info("Fonctionnalité d'exportation Word non implémentée.")
-                        # export_brief_word(st.session_state.brief_data, st.session_state.ksa_data)
             
             if PDF_AVAILABLE:
                 with col_export[1]:
                     if st.button("Exporter au format PDF", use_container_width=True):
                         st.info("Fonctionnalité d'exportation PDF non implémentée.")
-                        # export_brief_pdf(st.session_state.brief_data, st.session_state.ksa_data)
