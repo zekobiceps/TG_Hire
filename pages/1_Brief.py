@@ -807,8 +807,8 @@ with tabs[1]:
     # Vérification si un brief est chargé
     if not can_access_avant_brief:
         st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
-        st.stop()  # Arrête le rendu de cet onglet
-    
+        st.stop()
+
     # Afficher les informations du brief en cours
     st.markdown(f"<h3>🔄 Avant-brief (Préparation)</h3>", unsafe_allow_html=True)
 
@@ -885,52 +885,34 @@ with tabs[1]:
         },
     ]
 
-    # Construire le DataFrame avec fusion des sections (Contexte sur 3 lignes)
-    data = []
-    field_keys = []
-    for section in sections:
-        section_rows = len(section["fields"])
-        for i, (field_name, field_key, placeholder) in enumerate(section["fields"]):
-            # Ensure the value from session_state is a string
-            value = st.session_state.get(field_key, placeholder)
-            if value is not None and not isinstance(value, str):
-                value = str(value)
-            if section["title"] == "Contexte du poste" and i >= 0 and i < 3:  # Merge "Contexte du poste" for rows 2-3-4
-                data.append(["Contexte du poste" if i == 0 else "", field_name, value])
-            else:
-                data.append([section["title"] if i == 0 else "", field_name, value])
-            field_keys.append(field_key)
-
-    df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
-
-    # Afficher le data_editor stylé with initial placeholders
-    edited_df = st.data_editor(
-        df,
-        column_config={
-            "Section": st.column_config.TextColumn("Section", disabled=True),
-            "Détails": st.column_config.TextColumn("Détails", disabled=True),
-            "Informations": st.column_config.TextColumn("Informations", width="large")
-        },
-        use_container_width=True,
-        hide_index=True,
-        num_rows="fixed",
-        key="avant_brief_editor"
-    )
-
-    # --- Boutons Sauvegarder et Réinitialiser ---
-    col_save, col_reset = st.columns([1, 1])
-    with col_save:
-        if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True, key="save_avant_brief"):
+    # Créer un formulaire avec des champs de texte pour chaque section
+    with st.form("avant_brief_form"):
+        for section in sections:
+            st.markdown(f"<h4>{section['title']}</h4>", unsafe_allow_html=True)
+            
+            for field_name, field_key, placeholder in section["fields"]:
+                current_value = st.session_state.get(field_key, "")
+                st.text_area(
+                    field_name,
+                    value=current_value,
+                    key=f"form_{field_key}",
+                    placeholder=placeholder,
+                    height=100
+                )
+        
+        # Bouton de soumission du formulaire
+        submitted = st.form_submit_button("💾 Sauvegarder Avant-brief", type="primary")
+        
+        if submitted:
             if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
                 brief_name = st.session_state.current_brief_name
                 
-                # Mettre à jour st.session_state à partir de l'edited_df
-                for i in range(len(edited_df)):
-                    field_key = field_keys[i]
-                    value = edited_df["Informations"].iloc[i]
-                    if value is not None and not isinstance(value, str):
-                        value = str(value)
-                    st.session_state[field_key] = value
+                # Mettre à jour st.session_state à partir des champs du formulaire
+                for section in sections:
+                    for field_name, field_key, placeholder in section["fields"]:
+                        form_key = f"form_{field_key}"
+                        if form_key in st.session_state:
+                            st.session_state[field_key] = st.session_state[form_key]
                 
                 # Sauvegarder les liens de profils (si applicable)
                 st.session_state.profil_links = [
@@ -975,10 +957,10 @@ with tabs[1]:
                 st.rerun()
             else:
                 st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
-    
-    with col_reset:
-        if st.button("🗑️ Réinitialiser le Brief", type="secondary", use_container_width=True, key="reset_avant_brief"):
-            delete_current_brief()
+
+    # Bouton Réinitialiser
+    if st.button("🗑️ Réinitialiser le Brief", type="secondary", use_container_width=True, key="reset_avant_brief"):
+        delete_current_brief()
 
 # ---------------- RÉUNION (Wizard interne) ----------------
 with tabs[2]:
