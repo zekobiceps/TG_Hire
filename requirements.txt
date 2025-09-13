@@ -17,3 +17,6 @@ fake-useragent>=1.4.0
 
 # Pour tests & compatibilité
 tqdm>=4.66.1
+
+# Ajout pour l'analyse PDF
+pdfplumber
