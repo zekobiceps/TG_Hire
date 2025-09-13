@@ -175,7 +175,11 @@ with st.sidebar:
 # ---------------- NAVIGATION PRINCIPALE ----------------
 st.title("🤖 TG-Hire IA - Brief")
 
-# Style CSS pour les onglets personnalisés et les tableaux améliorés
+# Afficher la date et l'heure actuelles
+current_date_time = "03:50 PM +01, Saturday, September 13, 2025"
+st.markdown(f"<p style='color: #FAFAFA; font-size: 0.9em;'>Date et heure actuelles: {current_date_time}</p>", unsafe_allow_html=True)
+
+# Style CSS pour les onglets personnalisés et les tableaux améliorés (ajout de la largeur pour les deux tableaux)
 st.markdown("""
     <style>
     /* Style général pour l'application */
@@ -355,7 +359,7 @@ st.markdown("""
     /* Largeur des colonnes */
     .dark-table th:nth-child(1),
     .dark-table td:nth-child(1) {
-        width: 15%; /* Réduction de la première colonne */
+        width: 10%; /* Réduit à 10% pour la colonne Section */
     }
     
     .dark-table th:nth-child(2),
@@ -365,13 +369,18 @@ st.markdown("""
     
     .dark-table th:nth-child(3),
     .dark-table td:nth-child(3) {
-        width: 65%; /* Colonne Informations plus large */
+        width: 40%; /* Colonne Informations plus large */
+    }
+    
+    .dark-table th:nth-child(4),
+    .dark-table td:nth-child(4) {
+        width: 30%; /* Colonne Commentaires du manager élargie */
     }
     
     /* Style pour les tableaux avec 4 colonnes (réunion de brief) */
     .dark-table.four-columns th:nth-child(1),
     .dark-table.four-columns td:nth-child(1) {
-        width: 15%;
+        width: 10%;
     }
     
     .dark-table.four-columns th:nth-child(2),
@@ -386,7 +395,7 @@ st.markdown("""
     
     .dark-table.four-columns th:nth-child(4),
     .dark-table.four-columns td:nth-child(4) {
-        width: 25%; /* Colonne Commentaires du manager élargie */
+        width: 30%; /* Colonne Commentaires du manager élargie */
     }
     
     .section-title {
@@ -452,19 +461,24 @@ st.markdown("""
     }
     
     .stDataFrame td:nth-child(1) {
-        width: 10%;
+        width: 10% !important; /* Réduit à 10% pour la colonne Section */
     }
     
     .stDataFrame td:nth-child(2) {
-        width: 15%;
+        width: 20%;
     }
     
     .stDataFrame td:nth-child(3) {
-        width: 75%;
+        width: 40%;
     }
     
-    /* Style pour les cellules éditables (Informations) */
-    .stDataFrame td:nth-child(3) textarea {
+    .stDataFrame td:nth-child(4) {
+        width: 30%;
+    }
+    
+    /* Style pour les cellules éditables (Informations et Commentaires du manager) */
+    .stDataFrame td:nth-child(3) textarea,
+    .stDataFrame td:nth-child(4) textarea {
         background-color: #2D2D2D !important;
         color: white !important;
         border: 1px solid #555 !important;
