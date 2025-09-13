@@ -487,6 +487,12 @@ st.markdown("""
         min-height: 60px !important;
         resize: vertical !important;
     }
+    
+    /* Style pour le bouton pré-rédiger jaune avec lampe */
+    .stButton > button[key="pre_rediger"] {
+        background-color: #FFD700 !important;
+        color: black !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -494,13 +500,13 @@ st.markdown("""
 if "current_brief_name" not in st.session_state:
     st.session_state.current_brief_name = ""
 
-# Création des onglets dans l'ordre demandé : Gestion, Bibliothèque, Avant Brief, Réunion, Synthèse
+# Création des onglets dans l'ordre demandé : Gestion, Avant-brief, Réunion, Synthèse, Bibliothèque
 tabs = st.tabs([
     "📁 Gestion", 
-    "📚 Bibliothèque",
     "🔄 Avant-brief", 
     "✅ Réunion de brief", 
-    "📝 Synthèse"
+    "📝 Synthèse",
+    "📚 Bibliothèque"
 ])
 
 # Détection changement d'onglet pour reset message
@@ -603,9 +609,9 @@ with tabs[0]:
     # Ligne 2: Recruteur | Type d'affectation
     col3, col4 = st.columns(2)
     with col3:
-        st.text_input("Recruteur", key="recruteur")
+        st.selectbox("Recruteur", ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"], key="recruteur")
     with col4:
-        st.selectbox("Type d'affectation", ["Projet", "Filiale", "Chantier", "Groupe"], key="affectation_type")
+        st.selectbox("Type d'affectation", ["Chantier", "Siège", "Dépôt"], key="affectation_type")
     
     # Ligne 3: Nom affectation | Date du brief
     col5, col6 = st.columns(2)
@@ -651,8 +657,13 @@ with tabs[0]:
     
     st.divider()
     
-    # Section Filtrage - VERSION COMPACTE
-    st.markdown('<h3 style="margin-bottom: 0.3rem;">🔍 Filtrer les briefs</h3>', unsafe_allow_html=True)
+    # Section Filtrage - VERSION COMPACTE (à droite de informations de base, mais comme c'est en dessous, on garde)
+    col_title_left_filter, col_title_right_filter = st.columns([2, 1])
+    with col_title_left_filter:
+        st.markdown('<h3 style="margin-bottom: 0.3rem;">🔍 Filtrer les briefs</h3>', unsafe_allow_html=True)
+    with col_title_right_filter:
+        st.markdown('<h3 style="margin-bottom: 0.3rem;">Recherche de brief</h3>', unsafe_allow_html=True)
+    
     col_filter1, col_filter2, col_filter3 = st.columns(3)
     with col_filter1:
         month = st.selectbox("Mois", ["", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"], key="filter_month")
@@ -661,7 +672,7 @@ with tabs[0]:
         recruteur_filter = st.text_input("Recruteur", key="filter_recruteur")
         manager_filter = st.text_input("Manager", key="filter_manager")
     with col_filter3:
-        affectation_filter = st.selectbox("Affectation", ["", "Projet", "Filiale", "Chantier", "Groupe"], key="filter_affectation")
+        affectation_filter = st.selectbox("Affectation", ["", "Chantier", "Siège", "Dépôt"], key="filter_affectation")
         nom_affectation_filter = st.text_input("Nom affectation", key="filter_nom_affectation")
     
     if st.button("🔎 Filtrer", use_container_width=True, key="apply_filter"):
@@ -696,106 +707,8 @@ with tabs[0]:
     else:
         st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
 
-# ---------------- ONGLET BIBLIOTHÈQUE (amélioré : recherche, DF, expanders, sans champs supprimés, persistance) ----------------
-with tabs[1]:
-    st.header("📚 Bibliothèque des fiches de poste")  # Visuel retravaillé
-    
-    library = st.session_state.job_library
-    
-    # Recherche (par nom, date)
-    col_search1, col_search2 = st.columns(2)
-    with col_search1:
-        search_name = st.text_input("Rechercher par nom du poste")
-    with col_search2:
-        search_date = st.date_input("Date de création", value=None)
-    
-    filtered_library = library
-    if search_name:
-        filtered_library = [j for j in filtered_library if search_name.lower() in j.get("title", "").lower()]
-    if search_date:
-        filtered_library = [j for j in filtered_library if j.get("date_creation") and datetime.strptime(j["date_creation"], "%Y-%m-%d %H:%M:%S").date() == search_date]
-    
-    # Tableau récap (visuel amélioré)
-    if filtered_library:
-        df = pd.DataFrame({
-            "Intitulé": [j["title"] for j in filtered_library],
-            "Date de création": [j.get("date_creation", "") for j in filtered_library]
-        })
-        st.dataframe(df, use_container_width=True)
-        
-        # Expanders pour détails (sans Responsabilités Environnement-qualité-hygiène-métier du poste-sous métier)
-        for i, job in enumerate(filtered_library):
-            with st.expander(f"{job['title']} - {job.get('date_creation', '')}"):
-                st.write("**Finalité du poste :**", job.get("finalite", ""))
-                st.write("**Activités principales :**", job.get("activites", ""))
-                st.write("**N+1 hiérarchique :**", job.get("n1_hierarchique", ""))
-                st.write("**N+1 fonctionnel :**", job.get("n1_fonctionnel", ""))
-                st.write("**Entité de rattachement :**", job.get("entite_rattachement", ""))
-                st.write("**Indicateurs clés :**", job.get("indicateurs", ""))
-                st.write("**Interlocuteurs internes :**", job.get("interne", ""))
-                st.write("**Supervision directe :**", job.get("supervision_directe", ""))
-                st.write("**Interlocuteurs externes :**", job.get("externe", ""))
-                st.write("**Supervision indirecte :**", job.get("supervision_indirecte", ""))
-                st.write("**Niveau de diplôme :**", job.get("niveau_diplome", ""))
-                st.write("**Expérience globale :**", job.get("experience_globale", ""))
-                st.write("**Compétences requises :**", job.get("competences", ""))
-    else:
-        st.info("Aucune fiche trouvée.")
-    
-    # Formulaire pour ajouter ou modifier (avec vérif intitulé unique)
-    editing = 'editing_job' in st.session_state
-    job_data = library[st.session_state.editing_job] if editing else {}
-    
-    with st.form("job_form"):
-        title = st.text_input("Intitulé du poste", value=job_data.get('title', ''))
-        finalite = st.text_area("Finalité du poste", value=job_data.get('finalite', ''))
-        activites = st.text_area("Activités principales", value=job_data.get('activites', ''))
-        n1_hierarchique = st.text_input("N+1 hiérarchique", value=job_data.get('n1_hierarchique', ''))
-        n1_fonctionnel = st.text_input("N+1 fonctionnel", value=job_data.get('n1_fonctionnel', ''))
-        entite_rattachement = st.text_input("Entité de rattachement", value=job_data.get('entite_rattachement', ''))
-        indicateurs = st.text_area("Indicateurs clés de performance", value=job_data.get('indicateurs', ''))
-        interne = st.text_area("Interlocuteurs internes", value=job_data.get('interne', ''))
-        supervision_directe = st.text_input("Supervision directe", value=job_data.get('supervision_directe', ''))
-        externe = st.text_area("Interlocuteurs externes", value=job_data.get('externe', ''))
-        supervision_indirecte = st.text_input("Supervision indirecte", value=job_data.get('supervision_indirecte', ''))
-        niveau_diplome = st.text_input("Niveau de diplôme", value=job_data.get('niveau_diplome', ''))
-        experience_globale = st.text_input("Expérience globale", value=job_data.get('experience_globale', ''))
-        competences = st.text_area("Compétences requises", value=job_data.get('competences', ''))
-        
-        if st.form_submit_button("💾 Sauvegarder"):
-            # Vérif intitulé unique
-            if any(j["title"].lower() == title.lower() for j in library if not (editing and j["title"] == job_data.get("title", ""))):
-                st.error("Une fiche avec cet intitulé existe déjà.")
-            else:
-                new_job = {
-                    'title': title,
-                    'finalite': finalite,
-                    'activites': activites,
-                    'n1_hierarchique': n1_hierarchique,
-                    'n1_fonctionnel': n1_fonctionnel,
-                    'entite_rattachement': entite_rattachement,
-                    'indicateurs': indicateurs,
-                    'interne': interne,
-                    'supervision_directe': supervision_directe,
-                    'externe': externe,
-                    'supervision_indirecte': supervision_indirecte,
-                    'niveau_diplome': niveau_diplome,
-                    'experience_globale': experience_globale,
-                    'competences': competences,
-                    "date_creation": datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Pour recherche
-                }
-                if editing:
-                    library[st.session_state.editing_job] = new_job
-                    del st.session_state.editing_job
-                else:
-                    library.append(new_job)
-                save_library(library)
-                st.session_state.job_library = library
-                st.session_state.save_message = "✅ Fiche de poste sauvegardée"
-                st.rerun()
-
 # ---------------- AVANT-BRIEF (Tableau éditable, alignements sans lignes vides, colonnes réduites, bouton pré-rédiger en haut, AI synthétique) ----------------
-with tabs[2]:
+with tabs[1]:
     # Vérification si l'onglet est accessible
     if not can_access_avant_brief:
         st.warning("⚠️ Veuillez d'abord créer un brief dans l'onglet Gestion")
@@ -809,7 +722,7 @@ with tabs[2]:
     
     # Bouton Pré-rédiger en haut (sans lampe, demande à l'IA pour synthèse courte)
     poste = st.session_state.get("poste_intitule", "")
-    if st.button("Pré rédiger"):  # En haut du tableau
+    if st.button("💡 Pré rédiger", key="pre_rediger"):  # En haut du tableau
         if poste:
             library = st.session_state.job_library
             matching_job = next((job for job in library if job['title'].lower() == poste.lower()), None)
@@ -880,7 +793,6 @@ with tabs[2]:
                 ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"),
             ]
         },
-        # ... (autres sections identiques)
         {
             "title": "Must-have (Indispensables)",
             "fields": [
@@ -930,7 +842,7 @@ with tabs[2]:
         },
     ]
 
-    # Construire le DataFrame avec une seule occurrence par section
+    # Construire le DataFrame avec une seule occurrence par section sans lignes vides
     data = []
     for section in sections:
         data.append([section["title"], "", ""])  # Ajouter la section une seule fois (aligné)
@@ -953,7 +865,7 @@ with tabs[2]:
         num_rows="fixed"
     )
 
-    # Boutons Enregistrer et Réinitialiser
+    # Boutons Enregistrer et Pré-rédiger par IA (remplacement de réinitialiser)
     col_save, col_reset = st.columns(2)
     with col_save:
         if st.button("💾 Enregistrer modifications", type="primary", use_container_width=True, key="save_avant_brief"):
@@ -990,11 +902,69 @@ with tabs[2]:
                 st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
     
     with col_reset:
-        if st.button("🗑️ Réinitialiser le Brief", type="secondary", use_container_width=True, key="reset_avant_brief"):
-            delete_current_brief()
+        if st.button("Pré-rédiger par IA", type="secondary", use_container_width=True, key="pre_rediger_ia"):
+            poste = st.session_state.get("poste_intitule", "")
+            if poste:
+                library = st.session_state.job_library
+                matching_job = next((job for job in library if job['title'].lower() == poste.lower()), None)
+                if matching_job:
+                    fiche_data = (
+                        f"Title: {matching_job['title']}\n"
+                        f"Finalite: {matching_job.get('finalite', '')}\n"
+                        f"Activites: {matching_job.get('activites', '')}\n"
+                        f"Experience: {matching_job.get('experience_globale', '')}\n"
+                        f"Niveau diplome: {matching_job.get('niveau_diplome', '')}\n"
+                        f"Competences: {matching_job.get('competences', '')}"
+                    )
+                    try:
+                        ai_output = get_ai_pre_redaction(fiche_data)
+                        
+                        # Parse
+                        lines = ai_output.split("\n")
+                        mission_globale_ai = ""
+                        taches_ai = ""
+                        must_have_ai = ""
+                        nice_to_have_ai = ""
+                        
+                        current_section = None
+                        for line in lines:
+                            if "- Mission globale:" in line:
+                                current_section = "mission"
+                                mission_globale_ai = line.split(":", 1)[1].strip()
+                            elif "- Tâches principales:" in line:
+                                current_section = "taches"
+                            elif "- Must have:" in line:
+                                current_section = "must"
+                            elif "- Nice to have:" in line:
+                                current_section = "nice"
+                            elif line.startswith("- ") and current_section:
+                                if current_section == "taches":
+                                    taches_ai += line + "\n"
+                                elif current_section == "must":
+                                    must_have_ai += line + "\n"
+                                elif current_section == "nice":
+                                    nice_to_have_ai += line + "\n"
+                        
+                        st.session_state.impact_strategique = mission_globale_ai
+                        st.session_state.taches_principales = taches_ai.strip()
+                        st.session_state.must_have_experience = must_have_ai.strip()
+                        st.session_state.must_have_diplomes = must_have_ai.strip()
+                        st.session_state.must_have_competences = must_have_ai.strip()
+                        st.session_state.nice_to_have_experience = nice_to_have_ai.strip()
+                        st.session_state.nice_to_have_diplomes = nice_to_have_ai.strip()
+                        st.session_state.nice_to_have_competences = nice_to_have_ai.strip()
+                        
+                        st.session_state.save_message = "✅ Pré-rédaction AI appliquée (synthèse courte)"
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erreur AI: {e}")
+                else:
+                    st.warning("⚠️ Aucune fiche de poste trouvée pour ce titre")
+            else:
+                st.warning("⚠️ Veuillez d'abord entrer le poste à recruter")
 
-# ---------------- RÉUNION (Wizard interne, colonnes réduites) ----------------
-with tabs[3]:
+# ---------------- RÉUNION (Wizard interne, colonnes réduites, sans message création) ----------------
+with tabs[2]:
     # Vérification si l'onglet est accessible
     if not can_access_reunion:
         st.warning("⚠️ Veuillez d'abord compléter et sauvegarder l'onglet Avant-brief")
@@ -1053,8 +1023,22 @@ with tabs[3]:
             st.session_state.save_message = "✅ Commentaires sauvegardés"
             st.rerun()
 
-    # ... (autres steps identiques)
+    elif step == 2:
+        st.subheader("2️⃣ Questions Comportementales")
+        st.text_area("Comment le candidat devrait-il gérer [situation difficile] ?", key="comp_q1", height=100)
+        st.text_area("Réponse attendue", key="comp_rep1", height=100)
+        st.text_area("Compétences évaluées", key="comp_eval1", height=100)
 
+    elif step == 3:
+        st.subheader("📊 Matrice KSA - Validation manager")
+        render_ksa_matrix()
+
+    elif step == 4:
+        st.subheader("4️⃣ Stratégie Recrutement")
+        st.multiselect("Canaux prioritaires", ["LinkedIn", "Jobboards", "Cooptation", "Réseaux sociaux", "Chasse de tête"], key="canaux_prioritaires")
+        st.text_area("Critères d'exclusion", key="criteres_exclusion", height=100)
+        st.text_area("Processus d'évaluation (détails)", key="processus_evaluation", height=100)
+        
     elif step == 5:
         st.subheader("📝 Notes générales du manager")
         st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=200, 
@@ -1123,7 +1107,7 @@ with tabs[3]:
                 st.rerun()
 
 # ---------------- SYNTHÈSE ----------------
-with tabs[4]:
+with tabs[3]:
     # Vérification si l'onglet est accessible
     if not can_access_synthese:
         st.warning("⚠️ Veuillez d'abord compléter et sauvegarder l'onglet Réunion de brief")
@@ -1214,19 +1198,120 @@ with tabs[4]:
         else:
             st.info("⚠️ Word non dispo (pip install python-docx)")
 
+# ---------------- ONGLET BIBLIOTHÈQUE (amélioré : recherche, pas de liste par défaut, buttons modifier/supprimer, modification dans mêmes cases) ----------------
+with tabs[4]:
+    st.header("📚 Bibliothèque des fiches de poste")  # Visuel retravaillé
+    
+    library = st.session_state.job_library
+    
+    # Recherche (par nom, date)
+    col_search1, col_search2 = st.columns(2)
+    with col_search1:
+        search_name = st.text_input("Rechercher par nom du poste")
+    with col_search2:
+        search_date = st.date_input("Date de création", value=None)
+    
+    filtered_library = []
+    if search_name or search_date:
+        filtered_library = library
+        if search_name:
+            filtered_library = [j for j in filtered_library if search_name.lower() in j.get("title", "").lower()]
+        if search_date:
+            filtered_library = [j for j in filtered_library if j.get("date_creation") and datetime.strptime(j["date_creation"], "%Y-%m-%d %H:%M:%S").date() == search_date]
+    
+    # Affichage seulement si recherche faite
+    if filtered_library:
+        df = pd.DataFrame({
+            "Intitulé": [j["title"] for j in filtered_library],
+            "Date de création": [j.get("date_creation", "") for j in filtered_library]
+        })
+        st.dataframe(df, use_container_width=True)
+        
+        # Buttons pour chaque fiche
+        for i, job in enumerate(filtered_library):
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.write(f"**{job['title']}** - {job.get('date_creation', '')}")
+            with col2:
+                if st.button("Modifier", key=f"modify_job_{i}"):
+                    st.session_state.editing_job = i
+                    st.rerun()
+                if st.button("Supprimer", key=f"delete_job_{i}"):
+                    del library[i]
+                    save_library(library)
+                    st.session_state.job_library = library
+                    st.session_state.save_message = f"✅ Fiche de poste '{job['title']}' supprimée"
+                    st.rerun()
+    else:
+        st.info("Effectuez une recherche pour voir les fiches.")
+    
+    # Formulaire pour ajouter ou modifier (mêmes cases)
+    editing = 'editing_job' in st.session_state
+    job_data = library[st.session_state.editing_job] if editing else {}
+    
+    with st.form("job_form"):
+        title = st.text_input("Intitulé du poste", value=job_data.get('title', ''))
+        finalite = st.text_area("Finalité du poste", value=job_data.get('finalite', ''))
+        activites = st.text_area("Activités principales", value=job_data.get('activites', ''))
+        n1_hierarchique = st.text_input("N+1 hiérarchique", value=job_data.get('n1_hierarchique', ''))
+        n1_fonctionnel = st.text_input("N+1 fonctionnel", value=job_data.get('n1_fonctionnel', ''))
+        entite_rattachement = st.text_input("Entité de rattachement", value=job_data.get('entite_rattachement', ''))
+        indicateurs = st.text_area("Indicateurs clés de performance", value=job_data.get('indicateurs', ''))
+        interne = st.text_area("Interlocuteurs internes", value=job_data.get('interne', ''))
+        supervision_directe = st.text_input("Supervision directe", value=job_data.get('supervision_directe', ''))
+        externe = st.text_area("Interlocuteurs externes", value=job_data.get('externe', ''))
+        supervision_indirecte = st.text_input("Supervision indirecte", value=job_data.get('supervision_indirecte', ''))
+        niveau_diplome = st.text_input("Niveau de diplôme", value=job_data.get('niveau_diplome', ''))
+        experience_globale = st.text_input("Expérience globale", value=job_data.get('experience_globale', ''))
+        competences = st.text_area("Compétences requises", value=job_data.get('competences', ''))
+        
+        if st.form_submit_button("💾 Sauvegarder"):
+            # Vérif intitulé unique
+            if any(j["title"].lower() == title.lower() for j in library if not (editing and j["title"] == job_data.get("title", ""))):
+                st.error("Une fiche avec cet intitulé existe déjà.")
+            else:
+                new_job = {
+                    'title': title,
+                    'finalite': finalite,
+                    'activites': activites,
+                    'n1_hierarchique': n1_hierarchique,
+                    'n1_fonctionnel': n1_fonctionnel,
+                    'entite_rattachement': entite_rattachement,
+                    'indicateurs': indicateurs,
+                    'interne': interne,
+                    'supervision_directe': supervision_directe,
+                    'externe': externe,
+                    'supervision_indirecte': supervision_indirecte,
+                    'niveau_diplome': niveau_diplome,
+                    'experience_globale': experience_globale,
+                    'competences': competences,
+                    "date_creation": datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Pour recherche
+                }
+                if editing:
+                    library[st.session_state.editing_job] = new_job
+                    del st.session_state.editing_job
+                    message = f"✅ Fiche de poste '{title}' modifiée avec succès"
+                else:
+                    library.append(new_job)
+                    message = f"✅ Fiche de poste '{title}' créée avec succès"
+                save_library(library)
+                st.session_state.job_library = library
+                st.session_state.save_message = message
+                st.rerun()
+
 # JavaScript pour désactiver les onglets non accessibles
 st.markdown(f"""
 <script>
 // Désactiver les onglets selon les permissions
 const tabs = parent.document.querySelectorAll('[data-baseweb="tab"]');
 if (!{str(can_access_avant_brief).lower()}) {{
-    tabs[2].classList.add('disabled-tab');
+    tabs[1].classList.add('disabled-tab');
 }}
 if (!{str(can_access_reunion).lower()}) {{
-    tabs[3].classList.add('disabled-tab');
+    tabs[2].classList.add('disabled-tab');
 }}
 if (!{str(can_access_synthese).lower()}) {{
-    tabs[4].classList.add('disabled-tab');
+    tabs[3].classList.add('disabled-tab');
 }}
 </script>
 """, unsafe_allow_html=True)
