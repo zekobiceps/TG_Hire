@@ -289,6 +289,8 @@ st.markdown("""
         color: white !important;
         border-radius: 4px !important;
         border: none !important;
+        min-height: 60px !important;
+        resize: vertical !important;
     }
     
     /* Correction pour les date inputs */
@@ -297,11 +299,6 @@ st.markdown("""
         color: white !important;
         border-radius: 4px !important;
         border: none !important;
-    }
-    
-    /* Réduire la hauteur de la section avant-brief */
-    .stTextArea textarea {
-        height: 100px !important;
     }
     
     /* Ajustement pour le message de confirmation */
@@ -352,69 +349,69 @@ st.markdown("""
         width: 100%;
         border-collapse: collapse;
         margin-bottom: 20px;
-        background-color: #0d1117; /* Fond noir pour le tableau */
-        font-size: 0.9em; /* Augmentation de la taille du texte */
-        border: 1px solid #ffffff; /* Bordure blanche */
+        background-color: #0d1117;
+        font-size: 0.9em;
+        border: 1px solid #ffffff;
     }
     
     .dark-table th, .dark-table td {
         padding: 12px 16px;
         text-align: left;
-        border: 1px solid #ffffff; /* Bordures blanches */
-        color: #e6edf3; /* Texte clair sur fond sombre */
+        border: 1px solid #ffffff;
+        color: #e6edf3;
     }
     
     .dark-table th {
-        background-color: #FF4B4B !important;  /* Rouge vif identique aux boutons */
+        background-color: #FF4B4B !important;
         color: white !important;
         font-weight: 600;
         padding: 14px 16px;
         font-size: 16px;
-        border: 1px solid #ffffff; /* Bordure blanche */
+        border: 1px solid #ffffff;
     }
     
     /* Largeur des colonnes réduites */
     .dark-table th:nth-child(1),
     .dark-table td:nth-child(1) {
-        width: 10%; /* Réduite */
+        width: 10%;
     }
     
     .dark-table th:nth-child(2),
     .dark-table td:nth-child(2) {
-        width: 15%; /* Réduite */
+        width: 15%;
     }
     
     .dark-table th:nth-child(3),
     .dark-table td:nth-child(3) {
-        width: 65%; /* Colonne Informations plus large */
+        width: 65%;
     }
     
     /* Style pour les tableaux avec 4 colonnes (réunion de brief) */
     .dark-table.four-columns th:nth-child(1),
     .dark-table.four-columns td:nth-child(1) {
-        width: 10%; /* Réduite */
+        width: 10%;
     }
     
     .dark-table.four-columns th:nth-child(2),
     .dark-table.four-columns td:nth-child(2) {
-        width: 15%; /* Réduite */
+        width: 15%;
     }
     
     .dark-table.four-columns th:nth-child(3),
     .dark-table.four-columns td:nth-child(3) {
-        width: 50%; /* Réduit pour faire de la place à la colonne notes */
+        width: 50%;
     }
     
     .dark-table.four-columns th:nth-child(4),
     .dark-table.four-columns td:nth-child(4) {
-        width: 25%; /* Colonne Commentaires du manager élargie */
+        width: 25%;
     }
     
     .section-title {
         font-weight: 600;
-        color: #58a6ff; /* Couleur bleue pour les titres de section */
-        font-size: 0.95em; /* Augmentation de la taille du texte */
-        margin-bottom: 0 !important; /* Pas de marge pour alignement */
+        color: #58a6ff;
+        font-size: 0.95em;
+        margin-bottom: 0 !important;
     }
     
     /* Style pour les textareas dans les tableaux */
@@ -426,14 +423,14 @@ st.markdown("""
         border: 1px solid #555;
         border-radius: 4px;
         padding: 6px;
-        font-size: 0.9em; /* Augmentation de la taille du texte */
+        font-size: 0.9em;
         resize: vertical;
     }
     
     /* Style pour les cellules de texte */
     .table-text {
         padding: 6px;
-        font-size: 0.9em; /* Augmentation de la taille du texte */
+        font-size: 0.9em;
         color: #e6edf3;
     }
     
@@ -470,15 +467,15 @@ st.markdown("""
     
     .stDataFrame td:first-child {
         font-weight: 600;
-        color: #58a6ff; /* Couleur bleue pour les titres de section */
+        color: #58a6ff;
     }
     
     .stDataFrame td:nth-child(1) {
-        width: 10%; /* Réduite */
+        width: 10%;
     }
     
     .stDataFrame td:nth-child(2) {
-        width: 15%; /* Réduite */
+        width: 15%;
     }
     
     .stDataFrame td:nth-child(3) {
@@ -500,42 +497,6 @@ st.markdown("""
         resize: vertical !important;
     }
     
-    </style>
-""", unsafe_allow_html=True)
-
-# Vérification si un brief est chargé au début de l'application
-if "current_brief_name" not in st.session_state:
-    st.session_state.current_brief_name = ""
-
-# Création des onglets dans l'ordre demandé : Gestion, Avant-brief, Réunion, Synthèse, Bibliothèque
-tabs = st.tabs([
-    "📁 Gestion", 
-    "🔄 Avant-brief", 
-    "✅ Réunion de brief", 
-    "📝 Synthèse",
-    "📚 Bibliothèque"
-])
-
-# Détection changement d'onglet pour reset message
-selected_tab = st.session_state.current_tab
-if selected_tab != st.session_state.current_tab:
-    st.session_state.save_message = None
-    st.session_state.current_tab = selected_tab
-
-# Affichage message persistant si présent
-if st.session_state.save_message:
-    st.success(st.session_state.save_message)
-
-# Déterminer quels onglets sont accessibles
-can_access_avant_brief = st.session_state.current_brief_name != ""
-can_access_reunion = can_access_avant_brief and st.session_state.avant_brief_completed
-can_access_synthese = can_access_reunion and st.session_state.reunion_completed
-
-# ---------------- ONGLET GESTION ----------------
-with tabs[0]:
-    # Style CSS personnalisé pour réduire les espaces
-    st.markdown("""
-    <style>
     /* Réduire l'espace entre les éléments */
     .st-emotion-cache-1r6slb0 {
         margin-bottom: 0.2rem;
@@ -595,15 +556,42 @@ with tabs[0]:
         margin-bottom: 0.5rem !important;
     }
     </style>
-    """, unsafe_allow_html=True)
-    
+""", unsafe_allow_html=True)
+
+# Vérification si un brief est chargé au début de l'application
+if "current_brief_name" not in st.session_state:
+    st.session_state.current_brief_name = ""
+
+# Création des onglets dans l'ordre demandé : Gestion, Avant-brief, Réunion, Synthèse, Bibliothèque
+tabs = st.tabs([
+    "📁 Gestion", 
+    "🔄 Avant-brief", 
+    "✅ Réunion de brief", 
+    "📝 Synthèse",
+    "📚 Bibliothèque"
+])
+
+# Détection changement d'onglet pour reset message
+selected_tab = st.session_state.current_tab
+if selected_tab != st.session_state.current_tab:
+    st.session_state.save_message = None
+    st.session_state.current_tab = selected_tab
+
+# Affichage message persistant si présent
+if st.session_state.save_message:
+    st.success(st.session_state.save_message)
+
+# Déterminer quels onglets sont accessibles
+can_access_avant_brief = st.session_state.current_brief_name != ""
+can_access_reunion = can_access_avant_brief and st.session_state.avant_brief_completed
+can_access_synthese = can_access_reunion and st.session_state.reunion_completed
+
+# ---------------- ONGLET GESTION ----------------
+with tabs[0]:
     # En-tête avec les titres alignés - VERSION COMPACTE
-    col_title_left, col_title_right = st.columns([2, 1])
+    col_title_left, col_filter_section = st.columns([2, 1])
     with col_title_left:
-        # Titre "Informations de base" avec le type à droite - VERSION COMPACTE
         st.markdown('<div class="compact-title"><h3>Informations de base</h3></div>', unsafe_allow_html=True)
-    
-    with col_title_right:
         brief_type = st.radio("", ["Standard", "Méthode complète"], horizontal=True, key="brief_type")
     
     # Ligne 1: Poste à recruter | Manager
@@ -634,22 +622,19 @@ with tabs[0]:
     with col_create:
         if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
             brief_name = generate_automatic_brief_name()
-            if brief_name not in st.session_state.saved_briefs:
-                st.session_state.saved_briefs[brief_name] = {
-                    "poste_intitule": st.session_state.poste_intitule,
-                    "manager_nom": st.session_state.manager_nom,
-                    "recruteur": st.session_state.recruteur,
-                    "affectation_type": st.session_state.affectation_type,
-                    "affectation_nom": st.session_state.affectation_nom,
-                    "date_brief": str(st.session_state.date_brief),
-                    "brief_type": st.session_state.brief_type
-                }
-                save_briefs()
-                st.session_state.current_brief_name = brief_name
-                st.session_state.save_message = f"✅ Brief '{brief_name}' créé avec succès"
-                st.rerun()
-            else:
-                st.warning("⚠️ Un brief avec ce nom existe déjà")
+            st.session_state.saved_briefs[brief_name] = {
+                "poste_intitule": st.session_state.poste_intitule,
+                "manager_nom": st.session_state.manager_nom,
+                "recruteur": st.session_state.recruteur,
+                "affectation_type": st.session_state.affectation_type,
+                "affectation_nom": st.session_state.affectation_nom,
+                "date_brief": str(st.session_state.date_brief),
+                "brief_type": st.session_state.brief_type
+            }
+            save_briefs()
+            st.session_state.current_brief_name = brief_name
+            st.session_state.save_message = f"✅ Brief '{brief_name}' créé avec succès"
+            st.rerun()
     with col_cancel:
         if st.button("🗑️ Annuler", type="secondary", use_container_width=True, key="cancel_brief"):
             # Reset fields
@@ -665,54 +650,48 @@ with tabs[0]:
     st.divider()
     
     # Section Filtrage - VERSION COMPACTE
-    col_title_left_filter, col_title_right_filter = st.columns([2, 1])
-    with col_title_left_filter:
+    with col_filter_section:
         st.markdown('<h3 style="margin-bottom: 0.3rem;">🔍 Filtrer les briefs</h3>', unsafe_allow_html=True)
-    with col_title_right_filter:
-        st.markdown('<h3 style="margin-bottom: 0.3rem;">Recherche de brief</h3>', unsafe_allow_html=True)
+        col_filter1, col_filter2, col_filter3 = st.columns(3)
+        with col_filter1:
+            month = st.selectbox("Mois", ["", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"], key="filter_month")
+            brief_type_filter = st.selectbox("Type de brief", ["", "Standard", "Méthode complète"], key="filter_brief_type")
+        with col_filter2:
+            recruteur_filter = st.text_input("Recruteur", key="filter_recruteur")
+            manager_filter = st.text_input("Manager", key="filter_manager")
+        with col_filter3:
+            affectation_filter = st.selectbox("Affectation", ["", "Chantier", "Siège", "Dépôt"], key="filter_affectation")
+            nom_affectation_filter = st.text_input("Nom affectation", key="filter_nom_affectation")
+        
+        if st.button("🔎 Filtrer", use_container_width=True, key="apply_filter"):
+            st.session_state.filtered_briefs = filter_briefs(st.session_state.saved_briefs, month, recruteur_filter, brief_type_filter, manager_filter, affectation_filter, nom_affectation_filter)
+            st.session_state.show_filtered_results = True
     
-    col_filter1, col_filter2, col_filter3 = st.columns(3)
-    with col_filter1:
-        month = st.selectbox("Mois", ["", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"], key="filter_month")
-        brief_type_filter = st.selectbox("Type de brief", ["", "Standard", "Méthode complète"], key="filter_brief_type")
-    with col_filter2:
-        recruteur_filter = st.text_input("Recruteur", key="filter_recruteur")
-        manager_filter = st.text_input("Manager", key="filter_manager")
-    with col_filter3:
-        affectation_filter = st.selectbox("Affectation", ["", "Chantier", "Siège", "Dépôt"], key="filter_affectation")
-        nom_affectation_filter = st.text_input("Nom affectation", key="filter_nom_affectation")
-    
-    if st.button("🔎 Filtrer", use_container_width=True, key="apply_filter"):
-        st.session_state.filtered_briefs = filter_briefs(st.session_state.saved_briefs, month, recruteur_filter, brief_type_filter, manager_filter, affectation_filter, nom_affectation_filter)
-        st.session_state.show_filtered_results = True
-    
-    st.divider()
-    
-    # Affichage des résultats
-    st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
-    briefs_to_show = st.session_state.filtered_briefs if st.session_state.show_filtered_results else st.session_state.saved_briefs
-    
-    if briefs_to_show:
-        for name, data in briefs_to_show.items():
-            col_brief1, col_brief2, col_brief3, col_brief4 = st.columns([3, 1, 1, 1])
-            with col_brief1:
-                st.write(f"**{name}** - {data.get('brief_type', '')}")
-            with col_brief2:
-                if st.button("📝 Éditer", key=f"edit_{name}"):
-                    st.session_state.current_brief_name = name
-                    st.session_state.avant_brief_completed = True  # Permet l'accès aux onglets suivants
-                    st.rerun()
-            with col_brief3:
-                if st.button("🗑️ Supprimer", key=f"delete_{name}"):
-                    del st.session_state.saved_briefs[name]
-                    save_briefs()
-                    st.rerun()
-            with col_brief4:
-                if st.button("📄 Exporter", key=f"export_{name}"):
-                    # Logique d'export à implémenter si nécessaire
-                    pass
-    else:
-        st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
+    # Affichage des résultats uniquement si filtrage effectué
+    if st.session_state.get("show_filtered_results", False):
+        st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
+        briefs_to_show = st.session_state.filtered_briefs
+        
+        if briefs_to_show:
+            for name, data in briefs_to_show.items():
+                col_brief1, col_brief2, col_brief3, col_brief4 = st.columns([3, 1, 1, 1])
+                with col_brief1:
+                    st.write(f"**{name}** - {data.get('brief_type', '')}")
+                with col_brief2:
+                    if st.button("📝 Éditer", key=f"edit_{name}"):
+                        st.session_state.current_brief_name = name
+                        st.session_state.avant_brief_completed = True
+                        st.rerun()
+                with col_brief3:
+                    if st.button("🗑️ Supprimer", key=f"delete_{name}"):
+                        del st.session_state.saved_briefs[name]
+                        save_briefs()
+                        st.rerun()
+                with col_brief4:
+                    if st.button("📄 Exporter", key=f"export_{name}"):
+                        pass
+        else:
+            st.info("Aucun brief correspondant aux filtres.")
 
 # ---------------- AVANT-BRIEF ----------------
 with tabs[1]:
@@ -722,248 +701,74 @@ with tabs[1]:
     if "current_brief_name" in st.session_state:
         st.success(f"Brief actuel: {st.session_state.current_brief_name}")
     
-    # Bouton Pré-rédiger en haut
-    poste = st.session_state.get("poste_intitule", "")
-    if st.button("💡 Pré rédiger", type="primary", key="pre_rediger"):
-        if poste:
-            library = st.session_state.job_library
-            matching_job = next((job for job in library if job['title'].lower() == poste.lower()), None)
-            if matching_job:
-                fiche_data = (
-                    f"Title: {matching_job['title']}\n"
-                    f"Finalite: {matching_job.get('finalite', '')}\n"
-                    f"Activites: {matching_job.get('activites', '')}\n"
-                    f"Experience: {matching_job.get('experience_globale', '')}\n"
-                    f"Niveau diplome: {matching_job.get('niveau_diplome', '')}\n"
-                    f"Competences: {matching_job.get('competences', '')}"
-                )
-                try:
-                    ai_output = get_ai_pre_redaction(fiche_data)
-                    
-                    # Parse simple markdown
-                    lines = ai_output.split("\n")
-                    mission_globale_ai = ""
-                    taches_ai = ""
-                    must_have_ai = ""
-                    nice_to_have_ai = ""
-                    
-                    current_section = None
-                    for line in lines:
-                        if "- Mission globale:" in line:
-                            current_section = "mission"
-                            mission_globale_ai = line.split(":", 1)[1].strip()
-                        elif "- Tâches principales:" in line:
-                            current_section = "taches"
-                        elif "- Must have:" in line:
-                            current_section = "must"
-                        elif "- Nice to have:" in line:
-                            current_section = "nice"
-                        elif line.startswith("- ") and current_section:
-                            if current_section == "taches":
-                                taches_ai += line + "\n"
-                            elif current_section == "must":
-                                must_have_ai += line + "\n"
-                            elif current_section == "nice":
-                                nice_to_have_ai += line + "\n"
-                    
-                    # Modifie UNIQUEMENT ces sections
-                    st.session_state.impact_strategique = mission_globale_ai
-                    st.session_state.taches_principales = taches_ai.strip()
-                    st.session_state.must_have_experience = must_have_ai.strip()
-                    st.session_state.must_have_diplomes = must_have_ai.strip()
-                    st.session_state.must_have_competences = must_have_ai.strip()
-                    st.session_state.nice_to_have_experience = nice_to_have_ai.strip()
-                    st.session_state.nice_to_have_diplomes = nice_to_have_ai.strip()
-                    st.session_state.nice_to_have_competences = nice_to_have_ai.strip()
-                    
-                    st.session_state.save_message = "✅ Pré-rédaction AI appliquée (synthèse courte)"
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erreur AI: {e}")
-            else:
-                st.warning("⚠️ Aucune fiche de poste trouvée pour ce titre")
-        else:
-            st.warning("⚠️ Veuillez d'abord entrer le poste à recruter")
-    
     # Liste des sections et champs pour le tableau
     sections = [
-        {
-            "title": "Contexte du poste",
-            "fields": [
-                ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"),
-                ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"),
-                ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"),
-            ]
-        },
-        {
-            "title": "Must-have (Indispensables)",
-            "fields": [
-                ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
-                ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
-                ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"),
-                ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"),
-            ]
-        },
-        {
-            "title": "Nice-to-have (Atouts)",
-            "fields": [
-                ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
-                ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
-                ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
-            ]
-        },
-        {
-            "title": "Sourcing et marché",
-            "fields": [
-                ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
-                ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
-                ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
-            ]
-        },
-        {
-            "title": "Conditions et contraintes",
-            "fields": [
-                ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
-                ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
-            ]
-        },
-        {
-            "title": "Profils pertinents",
-            "fields": [
-                ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
-                ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
-                ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
-            ]
-        },
-        {
-            "title": "Notes libres",
-            "fields": [
-                ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
-                ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
-            ]
-        },
+        {"title": "Contexte du poste", "fields": [
+            ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"),
+            ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"),
+            ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget")]},
+        {"title": "Must-have (Indispensables)", "fields": [
+            ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
+            ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
+            ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"),
+            ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie")]},
+        {"title": "Nice-to-have (Atouts)", "fields": [
+            ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
+            ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
+            ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées")]},
+        {"title": "Sourcing et marché", "fields": [
+            ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
+            ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
+            ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels")]},
+        {"title": "Conditions et contraintes", "fields": [
+            ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
+            ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles")]},
+        {"title": "Profils pertinents", "fields": [
+            ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
+            ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
+            ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre")]},
+        {"title": "Notes libres", "fields": [
+            ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
+            ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique")]}
     ]
 
     # Construire le DataFrame avec une seule occurrence par section sans lignes vides
     data = []
     for section in sections:
-        data.append([section["title"], "", ""])
-        for field_name, field_key, placeholder in section["fields"]:
-            value = st.session_state.get(field_key, "")
-            data.append(["", field_name, value])
-
-    df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
+        data.append([section["title"], *[f"{field[0]}: {st.session_state.get(field[1], '')}" for field in section["fields"]]])
+    
+    df = pd.DataFrame(data, columns=["Section"] + [f"Field {i+1}" for i in range(len(sections[0]["fields"]))])
 
     # Afficher le data_editor stylé
     edited_df = st.data_editor(
         df,
         column_config={
             "Section": st.column_config.TextColumn("Section", disabled=True),
-            "Détails": st.column_config.TextColumn("Détails", disabled=True),
-            "Informations": st.column_config.TextColumn("Informations", width="large")
+            *[st.column_config.TextColumn(f"Field {i+1}", width="large") for i in range(len(sections[0]["fields"]))]
         },
         use_container_width=True,
         hide_index=True,
         num_rows="fixed"
     )
 
-    # Boutons Enregistrer et Pré-rédiger par IA
-    col_save, col_reset = st.columns(2)
-    with col_save:
-        if st.button("💾 Enregistrer modifications", type="primary", use_container_width=True, key="save_avant_brief"):
-            if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
-                brief_name = st.session_state.current_brief_name
-                brief_data = {
-                    "raison_ouverture": edited_df["Informations"].iloc[1],
-                    "impact_strategique": edited_df["Informations"].iloc[2],
-                    "taches_principales": edited_df["Informations"].iloc[3],
-                    "must_have_experience": edited_df["Informations"].iloc[5],
-                    "must_have_diplomes": edited_df["Informations"].iloc[6],
-                    "must_have_competences": edited_df["Informations"].iloc[7],
-                    "must_have_softskills": edited_df["Informations"].iloc[8],
-                    "nice_to_have_experience": edited_df["Informations"].iloc[10],
-                    "nice_to_have_diplomes": edited_df["Informations"].iloc[11],
-                    "nice_to_have_competences": edited_df["Informations"].iloc[12],
-                    "entreprises_profil": edited_df["Informations"].iloc[14],
-                    "synonymes_poste": edited_df["Informations"].iloc[15],
-                    "canaux_profil": edited_df["Informations"].iloc[16],
-                    "rattachement": edited_df["Informations"].iloc[18],
-                    "budget": edited_df["Informations"].iloc[19],
-                    "profil_link_1": edited_df["Informations"].iloc[21],
-                    "profil_link_2": edited_df["Informations"].iloc[22],
-                    "profil_link_3": edited_df["Informations"].iloc[23],
-                    "commentaires": edited_df["Informations"].iloc[25],
-                    "notes_libres": edited_df["Informations"].iloc[26]
-                }
-                st.session_state.saved_briefs[brief_name].update(brief_data)
-                save_briefs()
-                st.session_state.avant_brief_completed = True
-                st.session_state.save_message = "✅ Modifications sauvegardées"
-                st.rerun()
-            else:
-                st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
-    
-    with col_reset:
-        if st.button("💡 Pré-rédiger par IA", type="secondary", use_container_width=True, key="pre_rediger_ia"):
-            poste = st.session_state.get("poste_intitule", "")
-            if poste:
-                library = st.session_state.job_library
-                matching_job = next((job for job in library if job['title'].lower() == poste.lower()), None)
-                if matching_job:
-                    fiche_data = (
-                        f"Title: {matching_job['title']}\n"
-                        f"Finalite: {matching_job.get('finalite', '')}\n"
-                        f"Activites: {matching_job.get('activites', '')}\n"
-                        f"Experience: {matching_job.get('experience_globale', '')}\n"
-                        f"Niveau diplome: {matching_job.get('niveau_diplome', '')}\n"
-                        f"Competences: {matching_job.get('competences', '')}"
-                    )
-                    try:
-                        ai_output = get_ai_pre_redaction(fiche_data)
-                        
-                        # Parse
-                        lines = ai_output.split("\n")
-                        mission_globale_ai = ""
-                        taches_ai = ""
-                        must_have_ai = ""
-                        nice_to_have_ai = ""
-                        
-                        current_section = None
-                        for line in lines:
-                            if "- Mission globale:" in line:
-                                current_section = "mission"
-                                mission_globale_ai = line.split(":", 1)[1].strip()
-                            elif "- Tâches principales:" in line:
-                                current_section = "taches"
-                            elif "- Must have:" in line:
-                                current_section = "must"
-                            elif "- Nice to have:" in line:
-                                current_section = "nice"
-                            elif line.startswith("- ") and current_section:
-                                if current_section == "taches":
-                                    taches_ai += line + "\n"
-                                elif current_section == "must":
-                                    must_have_ai += line + "\n"
-                                elif current_section == "nice":
-                                    nice_to_have_ai += line + "\n"
-                        
-                        st.session_state.impact_strategique = mission_globale_ai
-                        st.session_state.taches_principales = taches_ai.strip()
-                        st.session_state.must_have_experience = must_have_ai.strip()
-                        st.session_state.must_have_diplomes = must_have_ai.strip()
-                        st.session_state.must_have_competences = must_have_ai.strip()
-                        st.session_state.nice_to_have_experience = nice_to_have_ai.strip()
-                        st.session_state.nice_to_have_diplomes = nice_to_have_ai.strip()
-                        st.session_state.nice_to_have_competences = nice_to_have_ai.strip()
-                        
-                        st.session_state.save_message = "✅ Pré-rédaction AI appliquée (synthèse courte)"
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erreur AI: {e}")
-                else:
-                    st.warning("⚠️ Aucune fiche de poste trouvée pour ce titre")
-            else:
-                st.warning("⚠️ Veuillez d'abord entrer le poste à recruter")
+    # Mettre à jour les données dans session_state après édition
+    for i, section in enumerate(sections):
+        for j, (field_name, field_key, _) in enumerate(section["fields"]):
+            value = edited_df[f"Field {j+1}"].iloc[i].replace(f"{field_name}: ", "", 1) if edited_df[f"Field {j+1}"].iloc[i].startswith(f"{field_name}: ") else edited_df[f"Field {j+1}"].iloc[i]
+            st.session_state[field_key] = value
+
+    # Boutons Enregistrer
+    if st.button("💾 Enregistrer modifications", type="primary", use_container_width=True, key="save_avant_brief"):
+        if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
+            brief_name = st.session_state.current_brief_name
+            brief_data = {field_key: st.session_state.get(field_key, "") for section in sections for _, field_key, _ in section["fields"]}
+            st.session_state.saved_briefs[brief_name].update(brief_data)
+            save_briefs()
+            st.session_state.avant_brief_completed = True
+            st.session_state.save_message = "✅ Modifications sauvegardées"
+            st.rerun()
+        else:
+            st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
 
 # ---------------- RÉUNION ----------------
 with tabs[2]:
@@ -977,28 +782,24 @@ with tabs[2]:
     if step == 1:
         st.subheader("📋 Portrait robot candidat - Validation")
 
-        # Construire le DataFrame
+        # Construire le DataFrame avec les données de Avant-brief
         data = []
-        field_keys = []
         comment_keys = []
         k = 1
         for section in sections:
-            data.append([section["title"], "", "", ""])
-            for field_name, field_key, placeholder in section["fields"]:
-                data.append(["", field_name, st.session_state.get(field_key, ""), ""])
-                field_keys.append(field_key)
+            data.append([section["title"], *[f"{field[0]}: {st.session_state.get(field[1], '')}" for field in section["fields"]], ""])
+            for _, field_key, _ in section["fields"]:
                 comment_keys.append(f"manager_comment_{k}")
                 k += 1
 
-        df = pd.DataFrame(data, columns=["Section", "Détails", "Informations", "Commentaires du manager"])
+        df = pd.DataFrame(data, columns=["Section"] + [f"Field {i+1}" for i in range(len(sections[0]["fields"]))] + ["Commentaires du manager"])
 
         # Afficher le data_editor stylé
         edited_df = st.data_editor(
             df,
             column_config={
                 "Section": st.column_config.TextColumn("Section", disabled=True),
-                "Détails": st.column_config.TextColumn("Détails", disabled=True),
-                "Informations": st.column_config.TextColumn("Informations", width="medium", disabled=True),
+                *[st.column_config.TextColumn(f"Field {i+1}", width="large", disabled=True) for i in range(len(sections[0]["fields"]))],
                 "Commentaires du manager": st.column_config.TextColumn("Commentaires du manager", width="medium")
             },
             use_container_width=True,
@@ -1047,13 +848,8 @@ with tabs[2]:
                     brief_name = st.session_state.current_brief_name
                     
                     # Récupérer tous les commentaires du manager
-                    manager_comments = {}
-                    for i in range(1, 21):
-                        comment_key = f"manager_comment_{i}"
-                        if comment_key in st.session_state:
-                            manager_comments[comment_key] = st.session_state[comment_key]
+                    manager_comments = {key: st.session_state.get(key, "") for key in [f"manager_comment_{i}" for i in range(1, 21)] if key in st.session_state}
                     
-                    # Charger les briefs existants depuis le fichier
                     existing_briefs = load_briefs()
                     if brief_name in existing_briefs:
                         existing_briefs[brief_name].update({
@@ -1106,7 +902,7 @@ with tabs[3]:
     # Vérification si l'onglet est accessible
     if not can_access_synthese:
         st.warning("⚠️ Veuillez d'abord compléter et sauvegarder l'onglet Réunion de brief")
-        st.stop()  # Arrête le rendu de cet onglet
+        st.stop()
     
     # Afficher les informations du brief en cours
     st.subheader(f"📝 Synthèse du Brief - {st.session_state.get('poste_intitule', '')}")
@@ -1193,28 +989,26 @@ with tabs[3]:
         else:
             st.info("⚠️ Word non dispo (pip install python-docx)")
 
-# ---------------- ONGLET BIBLIOTHÈQUE (toujours accessible, recherche, buttons modifier/supprimer, modification dans mêmes cases) ----------------
+# ---------------- ONGLET BIBLIOTHÈQUE ----------------
 with tabs[4]:
     st.header("📚 Bibliothèque des fiches de poste")
     
     library = st.session_state.job_library
     
-    # Recherche (par nom, date) - Liste n'apparaît que si recherche effectuée
+    # Recherche (par nom, date)
     col_search1, col_search2 = st.columns(2)
     with col_search1:
         search_name = st.text_input("Rechercher par nom du poste")
     with col_search2:
         search_date = st.date_input("Date de création", value=None)
     
-    filtered_library = []
-    if search_name or search_date:
-        filtered_library = library
-        if search_name:
-            filtered_library = [j for j in filtered_library if search_name.lower() in j.get("title", "").lower()]
-        if search_date:
-            filtered_library = [j for j in filtered_library if j.get("date_creation") and datetime.strptime(j["date_creation"], "%Y-%m-%d %H:%M:%S").date() == search_date]
+    filtered_library = library
+    if search_name:
+        filtered_library = [j for j in filtered_library if search_name.lower() in j.get("title", "").lower()]
+    if search_date:
+        filtered_library = [j for j in filtered_library if j.get("date_creation") and datetime.strptime(j["date_creation"], "%Y-%m-%d %H:%M:%S").date() == search_date]
     
-    # Affichage seulement si recherche faite
+    # Affichage des fiches
     if filtered_library:
         df = pd.DataFrame({
             "Intitulé": [j["title"] for j in filtered_library],
@@ -1222,7 +1016,6 @@ with tabs[4]:
         })
         st.dataframe(df, use_container_width=True)
         
-        # Buttons pour chaque fiche
         for i, job in enumerate(filtered_library):
             col1, col2 = st.columns([3, 1])
             with col1:
@@ -1238,12 +1031,9 @@ with tabs[4]:
                     st.session_state.save_message = f"✅ Fiche de poste '{job['title']}' supprimée"
                     st.rerun()
     else:
-        if not search_name and not search_date:
-            st.info("Effectuez une recherche pour voir les fiches.")
-        else:
-            st.info("Aucune fiche trouvée.")
+        st.info("Aucune fiche trouvée avec les critères actuels.")
     
-    # Formulaire pour ajouter ou modifier (mêmes cases, avec vérif unique)
+    # Formulaire pour ajouter ou modifier
     editing = 'editing_job' in st.session_state
     job_data = library[st.session_state.editing_job] if editing else {}
     
@@ -1264,7 +1054,6 @@ with tabs[4]:
         competences = st.text_area("Compétences requises", value=job_data.get('competences', ''))
         
         if st.form_submit_button("💾 Sauvegarder"):
-            # Vérif intitulé unique
             if any(j["title"].lower() == title.lower() for j in library if not (editing and j["title"] == job_data.get("title", ""))):
                 st.error("Une fiche avec cet intitulé existe déjà.")
             else:
@@ -1283,7 +1072,7 @@ with tabs[4]:
                     'niveau_diplome': niveau_diplome,
                     'experience_globale': experience_globale,
                     'competences': competences,
-                    "date_creation": datetime.now().strftime("%Y-%m-%d %H:%M:%S")  # Pour recherche
+                    "date_creation": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 }
                 if editing:
                     library[st.session_state.editing_job] = new_job
@@ -1310,6 +1099,5 @@ if (!{str(can_access_reunion).lower()}) {{
 if (!{str(can_access_synthese).lower()}) {{
     tabs[3].classList.add('disabled-tab');
 }}
-// Bibliothèque (tabs[4]) toujours accessible
 </script>
 """, unsafe_allow_html=True)
