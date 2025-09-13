@@ -1552,8 +1552,6 @@ if (!{str(can_access_reunion).lower()}) {{
 if (!{str(can_access_synthese).lower()}) {{
     tabs[3].classList.add('disabled-tab');
 }}
-if (!{str(can_access_bibliotheque).lower()}) {{
-    tabs[4].classList.add('disabled-tab');
-}}
+
 </script>
 """, unsafe_allow_html=True)
