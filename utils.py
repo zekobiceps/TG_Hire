@@ -62,7 +62,7 @@ def init_session_state():
         "profil_links": ["", "", ""],
         "ksa_data": {}, # Ancienne structure
         "ksa_matrix": pd.DataFrame(), # Nouvelle structure, plus robuste
-        "saved_briefs": {},
+        "saved_briefs": load_briefs(),
         "current_brief_name": None,
         "filtered_briefs": {},
         "show_filtered_results": False,
@@ -387,11 +387,15 @@ def save_library(library_data):
 # -------------------- Pré-rédaction IA avec DeepSeek --------------------
 def get_ai_pre_redaction(fiche_data):
     """Génère une pré-rédaction synthétique avec DeepSeek API via OpenAI client."""
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise ImportError("Le module 'openai' n'est pas installé. Veuillez l'installer avec 'pip install openai'.")
+
     api_key = st.secrets.get("DEEPSEEK_API_KEY")
     if not api_key:
         raise ValueError("Clé API DeepSeek non trouvée dans st.secrets")
 
-    from openai import OpenAI  # Import local pour éviter dépendance globale
     client = OpenAI(
         api_key=api_key,
         base_url="https://api.deepseek.com/v1"  # Compatible OpenAI
