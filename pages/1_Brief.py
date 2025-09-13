@@ -20,7 +20,7 @@ from utils import (
     filter_briefs,
     generate_automatic_brief_name,
     save_library,
-    get_ai_pre_redaction  # Nouvelle fonction AI
+    get_ai_pre_redaction
 )
 
 # ---------------- NOUVELLES FONCTIONS ----------------
@@ -245,6 +245,18 @@ st.markdown("""
     .stButton > button[kind="secondary"]:hover {
         background-color: #3D3D4D;
         color: #FAFAFA;
+    }
+    
+    /* Bouton Pré-rédiger jaune avec lampe */
+    .stButton > button[key="pre_rediger"], .stButton > button[key="pre_rediger_ia"] {
+        background-color: #FFD700 !important;
+        color: black !important;
+        border: none;
+    }
+    
+    .stButton > button[key="pre_rediger"]:hover, .stButton > button[key="pre_rediger_ia"]:hover {
+        background-color: #FFEA00 !important;
+        color: black !important;
     }
     
     /* Expanders */
@@ -488,11 +500,6 @@ st.markdown("""
         resize: vertical !important;
     }
     
-    /* Style pour le bouton pré-rédiger jaune avec lampe */
-    .stButton > button[key="pre_rediger"] {
-        background-color: #FFD700 !important;
-        color: black !important;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -657,7 +664,7 @@ with tabs[0]:
     
     st.divider()
     
-    # Section Filtrage - VERSION COMPACTE (à droite de informations de base, mais comme c'est en dessous, on garde)
+    # Section Filtrage - VERSION COMPACTE
     col_title_left_filter, col_title_right_filter = st.columns([2, 1])
     with col_title_left_filter:
         st.markdown('<h3 style="margin-bottom: 0.3rem;">🔍 Filtrer les briefs</h3>', unsafe_allow_html=True)
@@ -707,22 +714,17 @@ with tabs[0]:
     else:
         st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
 
-# ---------------- AVANT-BRIEF (Tableau éditable, alignements sans lignes vides, colonnes réduites, bouton pré-rédiger en haut, AI synthétique) ----------------
+# ---------------- AVANT-BRIEF ----------------
 with tabs[1]:
-    # Vérification si l'onglet est accessible
-    if not can_access_avant_brief:
-        st.warning("⚠️ Veuillez d'abord créer un brief dans l'onglet Gestion")
-        st.stop()  # Arrête le rendu de cet onglet
-    
     # Afficher les informations du brief en cours
-    st.subheader(f"🔄 Avant-brief - {st.session_state.get('poste_intitule', '')}")  # Aligné sans vide
+    st.subheader(f"🔄 Avant-brief - {st.session_state.get('poste_intitule', '')}")
     
     if "current_brief_name" in st.session_state:
         st.success(f"Brief actuel: {st.session_state.current_brief_name}")
     
-    # Bouton Pré-rédiger en haut (sans lampe, demande à l'IA pour synthèse courte)
+    # Bouton Pré-rédiger en haut
     poste = st.session_state.get("poste_intitule", "")
-    if st.button("💡 Pré rédiger", key="pre_rediger"):  # En haut du tableau
+    if st.button("💡 Pré rédiger", type="primary", key="pre_rediger"):
         if poste:
             library = st.session_state.job_library
             matching_job = next((job for job in library if job['title'].lower() == poste.lower()), None)
@@ -738,7 +740,7 @@ with tabs[1]:
                 try:
                     ai_output = get_ai_pre_redaction(fiche_data)
                     
-                    # Parse simple markdown (assume format: - Mission globale: ...\n- Tâches principales:\n- ...\n- Must have:\n- ...\n- Nice to have:\n- ...)
+                    # Parse simple markdown
                     lines = ai_output.split("\n")
                     mission_globale_ai = ""
                     taches_ai = ""
@@ -767,7 +769,7 @@ with tabs[1]:
                     # Modifie UNIQUEMENT ces sections
                     st.session_state.impact_strategique = mission_globale_ai
                     st.session_state.taches_principales = taches_ai.strip()
-                    st.session_state.must_have_experience = must_have_ai.strip()  # Exemple mapping, adapte si besoin
+                    st.session_state.must_have_experience = must_have_ai.strip()
                     st.session_state.must_have_diplomes = must_have_ai.strip()
                     st.session_state.must_have_competences = must_have_ai.strip()
                     st.session_state.nice_to_have_experience = nice_to_have_ai.strip()
@@ -783,10 +785,10 @@ with tabs[1]:
         else:
             st.warning("⚠️ Veuillez d'abord entrer le poste à recruter")
     
-    # Liste des sections et champs pour le tableau (aligné sans lignes vides)
+    # Liste des sections et champs pour le tableau
     sections = [
         {
-            "title": "Contexte du poste",  # Aligné
+            "title": "Contexte du poste",
             "fields": [
                 ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"),
                 ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"),
@@ -845,14 +847,14 @@ with tabs[1]:
     # Construire le DataFrame avec une seule occurrence par section sans lignes vides
     data = []
     for section in sections:
-        data.append([section["title"], "", ""])  # Ajouter la section une seule fois (aligné)
+        data.append([section["title"], "", ""])
         for field_name, field_key, placeholder in section["fields"]:
             value = st.session_state.get(field_key, "")
             data.append(["", field_name, value])
 
     df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
 
-    # Afficher le data_editor stylé (colonnes réduites via CSS)
+    # Afficher le data_editor stylé
     edited_df = st.data_editor(
         df,
         column_config={
@@ -865,7 +867,7 @@ with tabs[1]:
         num_rows="fixed"
     )
 
-    # Boutons Enregistrer et Pré-rédiger par IA (remplacement de réinitialiser)
+    # Boutons Enregistrer et Pré-rédiger par IA
     col_save, col_reset = st.columns(2)
     with col_save:
         if st.button("💾 Enregistrer modifications", type="primary", use_container_width=True, key="save_avant_brief"):
@@ -902,7 +904,7 @@ with tabs[1]:
                 st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
     
     with col_reset:
-        if st.button("Pré-rédiger par IA", type="secondary", use_container_width=True, key="pre_rediger_ia"):
+        if st.button("💡 Pré-rédiger par IA", type="secondary", use_container_width=True, key="pre_rediger_ia"):
             poste = st.session_state.get("poste_intitule", "")
             if poste:
                 library = st.session_state.job_library
@@ -963,32 +965,25 @@ with tabs[1]:
             else:
                 st.warning("⚠️ Veuillez d'abord entrer le poste à recruter")
 
-# ---------------- RÉUNION (Wizard interne, colonnes réduites, sans message création) ----------------
+# ---------------- RÉUNION ----------------
 with tabs[2]:
-    # Vérification si l'onglet est accessible
-    if not can_access_reunion:
-        st.warning("⚠️ Veuillez d'abord compléter et sauvegarder l'onglet Avant-brief")
-        st.stop()  # Arrête le rendu de cet onglet
-    
     # Afficher les informations du brief en cours
     st.subheader(f"✅ Réunion de brief avec le Manager - {st.session_state.get('poste_intitule', '')}")
 
-    total_steps = 5  # Augmenté à 5 étapes pour inclure les notes du manager
+    total_steps = 5
     step = st.session_state.reunion_step
     st.progress(int((step / total_steps) * 100), text=f"Étape {step}/{total_steps}")
 
     if step == 1:
         st.subheader("📋 Portrait robot candidat - Validation")
 
-        # ... (sections identiques, mais tableau avec colonnes réduites via CSS)
-
         # Construire le DataFrame
         data = []
         field_keys = []
         comment_keys = []
         k = 1
-        for section in sections:  # Réutilise sections d'avant-brief
-            data.append([section["title"], "", "", ""])  # Aligné
+        for section in sections:
+            data.append([section["title"], "", "", ""])
             for field_name, field_key, placeholder in section["fields"]:
                 data.append(["", field_name, st.session_state.get(field_key, ""), ""])
                 field_keys.append(field_key)
@@ -997,7 +992,7 @@ with tabs[2]:
 
         df = pd.DataFrame(data, columns=["Section", "Détails", "Informations", "Commentaires du manager"])
 
-        # Afficher le data_editor stylé avec 4 colonnes (réduites)
+        # Afficher le data_editor stylé
         edited_df = st.data_editor(
             df,
             column_config={
@@ -1053,7 +1048,7 @@ with tabs[2]:
                     
                     # Récupérer tous les commentaires du manager
                     manager_comments = {}
-                    for i in range(1, 21):  # 20 commentaires maintenant
+                    for i in range(1, 21):
                         comment_key = f"manager_comment_{i}"
                         if comment_key in st.session_state:
                             manager_comments[comment_key] = st.session_state[comment_key]
@@ -1105,7 +1100,6 @@ with tabs[2]:
             if st.button("Suivant ➡️", key="next_step"):
                 st.session_state.reunion_step += 1
                 st.rerun()
-
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
     # Vérification si l'onglet est accessible
@@ -1198,13 +1192,13 @@ with tabs[3]:
         else:
             st.info("⚠️ Word non dispo (pip install python-docx)")
 
-# ---------------- ONGLET BIBLIOTHÈQUE (amélioré : recherche, pas de liste par défaut, buttons modifier/supprimer, modification dans mêmes cases) ----------------
+# ---------------- ONGLET BIBLIOTHÈQUE (toujours accessible, recherche, buttons modifier/supprimer, modification dans mêmes cases) ----------------
 with tabs[4]:
-    st.header("📚 Bibliothèque des fiches de poste")  # Visuel retravaillé
+    st.header("📚 Bibliothèque des fiches de poste")
     
     library = st.session_state.job_library
     
-    # Recherche (par nom, date)
+    # Recherche (par nom, date) - Liste n'apparaît que si recherche effectuée
     col_search1, col_search2 = st.columns(2)
     with col_search1:
         search_name = st.text_input("Rechercher par nom du poste")
@@ -1243,9 +1237,12 @@ with tabs[4]:
                     st.session_state.save_message = f"✅ Fiche de poste '{job['title']}' supprimée"
                     st.rerun()
     else:
-        st.info("Effectuez une recherche pour voir les fiches.")
+        if not search_name and not search_date:
+            st.info("Effectuez une recherche pour voir les fiches.")
+        else:
+            st.info("Aucune fiche trouvée.")
     
-    # Formulaire pour ajouter ou modifier (mêmes cases)
+    # Formulaire pour ajouter ou modifier (mêmes cases, avec vérif unique)
     editing = 'editing_job' in st.session_state
     job_data = library[st.session_state.editing_job] if editing else {}
     
@@ -1290,16 +1287,15 @@ with tabs[4]:
                 if editing:
                     library[st.session_state.editing_job] = new_job
                     del st.session_state.editing_job
-                    message = f"✅ Fiche de poste '{title}' modifiée avec succès"
+                    st.session_state.save_message = f"✅ Fiche de poste '{title}' modifiée avec succès"
                 else:
                     library.append(new_job)
-                    message = f"✅ Fiche de poste '{title}' créée avec succès"
+                    st.session_state.save_message = f"✅ Fiche de poste '{title}' créée avec succès"
                 save_library(library)
                 st.session_state.job_library = library
-                st.session_state.save_message = message
                 st.rerun()
 
-# JavaScript pour désactiver les onglets non accessibles
+# JavaScript pour désactiver les onglets non accessibles (Bibliothèque exclue)
 st.markdown(f"""
 <script>
 // Désactiver les onglets selon les permissions
@@ -1313,5 +1309,6 @@ if (!{str(can_access_reunion).lower()}) {{
 if (!{str(can_access_synthese).lower()}) {{
     tabs[3].classList.add('disabled-tab');
 }}
+// Bibliothèque (tabs[4]) toujours accessible
 </script>
 """, unsafe_allow_html=True)
