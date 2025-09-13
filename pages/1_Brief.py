@@ -1100,6 +1100,7 @@ with tabs[2]:
             if st.button("Suivant ➡️", key="next_step"):
                 st.session_state.reunion_step += 1
                 st.rerun()
+
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
     # Vérification si l'onglet est accessible
