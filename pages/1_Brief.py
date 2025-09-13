@@ -3,12 +3,12 @@ import streamlit as st
 from datetime import datetime
 import json
 import pandas as pd
-import requests # Bibliothèque pour faire des appels API
+import requests
 
-# Pour la lecture des fichiers PDF
+# For PDF file reading
 import pdfplumber
 
-# ✅ permet d'accéder à utils.py à la racine
+# ✅ allows access to utils.py at the root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from utils import (
@@ -126,7 +126,6 @@ def delete_current_brief():
             st.session_state.brief_phase = "📁 Gestion"
             st.rerun()
 
-# Fonction pour appeler l'IA et extraire les informations (À ADAPTER)
 # Fonction pour appeler l'IA et extraire les informations (MISE À JOUR)
 def extract_info_with_deepseek(text, job_title):
     """
@@ -139,15 +138,13 @@ def extract_info_with_deepseek(text, job_title):
     RETOURNE:
     dict: Un dictionnaire contenant les informations extraites, ou un dictionnaire vide en cas d'erreur.
     """
-    # Votre clé API DeepSeek, récupérée de st.secrets
     if "DEEPSEEK_API_KEY" not in st.secrets:
         st.error("Clé API DeepSeek non trouvée dans les secrets de Streamlit. Veuillez la configurer.")
         return {}
         
     DEEPSEEK_API_KEY = st.secrets["DEEPSEEK_API_KEY"]
-    DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions" # URL de l'endpoint
+    DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
     
-    # Instruction à donner à l'IA
     system_prompt = f"""
     Vous êtes un expert en recrutement. Votre tâche est d'analyser une fiche de poste et d'extraire les informations clés pour créer un brief de recrutement. 
     Les informations à extraire sont :
@@ -170,14 +167,13 @@ def extract_info_with_deepseek(text, job_title):
     Répondez uniquement avec un objet JSON contenant ces clés et les valeurs extraites. Ne donnez aucune autre explication ou texte avant ou après le JSON. Si une information n'est pas trouvée, la valeur correspondante doit être une chaîne vide.
     """
 
-    # La requête à envoyer à l'API
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {DEEPSEEK_API_KEY}"
     }
 
     payload = {
-        "model": "deepseek-coder", # Ou un autre modèle pertinent pour le texte
+        "model": "deepseek-coder",
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": f"Analyse la fiche de poste pour le poste de '{job_title}' :\n\n{text}"}
@@ -187,12 +183,11 @@ def extract_info_with_deepseek(text, job_title):
 
     try:
         response = requests.post(DEEPSEEK_API_URL, headers=headers, json=payload)
-        response.raise_for_status() # Lève une exception si le statut HTTP n'est pas 2xx
+        response.raise_for_status()
         
         response_data = response.json()
         raw_content = response_data['choices'][0]['message']['content']
         
-        # L'IA doit répondre en JSON, on le parse directement
         parsed_data = json.loads(raw_content)
         return parsed_data
         
@@ -220,8 +215,10 @@ if "reunion_step" not in st.session_state:
 
 if "filtered_briefs" not in st.session_state:
     st.session_state.filtered_briefs = {}
+    
+if "job_descriptions" not in st.session_state:
+    st.session_state.job_descriptions = {}
 
-# Variables pour gérer l'accès aux onglets
 if "avant_brief_completed" not in st.session_state:
     st.session_state.avant_brief_completed = False
 
@@ -232,7 +229,6 @@ if "reunion_completed" not in st.session_state:
 with st.sidebar:
     st.title("📊 Statistiques Brief")
     
-    # Calculer quelques statistiques
     total_briefs = len(st.session_state.get("saved_briefs", {}))
     completed_briefs = sum(1 for b in st.session_state.get("saved_briefs", {}).values() 
                           if b.get("ksa_data") and any(b["ksa_data"].values()))
@@ -246,312 +242,60 @@ with st.sidebar:
 # ---------------- NAVIGATION PRINCIPALE ----------------
 st.title("🤖 TG-Hire IA - Brief")
 
-# Style CSS pour les onglets personnalisés et les tableaux améliorés
 st.markdown("""
     <style>
-    /* Style général pour l'application */
-    .stApp {
-        background-color: #0E1117;
-        color: #FAFAFA;
-    }
-    
-    /* Style pour les onglets de navigation */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 0px;
-        background-color: #0E1117;
-        padding: 0px;
-        border-radius: 4px;
-    }
-    
-    /* Style de base pour tous les onglets */
-    .stTabs [data-baseweb="tab"] {
-        background-color: #0E1117 !important;
-        color: white !important;
-        border: none !important;
-        padding: 10px 16px !important;
-        font-weight: 500 !important;
-        border-radius: 0 !important;
-        margin-right: 0 !important;
-        height: auto !important;
-    }
-    
-    /* Style pour l'onglet actif */
-    .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        color: #ff4b4b !important;
-        background-color: #0E1117 !important;
-        border-bottom: 3px solid #ff4b4b !important;
-    }
-    
-    /* Boutons principaux */
-    .stButton > button {
-        background-color: #FF4B4B;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        padding: 0.5rem 1rem;
-        font-weight: 500;
-    }
-    
-    .stButton > button:hover {
-        background-color: #FF6B6B;
-        color: white;
-    }
-    
-    /* Boutons secondaires */
-    .stButton > button[kind="secondary"] {
-        background-color: #262730;
-        color: #FAFAFA;
-        border: 1px solid #FF4B4B;
-    }
-    
-    .stButton > button[kind="secondary"]:hover {
-        background-color: #3D3D4D;
-        color: #FAFAFA;
-    }
-    
-    /* Expanders */
-    .streamlit-expanderHeader {
-        background-color: #262730;
-        color: #FAFAFA;
-        border-radius: 5px;
-        padding: 0.5rem;
-    }
-    
-    /* Correction pour les selectbox */
-    div[data-baseweb="select"] > div {
-        border: none !important;
-        background-color: #262730 !important;
-        color: white !important;
-        border-radius: 4px !important;
-    }
-    
-    /* Correction pour les inputs */
-    .stTextInput input {
-        background-color: #262730 !important;
-        color: white !important;
-        border-radius: 4px !important;
-        border: none !important;
-    }
-    
-    /* Correction pour les textareas */
-    .stTextArea textarea {
-        background-color: #262730 !important;
-        color: white !important;
-        border-radius: 4px !important;
-        border: none !important;
-    }
-    
-    /* Correction pour les date inputs */
-    .stDateInput input {
-        background-color: #262730 !important;
-        color: white !important;
-        border-radius: 4px !important;
-        border: none !important;
-    }
-    
-    /* Réduire la hauteur de la section avant-brief */
-    .stTextArea textarea {
-        height: 100px !important;
-    }
-    
-    /* Ajustement pour le message de confirmation */
-    .message-container {
-        margin-top: 10px;
-        padding: 10px;
-        border-radius: 5px;
-    }
-    
-    /* Style pour les messages d'alerte */
-    .stAlert {
-        padding: 10px;
-        margin-top: 10px;
-    }
-    
-    /* Style pour le tableau de méthode complète */
-    .comparison-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 1rem;
-    }
-    
-    .comparison-table th, .comparison-table td {
-        border: 1px solid #424242;
-        padding: 8px;
-        text-align: left;
-    }
-    
-    .comparison-table th {
-        background-color: #262730;
-        font-weight: bold;
-    }
-
-    /* Style pour la matrice KSA */
-    .dataframe {
-        width: 100%;
-    }
-    
-    /* Style pour les onglets désactivés */
-    .disabled-tab {
-        opacity: 0.5;
-        pointer-events: none;
-        cursor: not-allowed;
-    }
-    
-    /* Nouveau style pour le tableau amélioré - TABLEAU SOMBRE */
-    .dark-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 20px;
-        background-color: #0d1117; /* Fond noir pour le tableau */
-        font-size: 0.9em; /* Augmentation de la taille du texte */
-        border: 1px solid #ffffff; /* Bordure blanche */
-    }
-    
-    .dark-table th, .dark-table td {
-        padding: 12px 16px;
-        text-align: left;
-        border: 1px solid #ffffff; /* Bordures blanches */
-        color: #e6edf3; /* Texte clair sur fond sombre */
-    }
-    
-    .dark-table th {
-        background-color: #FF4B4B !important;  /* Rouge vif identique aux boutons */
-        color: white !important;
-        font-weight: 600;
-        padding: 14px 16px;
-        font-size: 16px;
-        border: 1px solid #ffffff; /* Bordure blanche */
-    }
-    
-    /* Largeur des colonnes */
-    .dark-table th:nth-child(1),
-    .dark-table td:nth-child(1) {
-        width: 15%; /* Réduction de la première colonne */
-    }
-    
-    .dark-table th:nth-child(2),
-    .dark-table td:nth-child(2) {
-        width: 20%;
-    }
-    
-    .dark-table th:nth-child(3),
-    .dark-table td:nth-child(3) {
-        width: 65%; /* Colonne Informations plus large */
-    }
-    
-    /* Style pour les tableaux avec 4 colonnes (réunion de brief) */
-    .dark-table.four-columns th:nth-child(1),
-    .dark-table.four-columns td:nth-child(1) {
-        width: 15%;
-    }
-    
-    .dark-table.four-columns th:nth-child(2),
-    .dark-table.four-columns td:nth-child(2) {
-        width: 20%;
-    }
-    
-    .dark-table.four-columns th:nth-child(3),
-    .dark-table.four-columns td:nth-child(3) {
-        width: 40%; /* Réduit pour faire de la place à la colonne notes */
-    }
-    
-    .dark-table.four-columns th:nth-child(4),
-    .dark-table.four-columns td:nth-child(4) {
-        width: 25%; /* Colonne Commentaires du manager élargie */
-    }
-    
-    .section-title {
-        font-weight: 600;
-        color: #58a6ff; /* Couleur bleue pour les titres de section */
-        font-size: 0.95em; /* Augmentation de la taille du texte */
-    }
-    
-    /* Style pour les textareas dans les tableaux */
-    .table-textarea {
-        width: 100%;
-        min-height: 60px;
-        background-color: #2D2D2D;
-        color: white;
-        border: 1px solid #555;
-        border-radius: 4px;
-        padding: 6px;
-        font-size: 0.9em; /* Augmentation de la taille du texte */
-        resize: vertical;
-    }
-    
-    /* Style pour les cellules de texte */
-    .table-text {
-        padding: 6px;
-        font-size: 0.9em; /* Augmentation de la taille du texte */
-        color: #e6edf3;
-    }
-    
-    /* Supprimer complètement les lignes vides */
-    .empty-row {
-        display: none;
-    }
-    
-    /* Style pour le data_editor afin de le faire ressembler au dark-table */
-    .stDataFrame {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 20px;
-        background-color: #0d1117;
-        font-size: 0.9em;
-        border: 1px solid #ffffff;
-    }
-    
-    .stDataFrame th, .stDataFrame td {
-        padding: 12px 16px;
-        text-align: left;
-        border: 1px solid #ffffff;
-        color: #e6edf3;
-    }
-    
-    .stDataFrame th {
-        background-color: #FF4B4B !important;
-        color: white !important;
-        font-weight: 600;
-        padding: 14px 16px;
-        font-size: 16px;
-        border: 1px solid #ffffff;
-    }
-    
-    .stDataFrame td:first-child {
-        font-weight: 600;
-        color: #58a6ff; /* Couleur bleue pour les titres de section */
-    }
-    
-    .stDataFrame td:nth-child(1) {
-        width: 15%;
-    }
-    
-    .stDataFrame td:nth-child(2) {
-        width: 20%;
-    }
-    
-    .stDataFrame td:nth-child(3) {
-        width: 65%;
-    }
-    
-    /* Style pour les cellules éditables (Informations) */
-    .stDataFrame td:nth-child(3) textarea {
-        background-color: #2D2D2D !important;
-        color: white !important;
-        border: 1px solid #555 !important;
-        border-radius: 4px !important;
-        padding: 6px !important;
-        min-height: 60px !important;
-        resize: vertical !important;
-    }
+    /* CSS code from previous response */
+    .stApp { background-color: #0E1117; color: #FAFAFA; }
+    .stTabs [data-baseweb="tab-list"] { gap: 0px; background-color: #0E1117; padding: 0px; border-radius: 4px; }
+    .stTabs [data-baseweb="tab"] { background-color: #0E1117 !important; color: white !important; border: none !important; padding: 10px 16px !important; font-weight: 500 !important; border-radius: 0 !important; margin-right: 0 !important; height: auto !important; }
+    .stTabs [aria-selected="true"] { color: #ff4b4b !important; border-bottom: 3px solid #ff4b4b !important; }
+    .stButton > button { background-color: #FF4B4B; color: white; border: none; border-radius: 5px; padding: 0.5rem 1rem; font-weight: 500; }
+    .stButton > button:hover { background-color: #FF6B6B; color: white; }
+    .stButton > button[kind="secondary"] { background-color: #262730; color: #FAFAFA; border: 1px solid #FF4B4B; }
+    .stButton > button[kind="secondary"]:hover { background-color: #3D3D4D; color: #FAFAFA; }
+    .streamlit-expanderHeader { background-color: #262730; color: #FAFAFA; border-radius: 5px; padding: 0.5rem; }
+    div[data-baseweb="select"] > div { border: none !important; background-color: #262730 !important; color: white !important; border-radius: 4px !important; }
+    .stTextInput input { background-color: #262730 !important; color: white !important; border-radius: 4px !important; border: none !important; }
+    .stTextArea textarea { background-color: #262730 !important; color: white !important; border-radius: 4px !important; border: none !important; }
+    .stDateInput input { background-color: #262730 !important; color: white !important; border-radius: 4px !important; border: none !important; }
+    .stTextArea textarea { height: 100px !important; }
+    .message-container { margin-top: 10px; padding: 10px; border-radius: 5px; }
+    .stAlert { padding: 10px; margin-top: 10px; }
+    .comparison-table { width: 100%; border-collapse: collapse; margin-bottom: 1rem; }
+    .comparison-table th, .comparison-table td { border: 1px solid #424242; padding: 8px; text-align: left; }
+    .comparison-table th { background-color: #262730; font-weight: bold; }
+    .dataframe { width: 100%; }
+    .disabled-tab { opacity: 0.5; pointer-events: none; cursor: not-allowed; }
+    .dark-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; background-color: #0d1117; font-size: 0.9em; border: 1px solid #ffffff; }
+    .dark-table th, .dark-table td { padding: 12px 16px; text-align: left; border: 1px solid #ffffff; color: #e6edf3; }
+    .dark-table th { background-color: #FF4B4B !important; color: white !important; font-weight: 600; padding: 14px 16px; font-size: 16px; border: 1px solid #ffffff; }
+    .dark-table th:nth-child(1), .dark-table td:nth-child(1) { width: 15%; }
+    .dark-table th:nth-child(2), .dark-table td:nth-child(2) { width: 20%; }
+    .dark-table th:nth-child(3), .dark-table td:nth-child(3) { width: 65%; }
+    .dark-table.four-columns th:nth-child(1), .dark-table.four-columns td:nth-child(1) { width: 15%; }
+    .dark-table.four-columns th:nth-child(2), .dark-table.four-columns td:nth-child(2) { width: 20%; }
+    .dark-table.four-columns th:nth-child(3), .dark-table.four-columns td:nth-child(3) { width: 40%; }
+    .dark-table.four-columns th:nth-child(4), .dark-table.four-columns td:nth-child(4) { width: 25%; }
+    .section-title { font-weight: 600; color: #58a6ff; font-size: 0.95em; }
+    .table-textarea { width: 100%; min-height: 60px; background-color: #2D2D2D; color: white; border: 1px solid #555; border-radius: 4px; padding: 6px; font-size: 0.9em; resize: vertical; }
+    .table-text { padding: 6px; font-size: 0.9em; color: #e6edf3; }
+    .empty-row { display: none; }
+    .stDataFrame { width: 100%; border-collapse: collapse; margin-bottom: 20px; background-color: #0d1117; font-size: 0.9em; border: 1px solid #ffffff; }
+    .stDataFrame th, .stDataFrame td { padding: 12px 16px; text-align: left; border: 1px solid #ffffff; color: #e6edf3; }
+    .stDataFrame th { background-color: #FF4B4B !important; color: white !important; font-weight: 600; padding: 14px 16px; font-size: 16px; border: 1px solid #ffffff; }
+    .stDataFrame td:first-child { font-weight: 600; color: #58a6ff; }
+    .stDataFrame td:nth-child(1) { width: 15%; }
+    .stDataFrame td:nth-child(2) { width: 20%; }
+    .stDataFrame td:nth-child(3) { width: 65%; }
+    .stDataFrame td:nth-child(3) textarea { background-color: #2D2D2D !important; color: white !important; border: 1px solid #555 !important; border-radius: 4px !important; padding: 6px !important; min-height: 60px !important; resize: vertical !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# Vérification si un brief est chargé au début de l'application
+# Check if a brief is loaded at the start of the application
 if "current_brief_name" not in st.session_state:
     st.session_state.current_brief_name = ""
 
-# Création des onglets avec gestion des accès
+# Creation of tabs with access management
 tabs = st.tabs([
     "📁 Gestion", 
     "🔄 Avant-brief", 
@@ -560,82 +304,34 @@ tabs = st.tabs([
     "📚 Bibliothèque"
 ])
 
-# Déterminer quels onglets sont accessibles
+# Determine which tabs are accessible
 can_access_avant_brief = st.session_state.current_brief_name != ""
 can_access_reunion = can_access_avant_brief and st.session_state.avant_brief_completed
 can_access_synthese = can_access_reunion and st.session_state.reunion_completed
-can_access_bibliotheque = can_access_avant_brief
+can_access_bibliotheque = True # Updated to be always accessible
 
 # ---------------- ONGLET GESTION ----------------
 with tabs[0]:
-    # Style CSS personnalisé pour réduire les espaces
     st.markdown("""
     <style>
-    /* Réduire l'espace entre les éléments */
-    .st-emotion-cache-1r6slb0 {
-        margin-bottom: 0.2rem;
-    }
-    .st-emotion-cache-1r6slb0 p {
-        margin-bottom: 0.2rem;
-    }
-    /* Réduire l'espace entre les titres et les champs */
-    h3 {
-        margin-bottom: 0.5rem !important;
-    }
-    /* Réduire la hauteur des champs */
-    .stTextInput input, .stSelectbox select, .stDateInput input {
-        padding-top: 0.2rem !important;
-        padding-bottom: 0.2rem !important;
-        height: 2rem !important;
-    }
-    /* Réduire l'espace entre les lignes de formulaire */
-    .st-emotion-cache-ocqkz7 {
-        gap: 0.5rem !important;
-    }
-    /* Style compact pour les radio buttons */
-    .custom-radio {
-        display: flex;
-        background-color: #262730;
-        padding: 3px;
-        border-radius: 5px;
-        border: 1px solid #424242;
-        margin-left: 10px;
-    }
-    .custom-radio input[type="radio"] {
-        display: none;
-    }
-    .custom-radio label {
-        padding: 3px 8px;
-        cursor: pointer;
-        border-radius: 3px;
-        margin: 0 3px;
-        font-size: 0.9em;
-    }
-    .custom-radio input[type="radio"]:checked + label {
-        background-color: #FF4B4B;
-        color: white;
-    }
-    /* Cacher le radio button Streamlit */
-    div[data-testid="stRadio"] > div {
-        display: none;
-    }
-    /* Réduire l'espace entre les colonnes */
-    .st-emotion-cache-5rimss p {
-        margin-bottom: 0.3rem;
-    }
-    /* Style pour le titre compact */
-    .compact-title {
-        display: flex;
-        align-items: center;
-        margin-bottom: 0.5rem !important;
-    }
+    /* ... (CSS for Gestion tab) ... */
+    .st-emotion-cache-1r6slb0 { margin-bottom: 0.2rem; }
+    .st-emotion-cache-1r6slb0 p { margin-bottom: 0.2rem; }
+    h3 { margin-bottom: 0.5rem !important; }
+    .stTextInput input, .stSelectbox select, .stDateInput input { padding-top: 0.2rem !important; padding-bottom: 0.2rem !important; height: 2rem !important; }
+    .st-emotion-cache-ocqkz7 { gap: 0.5rem !important; }
+    .custom-radio { display: flex; background-color: #262730; padding: 3px; border-radius: 5px; border: 1px solid #424242; margin-left: 10px; }
+    .custom-radio input[type="radio"] { display: none; }
+    .custom-radio label { padding: 3px 8px; cursor: pointer; border-radius: 3px; margin: 0 3px; font-size: 0.9em; }
+    .custom-radio input[type="radio"]:checked + label { background-color: #FF4B4B; color: white; }
+    div[data-testid="stRadio"] > div { display: none; }
+    .st-emotion-cache-5rimss p { margin-bottom: 0.3rem; }
+    .compact-title { display: flex; align-items: center; margin-bottom: 0.5rem !important; }
     </style>
     """, unsafe_allow_html=True)
     
-    # En-tête avec les titres alignés - VERSION COMPACTE
     col_title_left, col_title_right = st.columns([2, 1])
     with col_title_left:
-        # Titre "Informations de base" avec le type à droite - VERSION COMPACTE
         st.markdown("""
         <div class="compact-title">
             <h3 style="margin: 0; margin-right: 10px;">Informations de base</h3>
@@ -654,21 +350,17 @@ with tabs[0]:
     with col_title_right:
         st.markdown("<h3 style='margin-bottom: 0.5rem;'>Recherche & Chargement</h3>", unsafe_allow_html=True)
     
-    # Radio button Streamlit caché pour la fonctionnalité
-    # Utilisation d'une clé différente pour éviter l'erreur de session state
     if "gestion_brief_type" not in st.session_state:
         st.session_state.gestion_brief_type = "Brief"
     
     brief_type = st.radio("", ["Brief", "Canevas"], key="gestion_brief_type", horizontal=True, label_visibility="collapsed")
     
-    # Synchronisation avec la variable principale
     if st.session_state.gestion_brief_type != st.session_state.get("brief_type", "Brief"):
         st.session_state.brief_type = st.session_state.gestion_brief_type
     
     col_main, col_side = st.columns([2, 1])
     
     with col_main:
-        # --- INFOS DE BASE (3 colonnes)
         col1, col2, col3 = st.columns(3)
         with col1:
             st.text_input("Nom du manager *", key="manager_nom")
@@ -685,22 +377,16 @@ with tabs[0]:
         with col6:
             st.date_input("Date du Brief *", key="date_brief", value=datetime.today().date())
         
-        # --- SAUVEGARDE - Bouton étendu
         if st.button("💾 Sauvegarder", type="primary", use_container_width=True, key="save_gestion"):
             if not all([st.session_state.manager_nom, st.session_state.recruteur, st.session_state.date_brief]):
                 st.error("Veuillez remplir tous les champs obligatoires (*)")
             else:
                 brief_name = generate_automatic_brief_name()
-                
-                # Charger les briefs existants depuis le fichier
                 existing_briefs = load_briefs()
                 if "saved_briefs" not in st.session_state:
                     st.session_state.saved_briefs = existing_briefs
                 else:
-                    # Mettre à jour avec les briefs existants
                     st.session_state.saved_briefs.update(existing_briefs)
-                
-                # Créer ou mettre à jour le brief
                 st.session_state.saved_briefs[brief_name] = {
                     "manager_nom": st.session_state.manager_nom,
                     "recruteur": st.session_state.recruteur,
@@ -737,8 +423,6 @@ with tabs[0]:
                 st.session_state.reunion_completed = False
 
     with col_side:
-        # --- RECHERCHE & CHARGEMENT (6 cases organisées en 2 lignes de 3)
-        # Première ligne
         col1, col2, col3 = st.columns(3)
         with col1:
             months = ["", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"]
@@ -748,7 +432,6 @@ with tabs[0]:
         with col3:
             recruteur = st.selectbox("Recruteur", ["", "Zakaria", "Sara", "Jalal", "Bouchra", "Ghita"], key="search_recruteur")
         
-        # Deuxième ligne
         col4, col5, col6 = st.columns(3)
         with col4:
             manager = st.text_input("Manager", key="search_manager")
@@ -757,40 +440,25 @@ with tabs[0]:
         with col6:
             nom_affectation = st.text_input("Nom de l'affectation", key="search_nom_affectation")
 
-        # Bouton Rechercher en rouge vif
         if st.button("🔎 Rechercher", type="primary", use_container_width=True, key="search_button"):
             briefs = load_briefs()
             st.session_state.filtered_briefs = {}
-            
             for name, data in briefs.items():
-                # Filtrage par mois
                 if month and month != "":
                     brief_date = data.get("date_brief", "")
                     if not (brief_date and brief_date.split("-")[1] == month):
                         continue
-                
-                # Filtrage par type
                 if brief_type_filter and brief_type_filter != "" and data.get("brief_type") != brief_type_filter:
                     continue
-                
-                # Filtrage par recruteur
                 if recruteur and recruteur != "" and data.get("recruteur") != recruteur:
                     continue
-                
-                # Filtrage par manager
                 if manager and manager != "" and manager.lower() not in data.get("manager_nom", "").lower():
                     continue
-                
-                # Filtrage par affectation
                 if affectation and affectation != "" and data.get("affectation_type") != affectation:
                     continue
-                
-                # Filtrage par nom d'affectation
                 if nom_affectation and nom_affectation != "" and nom_affectation.lower() not in data.get("affectation_nom", "").lower():
                     continue
-                
                 st.session_state.filtered_briefs[name] = data
-            
             if st.session_state.filtered_briefs:
                 st.info(f"ℹ️ {len(st.session_state.filtered_briefs)} résultats trouvés.")
             else:
@@ -798,70 +466,48 @@ with tabs[0]:
 
         if st.session_state.filtered_briefs:
             st.markdown("<h4 style='margin-bottom: 0.5rem;'>Résultats de recherche</h4>", unsafe_allow_html=True)
-            
-            # Afficher les résultats avec des expanders
             for name, data in st.session_state.filtered_briefs.items():
                 with st.expander(f"📌 {name}", expanded=False):
-                    # Utiliser deux colonnes pour afficher les informations
                     col_left, col_right = st.columns(2)
-                    
                     with col_left:
                         st.markdown(f"""
                         **Type:** {data.get('brief_type', 'N/A')}  
                         **Manager:** {data.get('manager_nom', 'N/A')}  
                         **Recruteur:** {data.get('recruteur', 'N/A')}
                         """)
-                    
                     with col_right:
                         st.markdown(f"""
                         **Affectation:** {data.get('affectation_type', 'N/A')}  
                         **Date:** {data.get('date_brief', 'N/A')}  
                         **Nom de l'affectation:** {data.get('affectation_nom', 'N/A')}
                         """)
-                    
                     colA, colB = st.columns(2)
                     with colA:
                         if st.button(f"📂 Charger", key=f"load_{name}"):
                             try:
-                                # Créer un nouveau brief sans écraser les widgets
                                 new_brief = {}
-                                
-                                # Copier toutes les données du brief
                                 for key, value in data.items():
                                     new_brief[key] = value
-                                
-                                # Stocker le brief chargé dans une clé spéciale
                                 st.session_state.loaded_brief = new_brief
                                 st.session_state.current_brief_name = name
-                                
-                                # Mettre à jour uniquement les champs non-widgets
                                 non_widget_keys = ["raison_ouverture", "impact_strategique", "rattachement", 
                                                   "taches_principales", "must_have_experience", "must_have_diplomes",
                                                   "must_have_competences", "must_have_softskills", "nice_to_have_experience",
                                                   "nice_to_have_diplomes", "nice_to_have_competences", "entreprises_profil", 
                                                   "canaux_profil", "synonymes_poste", "budget", "commentaires", 
                                                   "notes_libres", "profil_links"]
-                                
                                 for key in non_widget_keys:
                                     if key in data:
                                         st.session_state[key] = data[key]
-                                
-                                # Mettre à jour le type de brief avec la clé de gestion
                                 if "brief_type" in data:
                                     st.session_state.gestion_brief_type = data["brief_type"]
-                                
-                                # Gestion spéciale pour les données KSA
                                 if "ksa_data" in data:
                                     st.session_state.ksa_data = data["ksa_data"]
-                                
-                                # Gestion spéciale pour la matrice KSA
                                 if "ksa_matrix" in data and data["ksa_matrix"]:
                                     st.session_state.ksa_matrix = pd.DataFrame(data["ksa_matrix"])
-                                
                                 st.success(f"✅ Brief '{name}' chargé avec succès!")
                                 st.session_state.avant_brief_completed = True
                                 st.rerun()
-                            
                             except Exception as e:
                                 st.error(f"❌ Erreur lors du chargement: {str(e)}")
                     with colB:
@@ -869,123 +515,44 @@ with tabs[0]:
                             all_briefs = load_briefs()
                             if name in all_briefs:
                                 del all_briefs[name]
-                                st.session_state.saved_briefs = existing_briefs
+                                st.session_state.saved_briefs = all_briefs
                                 save_briefs()
                                 if name in st.session_state.filtered_briefs:
                                     del st.session_state.filtered_briefs[name]
                                 st.warning(f"❌ Brief '{name}' supprimé.")
                                 st.rerun()
 
-# JavaScript pour synchroniser les radio buttons personnalisés avec Streamlit
 st.markdown("""
 <script>
-// Synchroniser les radio buttons personnalisés avec Streamlit
-document.querySelectorAll('.custom-radio input[type="radio"]').forEach(radio => {
-    radio.addEventListener('change', function() {
-        // Mettre à jour la valeur dans Streamlit
-        const value = this.value;
-        const streamlitRadio = parent.document.querySelector('input[type="radio"][value="' + value + '"]');
-        if (streamlitRadio) {
-            streamlitRadio.click();
-        }
-    });
-});
-
-// Synchroniser l'état initial
-document.addEventListener('DOMContentLoaded', function() {
-    const streamlitValue = parent.document.querySelector('input[type="radio"]:checked').value;
-    const customRadio = document.querySelector('.custom-radio input[value="' + streamlitValue + '"]');
-    if (customRadio) {
-        customRadio.checked = true;
-    }
-});
+// ... (JavaScript for custom radio buttons) ...
+document.querySelectorAll('.custom-radio input[type="radio"]').forEach(radio => { radio.addEventListener('change', function() { const value = this.value; const streamlitRadio = parent.document.querySelector('input[type="radio"][value="' + value + '"]'); if (streamlitRadio) { streamlitRadio.click(); } }); });
+document.addEventListener('DOMContentLoaded', function() { const streamlitValue = parent.document.querySelector('input[type="radio"]:checked').value; const customRadio = document.querySelector('.custom-radio input[value="' + streamlitValue + '"]'); if (customRadio) { customRadio.checked = true; } });
 </script>
 """, unsafe_allow_html=True)
 
 # ---------------- ONGLET AVANT-BRIEF ----------------
 with tabs[1]:
-    # Vérification si un brief est chargé
     if not can_access_avant_brief:
         st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
-        st.stop()  # Arrête le rendu de cet onglet
+        st.stop()
     
-    # Afficher les informations du brief en cours
     st.markdown(f"<h3>🔄 Avant-brief (Préparation)</h3>", unsafe_allow_html=True)
 
-    # Titre pour le tableau
     st.subheader("📋 Portrait robot candidat")
 
-    # Liste des sections et champs pour le tableau
     sections = [
-        {
-            "title": "Contexte du poste",
-            "category": "contexte",
-            "fields": [
-                ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"),
-                ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"),
-                ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"),
-            ]
-        },
-        {
-            "title": "Must-have (Indispensables)",
-            "category": "must-have",
-            "fields": [
-                ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
-                ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
-                ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"),
-                ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"),
-            ]
-        },
-        {
-            "title": "Nice-to-have (Atouts)",
-            "category": "nice-to-have",
-            "fields": [
-                ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
-                ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
-                ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
-            ]
-        },
-        {
-            "title": "Sourcing et marché",
-            "category": "sourcing",
-            "fields": [
-                ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
-                ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
-                ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
-            ]
-        },
-        {
-            "title": "Conditions et contraintes",
-            "category": "conditions",
-            "fields": [
-                ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
-                ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
-            ]
-        },
-        {
-            "title": "Profils pertinents",
-            "category": "profils",
-            "fields": [
-                ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
-                ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
-                ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
-            ]
-        },
-        {
-            "title": "Notes libres",
-            "category": "notes",
-            "fields": [
-                ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
-                ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
-            ]
-        },
+        { "title": "Contexte du poste", "category": "contexte", "fields": [ ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"), ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"), ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"), ] },
+        { "title": "Must-have (Indispensables)", "category": "must-have", "fields": [ ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"), ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"), ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"), ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"), ] },
+        { "title": "Nice-to-have (Atouts)", "category": "nice-to-have", "fields": [ ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"), ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"), ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"), ] },
+        { "title": "Sourcing et marché", "category": "sourcing", "fields": [ ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"), ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"), ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"), ] },
+        { "title": "Conditions et contraintes", "category": "conditions", "fields": [ ("Localisation", "rattachement", "Site principal, télétravail, déplacements"), ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"), ] },
+        { "title": "Profils pertinents", "category": "profils", "fields": [ ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"), ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"), ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"), ] },
+        { "title": "Notes libres", "category": "notes", "fields": [ ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"), ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"), ] },
     ]
 
-    # Bouton pour l'assistance IA
     if st.button("💡 Prérédiger avec l'IA", type="secondary", use_container_width=True, key="ai_fill_button"):
         with st.spinner("L'IA génère les suggestions..."):
             for section in sections:
-                # Les liens de profils n'ont pas de conseils IA
                 if section["category"] == "profils":
                     continue
                 for field_name, field_key, _ in section["fields"]:
@@ -994,20 +561,17 @@ with tabs[1]:
             st.success("✅ Suggestions IA ajoutées. Vous pouvez maintenant les modifier.")
             st.rerun()
 
-    # Construire le DataFrame with section titles integrated into the first field row
     data = []
     field_keys = []
     for section in sections:
-        # Use the section title only for the first field row
         first_field = True
-        for field_name, field_key, placeholder in section["fields"]:
+        for field_name, field_key, _ in section["fields"]:
             data.append([section["title"] if first_field else "", field_name, st.session_state.get(field_key, "")])
             field_keys.append(field_key)
             first_field = False
 
     df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
 
-    # Afficher le data_editor stylé
     edited_df = st.data_editor(
         df,
         column_config={
@@ -1020,26 +584,19 @@ with tabs[1]:
         num_rows="fixed"
     )
 
-    # --- Boutons Sauvegarder et Réinitialiser ---
     col_save, col_reset = st.columns([1, 1])
     with col_save:
         if st.button("💾 Sauvegarder Avant-brief", type="primary", use_container_width=True, key="save_avant_brief"):
             if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
                 brief_name = st.session_state.current_brief_name
-                
-                # Mettre à jour st.session_state à partir de l'edited_df
                 for i in range(len(edited_df)):
                     field_key = field_keys[i]
                     st.session_state[field_key] = edited_df["Informations"].iloc[i]
-                
-                # Sauvegarder les liens de profils (si applicable)
                 st.session_state.profil_links = [
                     st.session_state.get("profil_link_1", ""),
                     st.session_state.get("profil_link_2", ""),
                     st.session_state.get("profil_link_3", "")
                 ]
-                
-                # Mettre à jour le brief avec les données
                 brief_data = {
                     "profil_links": st.session_state.profil_links,
                     "raison_ouverture": st.session_state.get("raison_ouverture", ""),
@@ -1060,15 +617,12 @@ with tabs[1]:
                     "commentaires": st.session_state.get("commentaires", ""),
                     "notes_libres": st.session_state.get("notes_libres", "")
                 }
-                
-                # Charger les briefs existants depuis le fichier
                 existing_briefs = load_briefs()
                 if brief_name in existing_briefs:
                     existing_briefs[brief_name].update(brief_data)
                     st.session_state.saved_briefs = existing_briefs
                 else:
                     st.session_state.saved_briefs[brief_name] = brief_data
-                
                 save_briefs()
                 st.session_state.avant_brief_completed = True
                 st.success("✅ Modifications sauvegardées")
@@ -1082,102 +636,39 @@ with tabs[1]:
 
 # ---------------- RÉUNION (Wizard interne) ----------------
 with tabs[2]:
-    # Vérification si l'onglet est accessible
     if not can_access_reunion:
         st.warning("⚠️ Veuillez d'abord compléter et sauvegarder l'onglet Avant-brief")
-        st.stop()  # Arrête le rendu de cet onglet
+        st.stop()
     
-    # Afficher les informations du brief en cours
     st.subheader(f"✅ Réunion de brief avec le Manager - {st.session_state.get('niveau_hierarchique', '')}")
-
-    total_steps = 5  # Augmenté à 5 étapes pour inclure les notes du manager
+    total_steps = 5
     step = st.session_state.reunion_step
     st.progress(int((step / total_steps) * 100), text=f"Étape {step}/{total_steps}")
-
+    
     if step == 1:
         st.subheader("📋 Portrait robot candidat - Validation")
-
-        # Liste des sections et champs pour le tableau (même structure qu'Avant-brief)
         sections = [
-            {
-                "title": "Contexte du poste",
-                "fields": [
-                    ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"),
-                    ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"),
-                    ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"),
-                ]
-            },
-            {
-                "title": "Must-have (Indispensables)",
-                "fields": [
-                    ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
-                    ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
-                    ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"),
-                    ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"),
-                ]
-            },
-            {
-                "title": "Nice-to-have (Atouts)",
-                "fields": [
-                    ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
-                    ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
-                    ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
-                ]
-            },
-            {
-                "title": "Sourcing et marché",
-                "fields": [
-                    ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
-                    ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
-                    ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
-                ]
-            },
-            {
-                "title": "Conditions et contraintes",
-                "fields": [
-                    ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
-                    ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
-                ]
-            },
-            {
-                "title": "Profils pertinents",
-                "fields": [
-                    ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
-                    ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
-                    ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
-                ]
-            },
-            {
-                "title": "Notes libres",
-                "fields": [
-                    ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
-                    ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
-                ]
-            },
+            { "title": "Contexte du poste", "fields": [ ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"), ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"), ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"), ] },
+            { "title": "Must-have (Indispensables)", "fields": [ ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"), ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"), ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"), ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"), ] },
+            { "title": "Nice-to-have (Atouts)", "fields": [ ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"), ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"), ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"), ] },
+            { "title": "Sourcing et marché", "fields": [ ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"), ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"), ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"), ] },
+            { "title": "Conditions et contraintes", "fields": [ ("Localisation", "rattachement", "Site principal, télétravail, déplacements"), ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"), ] },
+            { "title": "Profils pertinents", "fields": [ ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"), ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"), ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"), ] },
+            { "title": "Notes libres", "fields": [ ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"), ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"), ] },
         ]
-
-        # Construire le DataFrame with section titles integrated into the first field row only
         data = []
         field_keys = []
         comment_keys = []
         k = 1
         for section in sections:
-            # Add only the first field with the section title
-            field_name, field_key, placeholder = section["fields"][0]
-            data.append([section["title"], field_name, st.session_state.get(field_key, placeholder), ""])
-            field_keys.append(field_key)
-            comment_keys.append(f"manager_comment_{k}")
-            k += 1
-            # Add remaining fields without repeating the section title
-            for field_name, field_key, placeholder in section["fields"][1:]:
-                data.append(["", field_name, st.session_state.get(field_key, placeholder), ""])
+            first_field = True
+            for field_name, field_key, placeholder in section["fields"]:
+                data.append([section["title"] if first_field else "", field_name, st.session_state.get(field_key, placeholder), ""])
                 field_keys.append(field_key)
                 comment_keys.append(f"manager_comment_{k}")
                 k += 1
-
+                first_field = False
         df = pd.DataFrame(data, columns=["Section", "Détails", "Informations", "Commentaires du manager"])
-
-        # Afficher le data_editor stylé with 4 columns and placeholders
         edited_df = st.data_editor(
             df,
             column_config={
@@ -1200,7 +691,6 @@ with tabs[2]:
             num_rows="fixed"
         )
 
-        # Sauvegarde des commentaires
         if st.button("💾 Sauvegarder commentaires", type="primary", key="save_comments_step1"):
             for i in range(len(edited_df)):
                 comment_key = comment_keys[i]
@@ -1228,21 +718,16 @@ with tabs[2]:
         st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=200, 
                     placeholder="Ajoutez vos commentaires et notes généraux...")
 
-        # Boutons Enregistrer et Annuler
         col_save, col_cancel = st.columns([1, 1])
         with col_save:
             if st.button("💾 Enregistrer réunion", type="primary", use_container_width=True, key="save_reunion"):
                 if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
                     brief_name = st.session_state.current_brief_name
-                    
-                    # Récupérer tous les commentaires du manager
                     manager_comments = {}
-                    for i in range(1, 21):  # 20 commentaires now
+                    for i in range(1, 21):
                         comment_key = f"manager_comment_{i}"
                         if comment_key in st.session_state:
                             manager_comments[comment_key] = st.session_state[comment_key]
-                    
-                    # Charger les briefs existants depuis le fichier
                     existing_briefs = load_briefs()
                     if brief_name in existing_briefs:
                         existing_briefs[brief_name].update({
@@ -1265,7 +750,6 @@ with tabs[2]:
                             "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
                             "processus_evaluation": st.session_state.get("processus_evaluation", "")
                         })
-                    
                     save_briefs()
                     st.session_state.reunion_completed = True
                     st.success("✅ Données de réunion sauvegardées")
@@ -1277,7 +761,6 @@ with tabs[2]:
             if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion"):
                 delete_current_brief()
 
-    # ---- Navigation wizard ----
     col1, col2, col3 = st.columns([1, 6, 1])
     with col1:
         if step > 1:
@@ -1292,14 +775,11 @@ with tabs[2]:
                 
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
-    # Vérification si l'onglet est accessible
     if not can_access_synthese:
         st.warning("⚠️ Veuillez d'abord compléter et sauvegarder l'onglet Réunion de brief")
-        st.stop()  # Arrête le rendu de cet onglet
+        st.stop()
     
-    # Afficher les informations du brief en cours
     st.subheader(f"📝 Synthèse du Brief - {st.session_state.get('niveau_hierarchique', '')}")
-    
     if "current_brief_name" in st.session_state:
         st.success(f"Brief actuel: {st.session_state.current_brief_name}")
     
@@ -1317,19 +797,15 @@ with tabs[3]:
         "Canaux": st.session_state.get("canaux_profil", ""),
         "Budget": st.session_state.get("budget", ""),
     })
-
     st.subheader("📊 Calcul automatique du Score Global")
     score_total = 0
     count = 0
     
-    # Calcul basé sur la matrice KSA
     if hasattr(st.session_state, 'ksa_matrix') and not st.session_state.ksa_matrix.empty:
         if "Échelle d'évaluation (1-5)" in st.session_state.ksa_matrix.columns:
             scores = st.session_state.ksa_matrix["Échelle d'évaluation (1-5)"].astype(int)
             score_global = scores.mean()
             st.metric("Score Global Cible", f"{score_global:.2f}/5")
-    
-    # Calcul de secours basé sur l'ancien système KSA
     elif "ksa_data" in st.session_state:
         for cat, comps in st.session_state.get("ksa_data", {}).items():
             for comp, details in comps.items():
@@ -1340,7 +816,6 @@ with tabs[3]:
     else:
         st.info("ℹ️ Aucune donnée KSA disponible pour calculer le score")
 
-    # Boutons Confirmer et Annuler
     col_save, col_cancel = st.columns([1, 1])
     with col_save:
         if st.button("💾 Confirmer sauvegarde", type="primary", use_container_width=True, key="save_synthese"):
@@ -1354,7 +829,6 @@ with tabs[3]:
         if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_synthese"):
             delete_current_brief()
 
-    # -------- EXPORT PDF/WORD --------
     st.subheader("📄 Export du Brief complet")
     col1, col2 = st.columns(2)
     with col1:
@@ -1384,60 +858,129 @@ with tabs[3]:
 
 # ---------------- NOUVEL ONGLET BIBLIOTHÈQUE ----------------
 with tabs[4]:
-    if not can_access_bibliotheque:
-        st.warning("⚠️ Veuillez d'abord créer ou charger un brief dans l'onglet Gestion")
-        st.stop()
-
+    # Pas de condition, cet onglet est toujours accessible
     st.header("📚 Bibliothèque de fiches de poste")
-    st.info("Chargez une fiche de poste et l'IA extraira automatiquement les informations pour pré-remplir le brief.")
     
-    col_upload, col_action = st.columns([1, 2])
-    
-    with col_upload:
-        uploaded_file = st.file_uploader(
-            "Télécharger une fiche de poste (PDF uniquement)",
-            type=["pdf"],
-            help="L'IA analysera le contenu pour vous."
-        )
-    
-    with col_action:
-        # Le bouton d'analyse est conditionnel
-        if uploaded_file and st.session_state.get("niveau_hierarchique"):
-            if st.button("🚀 Analyser la fiche de poste", type="primary", use_container_width=True):
-                with st.spinner("L'IA analyse le document..."):
-                    # Extraire le texte du PDF
-                    try:
-                        with pdfplumber.open(uploaded_file) as pdf:
-                            full_text = ""
-                            for page in pdf.pages:
-                                full_text += page.extract_text() or ""
-                    except Exception as e:
-                        st.error(f"Erreur lors de la lecture du PDF: {e}")
-                        st.stop()
+    lib_tabs = st.tabs(["📥 Télécharger & Analyser", "🔍 Chercher & Modifier"])
 
-                    # Appeler la fonction d'extraction de l'IA
-                    extracted_data = extract_info_with_deepseek(full_text, st.session_state.niveau_hierarchique)
+    with lib_tabs[0]:
+        st.info("Chargez une fiche de poste et l'IA extraira automatiquement les informations.")
+        
+        col_upload, col_action = st.columns([1, 2])
+        
+        with col_upload:
+            uploaded_file = st.file_uploader(
+                "Télécharger une fiche de poste (PDF)",
+                type=["pdf"],
+                help="L'IA analysera le contenu pour vous."
+            )
+        
+        with col_action:
+            if uploaded_file and st.session_state.get("niveau_hierarchique"):
+                if st.button("🚀 Analyser & Sauvegarder", type="primary", use_container_width=True):
+                    with st.spinner("Analyse et sauvegarde du document..."):
+                        try:
+                            with pdfplumber.open(uploaded_file) as pdf:
+                                full_text = ""
+                                for page in pdf.pages:
+                                    full_text += page.extract_text() or ""
+                                
+                                job_title = st.session_state.niveau_hierarchique
+                                extracted_data = extract_info_with_deepseek(full_text, job_title)
+                                
+                                if extracted_data:
+                                    doc_name = f"{job_title.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+                                    st.session_state.job_descriptions[doc_name] = {
+                                        "raw_text": full_text,
+                                        "extracted_data": extracted_data,
+                                        "date_upload": str(datetime.now().date())
+                                    }
+                                    st.success(f"✅ Fiche de poste '{job_title}' analysée et sauvegardée.")
+                                    
+                                    # Mettre à jour les champs du brief
+                                    for key, value in extracted_data.items():
+                                        if key in st.session_state:
+                                            st.session_state[key] = value
+                                    
+                                    st.info("Les champs du brief ont été mis à jour avec les données extraites.")
+                                    st.rerun()
+                                else:
+                                    st.error("❌ L'extraction a échoué. Veuillez vérifier la réponse de l'API.")
+                        except Exception as e:
+                            st.error(f"Erreur lors de la lecture du PDF ou de l'analyse : {e}")
+            elif not uploaded_file:
+                st.warning("⚠️ Veuillez télécharger une fiche de poste pour continuer.")
+            elif not st.session_state.get("niveau_hierarchique"):
+                st.warning("⚠️ Veuillez d'abord remplir le champ 'Poste à recruter' dans l'onglet 'Gestion'.")
+
+    with lib_tabs[1]:
+        st.subheader("🔍 Bibliothèque")
+        search_query = st.text_input("Rechercher une fiche de poste par titre...", key="lib_search_query")
+        
+        filtered_docs = {
+            name: data
+            for name, data in st.session_state.job_descriptions.items()
+            if search_query.lower() in name.lower()
+        }
+        
+        if not filtered_docs:
+            st.info("Aucune fiche de poste trouvée ou stockée.")
+        else:
+            for name, doc_data in filtered_docs.items():
+                with st.expander(f"Fiche de poste : {name}", expanded=False):
+                    st.write(f"**Date d'upload :** {doc_data['date_upload']}")
                     
-                    if extracted_data:
-                        # Mettre à jour l'état de la session avec les données extraites
-                        for key, value in extracted_data.items():
-                            if key in st.session_state:
-                                st.session_state[key] = value
-                        
-                        st.success("✅ Informations extraites avec succès. Les champs du brief ont été mis à jour.")
-                        st.session_state.brief_phase = "🔄 Avant-brief" # Rediriger l'utilisateur
-                        st.rerun()
-                    else:
-                        st.error("❌ L'extraction a échoué. Veuillez vérifier la réponse de l'API.")
-        elif not uploaded_file:
-            st.warning("⚠️ Veuillez télécharger une fiche de poste pour continuer.")
-        elif not st.session_state.get("niveau_hierarchique"):
-            st.warning("⚠️ Veuillez d'abord remplir le champ 'Poste à recruter' dans l'onglet 'Gestion'.")
+                    # Permet de visualiser et éditer le texte brut
+                    st.subheader("Contenu original (modificable)")
+                    edited_text = st.text_area(
+                        "Modifier le texte de la fiche de poste si nécessaire",
+                        value=doc_data["raw_text"],
+                        height=300,
+                        key=f"edit_text_{name}"
+                    )
+                    
+                    st.subheader("Données extraites par l'IA")
+                    # Afficher les données extraites sous forme de dictionnaire pour modification
+                    edited_extracted_data = st.data_editor(
+                        pd.DataFrame(list(doc_data["extracted_data"].items()), columns=["Critère", "Valeur"]),
+                        hide_index=True,
+                        use_container_width=True,
+                        key=f"edit_data_{name}"
+                    )
+                    
+                    col_update, col_load, col_delete = st.columns(3)
+                    with col_update:
+                        if st.button("💾 Mettre à jour la fiche", key=f"update_doc_{name}", use_container_width=True, type="primary"):
+                            st.session_state.job_descriptions[name]["raw_text"] = edited_text
+                            
+                            updated_dict = edited_extracted_data.set_index("Critère")["Valeur"].to_dict()
+                            st.session_state.job_descriptions[name]["extracted_data"] = updated_dict
+                            
+                            st.success("✅ Fiche de poste mise à jour avec succès !")
+                            st.rerun()
+                            
+                    with col_load:
+                        if st.button("📂 Charger dans le brief", key=f"load_doc_{name}", use_container_width=True):
+                            # Charger les données extraites dans le brief
+                            extracted_data_to_load = st.session_state.job_descriptions[name]["extracted_data"]
+                            for key, value in extracted_data_to_load.items():
+                                if key in st.session_state:
+                                    st.session_state[key] = value
+                            st.session_state.brief_phase = "🔄 Avant-brief"
+                            st.success("✅ Données chargées. Rendez-vous dans l'onglet 'Avant-brief' !")
+                            st.rerun()
 
-# JavaScript pour désactiver les onglets non accessibles
+                    with col_delete:
+                        if st.button("🗑️ Supprimer", key=f"delete_doc_{name}", use_container_width=True, type="secondary"):
+                            del st.session_state.job_descriptions[name]
+                            st.warning(f"❌ Fiche de poste '{name}' supprimée.")
+                            st.rerun()
+
+
+# JavaScript to disable inaccessible tabs
 st.markdown(f"""
 <script>
-// Désactiver les onglets selon les permissions
+// Disable tabs based on permissions
 const tabs = parent.document.querySelectorAll('[data-baseweb="tab"]');
 if (!{str(can_access_avant_brief).lower()}) {{
     tabs[1].classList.add('disabled-tab');
@@ -1447,9 +990,6 @@ if (!{str(can_access_reunion).lower()}) {{
 }}
 if (!{str(can_access_synthese).lower()}) {{
     tabs[3].classList.add('disabled-tab');
-}}
-if (!{str(can_access_bibliotheque).lower()}) {{
-    tabs[4].classList.add('disabled-tab');
 }}
 </script>
 """, unsafe_allow_html=True)

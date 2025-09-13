@@ -4,6 +4,7 @@ import os
 import pickle
 from datetime import datetime
 import io
+import requests
 
 # -------------------- Disponibilité PDF & Word --------------------
 try:
