@@ -745,7 +745,8 @@ with tabs[1]:
                     with col2:
                         # Bouton "Conseil IA" uniquement pour les sections non pertinentes
                         if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
-                            if st.button("💡 Conseil IA", key=f"advice_{key}"):
+                            if st.form_submit_button("💡 Conseil IA", key=f"advice_{key}"):
+                                # Action à effectuer lors du clic sur le bouton
                                 advice = generate_checklist_advice(section["title"], title)
                                 example = get_example_for_field(section["title"], title)
                                 st.session_state[key] = f"{advice}\nExemple : {example}"
@@ -774,6 +775,7 @@ with tabs[1]:
                 st.session_state.current_brief_name = ""
                 st.session_state.avant_brief_completed = False
                 st.rerun()
+
 
 # ---------------- RÉUNION ----------------
 with tabs[2]:
