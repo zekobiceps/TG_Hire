@@ -1274,10 +1274,3 @@ with tabs[4]:
         st.success(st.session_state.save_message)
         st.session_state.save_message = None
         st.session_state.save_message_tab = None
-
-# ---------------- LOGS ----------------
-with tabs[5]:
-    st.header("📋 Logs")
-    st.write(st.session_state.get("logs", []))
-
-# ... (reste du code inchangé pour les autres onglets)
