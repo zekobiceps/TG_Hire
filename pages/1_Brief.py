@@ -736,14 +736,15 @@ with tabs[1]:
     # Gérer les conseils IA avant le rendu des widgets
     for section in sections:
         for title, key, _ in section["fields"]:
-            if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
-                advice_key = f"advice_{key}"
-                if advice_key in st.session_state and st.session_state[advice_key]:
-                    advice = generate_checklist_advice(section["title"], title)
-                    example = get_example_for_field(section["title"], title)
-                    st.session_state[key] = f"{advice}\nExemple : {example}"
-                    st.session_state[advice_key] = False
-                    st.rerun()
+            advice_key = f"trigger_advice_{key}"
+            if advice_key not in st.session_state:
+                st.session_state[advice_key] = False
+            if st.session_state[advice_key]:
+                advice = generate_checklist_advice(section["title"], title)
+                example = get_example_for_field(section["title"], title)
+                st.session_state[key] = f"{advice}\nExemple : {example}"
+                st.session_state[advice_key] = False
+                st.rerun()
 
     # Formulaire pour les widgets
     with st.form(key="avant_brief_form"):
@@ -755,8 +756,8 @@ with tabs[1]:
                         st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")), key=key, placeholder=placeholder)
                     with col2:
                         if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
-                            if st.form_submit_button("💡 Conseil IA", key=f"advice_{key}"):
-                                st.session_state[f"advice_{key}"] = True
+                            if st.button("💡 Conseil IA", key=f"trigger_advice_{key}"):
+                                st.session_state[f"trigger_advice_{key}"] = True
                                 st.rerun()
 
         # Boutons Enregistrer et Annuler dans le formulaire
