@@ -3,13 +3,14 @@ import fitz
 import requests
 import json
 import io
+from docx import Document
 
 # -------------------- API DeepSeek Configuration --------------------
 def get_deepseek_response(prompt):
     """Obtient une réponse du modèle DeepSeek AI."""
     api_key = st.secrets.get("DEEPSEEK_API_KEY")
     if not api_key:
-        st.error("❌ Clé API DeepSeek non trouvée dans st.secrets. Assurez-vous d'avoir configuré le fichier secrets.toml.")
+        st.error("❌ Clé API DeepSeek non trouvée dans st.secrets.")
         return "Erreur: Clé API manquante."
 
     url = "https://api.deepseek.com/v1/chat/completions"
@@ -19,7 +20,7 @@ def get_deepseek_response(prompt):
     }
 
     # Utilisez un prompt de système pour aligner l'IA sur le recrutement
-    system_prompt = "Vous êtes un assistant d'analyse de documents RH. Votre objectif est d'analyser le contenu de documents (CV, fiches de poste, etc.), d'en extraire les informations clés et de fournir une synthèse claire et structurée. Vos réponses doivent être professionnelles, précises et directement applicables au contexte du recrutement."
+    system_prompt = "Vous êtes un assistant d'analyse de documents RH. Votre objectif est d'analyser le contenu de documents (CV, fiches de poste, etc.), d'en extraire les informations clés, et de fournir une synthèse claire et structurée. Vos réponses doivent être professionnelles, précises et directement applicables au contexte du recrutement."
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -105,6 +106,7 @@ def render_pdf_analysis_page():
             border: 1px solid #e0e0e0;
             border-radius: 8px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            color: black;
         }
         </style>
         <h1 class="main-header">📄 Analyse de Document IA</h1>
@@ -115,51 +117,62 @@ def render_pdf_analysis_page():
         """,
         unsafe_allow_html=True
     )
-
-    # Conteneur d'upload stylisé
-    with st.container():
+    
+    # Utilisation d'un formulaire pour une meilleure gestion des états
+    with st.form(key="pdf_analysis_form"):
         st.subheader("1. Uploader votre document")
-        st.markdown(
-            """
-            <div class="upload-container">
-                <p>Glissez & déposez votre fichier ici ou cliquez pour le parcourir</p>
-            </div>
-            """,
-            unsafe_allow_html=True
+        uploaded_file = st.file_uploader(
+            "Glissez & déposez votre fichier ici ou cliquez pour le parcourir",
+            type=["pdf", "docx"],
+            accept_multiple_files=False,
+            key="uploaded_file"
         )
-        uploaded_pdf = st.file_uploader("", accept_multiple_files=False, type=["pdf"])
-
-    # Logique de traitement
-    if uploaded_pdf is not None:
-        st.success("✅ Fichier PDF chargé avec succès!")
         
-        # Bouton d'analyse en rouge vif
-        if st.button("🚀 Lancer l'analyse du PDF", type="primary"):
-            try:
-                # Extraction du texte du PDF
-                with st.spinner('⏳ Extraction du texte du document...'):
-                    pdf_text = ""
-                    with fitz.open(stream=uploaded_pdf.read(), filetype="pdf") as doc:
-                        for page in doc:
-                            pdf_text += page.get_text()
+        # Champ pour afficher le texte extrait
+        extracted_text_area = st.empty()
 
-                if not pdf_text.strip():
-                    st.error("❌ Le document est vide ou l'extraction a échoué.")
-                else:
-                    # Affichage du texte extrait (facultatif)
-                    with st.expander("👁️ Voir le texte extrait du PDF"):
-                        st.text_area("Texte extrait:", pdf_text, height=300)
+        # Bouton pour lancer l'analyse
+        submit_button = st.form_submit_button("🚀 Lancer l'analyse du document", type="primary")
 
-                    # Appel à l'IA pour l'analyse
-                    with st.spinner('✨ Analyse en cours par l\'IA...'):
-                        analysis_prompt = f"Analyse le texte suivant extrait d'un document PDF. Extrait les informations clés pour un brief de recrutement : l'intitulé du poste, les tâches principales, les compétences techniques requises, les soft skills, et l'expérience demandée. Présente les informations dans une liste structurée. Le texte est : {pdf_text}"
-                        full_response = get_deepseek_response(analysis_prompt)
-                        
-                        st.subheader("💡 Résultat de l'analyse IA")
-                        st.markdown(f'<div class="analysis-box">{full_response}</div>', unsafe_allow_html=True)
-                        
-            except Exception as e:
-                st.error(f"❌ Erreur lors du traitement du PDF : {e}")
+    if submit_button:
+        if uploaded_file is not None:
+            st.success("✅ Fichier chargé avec succès!")
+            file_type = uploaded_file.type
+            
+            # --- Extraction du texte ---
+            with st.spinner('⏳ Extraction du texte du document...'):
+                text_content = ""
+                if file_type == "application/pdf":
+                    try:
+                        with fitz.open(stream=uploaded_file.read(), filetype="pdf") as doc:
+                            for page in doc:
+                                text_content += page.get_text()
+                    except Exception as e:
+                        st.error(f"❌ Erreur lors de l'extraction du PDF : {e}")
+                        text_content = ""
+                elif file_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+                    try:
+                        doc = Document(uploaded_file)
+                        text_content = " ".join([p.text for p in doc.paragraphs])
+                    except Exception as e:
+                        st.error(f"❌ Erreur lors de l'extraction du DOCX : {e}")
+                        text_content = ""
+
+            # Affichage du texte extrait
+            if text_content.strip():
+                extracted_text_area.text_area("Texte extrait:", text_content, height=300, disabled=True)
+                
+                # --- Appel à l'IA pour l'analyse ---
+                with st.spinner('✨ Analyse en cours par l\'IA...'):
+                    analysis_prompt = f"Analyse le texte suivant extrait d'un document PDF. Extrait les informations clés pour un brief de recrutement : l'intitulé du poste, les tâches principales, les compétences techniques requises, les soft skills, et l'expérience demandée. Présente les informations dans une liste structurée. Le texte est : {text_content}"
+                    full_response = get_deepseek_response(analysis_prompt)
+                    
+                    st.subheader("💡 Résultat de l'analyse IA")
+                    st.markdown(f'<div class="analysis-box">{full_response}</div>', unsafe_allow_html=True)
+            else:
+                st.error("❌ Le document est vide ou l'extraction a échoué.")
+        else:
+            st.warning("⚠️ Veuillez uploader un fichier pour lancer l'analyse.")
 
 # Appel de la fonction pour afficher la page si ce fichier est le point d'entrée
 if __name__ == "__main__":
