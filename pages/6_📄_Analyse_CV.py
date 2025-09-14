@@ -70,7 +70,7 @@ st.markdown("""
         gap: 10px;
     }
     .stTabs [data-baseweb="tab-list"] button {
-        background-color: white;
+        background-color: #f0f2f6; /* Couleur de l'arrière-plan de la page */
         border-radius: 8px 8px 0 0;
         padding: 12px 20px;
         font-size: 16px;
@@ -80,7 +80,7 @@ st.markdown("""
         transition: all 0.3s ease;
     }
     .stTabs [data-baseweb="tab-list"] button:hover {
-        background-color: #fecaca;
+        background-color: #e5e7eb;
     }
     .stTabs [aria-selected="true"] {
         background-color: #dc2626 !important;
@@ -104,8 +104,8 @@ def extract_text_from_pdf(file):
     except Exception as e:
         return f"Erreur d'extraction du texte: {str(e)}"
 
-def rank_resumes(job_description, resumes):
-    """Classe les CV en fonction de leur similarité avec la description de poste."""
+def rank_resumes_with_cosine(job_description, resumes):
+    """Classe les CV en fonction de leur similarité avec la description de poste en utilisant la similarité cosinus."""
     try:
         documents = [job_description] + resumes
         vectorizer = TfidfVectorizer().fit_transform(documents)
@@ -117,6 +117,56 @@ def rank_resumes(job_description, resumes):
     except Exception as e:
         st.error(f"❌ Erreur lors du classement des CVs: {e}")
         return []
+
+def rank_resumes_with_ai(job_description, resumes):
+    """Classe les CV en utilisant l'IA pour évaluer la pertinence de chaque CV."""
+    if not API_KEY:
+        st.error("❌ Impossible d'utiliser l'IA pour le classement. La clé API DeepSeek n'est pas configurée.")
+        return []
+
+    url = "https://api.deepseek.com/v1/chat/completions"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {API_KEY}"
+    }
+    
+    scores = []
+    for resume_text in resumes:
+        prompt = f"""
+        En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
+        Le score doit être un nombre entre 0 et 100, où 100 est la meilleure correspondance.
+        Réponds uniquement avec le score numérique.
+
+        Description du poste:
+        {job_description}
+
+        Texte du CV:
+        {resume_text}
+        
+        Ton score est:
+        """
+        payload = {
+            "model": "deepseek-chat",
+            "messages": [
+                {"role": "system", "content": "You are a professional recruiter assistant. Your only output is a number from 0 to 100."},
+                {"role": "user", "content": prompt}
+            ],
+            "stream": False,
+            "temperature": 0.0 # Vise une réponse déterministe
+        }
+        
+        try:
+            response = requests.post(url, headers=headers, data=json.dumps(payload))
+            response.raise_for_status()
+            response_data = response.json()
+            score_text = response_data["choices"][0]["message"]["content"].strip()
+            score = float(score_text.replace('%', '')) / 100
+            scores.append(score)
+        except Exception as e:
+            st.warning(f"⚠️ Erreur lors de l'évaluation d'un CV par l'IA: {e}")
+            scores.append(0.0) # Score nul en cas d'erreur
+            
+    return scores
 
 def get_deepseek_analysis(text):
     """Analyse le texte du CV pour identifier les points forts et faibles en utilisant DeepSeek."""
@@ -202,7 +252,9 @@ with tab1:
                     st.write(f"• {file.name}")
 
     st.markdown("---")
-
+    
+    use_ai_for_ranking = st.checkbox("Utiliser l'IA de DeepSeek pour le classement (Recommandé, mais utilise votre quota API)", value=False)
+    
     if st.button(
         "🔍 Analyser les CVs", 
         type="primary", 
@@ -223,8 +275,13 @@ with tab1:
                 st.warning(f"⚠️ {len(error_files)} fichier(s) non traité(s): {', '.join(error_files)}")
             
             if resumes:
-                scores = rank_resumes(job_description, resumes)
-                
+                if use_ai_for_ranking:
+                    scores = rank_resumes_with_ai(job_description, resumes)
+                    explanation = "Le score a été généré par l'IA de DeepSeek, qui a évalué la pertinence de chaque CV en fonction des informations fournies."
+                else:
+                    scores = rank_resumes_with_cosine(job_description, resumes)
+                    explanation = "Le score de correspondance est basé sur la **similarité cosinus**. Cette méthode analyse la fréquence des mots et des phrases dans chaque CV par rapport à la description du poste. Un score élevé (proche de 100 %) indique une forte correspondance thématique et de compétences."
+
                 if len(scores) > 0:
                     ranked_resumes = sorted(zip(file_names, scores), key=lambda x: x[1], reverse=True)
                     
@@ -255,11 +312,7 @@ with tab1:
                     
                     st.markdown("---")
                     st.markdown('<div class="section-header">🔍 Comment le score est-il calculé ?</div>', unsafe_allow_html=True)
-                    st.info("""
-                        Le score de correspondance est basé sur la **similarité cosinus**. 
-                        Cette méthode analyse la fréquence des mots et des phrases dans chaque CV par rapport à la description du poste. 
-                        Un score élevé (proche de 100 %) indique une forte correspondance thématique et de compétences entre le profil du candidat et les exigences du poste.
-                    """)
+                    st.info(explanation)
                     
                     st.markdown('<div class="section-header">💾 Exporter les Résultats</div>', unsafe_allow_html=True)
                     csv = results_df.to_csv(index=False).encode('utf-8')
