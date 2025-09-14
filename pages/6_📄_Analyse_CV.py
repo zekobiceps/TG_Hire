@@ -61,9 +61,6 @@ def get_deepseek_response(prompt):
 # -------------------- FONCTIONS DE MATCHING CORRIGÉES --------------------
 
 def match_cv_to_job(cv_text, job_offer_text):
-    """
-    Compare un CV et une offre d'emploi en utilisant une API DeepSeek pour générer une analyse JSON.
-    """
     prompt_for_json = f"""
     Compare the following CV and job offer. Extract all relevant information in a single JSON object.
 
