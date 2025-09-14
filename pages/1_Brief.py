@@ -733,23 +733,20 @@ with tabs[1]:
     if st.session_state.current_brief_name in st.session_state.saved_briefs:
         brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
 
-    # Afficher les champs avec text_area et boutons à droite
+    # Afficher les champs avec text_area et bouton IA sur la même ligne
     for section in sections:
         with st.expander(f"📋 {section['title']}"):
             for title, key, placeholder in section["fields"]:
                 col1, col2 = st.columns([4, 1])
                 with col1:
-                    st.write(f"{title} :small[❓]", unsafe_allow_html=True)
-                    st.text_area("", value=brief_data.get(key, st.session_state.get(key, "")), key=key, height=50, placeholder=placeholder)
+                    st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")), key=key, height=30, placeholder=placeholder)
                 with col2:
                     if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
                         if st.button("💡 Conseil IA", key=f"advice_{key}"):
                             advice = generate_checklist_advice(section["title"], title)
-                            example = f"Exemple : {get_example_for_field(section['title'], title)}"
-                            st.session_state[key] = f"{advice}\n{example}"
+                            example = get_example_for_field(section["title"], title)
+                            st.session_state[key] = f"{advice}\nExemple : {example}"
                             st.rerun()
-                    else:
-                        st.write("")
 
     # Boutons Enregistrer et Annuler en bas
     col_save, col_cancel = st.columns([1, 1])
@@ -773,8 +770,9 @@ with tabs[1]:
             st.session_state.avant_brief_completed = False
             st.rerun()
 
-# Ajout de la fonction get_example_for_field dans utils.py ou en bas de 1_Brief.py
+# Ajout de la fonction get_example_for_field (si non présente dans utils.py)
 def get_example_for_field(section_title, field_title):
+    """Retourne un exemple contextuel pour un champ donné."""
     examples = {
         "Contexte du poste": {
             "Raison de l'ouverture": "Remplacement d’un départ en retraite",
