@@ -971,16 +971,25 @@ with tabs[1]:
     
     with col_pre_rediger:
         if st.button("💡 Pré-rédiger par IA", type="primary", key="pre_rediger_ia", use_container_width=True):
-            # Ouvrir une fenêtre de sélection de la fiche de poste
-            library = st.session_state.job_library
-            job_titles = [job["title"] for job in library] if library else []
-            if not job_titles:
-                st.error("❌ Aucun poste disponible dans le catalogue. Ajoutez un poste dans l'onglet 'Catalogue des Postes'.")
-            else:
-                with st.dialog("Choisir une fiche de poste pour la pré-rédaction"):
-                    selected_job = st.selectbox("Sélectionnez un poste :", job_titles, key="select_job_for_pre_redaction")
+            # Logique de sélection de la fiche de poste
+            if "show_job_selection" not in st.session_state:
+                st.session_state.show_job_selection = False
+            if not st.session_state.show_job_selection:
+                st.session_state.show_job_selection = True
+                st.rerun()
+            
+            if st.session_state.show_job_selection:
+                library = st.session_state.job_library
+                job_titles = [job["title"] for job in library] if library else []
+                if not job_titles:
+                    st.error("❌ Aucun poste disponible dans le catalogue. Ajoutez un poste dans l'onglet 'Catalogue des Postes'.")
+                    st.session_state.show_job_selection = False
+                else:
+                    selected_job = st.selectbox("Sélectionnez un poste pour la pré-rédaction :", job_titles, key="select_job_for_pre_redaction")
                     if st.button("Confirmer", key="confirm_job_selection"):
                         apply_ai_pre_redaction(selected_job_title=selected_job)
+                        st.session_state.show_job_selection = False
+                        st.rerun()
 
 # ---------------- RÉUNION ----------------
 with tabs[2]:
