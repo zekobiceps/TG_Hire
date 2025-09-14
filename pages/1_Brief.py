@@ -734,6 +734,9 @@ with tabs[1]:
     if st.session_state.current_brief_name in st.session_state.saved_briefs:
         brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
 
+    # Variable locale pour stocker les réponses générées
+    generated_advice = {}
+
     # Formulaire pour les widgets
     for section in sections:
         with st.expander(f"📋 {section['title']}"):
@@ -742,7 +745,7 @@ with tabs[1]:
                 with col1:
                     st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")), key=key, placeholder=placeholder)
                 with col2:
-                    # Bouton "Conseil IA" à côté de chaque champ
+                    # Bouton "Conseil IA" uniquement pour les sections non pertinentes
                     if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
                         if st.button("💡", key=f"advice_{key}", help="Générer un conseil IA"):
                             # Génération du conseil par l'IA
@@ -750,9 +753,14 @@ with tabs[1]:
                             example = get_example_for_field(section["title"], title)
                             message_to_copy = f"{advice}\nExemple : {example}"
 
-                            # Affichage du message IA juste en dessous du bouton
-                            st.session_state[f"advice_{key}"] = message_to_copy
-                            st.code(message_to_copy, language="text")
+                            # Stockage de la réponse dans la variable locale
+                            generated_advice[key] = message_to_copy
+
+    # Affichage de la réponse générée pour chaque champ, si elle existe
+    for section in sections:
+        for title, key, placeholder in section["fields"]:
+            if key in generated_advice:
+                st.code(generated_advice[key], language="text")
 
     # Formulaire de soumission pour les boutons Enregistrer et Annuler
     col_save, col_cancel = st.columns([1, 1])
