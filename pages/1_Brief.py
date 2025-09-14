@@ -746,12 +746,12 @@ with tabs[1]:
                         # Utilisation de st.form_submit_button pour le bouton "Conseil IA"
                         if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
                             if st.form_submit_button(f"💡 Générer conseil IA pour {title}", key=f"btn_{key}"):
-                                # Générer le conseil IA et mettre à jour la réponse
+                                # Appel à DeepSeek pour générer la réponse dynamique
                                 advice = generate_checklist_advice(section["title"], title)
                                 example = get_example_for_field(section["title"], title)
                                 message_to_copy = f"{advice}\nExemple : {example}"
 
-                                # Stocker la réponse générée dans st.session_state
+                                # Stocker la réponse générée dans st.session_state pour chaque champ
                                 st.session_state[f"advice_{key}"] = message_to_copy
 
         # Affichage de la réponse générée pour chaque champ, si elle existe
