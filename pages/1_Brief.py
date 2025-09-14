@@ -721,6 +721,29 @@ with tabs[1]:
         },
     ]
 
+    # Appliquer un style CSS pour augmenter la taille de la police et ajuster le bouton
+    st.markdown(
+        """
+        <style>
+        /* Augmenter la taille de la police pour les titres des sections (expanders) */
+        .st-expander > div > div > div > div > div > span {
+            font-size: 20px !important;
+            font-weight: bold !important;
+        }
+        /* Augmenter la taille de la police pour les labels des champs (text_area) */
+        .stTextArea > label {
+            font-size: 18px !important;
+            font-weight: bold !important;
+        }
+        /* Faire descendre légèrement le bouton */
+        .stButton[data-testid="generate_advice_btn"] button {
+            margin-top: 5px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
     # Afficher le message de sauvegarde seulement pour cet onglet
     if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Avant-brief"):
         st.success(st.session_state.save_message)
@@ -775,11 +798,8 @@ with tabs[1]:
         for section in sections:
             with st.expander(f"📋 {section['title']}"):
                 for title, key, placeholder in section["fields"]:
-                    # Larger height for "Contexte du poste" section and specifically "Raison de l'ouverture"
-                    if section["title"] == "Contexte du poste":
-                        height = 200 if title == "Raison de l'ouverture" else 150
-                    else:
-                        height = 100
+                    # Larger height for all fields
+                    height = 150  # Increased from 100 for all fields
                     st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")) or "", key=key, placeholder=placeholder, height=height)
                     # Afficher le conseil généré juste en dessous du champ avec meilleur formatage
                     if f"advice_{key}" in st.session_state and st.session_state[f"advice_{key}"]:
