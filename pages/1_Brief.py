@@ -733,7 +733,19 @@ with tabs[1]:
     if st.session_state.current_brief_name in st.session_state.saved_briefs:
         brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
 
-    # Utiliser un formulaire pour gérer les widgets
+    # Gérer les conseils IA avant le rendu des widgets
+    for section in sections:
+        for title, key, _ in section["fields"]:
+            if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
+                advice_key = f"advice_{key}"
+                if advice_key in st.session_state and st.session_state[advice_key]:
+                    advice = generate_checklist_advice(section["title"], title)
+                    example = get_example_for_field(section["title"], title)
+                    st.session_state[key] = f"{advice}\nExemple : {example}"
+                    st.session_state[advice_key] = False
+                    st.rerun()
+
+    # Formulaire pour les widgets
     with st.form(key="avant_brief_form"):
         for section in sections:
             with st.expander(f"📋 {section['title']}"):
@@ -744,9 +756,7 @@ with tabs[1]:
                     with col2:
                         if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
                             if st.form_submit_button("💡 Conseil IA", key=f"advice_{key}"):
-                                advice = generate_checklist_advice(section["title"], title)
-                                example = get_example_for_field(section["title"], title)
-                                st.session_state[key] = f"{advice}\nExemple : {example}"
+                                st.session_state[f"advice_{key}"] = True
                                 st.rerun()
 
         # Boutons Enregistrer et Annuler dans le formulaire
@@ -770,34 +780,6 @@ with tabs[1]:
                 st.session_state.current_brief_name = ""
                 st.session_state.avant_brief_completed = False
                 st.rerun()
-
-# Ajout de la fonction get_example_for_field (si non présente dans utils.py)
-def get_example_for_field(section_title, field_title):
-    """Retourne un exemple contextuel pour un champ donné."""
-    examples = {
-        "Contexte du poste": {
-            "Raison de l'ouverture": "Remplacement d’un départ en retraite",
-            "Mission globale": "Assurer la gestion des projets stratégiques de l’entreprise",
-            "Tâches principales": "Gestion de projet complexe, coordination d’équipe, suivi budgétaire",
-        },
-        "Must-have (Indispensables)": {
-            "Expérience": "5 ans d’expérience dans le secteur IT",
-            "Connaissances / Diplômes / Certifications": "Diplôme en informatique, certification PMP",
-            "Compétences / Outils": "Maîtrise de Python et SQL",
-            "Soft skills / aptitudes comportementales": "Leadership et communication",
-        },
-        "Nice-to-have (Atouts)": {
-            "Expérience additionnelle": "Projets internationaux",
-            "Diplômes / Certifications valorisantes": "Certification Agile",
-            "Compétences complémentaires": "Connaissance en Cloud",
-        },
-        "Sourcing et marché": {
-            "Entreprises où trouver ce profil": "Google, Microsoft",
-            "Synonymes / intitulés proches": "Data Scientist, Analyste de données",
-            "Canaux à utiliser": "LinkedIn, chasse de tête",
-        }
-    }
-    return examples.get(section_title, {}).get(field_title, "Exemple non disponible")
 
 # ---------------- RÉUNION ----------------
 with tabs[2]:
