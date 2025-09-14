@@ -731,16 +731,41 @@ with tabs[1]:
     brief_display_name = f"Avant-brief - {st.session_state.current_brief_name}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
     st.subheader(f"🔄 {brief_display_name}")
 
+    # Option pour choisir où générer les conseils
+    advice_target = st.radio("Générer les conseils pour :", ["Tous les champs", "Champ spécifique"], index=0)
+    selected_field = None
+    if advice_target == "Champ spécifique":
+        field_options = [f"{section['title']} - {title}" for section in sections for title, key, _ in section["fields"]]
+        selected_field = st.selectbox("Choisir un champ :", field_options)
+
     # Bouton pour générer tous les conseils IA
     if st.button("🌟 Générer tous les conseils IA"):
+        # Effacer les conseils précédents
         for section in sections:
             for title, key, _ in section["fields"]:
-                if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
-                    advice = generate_checklist_advice(section["title"], title)
-                    if advice != "Pas de conseil disponible.":
-                        example = get_example_for_field(section["title"], title)
-                        message_to_copy = f"{advice}\nExemple : {example}"
-                        st.session_state[f"advice_{key}"] = message_to_copy
+                st.session_state[f"advice_{key}"] = ""
+        
+        # Générer de nouveaux conseils
+        if advice_target == "Tous les champs":
+            for section in sections:
+                for title, key, _ in section["fields"]:
+                    if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
+                        advice = generate_checklist_advice(section["title"], title)
+                        if advice != "Pas de conseil disponible.":
+                            example = get_example_for_field(section["title"], title)
+                            message_to_copy = f"{advice}\nExemple : {example}"
+                            st.session_state[f"advice_{key}"] = message_to_copy
+        elif advice_target == "Champ spécifique" and selected_field:
+            section_title, field_title = selected_field.split(" - ", 1)
+            for section in sections:
+                if section["title"] == section_title:
+                    for title, key, _ in section["fields"]:
+                        if title == field_title and section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
+                            advice = generate_checklist_advice(section["title"], title)
+                            if advice != "Pas de conseil disponible.":
+                                example = get_example_for_field(section["title"], title)
+                                message_to_copy = f"{advice}\nExemple : {example}"
+                                st.session_state[f"advice_{key}"] = message_to_copy
         st.rerun()
 
     brief_data = {}
