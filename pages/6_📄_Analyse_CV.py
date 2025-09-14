@@ -41,7 +41,7 @@ st.markdown("""
         background-color: #0E1117;
         padding: 0px;
         border-radius: 4px;
-        border: 1px solid white; /* Bordure blanche pour l'ensemble des onglets */
+        /* Suppression de la bordure blanche */
     }
     
     /* Style de base pour tous les onglets */
@@ -317,17 +317,15 @@ with tab1:
     st.markdown("---")
     
     # Remplacer la case à cocher par l'option radio et le bouton d'aide
-    col_radio, col_help = st.columns([0.8, 0.2])
-    with col_radio:
-        analyse_method = st.radio(
-            "Choisissez la méthode d'analyse :",
-            ("Méthode du cosinus", "Utilisation de l'IA"),
-            index=0,  # "Méthode du cosinus" est sélectionné par défaut
-            help="Sélectionnez la méthode que vous préférez pour le classement des CVs."
-        )
-    with col_help:
-        st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
-        st.help(st.radio)
+    use_ai_for_ranking = st.checkbox(
+        "Utiliser l'IA de DeepSeek pour le classement", 
+        value=False,
+        help="""
+            **Méthode du cosinus** : Par défaut, cette méthode analyse la fréquence des mots entre les CV et la description du poste pour calculer un score de similarité.
+
+            **Utilisation de l'IA de DeepSeek** : Cochez cette option pour utiliser l'IA. Elle fournit une analyse plus détaillée et un classement plus pertinent basé sur la compréhension du contexte et des compétences. Cela utilise votre quota API.
+        """
+    )
 
     st.markdown("---")
 
@@ -351,7 +349,7 @@ with tab1:
                 st.warning(f"⚠️ {len(error_files)} fichier(s) non traité(s): {', '.join(error_files)}")
             
             if resumes:
-                if analyse_method == "Utilisation de l'IA":
+                if use_ai_for_ranking:
                     scores_data = rank_resumes_with_ai(job_description, resumes, file_names)
                     scores = [data["score"] for data in scores_data]
                     explanations = {data["file_name"]: data["explanation"] for data in scores_data}
@@ -389,7 +387,7 @@ with tab1:
                     
                     st.markdown("---")
                     st.markdown('<div class="section-header">🔍 Comment le score est-il calculé ?</div>', unsafe_allow_html=True)
-                    if analyse_method == "Utilisation de l'IA":
+                    if use_ai_for_ranking:
                         st.info("Le score est basé sur une évaluation IA. Pour une analyse détaillée, consultez les sections ci-dessous.")
                         st.markdown('<div class="section-header">📝 Analyse détaillée de chaque CV</div>', unsafe_allow_html=True)
                         for file_name, score in ranked_resumes:
