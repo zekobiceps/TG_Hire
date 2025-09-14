@@ -734,29 +734,33 @@ with tabs[1]:
         /* Style pour les titres des expanders (sections) */
         .st-expander [data-testid="stExpanderDetails"] > div:first-child {
             font-size: 20px !important;
-            color: #58a6ff !important; /* Match advice text color */
-            font-weight: 600 !important; /* Match advice text weight */
+            color: #FAFAFA !important; /* Revert to original white color */
+            font-weight: 500 !important; /* Moderate weight */
         }
         
         /* Style pour les labels des text_area (champs) */
         .stTextArea > label {
             font-size: 20px !important;
-            color: #58a6ff !important; /* Match advice text color */
-            font-weight: 600 !important; /* Match advice text weight */
+            color: #FAFAFA !important; /* Revert to original white color */
+            font-weight: 500 !important; /* Moderate weight */
         }
         
         /* Style pour le contenu des conseils */
         .advice-box {
             background-color: #262730;
-            padding: 12px;
+            padding: 10px;
             border-radius: 5px;
             margin-top: 10px;
             border: 1px solid #58a6ff;
         }
         .advice-box strong {
             color: #58a6ff;
-            font-size: 20px; /* Ensure consistency with labels */
-            font-weight: 600;
+            font-size: 16px; /* Revert to default size */
+            font-weight: 500; /* Moderate weight to match original */
+        }
+        .advice-box div {
+            font-size: 16px; /* Ensure content matches original size */
+            color: #e6edf3; /* Light gray for readability */
         }
         </style>
     """, unsafe_allow_html=True)
@@ -807,9 +811,9 @@ with tabs[1]:
                         st.markdown(f"""
                             <div class="advice-box">
                                 <strong>Conseil</strong><br>
-                                {st.session_state[f'advice_{key}'].split('\n**Exemple :**\n')[0]}<br>
+                                <div>{st.session_state[f'advice_{key}'].split('\n**Exemple :**\n')[0]}</div><br>
                                 <strong>Exemple :</strong><br>
-                                {st.session_state[f'advice_{key}'].split('\n**Exemple :**\n')[1]}
+                                <div>{st.session_state[f'advice_{key}'].split('\n**Exemple :**\n')[1]}</div>
                             </div>
                         """, unsafe_allow_html=True)
 
