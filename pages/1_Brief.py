@@ -734,15 +734,15 @@ with tabs[1]:
         /* Style pour les titres des expanders (sections) */
         .st-expander [data-testid="stExpanderDetails"] > div:first-child {
             font-size: 20px !important;
-            color: #FAFAFA !important;
-            font-weight: 500 !important;
+            color: #58a6ff !important; /* Match advice text color */
+            font-weight: 600 !important; /* Match advice text weight */
         }
         
         /* Style pour les labels des text_area (champs) */
         .stTextArea > label {
             font-size: 20px !important;
-            color: #FAFAFA !important;
-            font-weight: 500 !important;
+            color: #58a6ff !important; /* Match advice text color */
+            font-weight: 600 !important; /* Match advice text weight */
         }
         
         /* Style pour le contenu des conseils */
@@ -755,6 +755,8 @@ with tabs[1]:
         }
         .advice-box strong {
             color: #58a6ff;
+            font-size: 20px; /* Ensure consistency with labels */
+            font-weight: 600;
         }
         </style>
     """, unsafe_allow_html=True)

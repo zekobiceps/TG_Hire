@@ -80,7 +80,7 @@ def match_cv_to_job(cv_text, job_offer_text):
         # Utiliser json5 pour une meilleure tolérance aux erreurs de format
         parsed_response = json5.loads(response)
         return parsed_response
-    except (json.JSONDecodeError, json5.JSONDecodeError) as e:
+    except json.JSONDecodeError as e:
         st.error(f"❌ Erreur lors de l'analyse de la réponse de l'IA. Veuillez réessayer. Détails : {e}")
         st.info(f"Réponse brute reçue: {response}")
         return None
