@@ -137,167 +137,165 @@ def delete_current_brief():
 def apply_ai_pre_redaction():
     """Applique la pré-rédaction IA aux champs concernés"""
     try:
-        # Afficher le message de pré-rédaction entre le tableau et le bouton
-        st.markdown("⏳ 📝 Pré-rédaction en cours...", unsafe_allow_html=True)
-        
-        # Récupérer l'intitulé du poste
-        job_title = st.session_state.get("poste_intitule", "")
-        if not job_title:
-            st.error("❌ Veuillez entrer un intitulé de poste avant de pré-rédiger.")
-            return
-        
-        brief_data = {}
-        
-        # Chercher une fiche de poste correspondante dans le Catalogue
-        library = st.session_state.job_library
-        matched_job = next((job for job in library if job['title'].lower() == job_title.lower()), None)
-        
-        if matched_job:
-            brief_data = {
-                "Mission globale": matched_job.get("finalite", ""),
-                "Tâches principales": matched_job.get("activites", ""),
-                "Must have expérience": matched_job.get("experience_globale", ""),
-                "Must have diplômes": matched_job.get("niveau_diplome", ""),
-                "Must have compétences": matched_job.get("competences", ""),
-                "Must have soft skills": "",
-                "Nice to have expérience": matched_job.get("experience_globale", ""),
-                "Nice to have diplômes": matched_job.get("niveau_diplome", ""),
-                "Nice to have compétences": matched_job.get("competences", ""),
+        # Afficher le spinner de chargement entre le tableau et le bouton
+        with st.spinner("📝 Pré-rédaction en cours..."):
+            # Récupérer l'intitulé du poste
+            job_title = st.session_state.get("poste_intitule", "")
+            if not job_title:
+                st.error("❌ Veuillez entrer un intitulé de poste avant de pré-rédiger.")
+                return
+            
+            brief_data = {}
+            
+            # Chercher une fiche de poste correspondante dans le Catalogue
+            library = st.session_state.job_library
+            matched_job = next((job for job in library if job['title'].lower() == job_title.lower()), None)
+            
+            if matched_job:
+                brief_data = {
+                    "Mission globale": matched_job.get("finalite", ""),
+                    "Tâches principales": matched_job.get("activites", ""),
+                    "Must have expérience": matched_job.get("experience_globale", ""),
+                    "Must have diplômes": matched_job.get("niveau_diplome", ""),
+                    "Must have compétences": matched_job.get("competences", ""),
+                    "Must have soft skills": "",
+                    "Nice to have expérience": matched_job.get("experience_globale", ""),
+                    "Nice to have diplômes": matched_job.get("niveau_diplome", ""),
+                    "Nice to have compétences": matched_job.get("competences", ""),
+                }
+            else:
+                brief_data = {
+                    "Mission globale": st.session_state.get("impact_strategique", ""),
+                    "Tâches principales": st.session_state.get("taches_principales", ""),
+                    "Must have expérience": st.session_state.get("must_have_experience", ""),
+                    "Must have diplômes": st.session_state.get("must_have_diplomes", ""),
+                    "Must have compétences": st.session_state.get("must_have_competences", ""),
+                    "Must have soft skills": st.session_state.get("must_have_softskills", ""),
+                    "Nice to have expérience": st.session_state.get("nice_to_have_experience", ""),
+                    "Nice to have diplômes": st.session_state.get("nice_to_have_diplomes", ""),
+                    "Nice to have compétences": st.session_state.get("nice_to_have_competences", ""),
+                }
+            
+            # Convertir en texte pour l'envoi à l'API
+            brief_data_str = "\n".join([f"{key}: {value}" for key, value in brief_data.items()])
+            
+            # Appeler l'API DeepSeek
+            ai_response = get_ai_pre_redaction(brief_data_str)
+            
+            if not ai_response:
+                st.error("❌ Aucune réponse reçue de l'API DeepSeek.")
+                return
+            
+            # Parser la réponse markdown
+            current_section = None
+            parsed_data = {
+                "impact_strategique": "",
+                "taches_principales": [],
+                "must_have": [],
+                "nice_to_have": [],
             }
-        else:
-            brief_data = {
-                "Mission globale": st.session_state.get("impact_strategique", ""),
-                "Tâches principales": st.session_state.get("taches_principales", ""),
-                "Must have expérience": st.session_state.get("must_have_experience", ""),
-                "Must have diplômes": st.session_state.get("must_have_diplomes", ""),
-                "Must have compétences": st.session_state.get("must_have_competences", ""),
-                "Must have soft skills": st.session_state.get("must_have_softskills", ""),
-                "Nice to have expérience": st.session_state.get("nice_to_have_experience", ""),
-                "Nice to have diplômes": st.session_state.get("nice_to_have_diplomes", ""),
-                "Nice to have compétences": st.session_state.get("nice_to_have_competences", ""),
-            }
-        
-        # Convertir en texte pour l'envoi à l'API
-        brief_data_str = "\n".join([f"{key}: {value}" for key, value in brief_data.items()])
-        
-        # Appeler l'API DeepSeek
-        ai_response = get_ai_pre_redaction(brief_data_str)
-        # st.write("Debug - Réponse API:", ai_response)  # Débogage optionnel
-        
-        if not ai_response:
-            st.error("❌ Aucune réponse reçue de l'API DeepSeek.")
-            return
-        
-        # Parser la réponse markdown
-        current_section = None
-        parsed_data = {
-            "impact_strategique": "",
-            "taches_principales": [],
-            "must_have": [],
-            "nice_to_have": [],
-        }
-        
-        for line in ai_response.split("\n"):
-            line = line.strip()
-            if line.startswith("## Mission globale"):
-                current_section = "impact_strategique"
-            elif line.startswith("## Tâches principales"):
-                current_section = "taches_principales"
-            elif line.startswith("## Must have"):
-                current_section = "must_have"
-            elif line.startswith("## Nice to have"):
-                current_section = "nice_to_have"
-            elif line.startswith("- ") and current_section:
-                if current_section == "impact_strategique":
-                    parsed_data[current_section] = line[2:].strip()
-                else:
-                    parsed_data[current_section].append(line[2:].strip())
-        
-        # Mettre à jour les champs de session
-        st.session_state.impact_strategique = parsed_data["impact_strategique"]
-        st.session_state.taches_principales = "\n".join(parsed_data["taches_principales"])
-        must_have_str = "\n".join(parsed_data["must_have"])
-        st.session_state.must_have_experience = must_have_str
-        st.session_state.must_have_diplomes = must_have_str
-        st.session_state.must_have_competences = must_have_str
-        st.session_state.must_have_softskills = must_have_str
-        nice_to_have_str = "\n".join(parsed_data["nice_to_have"])
-        st.session_state.nice_to_have_experience = nice_to_have_str
-        st.session_state.nice_to_have_diplomes = nice_to_have_str
-        st.session_state.nice_to_have_competences = nice_to_have_str
-        
-        # Mettre à jour le DataFrame pour refléter les modifications
-        brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
-        sections = [
-            {
-                "title": "Contexte du poste",
-                "fields": [
-                    ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"),
-                    ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"),
-                    ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"),
-                ]
-            },
-            {
-                "title": "Must-have (Indispensables)",
-                "fields": [
-                    ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
-                    ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
-                    ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"),
-                    ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"),
-                ]
-            },
-            {
-                "title": "Nice-to-have (Atouts)",
-                "fields": [
-                    ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
-                    ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
-                    ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
-                ]
-            },
-            {
-                "title": "Sourcing et marché",
-                "fields": [
-                    ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
-                    ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
-                    ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
-                ]
-            },
-            {
-                "title": "Conditions et contraintes",
-                "fields": [
-                    ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
-                    ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
-                ]
-            },
-            {
-                "title": "Profils pertinents",
-                "fields": [
-                    ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
-                    ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
-                    ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
-                ]
-            },
-            {
-                "title": "Notes libres",
-                "fields": [
-                    ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
-                    ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
-                ]
-            },
-        ]
-        data = []
-        for section in sections:
-            for i, (field_name, field_key, placeholder) in enumerate(section["fields"]):
-                value = brief_data.get(field_key, st.session_state.get(field_key, ""))
-                section_title = section["title"] if i == 0 else ""
-                data.append([section_title, field_name, value])
-        
-        df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
-        st.session_state.edited_df = df
-        
-        st.success("✅ Pré-rédaction IA appliquée avec succès")
-        save_briefs()
-        st.rerun()
+            
+            for line in ai_response.split("\n"):
+                line = line.strip()
+                if line.startswith("## Mission globale"):
+                    current_section = "impact_strategique"
+                elif line.startswith("## Tâches principales"):
+                    current_section = "taches_principales"
+                elif line.startswith("## Must have"):
+                    current_section = "must_have"
+                elif line.startswith("## Nice to have"):
+                    current_section = "nice_to_have"
+                elif line.startswith("- ") and current_section:
+                    if current_section == "impact_strategique":
+                        parsed_data[current_section] = line[2:].strip()
+                    else:
+                        parsed_data[current_section].append(line[2:].strip())
+            
+            # Mettre à jour les champs de session
+            st.session_state.impact_strategique = parsed_data["impact_strategique"] or st.session_state.get("impact_strategique", "")
+            st.session_state.taches_principales = "\n".join(parsed_data["taches_principales"]) or st.session_state.get("taches_principales", "")
+            must_have_str = "\n".join(parsed_data["must_have"]) or st.session_state.get("must_have_experience", "")
+            st.session_state.must_have_experience = must_have_str
+            st.session_state.must_have_diplomes = must_have_str
+            st.session_state.must_have_competences = must_have_str
+            st.session_state.must_have_softskills = must_have_str
+            nice_to_have_str = "\n".join(parsed_data["nice_to_have"]) or st.session_state.get("nice_to_have_experience", "")
+            st.session_state.nice_to_have_experience = nice_to_have_str
+            st.session_state.nice_to_have_diplomes = nice_to_have_str
+            st.session_state.nice_to_have_competences = nice_to_have_str
+            
+            # Mettre à jour le DataFrame pour refléter les modifications
+            brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
+            sections = [
+                {
+                    "title": "Contexte du poste",
+                    "fields": [
+                        ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"),
+                        ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"),
+                        ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"),
+                    ]
+                },
+                {
+                    "title": "Must-have (Indispensables)",
+                    "fields": [
+                        ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
+                        ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
+                        ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"),
+                        ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"),
+                    ]
+                },
+                {
+                    "title": "Nice-to-have (Atouts)",
+                    "fields": [
+                        ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
+                        ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
+                        ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
+                    ]
+                },
+                {
+                    "title": "Sourcing et marché",
+                    "fields": [
+                        ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
+                        ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
+                        ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
+                    ]
+                },
+                {
+                    "title": "Conditions et contraintes",
+                    "fields": [
+                        ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
+                        ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
+                    ]
+                },
+                {
+                    "title": "Profils pertinents",
+                    "fields": [
+                        ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
+                        ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
+                        ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
+                    ]
+                },
+                {
+                    "title": "Notes libres",
+                    "fields": [
+                        ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
+                        ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
+                    ]
+                },
+            ]
+            data = []
+            for section in sections:
+                for i, (field_name, field_key, placeholder) in enumerate(section["fields"]):
+                    value = brief_data.get(field_key, st.session_state.get(field_key, ""))
+                    section_title = section["title"] if i == 0 else ""
+                    data.append([section_title, field_name, value])
+            
+            df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
+            st.session_state.edited_df = df
+            
+            st.success("✅ Pré-rédaction IA appliquée avec succès")
+            save_briefs()
+            st.rerun()
     
     except Exception as e:
         st.error(f"❌ Erreur lors de la pré-rédaction IA : {str(e)}")
@@ -763,23 +761,20 @@ with tabs[0]:
         with col_create:
             if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
                 brief_name = generate_automatic_brief_name()
-                if brief_name not in st.session_state.saved_briefs:
-                    st.session_state.saved_briefs[brief_name] = {
-                        "poste_intitule": st.session_state.poste_intitule,
-                        "manager_nom": st.session_state.manager_nom,
-                        "recruteur": st.session_state.recruteur,
-                        "affectation_type": st.session_state.affectation_type,
-                        "affectation_nom": st.session_state.affectation_nom,
-                        "date_brief": str(st.session_state.date_brief),
-                        "brief_type": "Standard"  # Default to Standard
-                    }
-                    save_briefs()
-                    st.session_state.current_brief_name = brief_name
-                    st.session_state.save_message = f"✅ Brief '{brief_name}' créé avec succès"
-                    st.session_state.save_message_tab = "Gestion"
-                    st.rerun()
-                else:
-                    st.warning("⚠️ Un brief avec ce nom existe déjà")
+                st.session_state.saved_briefs[brief_name] = {
+                    "poste_intitule": st.session_state.poste_intitule,
+                    "manager_nom": st.session_state.manager_nom,
+                    "recruteur": st.session_state.recruteur,
+                    "affectation_type": st.session_state.affectation_type,
+                    "affectation_nom": st.session_state.affectation_nom,
+                    "date_brief": str(st.session_state.date_brief),
+                    "brief_type": "Standard"  # Default to Standard
+                }
+                save_briefs()
+                st.session_state.current_brief_name = brief_name
+                st.session_state.save_message = f"✅ Brief '{brief_name}' créé avec succès"
+                st.session_state.save_message_tab = "Gestion"
+                st.rerun()
         with col_cancel:
             if st.button("🗑️ Annuler", type="secondary", use_container_width=True, key="cancel_brief"):
                 # Reset fields
@@ -953,9 +948,6 @@ with tabs[1]:
         num_rows="fixed"
     )
 
-    # Afficher le message de pré-rédaction ici, entre le tableau et le bouton
-    pre_redaction_message = st.empty()
-
     # Boutons Enregistrer et Pré-rédiger par IA
     col_save, col_pre_rediger = st.columns(2)
     with col_save:
@@ -986,7 +978,6 @@ with tabs[1]:
     with col_pre_rediger:
         if st.button("💡 Pré-rédiger par IA", type="primary", key="pre_rediger_ia", use_container_width=True):
             apply_ai_pre_redaction()
-            pre_redaction_message.empty()  # Nettoyer le message après la fin
 
 # ---------------- RÉUNION ----------------
 with tabs[2]:
@@ -1242,77 +1233,4 @@ with tabs[4]:
         for i, job in enumerate(library):
             col1, col2, col3 = st.columns([3, 1, 1])
             with col1:
-                st.write(f"**{job['title']}** - Créé le {job.get('date_creation', 'date inconnue')}")
-            with col2:
-                if st.button("Modifier", key=f"modify_job_{i}"):
-                    st.session_state.editing_job = i
-                    st.rerun()
-            with col3:
-                if st.button("Supprimer", key=f"delete_job_{i}"):
-                    del library[i]
-                    save_library(library)
-                    st.session_state.job_library = library
-                    st.session_state.save_message = f"✅ Fiche de poste '{job['title']}' supprimée"
-                    st.session_state.save_message_tab = "Catalogue des Postes"
-                    st.rerun()
-    
-    # Formulaire pour ajouter ou modifier une fiche
-    st.subheader("➕ Ajouter/Modifier une fiche de poste")
-    
-    editing = 'editing_job' in st.session_state
-    job_data = library[st.session_state.editing_job] if editing else {}
-    
-    with st.form("job_form"):
-        title = st.text_input("Intitulé du poste", value=job_data.get('title', ''))
-        finalite = st.text_area("Finalité du poste", value=job_data.get('finalite', ''))
-        activites = st.text_area("Activités principales", value=job_data.get('activites', ''))
-        n1_hierarchique = st.text_input("N+1 hiérarchique", value=job_data.get('n1_hierarchique', ''))
-        n1_fonctionnel = st.text_input("N+1 fonctionnel", value=job_data.get('n1_fonctionnel', ''))
-        entite_rattachement = st.text_input("Entité de rattachement", value=job_data.get('entite_rattachement', ''))
-        indicateurs = st.text_area("Indicateurs clés de performance", value=job_data.get('indicateurs', ''))
-        interne = st.text_area("Interlocuteurs internes", value=job_data.get('interne', ''))
-        supervision_directe = st.text_input("Supervision directe", value=job_data.get('supervision_directe', ''))
-        externe = st.text_area("Interlocuteurs externes", value=job_data.get('externe', ''))
-        supervision_indirecte = st.text_input("Supervision indirecte", value=job_data.get('supervision_indirecte', ''))
-        niveau_diplome = st.text_input("Niveau de diplôme", value=job_data.get('niveau_diplome', ''))
-        experience_globale = st.text_input("Expérience globale", value=job_data.get('experience_globale', ''))
-        competences = st.text_area("Compétences requises", value=job_data.get('competences', ''))
-        
-        if st.form_submit_button("💾 Sauvegarder"):
-            # Vérif intitulé unique
-            if any(j["title"].lower() == title.lower() for j in library if not (editing and j["title"] == job_data.get("title", ""))):
-                st.error("Une fiche avec cet intitulé existe déjà.")
-            else:
-                new_job = {
-                    'title': title,
-                    'finalite': finalite,
-                    'activites': activites,
-                    'n1_hierarchique': n1_hierarchique,
-                    'n1_fonctionnel': n1_fonctionnel,
-                    'entite_rattachement': entite_rattachement,
-                    'indicateurs': indicateurs,
-                    'interne': interne,
-                    'supervision_directe': supervision_directe,
-                    'externe': externe,
-                    'supervision_indirecte': supervision_indirecte,
-                    'niveau_diplome': niveau_diplome,
-                    'experience_globale': experience_globale,
-                    'competences': competences,
-                    "date_creation": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                }
-                if editing:
-                    library[st.session_state.editing_job] = new_job
-                    del st.session_state.editing_job
-                    st.session_state.save_message = f"✅ Fiche de poste '{title}' modifiée avec succès"
-                else:
-                    library.append(new_job)
-                    st.session_state.save_message = f"✅ Fiche de poste '{title}' créée avec succès"
-                save_library(library)
-                st.session_state.job_library = library
-                st.session_state.save_message_tab = "Catalogue des Postes"
-        
-        # Afficher le message de sauvegarde en bas
-        if st.session_state.save_message and st.session_state.save_message_tab == "Catalogue des Postes":
-            st.success(st.session_state.save_message)
-            st.session_state.save_message = None
-            st.session_state.save_message_tab = None
+                st.write
