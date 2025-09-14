@@ -618,6 +618,23 @@ def generate_checklist_advice(section_title, field_title):
         }
     }
 
+# -------------------- Réponse IA aléatoire --------------------
+def generate_checklist_advice(section_title, field_title):
+    # Liste d'exemples de conseils pour chaque champ, adaptés au contexte BTP
+    advice_db = {
+        "Contexte du poste": {
+            "Raison de l'ouverture": [
+                "- Clarifier si remplacement pour un chantier en cours, création pour un nouveau projet BTP ou évolution interne due à une promotion.",
+                "- Identifier le niveau d'urgence lié aux délais de construction et à la priorisation des sites.",
+                "- Expliquer le contexte stratégique dans le secteur BTP, comme un nouveau contrat de travaux publics.",
+                "- Préciser si le poste est une création pour renforcer l'équipe sur un grand chantier ou une réaffectation pour optimiser les ressources.",
+                "- Relier le poste à la stratégie globale de l'entreprise en matière de développement durable dans le BTP."
+            ],
+            # ... (rest of advice_db remains unchanged)
+        }
+        # ... (other sections unchanged)
+    }
+
     # Sélectionner une réponse aléatoire pour la section et le champ donné
     import random
     section_advice = advice_db.get(section_title, {})
