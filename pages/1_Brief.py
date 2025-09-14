@@ -689,36 +689,6 @@ with tabs[1]:
                 ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
             ]
         },
-        {
-            "title": "Sourcing et marché",
-            "fields": [
-                ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
-                ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
-                ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
-            ]
-        },
-        {
-            "title": "Conditions et contraintes",
-            "fields": [
-                ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
-                ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
-            ]
-        },
-        {
-            "title": "Profils pertinents",
-            "fields": [
-                ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
-                ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
-                ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
-            ]
-        },
-        {
-            "title": "Notes libres",
-            "fields": [
-                ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
-                ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
-            ]
-        },
     ]
 
     # Afficher le message de sauvegarde seulement pour cet onglet
@@ -732,41 +702,31 @@ with tabs[1]:
     st.subheader(f"🔄 {brief_display_name}")
 
     # Contrôles pour générer les conseils IA avec sélection de champ
-    col1, col2 = st.columns([3, 7])
+    col1, col2 = st.columns([1, 1])  # Equal width columns
     with col1:
-        st.button("🌟 Générer tous les conseils IA")
+        st.button("💡 Générer par l'IA", key="generate_advice_btn", on_click=lambda: st.session_state.update({"generate_advice": True}), type="primary", help="Génère un conseil IA pour le champ sélectionné", style={"background-color": "#FF0000"})
     with col2:
-        field_options = ["Tous les champs"] + [f"{section['title']} - {title}" for section in sections for title, key, _ in section["fields"]]
+        field_options = [f"{section['title']} - {title}" for section in sections for title, key, _ in section["fields"]]
         selected_field = st.selectbox("Choisir un champ", field_options, index=0)
 
-    # Bouton pour générer les conseils IA (déclenché ci-dessus)
+    # Générer les conseils IA après clic sur le bouton
     if st.session_state.get("generate_advice", False):
         # Effacer les conseils précédents
         for section in sections:
             for title, key, _ in section["fields"]:
                 st.session_state[f"advice_{key}"] = ""
         
-        # Générer de nouveaux conseils
-        if selected_field == "Tous les champs":
-            for section in sections:
+        # Générer de nouveaux conseils pour le champ sélectionné
+        section_title, field_title = selected_field.split(" - ", 1)
+        for section in sections:
+            if section["title"] == section_title:
                 for title, key, _ in section["fields"]:
-                    if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
+                    if title == field_title:
                         advice = generate_checklist_advice(section["title"], title)
                         if advice != "Pas de conseil disponible.":
                             example = get_example_for_field(section["title"], title)
                             message_to_copy = f"{advice}\nExemple : {example}"
                             st.session_state[f"advice_{key}"] = message_to_copy
-        else:
-            section_title, field_title = selected_field.split(" - ", 1)
-            for section in sections:
-                if section["title"] == section_title:
-                    for title, key, _ in section["fields"]:
-                        if title == field_title and section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
-                            advice = generate_checklist_advice(section["title"], title)
-                            if advice != "Pas de conseil disponible.":
-                                example = get_example_for_field(section["title"], title)
-                                message_to_copy = f"{advice}\nExemple : {example}"
-                                st.session_state[f"advice_{key}"] = message_to_copy
         st.session_state["generate_advice"] = False
         st.rerun()
 
