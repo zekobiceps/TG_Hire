@@ -536,7 +536,131 @@ tabs = st.tabs([
     "📚 Catalogue des Postes"
 ])
 
-# ---------------- AVANT-BRIEF ----------------
+# ---------------- ONGLET GESTION ----------------
+with tabs[0]:
+    # Afficher le message de sauvegarde seulement pour cet onglet
+    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Gestion"):
+        st.success(st.session_state.save_message)
+        st.session_state.save_message = None
+        st.session_state.save_message_tab = None
+
+    # Organiser les sections Informations de base et Filtrer les briefs en 2 colonnes
+    col_info, col_filter = st.columns(2)
+    
+    # Section Informations de base
+    with col_info:
+        st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Informations de base</h3>', unsafe_allow_html=True)
+        
+        # Organiser en 3 colonnes
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.text_input("Poste à recruter", key="poste_intitule")
+        with col2:
+            st.text_input("Manager", key="manager_nom")
+        with col3:
+            st.selectbox("Recruteur", ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"], key="recruteur")
+        
+        col4, col5, col6 = st.columns(3)
+        with col4:
+            st.selectbox("Type d'affectation", ["Chantier", "Siège", "Dépôt"], key="affectation_type")
+        with col5:
+            st.text_input("Nom affectation", key="affectation_nom")
+        with col6:
+            st.date_input("Date du brief", key="date_brief", value=datetime.today())
+        
+        # Boutons Créer et Annuler
+        col_create, col_cancel = st.columns(2)
+        with col_create:
+            if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
+                brief_name = generate_automatic_brief_name()
+                st.session_state.saved_briefs[brief_name] = {
+                    "poste_intitule": st.session_state.poste_intitule,
+                    "manager_nom": st.session_state.manager_nom,
+                    "recruteur": st.session_state.recruteur,
+                    "affectation_type": st.session_state.affectation_type,
+                    "affectation_nom": st.session_state.affectation_nom,
+                    "date_brief": str(st.session_state.date_brief),
+                    "brief_type": "Standard"  # Default to Standard
+                }
+                save_briefs()
+                st.session_state.current_brief_name = brief_name
+                st.session_state.save_message = f"✅ Brief '{brief_name}' créé avec succès"
+                st.session_state.save_message_tab = "Gestion"
+                st.rerun()
+        with col_cancel:
+            if st.button("🗑️ Annuler", type="secondary", use_container_width=True, key="cancel_brief"):
+                # Reset fields
+                st.session_state.poste_intitule = ""
+                st.session_state.manager_nom = ""
+                st.session_state.recruteur = ""
+                st.session_state.affectation_type = ""
+                st.session_state.affectation_nom = ""
+                st.session_state.date_brief = datetime.today()
+                st.rerun()
+    
+    # Section Filtrage
+    with col_filter:
+        st.markdown('<h3 style="margin-bottom: 0.3rem;">🔍 Filtrer les briefs</h3>', unsafe_allow_html=True)
+        
+        # Organiser en 3 colonnes
+        col_filter1, col_filter2, col_filter3 = st.columns(3)
+        with col_filter1:
+            st.date_input("Date", key="filter_date", value=None)
+        with col_filter2:
+            st.text_input("Recruteur", key="filter_recruteur")
+        with col_filter3:
+            st.text_input("Manager", key="filter_manager")
+        
+        col_filter4, col_filter5, col_filter6 = st.columns(3)
+        with col_filter4:
+            st.selectbox("Affectation", ["", "Chantier", "Siège", "Dépôt"], key="filter_affectation")
+        with col_filter5:
+            st.text_input("Nom affectation", key="filter_nom_affectation")
+        with col_filter6:
+            st.selectbox("Type de brief", ["", "Standard", "Urgent", "Stratégique"], key="filter_brief_type")
+        
+        # Bouton Filtrer
+        if st.button("🔎 Filtrer", use_container_width=True, key="apply_filter"):
+            filter_month = st.session_state.filter_date.strftime("%m") if st.session_state.filter_date else ""
+            st.session_state.filtered_briefs = filter_briefs(
+                st.session_state.saved_briefs, 
+                filter_month, 
+                st.session_state.filter_recruteur, 
+                st.session_state.filter_brief_type, 
+                st.session_state.filter_manager, 
+                st.session_state.filter_affectation, 
+                st.session_state.filter_nom_affectation
+            )
+            st.session_state.show_filtered_results = True
+            st.rerun()
+        
+        # Affichage des résultats en dessous du bouton Filtrer
+        if st.session_state.show_filtered_results:
+            st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
+            briefs_to_show = st.session_state.filtered_briefs
+            
+            if briefs_to_show:
+                for name, data in briefs_to_show.items():
+                    col_brief1, col_brief2, col_brief3, col_brief4 = st.columns([3, 1, 1, 1])
+                    with col_brief1:
+                        st.write(f"**{name}** - Manager: {data.get('manager_nom', 'N/A')} - Affectation: {data.get('affectation_nom', 'N/A')}")
+                    with col_brief2:
+                        if st.button("📝 Éditer", key=f"edit_{name}"):
+                            st.session_state.current_brief_name = name
+                            st.session_state.avant_brief_completed = True
+                            st.rerun()
+                    with col_brief3:
+                        if st.button("🗑️ Supprimer", key=f"delete_{name}"):
+                            del st.session_state.saved_briefs[name]
+                            save_briefs()
+                            st.rerun()
+                    with col_brief4:
+                        if st.button("📄 Exporter", key=f"export_{name}"):
+                            pass  # Logique d'export à implémenter si nécessaire
+            else:
+                st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
+
+
 with tabs[1]:
     # Afficher le message de sauvegarde seulement pour cet onglet
     if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Avant-brief"):
