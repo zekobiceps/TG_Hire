@@ -735,7 +735,7 @@ with tabs[1]:
     col1, col2 = st.columns([1, 3])  # Narrower first column for selectbox
     with col1:
         field_options = [f"{section['title']} - {title}" for section in sections if section["title"] in ["Contexte du poste", "Must-have (Indispensables)", "Nice-to-have (Atouts)"] for title, key, _ in section["fields"]]
-        selected_field = st.selectbox("Choisir un champ", field_options, index=0)
+        selected_field = st.selectbox("", field_options, index=0, placeholder="Choisir un champ")
     with col2:
         st.button("💡 Générer par l'IA", key="generate_advice_btn", on_click=lambda: st.session_state.update({"generate_advice": True}), type="primary", help="Génère un conseil IA pour le champ sélectionné")
 
@@ -755,7 +755,7 @@ with tabs[1]:
                         advice = generate_checklist_advice(section["title"], title)
                         if advice != "Pas de conseil disponible.":
                             example = get_example_for_field(section["title"], title)
-                            message_to_copy = f"{advice}\nExemple : {example}"
+                            message_to_copy = f"**Conseil :** {advice}\n**Exemple :** {example}"
                             st.session_state[f"advice_{key}"] = message_to_copy
         st.session_state["generate_advice"] = False
         st.rerun()
@@ -775,10 +775,15 @@ with tabs[1]:
         for section in sections:
             with st.expander(f"📋 {section['title']}"):
                 for title, key, placeholder in section["fields"]:
-                    st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")) or "", key=key, placeholder=placeholder, height=100)
-                    # Afficher le conseil généré juste en dessous du champ
+                    # Larger height for "Contexte du poste" section and specifically "Raison de l'ouverture"
+                    if section["title"] == "Contexte du poste":
+                        height = 200 if title == "Raison de l'ouverture" else 150
+                    else:
+                        height = 100
+                    st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")) or "", key=key, placeholder=placeholder, height=height)
+                    # Afficher le conseil généré juste en dessous du champ avec meilleur formatage
                     if f"advice_{key}" in st.session_state and st.session_state[f"advice_{key}"]:
-                        st.code(st.session_state[f"advice_{key}"], language="text")
+                        st.markdown(st.session_state[f"advice_{key}"], unsafe_allow_html=False)
 
         # Boutons Enregistrer et Annuler dans le formulaire
         col_save, col_cancel = st.columns([1, 1])
