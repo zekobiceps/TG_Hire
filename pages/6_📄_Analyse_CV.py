@@ -41,14 +41,15 @@ st.markdown("""
         background-color: #0E1117;
         padding: 0px;
         border-radius: 4px;
-        border: none; /* Suppression de la bordure blanche */
+        border: none !important;
     }
     
     /* Style de base pour tous les onglets */
     .stTabs [data-baseweb="tab"] {
         background-color: #0E1117 !important;
         color: white !important;
-        border-right: 1px solid #333 !important; /* Bordure grise entre les onglets */
+        border: none !important;
+        border-right: 1px solid transparent !important; /* Bordure transparente entre les onglets */
         border-radius: 0 !important;
         padding: 10px 16px !important;
         font-weight: 500 !important;
@@ -60,8 +61,26 @@ st.markdown("""
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
         color: #FF0000 !important; /* Rouge vif pour le texte de l'onglet actif */
         background-color: #0E1117 !important;
-        border: 1px solid #333 !important;
+        border: none !important;
         border-bottom: 3px solid #FF0000 !important; /* Bordure inférieure rouge vif */
+    }
+    
+    /* Style pour les labels des champs de saisie */
+    .stTextInput label, .stTextArea label, .stFileUploader label {
+        font-size: 1.25rem;
+        font-weight: 600;
+        color: #FAFAFA;
+    }
+    
+    /* Style des options du widget radio pour le rapprochement */
+    .stRadio [data-baseweb="base-input"] {
+        flex-direction: row;
+        gap: 1.5rem; /* Réduire l'espace entre les options */
+    }
+
+    /* Style du texte des options du widget radio */
+    .stRadio label {
+        font-size: 1.1rem;
     }
     
     /* Boutons principaux */
@@ -122,14 +141,14 @@ st.markdown("""
         padding: 8px !important;
     }
     
-    /* Titres des sections en blanc */
+    /* Titres des sections en blanc et sans bordure */
     .section-header {
         font-size: 1.5rem;
         font-weight: 600;
-        color: #FAFAFA; /* Titres en blanc */
+        color: #FAFAFA;
         margin-bottom: 1rem;
         padding-bottom: 0.5rem;
-        border-bottom: 2px solid #FF0000;
+        border-bottom: none;
     }
 
     </style>
@@ -317,31 +336,20 @@ with tab1:
 
     st.markdown("---")
     
-    # Remplacer la case à cocher par les deux cases distinctes
-    col_methods = st.columns(2)
-    with col_methods[0]:
-        use_cosine_ranking = st.checkbox(
-            "Méthode du cosinus", 
-            value=True,
-            help="""
-                ❓ **Méthode du cosinus** :
-                Cette méthode analyse la fréquence des mots et des phrases pour calculer une similarité thématique entre chaque CV et la description du poste. C'est une méthode rapide et efficace pour un premier tri.
-            """
-        )
-    with col_methods[1]:
-        use_deepseek_ranking = st.checkbox(
-            "Utilisation de l'IA (DeepSeek)", 
-            value=False,
-            help="""
-                ❓ **Utilisation de l'IA de DeepSeek** :
-                Cette méthode utilise l'intelligence artificielle pour une analyse plus approfondie. L'IA évalue la pertinence de chaque profil en comprenant le contexte, les compétences et l'expérience. Elle fournit un score et une explication détaillée.
-                (Cette option utilise votre quota API DeepSeek.)
-            """
-        )
+    # Remplacer les cases à cocher par un widget radio
+    analysis_method = st.radio(
+        "Méthode d'analyse",
+        ["Méthode du cosinus", "Utilisation de l'IA (DeepSeek)"],
+        index=0,
+        help="""
+        ❓ **Méthode du cosinus** : Cette méthode analyse la fréquence des mots pour calculer une similarité thématique entre chaque CV et la description du poste. C'est une méthode rapide et efficace.
+
+        ❓ **Utilisation de l'IA de DeepSeek** : Cette méthode utilise l'IA pour une analyse plus approfondie. L'IA évalue la pertinence en comprenant le contexte et l'expérience. Elle fournit un score et une explication détaillée. (Cette option utilise votre quota API DeepSeek).
+        """
+    )
     
-    if use_cosine_ranking and use_deepseek_ranking:
-        st.warning("⚠️ Les deux méthodes sont sélectionnées. L'analyse par l'IA (DeepSeek) sera utilisée car elle est plus précise.")
-    
+    use_deepseek_ranking = (analysis_method == "Utilisation de l'IA (DeepSeek)")
+
     st.markdown("---")
 
     if st.button(
@@ -369,7 +377,7 @@ with tab1:
                     scores = [data["score"] for data in scores_data]
                     explanations = {data["file_name"]: data["explanation"] for data in scores_data}
                     method_used = "Utilisation de l'IA"
-                else: # Par défaut ou si seule Cosinus est cochée
+                else:
                     scores = rank_resumes_with_cosine(job_description, resumes)
                     explanations = None
                     method_used = "Méthode du cosinus"
