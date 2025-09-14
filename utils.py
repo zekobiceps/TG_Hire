@@ -17,36 +17,53 @@ from docx.shared import Pt
 #-------------------- Réponse IA aléatoire --------------------
 def generate_checklist_advice(section_title, field_title):
     # Liste d'exemples de conseils pour chaque champ
-    example_advice = {
+    advice_db = {
         "Raison de l'ouverture": [
             "- Clarifier si remplacement, création ou évolution interne.",
-            "- Identifier le niveau d'urgence.",
-            "- Relier au contexte business."
+            "- Identifier le niveau d'urgence du poste et sa priorisation.",
+            "- Expliquer le contexte stratégique dans lequel le poste est ouvert.",
+            "- Préciser si le poste est une création pour renforcer l'équipe ou une réaffectation.",
+            "- Relier le poste à la stratégie globale de l'entreprise.",
+            "- Préciser si le poste est dû à un départ en retraite ou une promotion.",
+            "- Mentionner la nécessité de ce poste pour un projet spécifique de l'entreprise.",
+            "- Identifier les changements dans l'organisation qui nécessitent ce recrutement.",
+            "- Justifier la création du poste par la croissance de l'entreprise ou un besoin de diversification.",
+            "- Définir la mission stratégique et les résultats attendus du poste."
         ],
         "Mission globale": [
-            "- Résumer les objectifs clés du poste.",
-            "- Définir les responsabilités principales du rôle.",
-            "- Mettre en évidence les attentes de performance."
+            "La mission globale consiste à diriger l'équipe de gestion de projet pour optimiser les processus et atteindre les objectifs de l'entreprise.",
+            "Le rôle consiste à améliorer l'efficacité organisationnelle en supervisant les projets complexes et en maintenant les délais et le budget.",
+            "La mission est de maximiser l'impact des projets internes en gérant la coordination inter-départements et la planification stratégique.",
+            "Superviser les activités et veiller à ce que tous les projets respectent les exigences commerciales et les attentes des clients.",
+            "Cette mission consiste à gérer les relations avec les clients et partenaires externes, tout en optimisant les ressources internes.",
+            "Superviser la transformation digitale et les projets d'innovation pour soutenir la compétitivité de l'entreprise.",
+            "Assurer le bon déroulement des projets en maintenant un équilibre entre qualité, coûts et délais.",
+            "Être responsable de l'alignement des objectifs de l’équipe avec les priorités stratégiques de l’entreprise.",
+            "Développer et déployer des processus et outils pour augmenter l'efficacité opérationnelle.",
+            "Garantir une communication fluide entre les équipes et les parties prenantes afin de maximiser l'impact du projet."
         ],
         "Tâches principales": [
-            "- Gestion de projet complexe.",
-            "- Coordination multi-sites.",
-            "- Respect des délais et du budget."
-        ]
+            "Piloter le process de recrutement, définir la stratégie de sourcing, interviewer les candidats, gérer les entretiens de recrutement, effectuer le reporting de l'activité.",
+            "Superviser la gestion des équipes, organiser des formations, garantir la conformité des processus, coordonner les projets transversaux, gérer les priorités.",
+            "Planifier les objectifs trimestriels, analyser les données financières, optimiser les performances des équipes, préparer les rapports de performance, former les nouvelles recrues.",
+            "Coordonner les efforts entre les départements, gérer les budgets, superviser la gestion des ressources humaines, faire le suivi des projets et des tâches assignées.",
+            "Assurer la planification des événements, organiser des sessions de formation, coordonner les activités de développement des talents, effectuer des évaluations de performance.",
+            "Gérer les tâches administratives liées au recrutement, à la formation et à l’intégration des nouveaux employés.",
+            "Définir les stratégies de communication interne et externe pour améliorer la notoriété et l’image de l’entreprise.",
+            "Diriger la mise en œuvre de stratégies de marketing digital et de développement de la marque.",
+            "Gérer les relations clients et partenaires, organiser des négociations et gérer les contrats.",
+            "Organiser et suivre les projets d’innovation technologique au sein de l’entreprise."
+        ],
+        # Ajoutez les autres sections ici de la même manière
     }
 
-    # Variabilité - Ajout d'un élément aléatoire
-    advice_list = example_advice.get(field_title, ["Pas de conseil disponible."])
+    # Sélectionner une réponse aléatoire pour le champ donné
+    if field_title in advice_db and advice_db[field_title]:
+        random.shuffle(advice_db[field_title])  # Mélanger pour obtenir une réponse aléatoire
+        return advice_db[field_title].pop()  # Retirer et retourner une réponse aléatoire
+    else:
+        return "Pas de conseil disponible."
 
-    # Utilisation de time.time() pour ajouter de la variabilité et rendre chaque conseil unique
-    random.shuffle(advice_list)  # Mélanger les éléments pour obtenir un conseil différent chaque fois
-
-    # Créer une réponse dynamique avec un timestamp ou un identifiant unique
-    timestamp = str(int(time.time()))  # Utiliser le timestamp pour rendre chaque appel unique
-    message = "\n".join(advice_list)
-    example = f"Exemple : {field_title} - Conseil {timestamp}"
-
-    return f"{message}\n{example}"
 
 # -------------------- Disponibilité PDF & Word --------------------
 try:
