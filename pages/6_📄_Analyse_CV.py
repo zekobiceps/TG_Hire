@@ -32,7 +32,7 @@ def rank_resumes(job_description, resumes):
     try:
         documents = [job_description] + resumes
         vectorizer = TfidfVectorizer().fit_transform(documents)
-        vectors = vectorizer.to_array()
+        vectors = vectorizer.toarray()
         job_description_vector = vectors[0]
         resume_vectors = vectors[1:]
         cosine_similarities = cosine_similarity([job_description_vector], resume_vectors).flatten()
