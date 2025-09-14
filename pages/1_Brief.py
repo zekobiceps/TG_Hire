@@ -669,7 +669,7 @@ with tabs[1]:
     brief_display_name = f"Avant-brief - {st.session_state.current_brief_name}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
     st.subheader(f"🔄 {brief_display_name}")
     
-    # Liste des sections et champs pour le tableau
+    # Liste des sections et champs pour les text_area
     sections = [
         {
             "title": "Contexte du poste",
@@ -732,46 +732,24 @@ with tabs[1]:
     if st.session_state.current_brief_name in st.session_state.saved_briefs:
         brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
 
-    data = []
+    # Afficher les champs avec text_area
     for section in sections:
-        for i, (field_name, field_key, placeholder) in enumerate(section["fields"]):
-            value = brief_data.get(field_key, st.session_state.get(field_key, ""))
-            section_title = section["title"] if i == 0 else ""
-            data.append([section_title, field_name, value])
+        with st.expander(f"📋 {section['title']}"):
+            for title, key, placeholder in section["fields"]:
+                value = brief_data.get(key, st.session_state.get(key, ""))
+                st.text_area(title, value, key=key, height=100, help=placeholder)
+                # Bouton pour conseil IA
+                if st.button("💡 Conseil IA", key=f"advice_{key}"):
+                    st.session_state[key] = generate_checklist_advice(section["title"], title)
+                    st.rerun()
 
-    df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
-    
-    edited_df = st.session_state.get("edited_df", df)
-    edited_df = st.data_editor(
-        edited_df,
-        column_config={
-            "Section": st.column_config.TextColumn("Section", disabled=True, width="small"),
-            "Détails": st.column_config.TextColumn("Détails", disabled=True, width="medium"),
-            "Informations": st.column_config.TextColumn("Informations", width="large")
-        },
-        use_container_width=True,
-        hide_index=True,
-        num_rows="fixed"
-    )
-    st.session_state.edited_df = edited_df  # Mettre à jour l'état avec le DataFrame édité
-
+    # Boutons Enregistrer et Annuler
     col_save, col_cancel = st.columns(2)
     with col_save:
         if st.button("💾 Enregistrer modifications", type="primary", use_container_width=True, key="save_avant_brief"):
             if st.session_state.current_brief_name in st.session_state.saved_briefs:
                 brief_name = st.session_state.current_brief_name
-                index = 0
-                for section in sections:
-                    for _, field_key, _ in section["fields"]:
-                        if index < len(edited_df):
-                            st.session_state[field_key] = edited_df["Informations"].iloc[index]
-                        index += 1
-                
-                update_data = {}
-                for section in sections:
-                    for _, field_key, _ in section["fields"]:
-                        update_data[field_key] = st.session_state.get(field_key, "")
-                
+                update_data = {key: st.session_state[key] for _, key, _ in [item for sublist in [s["fields"] for s in sections] for item in sublist]}
                 st.session_state.saved_briefs[brief_name].update(update_data)
                 save_briefs()
                 st.session_state.avant_brief_completed = True
