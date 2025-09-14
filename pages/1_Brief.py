@@ -734,23 +734,16 @@ with tabs[1]:
         field_options = [f"{section['title']} - {title}" for section in sections for title, key, _ in section["fields"]]
         selected_field = st.selectbox("Choisir un champ", field_options, index=0)
     with col2:
-        st.button("💡 Générer par l'IA", key="generate_advice_btn", on_click=lambda: st.session_state.update({"generate_advice": True}), type="primary", help="Génère un conseil IA pour le champ sélectionné")
-
-    # Générer les conseils IA après clic sur le bouton
-    if st.session_state.get("generate_advice", False):
-        # Générer un conseil uniquement pour le champ sélectionné sans réinitialiser les autres
-        section_title, field_title = selected_field.split(" - ", 1)
-        for section in sections:
-            if section["title"] == section_title:
-                for title, key, _ in section["fields"]:
-                    if title == field_title:
-                        advice = generate_checklist_advice(section["title"], title)
-                        if advice != "Pas de conseil disponible.":
-                            example = get_example_for_field(section["title"], title)
-                            message_to_copy = f"**Conseil :** {advice}\n**Exemple :** {example}"
-                            st.session_state[f"advice_{key}"] = message_to_copy
-        st.session_state["generate_advice"] = False
-        st.rerun()
+        if st.button("💡 Générer par l'IA", key="generate_advice_btn", type="primary", help="Génère un conseil IA pour le champ sélectionné"):
+            section_title, field_title = selected_field.split(" - ", 1)
+            for section in sections:
+                if section["title"] == section_title:
+                    for title, key, _ in section["fields"]:
+                        if title == field_title:
+                            advice = generate_checklist_advice(section["title"], title)
+                            if advice != "Pas de conseil disponible.":
+                                example = get_example_for_field(section["title"], title)
+                                st.session_state[f"advice_{key}"] = f"**Conseil :** {advice}\n**Exemple :** {example}"
 
     brief_data = {}
     if st.session_state.current_brief_name in st.session_state.saved_briefs:
@@ -769,7 +762,8 @@ with tabs[1]:
                 for title, key, placeholder in section["fields"]:
                     # Larger height for all fields
                     height = 150  # Increased from 100 for all fields
-                    st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")) or "", key=key, placeholder=placeholder, height=height)
+                    current_value = brief_data.get(key, st.session_state.get(key, ""))
+                    st.text_area(title, value=current_value, key=key, placeholder=placeholder, height=height)
                     # Afficher le conseil généré juste en dessous du champ avec meilleur formatage
                     if f"advice_{key}" in st.session_state and st.session_state[f"advice_{key}"]:
                         st.markdown(st.session_state[f"advice_{key}"], unsafe_allow_html=False)
