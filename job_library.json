@@ -1,0 +1,19 @@
+[
+    {
+        "title": "Test Poste",
+        "finalite": "Test description",
+        "activites": "Test activités",
+        "n1_hierarchique": "",
+        "n1_fonctionnel": "",
+        "entite_rattachement": "",
+        "indicateurs": "",
+        "interne": "",
+        "supervision_directe": "",
+        "externe": "",
+        "supervision_indirecte": "",
+        "niveau_diplome": "",
+        "experience_globale": "",
+        "competences": "",
+        "date_creation": "2025-09-14 11:00:00"
+    }
+]
