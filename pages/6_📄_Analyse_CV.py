@@ -41,14 +41,14 @@ st.markdown("""
         background-color: #0E1117;
         padding: 0px;
         border-radius: 4px;
-        /* Suppression de la bordure blanche */
+        border: none; /* Suppression de la bordure blanche */
     }
     
     /* Style de base pour tous les onglets */
     .stTabs [data-baseweb="tab"] {
         background-color: #0E1117 !important;
         color: white !important;
-        border-right: 1px solid white !important; /* Bordure blanche entre les onglets */
+        border-right: 1px solid #333 !important; /* Bordure grise entre les onglets */
         border-radius: 0 !important;
         padding: 10px 16px !important;
         font-weight: 500 !important;
@@ -60,7 +60,7 @@ st.markdown("""
     .stTabs [data-baseweb="tab"][aria-selected="true"] {
         color: #FF0000 !important; /* Rouge vif pour le texte de l'onglet actif */
         background-color: #0E1117 !important;
-        border: 1px solid white !important;
+        border: 1px solid #333 !important;
         border-bottom: 3px solid #FF0000 !important; /* Bordure inférieure rouge vif */
     }
     
@@ -122,10 +122,11 @@ st.markdown("""
         padding: 8px !important;
     }
     
+    /* Titres des sections en blanc */
     .section-header {
         font-size: 1.5rem;
         font-weight: 600;
-        color: #FF0000;
+        color: #FAFAFA; /* Titres en blanc */
         margin-bottom: 1rem;
         padding-bottom: 0.5rem;
         border-bottom: 2px solid #FF0000;
@@ -316,17 +317,31 @@ with tab1:
 
     st.markdown("---")
     
-    # Remplacer la case à cocher par l'option radio et le bouton d'aide
-    use_ai_for_ranking = st.checkbox(
-        "Utiliser l'IA de DeepSeek pour le classement", 
-        value=False,
-        help="""
-            **Méthode du cosinus** : Par défaut, cette méthode analyse la fréquence des mots entre les CV et la description du poste pour calculer un score de similarité.
-
-            **Utilisation de l'IA de DeepSeek** : Cochez cette option pour utiliser l'IA. Elle fournit une analyse plus détaillée et un classement plus pertinent basé sur la compréhension du contexte et des compétences. Cela utilise votre quota API.
-        """
-    )
-
+    # Remplacer la case à cocher par les deux cases distinctes
+    col_methods = st.columns(2)
+    with col_methods[0]:
+        use_cosine_ranking = st.checkbox(
+            "Méthode du cosinus", 
+            value=True,
+            help="""
+                ❓ **Méthode du cosinus** :
+                Cette méthode analyse la fréquence des mots et des phrases pour calculer une similarité thématique entre chaque CV et la description du poste. C'est une méthode rapide et efficace pour un premier tri.
+            """
+        )
+    with col_methods[1]:
+        use_deepseek_ranking = st.checkbox(
+            "Utilisation de l'IA (DeepSeek)", 
+            value=False,
+            help="""
+                ❓ **Utilisation de l'IA de DeepSeek** :
+                Cette méthode utilise l'intelligence artificielle pour une analyse plus approfondie. L'IA évalue la pertinence de chaque profil en comprenant le contexte, les compétences et l'expérience. Elle fournit un score et une explication détaillée.
+                (Cette option utilise votre quota API DeepSeek.)
+            """
+        )
+    
+    if use_cosine_ranking and use_deepseek_ranking:
+        st.warning("⚠️ Les deux méthodes sont sélectionnées. L'analyse par l'IA (DeepSeek) sera utilisée car elle est plus précise.")
+    
     st.markdown("---")
 
     if st.button(
@@ -349,13 +364,15 @@ with tab1:
                 st.warning(f"⚠️ {len(error_files)} fichier(s) non traité(s): {', '.join(error_files)}")
             
             if resumes:
-                if use_ai_for_ranking:
+                if use_deepseek_ranking:
                     scores_data = rank_resumes_with_ai(job_description, resumes, file_names)
                     scores = [data["score"] for data in scores_data]
                     explanations = {data["file_name"]: data["explanation"] for data in scores_data}
-                else: # Méthode du cosinus
+                    method_used = "Utilisation de l'IA"
+                else: # Par défaut ou si seule Cosinus est cochée
                     scores = rank_resumes_with_cosine(job_description, resumes)
                     explanations = None
+                    method_used = "Méthode du cosinus"
 
                 if len(scores) > 0:
                     ranked_resumes = sorted(zip(file_names, scores), key=lambda x: x[1], reverse=True)
@@ -386,8 +403,8 @@ with tab1:
                     )
                     
                     st.markdown("---")
-                    st.markdown('<div class="section-header">🔍 Comment le score est-il calculé ?</div>', unsafe_allow_html=True)
-                    if use_ai_for_ranking:
+                    st.markdown(f'<div class="section-header">🔍 Comment le score est-il calculé ? ({method_used})</div>', unsafe_allow_html=True)
+                    if use_deepseek_ranking:
                         st.info("Le score est basé sur une évaluation IA. Pour une analyse détaillée, consultez les sections ci-dessous.")
                         st.markdown('<div class="section-header">📝 Analyse détaillée de chaque CV</div>', unsafe_allow_html=True)
                         for file_name, score in ranked_resumes:
