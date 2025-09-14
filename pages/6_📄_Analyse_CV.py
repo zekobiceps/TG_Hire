@@ -32,7 +32,7 @@ def rank_resumes(job_description, resumes):
     try:
         documents = [job_description] + resumes
         vectorizer = TfidfVectorizer().fit_transform(documents)
-        vectors = vectorizer.toarray()
+        vectors = vectorizer.to_array()
         job_description_vector = vectors[0]
         resume_vectors = vectors[1:]
         cosine_similarities = cosine_similarity([job_description_vector], resume_vectors).flatten()
@@ -133,19 +133,12 @@ def main():
     # --- Job Information Section ---
     st.markdown('<div class="section-header">📄 Informations du Poste</div>', unsafe_allow_html=True)
     
-    col1, col2 = st.columns([2, 1])
+    job_title = st.text_input(
+        "Intitulé du poste",
+        placeholder="Ex: Développeur Python Senior",
+        help="Saisissez le titre du poste à pourvoir"
+    )
     
-    with col1:
-        job_title = st.text_input(
-            "Intitulé du poste",
-            placeholder="Ex: Développeur Python Senior",
-            help="Saisissez le titre du poste à pourvoir"
-        )
-    
-    with col2:
-        status = "Prêt à analyser" if st.session_state.get("uploaded_files") else "En attente"
-        st.metric("📊 Statut", status)
-
     # --- Job Description & Resume Upload ---
     st.markdown('<div class="section-header">📝 Description de Poste & 📂 CVs</div>', unsafe_allow_html=True)
 
@@ -242,44 +235,18 @@ def main():
                         hide_index=True
                     )
                     
-                    # Visualize top candidates
-                    st.markdown('<div class="section-header">📊 Top Candidats</div>', unsafe_allow_html=True)
-                    top_n = min(len(results_df), 8)
-                    chart_data = results_df.head(top_n).copy()
-                    
-                    # Create a nice bar chart
-                    chart_data["Score numérique"] = chart_data["Score brut"] * 100
-                    st.bar_chart(
-                        chart_data.set_index("Nom du CV")["Score numérique"],
-                        color="#dc2626"
-                    )
-                    
                     # Download options
                     st.markdown('<div class="section-header">💾 Exporter les Résultats</div>', unsafe_allow_html=True)
-                    col1, col2 = st.columns(2)
                     
-                    with col1:
-                        csv = results_df.to_csv(index=False).encode('utf-8')
-                        st.download_button(
-                            "📥 Télécharger CSV", 
-                            csv, 
-                            "resultats_classement.csv", 
-                            "text/csv",
-                            use_container_width=True
-                        )
-                    
-                    with col2:
-                        buffer = io.BytesIO()
-                        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                            results_df.to_excel(writer, index=False, sheet_name="Classement_CVs")
-                        buffer.seek(0)
-                        st.download_button(
-                            "📥 Télécharger Excel", 
-                            buffer, 
-                            "resultats_classement.xlsx", 
-                            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            use_container_width=True
-                        )
+                    csv = results_df.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        "📥 Télécharger CSV", 
+                        csv, 
+                        "resultats_classement.csv", 
+                        "text/csv",
+                        use_container_width=True
+                    )
+
                 else:
                     st.error("❌ Aucun score généré lors de l'analyse")
             else:
