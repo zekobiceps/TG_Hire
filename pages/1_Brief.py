@@ -653,13 +653,14 @@ st.markdown("""
 if "current_brief_name" not in st.session_state:
     st.session_state.current_brief_name = ""
 
-# Création des onglets dans l'ordre demandé : Gestion, Avant-brief, Réunion, Synthèse, Catalogue des Postes
+# Création des onglets avec "📋 Logs" inclus
 tabs = st.tabs([
     "📁 Gestion", 
     "🔄 Avant-brief", 
     "✅ Réunion de brief", 
     "📝 Synthèse",
-    "📚 Catalogue des Postes"
+    "📚 Catalogue des Postes",
+    "📋 Logs"
 ])
 
 # ---------------- ONGLET GESTION ----------------
