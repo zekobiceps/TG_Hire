@@ -635,6 +635,74 @@ def generate_checklist_advice(section_title, field_title):
         # ... (other sections unchanged)
     }
 
+# -------------------- Réponse IA aléatoire --------------------
+def generate_checklist_advice(section_title, field_title):
+    # Liste d'exemples de conseils pour chaque champ, adaptés au contexte BTP
+    advice_db = {
+        "Contexte du poste": {
+            "Raison de l'ouverture": [
+                "- Clarifier si remplacement pour un chantier en cours, création pour un nouveau projet BTP ou évolution interne due à une promotion.",
+                "- Identifier le niveau d'urgence lié aux délais de construction et à la priorisation des sites.",
+                "- Expliquer le contexte stratégique dans le secteur BTP, comme un nouveau contrat de travaux publics.",
+                "- Préciser si le poste est une création pour renforcer l'équipe sur un grand chantier ou une réaffectation pour optimiser les ressources.",
+                "- Relier le poste à la stratégie globale de l'entreprise en matière de développement durable dans le BTP."
+            ],
+            "Mission globale": [
+                "- La mission globale consiste à diriger l'équipe de gestion de chantier pour optimiser les processus de construction et respecter les normes de sécurité.",
+                "- Le rôle consiste à améliorer l'efficacité sur les sites en supervisant les projets BTP complexes et en maintenant les délais et le budget.",
+                "- Superviser la transformation des chantiers et les projets d'innovation pour soutenir la compétitivité dans le BTP.",
+                "- Assurer le bon déroulement des travaux en maintenant un équilibre entre qualité, coûts et respect des normes environnementales.",
+                "- Garantir une communication fluide entre les équipes de terrain et les parties prenantes pour maximiser l'impact du projet BTP."
+            ],
+            "Tâches principales": [
+                "- Piloter le process de recrutement pour des profils BTP, définir la stratégie de sourcing sur les chantiers, interviewer les candidats, gérer les entretiens, effectuer le reporting.",
+                "- Superviser la gestion des équipes sur site, organiser des formations sécurité, garantir la conformité aux normes BTP, coordonner les projets transversaux.",
+                "- Planifier les objectifs trimestriels pour les chantiers, analyser les données de coûts, optimiser les performances des équipes, préparer les rapports de performance.",
+                "- Coordonner les efforts entre les départements BTP, gérer les budgets de matériaux, superviser les ressources humaines sur site, suivre les projets et tâches assignées.",
+                "- Assurer la planification des travaux, organiser des sessions de formation aux normes de sécurité, coordonner les activités de développement des talents en BTP."
+            ]
+        },
+        "Must-have (Indispensables)": {
+            "Expérience": [
+                "- Spécifier le nombre d'années d'expérience requis dans le BTP et le secteur des chantiers.",
+                "- Mentionner les types de projets similaires, comme la gestion de grands travaux publics ou de construction résidentielle."
+            ],
+            "Connaissances / Diplômes / Certifications": [
+                "- Indiquer les diplômes exigés en génie civil ou BTP, certifications comme Habilitation Électrique ou CACES.",
+                "- Préciser les connaissances en normes de sécurité (ISO 45001) ou réglementaires (RT 2012 pour le BTP)."
+            ],
+            "Compétences / Outils": [
+                "- Suggérer des compétences techniques comme la maîtrise d'AutoCAD, Revit ou logiciels de gestion de chantier.",
+                "- Exemple : 'Expertise en gestion de projet BTP avec méthodes Agile adaptées aux chantiers'."
+            ],
+            "Soft skills / aptitudes comportementales": [
+                "- Suggérer des aptitudes comme 'Leadership sur terrain', 'Rigueur en sécurité', 'Communication avec sous-traitants', 'Autonomie en gestion de crises'."
+            ]
+        },
+        "Nice-to-have (Atouts)": {
+            "Expérience additionnelle": [
+                "- Ex. projets internationaux de BTP ou multi-sites avec coordination de grands chantiers."
+            ],
+            "Diplômes / Certifications valorisantes": [
+                "- Certifications supplémentaires comme LEED pour le développement durable en BTP."
+            ],
+            "Compétences complémentaires": [
+                "- Compétences en BIM (Building Information Modeling) ou en gestion environnementale des chantiers."
+            ]
+        },
+        "Sourcing et marché": {
+            "Entreprises où trouver ce profil": [
+                "- Suggérer des entreprises concurrentes dans le BTP comme Bouygues, Vinci ou Eiffage."
+            ],
+            "Synonymes / intitulés proches": [
+                "- Titres alternatifs comme 'Chef de Chantier', 'Ingénieur Travaux', 'Conducteur de Travaux BTP'."
+            ],
+            "Canaux à utiliser": [
+                "- Proposer LinkedIn pour profils BTP, jobboards spécialisés (Batiweb), cooptation sur chantiers, réseaux professionnels du BTP."
+            ]
+        }
+    }
+
     # Sélectionner une réponse aléatoire pour la section et le champ donné
     import random
     section_advice = advice_db.get(section_title, {})
