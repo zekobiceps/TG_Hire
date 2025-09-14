@@ -728,6 +728,22 @@ with tabs[1]:
         },
     ]
 
+    # Ajouter du CSS pour styliser les titres des champs
+    st.markdown("""
+        <style>
+        .custom-text-area-label {
+            font-size: 20px !important;
+            color: #FAFAFA !important;
+            font-weight: 500 !important;
+        }
+        .stTextArea > label {
+            font-size: 20px !important;
+            color: #FAFAFA !important;
+            font-weight: 500 !important;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
     # Contrôles pour générer les conseils IA avec sélection de champ
     col1, col2 = st.columns([1, 1])  # Equal width columns
     with col1:
@@ -763,12 +779,12 @@ with tabs[1]:
     # Formulaire avec expanders et champs éditable
     with st.form(key="avant_brief_form"):
         for section in sections:
-            with st.expander(f'<span style="font-size: 20px;">📋 {section["title"]}</span>', expanded=True):
+            with st.expander(f'<span class="custom-text-area-label">📋 {section["title"]}</span>', expanded=True):
                 for title, key, placeholder in section["fields"]:
-                    # Larger height for all fields and increased font size by 4 points (from default ~16px to 20px)
+                    # Larger height for all fields
                     height = 150  # Increased from 100 for all fields
                     current_value = brief_data.get(key, st.session_state.get(key, ""))
-                    st.text_area(f'<span style="font-size: 20px;">{title}</span>', value=current_value, key=key, placeholder=placeholder, height=height)
+                    st.text_area(title, value=current_value, key=key, placeholder=placeholder, height=height)
                     # Afficher le conseil généré juste en dessous du champ avec meilleur formatage
                     if f"advice_{key}" in st.session_state and st.session_state[f"advice_{key}"]:
                         st.markdown(f"""
@@ -801,7 +817,7 @@ with tabs[1]:
                 st.session_state.current_brief_name = ""
                 st.session_state.avant_brief_completed = False
                 st.rerun()
-
+                
 # ---------------- RÉUNION DE BRIEF ----------------
 with tabs[2]:
     # Afficher le message de sauvegarde seulement pour cet onglet
