@@ -137,11 +137,15 @@ def delete_current_brief():
 def apply_ai_pre_redaction():
     """Applique la pré-rédaction IA aux champs concernés"""
     try:
-        # Afficher le message de pré-rédaction en haut du bouton
-        st.markdown("📝 Pré-rédaction en cours...", unsafe_allow_html=True)
+        # Afficher le message de pré-rédaction entre le tableau et le bouton
+        st.markdown("⏳ 📝 Pré-rédaction en cours...", unsafe_allow_html=True)
         
         # Récupérer l'intitulé du poste
         job_title = st.session_state.get("poste_intitule", "")
+        if not job_title:
+            st.error("❌ Veuillez entrer un intitulé de poste avant de pré-rédiger.")
+            return
+        
         brief_data = {}
         
         # Chercher une fiche de poste correspondante dans le Catalogue
@@ -178,6 +182,11 @@ def apply_ai_pre_redaction():
         
         # Appeler l'API DeepSeek
         ai_response = get_ai_pre_redaction(brief_data_str)
+        # st.write("Debug - Réponse API:", ai_response)  # Débogage optionnel
+        
+        if not ai_response:
+            st.error("❌ Aucune réponse reçue de l'API DeepSeek.")
+            return
         
         # Parser la réponse markdown
         current_section = None
@@ -207,13 +216,11 @@ def apply_ai_pre_redaction():
         # Mettre à jour les champs de session
         st.session_state.impact_strategique = parsed_data["impact_strategique"]
         st.session_state.taches_principales = "\n".join(parsed_data["taches_principales"])
-        # Pour must-have et nice-to-have, concaténer dans les champs respectifs
         must_have_str = "\n".join(parsed_data["must_have"])
         st.session_state.must_have_experience = must_have_str
         st.session_state.must_have_diplomes = must_have_str
         st.session_state.must_have_competences = must_have_str
         st.session_state.must_have_softskills = must_have_str
-        
         nice_to_have_str = "\n".join(parsed_data["nice_to_have"])
         st.session_state.nice_to_have_experience = nice_to_have_str
         st.session_state.nice_to_have_diplomes = nice_to_have_str
@@ -295,6 +302,25 @@ def apply_ai_pre_redaction():
     except Exception as e:
         st.error(f"❌ Erreur lors de la pré-rédaction IA : {str(e)}")
 
+def test_deepseek_connection():
+    """Teste la connexion à l'API DeepSeek"""
+    try:
+        from openai import OpenAI
+        api_key = st.secrets.get("DEEPSEEK_API_KEY")
+        if not api_key:
+            st.error("❌ Clé API DeepSeek non trouvée dans st.secrets")
+            return
+        client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com/v1")
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": "Test de connexion"}],
+            temperature=0.5,
+            max_tokens=10
+        )
+        st.success("✅ Connexion à DeepSeek réussie ! Réponse : " + response.choices[0].message.content)
+    except Exception as e:
+        st.error(f"❌ Échec de la connexion à DeepSeek : {str(e)}")
+
 # ---------------- INIT ----------------
 init_session_state()
 st.set_page_config(
@@ -335,6 +361,8 @@ with st.sidebar:
     
     st.divider()
     st.info("💡 Assistant IA pour la création et gestion de briefs de recrutement")
+    if st.button("Tester DeepSeek", key="test_deepseek"):
+        test_deepseek_connection()
 
 # ---------------- NAVIGATION PRINCIPALE ----------------
 st.title("🤖 TG-Hire IA - Brief")
@@ -925,6 +953,9 @@ with tabs[1]:
         num_rows="fixed"
     )
 
+    # Afficher le message de pré-rédaction ici, entre le tableau et le bouton
+    pre_redaction_message = st.empty()
+
     # Boutons Enregistrer et Pré-rédiger par IA
     col_save, col_pre_rediger = st.columns(2)
     with col_save:
@@ -955,6 +986,7 @@ with tabs[1]:
     with col_pre_rediger:
         if st.button("💡 Pré-rédiger par IA", type="primary", key="pre_rediger_ia", use_container_width=True):
             apply_ai_pre_redaction()
+            pre_redaction_message.empty()  # Nettoyer le message après la fin
 
 # ---------------- RÉUNION ----------------
 with tabs[2]:
