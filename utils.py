@@ -442,3 +442,30 @@ def test_deepseek_connection():
     except Exception as e:
         st.error(f"❌ Erreur de connexion à DeepSeek : {e}")
         return False
+
+def get_example_for_field(section_title, field_title):
+    """Retourne un exemple contextuel pour un champ donné."""
+    examples = {
+        "Contexte du poste": {
+            "Raison de l'ouverture": "Remplacement d’un départ en retraite",
+            "Mission globale": "Assurer la gestion des projets stratégiques de l’entreprise",
+            "Tâches principales": "Gestion de projet complexe, coordination d’équipe, suivi budgétaire",
+        },
+        "Must-have (Indispensables)": {
+            "Expérience": "5 ans d’expérience dans le secteur IT",
+            "Connaissances / Diplômes / Certifications": "Diplôme en informatique, certification PMP",
+            "Compétences / Outils": "Maîtrise de Python et SQL",
+            "Soft skills / aptitudes comportementales": "Leadership et communication",
+        },
+        "Nice-to-have (Atouts)": {
+            "Expérience additionnelle": "Projets internationaux",
+            "Diplômes / Certifications valorisantes": "Certification Agile",
+            "Compétences complémentaires": "Connaissance en Cloud",
+        },
+        "Sourcing et marché": {
+            "Entreprises où trouver ce profil": "Google, Microsoft",
+            "Synonymes / intitulés proches": "Data Scientist, Analyste de données",
+            "Canaux à utiliser": "LinkedIn, chasse de tête",
+        }
+    }
+    return examples.get(section_title, {}).get(field_title, "Exemple non disponible")

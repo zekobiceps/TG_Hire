@@ -2,6 +2,7 @@ import sys, os
 import streamlit as st
 from datetime import datetime
 import json
+from utils import get_example_for_field
 import pandas as pd
 
 # ✅ permet d'accéder à utils.py à la racine
@@ -732,19 +733,26 @@ with tabs[1]:
     if st.session_state.current_brief_name in st.session_state.saved_briefs:
         brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
 
-    # Afficher les champs avec text_area
+    # Afficher les champs avec text_area et boutons à droite
     for section in sections:
         with st.expander(f"📋 {section['title']}"):
             for title, key, placeholder in section["fields"]:
-                value = brief_data.get(key, st.session_state.get(key, ""))
-                st.text_area(title, value, key=key, height=100, help=placeholder)
-                # Bouton pour conseil IA
-                if st.button("💡 Conseil IA", key=f"advice_{key}"):
-                    st.session_state[key] = generate_checklist_advice(section["title"], title)
-                    st.rerun()
+                col1, col2 = st.columns([4, 1])
+                with col1:
+                    st.write(f"{title} :small[❓]", unsafe_allow_html=True)
+                    st.text_area("", value=brief_data.get(key, st.session_state.get(key, "")), key=key, height=50, placeholder=placeholder)
+                with col2:
+                    if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
+                        if st.button("💡 Conseil IA", key=f"advice_{key}"):
+                            advice = generate_checklist_advice(section["title"], title)
+                            example = f"Exemple : {get_example_for_field(section['title'], title)}"
+                            st.session_state[key] = f"{advice}\n{example}"
+                            st.rerun()
+                    else:
+                        st.write("")
 
-    # Boutons Enregistrer et Annuler
-    col_save, col_cancel = st.columns(2)
+    # Boutons Enregistrer et Annuler en bas
+    col_save, col_cancel = st.columns([1, 1])
     with col_save:
         if st.button("💾 Enregistrer modifications", type="primary", use_container_width=True, key="save_avant_brief"):
             if st.session_state.current_brief_name in st.session_state.saved_briefs:
@@ -764,6 +772,33 @@ with tabs[1]:
             st.session_state.current_brief_name = ""
             st.session_state.avant_brief_completed = False
             st.rerun()
+
+# Ajout de la fonction get_example_for_field dans utils.py ou en bas de 1_Brief.py
+def get_example_for_field(section_title, field_title):
+    examples = {
+        "Contexte du poste": {
+            "Raison de l'ouverture": "Remplacement d’un départ en retraite",
+            "Mission globale": "Assurer la gestion des projets stratégiques de l’entreprise",
+            "Tâches principales": "Gestion de projet complexe, coordination d’équipe, suivi budgétaire",
+        },
+        "Must-have (Indispensables)": {
+            "Expérience": "5 ans d’expérience dans le secteur IT",
+            "Connaissances / Diplômes / Certifications": "Diplôme en informatique, certification PMP",
+            "Compétences / Outils": "Maîtrise de Python et SQL",
+            "Soft skills / aptitudes comportementales": "Leadership et communication",
+        },
+        "Nice-to-have (Atouts)": {
+            "Expérience additionnelle": "Projets internationaux",
+            "Diplômes / Certifications valorisantes": "Certification Agile",
+            "Compétences complémentaires": "Connaissance en Cloud",
+        },
+        "Sourcing et marché": {
+            "Entreprises où trouver ce profil": "Google, Microsoft",
+            "Synonymes / intitulés proches": "Data Scientist, Analyste de données",
+            "Canaux à utiliser": "LinkedIn, chasse de tête",
+        }
+    }
+    return examples.get(section_title, {}).get(field_title, "Exemple non disponible")
 
 # ---------------- RÉUNION ----------------
 with tabs[2]:
