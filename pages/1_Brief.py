@@ -731,22 +731,23 @@ with tabs[1]:
     brief_display_name = f"Avant-brief - {st.session_state.current_brief_name}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
     st.subheader(f"🔄 {brief_display_name}")
 
-    # Option pour choisir où générer les conseils
-    advice_target = st.radio("Générer les conseils pour :", ["Tous les champs", "Champ spécifique"], index=0)
-    selected_field = None
-    if advice_target == "Champ spécifique":
-        field_options = [f"{section['title']} - {title}" for section in sections for title, key, _ in section["fields"]]
-        selected_field = st.selectbox("Choisir un champ :", field_options)
+    # Contrôles pour générer les conseils IA avec sélection de champ
+    col1, col2 = st.columns([3, 7])
+    with col1:
+        st.button("🌟 Générer tous les conseils IA")
+    with col2:
+        field_options = ["Tous les champs"] + [f"{section['title']} - {title}" for section in sections for title, key, _ in section["fields"]]
+        selected_field = st.selectbox("Choisir un champ", field_options, index=0)
 
-    # Bouton pour générer tous les conseils IA
-    if st.button("🌟 Générer tous les conseils IA"):
+    # Bouton pour générer les conseils IA (déclenché ci-dessus)
+    if st.session_state.get("generate_advice", False):
         # Effacer les conseils précédents
         for section in sections:
             for title, key, _ in section["fields"]:
                 st.session_state[f"advice_{key}"] = ""
         
         # Générer de nouveaux conseils
-        if advice_target == "Tous les champs":
+        if selected_field == "Tous les champs":
             for section in sections:
                 for title, key, _ in section["fields"]:
                     if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
@@ -755,7 +756,7 @@ with tabs[1]:
                             example = get_example_for_field(section["title"], title)
                             message_to_copy = f"{advice}\nExemple : {example}"
                             st.session_state[f"advice_{key}"] = message_to_copy
-        elif advice_target == "Champ spécifique" and selected_field:
+        else:
             section_title, field_title = selected_field.split(" - ", 1)
             for section in sections:
                 if section["title"] == section_title:
@@ -766,6 +767,7 @@ with tabs[1]:
                                 example = get_example_for_field(section["title"], title)
                                 message_to_copy = f"{advice}\nExemple : {example}"
                                 st.session_state[f"advice_{key}"] = message_to_copy
+        st.session_state["generate_advice"] = False
         st.rerun()
 
     brief_data = {}
