@@ -747,6 +747,9 @@ with tabs[1]:
 
     # Formulaire pour les widgets
     with st.form(key="avant_brief_form"):
+        advice_triggered = False
+        advice_key_to_update = None
+        
         for section in sections:
             with st.expander(f"📋 {section['title']}"):
                 for title, key, placeholder in section["fields"]:
@@ -755,14 +758,18 @@ with tabs[1]:
                         st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")), key=key, placeholder=placeholder)
                     with col2:
                         if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
-                            if st.form_submit_button("💡 Conseil IA", key=f"advice_{key}"):
+                            # Use a regular button instead of form_submit_button
+                            if st.button("💡 Conseil IA", key=f"advice_{key}"):
                                 st.session_state[f"advice_{key}"] = True
+                                advice_triggered = True
+                                advice_key_to_update = key
                                 st.rerun()
 
         # Boutons Enregistrer et Annuler dans le formulaire
         col_save, col_cancel = st.columns([1, 1])
         with col_save:
-            if st.form_submit_button("💾 Enregistrer modifications", type="primary", use_container_width=True):
+            submitted = st.form_submit_button("💾 Enregistrer modifications", type="primary", use_container_width=True)
+            if submitted:
                 if st.session_state.current_brief_name in st.session_state.saved_briefs:
                     brief_name = st.session_state.current_brief_name
                     update_data = {key: st.session_state[key] for _, key, _ in [item for sublist in [s["fields"] for s in sections] for item in sublist]}
@@ -780,6 +787,18 @@ with tabs[1]:
                 st.session_state.current_brief_name = ""
                 st.session_state.avant_brief_completed = False
                 st.rerun()
+
+    # Handle advice generation outside the form
+    if advice_triggered and advice_key_to_update:
+        section_title = next((s["title"] for s in sections if any(f[1] == advice_key_to_update for f in s["fields"])), "")
+        field_title = next((f[0] for s in sections for f in s["fields"] if f[1] == advice_key_to_update), "")
+        
+        if section_title and field_title:
+            advice = generate_checklist_advice(section_title, field_title)
+            example = get_example_for_field(section_title, field_title)
+            st.session_state[advice_key_to_update] = f"{advice}\nExemple : {example}"
+            st.session_state[f"advice_{advice_key_to_update}"] = False
+            st.rerun()
 
 # ---------------- RÉUNION ----------------
 with tabs[2]:
