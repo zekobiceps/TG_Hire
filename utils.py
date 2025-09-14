@@ -5,6 +5,7 @@ import os
 import pickle
 from datetime import datetime
 import io
+import time
 import random
 import json
 import pandas as pd
@@ -34,13 +35,16 @@ def generate_checklist_advice(section_title, field_title):
         ]
     }
 
-    # Ajoutez un peu de variabilité
+    # Variabilité - Ajout d'un élément aléatoire
     advice_list = example_advice.get(field_title, ["Pas de conseil disponible."])
+
+    # Utilisation de time.time() pour ajouter de la variabilité et rendre chaque conseil unique
     random.shuffle(advice_list)  # Mélanger les éléments pour obtenir un conseil différent chaque fois
 
-    # Créez un message de réponse avec l'exemple
+    # Créer une réponse dynamique avec un timestamp ou un identifiant unique
+    timestamp = str(int(time.time()))  # Utiliser le timestamp pour rendre chaque appel unique
     message = "\n".join(advice_list)
-    example = "Exemple : Remplacement d’un départ en retraite"  # Vous pouvez également rendre cet exemple dynamique
+    example = f"Exemple : {field_title} - Conseil {timestamp}"
 
     return f"{message}\n{example}"
 
