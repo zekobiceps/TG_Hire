@@ -165,6 +165,8 @@ if "current_tab" not in st.session_state:
     st.session_state.current_tab = "Gestion"
 if "save_message" not in st.session_state:
     st.session_state.save_message = None
+if "save_message_tab" not in st.session_state:
+    st.session_state.save_message_tab = None
 
 # -------------------- Sidebar --------------------
 with st.sidebar:
@@ -290,10 +292,7 @@ st.markdown("""
         border-radius: 4px !important;
         border: none !important;
     }
-    /* Permettre le retour à la ligne avec Alt+Enter */
-.stTextArea textarea {
-    white-space: pre-wrap !important;
-}
+    
     /* Correction pour les date inputs */
     .stDateInput input {
         background-color: #262730 !important;
@@ -540,10 +539,6 @@ if selected_tab != st.session_state.current_tab:
     st.session_state.save_message = None
     st.session_state.current_tab = selected_tab
 
-# Affichage message persistant si présent
-if st.session_state.save_message:
-    st.success(st.session_state.save_message)
-
 # Déterminer quels onglets sont accessibles
 can_access_avant_brief = st.session_state.current_brief_name != ""
 can_access_reunion = can_access_avant_brief and st.session_state.avant_brief_completed
@@ -551,6 +546,12 @@ can_access_synthese = can_access_reunion and st.session_state.reunion_completed
 
 # ---------------- ONGLET GESTION ----------------
 with tabs[0]:
+    # Afficher le message de sauvegarde seulement pour cet onglet
+    if st.session_state.save_message_tab == "Gestion":
+        st.success(st.session_state.save_message)
+        st.session_state.save_message = None
+        st.session_state.save_message_tab = None
+
     # Style CSS personnalisé pour réduire les espaces
     st.markdown("""
     <style>
@@ -578,37 +579,37 @@ with tabs[0]:
     </style>
     """, unsafe_allow_html=True)
     
-    # Deux colonnes principales: Informations de base et Filtrage
+    # Deux colonnes: Informations de base à gauche, Filtrage à droite
     col_left, col_right = st.columns([2, 1])
     
     with col_left:
-        # En-tête Informations de base
+        # En-tête avec les titres alignés - VERSION COMPACTE
         st.markdown('<div class="compact-title"><h3>Informations de base</h3></div>', unsafe_allow_html=True)
         
-        # 3 colonnes et 2 lignes pour les informations de base
-        # Ligne 1
-        col1, col2, col3 = st.columns(3)
+        # Ligne 1: Poste à recruter | Manager
+        col1, col2 = st.columns(2)
         with col1:
             st.text_input("Poste à recruter", key="poste_intitule")
         with col2:
             st.text_input("Manager", key="manager_nom")
+        
+        # Ligne 2: Recruteur | Type d'affectation
+        col3, col4 = st.columns(2)
         with col3:
             st.selectbox("Recruteur", ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"], key="recruteur")
-        
-        # Ligne 2
-        col4, col5, col6 = st.columns(3)
         with col4:
             st.selectbox("Type d'affectation", ["Chantier", "Siège", "Dépôt"], key="affectation_type")
+        
+        # Ligne 3: Nom affectation | Date du brief
+        col5, col6 = st.columns(2)
         with col5:
             st.text_input("Nom affectation", key="affectation_nom")
         with col6:
             st.date_input("Date du brief", key="date_brief", value=datetime.today())
         
-        # Type de brief et boutons
-        col7, col8, col9 = st.columns(3)
-        with col7:
-            brief_type = st.radio("Type de brief", ["Standard", "Méthode complète"], horizontal=True, key="brief_type")
-        with col8:
+        # Boutons Créer et Annuler - VERSION COMPACTE
+        col_create, col_cancel = st.columns(2)
+        with col_create:
             if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
                 # Générer un nom unique avec timestamp
                 now = datetime.now()
@@ -623,15 +624,15 @@ with tabs[0]:
                         "affectation_type": st.session_state.affectation_type,
                         "affectation_nom": st.session_state.affectation_nom,
                         "date_brief": str(st.session_state.date_brief),
-                        "brief_type": st.session_state.brief_type
                     }
                     save_briefs()
                     st.session_state.current_brief_name = brief_name
                     st.session_state.save_message = f"✅ Brief '{brief_name}' créé avec succès"
+                    st.session_state.save_message_tab = "Gestion"
                     st.rerun()
                 else:
                     st.warning("⚠️ Un brief avec ce nom existe déjà")
-        with col9:
+        with col_cancel:
             if st.button("🗑️ Annuler", type="secondary", use_container_width=True, key="cancel_brief"):
                 # Reset fields
                 st.session_state.poste_intitule = ""
@@ -640,33 +641,20 @@ with tabs[0]:
                 st.session_state.affectation_type = ""
                 st.session_state.affectation_nom = ""
                 st.session_state.date_brief = datetime.today()
-                st.session_state.brief_type = "Standard"
                 st.rerun()
     
     with col_right:
-        # Section Filtrage - 3 colonnes et 2 lignes
+        # Section Filtrage - VERSION COMPACTE
         st.markdown('<h3 style="margin-bottom: 0.3rem;">🔍 Filtrer les briefs</h3>', unsafe_allow_html=True)
         
-        # Ligne 1
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            month = st.selectbox("Mois", ["", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"], key="filter_month")
-        with col2:
-            brief_type_filter = st.selectbox("Type", ["", "Standard", "Méthode complète"], key="filter_brief_type")
-        with col3:
-            recruteur_filter = st.text_input("Recruteur", key="filter_recruteur")
-        
-        # Ligne 2
-        col4, col5, col6 = st.columns(3)
-        with col4:
-            manager_filter = st.text_input("Manager", key="filter_manager")
-        with col5:
-            affectation_filter = st.selectbox("Affectation", ["", "Chantier", "Siège", "Dépôt"], key="filter_affectation")
-        with col6:
-            nom_affectation_filter = st.text_input("Nom affectation", key="filter_nom_affectation")
+        month = st.selectbox("Mois", ["", "01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"], key="filter_month")
+        recruteur_filter = st.text_input("Recruteur", key="filter_recruteur")
+        manager_filter = st.text_input("Manager", key="filter_manager")
+        affectation_filter = st.selectbox("Affectation", ["", "Chantier", "Siège", "Dépôt"], key="filter_affectation")
+        nom_affectation_filter = st.text_input("Nom affectation", key="filter_nom_affectation")
         
         if st.button("🔎 Filtrer", use_container_width=True, key="apply_filter"):
-            st.session_state.filtered_briefs = filter_briefs(st.session_state.saved_briefs, month, recruteur_filter, brief_type_filter, manager_filter, affectation_filter, nom_affectation_filter)
+            st.session_state.filtered_briefs = filter_briefs(st.session_state.saved_briefs, month, recruteur_filter, "", manager_filter, affectation_filter, nom_affectation_filter)
             st.session_state.show_filtered_results = True
     
     st.divider()
@@ -680,7 +668,7 @@ with tabs[0]:
             for name, data in briefs_to_show.items():
                 col_brief1, col_brief2, col_brief3, col_brief4 = st.columns([3, 1, 1, 1])
                 with col_brief1:
-                    st.write(f"**{name}** - {data.get('brief_type', '')}")
+                    st.write(f"**{name}**")
                 with col_brief2:
                     if st.button("📝 Éditer", key=f"edit_{name}"):
                         st.session_state.current_brief_name = name
@@ -700,31 +688,38 @@ with tabs[0]:
 
 # ---------------- AVANT-BRIEF ----------------
 with tabs[1]:
+    # Afficher le message de sauvegarde seulement pour cet onglet
+    if st.session_state.save_message_tab == "Avant-brief":
+        st.success(st.session_state.save_message)
+        st.session_state.save_message = None
+        st.session_state.save_message_tab = None
+
+    # Vérification si l'onglet est accessible
+    if not can_access_avant_brief:
+        st.warning("⚠️ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
+        st.stop()  # Arrête le rendu de cet onglet
+    
     # Afficher les informations du brief en cours
     st.subheader(f"🔄 Avant-brief - {st.session_state.get('poste_intitule', '')}")
     
     if "current_brief_name" in st.session_state:
         st.success(f"Brief actuel: {st.session_state.current_brief_name}")
     
-    # Ajouter ce style CSS pour réduire la largeur des colonnes Section et Détails
+    # Ajouter ce style CSS pour réduire la largeur des colonnes
     st.markdown("""
     <style>
     /* Réduire la largeur des colonnes Section et Détails */
     .stDataFrame th:nth-child(1), .stDataFrame td:nth-child(1) {
-        width: 10% !important;
-        max-width: 10% !important;
+        width: 15% !important;
+        max-width: 15% !important;
     }
     .stDataFrame th:nth-child(2), .stDataFrame td:nth-child(2) {
         width: 20% !important;
         max-width: 20% !important;
     }
     .stDataFrame th:nth-child(3), .stDataFrame td:nth-child(3) {
-        width: 70% !important;
-        max-width: 70% !important;
-    }
-    /* Permettre le retour à la ligne avec Alt+Enter */
-    .stTextArea textarea {
-        white-space: pre-wrap !important;
+        width: 65% !important;
+        max-width: 65% !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -793,14 +788,19 @@ with tabs[1]:
     if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
         brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
 
-    # Construire le DataFrame avec les données du brief actuel
+    # Construire le DataFrame sans ligne vide après les titres de section
     data = []
     for section in sections:
-        data.append([section["title"], "", ""])
+        # Ajouter seulement les champs, pas de ligne de titre séparée
         for field_name, field_key, placeholder in section["fields"]:
-            # Prendre la valeur depuis brief_data si disponible, sinon depuis session_state
             value = brief_data.get(field_key, st.session_state.get(field_key, ""))
-            data.append(["", field_name, value])
+            data.append([section["title"], field_name, value])
+        # Ajouter une ligne vide entre les sections pour la lisibilité
+        data.append(["", "", ""])
+
+    # Supprimer la dernière ligne vide si elle existe
+    if data and data[-1] == ["", "", ""]:
+        data = data[:-1]
 
     df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
 
@@ -823,32 +823,28 @@ with tabs[1]:
         if st.button("💾 Enregistrer modifications", type="primary", use_container_width=True, key="save_avant_brief"):
             if "current_brief_name" in st.session_state and st.session_state.current_brief_name in st.session_state.saved_briefs:
                 brief_name = st.session_state.current_brief_name
-                brief_data = {
-                    "raison_ouverture": edited_df["Informations"].iloc[1],
-                    "impact_strategique": edited_df["Informations"].iloc[2],
-                    "taches_principales": edited_df["Informations"].iloc[3],
-                    "must_have_experience": edited_df["Informations"].iloc[5],
-                    "must_have_diplomes": edited_df["Informations"].iloc[6],
-                    "must_have_competences": edited_df["Informations"].iloc[7],
-                    "must_have_softskills": edited_df["Informations"].iloc[8],
-                    "nice_to_have_experience": edited_df["Informations"].iloc[10],
-                    "nice_to_have_diplomes": edited_df["Informations"].iloc[11],
-                    "nice_to_have_competences": edited_df["Informations"].iloc[12],
-                    "entreprises_profil": edited_df["Informations"].iloc[14],
-                    "synonymes_poste": edited_df["Informations"].iloc[15],
-                    "canaux_profil": edited_df["Informations"].iloc[16],
-                    "rattachement": edited_df["Informations"].iloc[18],
-                    "budget": edited_df["Informations"].iloc[19],
-                    "profil_link_1": edited_df["Informations"].iloc[21],
-                    "profil_link_2": edited_df["Informations"].iloc[22],
-                    "profil_link_3": edited_df["Informations"].iloc[23],
-                    "commentaires": edited_df["Informations"].iloc[25],
-                    "notes_libres": edited_df["Informations"].iloc[26]
-                }
-                st.session_state.saved_briefs[brief_name].update(brief_data)
+                # Mapper les lignes du tableau aux clés de session state
+                # Note: Cette partie doit être adaptée en fonction de la structure de vos données
+                # Ici, on suppose que l'ordre des lignes dans edited_df correspond à l'ordre des champs dans sections
+                index = 0
+                for section in sections:
+                    for field_name, field_key, placeholder in section["fields"]:
+                        if index < len(edited_df):
+                            st.session_state[field_key] = edited_df["Informations"].iloc[index]
+                        index += 1
+                    index += 1  # Saute la ligne vide
+                
+                # Mettre à jour les données du brief
+                update_data = {}
+                for section in sections:
+                    for field_name, field_key, placeholder in section["fields"]:
+                        update_data[field_key] = st.session_state.get(field_key, "")
+                
+                st.session_state.saved_briefs[brief_name].update(update_data)
                 save_briefs()
                 st.session_state.avant_brief_completed = True
                 st.session_state.save_message = "✅ Modifications sauvegardées"
+                st.session_state.save_message_tab = "Avant-brief"
                 st.rerun()
             else:
                 st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
@@ -907,6 +903,7 @@ with tabs[1]:
                         st.session_state.nice_to_have_competences = nice_to_have_ai.strip()
                         
                         st.session_state.save_message = "✅ Pré-rédaction AI appliquée (synthèse courte)"
+                        st.session_state.save_message_tab = "Avant-brief"
                         st.rerun()
                     except Exception as e:
                         st.error(f"Erreur AI: {e}")
@@ -917,6 +914,17 @@ with tabs[1]:
 
 # ---------------- RÉUNION ----------------
 with tabs[2]:
+    # Afficher le message de sauvegarde seulement pour cet onglet
+    if st.session_state.save_message_tab == "Réunion":
+        st.success(st.session_state.save_message)
+        st.session_state.save_message = None
+        st.session_state.save_message_tab = None
+
+    # Vérification si l'onglet est accessible
+    if not can_access_reunion:
+        st.warning("⚠️ Veuillez d'abord compléter et sauvegarder l'onglet Avant-brief")
+        st.stop()  # Arrête le rendu de cet onglet
+    
     # Afficher les informations du brief en cours
     st.subheader(f"✅ Réunion de brief avec le Manager - {st.session_state.get('poste_intitule', '')}")
 
@@ -938,13 +946,18 @@ with tabs[2]:
             brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
             
             for section in sections:
-                data.append([section["title"], "", "", ""])
                 for field_name, field_key, placeholder in section["fields"]:
                     value = brief_data.get(field_key, "")
-                    data.append(["", field_name, value, ""])
+                    data.append([section["title"], field_name, value, ""])
                     field_keys.append(field_key)
                     comment_keys.append(f"manager_comment_{k}")
                     k += 1
+                # Ajouter une ligne vide entre les sections
+                data.append(["", "", "", ""])
+
+        # Supprimer la dernière ligne vide si elle existe
+        if data and data[-1] == ["", "", "", ""]:
+            data = data[:-1]
 
         df = pd.DataFrame(data, columns=["Section", "Détails", "Informations", "Commentaires du manager"])
 
@@ -964,14 +977,13 @@ with tabs[2]:
 
         # Sauvegarde des commentaires
         if st.button("💾 Sauvegarder commentaires", type="primary", key="save_comments_step1"):
-            section_index = 0
+            # Parcourir les lignes et sauvegarder les commentaires
             for i in range(len(edited_df)):
-                if edited_df["Section"].iloc[i] != "":
-                    section_index += 1
-                else:
-                    comment_key = comment_keys[i - section_index]
+                if edited_df["Section"].iloc[i] != "" and edited_df["Détails"].iloc[i] != "":
+                    comment_key = f"manager_comment_{i+1}"
                     st.session_state[comment_key] = edited_df["Commentaires du manager"].iloc[i]
             st.session_state.save_message = "✅ Commentaires sauvegardés"
+            st.session_state.save_message_tab = "Réunion"
             st.rerun()
 
     elif step == 2:
@@ -1004,7 +1016,7 @@ with tabs[2]:
                     
                     # Récupérer tous les commentaires du manager
                     manager_comments = {}
-                    for i in range(1, 21):
+                    for i in range(1, len(edited_df) + 1):
                         comment_key = f"manager_comment_{i}"
                         if comment_key in st.session_state:
                             manager_comments[comment_key] = st.session_state[comment_key]
@@ -1036,6 +1048,7 @@ with tabs[2]:
                     save_briefs()
                     st.session_state.reunion_completed = True
                     st.session_state.save_message = "✅ Données de réunion sauvegardées"
+                    st.session_state.save_message_tab = "Réunion"
                     st.rerun()
                 else:
                     st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
@@ -1056,8 +1069,15 @@ with tabs[2]:
             if st.button("Suivant ➡️", key="next_step"):
                 st.session_state.reunion_step += 1
                 st.rerun()
+
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
+    # Afficher le message de sauvegarde seulement pour cet onglet
+    if st.session_state.save_message_tab == "Synthèse":
+        st.success(st.session_state.save_message)
+        st.session_state.save_message = None
+        st.session_state.save_message_tab = None
+
     # Vérification si l'onglet est accessible
     if not can_access_synthese:
         st.warning("⚠️ Veuillez d'abord compléter et sauvegarder l'onglet Réunion de brief")
@@ -1074,7 +1094,6 @@ with tabs[3]:
         "Poste": st.session_state.get("poste_intitule", ""),
         "Manager": st.session_state.get("manager_nom", ""),
         "Recruteur": st.session_state.get("recruteur", ""),
-        "Type": st.session_state.get("brief_type", ""),
         "Affectation": f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}",
         "Date": str(st.session_state.get("date_brief", "")),
         "Raison ouverture": st.session_state.get("raison_ouverture", ""),
@@ -1113,6 +1132,7 @@ with tabs[3]:
             if "current_brief_name" in st.session_state:
                 save_briefs()
                 st.session_state.save_message = f"✅ Brief '{st.session_state.current_brief_name}' sauvegardé avec succès !"
+                st.session_state.save_message_tab = "Synthèse"
                 st.rerun()
             else:
                 st.error("❌ Aucun brief à sauvegarder. Veuillez d'abord créer un brief.")
@@ -1148,57 +1168,47 @@ with tabs[3]:
         else:
             st.info("⚠️ Word non dispo (pip install python-docx)")
 
-# ---------------- ONGLET BIBLIOTHÈQUE (toujours accessible, recherche, buttons modifier/supprimer, modification dans mêmes cases) ----------------
+# ---------------- ONGLET BIBLIOTHÈQUE ----------------
 with tabs[4]:
+    # Afficher le message de sauvegarde seulement pour cet onglet
+    if st.session_state.save_message_tab == "Bibliothèque":
+        st.success(st.session_state.save_message)
+        st.session_state.save_message = None
+        st.session_state.save_message_tab = None
+
     st.header("📚 Bibliothèque des fiches de poste")
     
     library = st.session_state.job_library
     
-    # Recherche (par nom, date) - Liste n'apparaît que si recherche effectuée
-    col_search1, col_search2 = st.columns(2)
-    with col_search1:
-        search_name = st.text_input("Rechercher par nom du poste")
-    with col_search2:
-        search_date = st.date_input("Date de création", value=None)
-    
-    filtered_library = []
-    if search_name or search_date:
-        filtered_library = library
-        if search_name:
-            filtered_library = [j for j in filtered_library if search_name.lower() in j.get("title", "").lower()]
-        if search_date:
-            filtered_library = [j for j in filtered_library if j.get("date_creation") and datetime.strptime(j["date_creation"], "%Y-%m-%d %H:%M:%S").date() == search_date]
-    
-    # Affichage seulement si recherche faite
-    if filtered_library:
-        # Afficher les résultats de recherche
-        for i, job in enumerate(filtered_library):
+    # Vérifier si la bibliothèque est vide
+    if not library:
+        st.info("La bibliothèque est vide. Ajoutez votre première fiche de poste ci-dessous.")
+    else:
+        # Afficher toutes les fiches sans besoin de recherche
+        st.subheader("📋 Fiches de poste disponibles")
+        
+        for i, job in enumerate(library):
             col1, col2, col3 = st.columns([3, 1, 1])
             with col1:
-                st.write(f"**{job['title']}** - {job.get('date_creation', '')}")
+                st.write(f"**{job['title']}** - Créé le {job.get('date_creation', 'date inconnue')}")
             with col2:
                 if st.button("Modifier", key=f"modify_job_{i}"):
-                    st.session_state.editing_job = job['title']
+                    st.session_state.editing_job = i
                     st.rerun()
             with col3:
                 if st.button("Supprimer", key=f"delete_job_{i}"):
-                    # Trouver l'index du job à supprimer
-                    index_to_delete = next((idx for idx, j in enumerate(library) if j['title'] == job['title']), None)
-                    if index_to_delete is not None:
-                        del library[index_to_delete]
-                        save_library(library)
-                        st.session_state.job_library = library
-                        st.session_state.save_message = f"✅ Fiche de poste '{job['title']}' supprimée"
-                        st.rerun()
-    else:
-        if not search_name and not search_date:
-            st.info("Effectuez une recherche pour voir les fiches.")
-        else:
-            st.info("Aucune fiche trouvée.")
+                    del library[i]
+                    save_library(library)
+                    st.session_state.job_library = library
+                    st.session_state.save_message = f"✅ Fiche de poste '{job['title']}' supprimée"
+                    st.session_state.save_message_tab = "Bibliothèque"
+                    st.rerun()
     
-    # Formulaire pour ajouter ou modifier (mêmes cases, avec vérif unique)
+    # Formulaire pour ajouter ou modifier une fiche
+    st.subheader("➕ Ajouter/Modifier une fiche de poste")
+    
     editing = 'editing_job' in st.session_state
-    job_data = next((j for j in library if j['title'] == st.session_state.editing_job), {}) if editing else {}
+    job_data = library[st.session_state.editing_job] if editing else {}
     
     with st.form("job_form"):
         title = st.text_input("Intitulé du poste", value=job_data.get('title', ''))
@@ -1239,10 +1249,7 @@ with tabs[4]:
                     "date_creation": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 }
                 if editing:
-                    # Mettre à jour la fiche existante
-                    index_to_update = next((idx for idx, j in enumerate(library) if j['title'] == st.session_state.editing_job), None)
-                    if index_to_update is not None:
-                        library[index_to_update] = new_job
+                    library[st.session_state.editing_job] = new_job
                     del st.session_state.editing_job
                     st.session_state.save_message = f"✅ Fiche de poste '{title}' modifiée avec succès"
                 else:
@@ -1250,6 +1257,7 @@ with tabs[4]:
                     st.session_state.save_message = f"✅ Fiche de poste '{title}' créée avec succès"
                 save_library(library)
                 st.session_state.job_library = library
+                st.session_state.save_message_tab = "Bibliothèque"
                 st.rerun()
 
 # JavaScript pour désactiver les onglets non accessibles (Bibliothèque exclue)

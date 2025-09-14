@@ -140,7 +140,7 @@ def generate_checklist_advice(category, item):
         if "Raison" in item:
             return "- Clarifier si remplacement, création ou évolution interne.\n- Identifier le niveau d'urgence.\n- Relier au contexte business."
         elif "Mission" in item or "impact" in item:
-            return "- Détailler la valeur ajoutée stratégique du poste.\n- Relier les missions aux objectifs de l’entreprise."
+            return "- Détailler la valeur ajoutée stratégique du poste.\n- Relier les missions aux objectifs de l'entreprise."
         elif "Tâches" in item:
             return "- Lister les tâches principales avec des verbes d'action concrets.\n- Inclure les responsabilités clés et les livrables attendus."
     elif "must-have" in category.lower() or "nice-to-have" in category.lower():
@@ -388,7 +388,7 @@ def save_library(library_data):
 def get_ai_pre_redaction(fiche_data):
     """Génère une pré-rédaction synthétique avec DeepSeek API via OpenAI client."""
     try:
-        from openai import OpenAI
+        from openai import OpenAI  # type: ignore
     except ImportError:
         raise ImportError("Le module 'openai' n'est pas installé. Veuillez l'installer avec 'pip install openai'.")
 
