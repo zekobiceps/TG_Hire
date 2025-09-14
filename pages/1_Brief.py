@@ -1274,3 +1274,34 @@ with tabs[4]:
         st.success(st.session_state.save_message)
         st.session_state.save_message = None
         st.session_state.save_message_tab = None
+
+# ---------------- LOGS ----------------
+with tabs[5]:
+    st.header("📋 Logs")
+    logs = st.session_state.get("logs", [])
+    if logs:
+        st.dataframe(pd.DataFrame(logs, columns=["Logs"]), use_container_width=True, hide_index=True)
+    else:
+        st.info("Aucun log disponible pour le moment.")
+    
+    # Ajouter un champ pour filtrer les logs par date ou mot-clé
+    filter_date = st.date_input("Filtrer par date", value=None, key="filter_log_date")
+    filter_keyword = st.text_input("Filtrer par mot-clé", key="filter_log_keyword")
+    
+    if filter_date or filter_keyword:
+        filtered_logs = []
+        for log in logs:
+            log_date = datetime.strptime(log.split(" à ")[1].split(" :")[0], "%Y-%m-%d %H:%M:%S") if " à " in log else None
+            keyword_match = filter_keyword.lower() in log.lower() if filter_keyword else True
+            date_match = log_date.date() == filter_date if filter_date and log_date else True
+            if keyword_match and date_match:
+                filtered_logs.append(log)
+        if filtered_logs:
+            st.dataframe(pd.DataFrame(filtered_logs, columns=["Logs"]), use_container_width=True, hide_index=True)
+        else:
+            st.info("Aucun log correspondant aux filtres.")
+    
+    # Bouton pour effacer les logs
+    if st.button("🗑️ Effacer les logs", type="secondary", key="clear_logs"):
+        st.session_state.logs = []
+        st.rerun()
