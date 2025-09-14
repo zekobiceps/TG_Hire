@@ -734,53 +734,57 @@ with tabs[1]:
     if st.session_state.current_brief_name in st.session_state.saved_briefs:
         brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
 
+    # Gérer les conseils IA avant le rendu des widgets
+    for section in sections:
+        for title, key, _ in section["fields"]:
+            if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
+                advice_key = f"advice_{key}"
+                if advice_key in st.session_state and st.session_state[advice_key]:
+                    advice = generate_checklist_advice(section["title"], title)
+                    example = get_example_for_field(section["title"], title)
+                    st.session_state[key] = f"{advice}\nExemple : {example}"
+                    st.session_state[advice_key] = False
+                    st.rerun()
+
     # Formulaire pour les widgets
-    for section in sections:
-        with st.expander(f"📋 {section['title']}"):
-            for title, key, placeholder in section["fields"]:
-                col1, col2 = st.columns([4, 1])
-                with col1:
-                    # Utilisation de st.text_area avec un texte par défaut (si vide) pour éviter le texte "False"
-                    st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")) or "", key=key, placeholder=placeholder)
-                with col2:
-                    # Bouton "Conseil IA" uniquement pour les sections non pertinentes
-                    if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
-                        if st.button("💡", key=f"advice_{key}", help="Générer un conseil IA"):
-                            # Appel à DeepSeek pour générer la réponse dynamique
-                            advice = generate_checklist_advice(section["title"], title)
-                            example = get_example_for_field(section["title"], title)
-                            message_to_copy = f"{advice}\nExemple : {example}"
+    with st.form(key="avant_brief_form"):
+        for section in sections:
+            with st.expander(f"📋 {section['title']}"):
+                for title, key, placeholder in section["fields"]:
+                    col1, col2 = st.columns([4, 1])
+                    with col1:
+                        st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")), key=key, placeholder=placeholder)
+                    with col2:
+                        # Modifier le bouton IA pour le rendre plus compact et à côté du champ
+                        if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
+                            if st.button(f"💡", key=f"btn_{key}"):
+                                st.session_state[f"advice_{key}"] = True
+                                st.session_state[key] = generate_checklist_advice(section["title"], title)
+                                st.session_state[key] = f"{st.session_state[key]}"
+                                st.rerun()
 
-                            # Mettez à jour l'élément de session_state à chaque fois
-                            st.session_state[f"advice_{key}"] = message_to_copy
-
-    # Affichage de la réponse générée pour chaque champ, si elle existe
-    for section in sections:
-        for title, key, placeholder in section["fields"]:
-            if key in st.session_state and f"advice_{key}" in st.session_state:
-                st.code(st.session_state[f"advice_{key}"], language="text")
-
-    # Formulaire de soumission pour les boutons Enregistrer et Annuler
-    col_save, col_cancel = st.columns([1, 1])
-    with col_save:
-        if st.button("💾 Enregistrer modifications", type="primary", use_container_width=True):
-            if st.session_state.current_brief_name in st.session_state.saved_briefs:
-                brief_name = st.session_state.current_brief_name
-                update_data = {key: st.session_state[key] for _, key, _ in [item for sublist in [s["fields"] for s in sections] for item in sublist]}
-                st.session_state.saved_briefs[brief_name].update(update_data)
-                save_briefs()
-                st.session_state.avant_brief_completed = True
-                st.session_state.save_message = "✅ Modifications sauvegardées"
-                st.session_state.save_message_tab = "Avant-brief"
-                st.rerun()
-            else:
-                st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
+        # Boutons Enregistrer et Annuler dans le formulaire
+        col_save, col_cancel = st.columns([1, 1])
+        with col_save:
+            if st.form_submit_button("💾 Enregistrer modifications", type="primary", use_container_width=True):
+                if st.session_state.current_brief_name in st.session_state.saved_briefs:
+                    brief_name = st.session_state.current_brief_name
+                    update_data = {key: st.session_state[key] for _, key, _ in [item for sublist in [s["fields"] for s in sections] for item in sublist]}
+                    st.session_state.saved_briefs[brief_name].update(update_data)
+                    save_briefs()
+                    st.session_state.avant_brief_completed = True
+                    st.session_state.save_message = "✅ Modifications sauvegardées"
+                    st.session_state.save_message_tab = "Avant-brief"
+                    st.rerun()
+                else:
+                    st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
         
-    with col_cancel:
-        if st.button("🗑️ Annuler", type="secondary", use_container_width=True):
-            st.session_state.current_brief_name = ""
-            st.session_state.avant_brief_completed = False
-            st.rerun()
+        with col_cancel:
+            if st.form_submit_button("🗑️ Annuler", type="secondary", use_container_width=True):
+                st.session_state.current_brief_name = ""
+                st.session_state.avant_brief_completed = False
+                st.rerun()
+
 
 
 # ---------------- RÉUNION ----------------
