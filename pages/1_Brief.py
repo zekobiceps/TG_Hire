@@ -680,30 +680,70 @@ with tabs[1]:
                 ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"),
             ]
         },
-        # ... (autres sections restent identiques)
+        {
+            "title": "Must-have (Indispensables)",
+            "fields": [
+                ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
+                ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
+                ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"),
+                ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"),
+            ]
+        },
+        {
+            "title": "Nice-to-have (Atouts)",
+            "fields": [
+                ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
+                ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
+                ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
+            ]
+        },
+        {
+            "title": "Sourcing et marché",
+            "fields": [
+                ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
+                ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
+                ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
+            ]
+        },
+        {
+            "title": "Conditions et contraintes",
+            "fields": [
+                ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
+                ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
+            ]
+        },
+        {
+            "title": "Profils pertinents",
+            "fields": [
+                ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
+                ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
+                ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
+            ]
+        },
+        {
+            "title": "Notes libres",
+            "fields": [
+                ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
+                ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
+            ]
+        },
     ]
 
     brief_data = {}
     if st.session_state.current_brief_name in st.session_state.saved_briefs:
         brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
 
-    # Fonction pour générer le conseil IA
-    def generate_and_apply_advice(section_title, title, key):
-        if st.session_state.get(f"trigger_advice_{key}", False):
-            st.write(f"Debug - Début : Section: {section_title}, Title: {title}, Key: {key}")
-            advice = generate_checklist_advice(section_title, title)
-            example = get_example_for_field(section_title, title)
-            st.write(f"Debug - Advice: {advice}, Example: {example}")
-            st.session_state[key] = f"{advice}\nExemple : {example}"
-            st.session_state[f"trigger_advice_{key}"] = False
-            st.write(f"Debug - Mise à jour : st.session_state[{key}] = {st.session_state[key]}")
-            st.rerun()
-
-    # Appliquer les conseils avant le rendu
+    # Gérer les conseils IA avant le rendu des widgets
     for section in sections:
         for title, key, _ in section["fields"]:
             if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
-                generate_and_apply_advice(section["title"], title, key)
+                advice_key = f"advice_{key}"
+                if advice_key in st.session_state and st.session_state[advice_key]:
+                    advice = generate_checklist_advice(section["title"], title)
+                    example = get_example_for_field(section["title"], title)
+                    st.session_state[key] = f"{advice}\nExemple : {example}"
+                    st.session_state[advice_key] = False
+                    st.rerun()
 
     # Formulaire pour les widgets
     with st.form(key="avant_brief_form"):
@@ -714,7 +754,10 @@ with tabs[1]:
                     with col1:
                         st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")), key=key, placeholder=placeholder)
                     with col2:
-                        pass
+                        if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
+                            if st.form_submit_button("💡 Conseil IA", key=f"advice_{key}"):
+                                st.session_state[f"advice_{key}"] = True
+                                st.rerun()
 
         # Boutons Enregistrer et Annuler dans le formulaire
         col_save, col_cancel = st.columns([1, 1])
@@ -737,18 +780,6 @@ with tabs[1]:
                 st.session_state.current_brief_name = ""
                 st.session_state.avant_brief_completed = False
                 st.rerun()
-
-    # Boutons "💡 Conseil IA" en dehors du formulaire
-    for section in sections:
-        with st.expander(f"📋 {section['title']}"):
-            for title, key, placeholder in section["fields"]:
-                if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
-                    col1, col2 = st.columns([4, 1])
-                    with col2:
-                        st.write(f"Debug - Bouton affiché pour : {title}, Key: {key}")
-                        if st.button("💡 Conseil IA", key=f"trigger_advice_{key}"):
-                            st.write(f"Debug - Bouton cliqué pour : {key}")
-                            pass
 
 # ---------------- RÉUNION ----------------
 with tabs[2]:
