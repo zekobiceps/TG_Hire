@@ -2,10 +2,8 @@ import sys, os
 import streamlit as st
 from datetime import datetime
 import json
-import streamlit as st
-from utils import get_example_for_field
 import pandas as pd
-from utils import generate_checklist_advice
+from utils import get_example_for_field, generate_checklist_advice
 
 # ✅ permet d'accéder à utils.py à la racine
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -113,8 +111,8 @@ def delete_current_brief():
             
             # Réinitialiser l'état de la session
             st.session_state.current_brief_name = ""
-            st.session_state.avant_brief_completed = False
-            st.session_state.reunion_completed = False
+            st.session_state.avant_brief_completed = True
+            st.session_state.reunion_completed = True
             st.session_state.reunion_step = 1
             
             # Réinitialiser les champs du formulaire
@@ -152,15 +150,15 @@ if "brief_phase" not in st.session_state:
 if "reunion_step" not in st.session_state:
     st.session_state.reunion_step = 1
 
-if "filtered_briefs" not in st.session_state:
+if "filtered_briefs" in st.session_state:
     st.session_state.filtered_briefs = {}
 
-# Variables pour gérer l'accès aux onglets
+# Variables pour gérer l'accès aux onglets (tous débloqués)
 if "avant_brief_completed" not in st.session_state:
-    st.session_state.avant_brief_completed = False
+    st.session_state.avant_brief_completed = True
 
 if "reunion_completed" not in st.session_state:
-    st.session_state.reunion_completed = False
+    st.session_state.reunion_completed = True
 
 # Message persistant jusqu'à changement d'onglet
 if "current_tab" not in st.session_state:
@@ -495,7 +493,7 @@ st.markdown("""
         width: 25% !important;
     }
     
-    /* Style pour les cellules éditables (Informations) */
+    /* Style pour les cellules éditable (Informations) */
     .stDataFrame td:nth-child(3) textarea {
         background-color: #2D2D2D !important;
         color: white !important;
@@ -527,13 +525,12 @@ st.markdown("""
 if "current_brief_name" not in st.session_state:
     st.session_state.current_brief_name = ""
 
-# Création des onglets dans l'ordre demandé : Gestion, Avant-brief, Réunion, Synthèse, Catalogue des Postes
+# Création des onglets dans l'ordre demandé : Gestion, Avant-brief, Réunion, Synthèse
 tabs = st.tabs([
     "📁 Gestion", 
     "🔄 Avant-brief", 
     "✅ Réunion de brief", 
-    "📝 Synthèse",
-    "📚 Catalogue des Postes"
+    "📝 Synthèse"
 ])
 
 # ---------------- ONGLET GESTION ----------------
@@ -662,7 +659,17 @@ with tabs[0]:
 
 # ---------------- AVANT-BRIEF ----------------
 with tabs[1]:
-    # Définir la liste des sections et champs en premier
+    # Afficher le message de sauvegarde seulement pour cet onglet
+    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Avant-brief"):
+        st.success(st.session_state.save_message)
+        st.session_state.save_message = None
+        st.session_state.save_message_tab = None
+
+    # Afficher les informations du brief en cours
+    brief_display_name = f"Avant-brief - {st.session_state.current_brief_name}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
+    st.subheader(f"🔄 {brief_display_name}")
+    
+    # Liste des sections et champs pour les text_area
     sections = [
         {
             "title": "Contexte du poste",
@@ -721,44 +728,11 @@ with tabs[1]:
         },
     ]
 
-    # Appliquer un style CSS pour augmenter la taille de la police et ajuster le bouton
-    st.markdown(
-        """
-        <style>
-        /* Augmenter la taille de la police pour les titres des sections (expanders) */
-        .st-expander > div > div > div > div > div > span {
-            font-size: 20px !important;
-            font-weight: bold !important;
-        }
-        /* Augmenter la taille de la police pour les labels des champs (text_area) */
-        .stTextArea > label {
-            font-size: 18px !important;
-            font-weight: bold !important;
-        }
-        /* Faire descendre légèrement le bouton */
-        .stButton[data-testid="generate_advice_btn"] button {
-            margin-top: 5px !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-
-    # Afficher le message de sauvegarde seulement pour cet onglet
-    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Avant-brief"):
-        st.success(st.session_state.save_message)
-        st.session_state.save_message = None
-        st.session_state.save_message_tab = None
-
-    # Afficher les informations du brief en cours
-    brief_display_name = f"Avant-brief - {st.session_state.current_brief_name}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
-    st.subheader(f"🔄 {brief_display_name}")
-
     # Contrôles pour générer les conseils IA avec sélection de champ
-    col1, col2 = st.columns([1, 3])  # Narrower first column for selectbox
+    col1, col2 = st.columns([1, 1])  # Equal width columns
     with col1:
-        field_options = [f"{section['title']} - {title}" for section in sections if section["title"] in ["Contexte du poste", "Must-have (Indispensables)", "Nice-to-have (Atouts)"] for title, key, _ in section["fields"]]
-        selected_field = st.selectbox("", field_options, index=0, placeholder="Choisir un champ")
+        field_options = [f"{section['title']} - {title}" for section in sections for title, key, _ in section["fields"]]
+        selected_field = st.selectbox("Choisir un champ", field_options, index=0)
     with col2:
         st.button("💡 Générer par l'IA", key="generate_advice_btn", on_click=lambda: st.session_state.update({"generate_advice": True}), type="primary", help="Génère un conseil IA pour le champ sélectionné")
 
@@ -827,6 +801,53 @@ with tabs[1]:
                 st.session_state.avant_brief_completed = False
                 st.rerun()
 
+# ---------------- RÉUNION DE BRIEF ----------------
+with tabs[2]:
+    # Afficher le message de sauvegarde seulement pour cet onglet
+    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Réunion de brief"):
+        st.success(st.session_state.save_message)
+        st.session_state.save_message = None
+        st.session_state.save_message_tab = None
+
+    # Vérifier si un brief est chargé
+    if not st.session_state.current_brief_name:
+        st.warning("⚠️ Veuillez créer ou sélectionner un brief dans l'onglet Gestion avant d'accéder à cette section.")
+    else:
+        st.subheader(f"✅ Réunion de brief - {st.session_state.current_brief_name}")
+        
+        # Étapes de la réunion
+        if "reunion_step" not in st.session_state:
+            st.session_state.reunion_step = 1
+        
+        if st.session_state.reunion_step == 1:
+            st.write("### Étape 1 : Présentation et contexte")
+            st.write("Résumez le contexte du poste et les objectifs de la réunion.")
+            if st.button("Passer à l'étape suivante", key="next_step_1"):
+                st.session_state.reunion_step = 2
+                st.rerun()
+        
+        elif st.session_state.reunion_step == 2:
+            st.write("### Étape 2 : Discussion des critères KSA")
+            render_ksa_matrix()
+            if st.button("Passer à l'étape suivante", key="next_step_2"):
+                st.session_state.reunion_step = 3
+                st.rerun()
+        
+        elif st.session_state.reunion_step == 3:
+            st.write("### Étape 3 : Validation et clôture")
+            st.write("Validez les informations et préparez la synthèse.")
+            if st.button("Terminer la réunion", key="finish_reunion"):
+                st.session_state.reunion_completed = True
+                st.session_state.save_message = f"✅ Réunion de brief pour '{st.session_state.current_brief_name}' terminée avec succès"
+                st.session_state.save_message_tab = "Réunion de brief"
+                st.rerun()
+        
+        # Bouton pour revenir en arrière
+        if st.session_state.reunion_step > 1:
+            if st.button("← Retour", key="back_step"):
+                st.session_state.reunion_step -= 1
+                st.rerun()
+
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
     # Afficher le message de sauvegarde seulement pour cet onglet
@@ -835,88 +856,78 @@ with tabs[3]:
         st.session_state.save_message = None
         st.session_state.save_message_tab = None
 
-    # Afficher les informations du brief en cours
-    brief_display_name = f"Synthèse - {st.session_state.current_brief_name}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
-    st.subheader(f"📝 {brief_display_name}")
-    
-    st.subheader("Résumé des informations")
-    st.json({
-        "Poste": st.session_state.get("poste_intitule", ""),
-        "Manager": st.session_state.get("manager_nom", ""),
-        "Recruteur": st.session_state.get("recruteur", ""),
-        "Affectation": f"{st.session_state.get('affectation_type','')} - {st.session_state.get('affectation_nom','')}",
-        "Date": str(st.session_state.get("date_brief", "")),
-        "Raison ouverture": st.session_state.get("raison_ouverture", ""),
-        "Tâches principales": st.session_state.get("taches_principales", ""),
-        "Entreprises profil": st.session_state.get("entreprises_profil", ""),
-        "Canaux": st.session_state.get("canaux_profil", ""),
-        "Budget": st.session_state.get("budget", ""),
-    })
-
-    st.subheader("📊 Calcul automatique du Score Global")
-    score_total = 0
-    count = 0
-    
-    # Calcul basé sur la matrice KSA
-    if hasattr(st.session_state, 'ksa_matrix') and not st.session_state.ksa_matrix.empty:
-        if "Échelle d'évaluation (1-5)" in st.session_state.ksa_matrix.columns:
-            scores = st.session_state.ksa_matrix["Échelle d'évaluation (1-5)"].astype(int)
-            score_global = scores.mean()
-            st.metric("Score Global Cible", f"{score_global:.2f}/5")
-    
-    # Calcul de secours basé sur l'ancien système KSA
-    elif "ksa_data" in st.session_state:
-        for cat, comps in st.session_state.ksa_data.items():
-            for comp, details in comps.items():
-                score_total += int(details.get("score") or 0)
-                count += 1
-        score_global = (score_total / count) if count else 0
-        st.metric("Score Global Cible", f"{score_global:.2f}/5")
+    # Vérifier si un brief est chargé et si la réunion est terminée
+    if not st.session_state.current_brief_name:
+        st.warning("⚠️ Veuillez créer ou sélectionner un brief dans l'onglet Gestion avant d'accéder à cette section.")
+    elif not st.session_state.reunion_completed:
+        st.warning("⚠️ Veuillez compléter la réunion de brief avant d'accéder à cette section.")
     else:
-        st.info("ℹ️ Aucune donnée KSA disponible pour calculer le score")
+        st.subheader(f"📝 Synthèse - {st.session_state.current_brief_name}")
+        
+        # Afficher les données du brief
+        brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
+        st.write("### Informations générales")
+        st.write(f"- **Poste :** {brief_data.get('poste_intitule', 'N/A')}")
+        st.write(f"- **Manager :** {brief_data.get('manager_nom', 'N/A')}")
+        st.write(f"- **Affectation :** {brief_data.get('affectation_nom', 'N/A')} ({brief_data.get('affectation_type', 'N/A')})")
+        st.write(f"- **Date :** {brief_data.get('date_brief', 'N/A')}")
+        
+        st.write("### Détails du brief")
+        for section in sections:
+            with st.expander(f"📋 {section['title']}"):
+                for title, key, _ in section["fields"]:
+                    value = brief_data.get(key, st.session_state.get(key, ""))
+                    if value:
+                        st.write(f"- **{title} :** {value}")
+        
+        # Afficher la matrice KSA si disponible
+        if "ksa_matrix" in st.session_state and not st.session_state.ksa_matrix.empty:
+            st.subheader("📊 Matrice KSA")
+            st.dataframe(st.session_state.ksa_matrix, use_container_width=True, hide_index=True)
+        
+        # Sauvegarde de la synthèse
+        st.write("### Actions")
+        col_save, col_cancel = st.columns([1, 1])
+        with col_save:
+            if st.button("💾 Confirmer sauvegarde", type="primary", use_container_width=True, key="save_synthese"):
+                if st.session_state.current_brief_name:
+                    save_briefs()
+                    st.session_state.save_message = f"✅ Brief '{st.session_state.current_brief_name}' sauvegardé avec succès !"
+                    st.session_state.save_message_tab = "Synthèse"
+                    st.rerun()
+                else:
+                    st.error("❌ Aucun brief à sauvegarder. Veuillez d'abord créer un brief.")
+        
+        with col_cancel:
+            if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_synthese"):
+                delete_current_brief()
 
-    # Boutons Confirmer et Annuler
-    col_save, col_cancel = st.columns([1, 1])
-    with col_save:
-        if st.button("💾 Confirmer sauvegarde", type="primary", use_container_width=True, key="save_synthese"):
-            if st.session_state.current_brief_name:
-                save_briefs()
-                st.session_state.save_message = f"✅ Brief '{st.session_state.current_brief_name}' sauvegardé avec succès !"
-                st.session_state.save_message_tab = "Synthèse"
-                st.rerun()
+        # -------- EXPORT PDF/WORD --------
+        st.subheader("📄 Export du Brief complet")
+        col1, col2 = st.columns(2)
+        with col1:
+            if PDF_AVAILABLE:
+                if st.session_state.current_brief_name:
+                    pdf_buf = export_brief_pdf()
+                    if pdf_buf:
+                        st.download_button("⬇️ Télécharger PDF", data=pdf_buf,
+                                         file_name=f"{st.session_state.current_brief_name}.pdf", mime="application/pdf")
+                else:
+                    st.info("ℹ️ Créez d'abord un brief pour l'exporter")
             else:
-                st.error("❌ Aucun brief à sauvegarder. Veuillez d'abord créer un brief.")
-    
-    with col_cancel:
-        if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_synthese"):
-            delete_current_brief()
-
-    # -------- EXPORT PDF/WORD --------
-    st.subheader("📄 Export du Brief complet")
-    col1, col2 = st.columns(2)
-    with col1:
-        if PDF_AVAILABLE:
-            if st.session_state.current_brief_name:
-                pdf_buf = export_brief_pdf()
-                if pdf_buf:
-                    st.download_button("⬇️ Télécharger PDF", data=pdf_buf,
-                                     file_name=f"{st.session_state.current_brief_name}.pdf", mime="application/pdf")
+                st.info("⚠️ PDF non dispo (pip install reportlab)")
+        with col2:
+            if WORD_AVAILABLE:
+                if st.session_state.current_brief_name:
+                    word_buf = export_brief_word()
+                    if word_buf:
+                        st.download_button("⬇️ Télécharger Word", data=word_buf,
+                                         file_name=f"{st.session_state.current_brief_name}.docx",
+                                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                else:
+                    st.info("ℹ️ Créez d'abord un brief pour l'exporter")
             else:
-                st.info("ℹ️ Créez d'abord un brief pour l'exporter")
-        else:
-            st.info("⚠️ PDF non dispo (pip install reportlab)")
-    with col2:
-        if WORD_AVAILABLE:
-            if st.session_state.current_brief_name:
-                word_buf = export_brief_word()
-                if word_buf:
-                    st.download_button("⬇️ Télécharger Word", data=word_buf,
-                                     file_name=f"{st.session_state.current_brief_name}.docx",
-                                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-            else:
-                st.info("ℹ️ Créez d'abord un brief pour l'exporter")
-        else:
-            st.info("⚠️ Word non dispo (pip install python-docx)")
+                st.info("⚠️ Word non dispo (pip install python-docx)")
 
 # ---------------- ONGLET CATALOGUE DES POSTES ----------------
 with tabs[4]:
