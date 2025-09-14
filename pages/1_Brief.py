@@ -728,43 +728,6 @@ with tabs[1]:
         },
     ]
 
-    # Ajouter du CSS pour styliser les titres des sections et champs
-    st.markdown("""
-        <style>
-        /* Style pour les titres des expanders (sections) */
-        .st-expander [data-testid="stExpanderDetails"] > div:first-child {
-            font-size: 20px !important;
-            color: #FAFAFA !important; /* White color */
-            font-weight: 500 !important; /* Moderate weight */
-        }
-        
-        /* Style pour les labels des text_area (champs) */
-        .stTextArea > label {
-            font-size: 20px !important;
-            color: #FAFAFA !important; /* White color */
-            font-weight: 500 !important; /* Moderate weight */
-        }
-        
-        /* Style pour le contenu des conseils */
-        .advice-box {
-            background-color: #262730;
-            padding: 10px;
-            border-radius: 5px;
-            margin-top: 10px;
-            border: 1px solid #58a6ff;
-        }
-        .advice-box strong {
-            color: #58a6ff;
-            font-size: 16px; /* Revert to default size */
-            font-weight: 500; /* Moderate weight */
-        }
-        .advice-box div {
-            font-size: 14px; /* Smaller size for advice content */
-            color: #e6edf3; /* Light gray for readability */
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
     # Contrôles pour générer les conseils IA avec sélection de champ
     col1, col2 = st.columns([1, 1])  # Equal width columns
     with col1:
