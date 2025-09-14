@@ -704,7 +704,7 @@ with tabs[1]:
     # Contrôles pour générer les conseils IA avec sélection de champ
     col1, col2 = st.columns([1, 1])  # Equal width columns
     with col1:
-        st.button("💡 Générer par l'IA", key="generate_advice_btn", on_click=lambda: st.session_state.update({"generate_advice": True}), type="primary", help="Génère un conseil IA pour le champ sélectionné", style={"background-color": "#FF0000"})
+        st.button("💡 Générer par l'IA", key="generate_advice_btn", on_click=lambda: st.session_state.update({"generate_advice": True}), type="primary", help="Génère un conseil IA pour le champ sélectionné")
     with col2:
         field_options = [f"{section['title']} - {title}" for section in sections for title, key, _ in section["fields"]]
         selected_field = st.selectbox("Choisir un champ", field_options, index=0)
