@@ -258,40 +258,30 @@ def test_deepseek_connection():
         st.error(f"❌ Échec de la connexion à DeepSeek : {str(e)}")
 
 # ---------------- INIT ----------------
-def init_session_state():
-    if "saved_briefs" not in st.session_state:
-        st.session_state.saved_briefs = {}
-    if "job_library" not in st.session_state:
-        st.session_state.job_library = []
-    if "avant_brief_completed" not in st.session_state:
-        st.session_state.avant_brief_completed = False
-    if "reunion_completed" not in st.session_state:
-        st.session_state.reunion_completed = False
-    if "reunion_step" not in st.session_state:
-        st.session_state.reunion_step = 1
-    if "filtered_briefs" not in st.session_state:
-        st.session_state.filtered_briefs = {}
-    if "current_brief_name" not in st.session_state:
-        st.session_state.current_brief_name = ""
-    if "current_tab" not in st.session_state:
-        st.session_state.current_tab = "Gestion"
-    if "save_message" not in st.session_state:
-        st.session_state.save_message = None
-    if "save_message_tab" not in st.session_state:
-        st.session_state.save_message_tab = None
-    if "ksa_matrix" not in st.session_state:
-        st.session_state.ksa_matrix = pd.DataFrame(columns=[
-            "Rubrique", "Critère", "Cible / Standard attendu", 
-            "Échelle d'évaluation (1-5)", "Évaluateur"
-        ])
-    if "edited_df" not in st.session_state:
-        st.session_state.edited_df = pd.DataFrame(columns=["Section", "Détails", "Informations"])
-    if "logs" not in st.session_state:
-        st.session_state.logs = []
-    if "show_job_selection" not in st.session_state:
-        st.session_state.show_job_selection = False
-    if "brief_phase" not in st.session_state:
-        st.session_state.brief_phase = "📁 Gestion"
+init_session_state()
+st.set_page_config(
+    page_title="TG-Hire IA - Brief",
+    page_icon="🤖",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+if "brief_phase" not in st.session_state:
+    st.session_state.brief_phase = "📁 Gestion"
+
+if "reunion_step" not in st.session_state:
+    st.session_state.reunion_step = 1
+
+if "filtered_briefs" not in st.session_state:
+    st.session_state.filtered_briefs = {}
+
+# Message persistant jusqu'à changement d'onglet
+if "current_tab" not in st.session_state:
+    st.session_state.current_tab = "Gestion"
+if "save_message" not in st.session_state:
+    st.session_state.save_message = None
+if "save_message_tab" not in st.session_state:
+    st.session_state.save_message_tab = None
 
 # -------------------- Sidebar --------------------
 with st.sidebar:
@@ -675,7 +665,7 @@ tabs = st.tabs([
 # ---------------- ONGLET GESTION ----------------
 with tabs[0]:
     # Afficher le message de sauvegarde seulement pour cet onglet
-    if st.session_state.save_message and st.session_state.save_message_tab == "Gestion":
+    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Gestion"):
         st.success(st.session_state.save_message)
         st.session_state.save_message = None
         st.session_state.save_message_tab = None
@@ -799,7 +789,7 @@ with tabs[0]:
 # ---------------- AVANT-BRIEF ----------------
 with tabs[1]:
     # Afficher le message de sauvegarde seulement pour cet onglet
-    if st.session_state.save_message and st.session_state.save_message_tab == "Avant-brief":
+    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Avant-brief"):
         st.success(st.session_state.save_message)
         st.session_state.save_message = None
         st.session_state.save_message_tab = None
@@ -1053,7 +1043,7 @@ with tabs[4]:
             
             st.rerun()
 
-    if st.session_state.save_message and st.session_state.save_message_tab == "Catalogue des Postes":
+    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Catalogue des Postes"):
         st.success(st.session_state.save_message)
         st.session_state.save_message = None
         st.session_state.save_message_tab = None
