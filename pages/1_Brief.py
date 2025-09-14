@@ -661,6 +661,7 @@ with tabs[0]:
                 st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
 
 
+# ---------------- AVANT-BRIEF ----------------
 with tabs[1]:
     # Afficher le message de sauvegarde seulement pour cet onglet
     if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Avant-brief"):
@@ -748,7 +749,7 @@ with tabs[1]:
                         if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
                             if st.form_submit_button(f"💡 Générer conseil IA pour {title}", key=f"btn_{key}"):
                                 # Appel à DeepSeek pour générer la réponse dynamique
-                                advice = generate_checklist_advice(section["title"], title)  # Cette fonction génère maintenant une réponse dynamique
+                                advice = generate_checklist_advice(section["title"], title)  # Cette fonction doit être dynamique
                                 example = get_example_for_field(section["title"], title)
                                 message_to_copy = f"{advice}\nExemple : {example}"
 
@@ -782,6 +783,7 @@ with tabs[1]:
                 st.session_state.current_brief_name = ""
                 st.session_state.avant_brief_completed = False
                 st.rerun()
+
 # ---------------- RÉUNION ----------------
 with tabs[2]:
     # Afficher le message de sauvegarde seulement pour cet onglet
