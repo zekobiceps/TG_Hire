@@ -101,119 +101,187 @@ def rank_resumes(job_description, resumes):
 # Add custom CSS for better styling
 st.markdown("""
     <style>
-        .stButton>button {
-            background-color: #1e90ff;
-            color: white;
-            font-size: 16px;
-            border-radius: 5px;
-            padding: 10px;
-            transition: background-color 0.3s ease;
-        }
-        .stButton>button:hover {
-            background-color: #4682b4;
-        }
-        .sidebar .sidebar-content {
-            padding: 20px;
-        }
-        .stTextInput>div>div>input {
-            font-size: 16px;
-            border-radius: 5px;
-        }
-        .stTextArea>div>div>textarea {
-            font-size: 16px;
-            border-radius: 5px;
-        }
-        .stTabs>div>div>button {
-            font-size: 18px;
-            font-weight: bold;
-            color: #1e90ff;
-        }
-        .stTabs>div>div>button:hover {
-            color: #4682b4;
-        }
-        .stExpander>div>div>button {
-            font-size: 16px;
-            font-weight: bold;
-            color: #1e90ff;
-        }
+    .main-header {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: #1e40af;
+        text-align: center;
+        margin-bottom: 2rem;
+        padding: 1rem;
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        border-radius: 10px;
+        border-left: 5px solid #1e40af;
+    }
+    
+    .section-header {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #1e40af;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e0f2fe;
+    }
+    
+    .stButton>button {
+        background-color: #1e40af;
+        color: white;
+        font-size: 16px;
+        border-radius: 8px;
+        padding: 12px 24px;
+        border: none;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton>button:hover {
+        background-color: #1e3a8a;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+    }
+    
+    .upload-box {
+        background: #f8fafc;
+        border: 2px dashed #cbd5e1;
+        border-radius: 10px;
+        padding: 2rem;
+        text-align: center;
+    }
+    
+    .result-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border-left: 4px solid #1e40af;
+    }
+    
+    .sidebar-content {
+        padding: 2rem 1rem;
+    }
+    
+    .nav-button {
+        width: 100%;
+        margin: 0.5rem 0;
+        text-align: left;
+        padding: 1rem;
+        border-radius: 8px;
+        border: none;
+        background: #f1f5f9;
+        color: #334155;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    
+    .nav-button:hover {
+        background: #e0f2fe;
+        color: #1e40af;
+    }
+    
+    .nav-button.active {
+        background: #1e40af;
+        color: white;
+    }
+    
+    .metric-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        margin: 1rem 0;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 def show_history_page():
-    st.title("📊 Ranking History")
-    st.markdown("### View your previous resume ranking sessions")
+    st.markdown('<div class="main-header">📊 Historique des Classements</div>', unsafe_allow_html=True)
     
     history = get_history()
     if history.empty:
-        st.info("📝 No ranking history found")
+        st.info("Aucun historique de classement trouvé")
     else:
         for idx, row in history.iterrows():
-            with st.expander(f"Job: {row['job_title']} - {row['timestamp']}"):
-                st.text_area("Job Description", value=row["description"], height=100, disabled=True, key=f"job_desc_{idx}")
-                try:
-                    results = pd.read_json(row["results"])
-                    st.dataframe(results.drop(columns=["Raw Score"]) if "Raw Score" in results.columns else results, 
-                               hide_index=True)
-                except:
-                    st.warning("⚠ Error loading results data")
+            with st.expander(f"📋 {row['job_title']} - {row['timestamp']}"):
+                col1, col2 = st.columns([1, 2])
+                
+                with col1:
+                    st.metric("Date", row['timestamp'].split()[0])
+                    if row['job_title']:
+                        st.metric("Poste", row['job_title'])
+                
+                with col2:
+                    st.text_area("Description du poste", value=row["description"], height=120, disabled=True)
+                    
+                    try:
+                        results = pd.read_json(row["results"])
+                        if not results.empty:
+                            st.dataframe(
+                                results.drop(columns=["Raw Score"]) if "Raw Score" in results.columns else results, 
+                                use_container_width=True,
+                                hide_index=True
+                            )
+                    except:
+                        st.warning("Erreur lors du chargement des résultats")
 
 def show_dashboard():
-    # Title with gradient effect using HTML
-    st.markdown("""
-        <h2 style="
-            background: -webkit-linear-gradient(45deg, #1FA2FF, #12D8FA);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-weight: 800;
-            text-align: center;
-            font-size: 2.5rem;">
-            🚀 Welcome to HireSense AI
-        </h2>
-    """, unsafe_allow_html=True)
-
-    st.markdown("### ")
+    st.markdown('<div class="main-header">📋 Analyse de CV</div>', unsafe_allow_html=True)
 
     # --- Job Information Section ---
-    with st.container():
-        st.subheader("📄 Job Information")
-        st.markdown("Fill in the job details to start screening candidates.")
-        job_title = st.text_input("Job Title", placeholder="e.g., Trainee Engineer", label_visibility="visible")
-
-    st.markdown("---")
+    st.markdown('<div class="section-header">📄 Informations du Poste</div>', unsafe_allow_html=True)
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        job_title = st.text_input(
+            "Intitulé du poste",
+            placeholder="Ex: Développeur Python Senior",
+            help="Saisissez le titre du poste à pourvoir"
+        )
+    
+    with col2:
+        st.metric("📊 Statut", "Prêt à analyser" if st.session_state.get("uploaded_files") else "En attente")
 
     # --- Job Description & Resume Upload ---
-    st.subheader("📋 Job Description & 📂 Resume Upload")
+    st.markdown('<div class="section-header">📝 Description de Poste & 📂 CVs</div>', unsafe_allow_html=True)
 
-    col1, col2 = st.columns([1.2, 1])
+    col1, col2 = st.columns([1, 1])
 
     with col1:
         job_description = st.text_area(
-            "Job Description",
-            placeholder="Paste or write the full job description here...",
-            height=220,
-            key="job_desc"
+            "Description du poste",
+            placeholder="Coller ou écrire la description complète du poste ici...",
+            height=200,
+            help="Décrivez les responsabilités, compétences requises et exigences du poste"
         )
 
     with col2:
-        st.markdown("#### Upload Resumes")
+        st.markdown("#### 📤 Importer des CVs")
         uploaded_files = st.file_uploader(
-            "Select PDF resumes",
+            "Sélectionnez les CVs (PDF)",
             type=["pdf"],
             accept_multiple_files=True,
-            key="resume_files"
+            help="Sélectionnez un ou plusieurs fichiers PDF de CV"
         )
-
+        
         if uploaded_files:
-            st.success(f"✅ {len(uploaded_files)} resume(s) uploaded successfully")
+            st.session_state["uploaded_files"] = uploaded_files
+            st.success(f"✅ {len(uploaded_files)} CV(s) importé(s) avec succès")
+            
+            # Afficher un aperçu des fichiers
+            with st.expander("📋 Liste des CVs"):
+                for file in uploaded_files:
+                    st.write(f"• {file.name}")
 
     st.markdown("---")
 
-    # Optional: Next step / action button
-    st.markdown("### Ready to rank candidates?")
-
     # --- Processing & Ranking ---
-    if st.button("🔍 Rank Resumes", disabled=not (uploaded_files and job_description)):
-        with st.spinner("🔍 Processing resumes..."):
+    if st.button(
+        "🔍 Analyser les CVs", 
+        type="primary", 
+        disabled=not (uploaded_files and job_description),
+        use_container_width=True
+    ):
+        with st.spinner("🔍 Analyse des CVs en cours..."):
             resumes = []
             file_names = []
             error_files = []
@@ -228,7 +296,7 @@ def show_dashboard():
                     file_names.append(file.name)
             
             if error_files:
-                st.warning(f"⚠ Could not process {len(error_files)} files: {', '.join(error_files)}")
+                st.warning(f"⚠ {len(error_files)} fichier(s) non traité(s): {', '.join(error_files)}")
             
             if resumes:
                 scores = rank_resumes(job_description, resumes)
@@ -236,90 +304,123 @@ def show_dashboard():
                 
                 # Create results dataframe
                 results_df = pd.DataFrame({
-                    "Rank": range(1, len(ranked_resumes) + 1),
-                    "Resume Name": [name for name, _ in ranked_resumes],
-                    "Match Score": [f"{round(score * 100, 1)}%" for _, score in ranked_resumes],
-                    "Raw Score": [round(score, 4) for _, score in ranked_resumes]
+                    "Rang": range(1, len(ranked_resumes) + 1),
+                    "Nom du CV": [name for name, _ in ranked_resumes],
+                    "Score de correspondance": [f"{round(score * 100, 1)}%" for _, score in ranked_resumes],
+                    "Score brut": [round(score, 4) for _, score in ranked_resumes]
                 })
                 
                 # Display results
-                st.subheader("🏆 Ranked Resumes")
-                st.dataframe(results_df.drop(columns=["Raw Score"]), hide_index=True)
+                st.markdown('<div class="section-header">🏆 Résultats du Classement</div>', unsafe_allow_html=True)
+                
+                # Metrics row
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("📊 CVs analysés", len(results_df))
+                with col2:
+                    top_score = results_df["Score brut"].max()
+                    st.metric("⭐ Meilleur score", f"{top_score * 100:.1f}%")
+                with col3:
+                    avg_score = results_df["Score brut"].mean()
+                    st.metric("📈 Score moyen", f"{avg_score * 100:.1f}%")
+                
+                # Results table
+                st.dataframe(
+                    results_df.drop(columns=["Score brut"]).rename(columns={
+                        "Rang": "#",
+                        "Nom du CV": "CV",
+                        "Score de correspondance": "Score"
+                    }), 
+                    use_container_width=True,
+                    hide_index=True
+                )
                 
                 # Visualize top candidates
-                st.subheader("📊 Top Candidates Visualization")
-                top_n = min(len(results_df), 10)  # Show top 10 or all if less than 10
+                st.markdown('<div class="section-header">📊 Top Candidats</div>', unsafe_allow_html=True)
+                top_n = min(len(results_df), 8)
                 chart_data = results_df.head(top_n).copy()
-                st.bar_chart(chart_data.set_index("Resume Name")["Raw Score"])
+                
+                # Create a nice bar chart
+                chart_data["Score numérique"] = chart_data["Score brut"] * 100
+                st.bar_chart(
+                    chart_data.set_index("Nom du CV")["Score numérique"],
+                    color="#1e40af"
+                )
                 
                 # Save ranking history
                 save_ranking_history(
-                    job_title if job_title else "Unnamed Job",
+                    job_title if job_title else "Poste sans titre",
                     job_description,
                     results_df
                 )
                 
                 # Download options
+                st.markdown('<div class="section-header">💾 Exporter les Résultats</div>', unsafe_allow_html=True)
                 col1, col2 = st.columns(2)
+                
                 with col1:
                     csv = results_df.to_csv(index=False).encode('utf-8')
-                    st.download_button("📥 Download CSV", csv, "ranked_resumes.csv", "text/csv")
+                    st.download_button(
+                        "📥 Télécharger CSV", 
+                        csv, 
+                        "resultats_classement.csv", 
+                        "text/csv",
+                        use_container_width=True
+                    )
+                
                 with col2:
                     buffer = io.BytesIO()
                     with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
-                        results_df.to_excel(writer, index=False)
+                        results_df.to_excel(writer, index=False, sheet_name="Classement_CVs")
                     buffer.seek(0)
-                    st.download_button("📥 Download Excel", buffer, "ranked_resumes.xlsx", 
-                                      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    st.download_button(
+                        "📥 Télécharger Excel", 
+                        buffer, 
+                        "resultats_classement.xlsx", 
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        use_container_width=True
+                    )
             else:
-                st.error("❌ No valid resumes to process")
+                st.error("❌ Aucun CV valide à analyser")
 
 # --- App Sidebar ---
 def render_sidebar():
     st.sidebar.markdown("""
-<h2 style="
-    text-align: center;
-    font-weight: bold;
-    font-size: 48px;
-    background: linear-gradient(90deg, #4CAF50, #2196F3);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-">
-    HireSense AI
-</h2>
+        <div class="sidebar-content">
+            <h2 style="text-align: center; color: #1e40af; margin-bottom: 2rem;">
+                📄 HireSense
+            </h2>
     """, unsafe_allow_html=True)
     
     # Navigation
-    st.sidebar.markdown("---")
-    st.sidebar.subheader("📱 Navigation")
+    pages = [
+        {"name": "🏠 Tableau de bord", "key": "dashboard"},
+        {"name": "📊 Historique", "key": "history"}
+    ]
     
-    if st.sidebar.button("🏠 Dashboard", use_container_width=True):
-        st.session_state["current_page"] = "dashboard"
-        st.rerun()
-        
-    if st.sidebar.button("📊 History", use_container_width=True):
-        st.session_state["current_page"] = "history"
-        st.rerun()
-
-# --- Global Footer (outside sidebar) ---
-def render_footer():
-    st.markdown("""
-        <style>
-        .footer {
-            position: fixed;
-            left: 0;
-            bottom: 0;
-            width: 100%;
-            background-color: #f1f1f1;
-            color: #555;
-            text-align: center;
-            padding: 10px 0;
-            font-size: 14px;
-            border-top: 1px solid #ccc;
-        }
-        </style>
-        <div class="footer">
-            © 2025 AI HireSense AI
+    for page in pages:
+        if st.sidebar.button(
+            page["name"],
+            key=page["key"],
+            use_container_width=True,
+            type="primary" if st.session_state["current_page"] == page["key"] else "secondary"
+        ):
+            st.session_state["current_page"] = page["key"]
+            st.rerun()
+    
+    st.sidebar.markdown("</div>", unsafe_allow_html=True)
+    
+    # Information
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("""
+        <div style="padding: 1rem; background: #f0f9ff; border-radius: 10px;">
+            <h4>ℹ️ Comment utiliser</h4>
+            <ol style="font-size: 0.9rem; padding-left: 1.2rem;">
+                <li>Saisir l'intitulé du poste</li>
+                <li>Rédiger la description du poste</li>
+                <li>Importer les CVs (PDF)</li>
+                <li>Lancer l'analyse</li>
+            </ol>
         </div>
     """, unsafe_allow_html=True)
 
@@ -330,41 +431,6 @@ def main():
     
     render_sidebar()
     
-    # Landing page
-    st.markdown("""
-<h1 style='
-    text-align: left;
-    font-weight: bold;
-    font-size: 48px;
-    background: linear-gradient(90deg, #4CAF50, #2196F3);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-'>
-📄 Welcome to HireSense AI
-</h1>
-    """, unsafe_allow_html=True)
-    
-    st.subheader("Your AI-powered hiring assistant")
-
-    st.markdown("""
-    ### 🚀 Why Use HireSense AI?
-    - 🔍 **Intelligent Resume Matching**: Find candidates who truly match your job criteria.
-    - ⚡ **Boost Efficiency**: Save hours of manual screening.
-    - 📈 **Data-Driven Ranking**: Make fair, unbiased decisions.
-    - 🧾 **Track & Compare**: Store ranking history for better long-term hiring strategy.
-    """)
-
-    # Advanced section
-    st.markdown("### 🛠️ Advanced Features")
-    st.markdown("""
-    - 🧠 **AI-Powered Resume Parsing**
-    - 📊 **Similarity Score Visualizations**
-    - 💾 **Exportable Reports**
-    - 🗂️ **Job Description Templates**
-    """)
-
-    st.markdown("---")
-
     # Show appropriate page content
     if st.session_state["current_page"] == "dashboard":
         show_dashboard()
