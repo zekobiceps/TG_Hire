@@ -6,6 +6,7 @@ import json
 from pypdf import PdfReader
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+import time
 
 # --- Configuration de la clé API DeepSeek via Streamlit Secrets ---
 try:
@@ -13,6 +14,7 @@ try:
     if not API_KEY:
         st.error("❌ La clé API DeepSeek n'est pas configurée dans les secrets de Streamlit. Veuillez l'ajouter sous le nom 'DEEPSEEK_API_KEY'.")
 except KeyError:
+    API_KEY = None
     st.error("❌ Le secret 'DEEPSEEK_API_KEY' est introuvable. Veuillez le configurer.")
 
 # --- Streamlit Page Config ---
@@ -59,13 +61,6 @@ st.markdown("""
         transform: translateY(-2px);
         box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
     }
-    .upload-box {
-        background: #fafafa;
-        border: 2px dashed #e5e5e5;
-        border-radius: 10px;
-        padding: 2rem;
-        text-align: center;
-    }
     .result-card {
         background: white;
         border-radius: 10px;
@@ -82,21 +77,26 @@ st.markdown("""
         text-align: center;
         margin: 1rem 0;
     }
-    .error-message {
-        background-color: #fee2e2;
-        border: 1px solid #fecaca;
-        color: #dc2626;
-        padding: 1rem;
-        border-radius: 8px;
-        margin: 1rem 0;
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 10px;
     }
-    .success-message {
-        background-color: #d1fae5;
-        border: 1px solid #a7f3d0;
-        color: #065f46;
-        padding: 1rem;
-        border-radius: 8px;
-        margin: 1rem 0;
+    .stTabs [data-baseweb="tab-list"] button {
+        background-color: #f8f9fa;
+        border-radius: 8px 8px 0 0;
+        padding: 12px 20px;
+        font-size: 16px;
+        color: #dc2626;
+        border: 1px solid #e5e5e5;
+        border-bottom: none;
+        transition: all 0.3s ease;
+    }
+    .stTabs [data-baseweb="tab-list"] button:hover {
+        background-color: #fecaca;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #dc2626 !important;
+        color: white !important;
+        border-color: #dc2626 !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -160,7 +160,7 @@ def get_deepseek_analysis(text):
 
     try:
         response = requests.post(url, headers=headers, data=json.dumps(payload))
-        response.raise_for_status() # Lève une exception pour les codes d'erreur HTTP
+        response.raise_for_status()
         response_data = response.json()
         if response_data and "choices" in response_data and len(response_data["choices"]) > 0:
             return response_data["choices"][0]["message"]["content"]
@@ -173,15 +173,21 @@ def get_deepseek_analysis(text):
         st.error(f"❌ Erreur lors de l'analyse IA : {e}")
         return "Analyse IA échouée. Veuillez réessayer."
 
-# --- Gestion des pages ---
-if "current_page" not in st.session_state:
-    st.session_state["current_page"] = "ranking"
+# --- Gestion des pages via des onglets ---
+st.markdown('<div class="main-header">📋 HireSense IA</div>', unsafe_allow_html=True)
+st.markdown("---")
+tab1, tab2 = st.tabs(["📊 Classement de CVs", "🎯 Analyse de Profil"])
 
-def show_ranking_page():
-    st.markdown('<div class="main-header">📋 Analyse de CV</div>', unsafe_allow_html=True)
+# --- Contenu de l'onglet Classement ---
+with tab1:
     st.markdown('<div class="section-header">📄 Informations du Poste</div>', unsafe_allow_html=True)
-    job_title = st.text_input("Intitulé du poste", placeholder="Ex: Développeur Python Senior", help="Saisissez le titre du poste à pourvoir")
-    st.markdown('<div class="section-header">📝 Description de Poste & 📂 CVs</div>', unsafe_allow_html=True)
+    
+    job_title = st.text_input(
+        "Intitulé du poste",
+        placeholder="Ex: Développeur Python Senior",
+        help="Saisissez le titre du poste à pourvoir"
+    )
+    
     col1, col2 = st.columns([1, 1])
 
     with col1:
@@ -191,119 +197,134 @@ def show_ranking_page():
             height=200,
             help="Décrivez les responsabilités, compétences requises et exigences du poste"
         )
+
     with col2:
         st.markdown("#### 📤 Importer des CVs")
-        uploaded_files = st.file_uploader(
+        uploaded_files_ranking = st.file_uploader(
             "Sélectionnez les CVs (PDF)",
             type=["pdf"],
             accept_multiple_files=True,
+            key="ranking_uploader",
             help="Sélectionnez un ou plusieurs fichiers PDF de CV"
         )
-        if uploaded_files:
-            st.session_state["uploaded_files"] = uploaded_files
-            st.success(f"✅ {len(uploaded_files)} CV(s) importé(s) avec succès")
+        
+        if uploaded_files_ranking:
+            st.success(f"✅ {len(uploaded_files_ranking)} CV(s) importé(s) avec succès")
             with st.expander("📋 Liste des CVs"):
-                for file in uploaded_files:
+                for file in uploaded_files_ranking:
                     st.write(f"• {file.name}")
 
     st.markdown("---")
-    if st.button("🔍 Analyser les CVs", type="primary", disabled=not (uploaded_files and job_description), use_container_width=True):
+
+    if st.button(
+        "🔍 Analyser les CVs", 
+        type="primary", 
+        disabled=not (uploaded_files_ranking and job_description),
+        use_container_width=True
+    ):
         with st.spinner("🔍 Analyse des CVs en cours..."):
             resumes, file_names, error_files = [], [], []
-            for file in uploaded_files:
+            for file in uploaded_files_ranking:
                 text = extract_text_from_pdf(file)
                 if "Erreur" in text:
                     error_files.append(file.name)
                 else:
                     resumes.append(text)
                     file_names.append(file.name)
+            
             if error_files:
                 st.warning(f"⚠️ {len(error_files)} fichier(s) non traité(s): {', '.join(error_files)}")
+            
             if resumes:
                 scores = rank_resumes(job_description, resumes)
+                
                 if len(scores) > 0:
                     ranked_resumes = sorted(zip(file_names, scores), key=lambda x: x[1], reverse=True)
+                    
                     results_df = pd.DataFrame({
                         "Rang": range(1, len(ranked_resumes) + 1),
                         "Nom du CV": [name for name, _ in ranked_resumes],
                         "Score de correspondance": [f"{round(score * 100, 1)}%" for _, score in ranked_resumes],
                         "Score brut": [round(score, 4) for _, score in ranked_resumes]
                     })
+                    
                     st.markdown('<div class="section-header">🏆 Résultats du Classement</div>', unsafe_allow_html=True)
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
+                    
+                    col1_m, col2_m, col3_m = st.columns(3)
+                    with col1_m:
                         st.metric("📊 CVs analysés", len(results_df))
-                    with col2:
+                    with col2_m:
                         top_score = results_df["Score brut"].max()
                         st.metric("⭐ Meilleur score", f"{top_score * 100:.1f}%")
-                    with col3:
+                    with col3_m:
                         avg_score = results_df["Score brut"].mean()
                         st.metric("📈 Score moyen", f"{avg_score * 100:.1f}%")
+                    
                     st.dataframe(
-                        results_df.drop(columns=["Score brut"]).rename(columns={"Rang": "#", "Nom du CV": "CV", "Score de correspondance": "Score"}),
-                        use_container_width=True, hide_index=True
+                        results_df.drop(columns=["Score brut"]).rename(columns={"Rang": "#", "Nom du CV": "CV", "Score de correspondance": "Score"}), 
+                        use_container_width=True,
+                        hide_index=True
                     )
+                    
                     st.markdown('<div class="section-header">💾 Exporter les Résultats</div>', unsafe_allow_html=True)
                     csv = results_df.to_csv(index=False).encode('utf-8')
-                    st.download_button("📥 Télécharger CSV", csv, "resultats_classement.csv", "text/csv", use_container_width=True)
+                    st.download_button(
+                        "📥 Télécharger CSV", 
+                        csv, 
+                        "resultats_classement.csv", 
+                        "text/csv",
+                        use_container_width=True
+                    )
                 else:
                     st.error("❌ Aucun score généré lors de l'analyse")
             else:
                 st.error("❌ Aucun CV valide à analyser")
 
-def show_profile_analysis_page():
-    st.markdown('<div class="main-header">🎯 Analyse de Profil IA</div>', unsafe_allow_html=True)
-    st.markdown('<div class="section-header">📂 Télécharger un CV</div>', unsafe_allow_html=True)
-    uploaded_file = st.file_uploader(
-        "Sélectionnez un seul CV (PDF)",
+# --- Contenu de l'onglet Analyse de Profil ---
+with tab2:
+    st.markdown('<div class="section-header">📂 Importer des CVs pour analyse</div>', unsafe_allow_html=True)
+    uploaded_files_analysis = st.file_uploader(
+        "Sélectionnez un ou plusieurs CVs (PDF)",
         type=["pdf"],
-        accept_multiple_files=False,
-        help="Téléchargez un CV pour l'analyser avec l'IA."
+        accept_multiple_files=True,
+        key="analysis_uploader",
+        help="Téléchargez un ou plusieurs CVs pour les analyser avec l'IA."
     )
-    if uploaded_file:
-        st.success(f"✅ Fichier '{uploaded_file.name}' importé avec succès.")
-        if st.button("🚀 Analyser le CV", type="primary", use_container_width=True):
+
+    if uploaded_files_analysis:
+        st.success(f"✅ {len(uploaded_files_analysis)} fichier(s) importé(s).")
+        st.markdown("---")
+        if st.button("🚀 Lancer l'analyse", type="primary", use_container_width=True):
             if not API_KEY:
                 st.error("L'analyse IA ne peut pas être effectuée car la clé API n'est pas configurée.")
             else:
-                with st.spinner("⏳ L'IA analyse le CV, veuillez patienter..."):
-                    text = extract_text_from_pdf(uploaded_file)
-                    if "Erreur" in text:
-                        st.error(f"❌ Erreur lors de l'extraction du texte : {text}")
-                    else:
-                        analysis_result = get_deepseek_analysis(text)
-                        st.markdown("---")
-                        st.markdown('<div class="section-header">📋 Résultat de l\'Analyse</div>', unsafe_allow_html=True)
-                        st.markdown(analysis_result)
+                st.markdown('<div class="section-header">📋 Résultats des Analyses</div>', unsafe_allow_html=True)
+                for uploaded_file in uploaded_files_analysis:
+                    with st.expander(f"Analyse du CV : **{uploaded_file.name}**", expanded=True):
+                        with st.spinner(f"⏳ L'IA analyse le CV '{uploaded_file.name}', veuillez patienter..."):
+                            text = extract_text_from_pdf(uploaded_file)
+                            if "Erreur" in text:
+                                st.error(f"❌ Erreur lors de l'extraction du texte : {text}")
+                            else:
+                                analysis_result = get_deepseek_analysis(text)
+                                col_analysis1, col_analysis2 = st.columns(2)
+                                
+                                # Séparer les points forts et faibles pour les colonnes
+                                strong_points = ""
+                                weak_points = ""
+                                if "Points forts" in analysis_result and "Points faibles" in analysis_result:
+                                    parts = analysis_result.split("Points faibles")
+                                    strong_points = parts[0]
+                                    if len(parts) > 1:
+                                        weak_points = "Points faibles" + parts[1]
+                                    else:
+                                        weak_points = ""
+                                else:
+                                    # Fallback si l'IA ne suit pas le format exact
+                                    st.markdown(analysis_result)
 
-# --- Sidebar et logique principale ---
-with st.sidebar:
-    st.markdown("""
-        <div style="text-align: center;">
-            <h2 style="color: #dc2626; margin-bottom: 2rem;">HireSense</h2>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    if st.button("📊 Classement de CVs", use_container_width=True):
-        st.session_state["current_page"] = "ranking"
-        st.rerun()
-
-    if st.button("🎯 Analyse de Profil", use_container_width=True):
-        st.session_state["current_page"] = "analysis"
-        st.rerun()
-
-    st.markdown("---")
-    st.markdown("""
-        <div style="padding: 1rem; background: #fef2f2; border-radius: 10px;">
-            <h4>ℹ️ Comment utiliser</h4>
-            <ul style="font-size: 0.9rem; padding-left: 1.2rem;">
-                <li>**Classement :** Compare plusieurs CV à une description de poste.</li>
-                <li>**Analyse de Profil :** Identifie les forces et faiblesses d'un seul CV.</li>
-            </ul>
-        </div>
-    """, unsafe_allow_html=True)
-
-if st.session_state["current_page"] == "ranking":
-    show_ranking_page()
-elif st.session_state["current_page"] == "analysis":
-    show_profile_analysis_page()
+                                if strong_points or weak_points:
+                                    with col_analysis1:
+                                        st.markdown(f'<div class="result-card">{strong_points}</div>', unsafe_allow_html=True)
+                                    with col_analysis2:
+                                        st.markdown(f'<div class="result-card">{weak_points}</div>', unsafe_allow_html=True)
