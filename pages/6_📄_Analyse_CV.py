@@ -1,259 +1,631 @@
 import streamlit as st
-import fitz
-import requests
-import json
-import io
-from docx import Document
 import pandas as pd
-import json5
+import os
+import io
+from pypdf import PdfReader
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import hashlib
+import uuid
+from datetime import datetime
+import sqlite3
+import json
 
-# -------------------- FONCTIONS DE NETTOYAGE & API --------------------
+# --- Configuration de la page Streamlit ---
+st.set_page_config(
+    page_title="HireSense AI",
+    page_icon="📄",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-def clean_json_string(text):
-    """
-    Supprime les backticks et le mot 'json' qui entourent un bloc de code JSON.
-    """
-    text = text.strip()
-    if text.startswith('```json'):
-        text = text[7:]
-    elif text.startswith('```'):
-        text = text[3:]
-    if text.endswith('```'):
-        text = text[:-3]
-    return text.strip()
-
-def get_deepseek_response(prompt):
-    """Obtient une réponse du modèle DeepSeek AI."""
-    api_key = st.secrets.get("DEEPSEEK_API_KEY")
-    if not api_key:
-        st.error("❌ Clé API DeepSeek non trouvée dans st.secrets.")
-        return "Erreur: Clé API manquante."
-
-    url = "[https://api.deepseek.com/v1/chat/completions](https://api.deepseek.com/v1/chat/completions)"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}"
-    }
-
-    system_prompt = "Vous êtes un assistant d'analyse de documents RH. Votre objectif est d'analyser le contenu de documents (CV, fiches de poste, etc.), d'en extraire les informations clés, et de fournir une synthèse claire et structurée. Vos réponses doivent être professionnelles, précises et directement applicables au contexte du recrutement. Pour l'évaluation de CV, votre réponse doit être un objet JSON valide, sans fioritures."
-
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": prompt}
-    ]
-
-    data = {
-        "model": "deepseek-coder",
-        "messages": messages,
-        "stream": False,
-        "max_tokens": 2000,
-    }
-
-    try:
-        response = requests.post(url, headers=headers, json=data)
-        if response.status_code == 200:
-            return response.json()["choices"][0]["message"]["content"]
-        else:
-            return f"Erreur API: {response.status_code} - {response.text}"
-    except Exception as e:
-        return f"Erreur lors de l'appel API: {e}"
-
-# -------------------- FONCTIONS DE MATCHING CORRIGÉES --------------------
-
-def match_cv_to_job(cv_text, job_offer_text):
-    prompt_for_json = f"""
-    Compare the following CV and job offer. Extract all relevant information in a single JSON object.
-
-    CV:
-    {cv_text}
-
-    Job Offer:
-    {job_offer_text}
-
-    Provide the JSON object with the following structure:
-    {{
-        "cv_summary": "A brief summary of the candidate's profile.",
-        "job_summary": "A brief summary of the job offer.",
-        "skills_match": {{
-            "matched_skills": ["skill1", "skill2"],
-            "missing_skills": ["skill3"]
-        }},
-        "experience_match": {{
-            "matched_experience": "A description of how the candidate's experience matches the job requirements.",
-            "unmatched_experience": "Any gaps or irrelevant experience."
-        }},
-        "overall_score": "An overall match score between 1 and 100."
-    }}
-
-    The response must contain ONLY the JSON object, no other text or explanation.
-    """
-    try:
-        # Utiliser la fonction DeepSeek
-        response_text = get_deepseek_response(prompt_for_json)
-        
-        # VÉRIFICATION: Si la réponse est une chaîne d'erreur, ne pas tenter de la décoder
-        if response_text.startswith("Erreur"):
-            st.error(f"❌ Erreur de l'API : {response_text}")
-            return None
-        
-        # Nettoyer la réponse de l'IA et analyser la chaîne JSON propre
-        cleaned_response = clean_json_string(response_text)
-        match_result = json5.loads(cleaned_response)
-        
-        return match_result
-    except json.JSONDecodeError as e:
-        st.error(f"❌ Erreur lors de l'analyse du JSON : {e}")
-        st.error("❌ L'évaluation de correspondance a échoué.")
-        return None
-    except Exception as e:
-        st.error(f"❌ Une erreur inattendue est survenue : {e}")
-        st.error("❌ L'évaluation de correspondance a échoué.")
-        return None
-
-# -------------------- LOGIQUE DE LA PAGE STREAMLIT --------------------
-
-def render_pdf_analysis_page():
-    """Affiche l'interface utilisateur pour l'analyse de PDF."""
+# --- Configuration de la base de données ---
+def init_db():
+    """Initialise la base de données SQLite avec les tables nécessaires."""
+    conn = sqlite3.connect('Resume.db')
+    c = conn.cursor()
     
-    st.markdown(
-        """
-        <style>
-        .st-emotion-cache-18j2gai { text-align: center; }
-        .main-header { font-size: 2.5em; font-weight: bold; color: #1a1a1a; text-align: center; margin-bottom: 0; padding-bottom: 0; }
-        .sub-header { font-size: 1.2em; color: #7f8c8d; text-align: center; margin-top: 0; }
-        .upload-container { padding: 20px; border-radius: 10px; border: 2px dashed #bdc3c7; text-align: center; margin-bottom: 20px; }
-        .stButton>button { color: white; background-color: #e74c3c; border-radius: 5px; padding: 10px 20px; font-size: 1em; border: none; cursor: pointer; width: 100%; }
-        .stButton>button:hover { background-color: #c0392b; }
-        .st-emotion-cache-1l8943x p { font-size: 1.1em; text-align: center; }
-        .st-emotion-cache-1l8943x { border: none; }
-        .st-emotion-cache-e8t53b { background-color: #ecf0f1; padding: 20px; border-radius: 10px; }
-        .analysis-box { padding: 20px; background-color: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); color: black; }
-        </style>
-        <h1 class="main-header">📄 Analyse de Document IA</h1>
-        <p class="sub-header">
-            Transforme instantanément n'importe quel PDF en un brief de recrutement structuré ou en une analyse de CV.
-        </p>
-        <hr/>
-        """,
-        unsafe_allow_html=True
+    # Créer la table des utilisateurs
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS users (
+        email TEXT PRIMARY KEY,
+        password TEXT NOT NULL,
+        name TEXT,
+        job_title TEXT,
+        company TEXT,
+        date_joined TEXT,
+        last_login TEXT
+    )
+    ''')
+    
+    # Créer la table de l'historique de classement
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS ranking_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        job_title TEXT,
+        description TEXT,
+        results TEXT,
+        FOREIGN KEY (email) REFERENCES users (email)
+    )
+    ''')
+    
+    conn.commit()
+    conn.close()
+
+# --- Initialisation de l'état de la session ---
+if "authenticated" not in st.session_state:
+    st.session_state["authenticated"] = False
+    st.session_state["user_email"] = None
+    st.session_state["user_name"] = None
+    st.session_state["profile_tab"] = "profile"
+    st.session_state["current_page"] = "login"  # Page par défaut : login, register, dashboard, profile
+
+# --- Fonctions de sécurité ---
+def hash_password(password, salt=None):
+    """Hashe un mot de passe pour le stockage."""
+    if salt is None:
+        salt = uuid.uuid4().hex
+    hashed = hashlib.sha256(salt.encode() + password.encode()).hexdigest()
+    return f"{salt}${hashed}"
+
+def verify_password(stored_password, provided_password):
+    """Vérifie un mot de passe stocké par rapport à celui fourni par l'utilisateur."""
+    try:
+        salt, hashed = stored_password.split('$')
+        return hashed == hashlib.sha256(salt.encode() + provided_password.encode()).hexdigest()
+    except (ValueError, IndexError):
+        return False
+
+# --- Fonctions de gestion des utilisateurs ---
+def save_user(email, password, name=""):
+    """Enregistre un nouvel utilisateur dans la base de données."""
+    conn = sqlite3.connect('Resume.db')
+    c = conn.cursor()
+    
+    c.execute("SELECT email FROM users WHERE email = ?", (email,))
+    if c.fetchone():
+        conn.close()
+        return False  # L'utilisateur existe déjà
+    
+    hashed_password = hash_password(password)
+    
+    current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    c.execute(
+        "INSERT INTO users VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (email, hashed_password, name, "", "", current_date, current_date)
     )
     
-    with st.form(key="pdf_analysis_form"):
-        st.subheader("1. Uploader votre document")
-        uploaded_file = st.file_uploader(
-            "Glissez & déposez votre fichier ici ou cliquez pour le parcourir",
-            type=["pdf", "docx"],
-            accept_multiple_files=False,
-            key="uploaded_file"
+    conn.commit()
+    conn.close()
+    return True
+
+def authenticate_user(email, password):
+    """Authentifie un utilisateur avec son email et son mot de passe."""
+    conn = sqlite3.connect('Resume.db')
+    c = conn.cursor()
+    
+    c.execute("SELECT password FROM users WHERE email = ?", (email,))
+    result = c.fetchone()
+    
+    if not result:
+        conn.close()
+        return False
+    
+    stored_password = result[0]
+    
+    if verify_password(stored_password, password):
+        current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        c.execute("UPDATE users SET last_login = ? WHERE email = ?", (current_date, email))
+        conn.commit()
+        conn.close()
+        return True
+    
+    conn.close()
+    return False
+
+def update_profile(email, name, job_title, company):
+    """Met à jour les informations du profil utilisateur."""
+    conn = sqlite3.connect('Resume.db')
+    c = conn.cursor()
+    
+    c.execute(
+        "UPDATE users SET name = ?, job_title = ?, company = ? WHERE email = ?",
+        (name, job_title, company, email)
+    )
+    
+    conn.commit()
+    conn.close()
+    return True
+
+def get_user_profile(email):
+    """Récupère les données du profil utilisateur."""
+    conn = sqlite3.connect('Resume.db')
+    c = conn.cursor()
+    
+    c.execute(
+        "SELECT email, name, job_title, company, date_joined, last_login FROM users WHERE email = ?",
+        (email,)
+    )
+    
+    result = c.fetchone()
+    conn.close()
+    
+    if not result:
+        return None
+    
+    return {
+        "email": result[0],
+        "name": result[1],
+        "job_title": result[2],
+        "company": result[3],
+        "date_joined": result[4],
+        "last_login": result[5]
+    }
+
+def change_password(email, current_password, new_password):
+    """Change le mot de passe d'un utilisateur."""
+    conn = sqlite3.connect('Resume.db')
+    c = conn.cursor()
+    
+    c.execute("SELECT password FROM users WHERE email = ?", (email,))
+    result = c.fetchone()
+    
+    if not result:
+        conn.close()
+        return False, "Utilisateur non trouvé"
+    
+    stored_password = result[0]
+    
+    if not verify_password(stored_password, current_password):
+        conn.close()
+        return False, "Le mot de passe actuel est incorrect"
+    
+    hashed_password = hash_password(new_password)
+    
+    c.execute("UPDATE users SET password = ? WHERE email = ?", (hashed_password, email))
+    conn.commit()
+    conn.close()
+    
+    return True, "Mot de passe changé avec succès"
+
+# --- Fonctions de l'historique ---
+def save_ranking_history(email, job_title, description, results):
+    """Sauvegarde l'historique de classement des CV pour l'utilisateur."""
+    conn = sqlite3.connect('Resume.db')
+    c = conn.cursor()
+    
+    c.execute(
+        "INSERT INTO ranking_history (email, timestamp, job_title, description, results) VALUES (?, ?, ?, ?, ?)",
+        (
+            email,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            job_title,
+            description,
+            results.to_json()
         )
-        
-        st.subheader("2. Coller l'offre d'emploi (optionnel)")
-        job_offer_text = st.text_area(
-            "Coller le texte de l'offre d'emploi pour évaluer le matching du CV",
-            height=250,
-            key="job_offer_text"
-        )
+    )
+    
+    conn.commit()
+    conn.close()
 
-        submit_button = st.form_submit_button("🚀 Lancer l'analyse du document", type="primary")
+def get_user_history(email):
+    """Récupère l'historique de classement des CV pour l'utilisateur."""
+    conn = sqlite3.connect('Resume.db')
+    
+    query = "SELECT id, timestamp, job_title, description, results FROM ranking_history WHERE email = ? ORDER BY timestamp DESC"
+    history_df = pd.read_sql_query(query, conn, params=(email,))
+    
+    conn.close()
+    
+    return history_df
 
-    if uploaded_file is not None:
-        st.success(f"✅ Fichier chargé : **{uploaded_file.name}**")
+# --- Fonctions de traitement des CV ---
+def extract_text_from_pdf(file):
+    """Extrait le texte d'un fichier PDF téléchargé."""
+    try:
+        pdf = PdfReader(file)
+        text = ""
+        for page in pdf.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+        return text.strip() if text else "Aucun texte lisible trouvé."
+    except Exception as e:
+        return f"Erreur lors de l'extraction du texte : {str(e)}"
 
-    if submit_button:
-        if uploaded_file is not None:
-            file_type = uploaded_file.type
-            
-            with st.spinner('⏳ Extraction du texte du document...'):
-                text_content = ""
-                if file_type == "application/pdf":
-                    try:
-                        with fitz.open(stream=uploaded_file.read(), filetype="pdf") as doc:
-                            for page in doc:
-                                text_content += page.get_text()
-                    except Exception as e:
-                        st.error(f"❌ Erreur lors de l'extraction du PDF : {e}")
-                        text_content = ""
-                elif file_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-                    try:
-                        doc = Document(uploaded_file)
-                        text_content = " ".join([p.text for p in doc.paragraphs])
-                    except Exception as e:
-                        st.error(f"❌ Erreur lors de l'extraction du DOCX : {e}")
-                        text_content = ""
-            
-            if text_content.strip():
-                if job_offer_text.strip():
-                    # --- FONCTIONNALITÉ: Matching CV ---
-                    st.subheader("🎯 Analyse de Correspondance CV vs Offre d'Emploi")
-                    with st.spinner('✨ Évaluation du matching en cours par l\'IA...'):
-                        match_result = match_cv_to_job(text_content, job_offer_text)
+def rank_resumes(job_description, resumes):
+    """Classe les CV en fonction de leur similarité avec la description de poste."""
+    documents = [job_description] + resumes
+    vectorizer = TfidfVectorizer().fit_transform(documents)
+    vectors = vectorizer.toarray()
+    job_description_vector = vectors[0]
+    resume_vectors = vectors[1:]
+    cosine_similarities = cosine_similarity([job_description_vector], resume_vectors).flatten()
+    return cosine_similarities
 
-                    if match_result:
-                        overall_score = match_result.get("overall_score")
-                        if overall_score is not None:
-                            try:
-                                # Tenter de convertir le score en int pour un affichage plus propre
-                                score_int = int(overall_score)
-                                st.markdown(
-                                    f"""
-                                    <h2 style='text-align: center;'>Score de Matching :</h2>
-                                    <h1 style='text-align: center; color: #e74c3c; font-size: 4em;'>{score_int} %</h1>
-                                    <hr/>
-                                    """, 
-                                    unsafe_allow_html=True
-                                )
-                            except ValueError:
-                                # Si la conversion échoue, afficher la valeur brute
-                                st.markdown(
-                                    f"""
-                                    <h2 style='text-align: center;'>Score de Matching :</h2>
-                                    <h1 style='text-align: center; color: #e74c3c; font-size: 4em;'>{overall_score}</h1>
-                                    <hr/>
-                                    """, 
-                                    unsafe_allow_html=True
-                                )
-                        
-                        # Afficher le résumé et les correspondances
-                        if match_result.get("cv_summary"):
-                            st.markdown(f"**Résumé du CV :** {match_result['cv_summary']}")
-                        if match_result.get("job_summary"):
-                            st.markdown(f"**Résumé de l'offre :** {match_result['job_summary']}")
-                        
-                        st.markdown("### Compétences et Expérience")
-                        
-                        if match_result.get("skills_match"):
-                            skills = match_result['skills_match']
-                            if skills.get("matched_skills"):
-                                st.success(f"✅ Compétences correspondantes : {', '.join(skills['matched_skills'])}")
-                            if skills.get("missing_skills"):
-                                st.warning(f"⚠️ Compétences manquantes : {', '.join(skills['missing_skills'])}")
-                        
-                        if match_result.get("experience_match"):
-                            exp = match_result['experience_match']
-                            if exp.get("matched_experience"):
-                                st.success(f"✅ Expérience correspondante : {exp['matched_experience']}")
-                            if exp.get("unmatched_experience"):
-                                st.warning(f"⚠️ Expérience à améliorer : {exp['unmatched_experience']}")
-                                
-                        else:
-                            st.warning("⚠️ L'IA n'a pas pu fournir de score. Veuillez vérifier les textes fournis.")
-                    
-                    else:
-                        st.error("❌ L'évaluation de correspondance a échoué.")
-                    
-                else:
-                    # --- ANCIENNE FONCTIONNALITÉ: Analyse simple de CV ---
-                    st.subheader("💡 Résultat de l'analyse IA")
-                    with st.spinner('✨ Analyse en cours par l\'IA...'):
-                        analysis_prompt = f"Analyse le texte suivant extrait d'un document. Extrait les informations clés pour un brief de recrutement : l'intitulé du poste, les tâches principales, les compétences techniques requises, les soft skills, et l'expérience demandée. Présente les informations dans une liste structurée. Le texte est : {text_content}"
-                        full_response = get_deepseek_response(analysis_prompt)
-                    
-                    st.markdown(f'<div class="analysis-box">{full_response}</div>', unsafe_allow_html=True)
+# --- Style CSS personnalisé ---
+st.markdown("""
+    <style>
+        .stButton>button {
+            background-color: #1e90ff;
+            color: white;
+            font-size: 16px;
+            border-radius: 5px;
+            padding: 10px;
+            transition: background-color 0.3s ease;
+        }
+        .stButton>button:hover {
+            background-color: #4682b4;
+        }
+        .sidebar .sidebar-content {
+            padding: 20px;
+        }
+        .stTextInput>div>div>input {
+            font-size: 16px;
+            border-radius: 5px;
+        }
+        .stTextArea>div>div>textarea {
+            font-size: 16px;
+            border-radius: 5px;
+        }
+        .stTabs>div>div>button {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1e90ff;
+        }
+        .stTabs>div>div>button:hover {
+            color: #4682b4;
+        }
+        .stExpander>div>div>button {
+            font-size: 16px;
+            font-weight: bold;
+            color: #1e90ff;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# --- Navigation principale ---
+def show_login_page():
+    st.sidebar.title("📝 Connexion Utilisateur")
+    st.sidebar.markdown("### Veuillez entrer vos identifiants pour vous connecter.")
+    
+    login_email = st.sidebar.text_input("📧 Email", key="login_email", placeholder="Entrez votre email")
+    login_password = st.sidebar.text_input("🔑 Mot de passe", type="password", key="login_password", placeholder="Entrez votre mot de passe")
+    
+    st.sidebar.markdown("---")
+    
+    col1, col2 = st.sidebar.columns(2)
+    
+    with col1:
+        if st.button("🔐 Se connecter", use_container_width=True):
+            if authenticate_user(login_email, login_password):
+                st.session_state["authenticated"] = True
+                st.session_state["user_email"] = login_email
+                profile = get_user_profile(login_email)
+                st.session_state["user_name"] = profile["name"]
+                st.session_state["current_page"] = "dashboard"
+                st.rerun()
             else:
-                st.error("❌ Le document est vide ou l'extraction a échoué.")
-        else:
-            st.warning("⚠️ Veuillez uploader un fichier pour lancer l'analyse.")
+                st.sidebar.error("❌ Email ou mot de passe invalide")
+    
+    with col2:
+        if st.button("📝 S'inscrire", use_container_width=True):
+            st.session_state["current_page"] = "register"
+            st.rerun()
 
-# Appel de la fonction pour afficher la page si ce fichier est le point d'entrée
+def show_register_page():
+    st.sidebar.title("📝 Inscription Utilisateur")
+    st.sidebar.markdown("### Créez un nouveau compte pour commencer.")
+    
+    reg_email = st.sidebar.text_input("📧 Email*", key="reg_email", placeholder="Entrez votre email")
+    reg_name = st.sidebar.text_input("👤 Nom complet", key="reg_name", placeholder="Entrez votre nom complet")
+    reg_password = st.sidebar.text_input("🔑 Mot de passe*", type="password", key="reg_password", placeholder="Entrez votre mot de passe")
+    reg_confirm_password = st.sidebar.text_input("🔑 Confirmer le mot de passe*", type="password", key="reg_confirm_password", placeholder="Confirmez votre mot de passe")
+    
+    st.sidebar.markdown("---")
+    
+    col1, col2 = st.sidebar.columns(2)
+    
+    with col1:
+        if st.button("✅ S'inscrire", use_container_width=True):
+            if not reg_email or not reg_password:
+                st.sidebar.error("❌ L'email et le mot de passe sont requis")
+            elif "@" not in reg_email or "." not in reg_email:
+                st.sidebar.error("❌ Format d'email invalide")
+            elif reg_password != reg_confirm_password:
+                st.sidebar.error("❌ Les mots de passe ne correspondent pas")
+            else:
+                if save_user(reg_email, reg_password, reg_name):
+                    st.sidebar.success("✅ Inscription réussie ! Vous pouvez maintenant vous connecter.")
+                    st.session_state["current_page"] = "login"
+                    st.rerun()
+                else:
+                    st.sidebar.warning("⚠ Email déjà enregistré. Veuillez vous connecter.")
+                    st.session_state["current_page"] = "login"
+                    st.rerun()
+    
+    with col2:
+        if st.button("↩️ Retour à la connexion", use_container_width=True):
+            st.session_state["current_page"] = "login"
+            st.rerun()
+
+def show_profile_page():
+    st.title("👤 Profil Utilisateur")
+    st.markdown("### Gérez vos informations de profil et vos préférences.")
+    
+    profile = get_user_profile(st.session_state["user_email"])
+    if not profile:
+        st.error("❌ Erreur lors du chargement des données du profil")
+        return
+    
+    profile_tab, password_tab, history_tab = st.tabs(["✏️ Modifier le profil", "🔐 Changer le mot de passe", "📊 Historique"])
+    
+    with profile_tab:
+        st.subheader("Informations personnelles")
+        
+        name = st.text_input("Nom complet", value=profile["name"] if profile["name"] else "")
+        job_title = st.text_input("Titre du poste", value=profile["job_title"] if profile["job_title"] else "")
+        company = st.text_input("Entreprise", value=profile["company"] if profile["company"] else "")
+        
+        if st.button("💾 Sauvegarder le profil"):
+            if update_profile(profile["email"], name, job_title, company):
+                st.session_state["user_name"] = name
+                st.success("✅ Profil mis à jour avec succès !")
+                st.rerun()
+            else:
+                st.error("❌ Erreur lors de la mise à jour du profil")
+    
+    with password_tab:
+        st.subheader("Changer le mot de passe")
+        
+        current_password = st.text_input("Mot de passe actuel", type="password")
+        new_password = st.text_input("Nouveau mot de passe", type="password")
+        confirm_new_password = st.text_input("Confirmer le nouveau mot de passe", type="password")
+        
+        if st.button("🔄 Mettre à jour le mot de passe"):
+            if not current_password or not new_password or not confirm_new_password:
+                st.error("❌ Tous les champs sont requis")
+            elif new_password != confirm_new_password:
+                st.error("❌ Les nouveaux mots de passe ne correspondent pas")
+            else:
+                success, message = change_password(profile["email"], current_password, new_password)
+                if success:
+                    st.success(f"✅ {message}")
+                else:
+                    st.error(f"❌ {message}")
+    
+    with history_tab:
+        st.subheader("Historique de classement des CV")
+        
+        history = get_user_history(profile["email"])
+        if history.empty:
+            st.info("📝 Aucun historique de classement trouvé")
+        else:
+            for idx, row in history.iterrows():
+                with st.expander(f"Offre : {row['job_title']} - {row['timestamp']}"):
+                    st.text_area("Description de l'offre", value=row["description"], height=100, disabled=True, key=f"job_desc_{idx}")
+                    try:
+                        results = pd.read_json(row["results"])
+                        st.dataframe(results, hide_index=True)
+                    except:
+                        st.warning("⚠ Erreur lors du chargement des résultats.")
+
+def show_dashboard():
+    welcome_name = st.session_state["user_name"] or st.session_state["user_email"]
+
+    st.markdown("""
+        <h2 style="
+            background: -webkit-linear-gradient(45deg, #1FA2FF, #12D8FA);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
+            text-align: center;
+            font-size: 2.5rem;">
+            🚀 Bienvenue sur HireSense AI
+        </h2>
+    """, unsafe_allow_html=True)
+
+    st.markdown(f"<div style='text-align:center; font-size:18px;'>Heureux de vous revoir, <b style='color:#4CAF50'>{welcome_name}</b> 👋</div>", unsafe_allow_html=True)
+    st.markdown("### ")
+
+    with st.container():
+        st.subheader("📄 Informations sur l'offre d'emploi")
+        st.markdown("Remplissez les détails du poste pour commencer à trier les candidats.")
+        job_title = st.text_input("Titre du poste", placeholder="Exemple : Ingénieur Stagiaire", label_visibility="visible")
+
+    st.markdown("---")
+
+    st.subheader("📋 Description de l'offre et 📂 Téléchargement des CV")
+
+    col1, col2 = st.columns([1.2, 1])
+
+    with col1:
+        job_description = st.text_area(
+            "Description de l'offre",
+            placeholder="Collez ou écrivez la description complète de l'offre ici...",
+            height=220,
+            key="job_desc"
+        )
+
+    with col2:
+        st.markdown("#### Télécharger les CV")
+        uploaded_files = st.file_uploader(
+            "Sélectionnez les CV au format PDF",
+            type=["pdf"],
+            accept_multiple_files=True,
+            key="resume_files"
+        )
+
+        if uploaded_files:
+            st.success(f"✅ {len(uploaded_files)} CV(s) téléchargé(s) avec succès")
+
+    st.markdown("---")
+
+    st.markdown("### Prêt à classer les candidats ?")
+
+    if st.button("🔍 Classer les CV", disabled=not (uploaded_files and job_description)):
+        with st.spinner("🔍 Traitement des CV en cours..."):
+            resumes = []
+            file_names = []
+            error_files = []
+            
+            for file in uploaded_files:
+                text = extract_text_from_pdf(file)
+                if "Erreur lors de l'extraction" in text:
+                    error_files.append(file.name)
+                else:
+                    resumes.append(text)
+                    file_names.append(file.name)
+            
+            if error_files:
+                st.warning(f"⚠ Impossible de traiter {len(error_files)} fichier(s) : {', '.join(error_files)}")
+            
+            if resumes:
+                scores = rank_resumes(job_description, resumes)
+                ranked_resumes = sorted(zip(file_names, scores), key=lambda x: x[1], reverse=True)
+                
+                results_df = pd.DataFrame({
+                    "Rang": range(1, len(ranked_resumes) + 1),
+                    "Nom du CV": [name for name, _ in ranked_resumes],
+                    "Score de correspondance": [f"{round(score * 100, 1)}%" for _, score in ranked_resumes],
+                    "Score brut": [round(score, 4) for _, score in ranked_resumes]
+                })
+                
+                st.subheader("🏆 CV Classés")
+                st.dataframe(results_df.drop(columns=["Score brut"]), hide_index=True)
+                
+                st.subheader("📊 Visualisation des meilleurs candidats")
+                top_n = min(len(results_df), 10)
+                chart_data = results_df.head(top_n).copy()
+                st.bar_chart(chart_data.set_index("Nom du CV")["Score brut"])
+                
+                save_ranking_history(
+                    st.session_state["user_email"],
+                    job_title if job_title else "Offre sans titre",
+                    job_description,
+                    results_df
+                )
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    csv = results_df.to_csv(index=False).encode('utf-8')
+                    st.download_button("📥 Télécharger en CSV", csv, "cv_classes.csv", "text/csv")
+                with col2:
+                    buffer = io.BytesIO()
+                    with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+                        results_df.to_excel(writer, index=False)
+                    buffer.seek(0)
+                    st.download_button("📥 Télécharger en Excel", buffer, "cv_classes.xlsx",
+                                       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            else:
+                st.error("❌ Aucun CV valide à traiter")
+
+# --- Barre latérale de l'application ---
+def render_sidebar():
+    st.sidebar.markdown("""
+<h2 style="
+    text-align: center;
+    font-weight: bold;
+    font-size: 48px;
+    background: linear-gradient(90deg, #4CAF50, #2196F3);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+">
+    HireSense AI
+</h2>
+                        """, unsafe_allow_html=True)
+    
+    if st.session_state["authenticated"]:
+        st.sidebar.subheader(f"👤 {st.session_state['user_email']}")
+        
+        st.sidebar.markdown("---")
+        st.sidebar.subheader("📱 Navigation")
+        
+        if st.sidebar.button("🏠 Tableau de bord", use_container_width=True):
+            st.session_state["current_page"] = "dashboard"
+            st.rerun()
+            
+        if st.sidebar.button("👤 Mon profil", use_container_width=True):
+            st.session_state["current_page"] = "profile"
+            st.rerun()
+            
+        st.sidebar.markdown("---")
+        if st.sidebar.button("🚪 Se déconnecter", use_container_width=True):
+            st.session_state["authenticated"] = False
+            st.session_state["user_email"] = None
+            st.session_state["user_name"] = None
+            st.session_state["current_page"] = "login"
+            st.sidebar.success("👋 Déconnexion réussie !")
+            st.rerun()
+
+# --- Pied de page global (hors de la barre latérale) ---
+def render_footer():
+    st.markdown("""
+        <style>
+        .footer {
+            position: fixed;
+            left: 0;
+            bottom: 0;
+            width: 100%;
+            background-color: #f1f1f1;
+            color: #555;
+            text-align: center;
+            padding: 10px 0;
+            font-size: 14px;
+            border-top: 1px solid #ccc;
+        }
+        </style>
+        <div class="footer">
+            © 2025 AI HireSense AI
+        </div>
+    """, unsafe_allow_html=True)
+
+# --- Logique principale de l'application ---
+def main():
+    init_db()
+    
+    render_sidebar()
+    
+    if not st.session_state.get("authenticated", False):
+        st.markdown("""
+<h1 style='
+    text-align: left;
+    font-weight: bold;
+    font-size: 48px;
+    background: linear-gradient(90deg, #4CAF50, #2196F3);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+'>
+📄 Bienvenue sur HireSense AI
+</h1>
+""", unsafe_allow_html=True)
+        st.subheader("Votre assistant de recrutement alimenté par l'IA")
+
+        st.markdown("""
+        ### 🚀 Pourquoi utiliser HireSense AI ?
+        - 🔍 **Correspondance intelligente des CV** : Trouvez les candidats qui correspondent vraiment à vos critères.
+        - ⚡ **Gagnez en efficacité** : Économisez des heures de tri manuel.
+        - 📈 **Classement basé sur les données** : Prenez des décisions équitables et impartiales.
+        - 🧾 **Suivi et comparaison** : Conservez l'historique de vos analyses pour une meilleure stratégie d'embauche.
+        """)
+
+        st.markdown("---")
+
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            if st.session_state["current_page"] == "login":
+                show_login_page()
+        with col2:
+            if st.session_state["current_page"] == "register":
+                show_register_page()
+    
+    else:
+        if st.session_state["current_page"] == "dashboard":
+            show_dashboard()
+        elif st.session_state["current_page"] == "profile":
+            show_profile_page()
+
 if __name__ == "__main__":
-    render_pdf_analysis_page()
+    main()
