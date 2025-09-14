@@ -842,6 +842,8 @@ with tabs[0]:
             else:
                 st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
 
+# ... (reste du code inchangé jusqu'à l'onglet Avant-brief)
+
 # ---------------- AVANT-BRIEF ----------------
 with tabs[1]:
     # Afficher le message de sauvegarde seulement pour cet onglet
@@ -918,7 +920,7 @@ with tabs[1]:
     if st.session_state.current_brief_name in st.session_state.saved_briefs:
         brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
 
-    # Construire le DataFrame sans répétition de "Contexte du poste"
+    # Construire le DataFrame avec les valeurs actuelles
     data = []
     for section in sections:
         for i, (field_name, field_key, placeholder) in enumerate(section["fields"]):
@@ -928,7 +930,7 @@ with tabs[1]:
 
     df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
     
-    # Afficher le data_editor avec les données mises à jour si disponibles
+    # Afficher le data_editor avec les données mises à jour
     edited_df = st.session_state.get("edited_df", df)
     edited_df = st.data_editor(
         edited_df,
@@ -941,6 +943,7 @@ with tabs[1]:
         hide_index=True,
         num_rows="fixed"
     )
+    st.session_state.edited_df = edited_df  # Mettre à jour l'état avec le DataFrame édité
 
     # Boutons Enregistrer et Pré-rédiger par IA
     col_save, col_pre_rediger = st.columns(2)
@@ -971,7 +974,6 @@ with tabs[1]:
     
     with col_pre_rediger:
         if st.button("💡 Pré-rédiger par IA", type="primary", key="pre_rediger_ia", use_container_width=True):
-            # Logique de sélection de la fiche de poste
             if "show_job_selection" not in st.session_state:
                 st.session_state.show_job_selection = False
             if not st.session_state.show_job_selection:
@@ -988,8 +990,18 @@ with tabs[1]:
                     selected_job = st.selectbox("Sélectionnez un poste pour la pré-rédaction :", job_titles, key="select_job_for_pre_redaction")
                     if st.button("Confirmer", key="confirm_job_selection"):
                         apply_ai_pre_redaction(selected_job_title=selected_job)
+                        # Reconstruire le DataFrame avec les nouvelles valeurs
+                        data = []
+                        for section in sections:
+                            for i, (field_name, field_key, placeholder) in enumerate(section["fields"]):
+                                value = st.session_state.get(field_key, "")
+                                section_title = section["title"] if i == 0 else ""
+                                data.append([section_title, field_name, value])
+                        st.session_state.edited_df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
                         st.session_state.show_job_selection = False
                         st.rerun()
+
+# ... (reste du code inchangé)
 
 # ---------------- RÉUNION ----------------
 with tabs[2]:
