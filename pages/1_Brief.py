@@ -734,18 +734,6 @@ with tabs[1]:
     if st.session_state.current_brief_name in st.session_state.saved_briefs:
         brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
 
-    # Gérer les conseils IA avant le rendu des widgets
-    for section in sections:
-        for title, key, _ in section["fields"]:
-            if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
-                advice_key = f"advice_{key}"
-                if advice_key in st.session_state and st.session_state[advice_key]:
-                    advice = generate_checklist_advice(section["title"], title)
-                    example = get_example_for_field(section["title"], title)
-                    st.session_state[key] = f"{advice}\nExemple : {example}"
-                    st.session_state[advice_key] = False
-                    st.rerun()
-
     # Formulaire pour les widgets
     with st.form(key="avant_brief_form"):
         for section in sections:
@@ -753,15 +741,24 @@ with tabs[1]:
                 for title, key, placeholder in section["fields"]:
                     col1, col2 = st.columns([4, 1])
                     with col1:
-                        st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")), key=key, placeholder=placeholder)
+                        st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")) or "", key=key, placeholder=placeholder)
                     with col2:
-                        # Modifier le bouton IA pour le rendre plus compact et à côté du champ
+                        # Utilisation de st.form_submit_button pour le bouton "Conseil IA"
                         if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
-                            if st.button(f"💡", key=f"btn_{key}"):
-                                st.session_state[f"advice_{key}"] = True
-                                st.session_state[key] = generate_checklist_advice(section["title"], title)
-                                st.session_state[key] = f"{st.session_state[key]}"
-                                st.rerun()
+                            if st.form_submit_button(f"💡 Générer conseil IA pour {title}", key=f"btn_{key}"):
+                                # Générer le conseil IA et mettre à jour la réponse
+                                advice = generate_checklist_advice(section["title"], title)
+                                example = get_example_for_field(section["title"], title)
+                                message_to_copy = f"{advice}\nExemple : {example}"
+
+                                # Stocker la réponse générée dans st.session_state
+                                st.session_state[f"advice_{key}"] = message_to_copy
+
+        # Affichage de la réponse générée pour chaque champ, si elle existe
+        for section in sections:
+            for title, key, placeholder in section["fields"]:
+                if f"advice_{key}" in st.session_state:
+                    st.code(st.session_state[f"advice_{key}"], language="text")
 
         # Boutons Enregistrer et Annuler dans le formulaire
         col_save, col_cancel = st.columns([1, 1])
@@ -784,8 +781,6 @@ with tabs[1]:
                 st.session_state.current_brief_name = ""
                 st.session_state.avant_brief_completed = False
                 st.rerun()
-
-
 
 # ---------------- RÉUNION ----------------
 with tabs[2]:
