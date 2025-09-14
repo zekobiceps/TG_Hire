@@ -5,12 +5,44 @@ import os
 import pickle
 from datetime import datetime
 import io
+import random
 import json
 import pandas as pd
 from docx import Document
 from docx.shared import Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
+
+#-------------------- Réponse IA aléatoire --------------------
+def generate_checklist_advice(section_title, field_title):
+    # Liste d'exemples de conseils pour chaque champ
+    example_advice = {
+        "Raison de l'ouverture": [
+            "- Clarifier si remplacement, création ou évolution interne.",
+            "- Identifier le niveau d'urgence.",
+            "- Relier au contexte business."
+        ],
+        "Mission globale": [
+            "- Résumer les objectifs clés du poste.",
+            "- Définir les responsabilités principales du rôle.",
+            "- Mettre en évidence les attentes de performance."
+        ],
+        "Tâches principales": [
+            "- Gestion de projet complexe.",
+            "- Coordination multi-sites.",
+            "- Respect des délais et du budget."
+        ]
+    }
+
+    # Ajoutez un peu de variabilité
+    advice_list = example_advice.get(field_title, ["Pas de conseil disponible."])
+    random.shuffle(advice_list)  # Mélanger les éléments pour obtenir un conseil différent chaque fois
+
+    # Créez un message de réponse avec l'exemple
+    message = "\n".join(advice_list)
+    example = "Exemple : Remplacement d’un départ en retraite"  # Vous pouvez également rendre cet exemple dynamique
+
+    return f"{message}\n{example}"
 
 # -------------------- Disponibilité PDF & Word --------------------
 try:
