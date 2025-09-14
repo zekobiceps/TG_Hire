@@ -736,32 +736,40 @@ with tabs[1]:
     if st.session_state.current_brief_name in st.session_state.saved_briefs:
         brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
 
-    # Formulaire pour les widgets
+    # Afficher les champs et boutons IA hors formulaire
+    for section in sections:
+        with st.expander(f"📋 {section['title']}"):
+            st.info("Cliquez sur 💡 Conseils IA pour générer un conseil dynamique pour chaque champ. Le conseil précédent sera remplacé par le nouveau.")
+            for title, key, placeholder in section["fields"]:
+                col1, col2 = st.columns([4, 1])
+                with col1:
+                    # Afficher le champ en lecture seule pour l'instant
+                    st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")) or "", key=f"display_{key}", placeholder=placeholder, height=100, disabled=True)
+                with col2:
+                    # Bouton IA seulement pour les sections autorisées
+                    if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
+                        if st.button("💡 Conseils IA", key=f"btn_conseil_{key}_{section['title']}"):
+                            advice = generate_checklist_advice(section["title"], title)
+                            if advice == "Pas de conseil disponible.":
+                                st.warning("Aucun conseil disponible pour ce champ.")
+                            else:
+                                example = get_example_for_field(section["title"], title)
+                                message_to_copy = f"{advice}\nExemple : {example}"
+                                # Remplacer l'ancien conseil
+                                st.session_state[f"advice_{key}"] = message_to_copy
+                                st.rerun()
+                
+                # Afficher le conseil généré juste en dessous du champ
+                if f"advice_{key}" in st.session_state:
+                    st.code(st.session_state[f"advice_{key}"], language="text")
+
+    # Formulaire pour les widgets (édition des champs)
     with st.form(key="avant_brief_form"):
+        st.subheader("Éditer les champs")
         for section in sections:
             with st.expander(f"📋 {section['title']}"):
-                st.info("Cliquez sur 💡 Conseils IA pour générer un conseil dynamique pour chaque champ. Le conseil précédent sera remplacé par le nouveau.")
                 for title, key, placeholder in section["fields"]:
-                    col1, col2 = st.columns([4, 1])
-                    with col1:
-                        st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")) or "", key=key, placeholder=placeholder, height=100)
-                    with col2:
-                        # Bouton IA seulement pour les sections autorisées
-                        if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
-                            if st.button("💡 Conseils IA", key=f"btn_conseil_{key}_{section['title']}"):
-                                advice = generate_checklist_advice(section["title"], title)
-                                if advice == "Pas de conseil disponible.":
-                                    st.warning("Aucun conseil disponible pour ce champ.")
-                                else:
-                                    example = get_example_for_field(section["title"], title)
-                                    message_to_copy = f"{advice}\nExemple : {example}"
-                                    # Remplacer l'ancien conseil
-                                    st.session_state[f"advice_{key}"] = message_to_copy
-                                    st.rerun()
-                    
-                    # Afficher le conseil généré juste en dessous du champ (remplace l'ancien)
-                    if f"advice_{key}" in st.session_state:
-                        st.code(st.session_state[f"advice_{key}"], language="text")
+                    st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")) or "", key=key, placeholder=placeholder, height=100)
 
         # Boutons Enregistrer et Annuler dans le formulaire
         col_save, col_cancel = st.columns([1, 1])
@@ -783,185 +791,6 @@ with tabs[1]:
             if st.form_submit_button("🗑️ Annuler", type="secondary", use_container_width=True):
                 st.session_state.current_brief_name = ""
                 st.session_state.avant_brief_completed = False
-                st.rerun()
-
-# ---------------- RÉUNION ----------------
-with tabs[2]:
-    # Afficher le message de sauvegarde seulement pour cet onglet
-    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Réunion"):
-        st.success(st.session_state.save_message)
-        st.session_state.save_message = None
-        st.session_state.save_message_tab = None
-
-    # Afficher les informations du brief en cours
-    brief_display_name = f"Réunion de brief - {st.session_state.current_brief_name}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
-    st.subheader(f"✅ {brief_display_name}")
-
-    total_steps = 5
-    step = st.session_state.reunion_step
-    st.progress(int((step / total_steps) * 100), text=f"Étape {step}/{total_steps}")
-
-    if step == 1:
-        st.subheader("📋 Portrait robot candidat - Validation")
-
-        # Récupérer les données de l'Avant-brief
-        if st.session_state.current_brief_name in st.session_state.saved_briefs:
-            brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
-            
-            # Définir les sections et champs (même structure que dans Avant-brief)
-            sections = [
-                {"title": "Contexte du poste", "fields": [
-                    ("Raison de l'ouverture", "raison_ouverture"),
-                    ("Mission globale", "impact_strategique"),
-                    ("Tâches principales", "taches_principales"),
-                ]},
-                {"title": "Must-have (Indispensables)", "fields": [
-                    ("Expérience", "must_have_experience"),
-                    ("Connaissances / Diplômes / Certifications", "must_have_diplomes"),
-                    ("Compétences / Outils", "must_have_competences"),
-                    ("Soft skills / aptitudes comportementales", "must_have_softskills"),
-                ]},
-                {"title": "Nice-to-have (Atouts)", "fields": [
-                    ("Expérience additionnelle", "nice_to_have_experience"),
-                    ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes"),
-                    ("Compétences complémentaires", "nice_to_have_competences"),
-                ]},
-                {"title": "Sourcing et marché", "fields": [
-                    ("Entreprises où trouver ce profil", "entreprises_profil"),
-                    ("Synonymes / intitulés proches", "synonymes_poste"),
-                    ("Canaux à utiliser", "canaux_profil"),
-                ]},
-                {"title": "Conditions et contraintes", "fields": [
-                    ("Localisation", "rattachement"),
-                    ("Budget recrutement", "budget"),
-                ]},
-                {"title": "Profils pertinents", "fields": [
-                    ("Lien profil 1", "profil_link_1"),
-                    ("Lien profil 2", "profil_link_2"),
-                    ("Lien profil 3", "profil_link_3"),
-                ]},
-                {"title": "Notes libres", "fields": [
-                    ("Points à discuter ou à clarifier avec le manager", "commentaires"),
-                    ("Case libre", "notes_libres"),
-                ]},
-            ]
-
-            # Construire les données pour le tableau
-            data = []
-            for section in sections:
-                for title, key in section["fields"]:
-                    value = brief_data.get(key, "")
-                    comment_key = f"manager_comment_{key}"
-                    comment = st.session_state.get(comment_key, "")
-                    data.append([section["title"] if title == section["fields"][0][0] else "", title, value, comment])
-
-            df = pd.DataFrame(data, columns=["Section", "Détails", "Informations", "Commentaires du manager"])
-
-            # Afficher le tableau éditable
-            edited_df = st.data_editor(
-                df,
-                column_config={
-                    "Section": st.column_config.TextColumn("Section", disabled=True, width="small"),
-                    "Détails": st.column_config.TextColumn("Détails", disabled=True, width="medium"),
-                    "Informations": st.column_config.TextColumn("Informations", disabled=True, width="medium"),
-                    "Commentaires du manager": st.column_config.TextColumn("Commentaires du manager", width="medium")
-                },
-                use_container_width=True,
-                hide_index=True,
-                num_rows="fixed"
-            )
-
-            # Sauvegarder les commentaires
-            if st.button("💾 Sauvegarder commentaires", type="primary", key="save_comments_step1"):
-                for i, row in edited_df.iterrows():
-                    if row["Détails"] != "":
-                        comment_key = f"manager_comment_{sections[i // len(sections[0]['fields'])]['fields'][i % len(sections[0]['fields'])][1]}"
-                        st.session_state[comment_key] = row["Commentaires du manager"]
-                st.session_state.save_message = "✅ Commentaires sauvegardés"
-                st.session_state.save_message_tab = "Réunion"
-                st.rerun()
-
-        else:
-            st.warning("Aucun brief sélectionné. Veuillez créer et sauvegarder un brief dans l'onglet Avant-brief.")
-
-    elif step == 2:
-        st.subheader("2️⃣ Questions Comportementales")
-        st.text_area("Comment le candidat devrait-il gérer [situation difficile] ?", key="comp_q1", height=100)
-        st.text_area("Réponse attendue", key="comp_rep1", height=100)
-        st.text_area("Compétences évaluées", key="comp_eval1", height=100)
-
-    elif step == 3:
-        st.subheader("📊 Matrice KSA - Validation manager")
-        render_ksa_matrix()
-
-    elif step == 4:
-        st.subheader("4️⃣ Stratégie Recrutement")
-        st.multiselect("Canaux prioritaires", ["LinkedIn", "Jobboards", "Cooptation", "Réseaux sociaux", "Chasse de tête"], key="canaux_prioritaires")
-        st.text_area("Critères d'exclusion", key="criteres_exclusion", height=100)
-        st.text_area("Processus d'évaluation (détails)", key="processus_evaluation", height=100)
-        
-    elif step == 5:
-        st.subheader("📝 Notes générales du manager")
-        st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=200, 
-                    placeholder="Ajoutez vos commentaires et notes généraux...")
-
-        # Boutons Enregistrer et Annuler
-        col_save, col_cancel = st.columns([1, 1])
-        with col_save:
-            if st.button("💾 Enregistrer réunion", type="primary", use_container_width=True, key="save_reunion"):
-                if st.session_state.current_brief_name in st.session_state.saved_briefs:
-                    brief_name = st.session_state.current_brief_name
-                    
-                    # Récupérer tous les commentaires du manager
-                    manager_comments = {k: v for k, v in st.session_state.items() if k.startswith("manager_comment_")}
-                    
-                    # Mettre à jour les briefs
-                    existing_briefs = load_briefs()
-                    if brief_name in existing_briefs:
-                        existing_briefs[brief_name].update({
-                            "ksa_data": st.session_state.get("ksa_data", {}),
-                            "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict(),
-                            "manager_notes": st.session_state.get("manager_notes", ""),
-                            "manager_comments": manager_comments,
-                            "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
-                            "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
-                            "processus_evaluation": st.session_state.get("processus_evaluation", "")
-                        })
-                        st.session_state.saved_briefs = existing_briefs
-                    else:
-                        st.session_state.saved_briefs[brief_name].update({
-                            "ksa_data": st.session_state.get("ksa_data", {}),
-                            "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict(),
-                            "manager_notes": st.session_state.get("manager_notes", ""),
-                            "manager_comments": manager_comments,
-                            "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
-                            "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
-                            "processus_evaluation": st.session_state.get("processus_evaluation", "")
-                        })
-                    
-                    save_briefs()
-                    st.session_state.reunion_completed = True
-                    st.session_state.save_message = "✅ Données de réunion sauvegardées"
-                    st.session_state.save_message_tab = "Réunion"
-                    st.rerun()
-                else:
-                    st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
-        
-        with col_cancel:
-            if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion"):
-                delete_current_brief()
-
-    # ---- Navigation wizard ----
-    col1, col2, col3 = st.columns([1, 6, 1])
-    with col1:
-        if step > 1:
-            if st.button("⬅️ Précédent", key="prev_step"):
-                st.session_state.reunion_step -= 1
-                st.rerun()
-    with col3:
-        if step < total_steps:
-            if st.button("Suivant ➡️", key="next_step"):
-                st.session_state.reunion_step += 1
                 st.rerun()
 
 # ---------------- SYNTHÈSE ----------------
