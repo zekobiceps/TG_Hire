@@ -61,6 +61,9 @@ def get_deepseek_response(prompt):
 # -------------------- FONCTIONS DE MATCHING CORRIGÉES --------------------
 
 def match_cv_to_job(cv_text, job_offer_text):
+    """
+    Compare un CV et une offre d'emploi en utilisant une API DeepSeek pour générer une analyse JSON.
+    """
     prompt_for_json = f"""
     Compare the following CV and job offer. Extract all relevant information in a single JSON object.
 
@@ -88,11 +91,16 @@ def match_cv_to_job(cv_text, job_offer_text):
     The response must contain ONLY the JSON object, no other text or explanation.
     """
     try:
-        # Utiliser la fonction DeepSeek et nettoyer la réponse
+        # Utiliser la fonction DeepSeek
         response_text = get_deepseek_response(prompt_for_json)
-        cleaned_response = clean_json_string(response_text)
         
-        # Analyser la chaîne JSON propre
+        # VÉRIFICATION: Si la réponse est une chaîne d'erreur, ne pas tenter de la décoder
+        if response_text.startswith("Erreur"):
+            st.error(f"❌ Erreur de l'API : {response_text}")
+            return None
+        
+        # Nettoyer la réponse de l'IA et analyser la chaîne JSON propre
+        cleaned_response = clean_json_string(response_text)
         match_result = json5.loads(cleaned_response)
         
         return match_result
