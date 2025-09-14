@@ -137,76 +137,68 @@ def delete_current_brief():
 def apply_ai_pre_redaction():
     """Applique la pré-rédaction IA aux champs concernés"""
     try:
-        # Récupérer les données actuelles du brief
-        brief_data = {
-            "Mission globale": st.session_state.get("impact_strategique", ""),
-            "Tâches principales": st.session_state.get("taches_principales", ""),
-            "Must have expérience": st.session_state.get("must_have_experience", ""),
-            "Must have diplômes": st.session_state.get("must_have_diplomes", ""),
-            "Must have compétences": st.session_state.get("must_have_competences", ""),
-            "Must have soft skills": st.session_state.get("must_have_softskills", ""),
-            "Nice to have expérience": st.session_state.get("nice_to_have_experience", ""),
-            "Nice to have diplômes": st.session_state.get("nice_to_have_diplomes", ""),
-            "Nice to have compétences": st.session_state.get("nice_to_have_competences", ""),
-        }
+        with st.spinner("📝 Pré-rédaction en cours..."):
+            # Récupérer les données actuelles du brief
+            brief_data = {
+                "Mission globale": st.session_state.get("impact_strategique", ""),
+                "Tâches principales": st.session_state.get("taches_principales", ""),
+                "Must have expérience": st.session_state.get("must_have_experience", ""),
+                "Must have diplômes": st.session_state.get("must_have_diplomes", ""),
+                "Must have compétences": st.session_state.get("must_have_competences", ""),
+                "Must have soft skills": st.session_state.get("must_have_softskills", ""),
+                "Nice to have expérience": st.session_state.get("nice_to_have_experience", ""),
+                "Nice to have diplômes": st.session_state.get("nice_to_have_diplomes", ""),
+                "Nice to have compétences": st.session_state.get("nice_to_have_competences", ""),
+            }
+            
+            # Convertir en texte pour l'envoi à l'API
+            brief_data_str = "\n".join([f"{key}: {value}" for key, value in brief_data.items()])
+            
+            # Appeler l'API DeepSeek
+            ai_response = get_ai_pre_redaction(brief_data_str)
+            
+            # Parser la réponse markdown
+            current_section = None
+            parsed_data = {
+                "impact_strategique": "",
+                "taches_principales": [],
+                "must_have": [],
+                "nice_to_have": [],
+            }
+            
+            for line in ai_response.split("\n"):
+                line = line.strip()
+                if line.startswith("## Mission globale"):
+                    current_section = "impact_strategique"
+                elif line.startswith("## Tâches principales"):
+                    current_section = "taches_principales"
+                elif line.startswith("## Must have"):
+                    current_section = "must_have"
+                elif line.startswith("## Nice to have"):
+                    current_section = "nice_to_have"
+                elif line.startswith("- ") and current_section:
+                    if current_section == "impact_strategique":
+                        parsed_data[current_section] = line[2:].strip()
+                    else:
+                        parsed_data[current_section].append(line[2:].strip())
+            
+            # Mettre à jour les champs de session
+            st.session_state.impact_strategique = parsed_data["impact_strategique"]
+            st.session_state.taches_principales = "\n".join(parsed_data["taches_principales"])
+            # Pour must-have et nice-to-have, concaténer dans les champs respectifs
+            must_have_str = "\n".join(parsed_data["must_have"])
+            st.session_state.must_have_experience = must_have_str
+            st.session_state.must_have_diplomes = must_have_str
+            st.session_state.must_have_competences = must_have_str
+            st.session_state.must_have_softskills = must_have_str
+            
+            nice_to_have_str = "\n".join(parsed_data["nice_to_have"])
+            st.session_state.nice_to_have_experience = nice_to_have_str
+            st.session_state.nice_to_have_diplomes = nice_to_have_str
+            st.session_state.nice_to_have_competences = nice_to_have_str
         
-        # Convertir en texte pour l'envoi à l'API
-        brief_data_str = "\n".join([f"{key}: {value}" for key, value in brief_data.items()])
-        
-        # Appeler l'API DeepSeek
-        ai_response = get_ai_pre_redaction(brief_data_str)
-        
-        # Parser la réponse markdown
-        current_section = None
-        parsed_data = {
-            "impact_strategique": "",
-            "taches_principales": [],
-            "must_have_experience": [],
-            "must_have_diplomes": [],
-            "must_have_competences": [],
-            "must_have_softskills": [],
-            "nice_to_have_experience": [],
-            "nice_to_have_diplomes": [],
-            "nice_to_have_competences": [],
-        }
-        
-        for line in ai_response.split("\n"):
-            line = line.strip()
-            if line.startswith("## Mission globale"):
-                current_section = "impact_strategique"
-            elif line.startswith("## Tâches principales"):
-                current_section = "taches_principales"
-            elif line.startswith("## Must have"):
-                if "expérience" in line.lower():
-                    current_section = "must_have_experience"
-                elif "diplômes" in line.lower():
-                    current_section = "must_have_diplomes"
-                elif "compétences" in line.lower():
-                    current_section = "must_have_competences"
-                elif "soft skills" in line.lower():
-                    current_section = "must_have_softskills"
-            elif line.startswith("## Nice to have"):
-                if "expérience" in line.lower():
-                    current_section = "nice_to_have_experience"
-                elif "diplômes" in line.lower():
-                    current_section = "nice_to_have_diplomes"
-                elif "compétences" in line.lower():
-                    current_section = "nice_to_have_competences"
-            elif line.startswith("- ") and current_section:
-                if current_section == "impact_strategique":
-                    parsed_data[current_section] = line[2:].strip()
-                else:
-                    parsed_data[current_section].append(line[2:].strip())
-        
-        # Mettre à jour les champs de session
-        for key, value in parsed_data.items():
-            if isinstance(value, list):
-                st.session_state[key] = "\n".join(value)
-            else:
-                st.session_state[key] = value
-        
-        st.success("✅ Pré-rédaction IA appliquée avec succès")
-        st.rerun()
+            st.success("✅ Pré-rédaction IA appliquée avec succès")
+            st.rerun()
     
     except Exception as e:
         st.error(f"❌ Erreur lors de la pré-rédaction IA : {str(e)}")
@@ -600,26 +592,11 @@ st.markdown("""
         min-height: 60px !important;
     }
     
-    /* Réduire l'espace entre les éléments */
-    .st-emotion-cache-1r6slb0 {
-        margin-bottom: 0.2rem;
-    }
-    .st-emotion-cache-1r6slb0 p {
-        margin-bottom: 0.2rem;
-    }
-    /* Réduire l'espace entre les titres et les champs */
-    h3 {
-        margin-bottom: 0.5rem !important;
-    }
-    /* Réduire la hauteur des champs */
-    .stTextInput input, .stSelectbox select, .stDateInput input {
-        padding-top: 0.2rem !important;
-        padding-bottom: 0.2rem !important;
-        height: 2rem !important;
-    }
-    /* Réduire l'espace entre les lignes de formulaire */
-    .st-emotion-cache-ocqkz7 {
-        gap: 0.5rem !important;
+    /* Réduire la taille des boutons dans Briefs sauvegardés */
+    .stButton > button {
+        padding: 0.25rem 0.5rem !important;
+        font-size: 0.8rem !important;
+        min-height: 30px !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -628,13 +605,13 @@ st.markdown("""
 if "current_brief_name" not in st.session_state:
     st.session_state.current_brief_name = ""
 
-# Création des onglets dans l'ordre demandé : Gestion, Avant-brief, Réunion, Synthèse, Bibliothèque
+# Création des onglets dans l'ordre demandé : Gestion, Avant-brief, Réunion, Synthèse, Catalogue des Postes
 tabs = st.tabs([
     "📁 Gestion", 
     "🔄 Avant-brief", 
     "✅ Réunion de brief", 
     "📝 Synthèse",
-    "📚 Bibliothèque"
+    "📚 Catalogue des Postes"
 ])
 
 # Déterminer quels onglets sont accessibles
@@ -873,8 +850,8 @@ with tabs[1]:
         num_rows="fixed"
     )
 
-    # Boutons Enregistrer, Pré-rédiger par IA et Réinitialiser
-    col_save, col_pre_rediger, col_reset = st.columns(3)
+    # Boutons Enregistrer et Pré-rédiger par IA (sans Réinitialiser)
+    col_save, col_pre_rediger = st.columns(2)
     with col_save:
         if st.button("💾 Enregistrer modifications", type="primary", use_container_width=True, key="save_avant_brief"):
             if st.session_state.current_brief_name in st.session_state.saved_briefs:
@@ -903,10 +880,6 @@ with tabs[1]:
     with col_pre_rediger:
         if st.button("💡 Pré-rédiger par IA", type="primary", key="pre_rediger_ia", use_container_width=True):
             apply_ai_pre_redaction()
-    
-    with col_reset:
-        if st.button("🗑️ Réinitialiser le Brief", type="secondary", use_container_width=True, key="reset_avant_brief"):
-            delete_current_brief()
 
 # ---------------- RÉUNION ----------------
 with tabs[2]:
@@ -1156,15 +1129,15 @@ with tabs[3]:
         else:
             st.info("⚠️ Word non dispo (pip install python-docx)")
 
-# ---------------- ONGLET BIBLIOTHÈQUE ----------------
+# ---------------- ONGLET CATALOGUE DES POSTES ----------------
 with tabs[4]:
-    st.header("📚 Bibliothèque des fiches de poste")
+    st.header("📚 Catalogue des Postes")
     
     library = st.session_state.job_library
     
     # Vérifier si la bibliothèque est vide
     if not library:
-        st.info("La bibliothèque est vide. Ajoutez votre première fiche de poste ci-dessous.")
+        st.info("Le catalogue est vide. Ajoutez votre première fiche de poste ci-dessous.")
     else:
         # Afficher toutes les fiches
         st.subheader("📋 Fiches de poste disponibles")
@@ -1183,7 +1156,7 @@ with tabs[4]:
                     save_library(library)
                     st.session_state.job_library = library
                     st.session_state.save_message = f"✅ Fiche de poste '{job['title']}' supprimée"
-                    st.session_state.save_message_tab = "Bibliothèque"
+                    st.session_state.save_message_tab = "Catalogue des Postes"
                     st.rerun()
     
     # Formulaire pour ajouter ou modifier une fiche
@@ -1239,15 +1212,15 @@ with tabs[4]:
                     st.session_state.save_message = f"✅ Fiche de poste '{title}' créée avec succès"
                 save_library(library)
                 st.session_state.job_library = library
-                st.session_state.save_message_tab = "Bibliothèque"
+                st.session_state.save_message_tab = "Catalogue des Postes"
         
         # Afficher le message de sauvegarde en bas
-        if st.session_state.save_message and st.session_state.save_message_tab == "Bibliothèque":
+        if st.session_state.save_message and st.session_state.save_message_tab == "Catalogue des Postes":
             st.success(st.session_state.save_message)
             st.session_state.save_message = None
             st.session_state.save_message_tab = None
 
-# JavaScript pour désactiver les onglets non accessibles (Bibliothèque exclue)
+# JavaScript pour désactiver les onglets non accessibles (Catalogue des Postes exclue)
 st.markdown(f"""
 <script>
 // Désactiver les onglets selon les permissions
@@ -1261,6 +1234,6 @@ if (!{str(can_access_reunion).lower()}) {{
 if (!{str(can_access_synthese).lower()}) {{
     tabs[3].classList.add('disabled-tab');
 }}
-// Bibliothèque (tabs[4]) toujours accessible
+// Catalogue des Postes (tabs[4]) toujours accessible
 </script>
 """, unsafe_allow_html=True)
