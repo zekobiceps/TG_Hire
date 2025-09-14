@@ -981,8 +981,13 @@ with tabs[1]:
                 st.rerun()
             
             if st.session_state.show_job_selection:
-                library = st.session_state.job_library
-                job_titles = [job["title"] for job in library] if library else []
+                if os.path.exists("job_library.json"):
+                    with open("job_library.json", "r") as f:
+                        library = json.load(f)
+                    job_titles = [job["title"] for job in library] if library else []
+                else:
+                    job_titles = []
+                
                 if not job_titles:
                     st.error("❌ Aucun poste disponible dans le catalogue. Ajoutez un poste dans l'onglet 'Catalogue des Postes'.")
                     st.session_state.show_job_selection = False
@@ -990,7 +995,6 @@ with tabs[1]:
                     selected_job = st.selectbox("Sélectionnez un poste pour la pré-rédaction :", job_titles, key="select_job_for_pre_redaction")
                     if st.button("Confirmer", key="confirm_job_selection"):
                         apply_ai_pre_redaction(selected_job_title=selected_job)
-                        # Reconstruire le DataFrame avec les nouvelles valeurs
                         data = []
                         for section in sections:
                             for i, (field_name, field_key, placeholder) in enumerate(section["fields"]):
@@ -1000,8 +1004,6 @@ with tabs[1]:
                         st.session_state.edited_df = pd.DataFrame(data, columns=["Section", "Détails", "Informations"])
                         st.session_state.show_job_selection = False
                         st.rerun()
-
-# ... (reste du code inchangé)
 
 # ---------------- RÉUNION ----------------
 with tabs[2]:
@@ -1265,10 +1267,14 @@ with tabs[4]:
             with col3:
                 if st.button("Supprimer", key=f"delete_job_{i}"):
                     del library[i]
-                    save_library(library)
-                    st.session_state.job_library = library
-                    st.session_state.save_message = f"✅ Fiche de poste '{job['title']}' supprimée"
-                    st.session_state.save_message_tab = "Catalogue des Postes"
+                    try:
+                        with open("job_library.json", "w") as f:
+                            json.dump(library, f, indent=4)
+                        st.session_state.job_library = library
+                        st.session_state.save_message = f"✅ Fiche de poste '{job['title']}' supprimée"
+                        st.session_state.save_message_tab = "Catalogue des Postes"
+                    except Exception as e:
+                        st.error(f"❌ Erreur lors de la suppression : {str(e)}")
                     st.rerun()
     
     # Formulaire pour ajouter ou modifier une fiche
@@ -1294,40 +1300,44 @@ with tabs[4]:
         competences = st.text_area("Compétences requises", value=job_data.get('competences', ''))
         
         if st.form_submit_button("💾 Sauvegarder"):
-            # Vérif intitulé unique
-            if any(j["title"].lower() == title.lower() for j in library if not (editing and j["title"] == job_data.get("title", ""))):
-                st.error("Une fiche avec cet intitulé existe déjà.")
+            new_job = {
+                'title': title,
+                'finalite': finalite,
+                'activites': activites,
+                'n1_hierarchique': n1_hierarchique,
+                'n1_fonctionnel': n1_fonctionnel,
+                'entite_rattachement': entite_rattachement,
+                'indicateurs': indicateurs,
+                'interne': interne,
+                'supervision_directe': supervision_directe,
+                'externe': externe,
+                'supervision_indirecte': supervision_indirecte,
+                'niveau_diplome': niveau_diplome,
+                'experience_globale': experience_globale,
+                'competences': competences,
+                "date_creation": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+            if editing:
+                library[st.session_state.editing_job] = new_job
+                del st.session_state.editing_job
+                st.session_state.save_message = f"✅ Fiche de poste '{title}' modifiée avec succès"
             else:
-                new_job = {
-                    'title': title,
-                    'finalite': finalite,
-                    'activites': activites,
-                    'n1_hierarchique': n1_hierarchique,
-                    'n1_fonctionnel': n1_fonctionnel,
-                    'entite_rattachement': entite_rattachement,
-                    'indicateurs': indicateurs,
-                    'interne': interne,
-                    'supervision_directe': supervision_directe,
-                    'externe': externe,
-                    'supervision_indirecte': supervision_indirecte,
-                    'niveau_diplome': niveau_diplome,
-                    'experience_globale': experience_globale,
-                    'competences': competences,
-                    "date_creation": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                }
-                if editing:
-                    library[st.session_state.editing_job] = new_job
-                    del st.session_state.editing_job
-                    st.session_state.save_message = f"✅ Fiche de poste '{title}' modifiée avec succès"
-                else:
-                    library.append(new_job)
-                    st.session_state.save_message = f"✅ Fiche de poste '{title}' créée avec succès"
-                save_library(library)
-                st.session_state.job_library = library
+                library.append(new_job)
+                st.session_state.save_message = f"✅ Fiche de poste '{title}' créée avec succès"
+            
+            # Sauvegarde explicite dans job_library.json
+            try:
+                with open("job_library.json", "w") as f:
+                    json.dump(library, f, indent=4)
+                st.session_state.job_library = library  # Synchroniser la session
                 st.session_state.save_message_tab = "Catalogue des Postes"
-        
-        # Afficher le message de sauvegarde en bas
-        if st.session_state.save_message and st.session_state.save_message_tab == "Catalogue des Postes":
-            st.success(st.session_state.save_message)
-            st.session_state.save_message = None
-            st.session_state.save_message_tab = None
+            except Exception as e:
+                st.error(f"❌ Erreur lors de la sauvegarde dans job_library.json : {str(e)}")
+            
+            st.rerun()
+
+    # Afficher le message de sauvegarde en bas
+    if st.session_state.save_message and st.session_state.save_message_tab == "Catalogue des Postes":
+        st.success(st.session_state.save_message)
+        st.session_state.save_message = None
+        st.session_state.save_message_tab = None
