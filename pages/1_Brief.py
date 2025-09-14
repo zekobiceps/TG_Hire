@@ -749,12 +749,11 @@ with tabs[1]:
                             advice = generate_checklist_advice(section["title"], title)
                             example = get_example_for_field(section["title"], title)
                             message_to_copy = f"{advice}\nExemple : {example}"
-                            # Affichage de la notification avec le conseil à copier
+
+                            # Affichage du message IA sous forme de notification persistant
                             st.success(f"Voici votre conseil IA pour {title}:")
                             st.code(message_to_copy, language="text")
                             st.info("Copiez ce message et collez-le dans la case correspondante.")
-                            # Ne plus utiliser session_state pour éviter l'erreur
-                            st.rerun()  # Rafraîchit la page pour que le conseil apparaisse
 
     # Formulaire de soumission pour les boutons Enregistrer et Annuler
     col_save, col_cancel = st.columns([1, 1])
