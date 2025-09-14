@@ -1,15 +1,9 @@
 import streamlit as st
 import pandas as pd
-import os
 import io
 from pypdf import PdfReader
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import hashlib
-import uuid
-from datetime import datetime
-import sqlite3
-import json
 
 # --- Streamlit Page Config ---
 st.set_page_config(
@@ -18,77 +12,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# --- Database Setup ---
-def init_db():
-    """Initialize SQLite database with necessary tables"""
-    try:
-        conn = sqlite3.connect('Resume.db')
-        c = conn.cursor()
-        
-        # Create ranking history table with proper constraints
-        c.execute('''
-        CREATE TABLE IF NOT EXISTS ranking_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL,
-            job_title TEXT,
-            description TEXT,
-            results TEXT
-        )
-        ''')
-        
-        conn.commit()
-        conn.close()
-        st.success("✅ Base de données initialisée avec succès")
-    except Exception as e:
-        st.error(f"❌ Erreur lors de l'initialisation de la base de données: {e}")
-
-# --- Initialize Session State ---
-if "current_page" not in st.session_state:
-    st.session_state["current_page"] = "dashboard"
-
-# --- Resume History Functions ---
-def save_ranking_history(job_title, description, results):
-    """Save resume ranking history."""
-    try:
-        conn = sqlite3.connect('Resume.db')
-        c = conn.cursor()
-        
-        # Convert DataFrame to JSON string safely
-        results_json = results.to_json(orient='records')
-        
-        # Create new history entry with proper data handling
-        c.execute(
-            "INSERT INTO ranking_history (timestamp, job_title, description, results) VALUES (?, ?, ?, ?)",
-            (
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                job_title if job_title else "Poste sans titre",
-                description if description else "Aucune description",
-                results_json
-            )
-        )
-        
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        st.error(f"❌ Erreur lors de la sauvegarde de l'historique: {e}")
-        return False
-
-def get_history():
-    """Get resume ranking history."""
-    try:
-        conn = sqlite3.connect('Resume.db')
-        
-        # Get all history records
-        query = "SELECT id, timestamp, job_title, description, results FROM ranking_history ORDER BY timestamp DESC"
-        history_df = pd.read_sql_query(query, conn)
-        
-        conn.close()
-        return history_df
-    except Exception as e:
-        st.error(f"❌ Erreur lors de la récupération de l'historique: {e}")
-        return pd.DataFrame()
 
 # --- Resume Processing Functions ---
 def extract_text_from_pdf(file):
@@ -118,32 +41,32 @@ def rank_resumes(job_description, resumes):
         st.error(f"❌ Erreur lors du classement des CVs: {e}")
         return []
 
-# Add custom CSS for better styling
+# Add custom CSS for better styling with 'rouge vif' buttons
 st.markdown("""
     <style>
     .main-header {
         font-size: 2.5rem;
         font-weight: 700;
-        color: #1e40af;
+        color: #dc2626; /* Bright red text */
         text-align: center;
         margin-bottom: 2rem;
         padding: 1rem;
-        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
         border-radius: 10px;
-        border-left: 5px solid #1e40af;
+        border-left: 5px solid #dc2626;
     }
     
     .section-header {
         font-size: 1.5rem;
         font-weight: 600;
-        color: #1e40af;
+        color: #dc2626;
         margin-bottom: 1rem;
         padding-bottom: 0.5rem;
-        border-bottom: 2px solid #e0f2fe;
+        border-bottom: 2px solid #fecaca;
     }
     
     .stButton>button {
-        background-color: #1e40af;
+        background-color: #dc2626; /* Bright red button color */
         color: white;
         font-size: 16px;
         border-radius: 8px;
@@ -153,14 +76,14 @@ st.markdown("""
     }
     
     .stButton>button:hover {
-        background-color: #1e3a8a;
+        background-color: #b91c1c; /* Darker red on hover */
         transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
     }
     
     .upload-box {
-        background: #f8fafc;
-        border: 2px dashed #cbd5e1;
+        background: #fafafa;
+        border: 2px dashed #e5e5e5;
         border-radius: 10px;
         padding: 2rem;
         text-align: center;
@@ -172,11 +95,7 @@ st.markdown("""
         padding: 1.5rem;
         margin: 1rem 0;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        border-left: 4px solid #1e40af;
-    }
-    
-    .sidebar-content {
-        padding: 2rem 1rem;
+        border-left: 4px solid #dc2626;
     }
     
     .metric-card {
@@ -208,47 +127,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-def show_history_page():
-    st.markdown('<div class="main-header">📊 Historique des Classements</div>', unsafe_allow_html=True)
-    
-    history = get_history()
-    if history.empty:
-        st.info("📝 Aucun historique de classement trouvé")
-    else:
-        for idx, row in history.iterrows():
-            with st.expander(f"📋 {row.get('job_title', 'Sans titre')} - {row.get('timestamp', 'Date inconnue')}"):
-                col1, col2 = st.columns([1, 2])
-                
-                with col1:
-                    if 'timestamp' in row and row['timestamp']:
-                        st.metric("Date", str(row['timestamp']).split()[0])
-                    if 'job_title' in row and row['job_title']:
-                        st.metric("Poste", row['job_title'])
-                
-                with col2:
-                    description = row.get('description', 'Aucune description')
-                    st.text_area("Description du poste", value=description, height=120, disabled=True)
-                    
-                    try:
-                        if 'results' in row and row['results']:
-                            results_data = pd.read_json(row['results'])
-                            if not results_data.empty:
-                                # Clean column names for display
-                                display_df = results_data.copy()
-                                if 'Raw Score' in display_df.columns:
-                                    display_df = display_df.drop(columns=['Raw Score'])
-                                if 'Score brut' in display_df.columns:
-                                    display_df = display_df.drop(columns=['Score brut'])
-                                
-                                st.dataframe(
-                                    display_df, 
-                                    use_container_width=True,
-                                    hide_index=True
-                                )
-                    except Exception as e:
-                        st.warning(f"⚠️ Impossible de charger les résultats: {e}")
-
-def show_dashboard():
+def main():
     st.markdown('<div class="main-header">📋 Analyse de CV</div>', unsafe_allow_html=True)
 
     # --- Job Information Section ---
@@ -372,18 +251,8 @@ def show_dashboard():
                     chart_data["Score numérique"] = chart_data["Score brut"] * 100
                     st.bar_chart(
                         chart_data.set_index("Nom du CV")["Score numérique"],
-                        color="#1e40af"
+                        color="#dc2626"
                     )
-                    
-                    # Save ranking history
-                    success = save_ranking_history(
-                        job_title,
-                        job_description,
-                        results_df
-                    )
-                    
-                    if success:
-                        st.success("✅ Historique sauvegardé avec succès")
                     
                     # Download options
                     st.markdown('<div class="section-header">💾 Exporter les Résultats</div>', unsafe_allow_html=True)
@@ -415,53 +284,6 @@ def show_dashboard():
                     st.error("❌ Aucun score généré lors de l'analyse")
             else:
                 st.error("❌ Aucun CV valide à analyser")
-
-# --- App Sidebar ---
-def render_sidebar():
-    st.sidebar.markdown("""
-        <div class="sidebar-content">
-            <h2 style="text-align: center; color: #1e40af; margin-bottom: 2rem;">
-                📄 HireSense
-            </h2>
-    """, unsafe_allow_html=True)
-    
-    # Navigation
-    if st.sidebar.button("🏠 Tableau de bord", use_container_width=True):
-        st.session_state["current_page"] = "dashboard"
-        st.rerun()
-        
-    if st.sidebar.button("📊 Historique", use_container_width=True):
-        st.session_state["current_page"] = "history"
-        st.rerun()
-    
-    st.sidebar.markdown("</div>", unsafe_allow_html=True)
-    
-    # Information
-    st.sidebar.markdown("---")
-    st.sidebar.markdown("""
-        <div style="padding: 1rem; background: #f0f9ff; border-radius: 10px;">
-            <h4>ℹ️ Comment utiliser</h4>
-            <ol style="font-size: 0.9rem; padding-left: 1.2rem;">
-                <li>Saisir l'intitulé du poste</li>
-                <li>Rédiger la description du poste</li>
-                <li>Importer les CVs (PDF)</li>
-                <li>Lancer l'analyse</li>
-            </ol>
-        </div>
-    """, unsafe_allow_html=True)
-
-# --- Main App Logic ---
-def main():
-    # Initialize database
-    init_db()
-    
-    render_sidebar()
-    
-    # Show appropriate page content
-    if st.session_state["current_page"] == "dashboard":
-        show_dashboard()
-    elif st.session_state["current_page"] == "history":
-        show_history_page()
 
 if __name__ == "__main__":
     main()
