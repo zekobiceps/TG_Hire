@@ -659,19 +659,10 @@ with tabs[0]:
                             pass  # Logique d'export à implémenter si nécessaire
             else:
                 st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
+
 # ---------------- AVANT-BRIEF ----------------
 with tabs[1]:
-    # Afficher le message de sauvegarde seulement pour cet onglet
-    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Avant-brief"):
-        st.success(st.session_state.save_message)
-        st.session_state.save_message = None
-        st.session_state.save_message_tab = None
-
-    # Afficher les informations du brief en cours
-    brief_display_name = f"Avant-brief - {st.session_state.current_brief_name}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
-    st.subheader(f"🔄 {brief_display_name}")
-
-    # Liste des sections et champs pour les text_area
+    # Définir la liste des sections et champs en premier
     sections = [
         {
             "title": "Contexte du poste",
@@ -730,43 +721,47 @@ with tabs[1]:
         },
     ]
 
+    # Afficher le message de sauvegarde seulement pour cet onglet
+    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Avant-brief"):
+        st.success(st.session_state.save_message)
+        st.session_state.save_message = None
+        st.session_state.save_message_tab = None
+
+    # Afficher les informations du brief en cours
+    brief_display_name = f"Avant-brief - {st.session_state.current_brief_name}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
+    st.subheader(f"🔄 {brief_display_name}")
+
+    # Bouton pour générer tous les conseils IA
+    if st.button("🌟 Générer tous les conseils IA"):
+        for section in sections:
+            for title, key, _ in section["fields"]:
+                if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
+                    advice = generate_checklist_advice(section["title"], title)
+                    if advice != "Pas de conseil disponible.":
+                        example = get_example_for_field(section["title"], title)
+                        message_to_copy = f"{advice}\nExemple : {example}"
+                        st.session_state[f"advice_{key}"] = message_to_copy
+        st.rerun()
+
     brief_data = {}
     if st.session_state.current_brief_name in st.session_state.saved_briefs:
         brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
 
-    # Section pour afficher les champs avec boutons IA (hors formulaire)
+    # Initialiser les conseils dans session_state si non existants
     for section in sections:
-        with st.expander(f"📋 {section['title']}"):
-            st.info("Cliquez sur 💡 Conseils IA pour générer un conseil dynamique à copier dans le champ. Le conseil précédent sera remplacé par le nouveau.")
-            for title, key, placeholder in section["fields"]:
-                col1, col2 = st.columns([4, 1])
-                with col1:
-                    # Afficher le champ en lecture seule pour visualisation
-                    st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")) or "", key=f"display_{key}", placeholder=placeholder, height=100, disabled=True)
-                with col2:
-                    # Bouton IA seulement pour les sections autorisées
-                    if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
-                        if st.button("💡 Conseils IA", key=f"btn_conseil_{key}_{section['title']}"):
-                            advice = generate_checklist_advice(section["title"], title)
-                            if advice == "Pas de conseil disponible.":
-                                st.warning("Aucun conseil disponible pour ce champ.")
-                            else:
-                                example = get_example_for_field(section["title"], title)
-                                message_to_copy = f"{advice}\nExemple : {example}"
-                                # Remplacer l'ancien conseil
-                                st.session_state[f"advice_{key}"] = message_to_copy
-                                st.rerun()
-                
-                # Afficher le conseil généré juste en dessous du champ
-                if f"advice_{key}" in st.session_state and st.session_state[f"advice_{key}"]:
-                    st.code(st.session_state[f"advice_{key}"], language="text")
+        for title, key, _ in section["fields"]:
+            if f"advice_{key}" not in st.session_state:
+                st.session_state[f"advice_{key}"] = ""
 
-    # Formulaire pour éditer les champs
+    # Formulaire avec expanders et champs éditable
     with st.form(key="avant_brief_form"):
         for section in sections:
             with st.expander(f"📋 {section['title']}"):
                 for title, key, placeholder in section["fields"]:
                     st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")) or "", key=key, placeholder=placeholder, height=100)
+                    # Afficher le conseil généré juste en dessous du champ
+                    if f"advice_{key}" in st.session_state and st.session_state[f"advice_{key}"]:
+                        st.code(st.session_state[f"advice_{key}"], language="text")
 
         # Boutons Enregistrer et Annuler dans le formulaire
         col_save, col_cancel = st.columns([1, 1])
@@ -789,7 +784,6 @@ with tabs[1]:
                 st.session_state.current_brief_name = ""
                 st.session_state.avant_brief_completed = False
                 st.rerun()
-
 
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
