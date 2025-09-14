@@ -57,3 +57,6 @@ python-docx
 PyMuPDF
 reportlab
 json5
+pypdf
+scikit-learn
+sqlite3
