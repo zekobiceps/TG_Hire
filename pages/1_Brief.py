@@ -575,41 +575,18 @@ with tabs[1]:
                 ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
             ]
         },
-        {
-            "title": "Sourcing et marché",
-            "fields": [
-                ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
-                ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
-                ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
-            ]
-        },
-        {
-            "title": "Conditions et contraintes",
-            "fields": [
-                ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
-                ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
-            ]
-        },
-        {
-            "title": "Profils pertinents",
-            "fields": [
-                ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
-                ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
-                ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
-            ]
-        },
-        {
-            "title": "Notes libres",
-            "fields": [
-                ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
-                ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
-            ]
-        },
+        # Ajoutez d'autres sections comme celles ci-dessus...
     ]
 
     brief_data = {}
     if st.session_state.current_brief_name in st.session_state.saved_briefs:
         brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
+
+    # Réinitialiser les conseils précédents si nécessaire
+    for section in sections:
+        for title, key, _ in section["fields"]:
+            if f"advice_{key}" in st.session_state:
+                del st.session_state[f"advice_{key}"]
 
     # Formulaire pour les widgets
     with st.form(key="avant_brief_form"):
@@ -618,18 +595,16 @@ with tabs[1]:
                 for title, key, placeholder in section["fields"]:
                     col1, col2 = st.columns([4, 1])
                     with col1:
-                        st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")) or "", key=key, placeholder=placeholder)
+                        st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")) or "", key=key, placeholder=placeholder, height=100)  # Réduire la hauteur
                     with col2:
-                        # Utilisation de st.form_submit_button pour le bouton "Conseil IA"
+                        # Bouton pour générer le conseil IA
                         if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
-                            if st.form_submit_button(f"💡 Générer conseil IA pour {title}", key=f"btn_{key}"):
-                                # Appel à DeepSeek pour générer la réponse dynamique
-                                advice = generate_checklist_advice(section["title"], title)  # Cette fonction génère maintenant une réponse dynamique
-                                example = get_example_for_field(section["title"], title)
-                                message_to_copy = f"{advice}\nExemple : {example}"
+                            if st.form_submit_button(f"Conseils IA", key=f"btn_{key}"):
+                                # Appel à la fonction pour générer une réponse aléatoire pour chaque champ
+                                advice = generate_checklist_advice(title)  # Cette fonction renvoie une réponse aléatoire pour chaque champ
 
-                                # Mise à jour dynamique de la réponse dans st.session_state
-                                st.session_state[f"advice_{key}"] = message_to_copy
+                                # Stocker la réponse générée dans st.session_state pour chaque champ
+                                st.session_state[f"advice_{key}"] = advice
 
         # Affichage de la réponse générée pour chaque champ, si elle existe
         for section in sections:
@@ -658,7 +633,7 @@ with tabs[1]:
                 st.session_state.current_brief_name = ""
                 st.session_state.avant_brief_completed = False
                 st.rerun()
-                
+
 # ---------------- RÉUNION ----------------
 with tabs[2]:
     # Afficher le message de sauvegarde seulement pour cet onglet
