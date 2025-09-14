@@ -733,18 +733,20 @@ with tabs[1]:
     if st.session_state.current_brief_name in st.session_state.saved_briefs:
         brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
 
-    # Gérer les conseils IA avant le rendu des widgets
+    # Fonction pour générer le conseil IA
+    def generate_and_apply_advice(section_title, title, key):
+        if st.session_state.get(f"trigger_advice_{key}", False):
+            advice = generate_checklist_advice(section_title, title)
+            example = get_example_for_field(section_title, title)
+            st.session_state[key] = f"{advice}\nExemple : {example}"
+            st.session_state[f"trigger_advice_{key}"] = False
+            st.rerun()
+
+    # Appliquer les conseils avant le rendu
     for section in sections:
         for title, key, _ in section["fields"]:
-            advice_key = f"trigger_advice_{key}"
-            if advice_key not in st.session_state:
-                st.session_state[advice_key] = False
-            if st.session_state[advice_key]:
-                advice = generate_checklist_advice(section["title"], title)
-                example = get_example_for_field(section["title"], title)
-                st.session_state[key] = f"{advice}\nExemple : {example}"
-                st.session_state[advice_key] = False
-                st.rerun()
+            if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
+                generate_and_apply_advice(section["title"], title, key)
 
     # Formulaire pour les widgets
     with st.form(key="avant_brief_form"):
@@ -757,8 +759,7 @@ with tabs[1]:
                     with col2:
                         if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
                             if st.button("💡 Conseil IA", key=f"trigger_advice_{key}"):
-                                st.session_state[f"trigger_advice_{key}"] = True
-                                st.rerun()
+                                pass  # La logique est gérée dans generate_and_apply_advice
 
         # Boutons Enregistrer et Annuler dans le formulaire
         col_save, col_cancel = st.columns([1, 1])
