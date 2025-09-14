@@ -28,17 +28,6 @@ st.set_page_config(
 # --- CSS personnalisée ---
 st.markdown("""
     <style>
-    .main-header {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: #dc2626;
-        text-align: center;
-        margin-bottom: 2rem;
-        padding: 1rem;
-        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
-        border-radius: 10px;
-        border-left: 5px solid #dc2626;
-    }
     .section-header {
         font-size: 1.5rem;
         font-weight: 600;
@@ -81,7 +70,7 @@ st.markdown("""
         gap: 10px;
     }
     .stTabs [data-baseweb="tab-list"] button {
-        background-color: #f8f9fa;
+        background-color: white;
         border-radius: 8px 8px 0 0;
         padding: 12px 20px;
         font-size: 16px;
@@ -174,8 +163,6 @@ def get_deepseek_analysis(text):
         return "Analyse IA échouée. Veuillez réessayer."
 
 # --- Gestion des pages via des onglets ---
-st.markdown('<div class="main-header">📋 HireSense IA</div>', unsafe_allow_html=True)
-st.markdown("---")
 tab1, tab2 = st.tabs(["📊 Classement de CVs", "🎯 Analyse de Profil"])
 
 # --- Contenu de l'onglet Classement ---
@@ -265,6 +252,14 @@ with tab1:
                         use_container_width=True,
                         hide_index=True
                     )
+                    
+                    st.markdown("---")
+                    st.markdown('<div class="section-header">🔍 Comment le score est-il calculé ?</div>', unsafe_allow_html=True)
+                    st.info("""
+                        Le score de correspondance est basé sur la **similarité cosinus**. 
+                        Cette méthode analyse la fréquence des mots et des phrases dans chaque CV par rapport à la description du poste. 
+                        Un score élevé (proche de 100 %) indique une forte correspondance thématique et de compétences entre le profil du candidat et les exigences du poste.
+                    """)
                     
                     st.markdown('<div class="section-header">💾 Exporter les Résultats</div>', unsafe_allow_html=True)
                     csv = results_df.to_csv(index=False).encode('utf-8')
