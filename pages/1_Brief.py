@@ -728,18 +728,33 @@ with tabs[1]:
         },
     ]
 
-    # Ajouter du CSS pour styliser les titres des champs
+    # Ajouter du CSS pour styliser les titres des sections et champs
     st.markdown("""
         <style>
-        .custom-text-area-label {
+        /* Style pour les titres des expanders (sections) */
+        .st-expander [data-testid="stExpanderDetails"] > div:first-child {
             font-size: 20px !important;
             color: #FAFAFA !important;
             font-weight: 500 !important;
         }
+        
+        /* Style pour les labels des text_area (champs) */
         .stTextArea > label {
             font-size: 20px !important;
             color: #FAFAFA !important;
             font-weight: 500 !important;
+        }
+        
+        /* Style pour le contenu des conseils */
+        .advice-box {
+            background-color: #262730;
+            padding: 12px;
+            border-radius: 5px;
+            margin-top: 10px;
+            border: 1px solid #58a6ff;
+        }
+        .advice-box strong {
+            color: #58a6ff;
         }
         </style>
     """, unsafe_allow_html=True)
@@ -779,7 +794,7 @@ with tabs[1]:
     # Formulaire avec expanders et champs éditable
     with st.form(key="avant_brief_form"):
         for section in sections:
-            with st.expander(f'<span class="custom-text-area-label">📋 {section["title"]}</span>', expanded=True):
+            with st.expander(f"📋 {section['title']}", expanded=True):
                 for title, key, placeholder in section["fields"]:
                     # Larger height for all fields
                     height = 150  # Increased from 100 for all fields
@@ -788,10 +803,10 @@ with tabs[1]:
                     # Afficher le conseil généré juste en dessous du champ avec meilleur formatage
                     if f"advice_{key}" in st.session_state and st.session_state[f"advice_{key}"]:
                         st.markdown(f"""
-                            <div style="background-color: #262730; padding: 12px; border-radius: 5px; margin-top: 10px; border: 1px solid #58a6ff;">
-                                <strong style="color: #58a6ff;">Conseil</strong><br>
+                            <div class="advice-box">
+                                <strong>Conseil</strong><br>
                                 {st.session_state[f'advice_{key}'].split('\n**Exemple :**\n')[0]}<br>
-                                <strong style="color: #58a6ff;">Exemple :</strong><br>
+                                <strong>Exemple :</strong><br>
                                 {st.session_state[f'advice_{key}'].split('\n**Exemple :**\n')[1]}
                             </div>
                         """, unsafe_allow_html=True)

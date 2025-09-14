@@ -4,6 +4,8 @@ import requests
 import json
 import io
 from docx import Document
+import pandas as pd
+import json5
 
 # -------------------- API DeepSeek Configuration --------------------
 def get_deepseek_response(prompt):
@@ -20,7 +22,7 @@ def get_deepseek_response(prompt):
     }
 
     # Utilisez un prompt de système pour aligner l'IA sur le recrutement
-    system_prompt = "Vous êtes un assistant d'analyse de documents RH. Votre objectif est d'analyser le contenu de documents (CV, fiches de poste, etc.), d'en extraire les informations clés, et de fournir une synthèse claire et structurée. Vos réponses doivent être professionnelles, précises et directement applicables au contexte du recrutement."
+    system_prompt = "Vous êtes un assistant d'analyse de documents RH. Votre objectif est d'analyser le contenu de documents (CV, fiches de poste, etc.), d'en extraire les informations clés, et de fournir une synthèse claire et structurée. Vos réponses doivent être professionnelles, précises et directement applicables au contexte du recrutement. Pour l'évaluation de CV, votre réponse doit être un objet JSON valide, sans fioritures."
 
     messages = [
         {"role": "system", "content": system_prompt},
@@ -42,6 +44,49 @@ def get_deepseek_response(prompt):
             return f"Erreur API: {response.status_code} - {response.text}"
     except Exception as e:
         return f"Erreur lors de l'appel API: {e}"
+
+# -------------------- Nouvelles fonctions de matching CV --------------------
+def match_cv_to_job(cv_text, job_offer_text):
+    """
+    Évalue le taux de matching d'un CV avec une offre d'emploi.
+    L'IA renvoie un score et une explication structurée.
+    """
+    prompt = f"""
+    Évaluez la correspondance entre le CV et l'offre d'emploi ci-dessous.
+    L'évaluation doit se baser sur les critères suivants :
+    - Expérience professionnelle (nombre d'années, pertinence)
+    - Compétences techniques (hard skills)
+    - Compétences transversales (soft skills)
+    - Diplômes et certifications
+    - Adéquation avec les responsabilités du poste
+
+    Fournissez votre réponse sous forme de JSON valide avec les clés suivantes :
+    - "score": un entier de 0 à 100 représentant le pourcentage de correspondance.
+    - "points_forts": une liste de 3-4 points clés sur lesquels le candidat correspond bien à l'offre.
+    - "axes_d_amelioration": une liste de 1-2 points où le candidat est moins pertinent.
+    - "resume_extraction": une liste de points clés extraits du CV (expérience, compétences, etc.).
+
+    CV :
+    {cv_text}
+
+    Offre d'emploi :
+    {job_offer_text}
+
+    Uniquement l'objet JSON, sans explication ni texte supplémentaire.
+    """
+    
+    response = get_deepseek_response(prompt)
+    try:
+        # Utiliser json5 pour une meilleure tolérance aux erreurs de format
+        parsed_response = json5.loads(response)
+        return parsed_response
+    except (json.JSONDecodeError, json5.JSONDecodeError) as e:
+        st.error(f"❌ Erreur lors de l'analyse de la réponse de l'IA. Veuillez réessayer. Détails : {e}")
+        st.info(f"Réponse brute reçue: {response}")
+        return None
+    except Exception as e:
+        st.error(f"❌ Une erreur inattendue est survenue : {e}")
+        return None
 
 # -------------------- Logique de la page --------------------
 def render_pdf_analysis_page():
@@ -118,7 +163,6 @@ def render_pdf_analysis_page():
         unsafe_allow_html=True
     )
     
-    # Utilisation d'un formulaire pour une meilleure gestion des états
     with st.form(key="pdf_analysis_form"):
         st.subheader("1. Uploader votre document")
         uploaded_file = st.file_uploader(
@@ -128,18 +172,23 @@ def render_pdf_analysis_page():
             key="uploaded_file"
         )
         
-        # Champ pour afficher le texte extrait
-        extracted_text_area = st.empty()
+        # Champ de texte pour le "matching"
+        st.subheader("2. Coller l'offre d'emploi (optionnel)")
+        job_offer_text = st.text_area(
+            "Coller le texte de l'offre d'emploi pour évaluer le matching du CV",
+            height=250,
+            key="job_offer_text"
+        )
 
-        # Bouton pour lancer l'analyse
         submit_button = st.form_submit_button("🚀 Lancer l'analyse du document", type="primary")
+
+    if uploaded_file is not None:
+        st.success(f"✅ Fichier chargé : **{uploaded_file.name}**")
 
     if submit_button:
         if uploaded_file is not None:
-            st.success("✅ Fichier chargé avec succès!")
             file_type = uploaded_file.type
             
-            # --- Extraction du texte ---
             with st.spinner('⏳ Extraction du texte du document...'):
                 text_content = ""
                 if file_type == "application/pdf":
@@ -157,17 +206,51 @@ def render_pdf_analysis_page():
                     except Exception as e:
                         st.error(f"❌ Erreur lors de l'extraction du DOCX : {e}")
                         text_content = ""
-
-            # Affichage du texte extrait
+            
             if text_content.strip():
-                extracted_text_area.text_area("Texte extrait:", text_content, height=300, disabled=True)
-                
-                # --- Appel à l'IA pour l'analyse ---
-                with st.spinner('✨ Analyse en cours par l\'IA...'):
-                    analysis_prompt = f"Analyse le texte suivant extrait d'un document PDF. Extrait les informations clés pour un brief de recrutement : l'intitulé du poste, les tâches principales, les compétences techniques requises, les soft skills, et l'expérience demandée. Présente les informations dans une liste structurée. Le texte est : {text_content}"
-                    full_response = get_deepseek_response(analysis_prompt)
+                if job_offer_text.strip():
+                    # --- NOUVELLE FONCTIONNALITÉ: Matching CV ---
+                    st.subheader("🎯 Analyse de Correspondance CV vs Offre d'Emploi")
+                    with st.spinner('✨ Évaluation du matching en cours par l\'IA...'):
+                        match_result = match_cv_to_job(text_content, job_offer_text)
+
+                        if match_result:
+                            score = match_result.get("score")
+                            if score is not None:
+                                # Afficher le score en grand avec une couleur
+                                st.markdown(
+                                    f"""
+                                    <h2 style='text-align: center;'>Score de Matching :</h2>
+                                    <h1 style='text-align: center; color: #e74c3c; font-size: 4em;'>{score} %</h1>
+                                    <hr/>
+                                    """, 
+                                    unsafe_allow_html=True
+                                )
+                                
+                                # Afficher les points clés
+                                st.markdown("### Points Forts")
+                                if match_result.get("points_forts"):
+                                    for point in match_result["points_forts"]:
+                                        st.markdown(f"✅ {point}")
+
+                                st.markdown("---")
+                                st.markdown("### Axes d'Amélioration")
+                                if match_result.get("axes_d_amelioration"):
+                                    for point in match_result["axes_d_amelioration"]:
+                                        st.markdown(f"⚠️ {point}")
+                            else:
+                                st.warning("⚠️ L'IA n'a pas pu fournir de score. Veuillez vérifier les textes fournis.")
+
+                        else:
+                            st.error("❌ L'évaluation de correspondance a échoué.")
                     
+                else:
+                    # --- ANCIENNE FONCTIONNALITÉ: Analyse simple de CV ---
                     st.subheader("💡 Résultat de l'analyse IA")
+                    with st.spinner('✨ Analyse en cours par l\'IA...'):
+                        analysis_prompt = f"Analyse le texte suivant extrait d'un document. Extrait les informations clés pour un brief de recrutement : l'intitulé du poste, les tâches principales, les compétences techniques requises, les soft skills, et l'expérience demandée. Présente les informations dans une liste structurée. Le texte est : {text_content}"
+                        full_response = get_deepseek_response(analysis_prompt)
+                    
                     st.markdown(f'<div class="analysis-box">{full_response}</div>', unsafe_allow_html=True)
             else:
                 st.error("❌ Le document est vide ou l'extraction a échoué.")
