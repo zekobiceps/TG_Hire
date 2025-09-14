@@ -420,3 +420,25 @@ def get_ai_pre_redaction(fiche_data):
     )
 
     return response.choices[0].message.content
+def test_deepseek_connection():
+    """Teste la connexion à l'API DeepSeek."""
+    try:
+        from openai import OpenAI  # type: ignore
+        api_key = st.secrets.get("DEEPSEEK_API_KEY")
+        if not api_key:
+            st.error("Clé API DeepSeek non trouvée dans st.secrets")
+            return False
+        client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.deepseek.com/v1"
+        )
+        client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[{"role": "user", "content": "Test de connexion"}],
+            max_tokens=1
+        )
+        st.success("✅ Connexion à DeepSeek réussie !")
+        return True
+    except Exception as e:
+        st.error(f"❌ Erreur de connexion à DeepSeek : {e}")
+        return False
