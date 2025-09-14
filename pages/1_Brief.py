@@ -747,11 +747,11 @@ with tabs[1]:
                         if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
                             if st.form_submit_button(f"💡 Générer conseil IA pour {title}", key=f"btn_{key}"):
                                 # Appel à DeepSeek pour générer la réponse dynamique
-                                advice = generate_checklist_advice(section["title"], title)
+                                advice = generate_checklist_advice(section["title"], title)  # Cette fonction doit être dynamique
                                 example = get_example_for_field(section["title"], title)
                                 message_to_copy = f"{advice}\nExemple : {example}"
 
-                                # Stocker la réponse générée dans st.session_state pour chaque champ
+                                # Mise à jour dynamique de la réponse dans st.session_state
                                 st.session_state[f"advice_{key}"] = message_to_copy
 
         # Affichage de la réponse générée pour chaque champ, si elle existe
