@@ -750,10 +750,11 @@ with tabs[1]:
                             example = get_example_for_field(section["title"], title)
                             message_to_copy = f"{advice}\nExemple : {example}"
 
-                            # Affichage du message IA sous forme de notification persistant
-                            st.success(f"Voici votre conseil IA pour {title}:")
+                            # Affichage du message IA sans autres messages superflus
                             st.code(message_to_copy, language="text")
-                            st.info("Copiez ce message et collez-le dans la case correspondante.")
+
+                            # Notification flottante : cette notification restera visible tant que l'utilisateur ne l'ignore pas
+                            st.success(f"Conseil généré pour {title}.")
 
     # Formulaire de soumission pour les boutons Enregistrer et Annuler
     col_save, col_cancel = st.columns([1, 1])
