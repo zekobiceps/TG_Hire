@@ -749,10 +749,11 @@ with tabs[1]:
                                 # Action à effectuer lors du clic sur le bouton
                                 advice = generate_checklist_advice(section["title"], title)
                                 example = get_example_for_field(section["title"], title)
+                                # Mettre la réponse générée dans la case correspondante
                                 st.session_state[key] = f"{advice}\nExemple : {example}"
                                 st.session_state[f"advice_{key}"] = False
                                 st.success(f"Conseil généré pour {title}")
-                                st.rerun()
+                                st.rerun()  # Rafraîchit la page pour que le conseil soit visible
 
         # Boutons Enregistrer et Annuler dans le formulaire
         col_save, col_cancel = st.columns([1, 1])
