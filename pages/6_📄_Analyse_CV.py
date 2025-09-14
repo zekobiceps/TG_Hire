@@ -26,68 +26,111 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS personnalisée ---
+# --- CSS personnalisée pour le thème sombre ---
 st.markdown("""
     <style>
+    /* Style général pour l'application */
+    .stApp {
+        background-color: #0E1117;
+        color: #FAFAFA;
+    }
+    
+    /* Style pour les onglets de navigation */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 0px;
+        background-color: #0E1117;
+        padding: 0px;
+        border-radius: 4px;
+        border: 1px solid white; /* Bordure blanche pour l'ensemble des onglets */
+    }
+    
+    /* Style de base pour tous les onglets */
+    .stTabs [data-baseweb="tab"] {
+        background-color: #0E1117 !important;
+        color: white !important;
+        border-right: 1px solid white !important; /* Bordure blanche entre les onglets */
+        border-radius: 0 !important;
+        padding: 10px 16px !important;
+        font-weight: 500 !important;
+        margin-right: 0 !important;
+        height: auto !important;
+    }
+    
+    /* Style pour l'onglet actif */
+    .stTabs [data-baseweb="tab"][aria-selected="true"] {
+        color: #FF0000 !important; /* Rouge vif pour le texte de l'onglet actif */
+        background-color: #0E1117 !important;
+        border: 1px solid white !important;
+        border-bottom: 3px solid #FF0000 !important; /* Bordure inférieure rouge vif */
+    }
+    
+    /* Boutons principaux */
+    .stButton > button {
+        background-color: #dc2626;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        padding: 12px 24px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .stButton > button:hover {
+        background-color: #b91c1c;
+        transform: translateY(-2px);
+    }
+    
+    /* Boutons secondaires */
+    .stButton > button[kind="secondary"] {
+        background-color: #262730;
+        color: #FAFAFA;
+        border: 1px solid #FF4B4B;
+    }
+    
+    .stButton > button[kind="secondary"]:hover {
+        background-color: #3D3D4D;
+        color: #FAFAFA;
+    }
+    
+    /* Conteneurs et cartes */
+    .result-card {
+        background: #1E1E1E;
+        border-radius: 10px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        border-left: 4px solid #dc2626;
+        color: #FAFAFA;
+    }
+    
+    .metric-card {
+        background: #1E1E1E;
+        padding: 1.5rem;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
+        text-align: center;
+        margin: 1rem 0;
+        color: #FAFAFA;
+    }
+    
+    /* Champs de saisie */
+    .stTextInput input, .stTextArea textarea, .stFileUploader label, .stSelectbox [data-baseweb="select"] > div {
+        background-color: #2D2D2D !important;
+        color: white !important;
+        border: 1px solid #555 !important;
+        border-radius: 4px !important;
+        padding: 8px !important;
+    }
+    
     .section-header {
         font-size: 1.5rem;
         font-weight: 600;
-        color: #dc2626;
+        color: #FF0000;
         margin-bottom: 1rem;
         padding-bottom: 0.5rem;
-        border-bottom: 2px solid #fecaca;
+        border-bottom: 2px solid #FF0000;
     }
-    .stButton>button {
-        background-color: #dc2626;
-        color: white;
-        font-size: 16px;
-        border-radius: 8px;
-        padding: 12px 24px;
-        border: none;
-        transition: all 0.3s ease;
-    }
-    .stButton>button:hover {
-        background-color: #b91c1c;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
-    }
-    .result-card {
-        background: white;
-        border-radius: 10px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        border-left: 4px solid #dc2626;
-    }
-    .metric-card {
-        background: white;
-        padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        text-align: center;
-        margin: 1rem 0;
-    }
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 10px;
-    }
-    .stTabs [data-baseweb="tab-list"] button {
-        background-color: transparent !important;
-        border-radius: 8px 8px 0 0;
-        padding: 12px 20px;
-        font-size: 16px;
-        color: #dc2626;
-        border: 1px solid #e5e5e5;
-        border-bottom: none;
-        transition: all 0.3s ease;
-    }
-    .stTabs [data-baseweb="tab-list"] button:hover {
-        background-color: #e5e7eb !important;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #dc2626 !important;
-        color: white !important;
-        border-color: #dc2626 !important;
-    }
+
     </style>
 """, unsafe_allow_html=True)
 
@@ -273,8 +316,21 @@ with tab1:
 
     st.markdown("---")
     
-    use_ai_for_ranking = st.checkbox("Utiliser l'IA de DeepSeek pour le classement (Recommandé, mais utilise votre quota API)", value=False)
-    
+    # Remplacer la case à cocher par l'option radio et le bouton d'aide
+    col_radio, col_help = st.columns([0.8, 0.2])
+    with col_radio:
+        analyse_method = st.radio(
+            "Choisissez la méthode d'analyse :",
+            ("Méthode du cosinus", "Utilisation de l'IA"),
+            index=0,  # "Méthode du cosinus" est sélectionné par défaut
+            help="Sélectionnez la méthode que vous préférez pour le classement des CVs."
+        )
+    with col_help:
+        st.markdown("<div style='margin-top: 2rem;'></div>", unsafe_allow_html=True)
+        st.help(st.radio)
+
+    st.markdown("---")
+
     if st.button(
         "🔍 Analyser les CVs", 
         type="primary", 
@@ -295,11 +351,11 @@ with tab1:
                 st.warning(f"⚠️ {len(error_files)} fichier(s) non traité(s): {', '.join(error_files)}")
             
             if resumes:
-                if use_ai_for_ranking:
+                if analyse_method == "Utilisation de l'IA":
                     scores_data = rank_resumes_with_ai(job_description, resumes, file_names)
                     scores = [data["score"] for data in scores_data]
                     explanations = {data["file_name"]: data["explanation"] for data in scores_data}
-                else:
+                else: # Méthode du cosinus
                     scores = rank_resumes_with_cosine(job_description, resumes)
                     explanations = None
 
@@ -333,7 +389,7 @@ with tab1:
                     
                     st.markdown("---")
                     st.markdown('<div class="section-header">🔍 Comment le score est-il calculé ?</div>', unsafe_allow_html=True)
-                    if use_ai_for_ranking:
+                    if analyse_method == "Utilisation de l'IA":
                         st.info("Le score est basé sur une évaluation IA. Pour une analyse détaillée, consultez les sections ci-dessous.")
                         st.markdown('<div class="section-header">📝 Analyse détaillée de chaque CV</div>', unsafe_allow_html=True)
                         for file_name, score in ranked_resumes:
