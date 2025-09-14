@@ -54,3 +54,4 @@ watchdog==6.0.0
 pygithub
 deepspeed
 python-docx
+PyMuPDF

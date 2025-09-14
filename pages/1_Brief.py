@@ -743,7 +743,7 @@ with tabs[1]:
                             advice = generate_checklist_advice(section["title"], title)
                             if advice != "Pas de conseil disponible.":
                                 example = get_example_for_field(section["title"], title)
-                                st.session_state[f"advice_{key}"] = f"**Conseil :** {advice}\n**Exemple :** {example}"
+                                st.session_state[f"advice_{key}"] = f"**Conseil :**\n{advice}\n**Exemple :**\n{example}"
 
     brief_data = {}
     if st.session_state.current_brief_name in st.session_state.saved_briefs:
@@ -766,7 +766,14 @@ with tabs[1]:
                     st.text_area(title, value=current_value, key=key, placeholder=placeholder, height=height)
                     # Afficher le conseil généré juste en dessous du champ avec meilleur formatage
                     if f"advice_{key}" in st.session_state and st.session_state[f"advice_{key}"]:
-                        st.markdown(st.session_state[f"advice_{key}"], unsafe_allow_html=False)
+                        st.markdown(f"""
+                            <div style="background-color: #262730; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                                <strong style="color: #58a6ff;">Conseil :</strong><br>
+                                {st.session_state[f'advice_{key}'].split('\n**Exemple :**\n')[0]}<br>
+                                <strong style="color: #58a6ff;">Exemple :</strong><br>
+                                {st.session_state[f'advice_{key}'].split('\n**Exemple :**\n')[1]}
+                            </div>
+                        """, unsafe_allow_html=True)
 
         # Boutons Enregistrer et Annuler dans le formulaire
         col_save, col_cancel = st.columns([1, 1])
