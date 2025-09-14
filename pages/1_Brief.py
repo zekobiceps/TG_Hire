@@ -733,42 +733,43 @@ with tabs[1]:
     if st.session_state.current_brief_name in st.session_state.saved_briefs:
         brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
 
-    # Afficher les champs avec text_area et bouton IA sur la même ligne
-    for section in sections:
-        with st.expander(f"📋 {section['title']}"):
-            for title, key, placeholder in section["fields"]:
-                col1, col2 = st.columns([4, 1])
-                with col1:
-                    st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")), key=key, height=30, placeholder=placeholder)
-                with col2:
-                    if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
-                        if st.button("💡 Conseil IA", key=f"advice_{key}"):
-                            advice = generate_checklist_advice(section["title"], title)
-                            example = get_example_for_field(section["title"], title)
-                            st.session_state[key] = f"{advice}\nExemple : {example}"
-                            st.rerun()
+    # Utiliser un formulaire pour gérer les widgets
+    with st.form(key="avant_brief_form"):
+        for section in sections:
+            with st.expander(f"📋 {section['title']}"):
+                for title, key, placeholder in section["fields"]:
+                    col1, col2 = st.columns([4, 1])
+                    with col1:
+                        st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")), key=key, placeholder=placeholder)
+                    with col2:
+                        if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
+                            if st.form_submit_button("💡 Conseil IA", key=f"advice_{key}"):
+                                advice = generate_checklist_advice(section["title"], title)
+                                example = get_example_for_field(section["title"], title)
+                                st.session_state[key] = f"{advice}\nExemple : {example}"
+                                st.rerun()
 
-    # Boutons Enregistrer et Annuler en bas
-    col_save, col_cancel = st.columns([1, 1])
-    with col_save:
-        if st.button("💾 Enregistrer modifications", type="primary", use_container_width=True, key="save_avant_brief"):
-            if st.session_state.current_brief_name in st.session_state.saved_briefs:
-                brief_name = st.session_state.current_brief_name
-                update_data = {key: st.session_state[key] for _, key, _ in [item for sublist in [s["fields"] for s in sections] for item in sublist]}
-                st.session_state.saved_briefs[brief_name].update(update_data)
-                save_briefs()
-                st.session_state.avant_brief_completed = True
-                st.session_state.save_message = "✅ Modifications sauvegardées"
-                st.session_state.save_message_tab = "Avant-brief"
+        # Boutons Enregistrer et Annuler dans le formulaire
+        col_save, col_cancel = st.columns([1, 1])
+        with col_save:
+            if st.form_submit_button("💾 Enregistrer modifications", type="primary", use_container_width=True):
+                if st.session_state.current_brief_name in st.session_state.saved_briefs:
+                    brief_name = st.session_state.current_brief_name
+                    update_data = {key: st.session_state[key] for _, key, _ in [item for sublist in [s["fields"] for s in sections] for item in sublist]}
+                    st.session_state.saved_briefs[brief_name].update(update_data)
+                    save_briefs()
+                    st.session_state.avant_brief_completed = True
+                    st.session_state.save_message = "✅ Modifications sauvegardées"
+                    st.session_state.save_message_tab = "Avant-brief"
+                    st.rerun()
+                else:
+                    st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
+        
+        with col_cancel:
+            if st.form_submit_button("🗑️ Annuler", type="secondary", use_container_width=True):
+                st.session_state.current_brief_name = ""
+                st.session_state.avant_brief_completed = False
                 st.rerun()
-            else:
-                st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
-    
-    with col_cancel:
-        if st.button("🗑️ Annuler", type="secondary", use_container_width=True, key="cancel_avant_brief"):
-            st.session_state.current_brief_name = ""
-            st.session_state.avant_brief_completed = False
-            st.rerun()
 
 # Ajout de la fonction get_example_for_field (si non présente dans utils.py)
 def get_example_for_field(section_title, field_title):
