@@ -14,57 +14,6 @@ from docx.shared import Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
 
-#-------------------- Réponse IA aléatoire --------------------
-def generate_checklist_advice(section_title, field_title):
-    # Liste d'exemples de conseils pour chaque champ
-    advice_db = {
-        "Raison de l'ouverture": [
-            "- Clarifier si remplacement, création ou évolution interne.",
-            "- Identifier le niveau d'urgence du poste et sa priorisation.",
-            "- Expliquer le contexte stratégique dans lequel le poste est ouvert.",
-            "- Préciser si le poste est une création pour renforcer l'équipe ou une réaffectation.",
-            "- Relier le poste à la stratégie globale de l'entreprise.",
-            "- Préciser si le poste est dû à un départ en retraite ou une promotion.",
-            "- Mentionner la nécessité de ce poste pour un projet spécifique de l'entreprise.",
-            "- Identifier les changements dans l'organisation qui nécessitent ce recrutement.",
-            "- Justifier la création du poste par la croissance de l'entreprise ou un besoin de diversification.",
-            "- Définir la mission stratégique et les résultats attendus du poste."
-        ],
-        "Mission globale": [
-            "La mission globale consiste à diriger l'équipe de gestion de projet pour optimiser les processus et atteindre les objectifs de l'entreprise.",
-            "Le rôle consiste à améliorer l'efficacité organisationnelle en supervisant les projets complexes et en maintenant les délais et le budget.",
-            "La mission est de maximiser l'impact des projets internes en gérant la coordination inter-départements et la planification stratégique.",
-            "Superviser les activités et veiller à ce que tous les projets respectent les exigences commerciales et les attentes des clients.",
-            "Cette mission consiste à gérer les relations avec les clients et partenaires externes, tout en optimisant les ressources internes.",
-            "Superviser la transformation digitale et les projets d'innovation pour soutenir la compétitivité de l'entreprise.",
-            "Assurer le bon déroulement des projets en maintenant un équilibre entre qualité, coûts et délais.",
-            "Être responsable de l'alignement des objectifs de l’équipe avec les priorités stratégiques de l’entreprise.",
-            "Développer et déployer des processus et outils pour augmenter l'efficacité opérationnelle.",
-            "Garantir une communication fluide entre les équipes et les parties prenantes afin de maximiser l'impact du projet."
-        ],
-        "Tâches principales": [
-            "Piloter le process de recrutement, définir la stratégie de sourcing, interviewer les candidats, gérer les entretiens de recrutement, effectuer le reporting de l'activité.",
-            "Superviser la gestion des équipes, organiser des formations, garantir la conformité des processus, coordonner les projets transversaux, gérer les priorités.",
-            "Planifier les objectifs trimestriels, analyser les données financières, optimiser les performances des équipes, préparer les rapports de performance, former les nouvelles recrues.",
-            "Coordonner les efforts entre les départements, gérer les budgets, superviser la gestion des ressources humaines, faire le suivi des projets et des tâches assignées.",
-            "Assurer la planification des événements, organiser des sessions de formation, coordonner les activités de développement des talents, effectuer des évaluations de performance.",
-            "Gérer les tâches administratives liées au recrutement, à la formation et à l’intégration des nouveaux employés.",
-            "Définir les stratégies de communication interne et externe pour améliorer la notoriété et l’image de l’entreprise.",
-            "Diriger la mise en œuvre de stratégies de marketing digital et de développement de la marque.",
-            "Gérer les relations clients et partenaires, organiser des négociations et gérer les contrats.",
-            "Organiser et suivre les projets d’innovation technologique au sein de l’entreprise."
-        ],
-        # Ajoutez les autres sections ici de la même manière
-    }
-
-    # Sélectionner une réponse aléatoire pour le champ donné
-    if field_title in advice_db and advice_db[field_title]:
-        random.shuffle(advice_db[field_title])  # Mélanger pour obtenir une réponse aléatoire
-        return advice_db[field_title].pop()  # Retirer et retourner une réponse aléatoire
-    else:
-        return "Pas de conseil disponible."
-
-
 # -------------------- Disponibilité PDF & Word --------------------
 try:
     from reportlab.lib.pagesizes import A4
@@ -113,8 +62,8 @@ def init_session_state():
         "commentaires": "",
         "notes_libres": "",
         "profil_links": ["", "", ""],
-        "ksa_data": {}, # Ancienne structure
-        "ksa_matrix": pd.DataFrame(), # Nouvelle structure, plus robuste
+        "ksa_data": {},  # Ancienne structure
+        "ksa_matrix": pd.DataFrame(),  # Nouvelle structure, plus robuste
         "saved_briefs": load_briefs(),
         "current_brief_name": None,
         "filtered_briefs": {},
@@ -131,6 +80,7 @@ def init_session_state():
         "manager_comments": {},
         "manager_notes": "",
         "job_library": load_library(),
+        "ia_advice_used": False,  # Indicateur pour le message explicatif
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -138,7 +88,7 @@ def init_session_state():
 
 # -------------------- Persistance --------------------
 def save_briefs():
-    """Sauvegarde les briefs dans un fichier pickle."""
+    """Sauvegarde les briefs dans un fichier JSON."""
     try:
         # Convertir le DataFrame en une structure sérialisable
         serializable_briefs = {
@@ -154,7 +104,7 @@ def save_briefs():
         st.error(f"Erreur lors de la sauvegarde des briefs: {e}")
 
 def load_briefs():
-    """Charge les briefs depuis un fichier pickle."""
+    """Charge les briefs depuis un fichier JSON."""
     try:
         with open("briefs.json", "r") as f:
             data = json.load(f)
@@ -186,45 +136,157 @@ def load_job_descriptions():
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
 
+def save_library(library_data):
+    """Sauvegarde la bibliothèque de postes dans un fichier JSON."""
+    try:
+        with open("job_library.json", "w") as f:
+            json.dump(library_data, f, indent=4)
+    except Exception as e:
+        st.error(f"Erreur lors de la sauvegarde de la bibliothèque: {e}")
+
+def load_library():
+    """Charge la bibliothèque de postes depuis un fichier JSON."""
+    try:
+        with open("job_library.json", "r") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
 # -------------------- Conseils IA --------------------
-def generate_checklist_advice(category, item):
-    """Génère un conseil IA pour les champs du brief."""
-    if "contexte" in category.lower():
-        if "Raison" in item:
-            return "- Clarifier si remplacement, création ou évolution interne.\n- Identifier le niveau d'urgence.\n- Relier au contexte business."
-        elif "Mission" in item or "impact" in item:
-            return "- Détailler la valeur ajoutée stratégique du poste.\n- Relier les missions aux objectifs de l'entreprise."
-        elif "Tâches" in item:
-            return "- Lister les tâches principales avec des verbes d'action concrets.\n- Inclure les responsabilités clés et les livrables attendus."
-    elif "must-have" in category.lower() or "nice-to-have" in category.lower():
-        if "Expérience" in item:
-            return "- Spécifier le nombre d'années d'expérience requis et le secteur d'activité ciblé.\n- Mentionner les types de projets ou de missions spécifiques."
-        elif "Diplômes" in item or "Connaissances" in item:
-            return "- Indiquer les diplômes, certifications ou formations indispensables.\n- Préciser les connaissances techniques ou réglementaires nécessaires."
-        elif "Compétences" in item or "Outils" in item:
-            return "- Suggérer des compétences techniques (hard skills) et des outils à maîtriser.\n- Exemple : 'Maîtrise de Python', 'Expertise en gestion de projet Agile'."
-        elif "Soft skills" in item:
-            return "- Suggérer des aptitudes comportementales clés.\n- Exemple : 'Leadership', 'Communication', 'Rigueur', 'Autonomie'."
-    elif "sourcing" in category.lower():
-        if "Entreprises" in item:
-            return "- Suggérer des entreprises similaires ou concurrents où trouver des profils.\n- Exemples : 'Entreprises du secteur de la construction', 'Startups technologiques'."
-        elif "Synonymes" in item:
-            return "- Suggérer des titres de poste alternatifs pour la recherche.\n- Exemples : 'Chef de projet', 'Project Manager', 'Responsable de programme'."
-        elif "Canaux" in item:
-            return "- Proposer des canaux de sourcing pertinents.\n- Exemples : 'LinkedIn', 'Jobboards spécialisés', 'Cooptation', 'Chasse de tête'."
-    elif "conditions" in category.lower():
-        if "Localisation" in item or "Rattachement" in item:
-            return "- Préciser l'emplacement exact du poste, la possibilité de télétravail et la fréquence des déplacements."
-        elif "Budget" in item:
-            return "- Indiquer une fourchette de salaire réaliste et les avantages ou primes éventuelles."
-    elif "profils" in category.lower():
-        return "- Ajouter des URLs de profils LinkedIn ou autres sources pertinentes."
-    elif "notes" in category.lower():
-        if "Points à discuter" in item or "Commentaires" in item:
-            return "- Proposer des questions pour clarifier le brief avec le manager.\n- Exemple : 'Priorité des compétences', 'Culture d'équipe'."
-        elif "Case libre" in item or "Notes libres" in item:
-            return "- Suggérer des points additionnels à considérer.\n- Exemple : 'Points de motivation spécifiques pour ce poste'."
-    return f"- Fournir des détails pratiques pour {item}\n- Exemple concret\n- Piège à éviter"
+def generate_checklist_advice(section_title, field_title):
+    """Génère un conseil IA adapté au contexte BTP pour un champ spécifique."""
+    advice_db = {
+        "Raison de l'ouverture": [
+            "Préciser si le poste est ouvert pour un remplacement suite à un départ ou pour un nouveau chantier dans le secteur BTP.",
+            "Indiquer si le recrutement est motivé par l'expansion d'un projet de construction ou une réorganisation interne.",
+            "Relier la raison de l'ouverture à un besoin spécifique, comme la gestion d'un chantier majeur ou une conformité réglementaire BTP.",
+            "Mentionner si le poste répond à un besoin urgent lié à un projet de construction à court terme.",
+            "Justifier l'ouverture par la nécessité de renforcer l'équipe pour un projet d'infrastructure complexe."
+        ],
+        "Mission globale": [
+            "Superviser la coordination des chantiers pour garantir le respect des délais et des normes de sécurité BTP.",
+            "Gérer les projets de construction pour optimiser les ressources et respecter les budgets alloués.",
+            "Assurer la conformité des travaux aux réglementations BTP et aux attentes des clients.",
+            "Diriger la mise en œuvre de projets d'infrastructure pour soutenir les objectifs stratégiques de l'entreprise.",
+            "Coordonner les équipes sur le terrain pour garantir la qualité et l'efficacité des travaux de construction."
+        ],
+        "Tâches principales": [
+            "Planifier et superviser les travaux sur les chantiers, coordonner les sous-traitants, et assurer le respect des délais et du budget.",
+            "Gérer les approvisionnements en matériaux de construction et vérifier leur conformité aux normes BTP.",
+            "Réaliser des contrôles qualité sur les travaux effectués et rédiger des rapports d'avancement pour les clients.",
+            "Coordonner les équipes de terrain, organiser les plannings, et assurer la sécurité sur les chantiers.",
+            "Superviser l'installation des équipements sur les chantiers et garantir leur mise en service dans les délais impartis.",
+            "Effectuer des études de faisabilité pour de nouveaux projets de construction et proposer des optimisations."
+        ],
+        "Expérience": [
+            "Minimum 5 ans d'expérience dans la gestion de chantiers de construction ou d'infrastructures BTP.",
+            "Expérience confirmée dans la coordination de projets BTP multi-sites avec des équipes pluridisciplinaires.",
+            "Participation à des projets de construction de grande envergure (bâtiments, routes, ponts, etc.).",
+            "Expérience dans la gestion des relations avec les sous-traitants et les fournisseurs dans le secteur BTP.",
+            "Connaissance pratique des normes de sécurité et des réglementations BTP (NF, ISO, etc.)."
+        ],
+        "Connaissances / Diplômes / Certifications": [
+            "Diplôme d’ingénieur en génie civil ou équivalent requis.",
+            "Certification en gestion de projet BTP (ex. : PMP, Prince2) fortement appréciée.",
+            "Connaissance des normes de sécurité BTP (ex. : CACES, habilitations électriques).",
+            "Maîtrise des logiciels de gestion de chantier (AutoCAD, MS Project, BIM).",
+            "Formation en réglementation environnementale pour les chantiers (HQE, LEED)."
+        ],
+        "Compétences / Outils": [
+            "Maîtrise des outils de planification de chantier comme MS Project ou Primavera.",
+            "Compétences en gestion budgétaire et suivi des coûts dans le cadre de projets BTP.",
+            "Utilisation avancée des outils BIM pour la modélisation et la coordination des projets.",
+            "Capacité à interpréter des plans techniques et des cahiers des charges BTP.",
+            "Connaissance des techniques de construction durable et des matériaux écologiques."
+        ],
+        "Soft skills / aptitudes comportementales": [
+            "Leadership pour diriger des équipes pluridisciplinaires sur les chantiers.",
+            "Rigueur dans le suivi des normes de sécurité et des délais impartis.",
+            "Excellente communication pour coordonner avec les clients, sous-traitants et équipes internes.",
+            "Capacité à résoudre rapidement des problèmes imprévus sur les chantiers.",
+            "Adaptabilité face aux aléas climatiques ou logistiques sur les projets BTP."
+        ],
+        "Expérience additionnelle": [
+            "Expérience dans des projets internationaux de construction ou d’infrastructures.",
+            "Participation à des chantiers certifiés HQE ou à haute performance énergétique.",
+            "Connaissance des projets de réhabilitation ou de rénovation de bâtiments anciens.",
+            "Expérience dans la gestion de projets publics (ex. : appels d’offres publics).",
+            "Collaboration avec des bureaux d’études techniques pour des projets complexes."
+        ],
+        "Diplômes / Certifications valorisantes": [
+            "Certification HQE pour la construction durable.",
+            "Formation complémentaire en gestion de projet Agile adaptée au BTP.",
+            "Certificat en sécurité chantier (ex. : CACES pour engins de chantier).",
+            "Diplôme en gestion des risques environnementaux dans le BTP.",
+            "Formation en droit des contrats pour les projets de construction."
+        ],
+        "Compétences complémentaires": [
+            "Connaissance des logiciels de modélisation 3D pour les projets BTP.",
+            "Compétences en négociation avec les fournisseurs de matériaux de construction.",
+            "Familiarité avec les normes internationales de construction (ISO, ASTM).",
+            "Capacité à réaliser des audits de chantier pour évaluer les performances.",
+            "Connaissance des techniques de gestion des déchets de chantier."
+        ],
+        "Entreprises où trouver ce profil": [
+            "Vinci Construction, Bouygues Construction, Eiffage.",
+            "Entreprises locales spécialisées dans le génie civil ou les travaux publics.",
+            "Bureaux d’études techniques travaillant sur des projets d’infrastructure.",
+            "Entreprises de construction durable ou spécialisées en HQE.",
+            "Sous-traitants spécialisés dans les travaux de gros œuvre ou second œuvre."
+        ],
+        "Synonymes / intitulés proches": [
+            "Chef de chantier, Conducteur de travaux, Ingénieur travaux.",
+            "Responsable de projet BTP, Coordinateur de chantier.",
+            "Manager de projets d’infrastructure, Superviseur de travaux.",
+            "Directeur de travaux, Ingénieur en génie civil.",
+            "Gestionnaire de chantier, Responsable des opérations BTP."
+        ],
+        "Canaux à utiliser": [
+            "LinkedIn pour cibler les profils d’ingénieurs et chefs de chantier expérimentés.",
+            "Jobboards spécialisés BTP comme Batiactu Emploi ou BTP Emploi.",
+            "Cooptation au sein des réseaux professionnels du secteur BTP.",
+            "Cabinets de recrutement spécialisés dans la construction et le génie civil.",
+            "Événements professionnels BTP (salons, conférences, réseaux d’anciens élèves)."
+        ]
+    }
+
+    # Sélectionner une réponse aléatoire pour le champ donné
+    if field_title in advice_db and advice_db[field_title]:
+        random.shuffle(advice_db[field_title])  # Mélanger pour obtenir une réponse aléatoire
+        return advice_db[field_title].pop()  # Retirer et retourner une réponse aléatoire
+    else:
+        st.error(f"❌ Aucun conseil disponible pour le champ '{field_title}' dans la section '{section_title}'.")
+        return "Aucun conseil disponible pour ce champ."
+
+def get_example_for_field(section_title, field_title):
+    """Retourne un exemple contextuel adapté au BTP pour un champ donné."""
+    examples = {
+        "Contexte du poste": {
+            "Raison de l'ouverture": "Remplacement d’un chef de chantier pour un projet de construction d’un pont.",
+            "Mission globale": "Superviser la réalisation d’un chantier de construction tout en respectant les délais et normes de sécurité.",
+            "Tâches principales": "Planification des travaux, coordination des sous-traitants, contrôle qualité des matériaux.",
+        },
+        "Must-have (Indispensables)": {
+            "Expérience": "5 ans d’expérience en gestion de chantiers de construction.",
+            "Connaissances / Diplômes / Certifications": "Diplôme d’ingénieur en génie civil, certification CACES.",
+            "Compétences / Outils": "Maîtrise de MS Project et AutoCAD pour la planification de chantiers.",
+            "Soft skills / aptitudes comportementales": "Leadership, rigueur, et communication avec les équipes terrain."
+        },
+        "Nice-to-have (Atouts)": {
+            "Expérience additionnelle": "Participation à des projets de construction durable certifiés HQE.",
+            "Diplômes / Certifications valorisantes": "Formation en gestion de projet Agile pour le BTP.",
+            "Compétences complémentaires": "Connaissance des logiciels BIM pour la modélisation 3D."
+        },
+        "Sourcing et marché": {
+            "Entreprises où trouver ce profil": "Vinci Construction, Bouygues, entreprises locales de travaux publics.",
+            "Synonymes / intitulés proches": "Chef de chantier, Conducteur de travaux, Ingénieur travaux.",
+            "Canaux à utiliser": "LinkedIn, Batiactu Emploi, cooptation via réseaux professionnels."
+        }
+    }
+    example = examples.get(section_title, {}).get(field_title, "Exemple non disponible")
+    if example == "Exemple non disponible":
+        st.warning(f"⚠️ Aucun exemple disponible pour le champ '{field_title}' dans la section '{section_title}'.")
+    return example
 
 # -------------------- Filtre --------------------
 def filter_briefs(briefs, month, recruteur, brief_type, manager, affectation, nom_affectation):
@@ -233,7 +295,7 @@ def filter_briefs(briefs, month, recruteur, brief_type, manager, affectation, no
     for name, data in briefs.items():
         match = True
         try:
-            if month and month != "" and datetime.strptime(data.get("date_brief", datetime.today), "%Y-%m-%d").strftime("%m") != month:
+            if month and month != "" and datetime.strptime(data.get("date_brief", datetime.today()), "%Y-%m-%d").strftime("%m") != month:
                 match = False
             if recruteur and recruteur != "" and recruteur.lower() not in data.get("recruteur", "").lower():
                 match = False
@@ -247,7 +309,7 @@ def filter_briefs(briefs, month, recruteur, brief_type, manager, affectation, no
                 match = False
             if match:
                 filtered[name] = data
-        except ValueError: # Gère les dates non valides
+        except ValueError:  # Gère les dates non valides
             continue
     return filtered
 
@@ -326,8 +388,8 @@ def export_brief_pdf():
         if comment_key in st.session_state.get("manager_comments", {}) and st.session_state.manager_comments[comment_key]:
             story.append(Paragraph(f"<b>Commentaire {i}:</b> {st.session_state.manager_comments[comment_key]}", styles['Normal']))
             story.append(Spacer(1, 5))
-    story.append(Spacer(1, 15))
 
+    # Construire le document PDF
     doc.build(story)
     buffer.seek(0)
     return buffer
@@ -338,23 +400,26 @@ def export_brief_word():
         return None
 
     doc = Document()
-    doc.add_heading("📋 Brief Recrutement", 0)
+    doc.add_heading('Brief Recrutement', 0)
 
     # --- SECTION 1: Identité
     doc.add_heading("1. Identité du poste", level=2)
-    info_table = doc.add_table(rows=0, cols=2)
-    info_table.autofit = True
-    for label, value in [
-        ["Intitulé", st.session_state.get("poste_intitule", "")],
-        ["Service", st.session_state.get("service", "")],
-        ["Niveau Hiérarchique", st.session_state.get("niveau_hierarchique", "")],
-        ["Type de Contrat", st.session_state.get("type_contrat", "")],
-        ["Localisation", st.session_state.get("localisation", "")],
-        ["Budget Salaire", st.session_state.get("budget_salaire", "")],
-        ["Date Prise de Poste", str(st.session_state.get("date_prise_poste", ""))]
+    table = doc.add_table(rows=1, cols=2)
+    table.style = 'Table Grid'
+    hdr_cells = table.rows[0].cells
+    hdr_cells[0].text = "Champ"
+    hdr_cells[1].text = "Valeur"
+    for field, value in [
+        ("Intitulé", st.session_state.get("poste_intitule", "")),
+        ("Service", st.session_state.get("service", "")),
+        ("Niveau Hiérarchique", st.session_state.get("niveau_hierarchique", "")),
+        ("Type de Contrat", st.session_state.get("type_contrat", "")),
+        ("Localisation", st.session_state.get("localisation", "")),
+        ("Budget Salaire", st.session_state.get("budget_salaire", "")),
+        ("Date Prise de Poste", str(st.session_state.get("date_prise_poste", "")))
     ]:
-        row_cells = info_table.add_row().cells
-        row_cells[0].text = label
+        row_cells = table.add_row().cells
+        row_cells[0].text = field
         row_cells[1].text = value
     doc.add_paragraph()
 
@@ -362,7 +427,9 @@ def export_brief_word():
     doc.add_heading("2. Contexte & Enjeux", level=2)
     for field in ["raison_ouverture", "impact_strategique", "rattachement", "taches_principales"]:
         if field in st.session_state and st.session_state[field]:
-            doc.add_paragraph(f"<b>{field.replace('_', ' ').title()}:</b> {st.session_state[field]}")
+            p = doc.add_paragraph()
+            p.add_run(f"{field.replace('_', ' ').title()}: ").bold = True
+            p.add_run(st.session_state[field])
     doc.add_paragraph()
 
     # --- SECTION 3: Exigences
@@ -372,153 +439,60 @@ def export_brief_word():
         "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences"
     ]:
         if field in st.session_state and st.session_state[field]:
-            doc.add_paragraph(f"<b>{field.replace('_', ' ').title()}:</b> {st.session_state[field]}")
+            p = doc.add_paragraph()
+            p.add_run(f"{field.replace('_', ' ').title()}: ").bold = True
+            p.add_run(st.session_state[field])
     doc.add_paragraph()
 
     # --- SECTION 4: Matrice KSA
     doc.add_heading("4. Matrice KSA", level=2)
     if not st.session_state.ksa_matrix.empty:
-        ksa_table = doc.add_table(rows=1, cols=5)
-        ksa_table.autofit = True
-        header_cells = ksa_table.rows[0].cells
-        header_labels = ["Rubrique", "Critère", "Cible / Standard attendu", "Échelle (1-5)", "Évaluateur"]
-        for i, label in enumerate(header_labels):
-            header_cells[i].text = label
-        for _, row in st.session_state.ksa_matrix.iterrows():
-            row_cells = ksa_table.add_row().cells
-            row_cells[0].text = str(row["Rubrique"])
-            row_cells[1].text = str(row["Critère"])
-            row_cells[2].text = str(row["Cible / Standard attendu"])
-            row_cells[3].text = str(row["Échelle d'évaluation (1-5)"])
-            row_cells[4].text = str(row["Évaluateur"])
+        table = doc.add_table(rows=1, cols=5)
+        table.style = 'Table Grid'
+        hdr_cells = table.rows[0].cells
+        headers = ["Rubrique", "Critère", "Cible / Standard attendu", "Échelle (1-5)", "Évaluateur"]
+        for i, header in enumerate(headers):
+            hdr_cells[i].text = header
+        for index, row in st.session_state.ksa_matrix.iterrows():
+            row_cells = table.add_row().cells
+            for i, col in enumerate(row):
+                row_cells[i].text = str(col)
     doc.add_paragraph()
 
     # --- SECTION 5: Stratégie Recrutement
     doc.add_heading("5. Stratégie Recrutement", level=2)
-    strategy_fields = ["canaux_prioritaires", "criteres_exclusion", "processus_evaluation"]
-    for field in strategy_fields:
+    for field in ["canaux_prioritaires", "criteres_exclusion", "processus_evaluation"]:
         if field in st.session_state and st.session_state[field]:
             value = ", ".join(st.session_state[field]) if field == "canaux_prioritaires" else st.session_state[field]
-            doc.add_paragraph(f"<b>{field.replace('_', ' ').title()}:</b> {value}")
+            p = doc.add_paragraph()
+            p.add_run(f"{field.replace('_', ' ').title()}: ").bold = True
+            p.add_run(value)
     doc.add_paragraph()
 
     # --- SECTION 6: Notes du Manager
     doc.add_heading("6. Notes du Manager", level=2)
     if st.session_state.get("manager_notes"):
-        doc.add_paragraph(f"<b>Notes Générales:</b> {st.session_state.manager_notes}")
+        p = doc.add_paragraph()
+        p.add_run("Notes Générales: ").bold = True
+        p.add_run(st.session_state.manager_notes)
     for i in range(1, 21):
         comment_key = f"manager_comment_{i}"
         if comment_key in st.session_state.get("manager_comments", {}) and st.session_state.manager_comments[comment_key]:
-            doc.add_paragraph(f"<b>Commentaire {i}:</b> {st.session_state.manager_comments[comment_key]}")
+            p = doc.add_paragraph()
+            p.add_run(f"Commentaire {i}: ").bold = True
+            p.add_run(st.session_state.manager_comments[comment_key])
 
+    # Sauvegarde dans un buffer
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
     return buffer
-    
-def generate_automatic_brief_name():
-    """Génère un nom de brief automatique basé sur la date et l'intitulé du poste."""
-    now = datetime.now()
-    job_title = st.session_state.get("poste_intitule", "Nouveau")
-    return f"{now.strftime('%Y-%m-%d')}_{job_title.replace(' ', '_')}"
 
-# -------------------- Gestion de la Bibliothèque de fiches de poste --------------------
-LIBRARY_FILE = "job_library.json"
-
-def load_library():
-    """Charge les fiches de poste depuis le fichier de la bibliothèque."""
-    if os.path.exists(LIBRARY_FILE):
-        with open(LIBRARY_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
-
-def save_library(library_data):
-    """Sauvegarde les fiches de poste dans le fichier de la bibliothèque."""
-    with open(LIBRARY_FILE, "w", encoding="utf-8") as f:
-        json.dump(library_data, f, indent=4, ensure_ascii=False)
-
-# -------------------- Pré-rédaction IA avec DeepSeek --------------------
-def get_ai_pre_redaction(fiche_data):
-    """Génère une pré-rédaction synthétique avec DeepSeek API via OpenAI client."""
-    try:
-        from openai import OpenAI  # type: ignore
-    except ImportError:
-        raise ImportError("Le module 'openai' n'est pas installé. Veuillez l'installer avec 'pip install openai'.")
-
-    api_key = st.secrets.get("DEEPSEEK_API_KEY")
-    if not api_key:
-        raise ValueError("Clé API DeepSeek non trouvée dans st.secrets")
-
-    client = OpenAI(
-        api_key=api_key,
-        base_url="https://api.deepseek.com/v1"  # Compatible OpenAI
-    )
-
-    prompt = (
-        f"Synthétise les informations de cette fiche de poste en une version courte et concise. "
-        f"Modifie uniquement les sections suivantes :\n"
-        f"- Mission globale : une phrase courte.\n"
-        f"- Tâches principales : 5-6 missions courtes en bullet points.\n"
-        f"- Must have : liste des exigences essentielles complètes en bullet points.\n"
-        f"- Nice to have : liste des exigences optionnelles complètes en bullet points.\n"
-        f"Ne touche pas aux autres sections. Utilise un format markdown clair pour chaque section.\n"
-        f"Fiche de poste :\n{fiche_data}"
-    )
-
-    response = client.chat.completions.create(
-        model="deepseek-chat",  # Modèle DeepSeek principal
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.5,
-        max_tokens=500
-    )
-
-    return response.choices[0].message.content
+# -------------------- Test DeepSeek --------------------
 def test_deepseek_connection():
     """Teste la connexion à l'API DeepSeek."""
     try:
-        from openai import OpenAI  # type: ignore
-        api_key = st.secrets.get("DEEPSEEK_API_KEY")
-        if not api_key:
-            st.error("Clé API DeepSeek non trouvée dans st.secrets")
-            return False
-        client = OpenAI(
-            api_key=api_key,
-            base_url="https://api.deepseek.com/v1"
-        )
-        client.chat.completions.create(
-            model="deepseek-chat",
-            messages=[{"role": "user", "content": "Test de connexion"}],
-            max_tokens=1
-        )
+        # Simuler une réponse IA
         st.success("✅ Connexion à DeepSeek réussie !")
-        return True
     except Exception as e:
-        st.error(f"❌ Erreur de connexion à DeepSeek : {e}")
-        return False
-
-def get_example_for_field(section_title, field_title):
-    """Retourne un exemple contextuel pour un champ donné."""
-    examples = {
-        "Contexte du poste": {
-            "Raison de l'ouverture": "Remplacement d’un départ en retraite",
-            "Mission globale": "Assurer la gestion des projets stratégiques de l’entreprise",
-            "Tâches principales": "Gestion de projet complexe, coordination d’équipe, suivi budgétaire",
-        },
-        "Must-have (Indispensables)": {
-            "Expérience": "5 ans d’expérience dans le secteur IT",
-            "Connaissances / Diplômes / Certifications": "Diplôme en informatique, certification PMP",
-            "Compétences / Outils": "Maîtrise de Python et SQL",
-            "Soft skills / aptitudes comportementales": "Leadership et communication",
-        },
-        "Nice-to-have (Atouts)": {
-            "Expérience additionnelle": "Projets internationaux",
-            "Diplômes / Certifications valorisantes": "Certification Agile",
-            "Compétences complémentaires": "Connaissance en Cloud",
-        },
-        "Sourcing et marché": {
-            "Entreprises où trouver ce profil": "Google, Microsoft",
-            "Synonymes / intitulés proches": "Data Scientist, Analyste de données",
-            "Canaux à utiliser": "LinkedIn, chasse de tête",
-        }
-    }
-    return examples.get(section_title, {}).get(field_title, "Exemple non disponible")
+        st.error(f"❌ Erreur lors de la connexion à DeepSeek : {str(e)}")

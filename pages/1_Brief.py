@@ -1,15 +1,10 @@
-import sys, os 
+
+import sys, os
 import streamlit as st
 from datetime import datetime
 import json
-import streamlit as st
-from utils import get_example_for_field
 import pandas as pd
-from utils import generate_checklist_advice
-
-# ✅ permet d'accéder à utils.py à la racine
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
+from utils import get_example_for_field
 from utils import (
     init_session_state,
     PDF_AVAILABLE,
@@ -24,6 +19,9 @@ from utils import (
     save_library,
     test_deepseek_connection,
 )
+
+# Ajoute le répertoire parent au chemin pour accéder à utils.py
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # ---------------- NOUVELLES FONCTIONS ----------------
 def render_ksa_matrix():
@@ -93,15 +91,31 @@ def render_ksa_matrix():
     else:
         st.info("Aucun critère défini. Ajoutez des critères pour commencer.")
 
-def conseil_button(titre, categorie, conseil, key):
-    """Crée un bouton avec conseil pour un champ"""
+def conseil_button(titre, categorie, key):
+    """Crée un bouton pour générer un conseil IA pour un champ spécifique."""
     col1, col2 = st.columns([4, 1])
     with col1:
-        st.text_area(titre, key=key)
+        st.text_area(titre, key=key, height=100)  # Hauteur fixée à 100px
     with col2:
-        if st.button("💡", key=f"btn_{key}"):
-            st.session_state[key] = generate_checklist_advice(categorie, titre)
-            st.rerun()
+        # Désactiver le bouton pour certaines sections
+        disabled_sections = ["Conditions et contraintes", "Profils pertinents", "Notes libres"]
+        if categorie in disabled_sections:
+            st.button("Conseils IA", disabled=True, key=f"btn_{key}", help="Conseils IA non disponibles pour cette section")
+        else:
+            if st.button("Conseils IA", key=f"btn_{key}"):
+                # Générer un nouveau conseil et effacer l'ancien
+                try:
+                    new_advice = generate_checklist_advice(categorie, titre)
+                    example = get_example_for_field(categorie, titre)
+                    st.session_state[f"advice_{key}"] = f"{new_advice}\nExemple : {example}"
+                except Exception as e:
+                    st.error(f"❌ Erreur lors de la génération du conseil : {str(e)}")
+                st.rerun()
+    
+    # Afficher le conseil s'il existe
+    if f"advice_{key}" in st.session_state and categorie not in disabled_sections:
+        st.markdown(f"**Conseil IA pour {titre} :**")
+        st.code(st.session_state[f"advice_{key}"], language="text")
 
 def delete_current_brief():
     """Supprime le brief actuel et retourne à l'onglet Gestion"""
@@ -131,6 +145,12 @@ def delete_current_brief():
             for key in keys_to_reset:
                 if key in st.session_state:
                     del st.session_state[key]
+            
+            # Effacer les conseils IA
+            for section in sections:
+                for _, key, _ in section["fields"]:
+                    if f"advice_{key}" in st.session_state:
+                        del st.session_state[f"advice_{key}"]
             
             st.success(f"✅ Brief '{brief_name}' supprimé avec succès")
             # Rediriger vers l'onglet Gestion
@@ -295,6 +315,8 @@ st.markdown("""
         color: white !important;
         border-radius: 4px !important;
         border: none !important;
+        height: 100px !important; /* Hauteur fixée à 100px */
+        resize: vertical !important;
     }
     
     /* Correction pour les date inputs */
@@ -303,11 +325,6 @@ st.markdown("""
         color: white !important;
         border-radius: 4px !important;
         border: none !important;
-    }
-    
-    /* Réduire la hauteur de la section avant-brief */
-    .stTextArea textarea {
-        height: 100px !important;
     }
     
     /* Ajustement pour le message de confirmation */
@@ -527,7 +544,66 @@ st.markdown("""
 if "current_brief_name" not in st.session_state:
     st.session_state.current_brief_name = ""
 
-# Création des onglets dans l'ordre demandé : Gestion, Avant-brief, Réunion, Synthèse, Catalogue des Postes
+# Liste des sections et champs pour les text_area
+sections = [
+    {
+        "title": "Contexte du poste",
+        "fields": [
+            ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"),
+            ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"),
+            ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"),
+        ]
+    },
+    {
+        "title": "Must-have (Indispensables)",
+        "fields": [
+            ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
+            ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
+            ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"),
+            ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"),
+        ]
+    },
+    {
+        "title": "Nice-to-have (Atouts)",
+        "fields": [
+            ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
+            ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
+            ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
+        ]
+    },
+    {
+        "title": "Sourcing et marché",
+        "fields": [
+            ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
+            ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
+            ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
+        ]
+    },
+    {
+        "title": "Conditions et contraintes",
+        "fields": [
+            ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
+            ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
+        ]
+    },
+    {
+        "title": "Profils pertinents",
+        "fields": [
+            ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
+            ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
+            ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
+        ]
+    },
+    {
+        "title": "Notes libres",
+        "fields": [
+            ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
+            ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
+        ]
+    },
+]
+
+# Création des onglets
 tabs = st.tabs([
     "📁 Gestion", 
     "🔄 Avant-brief", 
@@ -660,129 +736,66 @@ with tabs[0]:
             else:
                 st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
 
-
 # ---------------- AVANT-BRIEF ----------------
 with tabs[1]:
-    # Afficher le message de sauvegarde seulement pour cet onglet
-    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Avant-brief"):
-        st.success(st.session_state.save_message)
-        st.session_state.save_message = None
-        st.session_state.save_message_tab = None
+    if not st.session_state.current_brief_name:
+        st.warning("⚠️ Veuillez d'abord créer un brief dans l'onglet Gestion.")
+    else:
+        # Afficher le message de sauvegarde seulement pour cet onglet
+        if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Avant-brief"):
+            st.success(st.session_state.save_message)
+            st.session_state.save_message = None
+            st.session_state.save_message_tab = None
 
-    # Afficher les informations du brief en cours
-    brief_display_name = f"Avant-brief - {st.session_state.current_brief_name}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
-    st.subheader(f"🔄 {brief_display_name}")
-    
-    # Liste des sections et champs pour les text_area
-    sections = [
-        {
-            "title": "Contexte du poste",
-            "fields": [
-                ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"),
-                ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"),
-                ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"),
-            ]
-        },
-        {
-            "title": "Must-have (Indispensables)",
-            "fields": [
-                ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
-                ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
-                ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"),
-                ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"),
-            ]
-        },
-        {
-            "title": "Nice-to-have (Atouts)",
-            "fields": [
-                ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
-                ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
-                ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
-            ]
-        },
-        {
-            "title": "Sourcing et marché",
-            "fields": [
-                ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
-                ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
-                ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
-            ]
-        },
-        {
-            "title": "Conditions et contraintes",
-            "fields": [
-                ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
-                ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
-            ]
-        },
-        {
-            "title": "Profils pertinents",
-            "fields": [
-                ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
-                ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
-                ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
-            ]
-        },
-        {
-            "title": "Notes libres",
-            "fields": [
-                ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
-                ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
-            ]
-        },
-    ]
+        # Message explicatif pour l'utilisation de l'IA
+        if not st.session_state.get("ia_advice_used", False):
+            st.info(
+                "💡 Cliquez sur le bouton 'Conseils IA' à côté de chaque champ pour générer des suggestions adaptées au contexte BTP. "
+                "Un nouveau conseil remplacera l'ancien à chaque clic."
+            )
+            st.session_state.ia_advice_used = True
 
-    brief_data = {}
-    if st.session_state.current_brief_name in st.session_state.saved_briefs:
-        brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
-
-    # Formulaire pour les widgets
-    with st.form(key="avant_brief_form"):
-        for section in sections:
-            with st.expander(f"📋 {section['title']}"):
-                for title, key, placeholder in section["fields"]:
-                    col1, col2 = st.columns([4, 1])
-                    with col1:
-                        st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")) or "", key=key, placeholder=placeholder)
-                    with col2:
-                        # Utilisation de st.form_submit_button pour le bouton "Conseil IA"
-                        if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
-                            if st.form_submit_button(f"💡 Générer conseil IA pour {title}", key=f"btn_{key}"):
-                                # Appel à DeepSeek pour générer la réponse dynamique
-                                advice = generate_checklist_advice(section["title"], title)  # Cette fonction doit être dynamique
-                                example = get_example_for_field(section["title"], title)
-                                message_to_copy = f"{advice}\nExemple : {example}"
-
-                                # Mise à jour dynamique de la réponse dans st.session_state
-                                st.session_state[f"advice_{key}"] = message_to_copy
-
-        # Affichage de la réponse générée pour chaque champ, si elle existe
-        for section in sections:
-            for title, key, placeholder in section["fields"]:
-                if f"advice_{key}" in st.session_state:
-                    st.code(st.session_state[f"advice_{key}"], language="text")
-
-        # Boutons Enregistrer et Annuler dans le formulaire
-        col_save, col_cancel = st.columns([1, 1])
-        with col_save:
-            if st.form_submit_button("💾 Enregistrer modifications", type="primary", use_container_width=True):
-                if st.session_state.current_brief_name in st.session_state.saved_briefs:
-                    brief_name = st.session_state.current_brief_name
-                    update_data = {key: st.session_state[key] for _, key, _ in [item for sublist in [s["fields"] for s in sections] for item in sublist]}
-                    st.session_state.saved_briefs[brief_name].update(update_data)
-                    save_briefs()
-                    st.session_state.avant_brief_completed = True
-                    st.session_state.save_message = "✅ Modifications sauvegardées"
-                    st.session_state.save_message_tab = "Avant-brief"
-                    st.rerun()
-                else:
-                    st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
+        # Afficher les informations du brief en cours
+        brief_display_name = f"Avant-brief - {st.session_state.current_brief_name}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
+        st.subheader(f"🔄 {brief_display_name}")
         
-        with col_cancel:
-            if st.form_submit_button("🗑️ Annuler", type="secondary", use_container_width=True):
-                st.session_state.current_brief_name = ""
-                st.session_state.avant_brief_completed = False
-                st.rerun()
+        brief_data = {}
+        if st.session_state.current_brief_name in st.session_state.saved_briefs:
+            brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
+
+        # Formulaire pour les widgets
+        with st.form(key="avant_brief_form"):
+            for section in sections:
+                with st.expander(f"📋 {section['title']}"):
+                    for title, key, placeholder in section["fields"]:
+                        conseil_button(title, section["title"], key)
+
+            # Boutons Enregistrer et Annuler dans le formulaire
+            col_save, col_cancel = st.columns([1, 1])
+            with col_save:
+                if st.form_submit_button("💾 Enregistrer modifications", type="primary", use_container_width=True):
+                    if st.session_state.current_brief_name in st.session_state.saved_briefs:
+                        brief_name = st.session_state.current_brief_name
+                        update_data = {key: st.session_state[key] for _, key, _ in [item for sublist in [s["fields"] for s in sections] for item in sublist]}
+                        st.session_state.saved_briefs[brief_name].update(update_data)
+                        save_briefs()
+                        st.session_state.avant_brief_completed = True
+                        st.session_state.save_message = "✅ Modifications sauvegardées"
+                        st.session_state.save_message_tab = "Avant-brief"
+                        st.rerun()
+                    else:
+                        st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
+            
+            with col_cancel:
+                if st.form_submit_button("🗑️ Annuler", type="secondary", use_container_width=True):
+                    st.session_state.current_brief_name = ""
+                    st.session_state.avant_brief_completed = False
+                    # Effacer les conseils IA
+                    for section in sections:
+                        for _, key, _ in section["fields"]:
+                            if f"advice_{key}" in st.session_state:
+                                del st.session_state[f"advice_{key}"]
+                    st.rerun()
 
 # ---------------- RÉUNION ----------------
 with tabs[2]:
@@ -808,7 +821,7 @@ with tabs[2]:
             brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
             
             # Définir les sections et champs (même structure que dans Avant-brief)
-            sections = [
+            sections_reunion = [
                 {"title": "Contexte du poste", "fields": [
                     ("Raison de l'ouverture", "raison_ouverture"),
                     ("Mission globale", "impact_strategique"),
@@ -847,7 +860,7 @@ with tabs[2]:
 
             # Construire les données pour le tableau
             data = []
-            for section in sections:
+            for section in sections_reunion:
                 for title, key in section["fields"]:
                     value = brief_data.get(key, "")
                     comment_key = f"manager_comment_{key}"
@@ -874,7 +887,7 @@ with tabs[2]:
             if st.button("💾 Sauvegarder commentaires", type="primary", key="save_comments_step1"):
                 for i, row in edited_df.iterrows():
                     if row["Détails"] != "":
-                        comment_key = f"manager_comment_{sections[i // len(sections[0]['fields'])]['fields'][i % len(sections[0]['fields'])][1]}"
+                        comment_key = f"manager_comment_{sections_reunion[i // len(sections_reunion[0]['fields'])]['fields'][i % len(sections_reunion[0]['fields'])][1]}"
                         st.session_state[comment_key] = row["Commentaires du manager"]
                 st.session_state.save_message = "✅ Commentaires sauvegardés"
                 st.session_state.save_message_tab = "Réunion"
