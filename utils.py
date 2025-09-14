@@ -496,3 +496,13 @@ def test_deepseek_connection():
         st.success("✅ Connexion à DeepSeek réussie !")
     except Exception as e:
         st.error(f"❌ Erreur lors de la connexion à DeepSeek : {str(e)}")
+
+# -------------------- Générer Nom de Brief --------------------
+def generate_automatic_brief_name():
+    """Génère un nom unique pour un brief basé sur l'intitulé du poste et la date."""
+    import time
+    poste_intitule = st.session_state.get("poste_intitule", "Brief")
+    # Nettoyer l'intitulé pour éviter les caractères problématiques
+    poste_clean = "".join(c for c in poste_intitule if c.isalnum() or c in (" ", "_")).replace(" ", "_")
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    return f"{poste_clean}_{timestamp}"
