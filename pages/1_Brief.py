@@ -738,12 +738,7 @@ with tabs[1]:
 
     # Générer les conseils IA après clic sur le bouton
     if st.session_state.get("generate_advice", False):
-        # Effacer les conseils précédents
-        for section in sections:
-            for title, key, _ in section["fields"]:
-                st.session_state[f"advice_{key}"] = ""
-        
-        # Générer de nouveaux conseils pour le champ sélectionné
+        # Générer un conseil uniquement pour le champ sélectionné sans réinitialiser les autres
         section_title, field_title = selected_field.split(" - ", 1)
         for section in sections:
             if section["title"] == section_title:
