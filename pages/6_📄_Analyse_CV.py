@@ -7,6 +7,7 @@ from pypdf import PdfReader
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import time
+import re
 
 # --- Configuration de la clé API DeepSeek via Streamlit Secrets ---
 try:
@@ -70,7 +71,7 @@ st.markdown("""
         gap: 10px;
     }
     .stTabs [data-baseweb="tab-list"] button {
-        background-color: #f0f2f6; /* Couleur de l'arrière-plan de la page */
+        background-color: transparent !important;
         border-radius: 8px 8px 0 0;
         padding: 12px 20px;
         font-size: 16px;
@@ -80,7 +81,7 @@ st.markdown("""
         transition: all 0.3s ease;
     }
     .stTabs [data-baseweb="tab-list"] button:hover {
-        background-color: #e5e7eb;
+        background-color: #e5e7eb !important;
     }
     .stTabs [aria-selected="true"] {
         background-color: #dc2626 !important;
@@ -118,55 +119,74 @@ def rank_resumes_with_cosine(job_description, resumes):
         st.error(f"❌ Erreur lors du classement des CVs: {e}")
         return []
 
-def rank_resumes_with_ai(job_description, resumes):
-    """Classe les CV en utilisant l'IA pour évaluer la pertinence de chaque CV."""
+def get_detailed_score_with_ai(job_description, resume_text):
+    """Évalue la pertinence d'un CV en utilisant l'IA, en fournissant un score et une explication détaillée."""
     if not API_KEY:
-        st.error("❌ Impossible d'utiliser l'IA pour le classement. La clé API DeepSeek n'est pas configurée.")
-        return []
-
+        return {"score": 0.0, "explanation": "❌ Analyse IA impossible. Clé API non configurée."}
+    
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {API_KEY}"
     }
+
+    prompt = f"""
+    En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
+    Fournis ta réponse en deux parties distinctes et clairement identifiées.
+    1. Un score de correspondance en pourcentage (par exemple, "Score: 85%").
+    2. Une analyse détaillée en points, expliquant pourquoi ce score a été attribué. Détaille ce qui est pertinent (points forts) et ce qui manque pour un match parfait à 100% (points à améliorer).
+
+    ---
+    Description du poste:
+    {job_description}
+
+    ---
+    Texte du CV:
+    {resume_text}
+
+    ---
+    Ton score est:
+    """
     
-    scores = []
-    for resume_text in resumes:
-        prompt = f"""
-        En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
-        Le score doit être un nombre entre 0 et 100, où 100 est la meilleure correspondance.
-        Réponds uniquement avec le score numérique.
+    payload = {
+        "model": "deepseek-chat",
+        "messages": [
+            {"role": "system", "content": "You are a professional recruiter assistant. Your output must be a score in percentage followed by a detailed analysis."},
+            {"role": "user", "content": prompt}
+        ],
+        "stream": False,
+        "temperature": 0.0 # Vise une réponse déterministe
+    }
 
-        Description du poste:
-        {job_description}
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response.raise_for_status()
+        response_data = response.json()
+        full_response_text = response_data["choices"][0]["message"]["content"].strip()
+        
+        # Extraire le score et l'explication
+        score_match = re.search(r"Score: (\d+)%", full_response_text)
+        score = int(score_match.group(1)) / 100 if score_match else 0.0
+        
+        explanation_parts = full_response_text.split("2. Une analyse détaillée", 1)
+        explanation = explanation_parts[1].strip() if len(explanation_parts) > 1 else full_response_text
+        
+        return {"score": score, "explanation": explanation}
+    except Exception as e:
+        st.warning(f"⚠️ Erreur lors de l'évaluation par l'IA: {e}")
+        return {"score": 0.0, "explanation": "❌ Analyse IA échouée. Impossible de fournir une explication détaillée."}
 
-        Texte du CV:
-        {resume_text}
-        
-        Ton score est:
-        """
-        payload = {
-            "model": "deepseek-chat",
-            "messages": [
-                {"role": "system", "content": "You are a professional recruiter assistant. Your only output is a number from 0 to 100."},
-                {"role": "user", "content": prompt}
-            ],
-            "stream": False,
-            "temperature": 0.0 # Vise une réponse déterministe
-        }
-        
-        try:
-            response = requests.post(url, headers=headers, data=json.dumps(payload))
-            response.raise_for_status()
-            response_data = response.json()
-            score_text = response_data["choices"][0]["message"]["content"].strip()
-            score = float(score_text.replace('%', '')) / 100
-            scores.append(score)
-        except Exception as e:
-            st.warning(f"⚠️ Erreur lors de l'évaluation d'un CV par l'IA: {e}")
-            scores.append(0.0) # Score nul en cas d'erreur
-            
-    return scores
+def rank_resumes_with_ai(job_description, resumes, file_names):
+    """Classe les CV en utilisant l'IA pour évaluer la pertinence de chaque CV et fournit des explications."""
+    scores_data = []
+    for i, resume_text in enumerate(resumes):
+        detailed_response = get_detailed_score_with_ai(job_description, resume_text)
+        scores_data.append({
+            "file_name": file_names[i],
+            "score": detailed_response["score"],
+            "explanation": detailed_response["explanation"]
+        })
+    return scores_data
 
 def get_deepseek_analysis(text):
     """Analyse le texte du CV pour identifier les points forts et faibles en utilisant DeepSeek."""
@@ -276,11 +296,12 @@ with tab1:
             
             if resumes:
                 if use_ai_for_ranking:
-                    scores = rank_resumes_with_ai(job_description, resumes)
-                    explanation = "Le score a été généré par l'IA de DeepSeek, qui a évalué la pertinence de chaque CV en fonction des informations fournies."
+                    scores_data = rank_resumes_with_ai(job_description, resumes, file_names)
+                    scores = [data["score"] for data in scores_data]
+                    explanations = {data["file_name"]: data["explanation"] for data in scores_data}
                 else:
                     scores = rank_resumes_with_cosine(job_description, resumes)
-                    explanation = "Le score de correspondance est basé sur la **similarité cosinus**. Cette méthode analyse la fréquence des mots et des phrases dans chaque CV par rapport à la description du poste. Un score élevé (proche de 100 %) indique une forte correspondance thématique et de compétences."
+                    explanations = None
 
                 if len(scores) > 0:
                     ranked_resumes = sorted(zip(file_names, scores), key=lambda x: x[1], reverse=True)
@@ -312,8 +333,21 @@ with tab1:
                     
                     st.markdown("---")
                     st.markdown('<div class="section-header">🔍 Comment le score est-il calculé ?</div>', unsafe_allow_html=True)
-                    st.info(explanation)
+                    if use_ai_for_ranking:
+                        st.info("Le score est basé sur une évaluation IA. Pour une analyse détaillée, consultez les sections ci-dessous.")
+                        st.markdown('<div class="section-header">📝 Analyse détaillée de chaque CV</div>', unsafe_allow_html=True)
+                        for file_name, score in ranked_resumes:
+                            if file_name in explanations:
+                                with st.expander(f"Analyse détaillée pour : **{file_name}** (Score: {round(score * 100, 1)}%)", expanded=False):
+                                    st.markdown(explanations[file_name])
+                    else:
+                        st.info("""
+                            Le score de correspondance est basé sur la **similarité cosinus**. 
+                            Cette méthode analyse la fréquence des mots et des phrases dans chaque CV par rapport à la description du poste. 
+                            Un score élevé (proche de 100 %) indique une forte correspondance thématique et de compétences.
+                        """)
                     
+                    st.markdown("---")
                     st.markdown('<div class="section-header">💾 Exporter les Résultats</div>', unsafe_allow_html=True)
                     csv = results_df.to_csv(index=False).encode('utf-8')
                     st.download_button(
