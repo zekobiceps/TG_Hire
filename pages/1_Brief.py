@@ -742,19 +742,17 @@ with tabs[1]:
                 with col1:
                     st.text_area(title, value=brief_data.get(key, st.session_state.get(key, "")), key=key, placeholder=placeholder)
                 with col2:
-                    # Bouton "Conseil IA" uniquement pour les sections non pertinentes
+                    # Bouton "Conseil IA" à côté de chaque champ
                     if section["title"] not in ["Conditions et contraintes", "Profils pertinents", "Notes libres"]:
-                        if st.button("💡 Générer Conseil IA", key=f"advice_{key}"):
+                        if st.button("💡", key=f"advice_{key}", help="Générer un conseil IA"):
                             # Génération du conseil par l'IA
                             advice = generate_checklist_advice(section["title"], title)
                             example = get_example_for_field(section["title"], title)
                             message_to_copy = f"{advice}\nExemple : {example}"
 
-                            # Affichage du message IA sans autres messages superflus
+                            # Affichage du message IA juste en dessous du bouton
+                            st.session_state[f"advice_{key}"] = message_to_copy
                             st.code(message_to_copy, language="text")
-
-                            # Notification flottante : cette notification restera visible tant que l'utilisateur ne l'ignore pas
-                            st.success(f"Conseil généré pour {title}.")
 
     # Formulaire de soumission pour les boutons Enregistrer et Annuler
     col_save, col_cancel = st.columns([1, 1])
