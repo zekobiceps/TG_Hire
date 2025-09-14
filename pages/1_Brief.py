@@ -689,6 +689,36 @@ with tabs[1]:
                 ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
             ]
         },
+        {
+            "title": "Conditions et contraintes",
+            "fields": [
+                ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
+                ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
+            ]
+        },
+        {
+            "title": "Sourcing et marché",
+            "fields": [
+                ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
+                ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
+                ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
+            ]
+        },
+        {
+            "title": "Profils pertinents",
+            "fields": [
+                ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
+                ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
+                ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
+            ]
+        },
+        {
+            "title": "Notes libres",
+            "fields": [
+                ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
+                ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
+            ]
+        },
     ]
 
     # Afficher le message de sauvegarde seulement pour cet onglet
@@ -702,12 +732,12 @@ with tabs[1]:
     st.subheader(f"🔄 {brief_display_name}")
 
     # Contrôles pour générer les conseils IA avec sélection de champ
-    col1, col2 = st.columns([1, 1])  # Equal width columns
+    col1, col2 = st.columns([1, 3])  # Narrower first column for selectbox
     with col1:
-        st.button("💡 Générer par l'IA", key="generate_advice_btn", on_click=lambda: st.session_state.update({"generate_advice": True}), type="primary", help="Génère un conseil IA pour le champ sélectionné")
-    with col2:
-        field_options = [f"{section['title']} - {title}" for section in sections for title, key, _ in section["fields"]]
+        field_options = [f"{section['title']} - {title}" for section in sections if section["title"] in ["Contexte du poste", "Must-have (Indispensables)", "Nice-to-have (Atouts)"] for title, key, _ in section["fields"]]
         selected_field = st.selectbox("Choisir un champ", field_options, index=0)
+    with col2:
+        st.button("💡 Générer par l'IA", key="generate_advice_btn", on_click=lambda: st.session_state.update({"generate_advice": True}), type="primary", help="Génère un conseil IA pour le champ sélectionné")
 
     # Générer les conseils IA après clic sur le bouton
     if st.session_state.get("generate_advice", False):

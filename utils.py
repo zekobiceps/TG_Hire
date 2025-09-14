@@ -826,20 +826,10 @@ def generate_checklist_advice(section_title, field_title):
                 "- Compétences en BIM (Building Information Modeling) ou en gestion environnementale des chantiers."
             ]
         },
-        "Sourcing et marché": {
-            "Entreprises où trouver ce profil": [
-                "- Suggérer des entreprises concurrentes dans le BTP comme Bouygues, Vinci ou Eiffage."
-            ],
-            "Synonymes / intitulés proches": [
-                "- Titres alternatifs comme 'Chef de Chantier', 'Ingénieur Travaux', 'Conducteur de Travaux BTP'."
-            ],
-            "Canaux à utiliser": [
-                "- Proposer LinkedIn pour profils BTP, jobboards spécialisés (Batiweb), cooptation sur chantiers, réseaux professionnels du BTP."
-            ]
-        }
     }
 
     # Sélectionner une réponse aléatoire pour la section et le champ donné
+    import random
     section_advice = advice_db.get(section_title, {})
     field_advice = section_advice.get(field_title, [])
     if field_advice:
