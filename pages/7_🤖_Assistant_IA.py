@@ -8,6 +8,10 @@ from datetime import datetime
 import fitz
 from PIL import Image
 
+# Initialization of session state variables
+if "conversation_history" not in st.session_state:
+    st.session_state.conversation_history = []
+
 # -------------------- Import utils --------------------
 # This assumes utils.py is in the parent directory.
 # If not, adjust the path accordingly.

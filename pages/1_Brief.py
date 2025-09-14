@@ -736,6 +736,11 @@ with tabs[1]:
     with col2:
         if st.button("💡 Générer par l'IA", key="generate_advice_btn", type="primary", help="Génère un conseil IA pour le champ sélectionné"):
             section_title, field_title = selected_field.split(" - ", 1)
+            # Clear all advice before generating new one
+            for section in sections:
+                for title, key, _ in section["fields"]:
+                    st.session_state[f"advice_{key}"] = ""
+            # Generate advice for the selected field
             for section in sections:
                 if section["title"] == section_title:
                     for title, key, _ in section["fields"]:
@@ -743,7 +748,7 @@ with tabs[1]:
                             advice = generate_checklist_advice(section["title"], title)
                             if advice != "Pas de conseil disponible.":
                                 example = get_example_for_field(section["title"], title)
-                                st.session_state[f"advice_{key}"] = f"**Conseil :**\n{advice}\n**Exemple :**\n{example}"
+                                st.session_state[f"advice_{key}"] = f"{advice}\n**Exemple :**\n{example}"
 
     brief_data = {}
     if st.session_state.current_brief_name in st.session_state.saved_briefs:
@@ -758,17 +763,17 @@ with tabs[1]:
     # Formulaire avec expanders et champs éditable
     with st.form(key="avant_brief_form"):
         for section in sections:
-            with st.expander(f"📋 {section['title']}"):
+            with st.expander(f'<span style="font-size: 20px;">📋 {section["title"]}</span>', expanded=True):
                 for title, key, placeholder in section["fields"]:
-                    # Larger height for all fields
+                    # Larger height for all fields and increased font size by 4 points (from default ~16px to 20px)
                     height = 150  # Increased from 100 for all fields
                     current_value = brief_data.get(key, st.session_state.get(key, ""))
-                    st.text_area(title, value=current_value, key=key, placeholder=placeholder, height=height)
+                    st.text_area(f'<span style="font-size: 20px;">{title}</span>', value=current_value, key=key, placeholder=placeholder, height=height)
                     # Afficher le conseil généré juste en dessous du champ avec meilleur formatage
                     if f"advice_{key}" in st.session_state and st.session_state[f"advice_{key}"]:
                         st.markdown(f"""
-                            <div style="background-color: #262730; padding: 10px; border-radius: 5px; margin-top: 10px;">
-                                <strong style="color: #58a6ff;">Conseil :</strong><br>
+                            <div style="background-color: #262730; padding: 12px; border-radius: 5px; margin-top: 10px; border: 1px solid #58a6ff;">
+                                <strong style="color: #58a6ff;">Conseil</strong><br>
                                 {st.session_state[f'advice_{key}'].split('\n**Exemple :**\n')[0]}<br>
                                 <strong style="color: #58a6ff;">Exemple :</strong><br>
                                 {st.session_state[f'advice_{key}'].split('\n**Exemple :**\n')[1]}
