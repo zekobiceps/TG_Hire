@@ -944,10 +944,11 @@ with tabs[1]:
                         st.rerun()
 
 # ---------------- RÉUNION ----------------
+
 with tabs[2]:
     st.header("📅 Réunion de brief")
     st.subheader(f"Brief en cours : {st.session_state.current_brief_name}")
-    if st.session_state.avant_brief_completed:
+    if "avant_brief_completed" in st.session_state and st.session_state.avant_brief_completed:
         st.write("L'Avant-brief a été complété. Préparez-vous pour la réunion.")
         if st.button("Générer compte-rendu"):
             st.write("Compte-rendu généré : (à implémenter)")
