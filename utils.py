@@ -1,4 +1,3 @@
-
 # utils.py
 # -*- coding: utf-8 -*-
 import streamlit as st
@@ -551,4 +550,25 @@ def get_example_for_field(section_title, field_title):
     }
     return examples.get(section_title, {}).get(field_title, "Exemple non disponible")
 
-
+# -------------------- Génération de nom de brief automatique --------------------
+def generate_automatic_brief_name():
+    """
+    Generate a unique brief name based on the position title, manager name, and date.
+    Uses session_state values if available, otherwise defaults to a generic name.
+    """
+    poste = st.session_state.get("poste_intitule", "Poste")
+    manager = st.session_state.get("manager_nom", "Manager")
+    date_str = st.session_state.get("date_brief", datetime.today()).strftime("%Y%m%d")
+    
+    # Create a base name
+    base_name = f"{poste}_{manager}_{date_str}"
+    
+    # Ensure uniqueness by appending a counter if the name already exists
+    saved_briefs = st.session_state.get("saved_briefs", {})
+    counter = 1
+    brief_name = base_name
+    while brief_name in saved_briefs:
+        brief_name = f"{base_name}_{counter}"
+        counter += 1
+    
+    return brief_name
