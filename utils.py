@@ -467,7 +467,7 @@ def get_ai_pre_redaction(fiche_data):
 
 # -------------------- Génération de question IA avec DeepSeek --------------------
 def generate_ai_question(prompt):
-    """Génère une question d'entretien via l'API DeepSeek."""
+    """Génère une question d'entretien et une réponse exemple via l'API DeepSeek."""
     try:
         from openai import OpenAI
     except ImportError:
@@ -482,22 +482,33 @@ def generate_ai_question(prompt):
         base_url="https://api.deepseek.com/v1"
     )
 
+    # Extraire contexte et question si présents
+    context = "recruitment for a KSA (Knowledge, Skills, Abilities) matrix"
+    question = prompt
+    if "Context:" in prompt and "Question:" in prompt:
+        context_part = prompt.split("Context:")[1].split("Question:")[0].strip()
+        question_part = prompt.split("Question:")[1].strip()
+        context = f"{context}, {context_part}"
+        question = question_part
+
+    # Prompt pour générer question et réponse
     full_prompt = (
-        f"Génère une question d'entretien pour évaluer : {prompt}. "
-        f"Adapte la question au contexte du BTP si possible, en fonction du type de question sélectionné dans l'interface "
-        f"(Comportementale, Situationnelle, Technique, Générale). "
-        f"Retourne uniquement la question, sans explication supplémentaire."
+        f"Dans le contexte de {context}, génère une question d'entretien technique pour évaluer : {question}. "
+        f"Adapte la question au domaine spécifié dans le contexte (ex. BTP, recrutement) si applicable. "
+        f"Retourne une réponse exemple pertinente qui reflète une compétence ou une approche liée à la question. "
+        f"Utilise ce format :\n"
+        f"- Question: [votre question]\n"
+        f"- Réponse: [exemple de réponse]"
     )
 
     response = client.chat.completions.create(
         model="deepseek-chat",
         messages=[{"role": "user", "content": full_prompt}],
         temperature=0.7,
-        max_tokens=200
+        max_tokens=300
     )
 
     return response.choices[0].message.content.strip()
-
 # -------------------- Test de connexion DeepSeek --------------------
 def test_deepseek_connection():
     """Teste la connexion à l'API DeepSeek."""
