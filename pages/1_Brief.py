@@ -771,14 +771,13 @@ with tabs[1]:
                     st.text_area(title, value=current_value, key=key, placeholder=placeholder, height=height)
                     # Afficher le conseil généré juste en dessous du champ avec meilleur formatage
                     if f"advice_{key}" in st.session_state and st.session_state[f"advice_{key}"]:
-                        st.markdown(f"""
-                            <div class="advice-box">
-                                <strong>Conseil</strong><br>
-                                <div>{st.session_state[f'advice_{key}'].split('\n**Exemple :**\n')[0]}</div><br>
-                                <strong>Exemple :</strong><br>
-                                <div>{st.session_state[f'advice_{key}'].split('\n**Exemple :**\n')[1]}</div>
-                            </div>
-                        """, unsafe_allow_html=True)
+                        advice_and_example = st.session_state[f'advice_{key}'].split('\n**Exemple :**\n')
+                        advice_text = advice_and_example[0].strip()
+                        example_text = advice_and_example[1].strip() if len(advice_and_example) > 1 else ""
+                        
+                        st.markdown(f"**Conseil :** {advice_text}")
+                        if example_text:
+                            st.markdown(f"**Exemple :** {example_text}")
 
         # Boutons Enregistrer et Annuler dans le formulaire
         col_save, col_cancel = st.columns([1, 1])
