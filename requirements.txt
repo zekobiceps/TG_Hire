@@ -59,3 +59,4 @@ reportlab
 json5
 pypdf
 scikit-learn
+beautifulsoup4
