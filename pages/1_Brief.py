@@ -26,80 +26,80 @@ from utils import (
 # ---------------- NOUVELLES FONCTIONS ----------------
 def render_ksa_matrix():
     """Affiche la matrice KSA sous forme de tableau"""
-    st.subheader("📊 Matrice KSA (Knowledge, Skills, Abilities)")
+    st.subheader("📊 Guide d'entretien & Matrice KSA")
     
-    # Initialiser les données KSA si elles n'existent pas
+    # Initialiser les données KSA si elles n'existent pas, avec les nouvelles colonnes
     if "ksa_matrix" not in st.session_state:
         st.session_state.ksa_matrix = pd.DataFrame(columns=[
-            "Rubrique", "Critère", "Cible / Standard attendu", 
-            "Échelle d'évaluation (1-5)", "Évaluateur"
+            "Rubrique", 
+            "Critère", 
+            "Type de question", 
+            "Question pour l'entretien", 
+            "Évaluation (1-5)", 
+            "Notes"
         ])
     
-    # Formulaire pour ajouter une nouvelle ligne
-    with st.expander("➕ Ajouter un critère"):
-        col1, col2, col3, col4, col5 = st.columns([1, 1, 2, 1, 1])
-        
-        with col1:
-            new_rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique")
-        with col2:
-            new_critere = st.text_input("Critère", key="new_critere")
-        with col3:
-            new_cible = st.text_input("Cible / Standard attendu", key="new_cible")
-        with col4:
-            new_score = st.selectbox("Importance", [1, 2, 3, 4, 5], key="new_score")
-        with col5:
-            new_evaluateur = st.selectbox("Évaluateur", ["Manager", "Recruteur", "Les deux"], key="new_evaluateur")
-        
-        if st.button("Ajouter", key="add_ksa"):
-            if new_critere and new_cible:
-                new_row = {
-                    "Rubrique": new_rubrique,
-                    "Critère": new_critere,
-                    "Cible / Standard attendu": new_cible,
-                    "Échelle d'évaluation (1-5)": new_score,
-                    "Évaluateur": new_evaluateur
-                }
-                
-                # Ajouter la nouvelle ligne au DataFrame
-                st.session_state.ksa_matrix = pd.concat([
-                    st.session_state.ksa_matrix, 
-                    pd.DataFrame([new_row])
-                ], ignore_index=True)
-                
-                st.success("✅ Critère ajouté avec succès")
-                st.rerun()
-    
-    # Afficher le tableau KSA
-    if not st.session_state.ksa_matrix.empty:
-        st.dataframe(
-            st.session_state.ksa_matrix,
-            use_container_width=True,
-            hide_index=True
+    # Ajoute un expander pour la prise de notes générales
+    with st.expander("📝 Notes de l'entretien"):
+        if "entretien_notes" not in st.session_state:
+            st.session_state.entretien_notes = ""
+        st.session_state.entretien_notes = st.text_area(
+            "Notes générales sur le candidat :",
+            value=st.session_state.entretien_notes,
+            height=200
         )
-        
-        # Calculer et afficher la note globale
-        if "Échelle d'évaluation (1-5)" in st.session_state.ksa_matrix.columns:
-            scores = st.session_state.ksa_matrix["Échelle d'évaluation (1-5)"].astype(int)
-            moyenne = scores.mean()
-            st.metric("Note globale", f"{moyenne:.1f}/5")
-        
-        # Bouton pour supprimer la dernière entrée
-        if st.button("🗑️ Supprimer le dernier critère", type="secondary", key="delete_last_criteria"):
-            if len(st.session_state.ksa_matrix) > 0:
-                st.session_state.ksa_matrix = st.session_state.ksa_matrix.iloc[:-1]
-                st.rerun()
-    else:
-        st.info("Aucun critère défini. Ajoutez des critères pour commencer.")
-
-def conseil_button(titre, categorie, conseil, key):
-    """Crée un bouton avec conseil pour un champ"""
-    col1, col2 = st.columns([4, 1])
-    with col1:
-        st.text_area(titre, key=key)
-    with col2:
-        if st.button("💡", key=f"btn_{key}"):
-            st.session_state[key] = generate_checklist_advice(categorie, titre)
-            st.rerun()
+    
+    # Bouton pour ajouter une ligne à la matrice
+    if st.button("➕ Ajouter un critère / une question"):
+        new_row = pd.DataFrame([
+            {"Rubrique": "", "Critère": "", "Type de question": "", "Question pour l'entretien": "", "Évaluation (1-5)": 0, "Notes": ""}
+        ])
+        st.session_state.ksa_matrix = pd.concat([st.session_state.ksa_matrix, new_row], ignore_index=True)
+    
+    # Afficher la matrice KSA sous forme de data_editor
+    if not st.session_state.ksa_matrix.empty:
+        st.session_state.ksa_matrix = st.data_editor(
+            st.session_state.ksa_matrix,
+            hide_index=True,
+            column_config={
+                "Rubrique": st.column_config.SelectboxColumn(
+                    "Rubrique",
+                    options=["Knowledge", "Skills", "Abilities"],
+                    required=True,
+                ),
+                "Critère": st.column_config.TextColumn(
+                    "Critère (ex: Leadership)",
+                    help="Critère spécifique à évaluer.",
+                    required=True,
+                ),
+                "Type de question": st.column_config.SelectboxColumn(
+                    "Type de question",
+                    options=["Comportementale", "Situationnelle", "Technique", "Générale"],
+                    help="STAR, Mise en situation, Technique, etc.",
+                    required=True,
+                ),
+                "Question pour l'entretien": st.column_config.TextColumn(
+                    "Question pour l'entretien",
+                    help="La question à poser pour évaluer le critère.",
+                    required=True,
+                ),
+                "Évaluation (1-5)": st.column_config.NumberColumn(
+                    "Évaluation (1-5)",
+                    help="Notez la réponse du candidat de 1 à 5.",
+                    min_value=1,
+                    max_value=5,
+                    step=1,
+                    format="%d"
+                ),
+                "Notes": st.column_config.TextColumn(
+                    "Notes",
+                    help="Vos remarques sur la réponse du candidat.",
+                    required=False,
+                ),
+            },
+            num_rows="dynamic",
+            use_container_width=True,
+        )
 
 def delete_current_brief():
     """Supprime le brief actuel et retourne à l'onglet Gestion"""
@@ -278,6 +278,38 @@ st.markdown("""
         color: white !important;
         border-radius: 4px !important;
     }
+            /* Style pour la matrice KSA */
+    .stDataFrame {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+        background-color: #0d1117;
+        font-size: 0.9em;
+        border: 1px solid #ffffff;
+    }
+    
+    .stDataFrame th, .stDataFrame td {
+        padding: 12px 16px;
+        text-align: left;
+        border: 1px solid #ffffff;
+        color: #e6edf3;
+    }
+    
+    .stDataFrame th {
+        background-color: #FF4B4B !important;
+        color: white !important;
+        font-weight: 600;
+        padding: 14px 16px;
+        font-size: 16px;
+        border: 1px solid #ffffff;
+    }
+    
+    /* Auto-size pour les colonnes de la matrice */
+    .stDataFrame td:nth-child(1), .stDataFrame th:nth-child(1) { width: 10%; }
+    .stDataFrame td:nth-child(2), .stDataFrame th:nth-child(2) { width: 25%; }
+    .stDataFrame td:nth-child(3), .stDataFrame th:nth-child(3) { width: 15%; }
+    .stDataFrame td:nth-child(4), .stDataFrame th:nth-child(4) { width: 40%; }
+    .stDataFrame td:nth-child(5), .stDataFrame th:nth-child(5) { width: 10%; }
     
     /* Correction pour les inputs */
     .stTextInput input {
@@ -829,7 +861,7 @@ with tabs[2]:
     brief_display_name = f"Réunion de brief - {st.session_state.current_brief_name}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
     st.subheader(f"✅ {brief_display_name}")
 
-    total_steps = 5
+    total_steps = 4
     step = st.session_state.reunion_step
     st.progress(int((step / total_steps) * 100), text=f"Étape {step}/{total_steps}")
 
@@ -881,22 +913,16 @@ with tabs[2]:
             st.rerun()
 
     elif step == 2:
-        st.subheader("2️⃣ Questions Comportementales")
-        st.text_area("Comment le candidat devrait-il gérer [situation difficile] ?", key="comp_q1", height=100)
-        st.text_area("Réponse attendue", key="comp_rep1", height=100)
-        st.text_area("Compétences évaluées", key="comp_eval1", height=100)
-
-    elif step == 3:
         st.subheader("📊 Matrice KSA - Validation manager")
         render_ksa_matrix()
 
-    elif step == 4:
+    elif step == 3:
         st.subheader("4️⃣ Stratégie Recrutement")
         st.multiselect("Canaux prioritaires", ["LinkedIn", "Jobboards", "Cooptation", "Réseaux sociaux", "Chasse de tête"], key="canaux_prioritaires")
         st.text_area("Critères d'exclusion", key="criteres_exclusion", height=100)
         st.text_area("Processus d'évaluation (détails)", key="processus_evaluation", height=100)
         
-    elif step == 5:
+    elif step == 4:
         st.subheader("📝 Notes générales du manager")
         st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=200, 
                     placeholder="Ajoutez vos commentaires et notes généraux...")
