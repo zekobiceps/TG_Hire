@@ -105,7 +105,7 @@ def render_ksa_matrix():
             .ai-response {
                 margin-top: 10px;
                 padding: 5px;
-                background-color: #2a2a2a;
+                background-color: #28a745; /* Vert pour la réponse en bas */
                 border-radius: 8px;
                 color: #ffffff;
             }
@@ -182,20 +182,11 @@ def render_ksa_matrix():
                 }])
                 st.session_state.ksa_matrix = pd.concat([st.session_state.ksa_matrix, new_row], ignore_index=True)
                 st.markdown("<span class='success-icon'>✅</span>", unsafe_allow_html=True)  # Only show icon
-                # Réinitialiser les champs
-                st.session_state.new_rubrique = "Knowledge"
-                st.session_state.new_critere = ""
-                st.session_state.new_type_question = "Comportementale"
-                st.session_state.new_cible = ""
-                st.session_state.new_evaluation = 3
-                st.session_state.new_evaluateur = "Manager"
-                st.session_state.ai_prompt = ""
-                st.session_state.ai_response = None  # Réinitialiser la réponse IA
                 st.rerun()
-            
-            # Afficher la réponse générée en bas du bouton Ajouter
-            if "ai_response" in st.session_state and st.session_state.ai_response:
-                st.markdown(f"<div class='ai-response'>{st.session_state.ai_response}</div>", unsafe_allow_html=True)
+        
+        # Afficher la réponse générée uniquement en bas
+        if "ai_response" in st.session_state and st.session_state.ai_response:
+            st.markdown(f"<div class='ai-response'>{st.session_state.ai_response}</div>", unsafe_allow_html=True)
     
     # Afficher la matrice KSA sous forme de data_editor
     if not st.session_state.ksa_matrix.empty:
@@ -242,7 +233,6 @@ def render_ksa_matrix():
             num_rows="dynamic",
             use_container_width=True,
         )
-        
     # Afficher la dernière réponse IA si elle existe
     if "ai_response" in st.session_state and st.session_state.ai_response:
         st.success(f"Question générée : {st.session_state.ai_response}")
