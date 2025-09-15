@@ -522,28 +522,38 @@ with tab7:
         st.session_state.magicien_full_question = q_choice  # Set full question to selected question
 
     # Text area to allow appending text to the selected question
-    question = st.text_area("Modifiez la question si nécessaire :", 
-                           value=st.session_state.magicien_full_question if st.session_state.magicien_full_question else "",
-                           key="magicien_question", 
-                           height=100,
-                           placeholder="Posez votre question ici...")
+    # Prepend the base question and allow appending
+    base_question = st.session_state.magicien_selected_question
+    current_input = st.text_area("Modifiez la question si nécessaire (ajoutez du texte après la question pré-sélectionnée) :", 
+                                value=base_question if base_question and not st.session_state.magicien_full_question.startswith(base_question) else st.session_state.magicien_full_question,
+                                key="magicien_question", 
+                                height=100,
+                                placeholder="Posez votre question ici... ou ajoutez après la question pré-sélectionnée")
 
-    # Update full question with user input if it differs from the base
-    if question != st.session_state.magicien_full_question:
-        st.session_state.magicien_full_question = question
+    # Update full question with user input, ensuring base question is preserved
+    if current_input and base_question:
+        if not current_input.startswith(base_question):
+            st.session_state.magicien_full_question = base_question + " " + current_input.strip()
+        else:
+            st.session_state.magicien_full_question = current_input
+    elif current_input:
+        st.session_state.magicien_full_question = current_input
+
+    # Display a note to guide the user
+    st.caption("💡 Ajoutez votre texte après la question pré-sélectionnée (ex: 'Ingénieur travaux'). La question de base ne peut pas être supprimée.")
 
     mode_rapide_magicien = st.checkbox("⚡ Mode rapide (réponse concise)", key="magicien_fast")
 
     if st.button("✨ Poser la question", type="primary", key="ask_magicien", use_container_width=True):
-        if question:
+        if st.session_state.magicien_full_question:
             with st.spinner("⏳ Génération en cours..."):
                 start_time = time.time()
-                enhanced_question = question
-                if "synonymes" in question.lower():
+                enhanced_question = st.session_state.magicien_full_question
+                if "synonymes" in enhanced_question.lower():
                     enhanced_question += ". Réponds uniquement avec une liste de synonymes séparés par des virgules, sans introduction."
-                elif "outils" in question.lower() or "logiciels" in question.lower():
+                elif "outils" in enhanced_question.lower() or "logiciels" in enhanced_question.lower():
                     enhanced_question += ". Réponds avec une liste à puces des outils, sans introduction."
-                elif "compétences" in question.lower() or "skills" in question.lower():
+                elif "compétences" in enhanced_question.lower() or "skills" in enhanced_question.lower():
                     enhanced_question += ". Réponds avec une liste à puces, sans introduction."
                 
                 result = ask_deepseek([{"role": "user", "content": enhanced_question}], 
@@ -553,7 +563,7 @@ with tab7:
                 st.success(f"✅ Réponse générée en {total_time}s")
                 
                 st.session_state.magicien_history.append({
-                    "q": question, 
+                    "q": st.session_state.magicien_full_question, 
                     "r": result["content"], 
                     "time": total_time
                 })
@@ -573,7 +583,6 @@ with tab7:
             st.session_state.magicien_history.clear()
             st.success("✅ Historique vidé")
             st.rerun()
-
 # -------------------- Tab 8: Permutateur --------------------
 with tab8:
     st.header("📧 Permutateur Email")
