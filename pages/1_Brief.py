@@ -26,40 +26,59 @@ from utils import (
 # ---------------- NOUVELLES FONCTIONS ----------------
 def render_ksa_matrix():
     """Affiche la matrice KSA sous forme de tableau et permet l'ajout de critères."""
-    st.subheader("📊 Guide d'entretien & Matrice KSA")
+    
+    # Ajout des explications dans un expander
+    with st.expander("ℹ️ Explications de la méthode KSA"):
+        st.markdown("""
+### Méthode KSA (Knowledge, Skills, Abilities)
+- **Knowledge (Connaissances)** : Savoirs théoriques nécessaires. Ex: Connaissances en normes de sécurité BTP (ISO 45001).
+- **Skills (Compétences)** : Aptitudes pratiques acquises. Ex: Maîtrise d'AutoCAD pour dessiner des plans de chantier.
+- **Abilities (Aptitudes)** : Capacités innées ou développées. Ex: Capacité à gérer des crises sur chantier.
+
+### Types de questions :
+- **Comportementale** : Basée sur des expériences passées (méthode STAR: Situation, Tâche, Action, Résultat). Ex: "Décrivez une situation où vous avez résolu un conflit d'équipe."
+- **Situationnelle** : Hypothétique, pour évaluer la réaction future. Ex: "Que feriez-vous si un délai de chantier était menacé ?"
+- **Technique** : Évalue les connaissances spécifiques. Ex: "Expliquez comment vous utilisez AutoCAD pour la modélisation BTP."
+- **Générale** : Questions ouvertes sur l'expérience globale. Ex: "Parlez-moi de votre parcours en BTP."
+        """)
     
     # Initialiser les données KSA si elles n'existent pas, avec les colonnes demandées
-    if "ksa_matrix" not in st.session_state or st.session_state.ksa_matrix.empty:
+    if "ksa_matrix" not in st.session_state:
         st.session_state.ksa_matrix = pd.DataFrame(columns=[
             "Rubrique", 
             "Critère", 
             "Type de question", 
-            "Cible / Standard attendu",  # Align with export functions
-            "Échelle d'évaluation (1-5)",  # Align with export functions
+            "Cible / Standard attendu", 
+            "Échelle d'évaluation (1-5)", 
             "Évaluateur"
         ])
     
-    # Expander pour la prise de notes générales
-    with st.expander("📝 Notes de l'entretien"):
-        if "entretien_notes" not in st.session_state:
-            st.session_state.entretien_notes = ""
-        st.session_state.entretien_notes = st.text_area(
-            "Notes générales sur le candidat :",
-            value=st.session_state.entretien_notes,
-            height=200
-        )
+    # Fonction callback pour mettre à jour le placeholder en fonction du type de question
+    def update_placeholder():
+        placeholder_dict = {
+            "Comportementale": "Ex: Décrivez une situation où vous avez géré une équipe sous pression (méthode STAR: Situation, Tâche, Action, Résultat).",
+            "Situationnelle": "Ex: Que feriez-vous si un délai de chantier était menacé par un retard de livraison ?",
+            "Technique": "Ex: Expliquez comment vous utilisez AutoCAD pour la modélisation de structures BTP.",
+            "Générale": "Ex: Parlez-moi de votre expérience globale dans le secteur BTP."
+        }
+        if "new_type_question" in st.session_state:
+            st.session_state.cible_placeholder = placeholder_dict.get(st.session_state.new_type_question, "Définissez la cible ou le standard attendu pour ce critère.")
     
-    # Expander pour ajouter un nouveau critère
+    # Expander pour ajouter un nouveau critère, avec colonnes
     with st.expander("➕ Ajouter un critère"):
         with st.form(key="add_ksa_criterion_form"):
-            rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique")
-            critere = st.text_input("Critère", placeholder="Ex: Leadership", key="new_critere")
-            type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], 
-                                        key="new_type_question")
-            cible = st.text_area("Cible / Standard attendu", placeholder="Ex: Capacité à gérer des équipes sur des chantiers complexes", 
-                                key="new_cible", height=100)
-            evaluation = st.number_input("Évaluation (1-5)", min_value=1, max_value=5, step=1, key="new_evaluation")
-            evaluateur = st.text_input("Évaluateur", placeholder="Nom de l'évaluateur", key="new_evaluateur")
+            col1, col2 = st.columns(2)
+            with col1:
+                rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique")
+                critere = st.text_input("Critère", placeholder="Ex: Leadership", key="new_critere")
+                type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], 
+                                            key="new_type_question", on_change=update_placeholder)
+            with col2:
+                # Placeholder dynamique basé sur le type de question
+                placeholder = st.session_state.get("cible_placeholder", "Définissez la cible ou le standard attendu pour ce critère.")
+                cible = st.text_area("Cible / Standard attendu", placeholder=placeholder, key="new_cible", height=100)
+                evaluation = st.slider("Échelle d'évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
+                evaluateur = st.selectbox("Évaluateur", ["Manager", "Recruteur", "Les deux"], key="new_evaluateur")
             
             if st.form_submit_button("Ajouter"):
                 new_row = pd.DataFrame([{
@@ -87,7 +106,7 @@ def render_ksa_matrix():
                 ),
                 "Critère": st.column_config.TextColumn(
                     "Critère",
-                    help="Critère spécifique à évaluer (ex: Leadership).",
+                    help="Critère spécifique à évaluer.",
                     required=True,
                 ),
                 "Type de question": st.column_config.SelectboxColumn(
@@ -109,16 +128,17 @@ def render_ksa_matrix():
                     step=1,
                     format="%d"
                 ),
-                "Évaluateur": st.column_config.TextColumn(
+                "Évaluateur": st.column_config.SelectboxColumn(
                     "Évaluateur",
-                    help="Nom de l'évaluateur ou responsable.",
-                    required=False,
+                    options=["Manager", "Recruteur", "Les deux"],
+                    help="Qui évalue ce critère.",
+                    required=True,
                 ),
             },
             num_rows="dynamic",
             use_container_width=True,
         )
-
+        
 def delete_current_brief():
     """Supprime le brief actuel et retourne à l'onglet Gestion"""
     if "current_brief_name" in st.session_state and st.session_state.current_brief_name:
