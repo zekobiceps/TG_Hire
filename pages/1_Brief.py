@@ -42,7 +42,7 @@ def render_ksa_matrix():
 - **Générale** : Questions ouvertes sur l'expérience globale. Ex: "Parlez-moi de votre parcours en BTP."
         """)
     
-    # Initialiser les données KSA si elles n'existent pas, avec les colonnes demandées
+    # Initialiser les données KSA si elles n'existent pas
     if "ksa_matrix" not in st.session_state:
         st.session_state.ksa_matrix = pd.DataFrame(columns=[
             "Rubrique", 
@@ -53,16 +53,13 @@ def render_ksa_matrix():
             "Évaluateur"
         ])
     
-    # Fonction callback pour mettre à jour le placeholder en fonction du type de question
-    def update_placeholder():
-        placeholder_dict = {
-            "Comportementale": "Ex: Décrivez une situation où vous avez géré une équipe sous pression (méthode STAR: Situation, Tâche, Action, Résultat).",
-            "Situationnelle": "Ex: Que feriez-vous si un délai de chantier était menacé par un retard de livraison ?",
-            "Technique": "Ex: Expliquez comment vous utilisez AutoCAD pour la modélisation de structures BTP.",
-            "Générale": "Ex: Parlez-moi de votre expérience globale dans le secteur BTP."
-        }
-        if "new_type_question" in st.session_state:
-            st.session_state.cible_placeholder = placeholder_dict.get(st.session_state.new_type_question, "Définissez la cible ou le standard attendu pour ce critère.")
+    # Définir le dictionnaire des placeholders pour "Cible / Standard attendu"
+    placeholder_dict = {
+        "Comportementale": "Ex: Décrivez une situation où vous avez géré une équipe sous pression (méthode STAR: Situation, Tâche, Action, Résultat).",
+        "Situationnelle": "Ex: Que feriez-vous si un délai de chantier était menacé par un retard de livraison ?",
+        "Technique": "Ex: Expliquez comment vous utilisez AutoCAD pour la modélisation de structures BTP.",
+        "Générale": "Ex: Parlez-moi de votre expérience globale dans le secteur BTP."
+    }
     
     # Expander pour ajouter un nouveau critère, avec colonnes
     with st.expander("➕ Ajouter un critère"):
@@ -72,10 +69,10 @@ def render_ksa_matrix():
                 rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique")
                 critere = st.text_input("Critère", placeholder="Ex: Leadership", key="new_critere")
                 type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], 
-                                            key="new_type_question", on_change=update_placeholder)
+                                            key="new_type_question")
             with col2:
-                # Placeholder dynamique basé sur le type de question
-                placeholder = st.session_state.get("cible_placeholder", "Définissez la cible ou le standard attendu pour ce critère.")
+                # Utiliser le placeholder correspondant au type de question sélectionné
+                placeholder = placeholder_dict.get(type_question, "Définissez la cible ou le standard attendu pour ce critère.")
                 cible = st.text_area("Cible / Standard attendu", placeholder=placeholder, key="new_cible", height=100)
                 evaluation = st.slider("Échelle d'évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
                 evaluateur = st.selectbox("Évaluateur", ["Manager", "Recruteur", "Les deux"], key="new_evaluateur")
