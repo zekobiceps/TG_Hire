@@ -233,9 +233,6 @@ def render_ksa_matrix():
             num_rows="dynamic",
             use_container_width=True,
         )
-    # Afficher la dernière réponse IA si elle existe
-    if "ai_response" in st.session_state and st.session_state.ai_response:
-        st.success(f"Question générée : {st.session_state.ai_response}")
 
 def delete_current_brief():
     """Supprime le brief actuel et retourne à l'onglet Gestion"""
