@@ -487,18 +487,35 @@ def generate_ai_question(prompt):
     detail = "détailler" in prompt.lower()
     max_tokens = 150 if not detail else 300  # Réponse courte par défaut, détaillée si demandé
 
-    # Extraire skill et role si le format est suivi
+    # Extraire type de question, skill et role
     context = "recruitment for a KSA (Knowledge, Skills, Abilities) matrix"
-    question = prompt
-    if "une question technique pour évaluer" in prompt and "par" in prompt:
+    question_type = "technical"  # Par défaut
+    skill = prompt
+    role = "candidate"
+    if "une question" in prompt and "pour évaluer" in prompt and "par" in prompt:
+        question_type_part = prompt.split("une question")[1].split("pour")[0].strip().lower()
+        if "générale" in question_type_part:
+            question_type = "general"
+        elif "comportementale" in question_type_part:
+            question_type = "behavioral"
+        elif "situationnelle" in question_type_part:
+            question_type = "situational"
+        elif "technique" in question_type_part:
+            question_type = "technical"
         skill = prompt.split("évaluer")[1].split("par")[0].strip()
         role = prompt.split("par")[1].strip()
-        context = f"{context}, for a {role}"
-        question = f"expertise in {skill}"
+
+    # Ajuster le contexte en fonction du type de question
+    if question_type == "behavioral":
+        context += ", using the STAR method (Situation, Task, Action, Result)"
+    elif question_type == "situational":
+        context += ", presenting a hypothetical scenario"
+    elif question_type == "general":
+        context += ", focusing on overall experience"
 
     # Prompt pour générer question et réponse
     full_prompt = (
-        f"Dans le contexte de {context}, génère une question d'entretien technique pour évaluer : {question}. "
+        f"Dans le contexte de {context}, génère une {question_type} question d'entretien pour évaluer : {skill} by a {role}. "
         f"Adapte la question au domaine spécifié (ex. recrutement) si applicable. "
         f"Retourne une réponse exemple pertinente et concise (1-2 phrases) à moins que 'détailler' ne soit inclus, "
         f"dans ce cas, fournis une réponse détaillée (3-4 phrases). "
@@ -514,7 +531,14 @@ def generate_ai_question(prompt):
         max_tokens=max_tokens
     )
 
-    return response.choices[0].message.content.strip()
+    # Nettoyer la réponse pour éviter les redondances
+    result = response.choices[0].message.content.strip()
+    if result.startswith("- Question:"):
+        result = result.replace("- Question:", "Question:", 1)
+    if "Réponse: Réponse:" in result:
+        result = result.replace("Réponse: Réponse:", "Réponse:")
+
+    return result
 # -------------------- Test de connexion DeepSeek --------------------
 def test_deepseek_connection():
     """Teste la connexion à l'API DeepSeek."""
