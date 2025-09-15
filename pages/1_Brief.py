@@ -4,6 +4,7 @@ from datetime import datetime
 import json
 import pandas as pd
 from utils import get_example_for_field, generate_checklist_advice
+from utils import generate_ai_question
 
 # ✅ permet d'accéder à utils.py à la racine
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -28,7 +29,7 @@ def render_ksa_matrix():
     """Affiche la matrice KSA sous forme de tableau et permet l'ajout de critères."""
     
     # Ajout des explications dans un expander
-    with st.expander("ℹ️ Explications de la méthode KSA"):
+    with st.expander("ℹ️ Explications de la méthode KSA", expanded=False):
         st.markdown("""
 ### Méthode KSA (Knowledge, Skills, Abilities)
 - **Knowledge (Connaissances)** : Savoirs théoriques nécessaires. Ex: Connaissances en normes de sécurité BTP (ISO 45001).
@@ -53,7 +54,7 @@ def render_ksa_matrix():
             "Évaluateur"
         ])
     
-    # Définir le dictionnaire des placeholders pour "Cible / Standard attendu"
+    # Dictionnaire des placeholders pour "Cible / Standard attendu"
     placeholder_dict = {
         "Comportementale": "Ex: Décrivez une situation où vous avez géré une équipe sous pression (méthode STAR: Situation, Tâche, Action, Résultat).",
         "Situationnelle": "Ex: Que feriez-vous si un délai de chantier était menacé par un retard de livraison ?",
@@ -61,22 +62,92 @@ def render_ksa_matrix():
         "Générale": "Ex: Parlez-moi de votre expérience globale dans le secteur BTP."
     }
     
-    # Expander pour ajouter un nouveau critère, avec colonnes
-    with st.expander("➕ Ajouter un critère"):
+    # Expander pour ajouter un nouveau critère
+    with st.expander("➕ Ajouter un critère", expanded=True):
+        # CSS pour améliorer l'apparence
+        st.markdown("""
+        <style>
+            .stTextInput, .stSelectbox, .stSlider, .stTextArea {
+                margin-bottom: 15px;
+                padding: 10px;
+                border-radius: 8px;
+                background-color: #2a2a2a;
+                color: #ffffff;
+            }
+            .stTextInput > div > input, .stTextArea > div > textarea {
+                background-color: #2a2a2a;
+                color: #ffffff;
+                border: 1px solid #555555;
+                border-radius: 8px;
+            }
+            .stSelectbox > div > select {
+                background-color: #2a2a2a;
+                color: #ffffff;
+                border: 1px solid #555555;
+                border-radius: 8px;
+            }
+            .stButton > button {
+                background-color: #4CAF50;
+                color: white;
+                border-radius: 8px;
+                padding: 10px 20px;
+                margin-top: 10px;
+            }
+            .stButton > button:hover {
+                background-color: #45a049;
+            }
+            .st-expander {
+                border: 1px solid #555555;
+                border-radius: 8px;
+                background-color: #1e1e1e;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Sélecteur de type de question pour prévisualiser le placeholder
+        st.markdown("**Prévisualiser le type de question**")
+        preview_type = st.selectbox("Type de question (aperçu)", 
+                                    ["Comportementale", "Situationnelle", "Technique", "Générale"], 
+                                    key="preview_type_question")
+        st.text_area("Aperçu Cible / Standard attendu", 
+                     placeholder_dict.get(preview_type, "Définissez la cible ou le standard attendu pour ce critère."), 
+                     disabled=True, height=100)
+        
+        # Formulaire pour ajouter un critère
         with st.form(key="add_ksa_criterion_form"):
-            col1, col2 = st.columns(2)
+            col1, col2 = st.columns([1, 1.5])  # Ratio pour un meilleur alignement
             with col1:
+                st.markdown("<div style='padding: 10px;'>", unsafe_allow_html=True)
                 rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique")
                 critere = st.text_input("Critère", placeholder="Ex: Leadership", key="new_critere")
                 type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], 
-                                            key="new_type_question")
+                                             key="new_type_question")
+                st.markdown("</div>", unsafe_allow_html=True)
             with col2:
-                # Utiliser le placeholder correspondant au type de question sélectionné
+                st.markdown("<div style='padding: 10px;'>", unsafe_allow_html=True)
                 placeholder = placeholder_dict.get(type_question, "Définissez la cible ou le standard attendu pour ce critère.")
                 cible = st.text_area("Cible / Standard attendu", placeholder=placeholder, key="new_cible", height=100)
                 evaluation = st.slider("Échelle d'évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
                 evaluateur = st.selectbox("Évaluateur", ["Manager", "Recruteur", "Les deux"], key="new_evaluateur")
+                st.markdown("</div>", unsafe_allow_html=True)
             
+            # Section pour demander une question à l'IA
+            st.markdown("**Demander une question à l'IA**")
+            ai_prompt = st.text_input("Prompt pour l'IA", placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", 
+                                      key="ai_prompt")
+            if st.form_submit_button("Générer question IA"):
+                if ai_prompt:
+                    try:
+                        ai_response = generate_ai_question(ai_prompt)
+                        st.session_state.new_cible = ai_response  # Auto-remplir le champ Cible
+                        st.success(f"Question générée : {ai_response}")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erreur lors de la génération de la question : {e}")
+                else:
+                    st.error("Veuillez entrer un prompt pour l'IA.")
+            
+            # Bouton pour ajouter le critère
             if st.form_submit_button("Ajouter"):
                 new_row = pd.DataFrame([{
                     "Rubrique": rubrique,
@@ -88,6 +159,14 @@ def render_ksa_matrix():
                 }])
                 st.session_state.ksa_matrix = pd.concat([st.session_state.ksa_matrix, new_row], ignore_index=True)
                 st.success("✅ Critère ajouté à la matrice KSA")
+                # Réinitialiser les champs
+                st.session_state.new_rubrique = "Knowledge"
+                st.session_state.new_critere = ""
+                st.session_state.new_type_question = "Comportementale"
+                st.session_state.new_cible = ""
+                st.session_state.new_evaluation = 3
+                st.session_state.new_evaluateur = "Manager"
+                st.session_state.ai_prompt = ""
                 st.rerun()
     
     # Afficher la matrice KSA sous forme de data_editor
@@ -135,7 +214,8 @@ def render_ksa_matrix():
             num_rows="dynamic",
             use_container_width=True,
         )
-        
+
+
 def delete_current_brief():
     """Supprime le brief actuel et retourne à l'onglet Gestion"""
     if "current_brief_name" in st.session_state and st.session_state.current_brief_name:
