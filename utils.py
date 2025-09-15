@@ -466,6 +466,7 @@ def get_ai_pre_redaction(fiche_data):
     return response.choices[0].message.content
 
 # -------------------- Génération de question IA avec DeepSeek --------------------
+# -------------------- Génération de question IA avec DeepSeek --------------------
 def generate_ai_question(prompt):
     """Génère une question d'entretien et une réponse exemple via l'API DeepSeek."""
     try:
@@ -482,20 +483,25 @@ def generate_ai_question(prompt):
         base_url="https://api.deepseek.com/v1"
     )
 
-    # Extraire contexte et question si présents
+    # Déterminer si une réponse détaillée est demandée
+    detail = "détailler" in prompt.lower()
+    max_tokens = 150 if not detail else 300  # Réponse courte par défaut, détaillée si demandé
+
+    # Extraire skill et role si le format est suivi
     context = "recruitment for a KSA (Knowledge, Skills, Abilities) matrix"
     question = prompt
-    if "Context:" in prompt and "Question:" in prompt:
-        context_part = prompt.split("Context:")[1].split("Question:")[0].strip()
-        question_part = prompt.split("Question:")[1].strip()
-        context = f"{context}, {context_part}"
-        question = question_part
+    if "une question technique pour évaluer" in prompt and "par" in prompt:
+        skill = prompt.split("évaluer")[1].split("par")[0].strip()
+        role = prompt.split("par")[1].strip()
+        context = f"{context}, for a {role}"
+        question = f"expertise in {skill}"
 
     # Prompt pour générer question et réponse
     full_prompt = (
         f"Dans le contexte de {context}, génère une question d'entretien technique pour évaluer : {question}. "
-        f"Adapte la question au domaine spécifié dans le contexte (ex. BTP, recrutement) si applicable. "
-        f"Retourne une réponse exemple pertinente qui reflète une compétence ou une approche liée à la question. "
+        f"Adapte la question au domaine spécifié (ex. recrutement) si applicable. "
+        f"Retourne une réponse exemple pertinente et concise (1-2 phrases) à moins que 'détailler' ne soit inclus, "
+        f"dans ce cas, fournis une réponse détaillée (3-4 phrases). "
         f"Utilise ce format :\n"
         f"- Question: [votre question]\n"
         f"- Réponse: [exemple de réponse]"
@@ -505,7 +511,7 @@ def generate_ai_question(prompt):
         model="deepseek-chat",
         messages=[{"role": "user", "content": full_prompt}],
         temperature=0.7,
-        max_tokens=300
+        max_tokens=max_tokens
     )
 
     return response.choices[0].message.content.strip()
