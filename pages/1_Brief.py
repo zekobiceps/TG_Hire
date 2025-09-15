@@ -849,6 +849,7 @@ with tabs[1]:
                 st.session_state.avant_brief_completed = False
                 st.rerun()
                 
+# ---------------- RÉUNION DE BRIEF ----------------
 with tabs[2]:
     # Afficher le message de sauvegarde seulement pour cet onglet
     if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Réunion"):
