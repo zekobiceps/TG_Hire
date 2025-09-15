@@ -506,11 +506,11 @@ with tab7:
         "Quelles tendances de recrutement récentes pour le métier de"
     ]
 
-    # Initialize session state for selected question and full question
+    # Initialize session state for selected question and appended text
     if "magicien_selected_question" not in st.session_state:
         st.session_state.magicien_selected_question = ""
-    if "magicien_full_question" not in st.session_state:
-        st.session_state.magicien_full_question = ""
+    if "magicien_appended_text" not in st.session_state:
+        st.session_state.magicien_appended_text = ""
 
     # Selectbox for pre-defined questions
     q_choice = st.selectbox("📌 Questions prêtes :", [""] + questions_pretes, key="magicien_qchoice",
@@ -519,36 +519,32 @@ with tab7:
     # Update the selected question in session state when changed
     if q_choice and q_choice != st.session_state.magicien_selected_question:
         st.session_state.magicien_selected_question = q_choice
-        st.session_state.magicien_full_question = q_choice  # Set full question to selected question
+        st.session_state.magicien_appended_text = ""  # Reset appended text when new question is selected
 
-    # Text area to allow appending text to the selected question
-    # Prepend the base question and allow appending
-    base_question = st.session_state.magicien_selected_question
-    current_input = st.text_area("Modifiez la question si nécessaire (ajoutez du texte après la question pré-sélectionnée) :", 
-                                value=base_question if base_question and not st.session_state.magicien_full_question.startswith(base_question) else st.session_state.magicien_full_question,
-                                key="magicien_question", 
-                                height=100,
-                                placeholder="Posez votre question ici... ou ajoutez après la question pré-sélectionnée")
+    # Display base question as read-only
+    if st.session_state.magicien_selected_question:
+        st.markdown(f"**{st.session_state.magicien_selected_question}**", unsafe_allow_html=False)
 
-    # Update full question with user input, ensuring base question is preserved
-    if current_input and base_question:
-        if not current_input.startswith(base_question):
-            st.session_state.magicien_full_question = base_question + " " + current_input.strip()
-        else:
-            st.session_state.magicien_full_question = current_input
-    elif current_input:
-        st.session_state.magicien_full_question = current_input
+    # Text input for appended text
+    appended_text = st.text_input("", 
+                                 value=st.session_state.magicien_appended_text,
+                                 key="magicien_appended_text_input",
+                                 placeholder="Ajoutez votre texte ici (ex: 'Ingénieur travaux')")
 
-    # Display a note to guide the user
-    st.caption("💡 Ajoutez votre texte après la question pré-sélectionnée (ex: 'Ingénieur travaux'). La question de base ne peut pas être supprimée.")
+    # Update appended text in session state
+    if appended_text != st.session_state.magicien_appended_text:
+        st.session_state.magicien_appended_text = appended_text
+
+    # Construct full question
+    full_question = st.session_state.magicien_selected_question + (" " + st.session_state.magicien_appended_text if st.session_state.magicien_appended_text else "")
 
     mode_rapide_magicien = st.checkbox("⚡ Mode rapide (réponse concise)", key="magicien_fast")
 
     if st.button("✨ Poser la question", type="primary", key="ask_magicien", use_container_width=True):
-        if st.session_state.magicien_full_question:
+        if full_question:
             with st.spinner("⏳ Génération en cours..."):
                 start_time = time.time()
-                enhanced_question = st.session_state.magicien_full_question
+                enhanced_question = full_question
                 if "synonymes" in enhanced_question.lower():
                     enhanced_question += ". Réponds uniquement avec une liste de synonymes séparés par des virgules, sans introduction."
                 elif "outils" in enhanced_question.lower() or "logiciels" in enhanced_question.lower():
@@ -563,7 +559,7 @@ with tab7:
                 st.success(f"✅ Réponse générée en {total_time}s")
                 
                 st.session_state.magicien_history.append({
-                    "q": st.session_state.magicien_full_question, 
+                    "q": full_question, 
                     "r": result["content"], 
                     "time": total_time
                 })
