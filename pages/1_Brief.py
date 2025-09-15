@@ -775,9 +775,12 @@ with tabs[1]:
                         advice_text = advice_and_example[0].strip()
                         example_text = advice_and_example[1].strip() if len(advice_and_example) > 1 else ""
                         
-                        st.markdown(f"**Conseil :** {advice_text}")
-                        if example_text:
-                            st.markdown(f"**Exemple :** {example_text}")
+                        st.markdown(f"""
+<div class="ai-advice-box">
+    <strong>Conseil :</strong> {advice_text}<br>
+    <strong>Exemple :</strong> {example_text}
+</div>
+""", unsafe_allow_html=True)
 
         # Boutons Enregistrer et Annuler dans le formulaire
         col_save, col_cancel = st.columns([1, 1])
