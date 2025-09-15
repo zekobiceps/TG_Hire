@@ -140,7 +140,9 @@ def render_ksa_matrix():
             if st.form_submit_button("Générer question IA"):
                 if ai_prompt:
                     try:
-                        ai_response = generate_ai_question(ai_prompt)
+                        # Ajouter du contexte pour s'assurer que la question concerne le recrutement
+                        contextualized_prompt = f"In the context of recruitment for a KSA (Knowledge, Skills, Abilities) matrix, generate a technical question to evaluate {ai_prompt}."
+                        ai_response = generate_ai_question(contextualized_prompt)
                         st.session_state.ai_response = ai_response  # Stocker dans une variable temporaire
                         st.success(f"Question générée : {ai_response}")
                     except Exception as e:
