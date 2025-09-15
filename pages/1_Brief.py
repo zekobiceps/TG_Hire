@@ -518,6 +518,19 @@ st.markdown("""
         height: auto !important;
         min-height: 60px !important;
     }
+            /* Nouveau style pour les conseils IA */
+.ai-advice-box {
+    background-color: #1A1A1A;
+    border-left: 4px solid #FF4B4B;
+    padding: 1rem;
+    border-radius: 4px;
+    margin-top: 1rem;
+    color: #E0E0E0;
+}
+.ai-advice-box strong {
+    color: #FFFFFF;
+}
+
     </style>
 """, unsafe_allow_html=True)
 
