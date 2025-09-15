@@ -64,7 +64,7 @@ def render_ksa_matrix():
     
     # Expander pour ajouter un nouveau critère
     with st.expander("➕ Ajouter un critère", expanded=True):
-        # CSS pour améliorer l'apparence avec 3 colonnes et bouton rouge vif
+        # CSS pour améliorer l'apparence avec 2 colonnes, boutons rouges, et styliser la réponse
         st.markdown("""
         <style>
             .stTextInput, .stSelectbox, .stSlider, .stTextArea {
@@ -73,18 +73,21 @@ def render_ksa_matrix():
                 border-radius: 8px;
                 background-color: #2a2a2a;
                 color: #ffffff;
+                width: 90%; /* Réduire la taille des champs */
             }
             .stTextInput > div > input, .stTextArea > div > textarea {
                 background-color: #2a2a2a;
                 color: #ffffff;
                 border: 1px solid #555555;
                 border-radius: 8px;
+                width: 100%;
             }
             .stSelectbox > div > select {
                 background-color: #2a2a2a;
                 color: #ffffff;
                 border: 1px solid #555555;
                 border-radius: 8px;
+                width: 100%;
             }
             .stButton > button {
                 background-color: #FF0000;
@@ -105,52 +108,43 @@ def render_ksa_matrix():
             .form-row {
                 display: flex;
                 gap: 10px;
-                margin-bottom: 10px;
+                margin-bottom: 5px;
             }
             .ai-response {
                 margin-top: 10px;
                 padding: 5px;
-                background-color: #2a2a2a;
+                background-color: #28a745; /* Vert pour la réponse sous "Ajouter" */
                 border-radius: 8px;
                 color: #ffffff;
+            }
+            .stSuccess { /* Override green from st.success */
+                background-color: #2a2a2a !important;
+                color: #ffffff !important;
             }
         </style>
         """, unsafe_allow_html=True)
         
-        # Formulaire pour ajouter un critère avec 3 colonnes améliorées
+        # Formulaire pour ajouter un critère avec 2 colonnes améliorées
         with st.form(key="add_ksa_criterion_form"):
-            # Disposition améliorée avec "Cible / Standard attendu" en haut
-            col1, col2, col3 = st.columns([1, 1, 1.5])
-            with col1:
-                st.markdown("<div class='form-row' style='padding: 5px;'>", unsafe_allow_html=True)
-                cible = st.text_area("Cible / Standard attendu", 
-                                     placeholder=placeholder_dict.get("Technique", "Définissez la cible ou le standard attendu pour ce critère."), 
-                                     key="new_cible", height=100)
-                st.markdown("</div>", unsafe_allow_html=True)
+            # "Cible / Standard attendu" en haut, sur toute la largeur
+            st.markdown("<div class='form-row' style='padding: 5px; width: 100%;'>", unsafe_allow_html=True)
+            cible = st.text_area("Cible / Standard attendu", 
+                                 placeholder=placeholder_dict.get("Technique", "Définissez la cible ou le standard attendu pour ce critère."), 
+                                 key="new_cible", height=80)
+            st.markdown("</div>", unsafe_allow_html=True)
             
-            # Champs alignés dans une grille 3 colonnes
-            col1, col2, col3 = st.columns([1, 1, 1])
+            # Champs en 2 colonnes
+            col1, col2 = st.columns(2)
             with col1:
                 st.markdown("<div class='form-row' style='padding: 5px;'>", unsafe_allow_html=True)
                 rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique")
-                st.markdown("</div>", unsafe_allow_html=True)
-            with col2:
-                st.markdown("<div class='form-row' style='padding: 5px;'>", unsafe_allow_html=True)
                 critere = st.text_input("Critère", placeholder="", key="new_critere")
                 st.markdown("</div>", unsafe_allow_html=True)
-            with col3:
+            with col2:
                 st.markdown("<div class='form-row' style='padding: 5px;'>", unsafe_allow_html=True)
                 type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], 
                                              key="new_type_question")
-                st.markdown("</div>", unsafe_allow_html=True)
-            
-            col1, col2, col3 = st.columns([1, 1, 1])
-            with col1:
-                st.markdown("<div class='form-row' style='padding: 5px;'>", unsafe_allow_html=True)
                 evaluation = st.slider("Échelle d'évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
-                st.markdown("</div>", unsafe_allow_html=True)
-            with col2:
-                st.markdown("<div class='form-row' style='padding: 5px;'>", unsafe_allow_html=True)
                 evaluateur = st.selectbox("Évaluateur", ["Manager", "Recruteur", "Les deux"], key="new_evaluateur")
                 st.markdown("</div>", unsafe_allow_html=True)
             
@@ -164,7 +158,7 @@ def render_ksa_matrix():
                         # Adapter le prompt au nouveau format
                         if "une question" in ai_prompt and "pour évaluer" in ai_prompt and "par" in ai_prompt:
                             question_type = ai_prompt.split("une question")[1].split("pour")[0].strip()
-                            skill = ai_prompt.split("évaluer")[1].split("par")[0].strip()
+                            skill = ai_prompt.split("évaluate")[1].split("par")[0].strip()
                             role = ai_prompt.split("par")[1].strip()
                             contextualized_prompt = f"In the context of recruitment for a KSA (Knowledge, Skills, Abilities) matrix, generate a {question_type} question to evaluate {skill} by a {role} with a short response unless 'détailler' is included."
                         else:
@@ -199,7 +193,7 @@ def render_ksa_matrix():
                 st.session_state.ai_response = None  # Réinitialiser la réponse IA
                 st.rerun()
             
-            # Afficher la réponse générée en bas du bouton Ajouter avec style cohérent
+            # Afficher la réponse générée en bas du bouton Ajouter avec style vert
             if "ai_response" in st.session_state and st.session_state.ai_response:
                 st.markdown(f"<div class='ai-response'>{st.session_state.ai_response}</div>", unsafe_allow_html=True)
     
@@ -248,7 +242,7 @@ def render_ksa_matrix():
             num_rows="dynamic",
             use_container_width=True,
         )
-        
+
     # Afficher la dernière réponse IA si elle existe
     if "ai_response" in st.session_state and st.session_state.ai_response:
         st.success(f"Question générée : {st.session_state.ai_response}")
