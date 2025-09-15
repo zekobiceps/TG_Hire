@@ -64,12 +64,12 @@ def render_ksa_matrix():
     
     # Expander pour ajouter un nouveau critère
     with st.expander("➕ Ajouter un critère", expanded=True):
-        # CSS pour améliorer l'apparence
+        # CSS pour améliorer l'apparence et réduire les espaces vides
         st.markdown("""
         <style>
             .stTextInput, .stSelectbox, .stSlider, .stTextArea {
-                margin-bottom: 15px;
-                padding: 10px;
+                margin-bottom: 5px;
+                padding: 5px;
                 border-radius: 8px;
                 background-color: #2a2a2a;
                 color: #ffffff;
@@ -90,8 +90,8 @@ def render_ksa_matrix():
                 background-color: #4CAF50;
                 color: white;
                 border-radius: 8px;
-                padding: 10px 20px;
-                margin-top: 10px;
+                padding: 5px 10px;
+                margin-top: 5px;
             }
             .stButton > button:hover {
                 background-color: #45a049;
@@ -100,31 +100,23 @@ def render_ksa_matrix():
                 border: 1px solid #555555;
                 border-radius: 8px;
                 background-color: #1e1e1e;
+                padding: 5px;
             }
         </style>
         """, unsafe_allow_html=True)
         
-        # Sélecteur de type de question pour prévisualiser le placeholder
-        st.markdown("**Prévisualiser le type de question**")
-        preview_type = st.selectbox("Type de question (aperçu)", 
-                                    ["Comportementale", "Situationnelle", "Technique", "Générale"], 
-                                    key="preview_type_question")
-        st.text_area("Aperçu Cible / Standard attendu", 
-                     placeholder_dict.get(preview_type, "Définissez la cible ou le standard attendu pour ce critère."), 
-                     disabled=True, height=100)
-        
-        # Formulaire pour ajouter un critère
+        # Formulaire pour ajouter un critère avec organisation améliorée
         with st.form(key="add_ksa_criterion_form"):
-            col1, col2 = st.columns([1, 1.5])  # Ratio pour un meilleur alignement
+            col1, col2 = st.columns([1, 1.5])  # Ratio 1:1.5 maintenu
             with col1:
-                st.markdown("<div style='padding: 10px;'>", unsafe_allow_html=True)
+                st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
                 rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique")
                 critere = st.text_input("Critère", placeholder="Ex: Leadership", key="new_critere")
                 type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], 
                                              key="new_type_question")
                 st.markdown("</div>", unsafe_allow_html=True)
             with col2:
-                st.markdown("<div style='padding: 10px;'>", unsafe_allow_html=True)
+                st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
                 placeholder = placeholder_dict.get(type_question, "Définissez la cible ou le standard attendu pour ce critère.")
                 cible = st.text_area("Cible / Standard attendu", 
                                      value=st.session_state.get("ai_response", ""), 
@@ -142,9 +134,10 @@ def render_ksa_matrix():
                     try:
                         # Ajouter du contexte pour s'assurer que la question concerne le recrutement
                         contextualized_prompt = f"In the context of recruitment for a KSA (Knowledge, Skills, Abilities) matrix, generate a technical question to evaluate {ai_prompt}."
-                        ai_response = generate_ai_question(contextualized_prompt)
-                        st.session_state.ai_response = ai_response  # Stocker dans une variable temporaire
-                        st.success(f"Question générée : {ai_response}")
+                        ai_question = generate_ai_question(contextualized_prompt)
+                        # Générer une réponse exemple simple basée sur la question
+                        ai_response = f"Question: {ai_question}\nRéponse: [Exemple de réponse à adapter selon le contexte, ex. : J’utiliserais des outils comme LinkedIn Recruiter pour identifier les candidats et évaluer leur pertinence avec des critères tels que l’expérience et les compétences techniques.]"
+                        st.session_state.ai_response = ai_response
                     except Exception as e:
                         st.error(f"Erreur lors de la génération de la question : {e}")
                 else:
