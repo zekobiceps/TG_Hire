@@ -327,10 +327,20 @@ def export_brief_pdf():
     # --- SECTION 4: Matrice KSA
     story.append(Paragraph("4. Matrice KSA", styles['Heading2']))
     if not st.session_state.ksa_matrix.empty:
-        header = ["Rubrique", "Critère", "Cible / Standard attendu", "Échelle (1-5)", "Évaluateur"]
-        table_data = [header] + st.session_state.ksa_matrix.values.tolist()
+        header = ["Rubrique", "Critère", "Cible / Standard attendu", "Échelle d'évaluation (1-5)", "Évaluateur"]
+        table_data = [header]
+        for _, row in st.session_state.ksa_matrix.iterrows():
+            table_data.append([
+                str(row.get("Rubrique", "")),
+                str(row.get("Critère", "")),
+                str(row.get("Cible / Standard attendu", "")),
+                str(row.get("Échelle d'évaluation (1-5)", "")),
+                str(row.get("Évaluateur", ""))
+            ])
         t = Table(table_data, style=[('GRID', (0,0), (-1,-1), 1, colors.black), ('BACKGROUND', (0,0), (-1,0), colors.grey)])
         story.append(t)
+    else:
+        story.append(Paragraph("Aucune donnée KSA disponible.", styles['Normal']))
     story.append(Spacer(1, 15))
 
     # --- SECTION 5: Stratégie Recrutement
