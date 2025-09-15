@@ -516,12 +516,13 @@ def generate_ai_question(prompt):
     # Prompt pour générer question et réponse
     full_prompt = (
         f"Dans le contexte de {context}, génère une {question_type} question d'entretien pour évaluer : {skill} by a {role}. "
-        f"Adapte la question au domaine spécifié (ex. recrutement) si applicable. "
+        f"Adapte la question au domaine spécifié (ex. recrutement ou BTP) si applicable. "
         f"Retourne une réponse exemple pertinente et concise (1-2 phrases) à moins que 'détailler' ne soit inclus, "
         f"dans ce cas, fournis une réponse détaillée (3-4 phrases). "
-        f"Utilise ce format :\n"
-        f"- Question: [votre question]\n"
-        f"- Réponse: [exemple de réponse]"
+        f"Assure-toi que la réponse corresponde au type de question (ex. STAR pour comportementale, scénario pour situationnelle). "
+        f"Utilise uniquement ce format :\n"
+        f"Question: [votre question]\n"
+        f"Réponse: [exemple de réponse]"
     )
 
     response = client.chat.completions.create(
@@ -537,6 +538,15 @@ def generate_ai_question(prompt):
         result = result.replace("- Question:", "Question:", 1)
     if "Réponse: Réponse:" in result:
         result = result.replace("Réponse: Réponse:", "Réponse:")
+    if result.count("Question:") > 1 or result.count("Réponse:") > 1:
+        parts = result.split("\n")
+        cleaned_parts = []
+        for part in parts:
+            if part.startswith("Question:") and not any(p.startswith("Question:") for p in cleaned_parts):
+                cleaned_parts.append(part)
+            elif part.startswith("Réponse:") and not any(p.startswith("Réponse:") for p in cleaned_parts):
+                cleaned_parts.append(part)
+        result = "\n".join(cleaned_parts)
 
     return result
 # -------------------- Test de connexion DeepSeek --------------------
