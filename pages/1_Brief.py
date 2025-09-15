@@ -64,7 +64,7 @@ def render_ksa_matrix():
     
     # Expander pour ajouter un nouveau critère
     with st.expander("➕ Ajouter un critère", expanded=True):
-        # CSS pour améliorer l'apparence et réduire les espaces vides
+        # CSS pour améliorer l'apparence avec 3 colonnes et bouton rouge vif
         st.markdown("""
         <style>
             .stTextInput, .stSelectbox, .stSlider, .stTextArea {
@@ -87,14 +87,14 @@ def render_ksa_matrix():
                 border-radius: 8px;
             }
             .stButton > button {
-                background-color: #4CAF50;
+                background-color: #FF0000;
                 color: white;
                 border-radius: 8px;
                 padding: 5px 10px;
                 margin-top: 5px;
             }
             .stButton > button:hover {
-                background-color: #45a049;
+                background-color: #FF3333;
             }
             .st-expander {
                 border: 1px solid #555555;
@@ -105,38 +105,42 @@ def render_ksa_matrix():
         </style>
         """, unsafe_allow_html=True)
         
-        # Formulaire pour ajouter un critère avec organisation améliorée
+        # Formulaire pour ajouter un critère avec 3 colonnes
         with st.form(key="add_ksa_criterion_form"):
-            col1, col2 = st.columns([1, 1.5])  # Ratio 1:1.5 maintenu
+            col1, col2, col3 = st.columns([1, 1, 1.5])  # Three-column layout
             with col1:
                 st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
                 rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique")
-                critere = st.text_input("Critère", placeholder="Ex: Leadership", key="new_critere")
-                type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], 
-                                             key="new_type_question")
                 st.markdown("</div>", unsafe_allow_html=True)
             with col2:
                 st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
-                placeholder = placeholder_dict.get(type_question, "Définissez la cible ou le standard attendu pour ce critère.")
-                cible = st.text_area("Cible / Standard attendu", 
-                                     value=st.session_state.get("ai_response", ""), 
-                                     placeholder=placeholder, key="new_cible", height=100)
+                critere = st.text_input("Critère", placeholder="", key="new_critere")
+                type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], 
+                                             key="new_type_question")
+                st.markdown("</div>", unsafe_allow_html=True)
+            with col3:
+                st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
                 evaluation = st.slider("Échelle d'évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
                 evaluateur = st.selectbox("Évaluateur", ["Manager", "Recruteur", "Les deux"], key="new_evaluateur")
                 st.markdown("</div>", unsafe_allow_html=True)
             
             # Section pour demander une question à l'IA
             st.markdown("**Demander une question à l'IA**")
-            ai_prompt = st.text_input("Prompt pour l'IA", placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", 
+            ai_prompt = st.text_input("Prompt pour l'IA", placeholder="Ex: Context: [context], Question: [your question]", 
                                       key="ai_prompt")
-            if st.form_submit_button("Générer question IA"):
+            if st.form_submit_button("💡 Générer question IA"):
                 if ai_prompt:
                     try:
-                        # Ajouter du contexte pour s'assurer que la question concerne le recrutement
-                        contextualized_prompt = f"In the context of recruitment for a KSA (Knowledge, Skills, Abilities) matrix, generate a technical question to evaluate {ai_prompt}."
+                        # Extraire le contexte et la question du prompt
+                        if "Context:" in ai_prompt and "Question:" in ai_prompt:
+                            context_part = ai_prompt.split("Context:")[1].split("Question:")[0].strip()
+                            question_part = ai_prompt.split("Question:")[1].strip()
+                            contextualized_prompt = f"In the context of recruitment for a KSA (Knowledge, Skills, Abilities) matrix, {context_part}, generate a technical question to evaluate {question_part}."
+                        else:
+                            contextualized_prompt = f"In the context of recruitment for a KSA (Knowledge, Skills, Abilities) matrix, generate a technical question to evaluate {ai_prompt}."
                         ai_question = generate_ai_question(contextualized_prompt)
-                        # Générer une réponse exemple simple basée sur la question
-                        ai_response = f"Question: {ai_question}\nRéponse: [Exemple de réponse à adapter selon le contexte, ex. : J’utiliserais des outils comme LinkedIn Recruiter pour identifier les candidats et évaluer leur pertinence avec des critères tels que l’expérience et les compétences techniques.]"
+                        # Générer une réponse exemple basée sur le format demandé
+                        ai_response = f"Question générée: {ai_question}\nExemple de réponse à adapter selon le contexte, ex.: J’utiliserais des outils comme LinkedIn Recruiter pour identifier les candidats et évaluer leur pertinence avec des critères tels que l’expérience et les compétences techniques."
                         st.session_state.ai_response = ai_response
                     except Exception as e:
                         st.error(f"Erreur lors de la génération de la question : {e}")
@@ -165,6 +169,13 @@ def render_ksa_matrix():
                 st.session_state.ai_prompt = ""
                 st.session_state.ai_response = None  # Réinitialiser la réponse IA
                 st.rerun()
+            
+            # Zone de texte pour la réponse générée, placée en bas du bouton Ajouter
+            if "ai_response" in st.session_state and st.session_state.ai_response:
+                cible = st.text_area("Cible / Standard attendu", 
+                                     value=st.session_state.ai_response, 
+                                     placeholder=placeholder_dict.get(type_question, "Définissez la cible ou le standard attendu pour ce critère."), 
+                                     key="new_cible", height=100)
     
     # Afficher la matrice KSA sous forme de data_editor
     if not st.session_state.ksa_matrix.empty:
