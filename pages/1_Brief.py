@@ -126,7 +126,9 @@ def render_ksa_matrix():
             with col2:
                 st.markdown("<div style='padding: 10px;'>", unsafe_allow_html=True)
                 placeholder = placeholder_dict.get(type_question, "Définissez la cible ou le standard attendu pour ce critère.")
-                cible = st.text_area("Cible / Standard attendu", placeholder=placeholder, key="new_cible", height=100)
+                cible = st.text_area("Cible / Standard attendu", 
+                                     value=st.session_state.get("ai_generated_cible", ""), 
+                                     placeholder=placeholder, key="new_cible", height=100)
                 evaluation = st.slider("Échelle d'évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
                 evaluateur = st.selectbox("Évaluateur", ["Manager", "Recruteur", "Les deux"], key="new_evaluateur")
                 st.markdown("</div>", unsafe_allow_html=True)
@@ -137,13 +139,14 @@ def render_ksa_matrix():
                                       key="ai_prompt")
             if st.form_submit_button("Générer question IA"):
                 if ai_prompt:
-                    try:
-                        ai_response = generate_ai_question(ai_prompt)
-                        st.session_state.new_cible = ai_response  # Auto-remplir le champ Cible
-                        st.success(f"Question générée : {ai_response}")
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Erreur lors de la génération de la question : {e}")
+                    with st.spinner("Génération de la question par l'IA en cours..."):
+                        try:
+                            ai_response = generate_ai_question(ai_prompt)
+                            st.session_state.ai_generated_cible = ai_response  # Stocker dans une variable temporaire
+                            st.success(f"Question générée : {ai_response}")
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Erreur lors de la génération de la question : {e}")
                 else:
                     st.error("Veuillez entrer un prompt pour l'IA.")
             
@@ -163,7 +166,7 @@ def render_ksa_matrix():
                 st.session_state.new_rubrique = "Knowledge"
                 st.session_state.new_critere = ""
                 st.session_state.new_type_question = "Comportementale"
-                st.session_state.new_cible = ""
+                st.session_state.ai_generated_cible = ""  # Réinitialiser la variable temporaire
                 st.session_state.new_evaluation = 3
                 st.session_state.new_evaluateur = "Manager"
                 st.session_state.ai_prompt = ""
@@ -214,7 +217,6 @@ def render_ksa_matrix():
             num_rows="dynamic",
             use_container_width=True,
         )
-
 
 def delete_current_brief():
     """Supprime le brief actuel et retourne à l'onglet Gestion"""
@@ -393,7 +395,8 @@ st.markdown("""
         color: white !important;
         border-radius: 4px !important;
     }
-            /* Style pour la matrice KSA */
+    
+    /* Style pour la matrice KSA */
     .stDataFrame {
         width: 100%;
         border-collapse: collapse;
@@ -485,7 +488,7 @@ st.markdown("""
         background-color: #262730;
         font-weight: bold;
     }
-
+    
     /* Style pour la matrice KSA */
     .dataframe {
         width: 100%;
@@ -496,73 +499,43 @@ st.markdown("""
         width: 100%;
         border-collapse: collapse;
         margin-bottom: 20px;
-        background-color: #0d1117; /* Fond noir pour le tableau */
-        font-size: 0.9em; /* Augmentation de la taille du texte */
-        border: 1px solid #ffffff; /* Bordure blanche */
+        background-color: #0d1117;
+        font-size: 0.9em;
+        border: 1px solid #ffffff;
     }
     
     .dark-table th, .dark-table td {
         padding: 12px 16px;
         text-align: left;
-        border: 1px solid #ffffff; /* Bordures blanches */
-        color: #e6edf3; /* Texte clair sur fond sombre */
+        border: 1px solid #ffffff;
+        color: #e6edf3;
     }
     
     .dark-table th {
-        background-color: #FF4B4B !important;  /* Rouge vif identique aux boutons */
+        background-color: #FF4B4B !important;
         color: white !important;
         font-weight: 600;
         padding: 14px 16px;
         font-size: 16px;
-        border: 1px solid #ffffff; /* Bordure blanche */
+        border: 1px solid #ffffff;
     }
     
     /* Auto-size pour les deux premières colonnes */
-    .dark-table th:nth-child(1),
-    .dark-table td:nth-child(1) {
-        width: auto !important;
-        min-width: 100px;
-    }
-    
-    .dark-table th:nth-child(2),
-    .dark-table td:nth-child(2) {
-        width: auto !important;
-        min-width: 150px;
-    }
-    
-    .dark-table th:nth-child(3),
-    .dark-table td:nth-child(3) {
-        width: 65% !important;
-    }
+    .dark-table th:nth-child(1), .dark-table td:nth-child(1) { width: auto !important; min-width: 100px; }
+    .dark-table th:nth-child(2), .dark-table td:nth-child(2) { width: auto !important; min-width: 150px; }
+    .dark-table th:nth-child(3), .dark-table td:nth-child(3) { width: 65% !important; }
     
     /* Style pour les tableaux avec 4 colonnes (réunion de brief) */
-    .dark-table.four-columns th:nth-child(1),
-    .dark-table.four-columns td:nth-child(1) {
-        width: auto !important;
-        min-width: 100px;
-    }
-    
-    .dark-table.four-columns th:nth-child(2),
-    .dark-table.four-columns td:nth-child(2) {
-        width: auto !important;
-        min-width: 150px;
-    }
-    
-    .dark-table.four-columns th:nth-child(3),
-    .dark-table.four-columns td:nth-child(3) {
-        width: 50% !important;
-    }
-    
-    .dark-table.four-columns th:nth-child(4),
-    .dark-table.four-columns td:nth-child(4) {
-        width: 25% !important;
-    }
+    .dark-table.four-columns th:nth-child(1), .dark-table.four-columns td:nth-child(1) { width: auto !important; min-width: 100px; }
+    .dark-table.four-columns th:nth-child(2), .dark-table.four-columns td:nth-child(2) { width: auto !important; min-width: 150px; }
+    .dark-table.four-columns th:nth-child(3), .dark-table.four-columns td:nth-child(3) { width: 50% !important; }
+    .dark-table.four-columns th:nth-child(4), .dark-table.four-columns td:nth-child(4) { width: 25% !important; }
     
     .section-title {
         font-weight: 600;
-        color: #58a6ff; /* Couleur bleue pour les titres de section */
-        font-size: 0.95em; /* Augmentation de la taille du texte */
-        margin-bottom: 0 !important; /* Pas de marge pour alignement */
+        color: #58a6ff;
+        font-size: 0.95em;
+        margin-bottom: 0 !important;
     }
     
     /* Style pour les textareas dans les tableaux */
@@ -574,14 +547,14 @@ st.markdown("""
         border: 1px solid #555;
         border-radius: 4px;
         padding: 6px;
-        font-size: 0.9em; /* Augmentation de la taille du texte */
+        font-size: 0.9em;
         resize: vertical;
     }
     
     /* Style pour les cellules de texte */
     .table-text {
         padding: 6px;
-        font-size: 0.9em; /* Augmentation de la taille du texte */
+        font-size: 0.9em;
         color: #e6edf3;
     }
     
@@ -618,27 +591,14 @@ st.markdown("""
     
     .stDataFrame td:first-child {
         font-weight: 600;
-        color: #58a6ff; /* Couleur bleue pour les titres de section */
+        color: #58a6ff;
     }
     
     /* Auto-size pour les deux premières colonnes */
-    .stDataFrame td:nth-child(1) {
-        width: auto !important;
-        min-width: 100px;
-    }
-    
-    .stDataFrame td:nth-child(2) {
-        width: auto !important;
-        min-width: 150px;
-    }
-    
-    .stDataFrame td:nth-child(3) {
-        width: 50% !important;
-    }
-    
-    .stDataFrame td:nth-child(4) {
-        width: 25% !important;
-    }
+    .stDataFrame td:nth-child(1) { width: auto !important; min-width: 100px; }
+    .stDataFrame td:nth-child(2) { width: auto !important; min-width: 150px; }
+    .stDataFrame td:nth-child(3) { width: 50% !important; }
+    .stDataFrame td:nth-child(4) { width: 25% !important; }
     
     /* Style pour les cellules éditable (Informations) */
     .stDataFrame td:nth-child(3) textarea {
@@ -665,229 +625,135 @@ st.markdown("""
         height: auto !important;
         min-height: 60px !important;
     }
-            /* Nouveau style pour les conseils IA */
-.ai-advice-box {
-    background-color: #1A1A1A;
-    border-left: 4px solid #FF4B4B;
-    padding: 1rem;
-    border-radius: 4px;
-    margin-top: 1rem;
-    color: #E0E0E0;
-}
-.ai-advice-box strong {
-    color: #FFFFFF;
-}
-
     </style>
 """, unsafe_allow_html=True)
 
-# Vérification si un brief est chargé au début de l'application
-if "current_brief_name" not in st.session_state:
-    st.session_state.current_brief_name = ""
-
-# Création des onglets dans l'ordre demandé : Gestion, Avant-brief, Réunion de brief, Synthèse
-tabs = st.tabs([
-    "📁 Gestion", 
-    "🔄 Avant-brief", 
-    "✅ Réunion de brief", 
-    "📝 Synthèse"
-])
+# Sections pour le formulaire Avant Brief
+sections = [
+    {
+        "title": "Identité du poste",
+        "fields": [
+            ("Intitulé du poste", "poste_intitule", "Ex: Ingénieur travaux"),
+            ("Service", "service", "Ex: Travaux publics"),
+            ("Niveau hiérarchique", "niveau_hierarchique", "Ex: Cadre"),
+            ("Type de contrat", "type_contrat", "Ex: CDI"),
+            ("Localisation", "localisation", "Ex: Paris"),
+            ("Budget salaire", "budget_salaire", "Ex: 40-50k€ annuel"),
+            ("Date de prise de poste souhaitée", "date_prise_poste", "Ex: 01/01/2024")
+        ]
+    },
+    {
+        "title": "Contexte du poste",
+        "fields": [
+            ("Raison de l'ouverture", "raison_ouverture", "Ex: Remplacement, création de poste"),
+            ("Mission globale et impact stratégique", "impact_strategique", "Ex: Supervision des chantiers pour garantir les délais"),
+            ("Tâches principales", "taches_principales", "Ex: Gestion des équipes, suivi des budgets")
+        ]
+    },
+    {
+        "title": "Must-have (Indispensables)",
+        "fields": [
+            ("Expérience", "must_have_experience", "Ex: 5 ans en gestion de projets BTP"),
+            ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Ex: Diplôme d’ingénieur BTP"),
+            ("Compétences / Outils", "must_have_competences", "Ex: Maîtrise d’AutoCAD, Excel"),
+            ("Soft skills / aptitudes comportementales", "must_have_softskills", "Ex: Leadership, gestion du stress")
+        ]
+    },
+    {
+        "title": "Nice-to-have (Atouts)",
+        "fields": [
+            ("Expérience additionnelle", "nice_to_have_experience", "Ex: Expérience à l’international"),
+            ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Ex: Certification PMP"),
+            ("Compétences complémentaires", "nice_to_have_competences", "Ex: Connaissance en BIM")
+        ]
+    },
+    {
+        "title": "Sourcing et marché",
+        "fields": [
+            ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
+            ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
+            ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels")
+        ]
+    },
+    {
+        "title": "Profils pertinents",
+        "fields": [
+            ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
+            ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
+            ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre")
+        ]
+    },
+    {
+        "title": "Notes libres",
+        "fields": [
+            ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
+            ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique")
+        ]
+    },
+]
 
 # ---------------- ONGLET GESTION ----------------
-with tabs[0]:
-    # Afficher le message de sauvegarde seulement pour cet onglet
-    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Gestion"):
-        st.success(st.session_state.save_message)
-        st.session_state.save_message = None
-        st.session_state.save_message_tab = None
-
-    # Organiser les sections Informations de base et Filtrer les briefs en 2 colonnes
-    col_info, col_filter = st.columns(2)
+def gestion_tab():
+    st.header("📁 Gestion des Briefs")
     
-    # Section Informations de base
-    with col_info:
-        st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Informations de base</h3>', unsafe_allow_html=True)
-        
-        # Organiser en 3 colonnes
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.text_input("Poste à recruter", key="poste_intitule")
-        with col2:
-            st.text_input("Manager", key="manager_nom")
-        with col3:
-            st.selectbox("Recruteur", ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"], key="recruteur")
-        
-        col4, col5, col6 = st.columns(3)
-        with col4:
-            st.selectbox("Type d'affectation", ["Chantier", "Siège", "Dépôt"], key="affectation_type")
-        with col5:
-            st.text_input("Nom affectation", key="affectation_nom")
-        with col6:
-            st.date_input("Date du brief", key="date_brief", value=datetime.today())
-        
-        # Boutons Créer et Annuler
-        col_create, col_cancel = st.columns(2)
-        with col_create:
-            if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
-                brief_name = generate_automatic_brief_name()
-                st.session_state.saved_briefs[brief_name] = {
-                    "poste_intitule": st.session_state.poste_intitule,
-                    "manager_nom": st.session_state.manager_nom,
-                    "recruteur": st.session_state.recruteur,
-                    "affectation_type": st.session_state.affectation_type,
-                    "affectation_nom": st.session_state.affectation_nom,
-                    "date_brief": str(st.session_state.date_brief),
-                    "brief_type": "Standard"  # Default to Standard
-                }
-                save_briefs()
-                st.session_state.current_brief_name = brief_name
-                st.session_state.save_message = f"✅ Brief '{brief_name}' créé avec succès"
-                st.session_state.save_message_tab = "Gestion"
-                st.rerun()
-        with col_cancel:
-            if st.button("🗑️ Annuler", type="secondary", use_container_width=True, key="cancel_brief"):
-                # Reset fields
-                st.session_state.poste_intitule = ""
-                st.session_state.manager_nom = ""
-                st.session_state.recruteur = ""
-                st.session_state.affectation_type = ""
-                st.session_state.affectation_nom = ""
-                st.session_state.date_brief = datetime.today()
-                st.rerun()
-    
-    # Section Filtrage
-    with col_filter:
-        st.markdown('<h3 style="margin-bottom: 0.3rem;">🔍 Filtrer les briefs</h3>', unsafe_allow_html=True)
-        
-        # Organiser en 3 colonnes
-        col_filter1, col_filter2, col_filter3 = st.columns(3)
-        with col_filter1:
-            st.date_input("Date", key="filter_date", value=None)
-        with col_filter2:
-            st.text_input("Recruteur", key="filter_recruteur")
-        with col_filter3:
-            st.text_input("Manager", key="filter_manager")
-        
-        col_filter4, col_filter5, col_filter6 = st.columns(3)
-        with col_filter4:
-            st.selectbox("Affectation", ["", "Chantier", "Siège", "Dépôt"], key="filter_affectation")
-        with col_filter5:
-            st.text_input("Nom affectation", key="filter_nom_affectation")
-        with col_filter6:
-            st.selectbox("Type de brief", ["", "Standard", "Urgent", "Stratégique"], key="filter_brief_type")
-        
-        # Bouton Filtrer
-        if st.button("🔎 Filtrer", use_container_width=True, key="apply_filter"):
-            filter_month = st.session_state.filter_date.strftime("%m") if st.session_state.filter_date else ""
-            st.session_state.filtered_briefs = filter_briefs(
-                st.session_state.saved_briefs, 
-                filter_month, 
-                st.session_state.filter_recruteur, 
-                st.session_state.filter_brief_type, 
-                st.session_state.filter_manager, 
-                st.session_state.filter_affectation, 
-                st.session_state.filter_nom_affectation
-            )
-            st.session_state.show_filtered_results = True
+    # Créer un nouveau brief
+    with st.expander("Créer un nouveau brief", expanded=True):
+        if st.button("Créer brief"):
+            brief_name = generate_automatic_brief_name()
+            st.session_state.current_brief_name = brief_name
+            st.session_state.saved_briefs[brief_name] = {
+                "poste_intitule": st.session_state.get("poste_intitule", ""),
+                "manager_nom": st.session_state.get("manager_nom", ""),
+                "date_brief": st.session_state.get("date_brief", datetime.today().strftime("%Y-%m-%d")),
+                "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame())
+            }
+            save_briefs()
+            st.success(f"Brief '{brief_name}' créé avec succès !")
+            st.session_state.brief_phase = "📝 Avant Brief"
             st.rerun()
-        
-        # Affichage des résultats en dessous du bouton Filtrer
-        if st.session_state.show_filtered_results:
-            st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
-            briefs_to_show = st.session_state.filtered_briefs
-            
-            if briefs_to_show:
-                for name, data in briefs_to_show.items():
-                    col_brief1, col_brief2, col_brief3, col_brief4 = st.columns([3, 1, 1, 1])
-                    with col_brief1:
-                        st.write(f"**{name}** - Manager: {data.get('manager_nom', 'N/A')} - Affectation: {data.get('affectation_nom', 'N/A')}")
-                    with col_brief2:
-                        if st.button("📝 Éditer", key=f"edit_{name}"):
-                            st.session_state.current_brief_name = name
-                            st.session_state.avant_brief_completed = True
-                            st.rerun()
-                    with col_brief3:
-                        if st.button("🗑️ Supprimer", key=f"delete_{name}"):
-                            del st.session_state.saved_briefs[name]
-                            save_briefs()
-                            st.rerun()
-                    with col_brief4:
-                        if st.button("📄 Exporter", key=f"export_{name}"):
-                            pass  # Logique d'export à implémenter si nécessaire
-            else:
-                st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
-
-# ---------------- AVANT-BRIEF ----------------
-with tabs[1]:
-    # Afficher le message de sauvegarde seulement pour cet onglet
-    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Avant-brief"):
-        st.success(st.session_state.save_message)
-        st.session_state.save_message = None
-        st.session_state.save_message_tab = None
-
-    # Afficher les informations du brief en cours
-    brief_display_name = f"Avant-brief - {st.session_state.current_brief_name}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
-    st.subheader(f"🔄 {brief_display_name}")
     
-    # Liste des sections et champs pour les text_area
-    sections = [
-        {
-            "title": "Contexte du poste",
-            "fields": [
-                ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"),
-                ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"),
-                ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"),
-            ]
-        },
-        {
-            "title": "Must-have (Indispensables)",
-            "fields": [
-                ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
-                ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
-                ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"),
-                ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"),
-            ]
-        },
-        {
-            "title": "Nice-to-have (Atouts)",
-            "fields": [
-                ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
-                ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
-                ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
-            ]
-        },
-        {
-            "title": "Conditions et contraintes",
-            "fields": [
-                ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
-                ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
-            ]
-        },
-        {
-            "title": "Sourcing et marché",
-            "fields": [
-                ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
-                ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
-                ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
-            ]
-        },
-        {
-            "title": "Profils pertinents",
-            "fields": [
-                ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
-                ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
-                ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
-            ]
-        },
-        {
-            "title": "Notes libres",
-            "fields": [
-                ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
-                ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
-            ]
-        },
-    ]
+    # Filtrer les briefs existants
+    with st.expander("Filtrer les briefs", expanded=False):
+        with st.form(key="filter_form"):
+            month = st.selectbox("Mois", [""] + [f"{i:02d}" for i in range(1, 13)], index=0)
+            recruteur = st.text_input("Recruteur")
+            brief_type = st.selectbox("Type de brief", ["", "CDI", "CDD", "Stage", "Alternance"])
+            manager = st.text_input("Manager")
+            affectation = st.selectbox("Type d'affectation", ["", "Projet", "Service", "Chantier"])
+            nom_affectation = st.text_input("Nom affectation")
+            if st.form_submit_button("Filtrer", key="apply_filter"):
+                st.session_state.filtered_briefs = filter_briefs(
+                    st.session_state.saved_briefs, month, recruteur, brief_type, manager, affectation, nom_affectation
+                )
+                st.session_state.show_filtered_results = True
+    
+    # Afficher les briefs filtrés
+    if st.session_state.show_filtered_results and st.session_state.filtered_briefs:
+        st.subheader("Résultats filtrés")
+        for name, data in st.session_state.filtered_briefs.items():
+            with st.expander(f"Brief: {name}"):
+                st.write(f"Poste: {data.get('poste_intitule', '')}")
+                st.write(f"Manager: {data.get('manager_nom', '')}")
+                st.write(f"Date: {data.get('date_brief', '')}")
+                if st.button("Charger", key=f"load_{name}"):
+                    st.session_state.current_brief_name = name
+                    for key, value in data.items():
+                        st.session_state[key] = value
+                    st.session_state.brief_phase = "📝 Avant Brief"
+                    st.rerun()
+                if st.button("Supprimer", key=f"delete_{name}"):
+                    del st.session_state.saved_briefs[name]
+                    save_briefs()
+                    st.session_state.filtered_briefs = filter_briefs(
+                        st.session_state.saved_briefs, month, recruteur, brief_type, manager, affectation, nom_affectation
+                    )
+                    st.success(f"Brief '{name}' supprimé")
+                    st.rerun()
 
+# ---------------- ONGLET AVANT BRIEF ----------------
+def avant_brief_tab():
+    st.header("📝 Avant Brief")
+    
     # Contrôles pour générer les conseils IA avec sélection de champ
     col1, col2 = st.columns([1, 1])  # Equal width columns
     with col1:
@@ -963,9 +829,9 @@ with tabs[1]:
                 st.session_state.current_brief_name = ""
                 st.session_state.avant_brief_completed = False
                 st.rerun()
-                
-# ---------------- RÉUNION DE BRIEF ----------------
-with tabs[2]:
+
+# ---------------- ONGLET RÉUNION DE BRIEF ----------------
+def reunion_brief_tab():
     # Afficher le message de sauvegarde seulement pour cet onglet
     if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Réunion"):
         st.success(st.session_state.save_message)
@@ -1105,8 +971,8 @@ with tabs[2]:
                 st.session_state.reunion_step += 1
                 st.rerun()
 
-# ---------------- SYNTHÈSE ----------------
-with tabs[3]:
+# ---------------- ONGLET MÉTHODE COMPLÈTE ----------------
+def methode_complete_tab():
     # Afficher le message de sauvegarde seulement pour cet onglet
     if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Synthèse"):
         st.success(st.session_state.save_message)
@@ -1185,3 +1051,22 @@ with tabs[3]:
                     st.info("ℹ️ Créez d'abord un brief pour l'exporter")
             else:
                 st.info("⚠️ Word non dispo (pip install python-docx)")
+
+# ---------------- NAVIGATION ----------------
+tabs = st.tabs(["📁 Gestion", "📝 Avant Brief", "🤝 Réunion de brief", "📊 Méthode complète"])
+
+with tabs[0]:
+    gestion_tab()
+    st.session_state.current_tab = "Gestion"
+
+with tabs[1]:
+    avant_brief_tab()
+    st.session_state.current_tab = "Avant Brief"
+
+with tabs[2]:
+    reunion_brief_tab()
+    st.session_state.current_tab = "Réunion"
+
+with tabs[3]:
+    methode_complete_tab()
+    st.session_state.current_tab = "Synthèse"
