@@ -105,14 +105,14 @@ def render_ksa_matrix():
             .ai-response {
                 margin-top: 10px;
                 padding: 5px;
-                background-color: #28a745; /* Vert pour la réponse en bas */
+                background-color: #2a2a2a; /* Vert pour la réponse en bas */
                 border-radius: 8px;
                 color: #ffffff;
             }
             .success-icon {
                 display: inline-block;
                 margin-right: 5px;
-                color: #28a745; /* Vert pour l'icône ✅ */
+                color: #2a2a2a; /* Vert pour l'icône ✅ */
             }
             .stSuccess { /* Override green from st.success */
                 background-color: #2a2a2a !important;
