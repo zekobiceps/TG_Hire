@@ -25,21 +25,21 @@ from utils import (
 
 # ---------------- NOUVELLES FONCTIONS ----------------
 def render_ksa_matrix():
-    """Affiche la matrice KSA sous forme de tableau"""
+    """Affiche la matrice KSA sous forme de tableau et permet l'ajout de critères."""
     st.subheader("📊 Guide d'entretien & Matrice KSA")
     
-    # Initialiser les données KSA si elles n'existent pas, avec les nouvelles colonnes
-    if "ksa_matrix" not in st.session_state:
+    # Initialiser les données KSA si elles n'existent pas, avec les colonnes demandées
+    if "ksa_matrix" not in st.session_state or st.session_state.ksa_matrix.empty:
         st.session_state.ksa_matrix = pd.DataFrame(columns=[
             "Rubrique", 
             "Critère", 
             "Type de question", 
-            "Question pour l'entretien", 
-            "Évaluation (1-5)", 
-            "Notes"
+            "Cible / Standard attendu",  # Align with export functions
+            "Échelle d'évaluation (1-5)",  # Align with export functions
+            "Évaluateur"
         ])
     
-    # Ajoute un expander pour la prise de notes générales
+    # Expander pour la prise de notes générales
     with st.expander("📝 Notes de l'entretien"):
         if "entretien_notes" not in st.session_state:
             st.session_state.entretien_notes = ""
@@ -49,12 +49,30 @@ def render_ksa_matrix():
             height=200
         )
     
-    # Bouton pour ajouter une ligne à la matrice
-    if st.button("➕ Ajouter un critère / une question"):
-        new_row = pd.DataFrame([
-            {"Rubrique": "", "Critère": "", "Type de question": "", "Question pour l'entretien": "", "Évaluation (1-5)": 0, "Notes": ""}
-        ])
-        st.session_state.ksa_matrix = pd.concat([st.session_state.ksa_matrix, new_row], ignore_index=True)
+    # Expander pour ajouter un nouveau critère
+    with st.expander("➕ Ajouter un critère"):
+        with st.form(key="add_ksa_criterion_form"):
+            rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique")
+            critere = st.text_input("Critère", placeholder="Ex: Leadership", key="new_critere")
+            type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], 
+                                        key="new_type_question")
+            cible = st.text_area("Cible / Standard attendu", placeholder="Ex: Capacité à gérer des équipes sur des chantiers complexes", 
+                                key="new_cible", height=100)
+            evaluation = st.number_input("Évaluation (1-5)", min_value=1, max_value=5, step=1, key="new_evaluation")
+            evaluateur = st.text_input("Évaluateur", placeholder="Nom de l'évaluateur", key="new_evaluateur")
+            
+            if st.form_submit_button("Ajouter"):
+                new_row = pd.DataFrame([{
+                    "Rubrique": rubrique,
+                    "Critère": critere,
+                    "Type de question": type_question,
+                    "Cible / Standard attendu": cible,
+                    "Échelle d'évaluation (1-5)": evaluation,
+                    "Évaluateur": evaluateur
+                }])
+                st.session_state.ksa_matrix = pd.concat([st.session_state.ksa_matrix, new_row], ignore_index=True)
+                st.success("✅ Critère ajouté à la matrice KSA")
+                st.rerun()
     
     # Afficher la matrice KSA sous forme de data_editor
     if not st.session_state.ksa_matrix.empty:
@@ -68,32 +86,32 @@ def render_ksa_matrix():
                     required=True,
                 ),
                 "Critère": st.column_config.TextColumn(
-                    "Critère (ex: Leadership)",
-                    help="Critère spécifique à évaluer.",
+                    "Critère",
+                    help="Critère spécifique à évaluer (ex: Leadership).",
                     required=True,
                 ),
                 "Type de question": st.column_config.SelectboxColumn(
                     "Type de question",
                     options=["Comportementale", "Situationnelle", "Technique", "Générale"],
-                    help="STAR, Mise en situation, Technique, etc.",
+                    help="Type de question pour l'entretien.",
                     required=True,
                 ),
-                "Question pour l'entretien": st.column_config.TextColumn(
-                    "Question pour l'entretien",
-                    help="La question à poser pour évaluer le critère.",
+                "Cible / Standard attendu": st.column_config.TextColumn(
+                    "Cible / Standard attendu",
+                    help="Objectif ou standard à évaluer pour ce critère.",
                     required=True,
                 ),
-                "Évaluation (1-5)": st.column_config.NumberColumn(
-                    "Évaluation (1-5)",
+                "Échelle d'évaluation (1-5)": st.column_config.NumberColumn(
+                    "Échelle d'évaluation (1-5)",
                     help="Notez la réponse du candidat de 1 à 5.",
                     min_value=1,
                     max_value=5,
                     step=1,
                     format="%d"
                 ),
-                "Notes": st.column_config.TextColumn(
-                    "Notes",
-                    help="Vos remarques sur la réponse du candidat.",
+                "Évaluateur": st.column_config.TextColumn(
+                    "Évaluateur",
+                    help="Nom de l'évaluateur ou responsable.",
                     required=False,
                 ),
             },

@@ -389,7 +389,7 @@ def export_brief_word():
     doc.add_heading("2. Contexte & Enjeux", level=2)
     for field in ["raison_ouverture", "impact_strategique", "rattachement", "taches_principales"]:
         if field in st.session_state and st.session_state[field]:
-            doc.add_paragraph(f"<b>{field.replace('_', ' ').title()}:</b> {st.session_state[field]}")
+            doc.add_paragraph(f"{field.replace('_', ' ').title()}: {st.session_state[field]}")
     doc.add_paragraph()
 
     # --- SECTION 3: Exigences
@@ -399,7 +399,7 @@ def export_brief_word():
         "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences"
     ]:
         if field in st.session_state and st.session_state[field]:
-            doc.add_paragraph(f"<b>{field.replace('_', ' ').title()}:</b> {st.session_state[field]}")
+            doc.add_paragraph(f"{field.replace('_', ' ').title()}: {st.session_state[field]}")
     doc.add_paragraph()
 
     # --- SECTION 4: Matrice KSA
@@ -408,16 +408,18 @@ def export_brief_word():
         ksa_table = doc.add_table(rows=1, cols=5)
         ksa_table.autofit = True
         header_cells = ksa_table.rows[0].cells
-        header_labels = ["Rubrique", "Critère", "Cible / Standard attendu", "Échelle (1-5)", "Évaluateur"]
+        header_labels = ["Rubrique", "Critère", "Cible / Standard attendu", "Échelle d'évaluation (1-5)", "Évaluateur"]
         for i, label in enumerate(header_labels):
             header_cells[i].text = label
         for _, row in st.session_state.ksa_matrix.iterrows():
             row_cells = ksa_table.add_row().cells
-            row_cells[0].text = str(row["Rubrique"])
-            row_cells[1].text = str(row["Critère"])
-            row_cells[2].text = str(row["Cible / Standard attendu"])
-            row_cells[3].text = str(row["Échelle d'évaluation (1-5)"])
-            row_cells[4].text = str(row["Évaluateur"])
+            row_cells[0].text = str(row.get("Rubrique", ""))
+            row_cells[1].text = str(row.get("Critère", ""))
+            row_cells[2].text = str(row.get("Cible / Standard attendu", ""))
+            row_cells[3].text = str(row.get("Échelle d'évaluation (1-5)", ""))
+            row_cells[4].text = str(row.get("Évaluateur", ""))
+    else:
+        doc.add_paragraph("Aucune donnée KSA disponible.")
     doc.add_paragraph()
 
     # --- SECTION 5: Stratégie Recrutement
@@ -426,17 +428,17 @@ def export_brief_word():
     for field in strategy_fields:
         if field in st.session_state and st.session_state[field]:
             value = ", ".join(st.session_state[field]) if field == "canaux_prioritaires" else st.session_state[field]
-            doc.add_paragraph(f"<b>{field.replace('_', ' ').title()}:</b> {value}")
+            doc.add_paragraph(f"{field.replace('_', ' ').title()}: {value}")
     doc.add_paragraph()
 
     # --- SECTION 6: Notes du Manager
     doc.add_heading("6. Notes du Manager", level=2)
     if st.session_state.get("manager_notes"):
-        doc.add_paragraph(f"<b>Notes Générales:</b> {st.session_state.manager_notes}")
+        doc.add_paragraph(f"Notes Générales: {st.session_state.manager_notes}")
     for i in range(1, 21):
         comment_key = f"manager_comment_{i}"
         if comment_key in st.session_state.get("manager_comments", {}) and st.session_state.manager_comments[comment_key]:
-            doc.add_paragraph(f"<b>Commentaire {i}:</b> {st.session_state.manager_comments[comment_key]}")
+            doc.add_paragraph(f"Commentaire {i}: {st.session_state.manager_comments[comment_key]}")
 
     buffer = io.BytesIO()
     doc.save(buffer)
