@@ -134,7 +134,7 @@ st.markdown("""
     
     /* Champs de saisie - Couleur foncée désirée */
     .stTextInput input, .stTextArea textarea, .stFileUploader label, .stSelectbox [data-baseweb="select"] > div, .stDateInput input {
-        background-color: #2D2D2D !important;
+        background-color: #1F1F1F !important; /* Gris plus sombre */
         color: white !important;
         border: 1px solid #555 !important;
         border-radius: 4px !important;
@@ -421,9 +421,9 @@ with tab1:
                                     st.markdown(explanations[file_name])
                     else:
                         st.info("""
-                            Le score de correspondance est basé sur la **similarité cosinus**. 
-                            Cette méthode analyse la fréquence des mots et des phrases dans chaque CV par rapport à la description du poste. 
-                            Un score élevé (proche de 100 %) indique une forte correspondance thématique et de compétences.
+- Le score de correspondance est basé sur la **similarité cosinus**. 
+- Cette méthode analyse la fréquence des mots et des phrases dans chaque CV par rapport à la description du poste. 
+- Un score élevé (proche de 100 %) indique une forte correspondance thématique et de compétences.
                         """)
                     
                     st.markdown("---")
