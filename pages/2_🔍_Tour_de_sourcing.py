@@ -506,18 +506,24 @@ with tab7:
         "Quelles tendances de recrutement récentes pour le métier de"
     ]
 
-    q_choice = st.selectbox("📌 Questions prêtes :", [""] + questions_pretes, key="magicien_qchoice")
-    
-    if q_choice:
-        default_question = q_choice
-    else:
-        default_question = ""
-    
+    # Store the initial selected question in session state to preserve it
+    if "magicien_selected_question" not in st.session_state:
+        st.session_state.magicien_selected_question = ""
+
+    # Selectbox for pre-defined questions
+    q_choice = st.selectbox("📌 Questions prêtes :", [""] + questions_pretes, key="magicien_qchoice",
+                           index=questions_pretes.index(st.session_state.magicien_selected_question) + 1 if st.session_state.magicien_selected_question in questions_pretes else 0)
+
+    # Update the selected question in session state when changed
+    if q_choice and q_choice != st.session_state.magicien_selected_question:
+        st.session_state.magicien_selected_question = q_choice
+
+    # Text area to allow appending text to the selected question
     question = st.text_area("Modifiez la question si nécessaire :", 
-                          value=default_question, 
-                          key="magicien_question", 
-                          height=100,
-                          placeholder="Posez votre question ici...")
+                           value=st.session_state.magicien_selected_question if st.session_state.magicien_selected_question else "",
+                           key="magicien_question", 
+                           height=100,
+                           placeholder="Posez votre question ici...")
 
     mode_rapide_magicien = st.checkbox("⚡ Mode rapide (réponse concise)", key="magicien_fast")
 
