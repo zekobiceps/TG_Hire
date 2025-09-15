@@ -65,8 +65,8 @@ st.markdown("""
         border-bottom: 3px solid #FF0000 !important; /* Bordure inférieure rouge vif */
     }
     
-    /* Style pour les labels des champs de saisie */
-    .stTextInput label, .stTextArea label, .stFileUploader label {
+    /* Style pour les labels des champs de saisie et les titres de sections */
+    .stTextInput label, .stTextArea label, .stFileUploader label, .section-header {
         font-size: 1.25rem;
         font-weight: 600;
         color: #FAFAFA;
@@ -132,8 +132,8 @@ st.markdown("""
         color: #FAFAFA;
     }
     
-    /* Champs de saisie */
-    .stTextInput input, .stTextArea textarea, .stFileUploader label, .stSelectbox [data-baseweb="select"] > div {
+    /* Champs de saisie - Couleur foncée désirée */
+    .stTextInput input, .stTextArea textarea, .stFileUploader label, .stSelectbox [data-baseweb="select"] > div, .stDateInput input {
         background-color: #2D2D2D !important;
         color: white !important;
         border: 1px solid #555 !important;
@@ -300,7 +300,7 @@ tab1, tab2 = st.tabs(["📊 Classement de CVs", "🎯 Analyse de Profil"])
 
 # --- Contenu de l'onglet Classement ---
 with tab1:
-    st.markdown('<div class="section-header">📄 Informations du Poste</div>', unsafe_allow_html=True)
+    st.markdown('<p class="section-header">📄 Informations du Poste</p>', unsafe_allow_html=True)
     
     job_title = st.text_input(
         "Intitulé du poste",
@@ -392,7 +392,7 @@ with tab1:
                         "Score brut": [round(score, 4) for _, score in ranked_resumes]
                     })
                     
-                    st.markdown('<div class="section-header">🏆 Résultats du Classement</div>', unsafe_allow_html=True)
+                    st.markdown('<p class="section-header">🏆 Résultats du Classement</p>', unsafe_allow_html=True)
                     
                     col1_m, col2_m, col3_m = st.columns(3)
                     with col1_m:
@@ -411,10 +411,10 @@ with tab1:
                     )
                     
                     st.markdown("---")
-                    st.markdown(f'<div class="section-header">🔍 Comment le score est-il calculé ? ({method_used})</div>', unsafe_allow_html=True)
+                    st.markdown(f'<p class="section-header">🔍 Comment le score est-il calculé ? ({method_used})</p>', unsafe_allow_html=True)
                     if use_deepseek_ranking:
                         st.info("Le score est basé sur une évaluation IA. Pour une analyse détaillée, consultez les sections ci-dessous.")
-                        st.markdown('<div class="section-header">📝 Analyse détaillée de chaque CV</div>', unsafe_allow_html=True)
+                        st.markdown('<p class="section-header">📝 Analyse détaillée de chaque CV</p>', unsafe_allow_html=True)
                         for file_name, score in ranked_resumes:
                             if file_name in explanations:
                                 with st.expander(f"Analyse détaillée pour : **{file_name}** (Score: {round(score * 100, 1)}%)", expanded=False):
@@ -427,7 +427,7 @@ with tab1:
                         """)
                     
                     st.markdown("---")
-                    st.markdown('<div class="section-header">💾 Exporter les Résultats</div>', unsafe_allow_html=True)
+                    st.markdown('<p class="section-header">💾 Exporter les Résultats</p>', unsafe_allow_html=True)
                     csv = results_df.to_csv(index=False).encode('utf-8')
                     st.download_button(
                         "📥 Télécharger CSV", 
@@ -443,7 +443,7 @@ with tab1:
 
 # --- Contenu de l'onglet Analyse de Profil ---
 with tab2:
-    st.markdown('<div class="section-header">📂 Importer des CVs pour analyse</div>', unsafe_allow_html=True)
+    st.markdown('<p class="section-header">📂 Importer des CVs pour analyse</p>', unsafe_allow_html=True)
     uploaded_files_analysis = st.file_uploader(
         "Sélectionnez un ou plusieurs CVs (PDF)",
         type=["pdf"],
@@ -459,7 +459,7 @@ with tab2:
             if not API_KEY:
                 st.error("L'analyse IA ne peut pas être effectuée car la clé API n'est pas configurée.")
             else:
-                st.markdown('<div class="section-header">📋 Résultats des Analyses</div>', unsafe_allow_html=True)
+                st.markdown('<p class="section-header">📋 Résultats des Analyses</p>', unsafe_allow_html=True)
                 for uploaded_file in uploaded_files_analysis:
                     with st.expander(f"Analyse du CV : **{uploaded_file.name}**", expanded=True):
                         with st.spinner(f"⏳ L'IA analyse le CV '{uploaded_file.name}', veuillez patienter..."):
