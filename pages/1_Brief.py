@@ -126,7 +126,9 @@ def render_ksa_matrix():
             with col2:
                 st.markdown("<div style='padding: 10px;'>", unsafe_allow_html=True)
                 placeholder = placeholder_dict.get(type_question, "Définissez la cible ou le standard attendu pour ce critère.")
-                cible = st.text_area("Cible / Standard attendu", placeholder=placeholder, key="new_cible", height=100)
+                cible = st.text_area("Cible / Standard attendu", 
+                                     value=st.session_state.get("ai_response", ""), 
+                                     placeholder=placeholder, key="new_cible", height=100)
                 evaluation = st.slider("Échelle d'évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
                 evaluateur = st.selectbox("Évaluateur", ["Manager", "Recruteur", "Les deux"], key="new_evaluateur")
                 st.markdown("</div>", unsafe_allow_html=True)
@@ -139,9 +141,8 @@ def render_ksa_matrix():
                 if ai_prompt:
                     try:
                         ai_response = generate_ai_question(ai_prompt)
-                        st.session_state.new_cible = ai_response  # Auto-remplir le champ Cible
+                        st.session_state.ai_response = ai_response  # Stocker dans une variable temporaire
                         st.success(f"Question générée : {ai_response}")
-                        st.rerun()
                     except Exception as e:
                         st.error(f"Erreur lors de la génération de la question : {e}")
                 else:
@@ -167,6 +168,7 @@ def render_ksa_matrix():
                 st.session_state.new_evaluation = 3
                 st.session_state.new_evaluateur = "Manager"
                 st.session_state.ai_prompt = ""
+                st.session_state.ai_response = None  # Réinitialiser la réponse IA
                 st.rerun()
     
     # Afficher la matrice KSA sous forme de data_editor
@@ -215,6 +217,9 @@ def render_ksa_matrix():
             use_container_width=True,
         )
 
+    # Afficher la dernière réponse IA si elle existe
+    if "ai_response" in st.session_state and st.session_state.ai_response:
+        st.success(f"Question générée : {st.session_state.ai_response}")
 
 def delete_current_brief():
     """Supprime le brief actuel et retourne à l'onglet Gestion"""
