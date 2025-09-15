@@ -3,8 +3,6 @@ import streamlit as st
 from datetime import datetime
 import json
 import pandas as pd
-from utils import get_example_for_field, generate_checklist_advice
-from utils import generate_ai_question
 
 # ✅ permet d'accéder à utils.py à la racine
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -15,12 +13,15 @@ from utils import (
     WORD_AVAILABLE,
     save_briefs,
     load_briefs,
+    get_example_for_field,
     export_brief_pdf,
     export_brief_word,
+    generate_checklist_advice,
     generate_checklist_advice,
     filter_briefs,
     generate_automatic_brief_name,
     save_library,
+    generate_ai_question,
     test_deepseek_connection,
 )
 
