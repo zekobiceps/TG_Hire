@@ -17,7 +17,6 @@ from utils import (
     export_brief_pdf,
     export_brief_word,
     generate_checklist_advice,
-    generate_checklist_advice,
     filter_briefs,
     generate_automatic_brief_name,
     save_library,
