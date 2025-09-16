@@ -11,6 +11,14 @@ import hashlib
 import pandas as pd
 from collections import Counter
 
+# --- CSS pour augmenter la taille du texte des onglets ---
+st.markdown("""
+<style>
+div[data-testid="stTabs"] button p {
+    font-size: 18px; 
+}
+</style>
+""", unsafe_allow_html=True)
 
 # -------------------- Configuration initiale --------------------
 def init_session_state():
