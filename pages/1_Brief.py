@@ -731,7 +731,7 @@ with tabs[0]:
         st.session_state.save_message = None
         st.session_state.save_message_tab = None
 
-    # Charger les briefs depuis les fichiers JSON
+    # Charger les briefs depuis le fichier JSON unique
     st.session_state.saved_briefs = load_briefs()
 
     # Organiser les sections Informations de base et Filtrer les briefs en 2 colonnes
@@ -763,17 +763,25 @@ with tabs[0]:
         with col_create:
             if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
                 brief_name = generate_automatic_brief_name()
-                st.session_state.saved_briefs[brief_name] = {
+                st.session_state.current_brief_name = brief_name
+                brief_data = {
                     "poste_intitule": st.session_state.poste_intitule,
                     "manager_nom": st.session_state.manager_nom,
                     "recruteur": st.session_state.recruteur,
                     "affectation_type": st.session_state.affectation_type,
                     "affectation_nom": st.session_state.affectation_nom,
                     "date_brief": str(st.session_state.date_brief),
-                    "brief_type": "Standard"  # Default to Standard
+                    "brief_type": "Standard",  # Default to Standard
+                    "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()),
+                    "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
+                    "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
+                    "processus_evaluation": st.session_state.get("processus_evaluation", ""),
+                    "manager_comments": st.session_state.get("manager_comments", {}),
+                    "manager_notes": st.session_state.get("manager_notes", ""),
                 }
-                save_briefs()
-                st.session_state.current_brief_name = brief_name
+                st.session_state.saved_briefs[brief_name] = brief_data
+                save_briefs()  # Sauvegarde dans all_briefs.json
+                st.session_state.saved_briefs = load_briefs()  # Recharge immédiatement pour le filtrage
                 st.session_state.save_message = f"✅ Brief '{brief_name}' créé avec succès"
                 st.session_state.save_message_tab = "Gestion"
                 st.rerun()
@@ -813,12 +821,12 @@ with tabs[0]:
         if st.button("🔎 Filtrer", use_container_width=True, key="apply_filter"):
             filter_month = st.session_state.filter_date.strftime("%m") if st.session_state.filter_date else ""
             st.session_state.filtered_briefs = filter_briefs(
-                load_briefs(), 
-                filter_month, 
-                st.session_state.filter_recruteur, 
-                st.session_state.filter_brief_type, 
-                st.session_state.filter_manager, 
-                st.session_state.filter_affectation, 
+                st.session_state.saved_briefs,  # Utiliser les briefs en mémoire
+                filter_month,
+                st.session_state.filter_recruteur,
+                st.session_state.filter_brief_type,
+                st.session_state.filter_manager,
+                st.session_state.filter_affectation,
                 st.session_state.filter_nom_affectation
             )
             st.session_state.show_filtered_results = True
@@ -841,15 +849,44 @@ with tabs[0]:
                             st.rerun()
                     with col_brief3:
                         if st.button("🗑️ Supprimer", key=f"delete_{name}"):
-                            file_path = os.path.join("briefs", f"{name}.json")
-                            if os.path.exists(file_path):
-                                os.remove(file_path)
                             st.session_state.saved_briefs.pop(name, None)
-                            save_briefs()
+                            save_briefs()  # Sauvegarde dans all_briefs.json
+                            st.session_state.saved_briefs = load_briefs()  # Recharge pour mise à jour
+                            st.session_state.filtered_briefs = filter_briefs(
+                                st.session_state.saved_briefs,
+                                st.session_state.filter_date.strftime("%m") if st.session_state.filter_date else "",
+                                st.session_state.filter_recruteur,
+                                st.session_state.filter_brief_type,
+                                st.session_state.filter_manager,
+                                st.session_state.filter_affectation,
+                                st.session_state.filter_nom_affectation
+                            )
+                            st.session_state.save_message = f"✅ Brief '{name}' supprimé avec succès"
+                            st.session_state.save_message_tab = "Gestion"
                             st.rerun()
                     with col_brief4:
                         if st.button("📄 Exporter", key=f"export_{name}"):
-                            pass  # Logique d'export à implémenter si nécessaire
+                            st.session_state.current_brief_name = name
+                            if PDF_AVAILABLE:
+                                pdf_buf = export_brief_pdf()
+                                if pdf_buf:
+                                    st.download_button(
+                                        "⬇️ Télécharger PDF",
+                                        data=pdf_buf,
+                                        file_name=f"{name}.pdf",
+                                        mime="application/pdf",
+                                        key=f"download_pdf_{name}"
+                                    )
+                            if WORD_AVAILABLE:
+                                word_buf = export_brief_word()
+                                if word_buf:
+                                    st.download_button(
+                                        "⬇️ Télécharger Word",
+                                        data=word_buf,
+                                        file_name=f"{name}.docx",
+                                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                        key=f"download_word_{name}"
+                                    )
             else:
                 st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
 
