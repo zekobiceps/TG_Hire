@@ -385,7 +385,13 @@ with tab5:
                     st.dataframe(df_results, use_container_width=True)
                 except NameError:
                     st.error("Erreur: pandas n'est pas installé. Impossible de créer le DataFrame.")
-                    return
+                    # On continue sans DataFrame
+                    for i, concurrent in enumerate(results["concurrent"]):
+                        st.write(f"**{concurrent}** - {results['titre_poste'][i]}")
+                        st.write(f"Compétences: {results['competences'][i]}")
+                        st.write(f"Expérience: {results['experience'][i]}")
+                        st.write(f"Avantages: {results['avantages'][i]}")
+                        st.write("---")
                 
                 # Analyses avancées
                 st.subheader("📈 Analyses")
@@ -401,6 +407,7 @@ with tab5:
                         wordcloud_data = {k: v for k, v in skills_counter.items() if k}
                         if wordcloud_data:
                             try:
+                                # Import à l'intérieur du bloc try
                                 from wordcloud import WordCloud
                                 import matplotlib.pyplot as plt
                                 
@@ -433,7 +440,7 @@ with tab5:
                     for exp, count in exp_counter.items():
                         st.write(f"- {exp}: {count} offre(s)")
                 
-                # Export des résultats
+                # Export des résultats (uniquement si pandas est disponible)
                 try:
                     csv_data = df_results.to_csv(index=False).encode('utf-8')
                     st.download_button(
@@ -444,7 +451,7 @@ with tab5:
                         use_container_width=True
                     )
                 except NameError:
-                    st.error("Erreur: Impossible de générer le fichier CSV car pandas n'est pas disponible.")
+                    st.warning("Impossible de générer le fichier CSV car pandas n'est pas disponible.")
             else:
                 st.warning("Aucun résultat à afficher.")
         else:
@@ -466,6 +473,12 @@ with tab5:
         - Utilisez des mots-clés précis liés à vos besoins
         - Augmentez le délai entre les requêtes pour éviter le blocage
         - Testez d'abord avec 2-3 sites pour valider la configuration
+        
+        ### Dépendances requises:
+        Pour une expérience complète, installez les bibliothèques suivantes:
+        ```bash
+        pip install pandas matplotlib wordcloud
+        ```
         """)
 
 # -------------------- Tab 6: InMail --------------------
