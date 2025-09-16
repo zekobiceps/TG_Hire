@@ -1056,7 +1056,7 @@ with tabs[2]:
         # Section Canaux de sourcing
         st.markdown("**Canaux prioritaires**")
         st.multiselect("Sélectionnez les canaux à utiliser:", 
-                      ["LinkedIn", "Jobboards", "Cooptation", "Réseaux sociaux", "Chasse de tête", "Autre"],
+                      ["LinkedIn", "Jobboards", "Cooptation", "Réseaux sociaux", "Chasse de tête", "Autre", "Annonces", "Entreprise X", "Secteur Y"],
                       key="canaux_prioritaires")
 
         # Section Processus d'évaluation simplifié
@@ -1078,15 +1078,8 @@ with tabs[2]:
         st.text_area("Processus d'évaluation", 
                     value=processus_evaluation,
                     key="processus_evaluation",
-                    height=200)
+                    height=300)  # Increased height to accommodate more text
 
-        # Section Critères d'exclusion
-        st.markdown("**Critères d'exclusion**")
-        st.text_area("Critères éliminatoires", 
-                    placeholder="Ex: Plus de 2 ans sans expérience BTP, absence de diplôme requis...",
-                    key="criteres_exclusion",
-                    height=100)
-        
     elif step == 4:
         st.subheader("📝 Notes générales du manager")
         st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=200, 
@@ -1115,7 +1108,6 @@ with tabs[2]:
                             "manager_notes": st.session_state.get("manager_notes", ""),
                             "manager_comments": manager_comments,
                             "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
-                            "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
                             "processus_evaluation": st.session_state.get("processus_evaluation", "")
                         })
                         st.session_state.saved_briefs = existing_briefs
@@ -1126,7 +1118,6 @@ with tabs[2]:
                             "manager_notes": st.session_state.get("manager_notes", ""),
                             "manager_comments": manager_comments,
                             "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
-                            "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
                             "processus_evaluation": st.session_state.get("processus_evaluation", "")
                         })
                     
