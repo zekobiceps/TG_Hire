@@ -122,7 +122,6 @@ def render_ksa_matrix():
         """, unsafe_allow_html=True)
         
 # Formulaire pour ajouter un critère avec 3 colonnes
-# Formulaire pour ajouter un critère avec 3 colonnes
         with st.form(key="add_ksa_criterion_form"):
             # "Cible / Standard attendu" en haut, sur toute la largeur
             st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
