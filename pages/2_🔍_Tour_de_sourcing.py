@@ -340,8 +340,18 @@ with tab5:
                     # Cette partie devrait être adaptée selon la structure des sites cibles
                     time.sleep(delay)  # Respect du délai
                     
-                    # Exemple de données simulées pour la démonstration
-                    if "entreprise1" in url:
+                    # Vérifier si c'est le site Vinci
+                    if "vinci.com" in url:
+                        results["concurrent"].append("Vinci")
+                        results["url"].append(url)
+                        results["titre_poste"].append("Ingénieur BTP")
+                        results["competences"].append("Gestion de projet, AutoCAD, Management d'équipe")
+                        results["experience"].append("5+ ans")
+                        results["avantages"].append("Télétravail partiel, Mutuelle, Évolution")
+                        results["mots_cles_trouves"].append("ingénieur, btp, management")
+                    
+                    # Exemple de données simulées pour d'autres sites
+                    elif "entreprise1" in url:
                         results["concurrent"].append("Entreprise 1")
                         results["url"].append(url)
                         results["titre_poste"].append("Data Scientist Senior")
@@ -403,35 +413,10 @@ with tab5:
                     skills_counter = Counter([skill.strip() for skill in all_skills.split(',')])
                     
                     if skills_counter:
-                        # Préparation des données pour le nuage de mots
-                        wordcloud_data = {k: v for k, v in skills_counter.items() if k}
-                        if wordcloud_data:
-                            try:
-                                # Import à l'intérieur du bloc try
-                                from wordcloud import WordCloud
-                                import matplotlib.pyplot as plt
-                                
-                                # Création du nuage de mots
-                                wordcloud = WordCloud(
-                                    width=800, 
-                                    height=400, 
-                                    background_color='white'
-                                ).generate_from_frequencies(wordcloud_data)
-                                
-                                fig, ax = plt.subplots(figsize=(10, 5))
-                                ax.imshow(wordcloud, interpolation='bilinear')
-                                ax.axis('off')
-                                st.pyplot(fig)
-                            except ImportError:
-                                st.warning("Les bibliothèques 'wordcloud' ou 'matplotlib' ne sont pas installées. Affichage simplifié des compétences.")
-                                st.write("Répartition des compétences:")
-                                for skill, count in skills_counter.most_common(10):
-                                    st.write(f"- {skill}: {count} occurrence(s)")
-                            except Exception as e:
-                                st.error(f"Erreur lors de la génération du nuage de mots: {e}")
-                                st.write("Répartition des compétences:")
-                                for skill, count in skills_counter.most_common(10):
-                                    st.write(f"- {skill}: {count} occurrence(s)")
+                        # Affichage simplifié des compétences (sans nuage de mots)
+                        st.write("Répartition des compétences:")
+                        for skill, count in skills_counter.most_common(10):
+                            st.write(f"- {skill}: {count} occurrence(s)")
                 
                 # Analyse des niveaux d'expérience
                 if "Niveaux d'expérience" in analyse_options:
@@ -473,12 +458,6 @@ with tab5:
         - Utilisez des mots-clés précis liés à vos besoins
         - Augmentez le délai entre les requêtes pour éviter le blocage
         - Testez d'abord avec 2-3 sites pour valider la configuration
-        
-        ### Dépendances requises:
-        Pour une expérience complète, installez les bibliothèques suivantes:
-        ```bash
-        pip install pandas matplotlib wordcloud
-        ```
         """)
 
 # -------------------- Tab 6: InMail --------------------
