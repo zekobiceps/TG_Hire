@@ -941,7 +941,7 @@ with tabs[1]:
     # Formulaire avec expanders et champs éditable
     with st.form(key="avant_brief_form"):
         for section in sections:
-            with st.expander(f"📋 {section['title']}", expanded=True):
+            with st.expander(f"📋 {section['title']}", expanded=False):
                 for title, key, placeholder in section["fields"]:
                     # Larger height for all fields
                     height = 150  # Increased from 100 for all fields
