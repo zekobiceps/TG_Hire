@@ -12,62 +12,44 @@ import re
 # -------------------- Personnalisation CSS --------------------
 st.markdown("""
 <style>
-    /* Cases de texte avec fond gris */
+    /* Cases de texte */
     .stTextInput>div>div>input {
-        background-color: #f0f2f6 !important;
-        border: 2px solid #d0d0d0 !important;
-        border-radius: 8px !important;
-        padding: 10px !important;
-        color: #333333 !important;
+        background-color: #f0f2f6;
+        border: 2px solid #4CAF50;
+        border-radius: 8px;
+        padding: 10px;
     }
     
-    /* Zones de texte avec fond gris */
+    /* Zones de texte */
     .stTextArea>div>div>textarea {
-        background-color: #f0f2f6 !important;
-        border: 2px solid #d0d0d0 !important;
-        border-radius: 8px !important;
-        padding: 10px !important;
-        color: #333333 !important;
+        background-color: #f0f2f6;
+        border: 2px solid #4CAF50;
+        border-radius: 8px;
+        padding: 10px;
     }
     
     /* Boutons */
     .stButton>button {
-        background-color: #4CAF50 !important;
-        color: white !important;
-        border-radius: 8px !important;
-        padding: 10px 24px !important;
-        font-weight: bold !important;
-        border: none !important;
-        transition: all 0.3s !important;
+        background-color: #4CAF50;
+        color: white;
+        border-radius: 8px;
+        padding: 10px 24px;
+        font-weight: bold;
+        border: none;
+        transition: all 0.3s;
     }
     
     .stButton>button:hover {
-        background-color: #45a049 !important;
-        transform: scale(1.05) !important;
+        background-color: #45a049;
+        transform: scale(1.05);
     }
     
     /* Expanders */
     .streamlit-expanderHeader {
-        background-color: #1F1F1F !important;
-        border-radius: 8px !important;
-        padding: 12px !important;
-        font-weight: bold !important;
-        color: white !important;
-        border: 1px solid #4CAF50 !important;
-    }
-    
-    /* Conteneurs d'expand */
-    .streamlit-expanderContent {
-        background-color: #1F1F1F !important;
-        border-radius: 0 0 8px 8px !important;
-        border: 1px solid #4CAF50 !important;
-        border-top: none !important;
-    }
-    
-    /* Labels des champs */
-    .stTextInput label, .stTextArea label {
-        color: #FAFAFA !important;
-        font-weight: 600 !important;
+        background-color: #e8f5e9;
+        border-radius: 8px;
+        padding: 12px;
+        font-weight: bold;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -92,7 +74,7 @@ except KeyError:
 
 # --- Streamlit Page Config ---
 st.set_page_config(
-    page_title="HireSense AI",
+    page_title="Analyse CV AI",
     page_icon="📄",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -204,6 +186,15 @@ st.markdown("""
         color: #FAFAFA;
     }
     
+    /* Champs de saisie - Couleur foncée désirée */
+    .stTextInput input, .stTextArea textarea, .stFileUploader label, .stSelectbox [data-baseweb="select"] > div, .stDateInput input {
+        background-color: #1F1F1F !important; /* Gris plus sombre */
+        color: white !important;
+        border: 1px solid #555 !important;
+        border-radius: 4px !important;
+        padding: 8px !important;
+    }
+    
     /* Titres des sections en blanc et sans bordure */
     .section-header {
         font-size: 1.5rem;
@@ -246,7 +237,7 @@ def rank_resumes_with_cosine(job_description, resumes):
         return []
 
 def get_detailed_score_with_ai(job_description, resume_text):
-    """Évalue la pertinence d'un CV en utilisant l'IA, en providing un score et une explication détaillée."""
+    """Évalue la pertinence d'un CV en utilisant l'IA, en fournissant un score et une explication détaillée."""
     if not API_KEY:
         return {"score": 0.0, "explanation": "❌ Analyse IA impossible. Clé API non configurée."}
     
