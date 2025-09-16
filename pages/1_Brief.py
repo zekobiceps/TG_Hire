@@ -1008,17 +1008,28 @@ with tabs[2]:
         st.session_state.save_message = None
         st.session_state.save_message_tab = None
 
-    brief_display_name = f"Réunion de brief - {st.session_state.current_brief_name}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
-    st.markdown(f"<h3 style='color: #FFFFFF;'>📝 {brief_display_name}</h3>", unsafe_allow_html=True) # Titre en blanc
+    brief_display_name = f"Réunion de brief - {st.session_state.get('current_brief_name', 'Nom du Brief')}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
+    st.markdown(f"<h3 style='color: #FFFFFF;'>📝 {brief_display_name}</h3>", unsafe_allow_html=True)
 
     total_steps = 4
     step = st.session_state.reunion_step
     
     st.progress(int((step / total_steps) * 100), text=f"**Étape {step} sur {total_steps}**")
+    
+    # Boutons de navigation
+    col_prev, col_next = st.columns([1, 1])
+    with col_prev:
+        if st.button("⬅️ Précédent", disabled=(step == 1), use_container_width=True):
+            st.session_state.reunion_step -= 1
+            st.rerun()
+    with col_next:
+        if st.button("Suivant ➡️", disabled=(step == 4), use_container_width=True):
+            st.session_state.reunion_step += 1
+            st.rerun()
 
     if step == 1:
         with st.expander("📋 Portrait robot candidat - Validation", expanded=True):
-            # ... (Votre code pour le data_editor reste inchangé) ...
+            # Construire le DataFrame sans répétition de "Contexte du poste"
             data = []
             field_keys = []
             comment_keys = []
@@ -1059,73 +1070,79 @@ with tabs[2]:
 
     elif step == 2:
         with st.expander("📊 Matrice KSA - Validation manager", expanded=True):
-            # --- EXPLICATIONS DE LA MATRICE KSA ---
+            # 1. Onglet d'explication de la méthode KSA
             with st.expander("ℹ️ Explications de la méthode KSA", expanded=False):
                 st.markdown("""
-                ### Méthode KSA (Knowledge, Skills, Abilities)
-                - **Knowledge (Connaissances)** : Savoirs théoriques nécessaires.
-                - **Skills (Compétences)** : Aptitudes pratiques acquises.
-                - **Abilities (Aptitudes)** : Capacités innées ou développées.
-                """, unsafe_allow_html=True)
-                
-            # Formulaire pour ajouter une nouvelle ligne
-            with st.expander("➕ Ajouter un critère", expanded=False):
-                with st.container(border=True):
-                    # Section pour l'IA
-                    st.markdown("**Générer une question avec l'IA**")
-                    ai_prompt = st.text_input("Prompt pour l'IA", placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", key="ai_prompt_input")
+                    ### Méthode KSA (Knowledge, Skills, Abilities)
+                    La méthode KSA permet de décomposer un poste en trois catégories de compétences pour une évaluation plus précise.
                     
-                    if st.button("Générer question IA"):
-                        if ai_prompt:
-                            try:
-                                ai_response = generate_ai_question(ai_prompt)
-                                st.session_state.generated_ai_question = ai_response
-                                st.success("Question générée avec succès ! Copiez-la dans le champ ci-dessous.")
-                            except Exception as e:
-                                st.error(f"Erreur lors de la génération : {e}")
-                        else:
-                            st.error("Veuillez entrer un prompt pour l'IA.")
-                            
-                    st.divider()
+                    #### 🧠 Knowledge (Connaissances)
+                    Ce sont les connaissances théoriques ou factuelles qu'un candidat doit posséder.
+                    - **Exemple 1 :** Connaissances des protocoles de sécurité IT (ISO 27001).
+                    - **Exemple 2 :** Maîtrise des concepts de la comptabilité analytique.
+                    - **Exemple 3 :** Connaissance approfondie des langages de programmation Python et R.
+                    
+                    #### 💪 Skills (Compétences)
+                    Ce sont les compétences pratiques et techniques que l'on acquiert par la pratique.
+                    - **Exemple 1 :** Capacité à utiliser le logiciel Adobe Photoshop pour le design graphique.
+                    - **Exemple 2 :** Expertise en négociation commerciale pour la conclusion de contrats.
+                    - **Exemple 3 :** Maîtrise de la gestion de projet Agile ou Scrum.
+                    
+                    #### ✨ Abilities (Aptitudes)
+                    Ce sont les aptitudes plus générales ou innées, souvent liées au comportement.
+                    - **Exemple 1 :** Capacité à gérer le stress et la pression.
+                    - **Exemple 2 :** Aptitude à communiquer clairement des idées complexes.
+                    - **Exemple 3 :** Capacité à travailler en équipe et à collaborer efficacement.
+                    
+                    """, unsafe_allow_html=True)
 
-                    # Formulaire principal pour les critères
-                    col1, col2, col3 = st.columns([1, 1, 2])
+            # 2. Onglet pour ajouter un critère
+            with st.expander("➕ Ajouter un critère", expanded=True):
+                with st.form(key="add_criteria_form"):
+                    col1, col2 = st.columns([1, 1])
                     with col1:
                         rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique")
                         type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], key="new_type_question")
-                    with col2:
                         critere = st.text_input("Critère", placeholder="Ex: Leadership", key="new_critere")
+                    
+                    with col2:
+                        question = st.text_area("Question pour l'entretien", placeholder="Ex: Parlez-moi d'une situation où vous avez dû faire preuve de leadership.", key="new_question", height=100)
                         evaluation = st.slider("Évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
-                    with col3:
-                        initial_value = st.session_state.get('generated_ai_question', '')
-                        question = st.text_area("Question pour l'entretien", placeholder="Ex: Parlez-moi d'une situation où vous avez dû faire preuve de leadership.", key="new_question", height=100, value=initial_value)
-
-                    if st.button("➕ Ajouter à la matrice", type="primary", use_container_width=True):
-                        # ... (Votre logique de sauvegarde reste la même) ...
-                        st.session_state.ksa_matrix = st.session_state.ksa_matrix.append(
-                            {
-                                "Rubrique": rubrique,
-                                "Critère": critere,
-                                "Type de question": type_question,
-                                "Question pour l'entretien": question,
-                                "Évaluation (1-5)": evaluation
-                            }, ignore_index=True
-                        )
-                        st.session_state.save_message = "✅ Critère ajouté avec succès."
-                        st.session_state.save_message_tab = "Réunion"
-                        st.session_state.generated_ai_question = "" # Réinitialiser la question de l'IA
-                        st.rerun()
+                        evaluateur = st.selectbox("Qui évalue ce critère ?", ["Recruteur", "Manager", "Les deux"], key="new_evaluateur")
+                    
+                    st.markdown("---")
+                    st.markdown("**Générer une question avec l'IA**")
+                    ai_prompt = st.text_input("Décrivez ce que l'IA doit générer :", placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", key="ai_prompt_input")
+                    
+                    col_ai, col_add = st.columns([1, 1])
+                    with col_ai:
+                        if st.form_submit_button("Générer question IA", use_container_width=True):
+                            if ai_prompt:
+                                try:
+                                    ai_response = "Exemple de réponse IA générée pour : " + ai_prompt 
+                                    st.success(f"Question générée : `{ai_response}`. Copiez-la et collez-la dans le champ ci-dessus.")
+                                except Exception as e:
+                                    st.error(f"Erreur lors de la génération : {e}")
+                            else:
+                                st.error("Veuillez entrer un prompt pour l'IA.")
+                    
+                    with col_add:
+                        if st.form_submit_button("➕ Ajouter le critère", type="primary", use_container_width=True):
+                            if not critere or not question:
+                                st.error("Veuillez remplir au moins le critère et la question.")
+                            else:
+                                st.session_state.ksa_matrix = pd.concat([st.session_state.ksa_matrix, pd.DataFrame([{
+                                    "Rubrique": rubrique,
+                                    "Critère": critere,
+                                    "Type de question": type_question,
+                                    "Question pour l'entretien": question,
+                                    "Évaluation (1-5)": evaluation,
+                                    "Évaluateur": evaluateur
+                                }])], ignore_index=True)
+                                st.success("✅ Critère ajouté avec succès !")
+                                st.rerun()
 
             st.dataframe(st.session_state.ksa_matrix, use_container_width=True, hide_index=True)
-            
-            col_export_word, col_export_pdf = st.columns(2)
-            # ... (Le code des boutons d'export reste le même) ...
-            with col_export_word:
-                # ...
-                pass
-            with col_export_pdf:
-                # ...
-                pass
 
     elif step == 3:
         with st.expander("💡 Stratégie et Processus", expanded=True):
