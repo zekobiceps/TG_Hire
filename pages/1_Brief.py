@@ -1014,18 +1014,8 @@ with tabs[2]:
     total_steps = 4
     step = st.session_state.reunion_step
     
+    # Barre de progression sans boutons de navigation
     st.progress(int((step / total_steps) * 100), text=f"**Étape {step} sur {total_steps}**")
-    
-    # Boutons de navigation
-    col_prev, col_next = st.columns([1, 1])
-    with col_prev:
-        if st.button("⬅️ Précédent", disabled=(step == 1), use_container_width=True):
-            st.session_state.reunion_step -= 1
-            st.rerun()
-    with col_next:
-        if st.button("Suivant ➡️", disabled=(step == 4), use_container_width=True):
-            st.session_state.reunion_step += 1
-            st.rerun()
 
     if step == 1:
         with st.expander("📋 Portrait robot candidat - Validation", expanded=True):
@@ -1119,7 +1109,8 @@ with tabs[2]:
                         if st.form_submit_button("Générer question IA", use_container_width=True):
                             if ai_prompt:
                                 try:
-                                    ai_response = "Exemple de réponse IA générée pour : " + ai_prompt 
+                                    # Correction : Appel de votre fonction réelle
+                                    ai_response = generate_ai_question(ai_prompt)
                                     st.success(f"Question générée : `{ai_response}`. Copiez-la et collez-la dans le champ ci-dessus.")
                                 except Exception as e:
                                     st.error(f"Erreur lors de la génération : {e}")
@@ -1143,7 +1134,7 @@ with tabs[2]:
                                 st.rerun()
 
             st.dataframe(st.session_state.ksa_matrix, use_container_width=True, hide_index=True)
-
+            
     elif step == 3:
         with st.expander("💡 Stratégie et Processus", expanded=True):
             st.info("Définissez les canaux de sourcing et les critères d'évaluation.")
