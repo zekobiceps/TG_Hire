@@ -1089,47 +1089,54 @@ with tabs[2]:
 
             with st.expander("➕ Ajouter un critère", expanded=True):
                 with st.form(key="add_criteria_form"):
-                    col1, col2 = st.columns([1, 1])
+                    col1, col2, col3 = st.columns(3)
+                    
                     with col1:
                         rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique")
-                        type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], key="new_type_question")
                         critere = st.text_input("Critère", placeholder="Ex: Leadership", key="new_critere")
                     
                     with col2:
-                        question = st.text_area("Question pour l'entretien", placeholder="Ex: Parlez-moi d'une situation où vous avez dû faire preuve de leadership.", key="new_question", height=100)
+                        type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], key="new_type_question")
                         evaluation = st.slider("Évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
+                    
+                    with col3:
                         evaluateur = st.selectbox("Qui évalue ce critère ?", ["Recruteur", "Manager", "Les deux"], key="new_evaluateur")
+
+                    question = st.text_area("Question pour l'entretien", placeholder="Ex: Parlez-moi d'une situation où vous avez dû faire preuve de leadership.", key="new_question", height=100)
                     
                     st.markdown("---")
                     st.markdown("**Générer une question avec l'IA**")
                     ai_prompt = st.text_input("Décrivez ce que l'IA doit générer :", placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", key="ai_prompt_input")
                     
-                    if st.form_submit_button("💡 Générer question IA", type="primary", use_container_width=True):
-                        if ai_prompt:
-                            with st.spinner("Génération en cours..."):
-                                try:
-                                    ai_response = generate_ai_question(ai_prompt)
-                                    st.success(f"Réponse générée : `{ai_response}`")
-                                except Exception as e:
-                                    st.error(f"Erreur lors de la génération : {e}")
-                            
-                        else:
-                            st.error("Veuillez entrer un prompt pour l'IA.")
-                            
-                    if st.form_submit_button("➕ Ajouter le critère", type="primary", use_container_width=True):
-                        if not critere or not question:
-                            st.error("Veuillez remplir au moins le critère et la question.")
-                        else:
-                            st.session_state.ksa_matrix = pd.concat([st.session_state.ksa_matrix, pd.DataFrame([{
-                                "Rubrique": rubrique,
-                                "Critère": critere,
-                                "Type de question": type_question,
-                                "Question pour l'entretien": question,
-                                "Évaluation (1-5)": evaluation,
-                                "Évaluateur": evaluateur
-                            }])], ignore_index=True)
-                            st.success("✅ Critère ajouté avec succès !")
-                            st.rerun()
+                    col_ai, col_add = st.columns(2)
+                    with col_ai:
+                        if st.form_submit_button("💡 Générer question IA", type="primary", use_container_width=True):
+                            if ai_prompt:
+                                with st.spinner("Génération en cours..."):
+                                    try:
+                                        # Correction : Appel de votre fonction réelle
+                                        ai_response = generate_ai_question(ai_prompt)
+                                        st.success(f"**Question :** `{ai_response}`")
+                                    except Exception as e:
+                                        st.error(f"Erreur lors de la génération : {e}")
+                            else:
+                                st.error("Veuillez entrer un prompt pour l'IA.")
+                    
+                    with col_add:
+                        if st.form_submit_button("➕ Ajouter le critère", type="primary", use_container_width=True):
+                            if not critere or not question:
+                                st.error("Veuillez remplir au moins le critère et la question.")
+                            else:
+                                st.session_state.ksa_matrix = pd.concat([st.session_state.ksa_matrix, pd.DataFrame([{
+                                    "Rubrique": rubrique,
+                                    "Critère": critere,
+                                    "Type de question": type_question,
+                                    "Question pour l'entretien": question,
+                                    "Évaluation (1-5)": evaluation,
+                                    "Évaluateur": evaluateur
+                                }])], ignore_index=True)
+                                st.success("✅ Critère ajouté avec succès !")
+                                st.rerun()
 
             st.dataframe(st.session_state.ksa_matrix, use_container_width=True, hide_index=True)
 
