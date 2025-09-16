@@ -999,6 +999,11 @@ with tabs[2]:
                 color: white;
                 border-color: #555555;
             }
+            div[data-testid="stForm"] {
+                padding: 1rem;
+                border: 1px solid #555555;
+                border-radius: 0.5rem;
+            }
         </style>
         """, unsafe_allow_html=True)
     
@@ -1014,12 +1019,10 @@ with tabs[2]:
     total_steps = 4
     step = st.session_state.reunion_step
     
-    # Barre de progression sans boutons de navigation
     st.progress(int((step / total_steps) * 100), text=f"**Étape {step} sur {total_steps}**")
 
     if step == 1:
         with st.expander("📋 Portrait robot candidat - Validation", expanded=True):
-            # Construire le DataFrame sans répétition de "Contexte du poste"
             data = []
             field_keys = []
             comment_keys = []
@@ -1060,7 +1063,6 @@ with tabs[2]:
 
     elif step == 2:
         with st.expander("📊 Matrice KSA - Validation manager", expanded=True):
-            # 1. Onglet d'explication de la méthode KSA
             with st.expander("ℹ️ Explications de la méthode KSA", expanded=False):
                 st.markdown("""
                     ### Méthode KSA (Knowledge, Skills, Abilities)
@@ -1083,10 +1085,8 @@ with tabs[2]:
                     - **Exemple 1 :** Capacité à gérer le stress et la pression.
                     - **Exemple 2 :** Aptitude à communiquer clairement des idées complexes.
                     - **Exemple 3 :** Capacité à travailler en équipe et à collaborer efficacement.
-                    
                     """, unsafe_allow_html=True)
 
-            # 2. Onglet pour ajouter un critère
             with st.expander("➕ Ajouter un critère", expanded=True):
                 with st.form(key="add_criteria_form"):
                     col1, col2 = st.columns([1, 1])
@@ -1104,37 +1104,35 @@ with tabs[2]:
                     st.markdown("**Générer une question avec l'IA**")
                     ai_prompt = st.text_input("Décrivez ce que l'IA doit générer :", placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", key="ai_prompt_input")
                     
-                    col_ai, col_add = st.columns([1, 1])
-                    with col_ai:
-                        if st.form_submit_button("Générer question IA", use_container_width=True):
-                            if ai_prompt:
+                    if st.form_submit_button("💡 Générer question IA", type="primary", use_container_width=True):
+                        if ai_prompt:
+                            with st.spinner("Génération en cours..."):
                                 try:
-                                    # Correction : Appel de votre fonction réelle
                                     ai_response = generate_ai_question(ai_prompt)
-                                    st.success(f"Question générée : `{ai_response}`. Copiez-la et collez-la dans le champ ci-dessus.")
+                                    st.success(f"Réponse générée : `{ai_response}`")
                                 except Exception as e:
                                     st.error(f"Erreur lors de la génération : {e}")
-                            else:
-                                st.error("Veuillez entrer un prompt pour l'IA.")
-                    
-                    with col_add:
-                        if st.form_submit_button("➕ Ajouter le critère", type="primary", use_container_width=True):
-                            if not critere or not question:
-                                st.error("Veuillez remplir au moins le critère et la question.")
-                            else:
-                                st.session_state.ksa_matrix = pd.concat([st.session_state.ksa_matrix, pd.DataFrame([{
-                                    "Rubrique": rubrique,
-                                    "Critère": critere,
-                                    "Type de question": type_question,
-                                    "Question pour l'entretien": question,
-                                    "Évaluation (1-5)": evaluation,
-                                    "Évaluateur": evaluateur
-                                }])], ignore_index=True)
-                                st.success("✅ Critère ajouté avec succès !")
-                                st.rerun()
+                            
+                        else:
+                            st.error("Veuillez entrer un prompt pour l'IA.")
+                            
+                    if st.form_submit_button("➕ Ajouter le critère", type="primary", use_container_width=True):
+                        if not critere or not question:
+                            st.error("Veuillez remplir au moins le critère et la question.")
+                        else:
+                            st.session_state.ksa_matrix = pd.concat([st.session_state.ksa_matrix, pd.DataFrame([{
+                                "Rubrique": rubrique,
+                                "Critère": critere,
+                                "Type de question": type_question,
+                                "Question pour l'entretien": question,
+                                "Évaluation (1-5)": evaluation,
+                                "Évaluateur": evaluateur
+                            }])], ignore_index=True)
+                            st.success("✅ Critère ajouté avec succès !")
+                            st.rerun()
 
             st.dataframe(st.session_state.ksa_matrix, use_container_width=True, hide_index=True)
-            
+
     elif step == 3:
         with st.expander("💡 Stratégie et Processus", expanded=True):
             st.info("Définissez les canaux de sourcing et les critères d'évaluation.")
