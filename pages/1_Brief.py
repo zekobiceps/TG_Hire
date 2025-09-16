@@ -1105,14 +1105,16 @@ with tabs[2]:
                     with col4:
                         evaluateur = st.selectbox("Qui évalue ce critère ?", ["Recruteur", "Manager", "Les deux"], key="new_evaluateur")
 
-                    col_ai_prompt, col_q_text, col_slider = st.columns([2, 4, 1])
+                    col_q_text, col_slider = st.columns([4, 1])
 
-                    with col_ai_prompt:
-                         ai_prompt = st.text_input("Décrivez ce que l'IA doit générer :", placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", key="ai_prompt_input")
                     with col_q_text:
                         question = st.text_area("Question pour l'entretien", placeholder="Ex: Parlez-moi d'une situation où vous avez dû faire preuve de leadership.", key="new_question", height=100)
                     with col_slider:
                          evaluation = st.slider("Évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
+                    
+                    # Nouvelle section pour l'IA
+                    concise_mode = st.checkbox("⚡ Mode rapide (réponse concise)", key="concise_mode")
+                    ai_prompt = st.text_input("Décrivez ce que l'IA doit générer :", placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", key="ai_prompt_input")
                     
                     st.markdown("---")
                     
@@ -1122,7 +1124,8 @@ with tabs[2]:
                             if ai_prompt:
                                 with st.spinner("Génération en cours..."):
                                     try:
-                                        ai_response = generate_ai_question(ai_prompt)
+                                        # Ajout du paramètre pour le mode concis
+                                        ai_response = generate_ai_question(ai_prompt, concise_mode)
                                         # Nettoyer la réponse de l'IA si elle a un format indésirable
                                         if ai_response.strip().startswith("Question:"):
                                             ai_response = ai_response.strip().replace("Question:", "", 1).strip()
