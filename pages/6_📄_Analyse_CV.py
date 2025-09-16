@@ -12,22 +12,22 @@ import re
 # -------------------- Personnalisation CSS --------------------
 st.markdown("""
 <style>
-    /* Cases de texte */
+    /* Cases de texte avec fond gris */
     .stTextInput>div>div>input {
-        background-color: #1F1F1F !important;
-        border: 2px solid #4CAF50 !important;
+        background-color: #f0f2f6 !important;
+        border: 2px solid #d0d0d0 !important;
         border-radius: 8px !important;
         padding: 10px !important;
-        color: white !important;
+        color: #333333 !important;
     }
     
-    /* Zones de texte */
+    /* Zones de texte avec fond gris */
     .stTextArea>div>div>textarea {
-        background-color: #1F1F1F !important;
-        border: 2px solid #4CAF50 !important;
+        background-color: #f0f2f6 !important;
+        border: 2px solid #d0d0d0 !important;
         border-radius: 8px !important;
         padding: 10px !important;
-        color: white !important;
+        color: #333333 !important;
     }
     
     /* Boutons */
@@ -62,6 +62,12 @@ st.markdown("""
         border-radius: 0 0 8px 8px !important;
         border: 1px solid #4CAF50 !important;
         border-top: none !important;
+    }
+    
+    /* Labels des champs */
+    .stTextInput label, .stTextArea label {
+        color: #FAFAFA !important;
+        font-weight: 600 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -198,15 +204,6 @@ st.markdown("""
         color: #FAFAFA;
     }
     
-    /* Champs de saisie - Couleur foncée désirée */
-    .stTextInput input, .stTextArea textarea, .stFileUploader label, .stSelectbox [data-baseweb="select"] > div, .stDateInput input {
-        background-color: #1F1F1F !important; /* Gris plus sombre */
-        color: white !important;
-        border: 1px solid #555 !important;
-        border-radius: 4px !important;
-        padding: 8px !important;
-    }
-    
     /* Titres des sections en blanc et sans bordure */
     .section-header {
         font-size: 1.5rem;
@@ -249,7 +246,7 @@ def rank_resumes_with_cosine(job_description, resumes):
         return []
 
 def get_detailed_score_with_ai(job_description, resume_text):
-    """Évalue la pertinence d'un CV en utilisant l'IA, en fournissant un score et une explication détaillée."""
+    """Évalue la pertinence d'un CV en utilisant l'IA, en providing un score et une explication détaillée."""
     if not API_KEY:
         return {"score": 0.0, "explanation": "❌ Analyse IA impossible. Clé API non configurée."}
     
