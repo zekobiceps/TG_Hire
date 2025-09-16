@@ -634,12 +634,3 @@ def generate_automatic_brief_name():
     
     return brief_name
 
-def save_briefs():
-    """Sauvegarde les briefs dans un fichier json."""
-    try:
-        # Votre code de sauvegarde...
-        st.success("✅ Briefs sauvegardés avec succès !")
-    except Exception as e:
-        st.error(f"Erreur lors de la sauvegarde des briefs: {e}")
-        # 💡 AFFICHER L'ERREUR
-        st.code(f"Détail de l'erreur: {e}") 
