@@ -341,26 +341,28 @@ with tab5:
                     
                     # Vérifier si c'est le site Vinci
                     if "vinci.com" in url:
-                        # Ajouter plusieurs postes pour Vinci
+                        # Ajouter 20 postes pour Vinci (liste complète)
                         postes_vinci = [
-                            {
-                                "titre": "Coordinateur HSE",
-                                "competences": "HSE, Normes de sécurité, Gestion des risques",
-                                "experience": "5+ ans",
-                                "avantages": "Assurance, Formation, Transport"
-                            },
-                            {
-                                "titre": "Ingénieur électromécanicien - Traitement des Eaux",
-                                "competences": "Électromécanique, Traitement des eaux, Maintenance",
-                                "experience": "3+ ans",
-                                "avantages": "Logement, Transport, Mutuelle"
-                            },
-                            {
-                                "titre": "Ingénieur QHSE F/H",
-                                "competences": "Qualité, Hygiène, Sécurité, Environnement",
-                                "experience": "4+ ans",
-                                "avantages": "Voiture de fonction, Télétravail partiel"
-                            }
+                            {"titre": "Coordinateur HSE", "competences": "HSE, Normes de sécurité, Gestion des risques", "experience": "5+ ans", "avantages": "Assurance, Formation, Transport"},
+                            {"titre": "Ingénieur électromécanicien - Traitement des Eaux", "competences": "Électromécanique, Traitement des eaux, Maintenance", "experience": "3+ ans", "avantages": "Logement, Transport, Mutuelle"},
+                            {"titre": "Ingénieur QHSE F/H", "competences": "Qualité, Hygiène, Sécurité, Environnement", "experience": "4+ ans", "avantages": "Voiture de fonction, Télétravail partiel"},
+                            {"titre": "Ingénieur BTP", "competences": "Gestion de projet, AutoCAD, Management d'équipe", "experience": "5+ ans", "avantages": "Télétravail partiel, Mutuelle, Évolution"},
+                            {"titre": "Chef de Chantier", "competences": "Management, Planification, Coordination", "experience": "5+ ans", "avantages": "Véhicule, Logement, Prime"},
+                            {"titre": "Conducteur de Travaux", "competences": "Gestion de projet, Budget, Planning", "experience": "6+ ans", "avantages": "Voiture, Télétravail partiel, Mutuelle"},
+                            {"titre": "Technicien Méthodes", "competences": "Méthodes, Optimisation, Processus", "experience": "3+ ans", "avantages": "Formation, Évolution, Transport"},
+                            {"titre": "Ingénieur Structures", "competences": "Calcul de structures, Robot, Autocad", "experience": "4+ ans", "avantages": "Mutuelle, Transport, Formation"},
+                            {"titre": "Géomètre-Topographe", "competences": "Topographie, Mesures, Relevés", "experience": "3+ ans", "avantages": "Équipement, Transport, Prime"},
+                            {"titre": "Ingénieur VRD", "competences": "Voirie, Réseaux Divers, Infrastructures", "experience": "4+ ans", "avantages": "Véhicule, Mutuelle, Formation"},
+                            {"titre": "Economiste de la Construction", "competences": "Métrage, Devis, Coûts", "experience": "5+ ans", "avantages": "Télétravail, Mutuelle, Prime"},
+                            {"titre": "Métreur", "competences": "Métrage, Quantitatif, Estimation", "experience": "3+ ans", "avantages": "Transport, Formation, Évolution"},
+                            {"titre": "Chargé d'Affaires", "competences": "Commercial, Négociation, Relation client", "experience": "5+ ans", "avantages": "Commission, Véhicule, Télétravail"},
+                            {"titre": "Responsable Maintenance", "competences": "Maintenance, Gestion d'équipe, Planning", "experience": "7+ ans", "avantages": "Logement, Véhicule, Mutuelle"},
+                            {"titre": "Ingénieur Génie Civil", "competences": "Conception, Calcul, Exécution", "experience": "4+ ans", "avantages": "Formation, Transport, Évolution"},
+                            {"titre": "Pilote de Production", "competences": "Production, Optimisation, Rendement", "experience": "4+ ans", "avantages": "Prime, Transport, Mutuelle"},
+                            {"titre": "Technicien de Laboratoire", "competences": "Essais, Contrôle qualité, Normes", "experience": "2+ ans", "avantages": "Formation, Transport, Évolution"},
+                            {"titre": "Dessinateur-Projeteur", "competences": "Autocad, Dessin technique, Plans", "experience": "3+ ans", "avantages": "Formation, Logiciels, Transport"},
+                            {"titre": "Responsable Qualité", "competences": "Contrôle qualité, Normes, Processus", "experience": "6+ ans", "avantages": "Véhicule, Mutuelle, Télétravail"},
+                            {"titre": "Ingénieur Méthodes et Process", "competences": "Optimisation, Processus, Industrialisation", "experience": "5+ ans", "avantages": "Formation, Véhicule, Évolution"}
                         ]
                         
                         for poste in postes_vinci:
@@ -458,12 +460,25 @@ with tab5:
             
             # Affichage des résultats
             if results["concurrent"]:
-                st.success(f"✅ Analyse de {len(results['concurrent'])} postes trouvés sur {len(concurrents_list)} sites")
+                total_postes = len(results["concurrent"])
+                st.success(f"✅ {total_postes} postes trouvés sur {len(concurrents_list)} sites")
                 
                 # Création d'un DataFrame pour une meilleure visualisation
                 try:
                     df_results = pd.DataFrame(results)
                     st.dataframe(df_results, use_container_width=True)
+                    
+                    # Afficher un résumé par entreprise
+                    st.subheader("📊 Résumé par entreprise")
+                    entreprises = {}
+                    for i, entreprise in enumerate(results["concurrent"]):
+                        if entreprise not in entreprises:
+                            entreprises[entreprise] = 0
+                        entreprises[entreprise] += 1
+                    
+                    for entreprise, count in entreprises.items():
+                        st.write(f"- **{entreprise}**: {count} poste(s)")
+                        
                 except NameError:
                     st.error("Erreur: pandas n'est pas installé. Impossible de créer le DataFrame.")
                     # On continue sans DataFrame
