@@ -9,6 +9,51 @@ from sklearn.metrics.pairwise import cosine_similarity
 import time
 import re
 
+# -------------------- Personnalisation CSS --------------------
+st.markdown("""
+<style>
+    /* Cases de texte */
+    .stTextInput>div>div>input {
+        background-color: #f0f2f6;
+        border: 2px solid #4CAF50;
+        border-radius: 8px;
+        padding: 10px;
+    }
+    
+    /* Zones de texte */
+    .stTextArea>div>div>textarea {
+        background-color: #f0f2f6;
+        border: 2px solid #4CAF50;
+        border-radius: 8px;
+        padding: 10px;
+    }
+    
+    /* Boutons */
+    .stButton>button {
+        background-color: #4CAF50;
+        color: white;
+        border-radius: 8px;
+        padding: 10px 24px;
+        font-weight: bold;
+        border: none;
+        transition: all 0.3s;
+    }
+    
+    .stButton>button:hover {
+        background-color: #45a049;
+        transform: scale(1.05);
+    }
+    
+    /* Expanders */
+    .streamlit-expanderHeader {
+        background-color: #e8f5e9;
+        border-radius: 8px;
+        padding: 12px;
+        font-weight: bold;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # --- CSS pour augmenter la taille du texte des onglets ---
 st.markdown("""
 <style>
