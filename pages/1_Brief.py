@@ -115,7 +115,7 @@ def render_ksa_matrix():
                 color: #28a745; /* Vert pour l'icône ✅ */
             }
             .stSuccess { /* Override green from st.success */
-                background-color: #2a2a2a !important;
+                background-color: #28a745 !important;
                 color: #ffffff !important;
             }
         </style>
@@ -985,8 +985,7 @@ with tabs[1]:
 # ---------------- RÉUNION DE BRIEF ----------------
 with tabs[2]:
     # Afficher le message de sauvegarde seulement pour cet onglet
-    if ("save_message" in st.session_state and st.session_state.save_message) and \
-       ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Réunion"):
+    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Réunion"):
         st.success(st.session_state.save_message)
         st.session_state.save_message = None
         st.session_state.save_message_tab = None
@@ -1051,35 +1050,11 @@ with tabs[2]:
         render_ksa_matrix()
 
     elif step == 3:
-        st.subheader("🎯 Stratégie de Sourcing et Recrutement")
-
-        # Section Canaux de sourcing
-        st.markdown("**Canaux prioritaires**")
-        st.multiselect("Sélectionnez les canaux à utiliser:", 
-                      ["LinkedIn", "Jobboards", "Cooptation", "Réseaux sociaux", "Chasse de tête", "Autre", "Annonces", "Entreprise X", "Secteur Y"],
-                      key="canaux_prioritaires")
-
-        # Section Processus d'évaluation simplifié
-        st.markdown("**Processus d'évaluation**")
-        processus_evaluation = """Étape 1 : Pré-qualification initiale
-- Tri des CV : Vérification des critères must-have
-- Entretien téléphonique de 10 min
-
-Étape 2 : Évaluation technique
-- Entretien recruteur (30 min) : Compétences techniques
-- Test technique / Étude de cas
-
-Étape 3 : Entretien manager
-- Entretien approfondissement (30 min)
-
-Étape 4 : Décision finale
-- Délibération collective
-- Remise dossier DRH"""
-        st.text_area("Processus d'évaluation", 
-                    value=processus_evaluation,
-                    key="processus_evaluation",
-                    height=300)  # Increased height to accommodate more text
-
+        st.subheader("4️⃣ Stratégie Recrutement")
+        st.multiselect("Canaux prioritaires", ["LinkedIn", "Jobboards", "Cooptation", "Réseaux sociaux", "Chasse de tête"], key="canaux_prioritaires")
+        st.text_area("Critères d'exclusion", key="criteres_exclusion", height=100)
+        st.text_area("Processus d'évaluation (détails)", key="processus_evaluation", height=100)
+        
     elif step == 4:
         st.subheader("📝 Notes générales du manager")
         st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=200, 
@@ -1108,6 +1083,7 @@ with tabs[2]:
                             "manager_notes": st.session_state.get("manager_notes", ""),
                             "manager_comments": manager_comments,
                             "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
+                            "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
                             "processus_evaluation": st.session_state.get("processus_evaluation", "")
                         })
                         st.session_state.saved_briefs = existing_briefs
@@ -1118,6 +1094,7 @@ with tabs[2]:
                             "manager_notes": st.session_state.get("manager_notes", ""),
                             "manager_comments": manager_comments,
                             "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
+                            "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
                             "processus_evaluation": st.session_state.get("processus_evaluation", "")
                         })
                     
@@ -1132,17 +1109,6 @@ with tabs[2]:
         with col_cancel:
             if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion"):
                 delete_current_brief()
-
-    # Ajout des boutons Suivant et Précédent
-    col_prev, col_next = st.columns([2, 2])  # Adjusted for smaller buttons
-    with col_prev:
-        if st.button("⬅️ Précédent", type="secondary", key=f"prev_step_{step}", disabled=step == 1):
-            st.session_state.reunion_step -= 1
-            st.rerun()
-    with col_next:
-        if st.button("➡️ Suivant", type="primary", key=f"next_step_{step}", disabled=step == 4):
-            st.session_state.reunion_step += 1
-            st.rerun()
 
     # ---- Navigation wizard ----
     col1, col2, col3 = st.columns([1, 6, 1])
