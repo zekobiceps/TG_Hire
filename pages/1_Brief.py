@@ -981,7 +981,7 @@ with tabs[1]:
                 st.session_state.current_brief_name = ""
                 st.session_state.avant_brief_completed = False
                 st.rerun()
-                
+# ---------------- REUNION BRIEF ----------------           
 with tabs[2]:
     # Afficher le message de sauvegarde seulement pour cet onglet
     if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Réunion"):
@@ -1047,6 +1047,11 @@ with tabs[2]:
     elif step == 2:
         st.subheader("📊 Matrice KSA - Validation manager")
         render_ksa_matrix()
+        # Calculer le score total à partir de la matrice KSA
+        if 'ksa_matrix' in st.session_state and not st.session_state.ksa_matrix.empty:
+            total_score = st.session_state.ksa_matrix['Note'].sum()  # Assuming 'Note' column exists
+            target_score = min(5, max(0, total_score))  # Cap the score between 0 and 5
+            st.markdown(f"**Score cible : {target_score} / 5**")
 
     elif step == 3:
         st.subheader("4️⃣ Stratégie Recrutement")
@@ -1068,17 +1073,22 @@ Délibération collective : Le recruteur et le manager comparent leurs notes et 
 
 Étape 5 : Remise du dossier à la DRH""",
                      key="processus_evaluation",
-                     height=600)  # Significantly increased height to reduce scrolling
+                     height=600)
         st.markdown("**Critères d'exclusion**")
         st.text_area("Critères éliminatoires", 
                      placeholder="Ex: Plus de 2 ans sans expérience BTP, absence de diplôme requis...",
                      key="criteres_exclusion",
-                     height=200)  # Reasonable height for this section
+                     height=200)
 
     elif step == 4:
         st.subheader("📝 Notes générales du manager")
         st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=200, 
                     placeholder="Ajoutez vos commentaires et notes généraux...")
+
+        # Bouton Précédent
+        if st.button("⬅️ Précédent", type="secondary", key=f"prev_step_4", use_container_width=True):
+            st.session_state.reunion_step = 3
+            st.rerun()
 
         # Boutons Enregistrer et Annuler
         col_save, col_cancel = st.columns([1, 1])
