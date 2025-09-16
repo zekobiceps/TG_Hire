@@ -1068,7 +1068,12 @@ Délibération collective : Le recruteur et le manager comparent leurs notes et 
 
 Étape 5 : Remise du dossier à la DRH""",
                      key="processus_evaluation",
-                     height=400)  # Enlarged height to accommodate the text
+                     height=600)  # Significantly increased height to reduce scrolling
+        st.markdown("**Critères d'exclusion**")
+        st.text_area("Critères éliminatoires", 
+                     placeholder="Ex: Plus de 2 ans sans expérience BTP, absence de diplôme requis...",
+                     key="criteres_exclusion",
+                     height=200)  # Reasonable height for this section
 
     elif step == 4:
         st.subheader("📝 Notes générales du manager")
@@ -1098,7 +1103,8 @@ Délibération collective : Le recruteur et le manager comparent leurs notes et 
                             "manager_notes": st.session_state.get("manager_notes", ""),
                             "manager_comments": manager_comments,
                             "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
-                            "processus_evaluation": st.session_state.get("processus_evaluation", "")
+                            "processus_evaluation": st.session_state.get("processus_evaluation", ""),
+                            "criteres_exclusion": st.session_state.get("criteres_exclusion", "")
                         })
                         st.session_state.saved_briefs = existing_briefs
                     else:
@@ -1108,7 +1114,8 @@ Délibération collective : Le recruteur et le manager comparent leurs notes et 
                             "manager_notes": st.session_state.get("manager_notes", ""),
                             "manager_comments": manager_comments,
                             "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
-                            "processus_evaluation": st.session_state.get("processus_evaluation", "")
+                            "processus_evaluation": st.session_state.get("processus_evaluation", ""),
+                            "criteres_exclusion": st.session_state.get("criteres_exclusion", "")
                         })
                     
                     save_briefs()
@@ -1122,19 +1129,6 @@ Délibération collective : Le recruteur et le manager comparent leurs notes et 
         with col_cancel:
             if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion"):
                 delete_current_brief()
-                
-    # ---- Navigation wizard ----
-    col1, col2, col3 = st.columns([1, 6, 1])
-    with col1:
-        if step > 1:
-            if st.button("⬅️ Précédent", key="prev_step"):
-                st.session_state.reunion_step -= 1
-                st.rerun()
-    with col3:
-        if step < total_steps:
-            if st.button("Suivant ➡️", key="next_step"):
-                st.session_state.reunion_step += 1
-                st.rerun()
 
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
