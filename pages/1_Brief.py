@@ -1009,29 +1009,16 @@ with tabs[2]:
         st.session_state.save_message_tab = None
 
     brief_display_name = f"Réunion de brief - {st.session_state.current_brief_name}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
-    st.markdown(f"<h3 style='color: #FF4B4B;'>📝 {brief_display_name}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color: #FFFFFF;'>📝 {brief_display_name}</h3>", unsafe_allow_html=True) # Titre en blanc
 
     total_steps = 4
     step = st.session_state.reunion_step
     
-    with st.container(border=True):
-        st.progress(int((step / total_steps) * 100), text=f"**Étape {step} sur {total_steps}**")
-        
-        col_prev, col_next = st.columns([1, 1])
-        with col_prev:
-            if st.button("⬅️ Précédent", disabled=(step == 1), use_container_width=True):
-                st.session_state.reunion_step -= 1
-                st.rerun()
-        with col_next:
-            if st.button("Suivant ➡️", disabled=(step == 4), use_container_width=True):
-                st.session_state.reunion_step += 1
-                st.rerun()
+    st.progress(int((step / total_steps) * 100), text=f"**Étape {step} sur {total_steps}**")
 
     if step == 1:
         with st.expander("📋 Portrait robot candidat - Validation", expanded=True):
             # ... (Votre code pour le data_editor reste inchangé) ...
-            
-            # Construire le DataFrame sans répétition de "Contexte du poste"
             data = []
             field_keys = []
             comment_keys = []
@@ -1072,13 +1059,36 @@ with tabs[2]:
 
     elif step == 2:
         with st.expander("📊 Matrice KSA - Validation manager", expanded=True):
-            # --- CODE DE LA MATRICE KSA AVEC MISE EN PAGE AMÉLIORÉE ---
-            st.subheader("📊 Matrice KSA (Knowledge, Skills, Abilities)")
-            
+            # --- EXPLICATIONS DE LA MATRICE KSA ---
+            with st.expander("ℹ️ Explications de la méthode KSA", expanded=False):
+                st.markdown("""
+                ### Méthode KSA (Knowledge, Skills, Abilities)
+                - **Knowledge (Connaissances)** : Savoirs théoriques nécessaires.
+                - **Skills (Compétences)** : Aptitudes pratiques acquises.
+                - **Abilities (Aptitudes)** : Capacités innées ou développées.
+                """, unsafe_allow_html=True)
+                
             # Formulaire pour ajouter une nouvelle ligne
             with st.expander("➕ Ajouter un critère", expanded=False):
                 with st.container(border=True):
-                    # Utilisation de colonnes pour une mise en page plus compacte
+                    # Section pour l'IA
+                    st.markdown("**Générer une question avec l'IA**")
+                    ai_prompt = st.text_input("Prompt pour l'IA", placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", key="ai_prompt_input")
+                    
+                    if st.button("Générer question IA"):
+                        if ai_prompt:
+                            try:
+                                ai_response = generate_ai_question(ai_prompt)
+                                st.session_state.generated_ai_question = ai_response
+                                st.success("Question générée avec succès ! Copiez-la dans le champ ci-dessous.")
+                            except Exception as e:
+                                st.error(f"Erreur lors de la génération : {e}")
+                        else:
+                            st.error("Veuillez entrer un prompt pour l'IA.")
+                            
+                    st.divider()
+
+                    # Formulaire principal pour les critères
                     col1, col2, col3 = st.columns([1, 1, 2])
                     with col1:
                         rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique")
@@ -1087,9 +1097,9 @@ with tabs[2]:
                         critere = st.text_input("Critère", placeholder="Ex: Leadership", key="new_critere")
                         evaluation = st.slider("Évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
                     with col3:
-                        question = st.text_area("Question pour l'entretien", placeholder="Ex: Parlez-moi d'une situation où vous avez dû faire preuve de leadership.", key="new_question", height=100)
+                        initial_value = st.session_state.get('generated_ai_question', '')
+                        question = st.text_area("Question pour l'entretien", placeholder="Ex: Parlez-moi d'une situation où vous avez dû faire preuve de leadership.", key="new_question", height=100, value=initial_value)
 
-                    # Bouton d'ajout
                     if st.button("➕ Ajouter à la matrice", type="primary", use_container_width=True):
                         # ... (Votre logique de sauvegarde reste la même) ...
                         st.session_state.ksa_matrix = st.session_state.ksa_matrix.append(
@@ -1103,21 +1113,19 @@ with tabs[2]:
                         )
                         st.session_state.save_message = "✅ Critère ajouté avec succès."
                         st.session_state.save_message_tab = "Réunion"
+                        st.session_state.generated_ai_question = "" # Réinitialiser la question de l'IA
                         st.rerun()
 
-            # Affichage de la matrice
             st.dataframe(st.session_state.ksa_matrix, use_container_width=True, hide_index=True)
             
-            # Boutons d'export de la matrice
             col_export_word, col_export_pdf = st.columns(2)
-            # ... (Le code des boutons d'export de la matrice reste le même) ...
+            # ... (Le code des boutons d'export reste le même) ...
             with col_export_word:
                 # ...
                 pass
             with col_export_pdf:
                 # ...
                 pass
-
 
     elif step == 3:
         with st.expander("💡 Stratégie et Processus", expanded=True):
@@ -1144,7 +1152,6 @@ with tabs[2]:
         col_save, col_cancel = st.columns([1, 1])
         with col_save:
             if st.button("💾 Enregistrer la réunion", type="primary", use_container_width=True, key="save_reunion"):
-                # ... (Votre logique de sauvegarde reste la même) ...
                 if st.session_state.current_brief_name in st.session_state.saved_briefs:
                     brief_name = st.session_state.current_brief_name
                     manager_comments = {}
