@@ -292,7 +292,7 @@ with tab5:
         with col1:
             concurrents = st.text_area(
                 "Sites des concurrents à analyser (1 par ligne):", 
-                placeholder="https://www.entreprise1.com/carrieres\nhttps://www.entreprise2.com/emplois",
+                placeholder="https://jobs.vinci.com/fr/recherche-d'offres/Maroc\nhttps://www.rekrute.com/sogea-maroc-emploi.html",
                 height=100
             )
             max_pages = st.slider("Nombre maximum de pages à analyser par site:", 1, 20, 5)
@@ -300,7 +300,7 @@ with tab5:
         with col2:
             mots_cles = st.text_input(
                 "Mots-clés à rechercher (séparés par des virgules):",
-                placeholder="data scientist, python, cloud, IA"
+                placeholder="ingénieur, coordinateur, mécanicien, acheteur"
             )
             delay = st.slider("Délai entre les requêtes (secondes):", 1, 10, 3)
     
@@ -337,18 +337,89 @@ with tab5:
                 
                 try:
                     # Simulation de scraping - À remplacer par votre logique réelle
-                    # Cette partie devrait être adaptée selon la structure des sites cibles
                     time.sleep(delay)  # Respect du délai
                     
                     # Vérifier si c'est le site Vinci
                     if "vinci.com" in url:
-                        results["concurrent"].append("Vinci")
-                        results["url"].append(url)
-                        results["titre_poste"].append("Ingénieur BTP")
-                        results["competences"].append("Gestion de projet, AutoCAD, Management d'équipe")
-                        results["experience"].append("5+ ans")
-                        results["avantages"].append("Télétravail partiel, Mutuelle, Évolution")
-                        results["mots_cles_trouves"].append("ingénieur, btp, management")
+                        # Ajouter plusieurs postes pour Vinci
+                        postes_vinci = [
+                            {
+                                "titre": "Coordinateur HSE",
+                                "competences": "HSE, Normes de sécurité, Gestion des risques",
+                                "experience": "5+ ans",
+                                "avantages": "Assurance, Formation, Transport"
+                            },
+                            {
+                                "titre": "Ingénieur électromécanicien - Traitement des Eaux",
+                                "competences": "Électromécanique, Traitement des eaux, Maintenance",
+                                "experience": "3+ ans",
+                                "avantages": "Logement, Transport, Mutuelle"
+                            },
+                            {
+                                "titre": "Ingénieur QHSE F/H",
+                                "competences": "Qualité, Hygiène, Sécurité, Environnement",
+                                "experience": "4+ ans",
+                                "avantages": "Voiture de fonction, Télétravail partiel"
+                            }
+                        ]
+                        
+                        for poste in postes_vinci:
+                            results["concurrent"].append("Vinci")
+                            results["url"].append(url)
+                            results["titre_poste"].append(poste["titre"])
+                            results["competences"].append(poste["competences"])
+                            results["experience"].append(poste["experience"])
+                            results["avantages"].append(poste["avantages"])
+                            # Vérifier quels mots-clés correspondent
+                            mots_trouves = []
+                            for mot in mots_cles_list:
+                                if mot in poste["titre"].lower() or mot in poste["competences"].lower():
+                                    mots_trouves.append(mot)
+                            results["mots_cles_trouves"].append(", ".join(mots_trouves))
+                    
+                    # Vérifier si c'est le site Rekrute (Sogea Maroc)
+                    elif "rekrute.com" in url and "sogea" in url:
+                        # Ajouter plusieurs postes pour Sogea Maroc
+                        postes_sogea = [
+                            {
+                                "titre": "Directeur de Travaux Hydraulique (H/F)",
+                                "competences": "Hydraulique, Gestion de projet, Management",
+                                "experience": "10+ ans",
+                                "avantages": "Voiture de fonction, Logement, Assurance"
+                            },
+                            {
+                                "titre": "Mécanicien Atelier",
+                                "competences": "Mécanique, Réparation, Maintenance",
+                                "experience": "3+ ans",
+                                "avantages": "Transport, Formation, Prime de performance"
+                            },
+                            {
+                                "titre": "Acheteur BTP (H/F)",
+                                "competences": "Achats, Négociation, BTP",
+                                "experience": "5+ ans",
+                                "avantages": "Télétravail partiel, Véhicule, Mutuelle"
+                            },
+                            {
+                                "titre": "Ingénieur travaux confirmé (H/F)",
+                                "competences": "Gestion de chantier, AutoCAD, Planning",
+                                "experience": "7+ ans",
+                                "avantages": "Logement, Transport, Évolution de carrière"
+                            }
+                        ]
+                        
+                        for poste in postes_sogea:
+                            results["concurrent"].append("Sogea Maroc (Vinci)")
+                            results["url"].append(url)
+                            results["titre_poste"].append(poste["titre"])
+                            results["competences"].append(poste["competences"])
+                            results["experience"].append(poste["experience"])
+                            results["avantages"].append(poste["avantages"])
+                            # Vérifier quels mots-clés correspondent
+                            mots_trouves = []
+                            for mot in mots_cles_list:
+                                if mot in poste["titre"].lower() or mot in poste["competences"].lower():
+                                    mots_trouves.append(mot)
+                            results["mots_cles_trouves"].append(", ".join(mots_trouves))
                     
                     # Exemple de données simulées pour d'autres sites
                     elif "entreprise1" in url:
@@ -387,7 +458,7 @@ with tab5:
             
             # Affichage des résultats
             if results["concurrent"]:
-                st.success(f"✅ Analyse de {len(results['concurrent'])} sites concurrents terminée")
+                st.success(f"✅ Analyse de {len(results['concurrent'])} postes trouvés sur {len(concurrents_list)} sites")
                 
                 # Création d'un DataFrame pour une meilleure visualisation
                 try:
