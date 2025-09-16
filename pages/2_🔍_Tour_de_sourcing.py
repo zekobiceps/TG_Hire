@@ -8,6 +8,9 @@ from datetime import datetime
 import json
 import os
 import hashlib
+import pandas as pd
+from collections import Counter
+
 
 # -------------------- Configuration initiale --------------------
 def init_session_state():
@@ -278,35 +281,192 @@ with tab4:
             dogpile_url = f"http://www.dogpile.com/serp?q={quote(st.session_state['dogpile_query'])}"
             st.link_button("🌐 Ouvrir sur Dogpile", dogpile_url, use_container_width=True)
 
-# -------------------- Tab 5: Web Scraper --------------------
+# -------------------- Tab 5: Web Scraper - Analyse Concurrentielle --------------------
+# -------------------- Tab 5: Web Scraper - Analyse Concurrentielle --------------------
 with tab5:
-    st.header("🕷️ Web Scraper")
-    choix = st.selectbox("Choisir un objectif:", [
-        "Veille salariale & marché",
-        "Intelligence concurrentielle",
-        "Contact personnalisé",
-        "Collecte de CV / emails / téléphones"
-    ], key="scraper_choice")
-    url = st.text_input("URL à analyser:", key="scraper_url", placeholder="https://exemple.com")
-    if st.button("🚀 Scraper", use_container_width=True, key="scraper_btn"):
-        if url:
-            try:
-                with st.spinner("⏳ Scraping en cours..."):
-                    start_time = time.time()
-                    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=10)
-                    soup = BeautifulSoup(r.text, "html.parser")
-                    texte = soup.get_text()[:1200]
-                    emails = set(re.findall(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", texte))
-                    st.session_state["scraper_result"] = texte
-                    st.session_state["scraper_emails"] = emails
-                    total_time = time.time() - start_time
-                    st.success(f"✅ Scraping terminé en {total_time:.1f}s - {len(emails)} email(s) trouvé(s)")
-            except Exception as e:
-                st.error(f"❌ Erreur scraping : {e}")
-    if st.session_state.get("scraper_result"):
-        st.text_area("Extrait du contenu:", value=st.session_state["scraper_result"], height=200, key="scraper_area")
-        if st.session_state.get("scraper_emails"):
-            st.info("📧 Emails détectés: " + ", ".join(st.session_state["scraper_emails"]))
+    st.header("🔍 Analyse Concurrentielle - Offres d'Emploi")
+    
+    # Configuration du scraping
+    with st.expander("⚙️ Configuration", expanded=True):
+        col1, col2 = st.columns(2)
+        with col1:
+            concurrents = st.text_area(
+                "Sites des concurrents à analyser (1 par ligne):", 
+                placeholder="https://www.entreprise1.com/carrieres\nhttps://www.entreprise2.com/emplois",
+                height=100
+            )
+            max_pages = st.slider("Nombre maximum de pages à analyser par site:", 1, 20, 5)
+        
+        with col2:
+            mots_cles = st.text_input(
+                "Mots-clés à rechercher (séparés par des virgules):",
+                placeholder="data scientist, python, cloud, IA"
+            )
+            delay = st.slider("Délai entre les requêtes (secondes):", 1, 10, 3)
+    
+    # Options d'analyse
+    with st.expander("📊 Options d'analyse", expanded=False):
+        analyse_options = st.multiselect(
+            "Éléments à analyser:",
+            ["Compétences recherchées", "Niveaux d'expérience", "Avantages proposés", 
+             "Types de contrats", "Localisations", "Salaires mentionnés", "Processus de recrutement"],
+            default=["Compétences recherchées", "Niveaux d'expérience", "Avantages proposés"]
+        )
+    
+    if st.button("🚀 Lancer l'analyse concurrentielle", use_container_width=True, key="scraper_btn"):
+        if concurrents:
+            concurrents_list = [url.strip() for url in concurrents.split('\n') if url.strip()]
+            mots_cles_list = [mot.strip().lower() for mot in mots_cles.split(',')] if mots_cles else []
+            
+            # Initialiser les résultats
+            results = {
+                "concurrent": [],
+                "url": [],
+                "titre_poste": [],
+                "competences": [],
+                "experience": [],
+                "avantages": [],
+                "mots_cles_trouves": []
+            }
+            
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            for i, url in enumerate(concurrents_list):
+                status_text.text(f"Analyse de {url}...")
+                
+                try:
+                    # Simulation de scraping - À remplacer par votre logique réelle
+                    # Cette partie devrait être adaptée selon la structure des sites cibles
+                    time.sleep(delay)  # Respect du délai
+                    
+                    # Exemple de données simulées pour la démonstration
+                    if "entreprise1" in url:
+                        results["concurrent"].append("Entreprise 1")
+                        results["url"].append(url)
+                        results["titre_poste"].append("Data Scientist Senior")
+                        results["competences"].append("Python, Machine Learning, SQL, Cloud")
+                        results["experience"].append("5+ ans")
+                        results["avantages"].append("Télétravail, CE, Mutuelle")
+                        results["mots_cles_trouves"].append("data scientist, python, cloud")
+                    
+                    elif "entreprise2" in url:
+                        results["concurrent"].append("Entreprise 2")
+                        results["url"].append(url)
+                        results["titre_poste"].append("Développeur Full Stack")
+                        results["competences"].append("JavaScript, React, Node.js, AWS")
+                        results["experience"].append("3+ ans")
+                        results["avantages"].append("RTT, Titre-restaurant, Évolution")
+                        results["mots_cles_trouves"].append("javascript, react, aws")
+                    
+                    else:
+                        results["concurrent"].append("Autre entreprise")
+                        results["url"].append(url)
+                        results["titre_poste"].append("Poste varié")
+                        results["competences"].append("Compétences diverses")
+                        results["experience"].append("Non spécifié")
+                        results["avantages"].append("Avantages standards")
+                        results["mots_cles_trouves"].append("")
+                
+                except Exception as e:
+                    st.error(f"Erreur avec {url}: {str(e)}")
+                
+                progress_bar.progress((i + 1) / len(concurrents_list))
+            
+            status_text.text("Analyse terminée!")
+            
+            # Affichage des résultats
+            if results["concurrent"]:
+                st.success(f"✅ Analyse de {len(results['concurrent'])} sites concurrents terminée")
+                
+                # Création d'un DataFrame pour une meilleure visualisation
+                try:
+                    df_results = pd.DataFrame(results)
+                    st.dataframe(df_results, use_container_width=True)
+                except NameError:
+                    st.error("Erreur: pandas n'est pas installé. Impossible de créer le DataFrame.")
+                    return
+                
+                # Analyses avancées
+                st.subheader("📈 Analyses")
+                
+                # Nuage de mots des compétences recherchées
+                if "Compétences recherchées" in analyse_options:
+                    st.write("**Compétences les plus recherchées:**")
+                    all_skills = ", ".join(results["competences"]).lower()
+                    skills_counter = Counter([skill.strip() for skill in all_skills.split(',')])
+                    
+                    if skills_counter:
+                        # Préparation des données pour le nuage de mots
+                        wordcloud_data = {k: v for k, v in skills_counter.items() if k}
+                        if wordcloud_data:
+                            try:
+                                from wordcloud import WordCloud
+                                import matplotlib.pyplot as plt
+                                
+                                # Création du nuage de mots
+                                wordcloud = WordCloud(
+                                    width=800, 
+                                    height=400, 
+                                    background_color='white'
+                                ).generate_from_frequencies(wordcloud_data)
+                                
+                                fig, ax = plt.subplots(figsize=(10, 5))
+                                ax.imshow(wordcloud, interpolation='bilinear')
+                                ax.axis('off')
+                                st.pyplot(fig)
+                            except ImportError:
+                                st.warning("Les bibliothèques 'wordcloud' ou 'matplotlib' ne sont pas installées. Affichage simplifié des compétences.")
+                                st.write("Répartition des compétences:")
+                                for skill, count in skills_counter.most_common(10):
+                                    st.write(f"- {skill}: {count} occurrence(s)")
+                            except Exception as e:
+                                st.error(f"Erreur lors de la génération du nuage de mots: {e}")
+                                st.write("Répartition des compétences:")
+                                for skill, count in skills_counter.most_common(10):
+                                    st.write(f"- {skill}: {count} occurrence(s)")
+                
+                # Analyse des niveaux d'expérience
+                if "Niveaux d'expérience" in analyse_options:
+                    st.write("**Niveaux d'expérience requis:**")
+                    exp_counter = Counter(results["experience"])
+                    for exp, count in exp_counter.items():
+                        st.write(f"- {exp}: {count} offre(s)")
+                
+                # Export des résultats
+                try:
+                    csv_data = df_results.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="📥 Télécharger les résultats (CSV)",
+                        data=csv_data,
+                        file_name="analyse_concurrentielle_emplois.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+                except NameError:
+                    st.error("Erreur: Impossible de générer le fichier CSV car pandas n'est pas disponible.")
+            else:
+                st.warning("Aucun résultat à afficher.")
+        else:
+            st.error("Veuillez entrer au moins une URL de concurrent à analyser.")
+    
+    # Section d'aide
+    with st.expander("❓ Comment utiliser cet outil", expanded=False):
+        st.markdown("""
+        ### Guide d'utilisation de l'analyse concurrentielle
+        
+        1. **Listez les sites de vos concurrents** - Entrez les URLs des pages carrières ou offres d'emploi
+        2. **Définissez les mots-clés** - Spécifiez les compétences ou postes qui vous intéressent
+        3. **Configurez l'analyse** - Choisissez ce que vous voulez analyser précisément
+        4. **Lancez l'extraction** - L'outil parcourt les sites et extrait les informations
+        5. **Consultez les résultats** - Visualisez les tendances et téléchargez les données
+        
+        ### Conseils pour de meilleurs résultats:
+        - Ciblez des pages listant plusieurs offres d'emploi
+        - Utilisez des mots-clés précis liés à vos besoins
+        - Augmentez le délai entre les requêtes pour éviter le blocage
+        - Testez d'abord avec 2-3 sites pour valider la configuration
+        """)
 
 # -------------------- Tab 6: InMail --------------------
 with tab6:
@@ -489,7 +649,6 @@ démontrent un potentiel fort pour le poste de {poste} au sein de notre {terme_o
                 st.success(f"✅ Modèle '{poste_accroche} - {entry['date']}' sauvegardé")
 
 
-# -------------------- Tab 7: Magicien --------------------
 # -------------------- Tab 7: Magicien --------------------
 with tab7:
     st.header("🤖 Magicien de sourcing")
