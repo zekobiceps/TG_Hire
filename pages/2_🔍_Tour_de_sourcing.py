@@ -490,6 +490,7 @@ démontrent un potentiel fort pour le poste de {poste} au sein de notre {terme_o
 
 
 # -------------------- Tab 7: Magicien --------------------
+# -------------------- Tab 7: Magicien --------------------
 with tab7:
     st.header("🤖 Magicien de sourcing")
 
@@ -501,55 +502,36 @@ with tab7:
         "Quels critères éliminatoires fréquents pour le poste de",
         "Quels secteurs d'activité embauchent souvent pour le poste de",
         "Quelles certifications utiles pour le métier de",
-        "Quels intitulés de poste équivalents dans le marché marocain pour",
         "Quels rôles proches à considérer lors du sourcing pour",
         "Quelles tendances de recrutement récentes pour le métier de"
     ]
 
-    # Initialize session state for selected question and appended text
-    if "magicien_selected_question" not in st.session_state:
-        st.session_state.magicien_selected_question = ""
-    if "magicien_appended_text" not in st.session_state:
-        st.session_state.magicien_appended_text = ""
+    q_choice = st.selectbox("📌 Questions prêtes :", 
+                            [""] + questions_pretes, key="magicien_qchoice")
 
-    # Selectbox for pre-defined questions
-    q_choice = st.selectbox("📌 Questions prêtes :", [""] + questions_pretes, key="magicien_qchoice",
-                           index=questions_pretes.index(st.session_state.magicien_selected_question) + 1 if st.session_state.magicien_selected_question in questions_pretes else 0)
+    if q_choice:
+        default_question = q_choice
+    else:
+        default_question = ""
 
-    # Update the selected question in session state when changed
-    if q_choice and q_choice != st.session_state.magicien_selected_question:
-        st.session_state.magicien_selected_question = q_choice
-        st.session_state.magicien_appended_text = ""  # Reset appended text when new question is selected
-
-    # Display base question as read-only
-    if st.session_state.magicien_selected_question:
-        st.markdown(f"**{st.session_state.magicien_selected_question}**", unsafe_allow_html=False)
-
-    # Text input for appended text
-    appended_text = st.text_input("", 
-                                 value=st.session_state.magicien_appended_text,
-                                 key="magicien_appended_text_input",
-                                 placeholder="Ajoutez votre texte ici (ex: 'Ingénieur travaux')")
-
-    # Update appended text in session state
-    if appended_text != st.session_state.magicien_appended_text:
-        st.session_state.magicien_appended_text = appended_text
-
-    # Construct full question
-    full_question = st.session_state.magicien_selected_question + (" " + st.session_state.magicien_appended_text if st.session_state.magicien_appended_text else "")
+    question = st.text_area("Modifiez la question si nécessaire :", 
+                          value=default_question, 
+                          key="magicien_question", 
+                          height=100,
+                          placeholder="Posez votre question ici...")
 
     mode_rapide_magicien = st.checkbox("⚡ Mode rapide (réponse concise)", key="magicien_fast")
 
     if st.button("✨ Poser la question", type="primary", key="ask_magicien", use_container_width=True):
-        if full_question:
+        if question:
             with st.spinner("⏳ Génération en cours..."):
                 start_time = time.time()
-                enhanced_question = full_question
-                if "synonymes" in enhanced_question.lower():
+                enhanced_question = question
+                if "synonymes" in question.lower():
                     enhanced_question += ". Réponds uniquement avec une liste de synonymes séparés par des virgules, sans introduction."
-                elif "outils" in enhanced_question.lower() or "logiciels" in enhanced_question.lower():
+                elif "outils" in question.lower() or "logiciels" in question.lower():
                     enhanced_question += ". Réponds avec une liste à puces des outils, sans introduction."
-                elif "compétences" in enhanced_question.lower() or "skills" in enhanced_question.lower():
+                elif "compétences" in question.lower() or "skills" in question.lower():
                     enhanced_question += ". Réponds avec une liste à puces, sans introduction."
                 
                 result = ask_deepseek([{"role": "user", "content": enhanced_question}], 
@@ -559,7 +541,7 @@ with tab7:
                 st.success(f"✅ Réponse générée en {total_time}s")
                 
                 st.session_state.magicien_history.append({
-                    "q": full_question, 
+                    "q": question, 
                     "r": result["content"], 
                     "time": total_time
                 })
@@ -579,6 +561,7 @@ with tab7:
             st.session_state.magicien_history.clear()
             st.success("✅ Historique vidé")
             st.rerun()
+            
 # -------------------- Tab 8: Permutateur --------------------
 with tab8:
     st.header("📧 Permutateur Email")

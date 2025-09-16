@@ -983,9 +983,11 @@ with tabs[1]:
                 st.rerun()
                 
 # ---------------- RÉUNION DE BRIEF ----------------
+
 with tabs[2]:
     # Afficher le message de sauvegarde seulement pour cet onglet
-    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Réunion"):
+    if ("save_message" in st.session_state and st.session_state.save_message) and \
+       ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Réunion"):
         st.success(st.session_state.save_message)
         st.session_state.save_message = None
         st.session_state.save_message_tab = None
@@ -1050,10 +1052,48 @@ with tabs[2]:
         render_ksa_matrix()
 
     elif step == 3:
-        st.subheader("4️⃣ Stratégie Recrutement")
-        st.multiselect("Canaux prioritaires", ["LinkedIn", "Jobboards", "Cooptation", "Réseaux sociaux", "Chasse de tête"], key="canaux_prioritaires")
-        st.text_area("Critères d'exclusion", key="criteres_exclusion", height=100)
-        st.text_area("Processus d'évaluation (détails)", key="processus_evaluation", height=100)
+        st.subheader("🎯 Stratégie de Sourcing et Recrutement")
+        
+        # Section Canaux de sourcing
+        with st.expander("📊 Canaux de Sourcing", expanded=True):
+            st.markdown("**Canaux prioritaires**")
+            st.multiselect("Sélectionnez les canaux à utiliser:", 
+                          ["LinkedIn", "Jobboards", "Cooptation", "Réseaux sociaux", "Chasse de tête", "Autre"],
+                          key="canaux_prioritaires")
+            
+            st.text_area("Mots-clés et Boolean Search", 
+                        placeholder="Ex: (ingénieur AND BTP) OR (conducteur AND travaux) NOT assistant",
+                        key="boolean_search",
+                        height=80)
+    
+        # Section Processus d'évaluation simplifié
+        with st.expander("🔄 Processus d'Évaluation", expanded=True):
+            processus_evaluation = """Étape 1 : Pré-qualification initiale
+- Tri des CV : Vérification des critères must-have
+- Entretien téléphonique de 10 min
+
+Étape 2 : Évaluation technique
+- Entretien recruteur (30 min) : Compétences techniques
+- Test technique / Étude de cas
+
+Étape 3 : Entretien manager
+- Entretien approfondissement (30 min)
+
+Étape 4 : Décision finale
+- Délibération collective
+- Remise dossier DRH"""
+            
+            st.text_area("Processus d'évaluation", 
+                        value=processus_evaluation,
+                        key="processus_evaluation",
+                        height=200)
+    
+        # Section Critères d'exclusion
+        with st.expander("🚫 Critères d'exclusion", expanded=True):
+            st.text_area("Critères éliminatoires", 
+                        placeholder="Ex: Plus de 2 ans sans expérience BTP, absence de diplôme requis...",
+                        key="criteres_exclusion",
+                        height=100)
         
     elif step == 4:
         st.subheader("📝 Notes générales du manager")
@@ -1109,19 +1149,6 @@ with tabs[2]:
         with col_cancel:
             if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion"):
                 delete_current_brief()
-
-    # ---- Navigation wizard ----
-    col1, col2, col3 = st.columns([1, 6, 1])
-    with col1:
-        if step > 1:
-            if st.button("⬅️ Précédent", key="prev_step"):
-                st.session_state.reunion_step -= 1
-                st.rerun()
-    with col3:
-        if step < total_steps:
-            if st.button("Suivant ➡️", key="next_step"):
-                st.session_state.reunion_step += 1
-                st.rerun()
 
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
