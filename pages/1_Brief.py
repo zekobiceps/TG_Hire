@@ -1100,10 +1100,13 @@ with tabs[2]:
                         evaluateur = st.selectbox("Qui évalue ce critère ?", ["Recruteur", "Manager", "Les deux"], key="new_evaluateur")
                     
                     with col3:
-                         ai_prompt = st.text_input("Décrivez ce que l'IA doit générer :", placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", key="ai_prompt_input")
                          evaluation = st.slider("Évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
 
                     question = st.text_area("Question pour l'entretien", placeholder="Ex: Parlez-moi d'une situation où vous avez dû faire preuve de leadership.", key="new_question", height=100)
+                    
+                    st.markdown("---")
+                    st.markdown("**Générer une question avec l'IA**")
+                    ai_prompt = st.text_input("Décrivez ce que l'IA doit générer :", placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", key="ai_prompt_input")
                     
                     col_ai, col_add = st.columns(2)
                     with col_ai:
@@ -1111,7 +1114,7 @@ with tabs[2]:
                             if ai_prompt:
                                 with st.spinner("Génération en cours..."):
                                     try:
-                                        ai_response = generate_ai_question(ai_prompt, length="short")
+                                        ai_response = generate_ai_question(ai_prompt)
                                         st.session_state.ai_generated_question = ai_response
                                     except Exception as e:
                                         st.error(f"Erreur lors de la génération : {e}")
@@ -1119,7 +1122,7 @@ with tabs[2]:
                                 st.error("Veuillez entrer un prompt pour l'IA.")
                     
                     with col_add:
-                        if st.form_submit_button("➕ Ajouter le critère", type="primary", use_container_width=True):
+                        if st.form_submit_button("➕ Ajouter le critère", type="secondary", use_container_width=True):
                             if not critere or not question:
                                 st.error("Veuillez remplir au moins le critère et la question.")
                             else:
@@ -1134,17 +1137,15 @@ with tabs[2]:
                                 st.success("✅ Critère ajouté avec succès !")
                                 st.rerun()
 
-                # Affichage du message de l'IA en bas du formulaire
                 if "ai_generated_question" in st.session_state and st.session_state.ai_generated_question:
                     st.success(f"**Question :** `{st.session_state.ai_generated_question}`")
                     st.session_state.ai_generated_question = ""
             
             st.dataframe(st.session_state.ksa_matrix, use_container_width=True, hide_index=True)
             
-            # Affichage de la note cible
             if not st.session_state.ksa_matrix.empty:
                 avg_rating = st.session_state.ksa_matrix["Évaluation (1-5)"].mean()
-                st.markdown(f"**Note cible de l'ensemble des critères :** 🎯 **{avg_rating:.2f}** / 5")
+                st.markdown(f"**<div style='font-size: 24px;'>Note cible de l'ensemble des critères : 🎯 {avg_rating:.2f} / 5</div>**", unsafe_allow_html=True)
 
     elif step == 3:
         with st.expander("💡 Stratégie et Processus", expanded=True):
