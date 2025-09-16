@@ -9,6 +9,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import time
 import re
 
+
 # -------------------- Personnalisation CSS --------------------
 st.markdown("""
 <style>

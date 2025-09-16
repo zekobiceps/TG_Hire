@@ -337,11 +337,7 @@ st.title("🤖 TG-Hire IA - Brief")
 # Style CSS pour les onglets personnalisés et les tableaux améliorés
 st.markdown("""
     <style>
-    /* Style général pour l'application */
-    .stApp {
-        background-color: #0E1117;
-        color: #FAFAFA;
-    }
+    
     
     /* Style pour les onglets de navigation */
     .stTabs [data-baseweb="tab-list"] {
