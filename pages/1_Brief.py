@@ -32,7 +32,7 @@ div[data-testid="stTabs"] button p {
 }
 </style>
 """, unsafe_allow_html=True)
-# ---------------- NOUVELLES FONCTIONS ----------------
+
 def render_ksa_matrix():
     """Affiche la matrice KSA sous forme de tableau et permet l'ajout de critères."""
     
@@ -129,7 +129,7 @@ def render_ksa_matrix():
         </style>
         """, unsafe_allow_html=True)
         
-# Formulaire pour ajouter un critère avec 3 colonnes
+        # Formulaire pour ajouter un critère avec 3 colonnes
         with st.form(key="add_ksa_criterion_form"):
             # "Cible / Standard attendu" en haut, sur toute la largeur
             st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
@@ -250,8 +250,10 @@ def delete_current_brief():
     """Supprime le brief actuel et retourne à l'onglet Gestion"""
     if "current_brief_name" in st.session_state and st.session_state.current_brief_name:
         brief_name = st.session_state.current_brief_name
-        if brief_name in st.session_state.saved_briefs:
-            del st.session_state.saved_briefs[brief_name]
+        file_path = os.path.join("briefs", f"{brief_name}.json")
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            st.session_state.saved_briefs.pop(brief_name, None)
             save_briefs()
             
             # Réinitialiser l'état de la session
@@ -295,7 +297,7 @@ if "brief_phase" not in st.session_state:
 if "reunion_step" not in st.session_state:
     st.session_state.reunion_step = 1
 
-if "filtered_briefs" in st.session_state:
+if "filtered_briefs" not in st.session_state:
     st.session_state.filtered_briefs = {}
 
 # Variables pour gérer l'accès aux onglets (tous débloqués)
@@ -318,8 +320,8 @@ with st.sidebar:
     st.title("📊 Statistiques Brief")
     
     # Calculer quelques statistiques
-    total_briefs = len(st.session_state.get("saved_briefs", {}))
-    completed_briefs = sum(1 for b in st.session_state.get("saved_briefs", {}).values() 
+    total_briefs = len(load_briefs())
+    completed_briefs = sum(1 for b in load_briefs().values() 
                           if b.get("ksa_data") and any(b["ksa_data"].values()))
     
     st.metric("📋 Briefs créés", total_briefs)
@@ -706,7 +708,6 @@ st.markdown("""
 .ai-advice-box strong {
     color: #FFFFFF;
 }
-
     </style>
 """, unsafe_allow_html=True)
 
@@ -729,6 +730,9 @@ with tabs[0]:
         st.success(st.session_state.save_message)
         st.session_state.save_message = None
         st.session_state.save_message_tab = None
+
+    # Charger les briefs depuis les fichiers JSON
+    st.session_state.saved_briefs = load_briefs()
 
     # Organiser les sections Informations de base et Filtrer les briefs en 2 colonnes
     col_info, col_filter = st.columns(2)
@@ -809,7 +813,7 @@ with tabs[0]:
         if st.button("🔎 Filtrer", use_container_width=True, key="apply_filter"):
             filter_month = st.session_state.filter_date.strftime("%m") if st.session_state.filter_date else ""
             st.session_state.filtered_briefs = filter_briefs(
-                st.session_state.saved_briefs, 
+                load_briefs(), 
                 filter_month, 
                 st.session_state.filter_recruteur, 
                 st.session_state.filter_brief_type, 
@@ -837,7 +841,10 @@ with tabs[0]:
                             st.rerun()
                     with col_brief3:
                         if st.button("🗑️ Supprimer", key=f"delete_{name}"):
-                            del st.session_state.saved_briefs[name]
+                            file_path = os.path.join("briefs", f"{name}.json")
+                            if os.path.exists(file_path):
+                                os.remove(file_path)
+                            st.session_state.saved_briefs.pop(name, None)
                             save_briefs()
                             st.rerun()
                     with col_brief4:
@@ -939,9 +946,7 @@ with tabs[1]:
                                 example = get_example_for_field(section["title"], title)
                                 st.session_state[f"advice_{key}"] = f"{advice}\n**Exemple :**\n{example}"
 
-    brief_data = {}
-    if st.session_state.current_brief_name in st.session_state.saved_briefs:
-        brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
+    brief_data = load_briefs().get(st.session_state.current_brief_name, {})
 
     # Initialiser les conseils dans session_state si non existants
     for section in sections:
@@ -975,10 +980,9 @@ with tabs[1]:
         col_save, col_cancel = st.columns([1, 1])
         with col_save:
             if st.form_submit_button("💾 Enregistrer modifications", type="primary", use_container_width=True):
-                if st.session_state.current_brief_name in st.session_state.saved_briefs:
-                    brief_name = st.session_state.current_brief_name
+                if st.session_state.current_brief_name:
                     update_data = {key: st.session_state[key] for _, key, _ in [item for sublist in [s["fields"] for s in sections] for item in sublist]}
-                    st.session_state.saved_briefs[brief_name].update(update_data)
+                    st.session_state.saved_briefs[st.session_state.current_brief_name].update(update_data)
                     save_briefs()
                     st.session_state.avant_brief_completed = True
                     st.session_state.save_message = "✅ Modifications sauvegardées"
@@ -993,7 +997,6 @@ with tabs[1]:
                 st.session_state.avant_brief_completed = False
                 st.rerun()
 
-# ---------------- REUNION BRIEF ----------------           
 # ---------------- REUNION BRIEF ----------------           
 with tabs[2]:
     # --- STYLE PERSONNALISÉ POUR LES CHAMPS ---
@@ -1040,16 +1043,15 @@ with tabs[2]:
             field_keys = []
             comment_keys = []
             k = 1
-            if st.session_state.current_brief_name in st.session_state.saved_briefs:
-                brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
-                for section in sections:
-                    for i, (field_name, field_key, placeholder) in enumerate(section["fields"]):
-                        value = brief_data.get(field_key, "")
-                        section_title = section["title"] if i == 0 else ""
-                        data.append([section_title, field_name, value, ""])
-                        field_keys.append(field_key)
-                        comment_keys.append(f"manager_comment_{k}")
-                        k += 1
+            brief_data = load_briefs().get(st.session_state.current_brief_name, {})
+            for section in sections:
+                for i, (field_name, field_key, placeholder) in enumerate(section["fields"]):
+                    value = brief_data.get(field_key, "")
+                    section_title = section["title"] if i == 0 else ""
+                    data.append([section_title, field_name, value, ""])
+                    field_keys.append(field_key)
+                    comment_keys.append(f"manager_comment_{k}")
+                    k += 1
             df = pd.DataFrame(data, columns=["Section", "Détails", "Informations", "Commentaires du manager"])
 
             edited_df = st.data_editor(
@@ -1197,16 +1199,15 @@ with tabs[2]:
         col_save, col_cancel = st.columns([1, 1])
         with col_save:
             if st.button("💾 Enregistrer la réunion", type="primary", use_container_width=True, key="save_reunion"):
-                if st.session_state.current_brief_name in st.session_state.saved_briefs:
-                    brief_name = st.session_state.current_brief_name
+                if st.session_state.current_brief_name:
                     manager_comments = {}
                     for i in range(1, 21):
                         comment_key = f"manager_comment_{i}"
                         if comment_key in st.session_state:
                             manager_comments[comment_key] = st.session_state[comment_key]
                     existing_briefs = load_briefs()
-                    if brief_name in existing_briefs:
-                        existing_briefs[brief_name].update({
+                    if st.session_state.current_brief_name in existing_briefs:
+                        existing_briefs[st.session_state.current_brief_name].update({
                             "ksa_data": st.session_state.get("ksa_data", {}),
                             "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict(),
                             "manager_notes": st.session_state.get("manager_notes", ""),
@@ -1217,7 +1218,7 @@ with tabs[2]:
                         })
                         st.session_state.saved_briefs = existing_briefs
                     else:
-                        st.session_state.saved_briefs[brief_name].update({
+                        st.session_state.saved_briefs[st.session_state.current_brief_name].update({
                             "ksa_data": st.session_state.get("ksa_data", {}),
                             "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()).to_dict(),
                             "manager_notes": st.session_state.get("manager_notes", ""),
@@ -1268,7 +1269,7 @@ with tabs[3]:
         st.subheader(f"📝 Synthèse - {st.session_state.current_brief_name}")
         
         # Afficher les données du brief
-        brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
+        brief_data = load_briefs().get(st.session_state.current_brief_name, {})
         st.write("### Informations générales")
         st.write(f"- **Poste :** {brief_data.get('poste_intitule', 'N/A')}")
         st.write(f"- **Manager :** {brief_data.get('manager_nom', 'N/A')}")

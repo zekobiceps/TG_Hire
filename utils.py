@@ -2,13 +2,11 @@
 # -*- coding: utf-8 -*-
 import streamlit as st
 import os
-import pickle
-from datetime import datetime
-import io
-import time
-import random
 import json
 import pandas as pd
+from datetime import datetime
+import io
+import random
 from docx import Document
 from docx.shared import Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -29,6 +27,70 @@ try:
     WORD_AVAILABLE = True
 except ImportError:
     WORD_AVAILABLE = False
+
+# -------------------- Directory for Briefs --------------------
+BRIEFS_DIR = "briefs"
+
+def ensure_briefs_directory():
+    """Ensure the briefs directory exists."""
+    if not os.path.exists(BRIEFS_DIR):
+        os.makedirs(BRIEFS_DIR)
+
+# -------------------- Persistance --------------------
+def save_briefs():
+    """Save each brief in session_state.saved_briefs to a separate JSON file."""
+    try:
+        ensure_briefs_directory()
+        serializable_briefs = {
+            name: {
+                key: value.to_dict() if isinstance(value, pd.DataFrame) else value
+                for key, value in data.items()
+            }
+            for name, data in st.session_state.saved_briefs.items()
+        }
+        for brief_name, brief_data in serializable_briefs.items():
+            file_path = os.path.join(BRIEFS_DIR, f"{brief_name}.json")
+            with open(file_path, "w", encoding="utf-8") as f:
+                json.dump(brief_data, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        st.error(f"Erreur lors de la sauvegarde des briefs: {e}")
+
+def load_briefs():
+    """Load all briefs from JSON files in the briefs directory."""
+    try:
+        ensure_briefs_directory()
+        briefs = {}
+        for file_name in os.listdir(BRIEFS_DIR):
+            if file_name.endswith(".json"):
+                brief_name = file_name[:-5]  # Remove .json extension
+                file_path = os.path.join(BRIEFS_DIR, file_name)
+                with open(file_path, "r", encoding="utf-8") as f:
+                    brief_data = json.load(f)
+                    # Reconvertir les dictionnaires en DataFrames
+                    briefs[brief_name] = {
+                        key: pd.DataFrame.from_dict(value) if key == "ksa_matrix" else value
+                        for key, value in brief_data.items()
+                    }
+        return briefs
+    except Exception as e:
+        st.error(f"Erreur lors du chargement des briefs: {e}")
+        return {}
+
+def save_job_descriptions():
+    """Sauvegarde les fiches de poste dans job_descriptions.json."""
+    try:
+        with open("job_descriptions.json", "w", encoding="utf-8") as f:
+            json.dump(st.session_state.saved_job_descriptions, f, indent=4, ensure_ascii=False)
+    except Exception as e:
+        st.error(f"Erreur lors de la sauvegarde des fiches de poste: {e}")
+
+def load_job_descriptions():
+    """Charge les fiches de poste depuis job_descriptions.json."""
+    try:
+        with open("job_descriptions.json", "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
 
 # -------------------- Initialisation Session --------------------
 def init_session_state():
@@ -71,7 +133,7 @@ def init_session_state():
         "brief_data": {},
         "comment_libre": "",
         "brief_phase": "Gestion",
-        "saved_job_descriptions": {},
+        "saved_job_descriptions": load_job_descriptions(),
         "temp_extracted_data": None,
         "temp_job_title": "",
         "canaux_prioritaires": [],
@@ -84,56 +146,6 @@ def init_session_state():
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
-
-# -------------------- Persistance --------------------
-def save_briefs():
-    """Sauvegarde les briefs dans un fichier pickle."""
-    try:
-        # Convertir le DataFrame en une structure sérialisable
-        serializable_briefs = {
-            name: {
-                key: value.to_dict() if isinstance(value, pd.DataFrame) else value
-                for key, value in data.items()
-            }
-            for name, data in st.session_state.saved_briefs.items()
-        }
-        with open("briefs.json", "w") as f:
-            json.dump(serializable_briefs, f, indent=4)
-    except Exception as e:
-        st.error(f"Erreur lors de la sauvegarde des briefs: {e}")
-
-def load_briefs():
-    """Charge les briefs depuis un fichier pickle."""
-    try:
-        with open("briefs.json", "r") as f:
-            data = json.load(f)
-            # Reconvertir les dictionnaires en DataFrames
-            loaded_briefs = {
-                name: {
-                    key: pd.DataFrame.from_dict(value) if key == "ksa_matrix" else value
-                    for key, value in brief_data.items()
-                }
-                for name, brief_data in data.items()
-            }
-            return loaded_briefs
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
-
-def save_job_descriptions():
-    """Sauvegarde les fiches de poste dans job_descriptions.json."""
-    try:
-        with open("job_descriptions.json", "w") as f:
-            json.dump(st.session_state.saved_job_descriptions, f, indent=4)
-    except Exception as e:
-        st.error(f"Erreur lors de la sauvegarde des fiches de poste: {e}")
-
-def load_job_descriptions():
-    """Charge les fiches de poste depuis job_descriptions.json."""
-    try:
-        with open("job_descriptions.json", "r") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        return {}
 
 # -------------------- Conseils IA --------------------
 def generate_checklist_advice(section_title, field_title):
@@ -203,11 +215,10 @@ def generate_checklist_advice(section_title, field_title):
         }
     }
 
-    # Sélectionner une réponse aléatoire pour la section et le champ donné
     section_advice = advice_db.get(section_title, {})
     field_advice = section_advice.get(field_title, [])
     if field_advice:
-        return random.choice(field_advice)  # Sélectionner un conseil aléatoire sans modifier la liste
+        return random.choice(field_advice)
     else:
         return "Pas de conseil disponible."
 
@@ -218,7 +229,7 @@ def filter_briefs(briefs, month, recruteur, brief_type, manager, affectation, no
     for name, data in briefs.items():
         match = True
         try:
-            if month and month != "" and datetime.strptime(data.get("date_brief", datetime.today), "%Y-%m-%d").strftime("%m") != month:
+            if month and month != "" and datetime.strptime(data.get("date_brief", datetime.today().strftime("%Y-%m-%d")), "%Y-%m-%d").strftime("%m") != month:
                 match = False
             if recruteur and recruteur != "" and recruteur.lower() not in data.get("recruteur", "").lower():
                 match = False
@@ -301,7 +312,7 @@ def export_brief_pdf():
         story.append(Paragraph("Aucune donnée KSA disponible.", styles['Normal']))
     story.append(Spacer(1, 15))
 
-    # --- SECTION 5: Stratégie Recrutement (emoji removed)
+    # --- SECTION 5: Stratégie Recrutement
     story.append(Paragraph("5. Stratégie Recrutement", styles['Heading2']))
     strategy_fields = ["canaux_prioritaires", "criteres_exclusion", "processus_evaluation"]
     for field in strategy_fields:
@@ -390,7 +401,7 @@ def export_brief_word():
         doc.add_paragraph("Aucune donnée KSA disponible.")
     doc.add_paragraph()
 
-    # --- SECTION 5: Stratégie Recrutement (emoji removed)
+    # --- SECTION 5: Stratégie Recrutement
     doc.add_heading("5. Stratégie Recrutement", level=2)
     strategy_fields = ["canaux_prioritaires", "criteres_exclusion", "processus_evaluation"]
     for field in strategy_fields:
@@ -432,7 +443,7 @@ def save_library(library_data):
 def get_ai_pre_redaction(fiche_data):
     """Génère une pré-rédaction synthétique avec DeepSeek API via OpenAI client."""
     try:
-        from openai import OpenAI  # type: ignore
+        from openai import OpenAI
     except ImportError:
         raise ImportError("Le module 'openai' n'est pas installé. Veuillez l'installer avec 'pip install openai'.")
 
@@ -442,7 +453,7 @@ def get_ai_pre_redaction(fiche_data):
 
     client = OpenAI(
         api_key=api_key,
-        base_url="https://api.deepseek.com/v1"  # Compatible OpenAI
+        base_url="https://api.deepseek.com/v1"
     )
 
     prompt = (
@@ -457,7 +468,7 @@ def get_ai_pre_redaction(fiche_data):
     )
 
     response = client.chat.completions.create(
-        model="deepseek-chat",  # Modèle DeepSeek principal
+        model="deepseek-chat",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.5,
         max_tokens=500
@@ -482,14 +493,13 @@ def generate_ai_question(prompt, concise=False):
         base_url="https://api.deepseek.com/v1"
     )
 
-    max_tokens = 700  # Augmentation de la taille de la réponse pour éviter la troncature
+    max_tokens = 700
 
     context = "recruitment for a KSA (Knowledge, Skills, Abilities) matrix"
     question_type = "technical"
     skill = prompt
     role = "candidate"
     
-    # Logic to parse the prompt
     if "une question" in prompt and "pour évaluer" in prompt and "par" in prompt:
         parts = prompt.split("une question")
         if len(parts) > 1:
@@ -528,14 +538,13 @@ def generate_ai_question(prompt, concise=False):
         f"Réponse: [exemple de réponse]"
     )
     
-    # New logic for concise response
     if concise:
         full_prompt = (
             f"Génère une question d'entretien et une réponse très concise et directe pour évaluer le critère : '{skill}'. "
             f"La question doit être {question_type} et la réponse ne doit pas dépasser 50 mots. "
             f"Format : 'Question: [votre question]\nRéponse: [réponse concise]'"
         )
-        max_tokens = 150 # Reduced max tokens for a concise response
+        max_tokens = 150
 
     response = client.chat.completions.create(
         model="deepseek-chat",
@@ -556,7 +565,7 @@ def generate_ai_question(prompt, concise=False):
 def test_deepseek_connection():
     """Teste la connexion à l'API DeepSeek."""
     try:
-        from openai import OpenAI  # type: ignore
+        from openai import OpenAI
         api_key = st.secrets.get("DEEPSEEK_API_KEY")
         if not api_key:
             st.error("Clé API DeepSeek non trouvée dans st.secrets")
@@ -614,10 +623,8 @@ def generate_automatic_brief_name():
     manager = st.session_state.get("manager_nom", "Manager")
     date_str = st.session_state.get("date_brief", datetime.today()).strftime("%Y%m%d")
     
-    # Create a base name
     base_name = f"{poste}_{manager}_{date_str}"
     
-    # Ensure uniqueness by appending a counter if the name already exists
     saved_briefs = st.session_state.get("saved_briefs", {})
     counter = 1
     brief_name = base_name
