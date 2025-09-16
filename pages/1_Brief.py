@@ -121,13 +121,13 @@ def render_ksa_matrix():
         </style>
         """, unsafe_allow_html=True)
         
-        # Formulaire pour ajouter un critère avec 3 colonnes
+# Formulaire pour ajouter un critère avec 3 colonnes
         with st.form(key="add_ksa_criterion_form"):
             # "Cible / Standard attendu" en haut, sur toute la largeur
             st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
             cible = st.text_area("Cible / Standard attendu", 
-                                 placeholder=placeholder_dict.get("Technique", "Définissez la cible ou le standard attendu pour ce critère."), 
-                                 key="new_cible", height=100)
+                                  placeholder="Définissez la cible ou le standard attendu pour ce critère.", 
+                                  key="new_cible", height=100)
             st.markdown("</div>", unsafe_allow_html=True)
             
             # Champs en 3 colonnes
@@ -152,42 +152,43 @@ def render_ksa_matrix():
             st.markdown("**Demander une question à l'IA**")
             ai_prompt = st.text_input("Prompt pour l'IA", placeholder="Ex: une question générale pour évaluer la maîtrise des techniques de sourcing par un chargé de recrutement", 
                                       key="ai_prompt")
-            if st.form_submit_button("💡 Générer question IA"):
-                if ai_prompt:
-                    try:
-                        # Adapter le prompt au nouveau format
-                        if "une question" in ai_prompt and "pour évaluer" in ai_prompt and "par" in ai_prompt:
-                            question_type = ai_prompt.split("une question")[1].split("pour")[0].strip()
-                            skill = ai_prompt.split("évaluer")[1].split("par")[0].strip()
-                            role = ai_prompt.split("par")[1].strip()
-                            contextualized_prompt = f"In the context of recruitment for a KSA (Knowledge, Skills, Abilities) matrix, generate a {question_type} question to evaluate {skill} by a {role} with a short response unless 'détailler' is included."
-                        else:
-                            contextualized_prompt = f"In the context of recruitment for a KSA (Knowledge, Skills, Abilities) matrix, generate a technical question to evaluate {ai_prompt} with a short response unless 'détailler' is included."
-                        ai_response = generate_ai_question(contextualized_prompt)
-                        st.session_state.ai_response = ai_response
-                    except Exception as e:
-                        st.error(f"Erreur lors de la génération de la question : {e}")
-                else:
-                    st.error("Veuillez entrer un prompt pour l'IA")
+            st.checkbox("Réponse courte (comme sur magicien)", key="concise_checkbox")
+
+            col_buttons = st.columns([1, 1])
+            with col_buttons[0]:
+                if st.form_submit_button("💡 Générer question IA", use_container_width=True):
+                    if ai_prompt:
+                        try:
+                            # Adapter le prompt pour la fonction generate_ai_question
+                            ai_response = generate_ai_question(ai_prompt, concise=st.session_state.concise_checkbox)
+                            st.session_state.ai_response = ai_response
+                        except Exception as e:
+                            st.error(f"Erreur lors de la génération de la question : {e}")
+                    else:
+                        st.error("Veuillez entrer un prompt pour l'IA")
             
             # Bouton pour ajouter le critère
-            if st.form_submit_button("Ajouter"):
-                new_row = pd.DataFrame([{
-                    "Rubrique": rubrique,
-                    "Critère": critere,
-                    "Type de question": type_question,
-                    "Cible / Standard attendu": cible,
-                    "Échelle d'évaluation (1-5)": evaluation,
-                    "Évaluateur": evaluateur
-                }])
-                st.session_state.ksa_matrix = pd.concat([st.session_state.ksa_matrix, new_row], ignore_index=True)
-                st.markdown("<span class='success-icon'>✅</span>", unsafe_allow_html=True)  # Only show icon
-                st.rerun()
-        
+            with col_buttons[1]:
+                if st.form_submit_button("➕ Ajouter le critère", use_container_width=True):
+                    if not critere or not cible:
+                        st.error("Veuillez remplir au moins le critère et la cible.")
+                    else:
+                        new_row = pd.DataFrame([{
+                            "Rubrique": rubrique,
+                            "Critère": critere,
+                            "Type de question": type_question,
+                            "Cible / Standard attendu": cible,
+                            "Échelle d'évaluation (1-5)": evaluation,
+                            "Évaluateur": evaluateur
+                        }])
+                        st.session_state.ksa_matrix = pd.concat([st.session_state.ksa_matrix, new_row], ignore_index=True)
+                        st.success("✅ Critère ajouté avec succès !")
+                        st.rerun()
+
         # Afficher la réponse générée uniquement en bas
         if "ai_response" in st.session_state and st.session_state.ai_response:
             st.markdown(f"<div class='ai-response'>{st.session_state.ai_response}</div>", unsafe_allow_html=True)
-    
+            
     # Afficher la matrice KSA sous forme de data_editor
     if not st.session_state.ksa_matrix.empty:
         st.session_state.ksa_matrix = st.data_editor(
