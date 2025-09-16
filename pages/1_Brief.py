@@ -980,7 +980,7 @@ with tabs[1]:
                 st.session_state.current_brief_name = ""
                 st.session_state.avant_brief_completed = False
                 st.rerun()
-
+# ---------------- REUNION BRIEF ----------------           
 with tabs[2]:
     # Afficher le message de sauvegarde seulement pour cet onglet
     if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Réunion"):
@@ -990,103 +990,78 @@ with tabs[2]:
 
     # Afficher les informations du brief en cours
     brief_display_name = f"Réunion de brief - {st.session_state.current_brief_name}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
-    st.markdown(f"<h3 style='color: #FF4B4B;'>📝 {brief_display_name}</h3>", unsafe_allow_html=True)
+    st.subheader(f"✅ {brief_display_name}")
 
     total_steps = 4
     step = st.session_state.reunion_step
-    
-    # Utilisation d'un conteneur pour la progression et la navigation
-    with st.container(border=True):
-        st.progress(int((step / total_steps) * 100), text=f"**Étape {step} sur {total_steps}**")
-        
-        # Boutons de navigation
-        col_prev, col_next = st.columns([1, 1])
-        with col_prev:
-            if st.button("⬅️ Précédent", disabled=(step == 1), use_container_width=True):
-                st.session_state.reunion_step -= 1
-                st.rerun()
-        with col_next:
-            if st.button("Suivant ➡️", disabled=(step == 4), use_container_width=True):
-                st.session_state.reunion_step += 1
-                st.rerun()
+    st.progress(int((step / total_steps) * 100), text=f"Étape {step}/{total_steps}")
 
-    # Contenu de chaque étape dans des expanders pour une meilleure organisation
     if step == 1:
-        with st.expander("📋 Portrait robot candidat - Validation", expanded=True):
-            # Construire le DataFrame sans répétition de "Contexte du poste"
-            data = []
-            field_keys = []
-            comment_keys = []
-            k = 1
-            
-            if st.session_state.current_brief_name in st.session_state.saved_briefs:
-                brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
-                
-                for section in sections:
-                    for i, (field_name, field_key, placeholder) in enumerate(section["fields"]):
-                        value = brief_data.get(field_key, "")
-                        section_title = section["title"] if i == 0 else ""
-                        data.append([section_title, field_name, value, ""])
-                        field_keys.append(field_key)
-                        comment_keys.append(f"manager_comment_{k}")
-                        k += 1
+        st.subheader("📋 Portrait robot candidat - Validation")
 
-            df = pd.DataFrame(data, columns=["Section", "Détails", "Informations", "Commentaires du manager"])
+        # Construire le DataFrame sans répétition de "Contexte du poste"
+        data = []
+        field_keys = []
+        comment_keys = []
+        k = 1
+        
+        if st.session_state.current_brief_name in st.session_state.saved_briefs:
+            brief_data = st.session_state.saved_briefs[st.session_state.current_brief_name]
             
-            # Afficher le data_editor avec auto-size pour les deux premières colonnes
-            edited_df = st.data_editor(
-                df,
-                column_config={
-                    "Section": st.column_config.TextColumn("Section", disabled=True, width="small"),
-                    "Détails": st.column_config.TextColumn("Détails", disabled=True, width="medium"),
-                    "Informations": st.column_config.TextColumn("Informations", width="medium", disabled=True),
-                    "Commentaires du manager": st.column_config.TextColumn("Commentaires du manager", width="medium")
-                },
-                use_container_width=True,
-                hide_index=True,
-                num_rows="fixed"
-            )
+            for section in sections:
+                for i, (field_name, field_key, placeholder) in enumerate(section["fields"]):
+                    value = brief_data.get(field_key, "")
+                    section_title = section["title"] if i == 0 else ""
+                    data.append([section_title, field_name, value, ""])
+                    field_keys.append(field_key)
+                    comment_keys.append(f"manager_comment_{k}")
+                    k += 1
 
-            # Sauvegarde des commentaires
-            if st.button("💾 Sauvegarder commentaires", type="primary", key="save_comments_step1"):
-                for i in range(len(edited_df)):
-                    if edited_df["Détails"].iloc[i] != "":
-                        comment_key = comment_keys[i]
-                        st.session_state[comment_key] = edited_df["Commentaires du manager"].iloc[i]
-                st.session_state.save_message = "✅ Commentaires sauvegardés"
-                st.session_state.save_message_tab = "Réunion"
-                st.rerun()
+        df = pd.DataFrame(data, columns=["Section", "Détails", "Informations", "Commentaires du manager"])
+
+        # Afficher le data_editor avec auto-size pour les deux premières colonnes
+        edited_df = st.data_editor(
+            df,
+            column_config={
+                "Section": st.column_config.TextColumn("Section", disabled=True, width="small"),
+                "Détails": st.column_config.TextColumn("Détails", disabled=True, width="medium"),
+                "Informations": st.column_config.TextColumn("Informations", width="medium", disabled=True),
+                "Commentaires du manager": st.column_config.TextColumn("Commentaires du manager", width="medium")
+            },
+            use_container_width=True,
+            hide_index=True,
+            num_rows="fixed"
+        )
+
+        # Sauvegarde des commentaires
+        if st.button("💾 Sauvegarder commentaires", type="primary", key="save_comments_step1"):
+            for i in range(len(edited_df)):
+                if edited_df["Détails"].iloc[i] != "":
+                    comment_key = comment_keys[i]
+                    st.session_state[comment_key] = edited_df["Commentaires du manager"].iloc[i]
+            st.session_state.save_message = "✅ Commentaires sauvegardés"
+            st.session_state.save_message_tab = "Réunion"
+            st.rerun()
 
     elif step == 2:
-        with st.expander("📊 Matrice KSA - Validation manager", expanded=True):
-            render_ksa_matrix()
+        st.subheader("📊 Matrice KSA - Validation manager")
+        render_ksa_matrix()
 
     elif step == 3:
-        with st.expander("💡 Stratégie et Processus", expanded=True):
-            st.info("Définissez les canaux de sourcing et les critères d'évaluation.")
-            st.multiselect("🎯 Canaux prioritaires", ["LinkedIn", "Jobboards", "Cooptation", "Réseaux sociaux", "Chasse de tête"], key="canaux_prioritaires")
-            
-            st.markdown("---")
-            st.subheader("Critères d'exclusion et Processus d'évaluation")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.text_area("🚫 Critères d'exclusion", key="criteres_exclusion", height=150, 
-                             placeholder="Ex: ne pas avoir d'expérience dans le secteur public...")
-            with col2:
-                st.text_area("✅ Processus d'évaluation (détails)", key="processus_evaluation", height=150, 
-                             placeholder="Ex: Entretien RH (30min), Test technique, Entretien manager (60min)...")
+        st.subheader("4️⃣ Stratégie Recrutement")
+        st.multiselect("Canaux prioritaires", ["LinkedIn", "Jobboards", "Cooptation", "Réseaux sociaux", "Chasse de tête"], key="canaux_prioritaires")
+        st.text_area("Critères d'exclusion", key="criteres_exclusion", height=100)
+        st.text_area("Processus d'évaluation (détails)", key="processus_evaluation", height=100)
         
     elif step == 4:
-        with st.expander("📝 Notes générales du manager", expanded=True):
-            st.info("Ajoutez des notes ou des commentaires finaux pour le brief.")
-            st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=250, 
-                         placeholder="Ajoutez vos commentaires et notes généraux...")
+        st.subheader("📝 Notes générales du manager")
+        st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=200, 
+                    placeholder="Ajoutez vos commentaires et notes généraux...")
 
-        # Boutons Enregistrer et Annuler dans un conteneur séparé
-        st.markdown("---")
+        # Boutons Enregistrer et Annuler
         col_save, col_cancel = st.columns([1, 1])
         with col_save:
-            if st.button("💾 Enregistrer la réunion", type="primary", use_container_width=True, key="save_reunion"):
+            if st.button("💾 Enregistrer réunion", type="primary", use_container_width=True, key="save_reunion"):
                 if st.session_state.current_brief_name in st.session_state.saved_briefs:
                     brief_name = st.session_state.current_brief_name
                     
@@ -1132,6 +1107,7 @@ with tabs[2]:
         with col_cancel:
             if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion"):
                 delete_current_brief()
+
     # ---- Navigation wizard ----
     col1, col2, col3 = st.columns([1, 6, 1])
     with col1:
