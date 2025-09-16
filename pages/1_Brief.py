@@ -152,12 +152,12 @@ def render_ksa_matrix():
             st.markdown("---")
             st.markdown("**Demander une question à l'IA**")
             
-            # Champ de saisie et checkbox sur des lignes séparées
+            # Le champ de texte et le bouton sont maintenant sur des lignes distinctes pour éviter le problème d'alignement.
             ai_prompt = st.text_input("Décrivez ce que l'IA doit générer :", placeholder="Ex: une question générale pour évaluer la maîtrise des techniques de sourcing par un chargé de recrutement", 
                                       key="ai_prompt")
             st.checkbox("⚡ Mode rapide (réponse concise)", key="concise_checkbox")
             
-            # Boutons sur une ligne distincte
+            # Les boutons sont placés sur une nouvelle ligne, après les champs de saisie.
             col_buttons = st.columns([1, 1])
             with col_buttons[0]:
                 if st.form_submit_button("💡 Générer question IA", use_container_width=True):
