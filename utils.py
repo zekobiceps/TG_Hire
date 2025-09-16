@@ -466,7 +466,7 @@ def get_ai_pre_redaction(fiche_data):
     return response.choices[0].message.content
 
 # -------------------- Génération de question IA avec DeepSeek --------------------
-def generate_ai_question(prompt):
+def generate_ai_question(prompt, concise=False):
     """Génère une question d'entretien et une réponse exemple via l'API DeepSeek."""
     try:
         from openai import OpenAI
@@ -482,24 +482,34 @@ def generate_ai_question(prompt):
         base_url="https://api.deepseek.com/v1"
     )
 
-    max_tokens = 500  # Augmentation de la taille de la réponse pour éviter la troncature
+    max_tokens = 700  # Augmentation de la taille de la réponse pour éviter la troncature
 
     context = "recruitment for a KSA (Knowledge, Skills, Abilities) matrix"
     question_type = "technical"
     skill = prompt
     role = "candidate"
+    
+    # Logic to parse the prompt
     if "une question" in prompt and "pour évaluer" in prompt and "par" in prompt:
-        question_type_part = prompt.split("une question")[1].split("pour")[0].strip().lower()
-        if "générale" in question_type_part:
-            question_type = "general"
-        elif "comportementale" in question_type_part:
-            question_type = "behavioral"
-        elif "situationnelle" in question_type_part:
-            question_type = "situational"
-        elif "technique" in question_type_part:
-            question_type = "technical"
-        skill = prompt.split("évaluer")[1].split("par")[0].strip()
-        role = prompt.split("par")[1].strip()
+        parts = prompt.split("une question")
+        if len(parts) > 1:
+            question_type_part = parts[1].split("pour")[0].strip().lower()
+            if "générale" in question_type_part:
+                question_type = "general"
+            elif "comportementale" in question_type_part:
+                question_type = "behavioral"
+            elif "situationnelle" in question_type_part:
+                question_type = "situational"
+            elif "technique" in question_type_part:
+                question_type = "technical"
+            
+            skill_part = prompt.split("évaluer")
+            if len(skill_part) > 1:
+                skill = skill_part[1].split("par")[0].strip()
+            
+            role_part = prompt.split("par")
+            if len(role_part) > 1:
+                role = role_part[1].strip()
 
     if question_type == "behavioral":
         context += ", using the STAR method (Situation, Task, Action, Result)"
@@ -517,6 +527,15 @@ def generate_ai_question(prompt):
         f"Question: [votre question]\n"
         f"Réponse: [exemple de réponse]"
     )
+    
+    # New logic for concise response
+    if concise:
+        full_prompt = (
+            f"Génère une question d'entretien et une réponse très concise et directe pour évaluer le critère : '{skill}'. "
+            f"La question doit être {question_type} et la réponse ne doit pas dépasser 50 mots. "
+            f"Format : 'Question: [votre question]\nRéponse: [réponse concise]'"
+        )
+        max_tokens = 150 # Reduced max tokens for a concise response
 
     response = client.chat.completions.create(
         model="deepseek-chat",

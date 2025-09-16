@@ -982,6 +982,7 @@ with tabs[1]:
                 st.rerun()
 
 # ---------------- REUNION BRIEF ----------------           
+# ---------------- REUNION BRIEF ----------------           
 with tabs[2]:
     # --- STYLE PERSONNALISÉ POUR LES CHAMPS ---
     st.markdown("""
@@ -1093,39 +1094,35 @@ with tabs[2]:
                     
                     with col1:
                         rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique")
-                    
                     with col2:
                         critere = st.text_input("Critère", placeholder="Ex: Leadership", key="new_critere")
-                    
                     with col3:
                         type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], key="new_type_question")
-                    
                     with col4:
                         evaluateur = st.selectbox("Qui évalue ce critère ?", ["Recruteur", "Manager", "Les deux"], key="new_evaluateur")
 
-                    col_q, col_s = st.columns(2)
-                    with col_q:
+                    col_q_text, col_ai_prompt, col_slider = st.columns([2, 2, 1])
+                    
+                    with col_q_text:
                         question = st.text_area("Question pour l'entretien", placeholder="Ex: Parlez-moi d'une situation où vous avez dû faire preuve de leadership.", key="new_question", height=100)
-                    with col_s:
-                        evaluation = st.slider("Évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
+                    with col_ai_prompt:
+                         ai_prompt = st.text_input("Décrivez ce que l'IA doit générer :", placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", key="ai_prompt_input")
+                    with col_slider:
+                         evaluation = st.slider("Évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
                     
                     st.markdown("---")
-                    st.markdown("**Générer une question avec l'IA**")
-                    ai_prompt = st.text_input("Décrivez ce que l'IA doit générer :", placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", key="ai_prompt_input")
                     
                     col_ai, col_add = st.columns(2)
                     with col_ai:
+                        concise_response = st.checkbox("Réponse concise", key="concise_checkbox")
                         if st.form_submit_button("💡 Générer question IA", type="primary", use_container_width=True):
                             if ai_prompt:
                                 with st.spinner("Génération en cours..."):
                                     try:
-                                        # Correction: suppression de l'argument 'length'
-                                        ai_response = generate_ai_question(ai_prompt)
-                                        
-                                        # Correction: enlève le préfixe si la fonction le retourne
+                                        ai_response = generate_ai_question(ai_prompt, concise=concise_response)
+                                        # Nettoyer la réponse de l'IA si elle a un format indésirable
                                         if ai_response.strip().startswith("Question:"):
                                             ai_response = ai_response.strip().replace("Question:", "", 1).strip()
-                                            
                                         st.session_state.ai_generated_question = ai_response
                                     except Exception as e:
                                         st.error(f"Erreur lors de la génération : {e}")
