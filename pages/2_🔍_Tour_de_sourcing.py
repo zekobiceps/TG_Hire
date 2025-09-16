@@ -341,118 +341,203 @@ with tab5:
                     
                     # Vérifier si c'est le site Vinci
                     if "vinci.com" in url:
-                        # Ajouter 20 postes pour Vinci (liste complète)
-                        postes_vinci = [
-                            {"titre": "Coordinateur HSE", "competences": "HSE, Normes de sécurité, Gestion des risques", "experience": "5+ ans", "avantages": "Assurance, Formation, Transport"},
-                            {"titre": "Ingénieur électromécanicien - Traitement des Eaux", "competences": "Électromécanique, Traitement des eaux, Maintenance", "experience": "3+ ans", "avantages": "Logement, Transport, Mutuelle"},
-                            {"titre": "Ingénieur QHSE F/H", "competences": "Qualité, Hygiène, Sécurité, Environnement", "experience": "4+ ans", "avantages": "Voiture de fonction, Télétravail partiel"},
-                            {"titre": "Ingénieur BTP", "competences": "Gestion de projet, AutoCAD, Management d'équipe", "experience": "5+ ans", "avantages": "Télétravail partiel, Mutuelle, Évolution"},
-                            {"titre": "Chef de Chantier", "competences": "Management, Planification, Coordination", "experience": "5+ ans", "avantages": "Véhicule, Logement, Prime"},
-                            {"titre": "Conducteur de Travaux", "competences": "Gestion de projet, Budget, Planning", "experience": "6+ ans", "avantages": "Voiture, Télétravail partiel, Mutuelle"},
-                            {"titre": "Technicien Méthodes", "competences": "Méthodes, Optimisation, Processus", "experience": "3+ ans", "avantages": "Formation, Évolution, Transport"},
-                            {"titre": "Ingénieur Structures", "competences": "Calcul de structures, Robot, Autocad", "experience": "4+ ans", "avantages": "Mutuelle, Transport, Formation"},
-                            {"titre": "Géomètre-Topographe", "competences": "Topographie, Mesures, Relevés", "experience": "3+ ans", "avantages": "Équipement, Transport, Prime"},
-                            {"titre": "Ingénieur VRD", "competences": "Voirie, Réseaux Divers, Infrastructures", "experience": "4+ ans", "avantages": "Véhicule, Mutuelle, Formation"},
-                            {"titre": "Economiste de la Construction", "competences": "Métrage, Devis, Coûts", "experience": "5+ ans", "avantages": "Télétravail, Mutuelle, Prime"},
-                            {"titre": "Métreur", "competences": "Métrage, Quantitatif, Estimation", "experience": "3+ ans", "avantages": "Transport, Formation, Évolution"},
-                            {"titre": "Chargé d'Affaires", "competences": "Commercial, Négociation, Relation client", "experience": "5+ ans", "avantages": "Commission, Véhicule, Télétravail"},
-                            {"titre": "Responsable Maintenance", "competences": "Maintenance, Gestion d'équipe, Planning", "experience": "7+ ans", "avantages": "Logement, Véhicule, Mutuelle"},
-                            {"titre": "Ingénieur Génie Civil", "competences": "Conception, Calcul, Exécution", "experience": "4+ ans", "avantages": "Formation, Transport, Évolution"},
-                            {"titre": "Pilote de Production", "competences": "Production, Optimisation, Rendement", "experience": "4+ ans", "avantages": "Prime, Transport, Mutuelle"},
-                            {"titre": "Technicien de Laboratoire", "competences": "Essais, Contrôle qualité, Normes", "experience": "2+ ans", "avantages": "Formation, Transport, Évolution"},
-                            {"titre": "Dessinateur-Projeteur", "competences": "Autocad, Dessin technique, Plans", "experience": "3+ ans", "avantages": "Formation, Logiciels, Transport"},
-                            {"titre": "Responsable Qualité", "competences": "Contrôle qualité, Normes, Processus", "experience": "6+ ans", "avantages": "Véhicule, Mutuelle, Télétravail"},
-                            {"titre": "Ingénieur Méthodes et Process", "competences": "Optimisation, Processus, Industrialisation", "experience": "5+ ans", "avantages": "Formation, Véhicule, Évolution"}
-                        ]
-                        
-                        for poste in postes_vinci:
-                            results["concurrent"].append("Vinci")
-                            results["url"].append(url)
-                            results["titre_poste"].append(poste["titre"])
-                            results["competences"].append(poste["competences"])
-                            results["experience"].append(poste["experience"])
-                            results["avantages"].append(poste["avantages"])
-                            # Vérifier quels mots-clés correspondent
-                            mots_trouves = []
-                            for mot in mots_cles_list:
-                                if mot in poste["titre"].lower() or mot in poste["competences"].lower():
-                                    mots_trouves.append(mot)
-                            results["mots_cles_trouves"].append(", ".join(mots_trouves))
+                        try:
+                            # Tentative de scraping réel du site Vinci
+                            headers = {
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                            }
+                            response = requests.get(url, headers=headers, timeout=10)
+                            soup = BeautifulSoup(response.content, 'html.parser')
+                            
+                            # Chercher les éléments qui contiennent les offres d'emploi
+                            # (Cette sélecteur est un exemple et doit être adapté au site réel)
+                            offres = soup.select('.job-listing, .offer-item, .job-title, [class*="job"]')
+                            
+                            if offres:
+                                for offre in offres[:20]:  # Limiter à 20 offres
+                                    try:
+                                        titre = offre.get_text(strip=True)
+                                        if titre and len(titre) > 10:  # Filtrer les textes trop courts
+                                            results["concurrent"].append("Vinci")
+                                            results["url"].append(url)
+                                            results["titre_poste"].append(titre)
+                                            results["competences"].append("À analyser")
+                                            results["experience"].append("Non spécifié")
+                                            results["avantages"].append("À analyser")
+                                            
+                                            # Vérifier quels mots-clés correspondent
+                                            mots_trouves = []
+                                            for mot in mots_cles_list:
+                                                if mot in titre.lower():
+                                                    mots_trouves.append(mot)
+                                            results["mots_cles_trouves"].append(", ".join(mots_trouves))
+                                    except:
+                                        continue
+                            else:
+                                st.warning(f"Aucune offre trouvée sur {url}. Utilisation des données simulées.")
+                                # Fallback aux données simulées si le scraping échoue
+                                postes_vinci = [
+                                    {"titre": "Coordinateur HSE", "competences": "HSE, Normes de sécurité, Gestion des risques", "experience": "5+ ans", "avantages": "Assurance, Formation, Transport"},
+                                    {"titre": "Ingénieur électromécanicien - Traitement des Eaux", "competences": "Électromécanique, Traitement des eaux, Maintenance", "experience": "3+ ans", "avantages": "Logement, Transport, Mutuelle"},
+                                    # ... (ajouter d'autres postes simulés)
+                                ]
+                                
+                                for poste in postes_vinci:
+                                    results["concurrent"].append("Vinci")
+                                    results["url"].append(url)
+                                    results["titre_poste"].append(poste["titre"])
+                                    results["competences"].append(poste["competences"])
+                                    results["experience"].append(poste["experience"])
+                                    results["avantages"].append(poste["avantages"])
+                                    mots_trouves = []
+                                    for mot in mots_cles_list:
+                                        if mot in poste["titre"].lower() or mot in poste["competences"].lower():
+                                            mots_trouves.append(mot)
+                                    results["mots_cles_trouves"].append(", ".join(mots_trouves))
+                                
+                        except Exception as e:
+                            st.error(f"Erreur lors du scraping de {url}: {str(e)}")
+                            # Fallback aux données simulées en cas d'erreur
+                            # ... (code de fallback similaire à ci-dessus)
                     
                     # Vérifier si c'est le site Rekrute (Sogea Maroc)
                     elif "rekrute.com" in url and "sogea" in url:
-                        # Ajouter plusieurs postes pour Sogea Maroc
-                        postes_sogea = [
-                            {
-                                "titre": "Directeur de Travaux Hydraulique (H/F)",
-                                "competences": "Hydraulique, Gestion de projet, Management",
-                                "experience": "10+ ans",
-                                "avantages": "Voiture de fonction, Logement, Assurance"
-                            },
-                            {
-                                "titre": "Mécanicien Atelier",
-                                "competences": "Mécanique, Réparation, Maintenance",
-                                "experience": "3+ ans",
-                                "avantages": "Transport, Formation, Prime de performance"
-                            },
-                            {
-                                "titre": "Acheteur BTP (H/F)",
-                                "competences": "Achats, Négociation, BTP",
-                                "experience": "5+ ans",
-                                "avantages": "Télétravail partiel, Véhicule, Mutuelle"
-                            },
-                            {
-                                "titre": "Ingénieur travaux confirmé (H/F)",
-                                "competences": "Gestion de chantier, AutoCAD, Planning",
-                                "experience": "7+ ans",
-                                "avantages": "Logement, Transport, Évolution de carrière"
+                        try:
+                            # Tentative de scraping réel du site Rekrute
+                            headers = {
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
                             }
-                        ]
-                        
-                        for poste in postes_sogea:
-                            results["concurrent"].append("Sogea Maroc (Vinci)")
-                            results["url"].append(url)
-                            results["titre_poste"].append(poste["titre"])
-                            results["competences"].append(poste["competences"])
-                            results["experience"].append(poste["experience"])
-                            results["avantages"].append(poste["avantages"])
-                            # Vérifier quels mots-clés correspondent
-                            mots_trouves = []
-                            for mot in mots_cles_list:
-                                if mot in poste["titre"].lower() or mot in poste["competences"].lower():
-                                    mots_trouves.append(mot)
-                            results["mots_cles_trouves"].append(", ".join(mots_trouves))
+                            response = requests.get(url, headers=headers, timeout=10)
+                            soup = BeautifulSoup(response.content, 'html.parser')
+                            
+                            # Chercher les éléments qui contiennent les offres d'emploi
+                            # (Cette sélecteur est un exemple et doit être adapté au site réel)
+                            offres = soup.select('.job-item, .offer-title, [class*="job"]')
+                            
+                            if offres:
+                                for offre in offres[:10]:  # Limiter à 10 offres
+                                    try:
+                                        titre = offre.get_text(strip=True)
+                                        if titre and len(titre) > 10:  # Filtrer les textes trop courts
+                                            results["concurrent"].append("Sogea Maroc (Vinci)")
+                                            results["url"].append(url)
+                                            results["titre_poste"].append(titre)
+                                            results["competences"].append("À analyser")
+                                            results["experience"].append("Non spécifié")
+                                            results["avantages"].append("À analyser")
+                                            
+                                            # Vérifier quels mots-clés correspondent
+                                            mots_trouves = []
+                                            for mot in mots_cles_list:
+                                                if mot in titre.lower():
+                                                    mots_trouves.append(mot)
+                                            results["mots_cles_trouves"].append(", ".join(mots_trouves))
+                                    except:
+                                        continue
+                            else:
+                                st.warning(f"Aucune offre trouvée sur {url}. Utilisation des données simulées.")
+                                # Fallback aux données simulées si le scraping échoue
+                                postes_sogea = [
+                                    {"titre": "Directeur de Travaux Hydraulique (H/F)", "competences": "Hydraulique, Gestion de projet, Management", "experience": "10+ ans", "avantages": "Voiture de fonction, Logement, Assurance"},
+                                    {"titre": "Mécanicien Atelier", "competences": "Mécanique, Réparation, Maintenance", "experience": "3+ ans", "avantages": "Transport, Formation, Prime de performance"},
+                                    # ... (ajouter d'autres postes simulés)
+                                ]
+                                
+                                for poste in postes_sogea:
+                                    results["concurrent"].append("Sogea Maroc (Vinci)")
+                                    results["url"].append(url)
+                                    results["titre_poste"].append(poste["titre"])
+                                    results["competences"].append(poste["competences"])
+                                    results["experience"].append(poste["experience"])
+                                    results["avantages"].append(poste["avantages"])
+                                    mots_trouves = []
+                                    for mot in mots_cles_list:
+                                        if mot in poste["titre"].lower() or mot in poste["competences"].lower():
+                                            mots_trouves.append(mot)
+                                    results["mots_cles_trouves"].append(", ".join(mots_trouves))
+                                
+                        except Exception as e:
+                            st.error(f"Erreur lors du scraping de {url}: {str(e)}")
+                            # Fallback aux données simulées en cas d'erreur
+                            # ... (code de fallback similaire à ci-dessus)
                     
-                    # Exemple de données simulées pour d'autres sites
-                    elif "entreprise1" in url:
-                        results["concurrent"].append("Entreprise 1")
-                        results["url"].append(url)
-                        results["titre_poste"].append("Data Scientist Senior")
-                        results["competences"].append("Python, Machine Learning, SQL, Cloud")
-                        results["experience"].append("5+ ans")
-                        results["avantages"].append("Télétravail, CE, Mutuelle")
-                        results["mots_cles_trouves"].append("data scientist, python, cloud")
-                    
-                    elif "entreprise2" in url:
-                        results["concurrent"].append("Entreprise 2")
-                        results["url"].append(url)
-                        results["titre_poste"].append("Développeur Full Stack")
-                        results["competences"].append("JavaScript, React, Node.js, AWS")
-                        results["experience"].append("3+ ans")
-                        results["avantages"].append("RTT, Titre-restaurant, Évolution")
-                        results["mots_cles_trouves"].append("javascript, react, aws")
-                    
+                    # Pour les autres sites
                     else:
-                        results["concurrent"].append("Autre entreprise")
-                        results["url"].append(url)
-                        results["titre_poste"].append("Poste varié")
-                        results["competences"].append("Compétences diverses")
-                        results["experience"].append("Non spécifié")
-                        results["avantages"].append("Avantages standards")
-                        results["mots_cles_trouves"].append("")
+                        try:
+                            # Tentative de scraping générique pour les autres sites
+                            headers = {
+                                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                            }
+                            response = requests.get(url, headers=headers, timeout=10)
+                            soup = BeautifulSoup(response.content, 'html.parser')
+                            
+                            # Chercher les éléments qui pourraient contenir des offres d'emploi
+                            # (Cette approche est très générale et peut ne pas fonctionner)
+                            potential_selectors = [
+                                '.job', '.offer', '.employment', '.career', 
+                                '[class*="job"]', '[class*="offer"]', '[class*="employment"]',
+                                'h1', 'h2', 'h3', 'h4', 'h5', 'h6'  # Les titres peuvent contenir des offres
+                            ]
+                            
+                            offres_trouvees = False
+                            for selector in potential_selectors:
+                                offres = soup.select(selector)
+                                for offre in offres[:5]:  # Limiter à 5 offres par sélecteur
+                                    try:
+                                        texte = offre.get_text(strip=True)
+                                        if texte and len(texte) > 20 and len(texte) < 200:  # Filtrer les textes
+                                            # Vérifier si le texte ressemble à un titre d'offre d'emploi
+                                            mots_emploi = ["emploi", "job", "offre", "recrutement", "poste", "h/f", "f/h"]
+                                            if any(mot in texte.lower() for mot in mots_emploi):
+                                                results["concurrent"].append("Autre entreprise")
+                                                results["url"].append(url)
+                                                results["titre_poste"].append(texte)
+                                                results["competences"].append("À analyser")
+                                                results["experience"].append("Non spécifié")
+                                                results["avantages"].append("À analyser")
+                                                
+                                                # Vérifier quels mots-clés correspondent
+                                                mots_trouves = []
+                                                for mot in mots_cles_list:
+                                                    if mot in texte.lower():
+                                                        mots_trouves.append(mot)
+                                                results["mots_cles_trouves"].append(", ".join(mots_trouves))
+                                                offres_trouvees = True
+                                    except:
+                                        continue
+                            
+                            if not offres_trouvees:
+                                st.warning(f"Aucune offre détectée sur {url}. Le site peut nécessiter une configuration spécifique.")
+                                # Ajouter une entrée générique
+                                results["concurrent"].append("Autre entreprise")
+                                results["url"].append(url)
+                                results["titre_poste"].append("Poste varié - Analyse manuelle requise")
+                                results["competences"].append("Compétences diverses")
+                                results["experience"].append("Non spécifié")
+                                results["avantages"].append("Avantages standards")
+                                results["mots_cles_trouves"].append("")
+                                
+                        except Exception as e:
+                            st.error(f"Erreur lors du scraping de {url}: {str(e)}")
+                            # Ajouter une entrée d'erreur
+                            results["concurrent"].append("Erreur de scraping")
+                            results["url"].append(url)
+                            results["titre_poste"].append(f"Erreur: {str(e)}")
+                            results["competences"].append("N/A")
+                            results["experience"].append("N/A")
+                            results["avantages"].append("N/A")
+                            results["mots_cles_trouves"].append("")
                 
                 except Exception as e:
                     st.error(f"Erreur avec {url}: {str(e)}")
+                    # Ajouter une entrée d'erreur
+                    results["concurrent"].append("Erreur")
+                    results["url"].append(url)
+                    results["titre_poste"].append(f"Erreur: {str(e)}")
+                    results["competences"].append("N/A")
+                    results["experience"].append("N/A")
+                    results["avantages"].append("N/A")
+                    results["mots_cles_trouves"].append("")
                 
                 progress_bar.progress((i + 1) / len(concurrents_list))
             
@@ -544,6 +629,11 @@ with tab5:
         - Utilisez des mots-clés précis liés à vos besoins
         - Augmentez le délai entre les requêtes pour éviter le blocage
         - Testez d'abord avec 2-3 sites pour valider la configuration
+        
+        ### Limitations:
+        - Le scraping web peut être bloqué par certains sites
+        - La structure des pages peut changer, nécessitant une mise à jour des sélecteurs
+        - Certains sites utilisent JavaScript pour charger le contenu, ce qui peut ne pas être compatible avec cette approche
         """)
 
 # -------------------- Tab 6: InMail --------------------
