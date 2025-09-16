@@ -1086,7 +1086,7 @@ with tabs[2]:
                     - **Exemple 3 :** Maîtrise de la gestion de projet Agile ou Scrum.
                     
                     #### ✨ Abilities (Aptitudes)
-                    Ce sont les aptitudes plus générales ou innées, souvent liées au comportement.
+                    Ce sont les aptitudes plus générales ou innées, often liées au comportement.
                     - **Exemple 1 :** Capacité à gérer le stress et la pression.
                     - **Exemple 2 :** Aptitude à communiquer clairement des idées complexes.
                     - **Exemple 3 :** Capacité à travailler en équipe et à collaborer efficacement.
@@ -1105,16 +1105,19 @@ with tabs[2]:
                     with col4:
                         evaluateur = st.selectbox("Qui évalue ce critère ?", ["Recruteur", "Manager", "Les deux"], key="new_evaluateur")
 
-                    col_q_text, col_slider = st.columns([4, 1])
+                    # Réduction de la largeur de la question pour une seule ligne
+                    col_q_text, col_slider = st.columns([2, 1])
 
                     with col_q_text:
-                        question = st.text_area("Question pour l'entretien", placeholder="Ex: Parlez-moi d'une situation où vous avez dû faire preuve de leadership.", key="new_question", height=100)
+                        question = st.text_input("Question pour l'entretien", placeholder="Ex: Parlez-moi d'une situation où vous avez dû faire preuve de leadership.", key="new_question")
                     with col_slider:
                          evaluation = st.slider("Évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
                     
-                    # Nouvelle section pour l'IA
+                    # Nouvelle section pour l'IA avec le label modifié
+                    ai_prompt = st.text_input("Décrivez ce que l'IA doit générer comme réponse", placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", key="ai_prompt_input")
+                    
+                    # Case à cocher placée juste après le champ de texte et avant le bouton
                     concise_mode = st.checkbox("⚡ Mode rapide (réponse concise)", key="concise_mode")
-                    ai_prompt = st.text_input("Décrivez ce que l'IA doit générer :", placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", key="ai_prompt_input")
                     
                     st.markdown("---")
                     
