@@ -115,7 +115,7 @@ def render_ksa_matrix():
                 color: #28a745; /* Vert pour l'icône ✅ */
             }
             .stSuccess { /* Override green from st.success */
-                background-color: #28a745 !important;
+                background-color: #2a2a2a !important;
                 color: #ffffff !important;
             }
         </style>
@@ -983,7 +983,6 @@ with tabs[1]:
                 st.rerun()
                 
 # ---------------- RÉUNION DE BRIEF ----------------
-
 with tabs[2]:
     # Afficher le message de sauvegarde seulement pour cet onglet
     if ("save_message" in st.session_state and st.session_state.save_message) and \
@@ -1149,6 +1148,30 @@ with tabs[2]:
         with col_cancel:
             if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion"):
                 delete_current_brief()
+
+    # Ajout des boutons Suivant et Précédent
+    col_prev, col_next = st.columns([1, 1])
+    with col_prev:
+        if st.button("⬅️ Précédent", type="secondary", use_container_width=True, key="prev_step", disabled=step == 1):
+            st.session_state.reunion_step -= 1
+            st.rerun()
+    with col_next:
+        if st.button("➡️ Suivant", type="primary", use_container_width=True, key="next_step", disabled=step == 4):
+            st.session_state.reunion_step += 1
+            st.rerun()
+
+    # ---- Navigation wizard ----
+    col1, col2, col3 = st.columns([1, 6, 1])
+    with col1:
+        if step > 1:
+            if st.button("⬅️ Précédent", key="prev_step"):
+                st.session_state.reunion_step -= 1
+                st.rerun()
+    with col3:
+        if step < total_steps:
+            if st.button("Suivant ➡️", key="next_step"):
+                st.session_state.reunion_step += 1
+                st.rerun()
 
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
