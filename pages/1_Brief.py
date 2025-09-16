@@ -1052,22 +1052,16 @@ with tabs[2]:
 
     elif step == 3:
         st.subheader("🎯 Stratégie de Sourcing et Recrutement")
-        
+
         # Section Canaux de sourcing
-        with st.expander("📊 Canaux de Sourcing", expanded=True):
-            st.markdown("**Canaux prioritaires**")
-            st.multiselect("Sélectionnez les canaux à utiliser:", 
-                          ["LinkedIn", "Jobboards", "Cooptation", "Réseaux sociaux", "Chasse de tête", "Autre"],
-                          key="canaux_prioritaires")
-            
-            st.text_area("Mots-clés et Boolean Search", 
-                        placeholder="Ex: (ingénieur AND BTP) OR (conducteur AND travaux) NOT assistant",
-                        key="boolean_search",
-                        height=80)
-    
+        st.markdown("**Canaux prioritaires**")
+        st.multiselect("Sélectionnez les canaux à utiliser:", 
+                      ["LinkedIn", "Jobboards", "Cooptation", "Réseaux sociaux", "Chasse de tête", "Autre"],
+                      key="canaux_prioritaires")
+
         # Section Processus d'évaluation simplifié
-        with st.expander("🔄 Processus d'Évaluation", expanded=True):
-            processus_evaluation = """Étape 1 : Pré-qualification initiale
+        st.markdown("**Processus d'évaluation**")
+        processus_evaluation = """Étape 1 : Pré-qualification initiale
 - Tri des CV : Vérification des critères must-have
 - Entretien téléphonique de 10 min
 
@@ -1081,18 +1075,17 @@ with tabs[2]:
 Étape 4 : Décision finale
 - Délibération collective
 - Remise dossier DRH"""
-            
-            st.text_area("Processus d'évaluation", 
-                        value=processus_evaluation,
-                        key="processus_evaluation",
-                        height=200)
-    
+        st.text_area("Processus d'évaluation", 
+                    value=processus_evaluation,
+                    key="processus_evaluation",
+                    height=200)
+
         # Section Critères d'exclusion
-        with st.expander("🚫 Critères d'exclusion", expanded=True):
-            st.text_area("Critères éliminatoires", 
-                        placeholder="Ex: Plus de 2 ans sans expérience BTP, absence de diplôme requis...",
-                        key="criteres_exclusion",
-                        height=100)
+        st.markdown("**Critères d'exclusion**")
+        st.text_area("Critères éliminatoires", 
+                    placeholder="Ex: Plus de 2 ans sans expérience BTP, absence de diplôme requis...",
+                    key="criteres_exclusion",
+                    height=100)
         
     elif step == 4:
         st.subheader("📝 Notes générales du manager")
@@ -1150,13 +1143,13 @@ with tabs[2]:
                 delete_current_brief()
 
     # Ajout des boutons Suivant et Précédent
-    col_prev, col_next = st.columns([1, 1])
+    col_prev, col_next = st.columns([2, 2])  # Adjusted for smaller buttons
     with col_prev:
-        if st.button("⬅️ Précédent", type="secondary", use_container_width=True, key="prev_step", disabled=step == 1):
+        if st.button("⬅️ Précédent", type="secondary", key=f"prev_step_{step}", disabled=step == 1):
             st.session_state.reunion_step -= 1
             st.rerun()
     with col_next:
-        if st.button("➡️ Suivant", type="primary", use_container_width=True, key="next_step", disabled=step == 4):
+        if st.button("➡️ Suivant", type="primary", key=f"next_step_{step}", disabled=step == 4):
             st.session_state.reunion_step += 1
             st.rerun()
 
