@@ -1114,7 +1114,7 @@ with tabs[2]:
                          evaluation = st.slider("Évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
                     
                     # Nouvelle section pour l'IA avec le label modifié
-                    ai_prompt = st.text_input("Décrivez ce que l'IA doit générer comme réponse", placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", key="ai_prompt_input")
+                    ai_prompt = st.text_input("Décrivez ce que l'IA doit générer comme Question", placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", key="ai_prompt_input")
                     
                     # Case à cocher placée juste après le champ de texte et avant le bouton
                     concise_mode = st.checkbox("⚡ Mode rapide (réponse concise)", key="concise_mode")
