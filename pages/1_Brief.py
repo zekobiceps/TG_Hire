@@ -149,17 +149,19 @@ def render_ksa_matrix():
                 st.markdown("</div>", unsafe_allow_html=True)
             
             # Section pour demander une question à l'IA
+            st.markdown("---")
             st.markdown("**Demander une question à l'IA**")
-            ai_prompt = st.text_input("Prompt pour l'IA", placeholder="Ex: une question générale pour évaluer la maîtrise des techniques de sourcing par un chargé de recrutement", 
+            
+            ai_prompt = st.text_input("Décrivez ce que l'IA doit générer :", placeholder="Ex: une question générale pour évaluer la maîtrise des techniques de sourcing par un chargé de recrutement", 
                                       key="ai_prompt")
-            st.checkbox("Réponse courte (comme sur magicien)", key="concise_checkbox")
-
+            
+            st.checkbox("⚡ Mode rapide (réponse concise)", key="concise_checkbox")
+            
             col_buttons = st.columns([1, 1])
             with col_buttons[0]:
                 if st.form_submit_button("💡 Générer question IA", use_container_width=True):
                     if ai_prompt:
                         try:
-                            # Adapter le prompt pour la fonction generate_ai_question
                             ai_response = generate_ai_question(ai_prompt, concise=st.session_state.concise_checkbox)
                             st.session_state.ai_response = ai_response
                         except Exception as e:
@@ -188,7 +190,7 @@ def render_ksa_matrix():
         # Afficher la réponse générée uniquement en bas
         if "ai_response" in st.session_state and st.session_state.ai_response:
             st.markdown(f"<div class='ai-response'>{st.session_state.ai_response}</div>", unsafe_allow_html=True)
-            
+
     # Afficher la matrice KSA sous forme de data_editor
     if not st.session_state.ksa_matrix.empty:
         st.session_state.ksa_matrix = st.data_editor(
