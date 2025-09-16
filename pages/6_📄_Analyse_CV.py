@@ -9,6 +9,15 @@ from sklearn.metrics.pairwise import cosine_similarity
 import time
 import re
 
+# --- CSS pour augmenter la taille du texte des onglets ---
+st.markdown("""
+<style>
+div[data-testid="stTabs"] button p {
+    font-size: 18px; 
+}
+</style>
+""", unsafe_allow_html=True)
+
 # --- Configuration de la clé API DeepSeek via Streamlit Secrets ---
 try:
     API_KEY = st.secrets["DEEPSEEK_API_KEY"]

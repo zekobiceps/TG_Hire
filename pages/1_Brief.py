@@ -24,6 +24,14 @@ from utils import (
     test_deepseek_connection,
 )
 
+# --- CSS pour augmenter la taille du texte des onglets ---
+st.markdown("""
+<style>
+div[data-testid="stTabs"] button p {
+    font-size: 18px; 
+}
+</style>
+""", unsafe_allow_html=True)
 # ---------------- NOUVELLES FONCTIONS ----------------
 def render_ksa_matrix():
     """Affiche la matrice KSA sous forme de tableau et permet l'ajout de critères."""
