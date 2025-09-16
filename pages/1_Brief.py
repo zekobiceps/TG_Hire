@@ -1089,20 +1089,25 @@ with tabs[2]:
 
             with st.expander("➕ Ajouter un critère", expanded=True):
                 with st.form(key="add_criteria_form"):
-                    col1, col2, col3 = st.columns(3)
+                    col1, col2, col3, col4 = st.columns(4)
                     
                     with col1:
                         rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique")
-                        critere = st.text_input("Critère", placeholder="Ex: Leadership", key="new_critere")
                     
                     with col2:
-                        type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], key="new_type_question")
-                        evaluateur = st.selectbox("Qui évalue ce critère ?", ["Recruteur", "Manager", "Les deux"], key="new_evaluateur")
+                        critere = st.text_input("Critère", placeholder="Ex: Leadership", key="new_critere")
                     
                     with col3:
-                         evaluation = st.slider("Évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
+                        type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], key="new_type_question")
+                    
+                    with col4:
+                        evaluateur = st.selectbox("Qui évalue ce critère ?", ["Recruteur", "Manager", "Les deux"], key="new_evaluateur")
 
-                    question = st.text_area("Question pour l'entretien", placeholder="Ex: Parlez-moi d'une situation où vous avez dû faire preuve de leadership.", key="new_question", height=100)
+                    col_q, col_s = st.columns(2)
+                    with col_q:
+                        question = st.text_area("Question pour l'entretien", placeholder="Ex: Parlez-moi d'une situation où vous avez dû faire preuve de leadership.", key="new_question", height=100)
+                    with col_s:
+                        evaluation = st.slider("Évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
                     
                     st.markdown("---")
                     st.markdown("**Générer une question avec l'IA**")
@@ -1114,7 +1119,13 @@ with tabs[2]:
                             if ai_prompt:
                                 with st.spinner("Génération en cours..."):
                                     try:
+                                        # Correction: suppression de l'argument 'length'
                                         ai_response = generate_ai_question(ai_prompt)
+                                        
+                                        # Correction: enlève le préfixe si la fonction le retourne
+                                        if ai_response.strip().startswith("Question:"):
+                                            ai_response = ai_response.strip().replace("Question:", "", 1).strip()
+                                            
                                         st.session_state.ai_generated_question = ai_response
                                     except Exception as e:
                                         st.error(f"Erreur lors de la génération : {e}")
