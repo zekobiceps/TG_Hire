@@ -982,7 +982,6 @@ with tabs[1]:
                 st.session_state.avant_brief_completed = False
                 st.rerun()
                 
-# ---------------- RÉUNION DE BRIEF ----------------
 with tabs[2]:
     # Afficher le message de sauvegarde seulement pour cet onglet
     if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Réunion"):
@@ -1051,10 +1050,26 @@ with tabs[2]:
 
     elif step == 3:
         st.subheader("4️⃣ Stratégie Recrutement")
-        st.multiselect("Canaux prioritaires", ["LinkedIn", "Jobboards", "Cooptation", "Réseaux sociaux", "Chasse de tête"], key="canaux_prioritaires")
-        st.text_area("Critères d'exclusion", key="criteres_exclusion", height=100)
-        st.text_area("Processus d'évaluation (détails)", key="processus_evaluation", height=100)
-        
+        st.multiselect("Canaux prioritaires", ["LinkedIn", "Jobboards", "Cooptation", "Réseaux sociaux", "Chasse de tête", "Annonces", "Entreprise X", "Secteur Y"], key="canaux_prioritaires")
+        st.text_area("Suite du brief", 
+                     value="""Étape 1 : Pré-qualification initiale
+Tri des CV : Vérification des critères minimums (must-have) (expérience, diplôme, etc.).
+Entretien téléphonique de 10 min : Évaluation de la motivation, de la disponibilité et des attentes salariales.
+
+Étape 2 : Évaluation technique et des compétences
+Entretien avec le recruteur (30 min) : Questions sur les compétences techniques (Skills) et les aptitudes (Abilities) en lien avec la matrice KSA.
+Test technique / Étude de cas : Mise en situation concrète pour évaluer la capacité du candidat à résoudre un problème lié au poste.
+
+Étape 3 : Entretien avec le manager
+Entretien d'approfondissement (30 min) : Discussion sur l'expérience, le leadership et l'adéquation culturelle.
+
+Étape 4 : Prise de décision
+Délibération collective : Le recruteur et le manager comparent leurs notes et débriefent sur les candidats pour prendre la décision finale.
+
+Étape 5 : Remise du dossier à la DRH""",
+                     key="processus_evaluation",
+                     height=400)  # Enlarged height to accommodate the text
+
     elif step == 4:
         st.subheader("📝 Notes générales du manager")
         st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=200, 
@@ -1083,7 +1098,6 @@ with tabs[2]:
                             "manager_notes": st.session_state.get("manager_notes", ""),
                             "manager_comments": manager_comments,
                             "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
-                            "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
                             "processus_evaluation": st.session_state.get("processus_evaluation", "")
                         })
                         st.session_state.saved_briefs = existing_briefs
@@ -1094,7 +1108,6 @@ with tabs[2]:
                             "manager_notes": st.session_state.get("manager_notes", ""),
                             "manager_comments": manager_comments,
                             "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
-                            "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
                             "processus_evaluation": st.session_state.get("processus_evaluation", "")
                         })
                     
@@ -1109,7 +1122,7 @@ with tabs[2]:
         with col_cancel:
             if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion"):
                 delete_current_brief()
-
+                
     # ---- Navigation wizard ----
     col1, col2, col3 = st.columns([1, 6, 1])
     with col1:
