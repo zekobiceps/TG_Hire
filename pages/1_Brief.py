@@ -980,6 +980,7 @@ with tabs[1]:
                 st.session_state.current_brief_name = ""
                 st.session_state.avant_brief_completed = False
                 st.rerun()
+
 # ---------------- REUNION BRIEF ----------------           
 with tabs[2]:
     # --- STYLE PERSONNALISÉ POUR LES CHAMPS ---
