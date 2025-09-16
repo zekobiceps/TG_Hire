@@ -28,6 +28,44 @@ try:
 except ImportError:
     WORD_AVAILABLE = False
 
+# -------------------- Fichier unique pour tous les briefs --------------------
+BRIEFS_FILE = "all_briefs.json"  # Fichier unique comme base de données
+
+def save_briefs():
+    """Sauvegarde tous les briefs dans un seul fichier JSON."""
+    try:
+        serializable_briefs = {
+            name: {
+                key: value.to_dict(orient='records') if isinstance(value, pd.DataFrame) else value
+                for key, value in data.items()
+            }
+            for name, data in st.session_state.saved_briefs.items()
+        }
+        with open(BRIEFS_FILE, "w", encoding="utf-8") as f:
+            json.dump(serializable_briefs, f, indent=4, ensure_ascii=False)
+        st.success(f"✅ Tous les briefs sauvegardés dans {BRIEFS_FILE}")
+    except Exception as e:
+        st.error(f"Erreur lors de la sauvegarde des briefs: {e}")
+
+def load_briefs():
+    """Charge tous les briefs depuis le fichier JSON unique."""
+    try:
+        if os.path.exists(BRIEFS_FILE):
+            with open(BRIEFS_FILE, "r", encoding="utf-8") as f:
+                briefs_data = json.load(f)
+                briefs = {}
+                for name, data in briefs_data.items():
+                    briefs[name] = {
+                        key: pd.DataFrame(value) if key == "ksa_matrix" else value
+                        for key, value in data.items()
+                    }
+                return briefs
+        else:
+            return {}
+    except Exception as e:
+        st.error(f"Erreur lors du chargement des briefs: {e}")
+        return {}
+
 # -------------------- Directory for Briefs --------------------
 BRIEFS_DIR = "briefs"
 

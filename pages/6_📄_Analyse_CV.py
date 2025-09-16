@@ -14,42 +14,54 @@ st.markdown("""
 <style>
     /* Cases de texte */
     .stTextInput>div>div>input {
-        background-color: #f0f2f6;
-        border: 2px solid #4CAF50;
-        border-radius: 8px;
-        padding: 10px;
+        background-color: #1F1F1F !important;
+        border: 2px solid #4CAF50 !important;
+        border-radius: 8px !important;
+        padding: 10px !important;
+        color: white !important;
     }
     
     /* Zones de texte */
     .stTextArea>div>div>textarea {
-        background-color: #f0f2f6;
-        border: 2px solid #4CAF50;
-        border-radius: 8px;
-        padding: 10px;
+        background-color: #1F1F1F !important;
+        border: 2px solid #4CAF50 !important;
+        border-radius: 8px !important;
+        padding: 10px !important;
+        color: white !important;
     }
     
     /* Boutons */
     .stButton>button {
-        background-color: #4CAF50;
-        color: white;
-        border-radius: 8px;
-        padding: 10px 24px;
-        font-weight: bold;
-        border: none;
-        transition: all 0.3s;
+        background-color: #4CAF50 !important;
+        color: white !important;
+        border-radius: 8px !important;
+        padding: 10px 24px !important;
+        font-weight: bold !important;
+        border: none !important;
+        transition: all 0.3s !important;
     }
     
     .stButton>button:hover {
-        background-color: #45a049;
-        transform: scale(1.05);
+        background-color: #45a049 !important;
+        transform: scale(1.05) !important;
     }
     
     /* Expanders */
     .streamlit-expanderHeader {
-        background-color: #e8f5e9;
-        border-radius: 8px;
-        padding: 12px;
-        font-weight: bold;
+        background-color: #1F1F1F !important;
+        border-radius: 8px !important;
+        padding: 12px !important;
+        font-weight: bold !important;
+        color: white !important;
+        border: 1px solid #4CAF50 !important;
+    }
+    
+    /* Conteneurs d'expand */
+    .streamlit-expanderContent {
+        background-color: #1F1F1F !important;
+        border-radius: 0 0 8px 8px !important;
+        border: 1px solid #4CAF50 !important;
+        border-top: none !important;
     }
 </style>
 """, unsafe_allow_html=True)
