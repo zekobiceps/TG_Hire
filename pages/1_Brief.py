@@ -314,7 +314,6 @@ with st.sidebar:
     st.metric("✅ Briefs complétés", completed_briefs)
     
     st.divider()
-    st.info("💡 Assistant IA pour la création et gestion de briefs de recrutement")
     if st.button("Tester DeepSeek", key="test_deepseek"):
         test_deepseek_connection()
 
