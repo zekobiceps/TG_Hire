@@ -401,7 +401,3 @@ with st.sidebar:
                 st.error(f"❌ Erreur: {e}")
         else:
             st.error("❌ Clé API non configurée")
-
-# -------------------- Footer --------------------
-st.markdown("---")
-st.markdown("*Application d'analyse de CVs powered by DeepSeek AI*")
