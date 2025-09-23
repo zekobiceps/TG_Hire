@@ -1,4 +1,4 @@
-import sys, os 
+import sys, os
 import streamlit as st
 from datetime import datetime
 import json
@@ -24,11 +24,126 @@ from utils import (
     test_deepseek_connection,
 )
 
-# --- CSS pour augmenter la taille du texte des onglets ---
+# --- CSS pour le style light thème aligné avec Annonces ---
 st.markdown("""
 <style>
+/* Fond de l'application */
+.stApp {
+    background-color: #FFFFFF !important;
+}
+
+/* Style pour les onglets de navigation */
 div[data-testid="stTabs"] button p {
-    font-size: 18px; 
+    font-size: 18px;
+}
+
+/* Style des inputs et textareas */
+.stTextInput input, .stTextArea textarea {
+    background-color: #F0F2F6 !important;
+    color: #333333 !important;
+    border-radius: 4px !important;
+    border: none !important;
+}
+.stSelectbox > div > select {
+    background-color: #F0F2F6 !important;
+    color: #333333 !important;
+    border: none !important;
+    border-radius: 4px !important;
+}
+.stDateInput input {
+    background-color: #F0F2F6 !important;
+    color: #333333 !important;
+    border-radius: 4px !important;
+    border: none !important;
+}
+
+/* Style des boutons */
+.stButton > button[type="primary"] {
+    background-color: #0066CC !important;
+    color: white !important;
+    border-radius: 5px !important;
+    padding: 0.5rem 1rem !important;
+}
+.stButton > button[type="primary"]:hover {
+    background-color: #0055AA !important;
+}
+.stButton > button:not([type="primary"]) {
+    background-color: #E0E0E0 !important;
+    color: #333333 !important;
+    border: none !important;
+    border-radius: 5px !important;
+}
+.stButton > button:not([type="primary"]):hover {
+    background-color: #D0D0D0 !important;
+}
+
+/* Style pour les expanders */
+.streamlit-expanderHeader {
+    background-color: #E0E0E0 !important;
+    color: #333333 !important;
+    border-radius: 5px !important;
+    padding: 0.5rem !important;
+}
+
+/* Style pour les alertes */
+.stSuccess {
+    background-color: #28A745 !important;
+    color: #FFFFFF !important;
+}
+.stWarning {
+    background-color: #FFC107 !important;
+    color: #333333 !important;
+}
+.stInfo {
+    background-color: #17A2B8 !important;
+    color: #FFFFFF !important;
+}
+.stError {
+    background-color: #DC3545 !important;
+    color: #FFFFFF !important;
+}
+
+/* Style pour la matrice KSA */
+.stDataFrame {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 20px;
+    background-color: #FFFFFF !important;
+    font-size: 0.9em;
+    border: 1px solid #CCCCCC;
+}
+.stDataFrame th, .stDataFrame td {
+    padding: 12px 16px;
+    text-align: left;
+    border: 1px solid #CCCCCC;
+    color: #333333;
+}
+.stDataFrame th {
+    background-color: #0066CC !important;
+    color: white !important;
+    font-weight: 600;
+    padding: 14px 16px;
+    font-size: 16px;
+}
+
+/* Style pour les formulaires */
+div[data-testid="stForm"] {
+    padding: 1rem;
+    border: 1px solid #CCCCCC;
+    border-radius: 0.5rem;
+}
+
+/* Style pour les conseils IA */
+.ai-advice-box {
+    background-color: #F0F2F6;
+    border-left: 4px solid #0066CC;
+    padding: 1rem;
+    border-radius: 4px;
+    margin-top: 1rem;
+    color: #333333;
+}
+.ai-advice-box strong {
+    color: #000000;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -72,63 +187,6 @@ def render_ksa_matrix():
     
     # Expander pour ajouter un nouveau critère
     with st.expander("➕ Ajouter un critère", expanded=True):
-        # CSS pour améliorer l'apparence avec 3 colonnes et styliser la réponse
-        st.markdown("""
-        <style>
-            .stTextInput, .stSelectbox, .stSlider, .stTextArea {
-                margin-bottom: 5px;
-                padding: 5px;
-                border-radius: 8px;
-                background-color: #2a2a2a;
-                color: #ffffff;
-            }
-            .stTextInput > div > input, .stTextArea > div > textarea {
-                background-color: #2a2a2a;
-                color: #ffffff;
-                border: 1px solid #555555;
-                border-radius: 8px;
-            }
-            .stSelectbox > div > select {
-                background-color: #2a2a2a;
-                color: #ffffff;
-                border: 1px solid #555555;
-                border-radius: 8px;
-            }
-            .stButton > button {
-                background-color: #FF0000;
-                color: white;
-                border-radius: 8px;
-                padding: 5px 10px;
-                margin-top: 5px;
-            }
-            .stButton > button:hover {
-                background-color: #FF3333;
-            }
-            .st-expander {
-                border: 1px solid #555555;
-                border-radius: 8px;
-                background-color: #1e1e1e;
-                padding: 5px;
-            }
-            .ai-response {
-                margin-top: 10px;
-                padding: 5px;
-                background-color: #28a745; /* Vert pour la réponse en bas */
-                border-radius: 8px;
-                color: #ffffff;
-            }
-            .success-icon {
-                display: inline-block;
-                margin-right: 5px;
-                color: #28a745; /* Vert pour l'icône ✅ */
-            }
-            .stSuccess { /* Override green from st.success */
-                background-color: #28a745 !important;
-                color: #ffffff !important;
-            }
-        </style>
-        """, unsafe_allow_html=True)
-        
         # Formulaire pour ajouter un critère avec 3 colonnes
         with st.form(key="add_ksa_criterion_form"):
             # "Cible / Standard attendu" en haut, sur toute la largeur
@@ -333,383 +391,6 @@ with st.sidebar:
 
 # ---------------- NAVIGATION PRINCIPALE ----------------
 st.title("🤖 TG-Hire IA - Brief")
-
-# Style CSS pour les onglets personnalisés et les tableaux améliorés
-st.markdown("""
-    <style>
-    
-    
-    /* Style pour les onglets de navigation */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 0px;
-        background-color: #0E1117;
-        padding: 0px;
-        border-radius: 4px;
-    }
-    
-    /* Style de base pour tous les onglets */
-    .stTabs [data-baseweb="tab"] {
-        background-color: #0E1117 !important;
-        color: white !important;
-        border: none !important;
-        padding: 10px 16px !important;
-        font-weight: 500 !important;
-        border-radius: 0 !important;
-        margin-right: 0 !important;
-        height: auto !important;
-    }
-    
-    /* Style pour l'onglet actif */
-    .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        color: #ff4b4b !important;
-        background-color: #0E1117 !important;
-        border-bottom: 3px solid #ff4b4b !important;
-    }
-    
-    /* Boutons principaux */
-    .stButton > button {
-        background-color: #FF4B4B;
-        color: white;
-        border: none;
-        border-radius: 5px;
-        padding: 0.5rem 1rem;
-        font-weight: 500;
-    }
-    
-    .stButton > button:hover {
-        background-color: #FF6B6B;
-        color: white;
-    }
-    
-    /* Boutons secondaires */
-    .stButton > button[kind="secondary"] {
-        background-color: #262730;
-        color: #FAFAFA;
-        border: 1px solid #FF4B4B;
-    }
-    
-    .stButton > button[kind="secondary"]:hover {
-        background-color: #3D3D4D;
-        color: #FAFAFA;
-    }
-    
-    /* Bouton Filtrer en rouge vif */
-    .stButton > button[key="apply_filter"] {
-        background-color: #FF0000 !important;
-        color: white !important;
-        border: none;
-    }
-    
-    .stButton > button[key="apply_filter"]:hover {
-        background-color: #FF3333 !important;
-        color: white !important;
-    }
-    
-    /* Expanders */
-    .streamlit-expanderHeader {
-        background-color: #262730;
-        color: #FAFAFA;
-        border-radius: 5px;
-        padding: 0.5rem;
-    }
-    
-    /* Correction pour les selectbox */
-    div[data-baseweb="select"] > div {
-        border: none !important;
-        background-color: #262730 !important;
-        color: white !important;
-        border-radius: 4px !important;
-    }
-            /* Style pour la matrice KSA */
-    .stDataFrame {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 20px;
-        background-color: #0d1117;
-        font-size: 0.9em;
-        border: 1px solid #ffffff;
-    }
-    
-    .stDataFrame th, .stDataFrame td {
-        padding: 12px 16px;
-        text-align: left;
-        border: 1px solid #ffffff;
-        color: #e6edf3;
-    }
-    
-    .stDataFrame th {
-        background-color: #FF4B4B !important;
-        color: white !important;
-        font-weight: 600;
-        padding: 14px 16px;
-        font-size: 16px;
-        border: 1px solid #ffffff;
-    }
-    
-    /* Auto-size pour les colonnes de la matrice */
-    .stDataFrame td:nth-child(1), .stDataFrame th:nth-child(1) { width: 10%; }
-    .stDataFrame td:nth-child(2), .stDataFrame th:nth-child(2) { width: 25%; }
-    .stDataFrame td:nth-child(3), .stDataFrame th:nth-child(3) { width: 15%; }
-    .stDataFrame td:nth-child(4), .stDataFrame th:nth-child(4) { width: 40%; }
-    .stDataFrame td:nth-child(5), .stDataFrame th:nth-child(5) { width: 10%; }
-    
-    /* Correction pour les inputs */
-    .stTextInput input {
-        background-color: #262730 !important;
-        color: white !important;
-        border-radius: 4px !important;
-        border: none !important;
-    }
-    
-    /* Correction pour les textareas */
-    .stTextArea textarea {
-        background-color: #262730 !important;
-        color: white !important;
-        border-radius: 4px !important;
-        border: none !important;
-    }
-    
-    /* Correction pour les date inputs */
-    .stDateInput input {
-        background-color: #262730 !important;
-        color: white !important;
-        border-radius: 4px !important;
-        border: none !important;
-    }
-    
-    /* Réduire la hauteur de la section avant-brief */
-    .stTextArea textarea {
-        height: 100px !important;
-    }
-    
-    /* Ajustement pour le message de confirmation */
-    .message-container {
-        margin-top: 10px;
-        padding: 10px;
-        border-radius: 5px;
-    }
-    
-    /* Style pour les messages d'alerte */
-    .stAlert {
-        padding: 10px;
-        margin-top: 10px;
-    }
-    
-    /* Style pour le tableau de méthode complète */
-    .comparison-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 1rem;
-    }
-    
-    .comparison-table th, .comparison-table td {
-        border: 1px solid #424242;
-        padding: 8px;
-        text-align: left;
-    }
-    
-    .comparison-table th {
-        background-color: #262730;
-        font-weight: bold;
-    }
-
-    /* Style pour la matrice KSA */
-    .dataframe {
-        width: 100%;
-    }
-    
-    /* Style pour le tableau amélioré - TABLEAU SOMBRE */
-    .dark-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 20px;
-        background-color: #0d1117; /* Fond noir pour le tableau */
-        font-size: 0.9em; /* Augmentation de la taille du texte */
-        border: 1px solid #ffffff; /* Bordure blanche */
-    }
-    
-    .dark-table th, .dark-table td {
-        padding: 12px 16px;
-        text-align: left;
-        border: 1px solid #ffffff; /* Bordures blanches */
-        color: #e6edf3; /* Texte clair sur fond sombre */
-    }
-    
-    .dark-table th {
-        background-color: #FF4B4B !important;  /* Rouge vif identique aux boutons */
-        color: white !important;
-        font-weight: 600;
-        padding: 14px 16px;
-        font-size: 16px;
-        border: 1px solid #ffffff; /* Bordure blanche */
-    }
-    
-    /* Auto-size pour les deux premières colonnes */
-    .dark-table th:nth-child(1),
-    .dark-table td:nth-child(1) {
-        width: auto !important;
-        min-width: 100px;
-    }
-    
-    .dark-table th:nth-child(2),
-    .dark-table td:nth-child(2) {
-        width: auto !important;
-        min-width: 150px;
-    }
-    
-    .dark-table th:nth-child(3),
-    .dark-table td:nth-child(3) {
-        width: 65% !important;
-    }
-    
-    /* Style pour les tableaux avec 4 colonnes (réunion de brief) */
-    .dark-table.four-columns th:nth-child(1),
-    .dark-table.four-columns td:nth-child(1) {
-        width: auto !important;
-        min-width: 100px;
-    }
-    
-    .dark-table.four-columns th:nth-child(2),
-    .dark-table.four-columns td:nth-child(2) {
-        width: auto !important;
-        min-width: 150px;
-    }
-    
-    .dark-table.four-columns th:nth-child(3),
-    .dark-table.four-columns td:nth-child(3) {
-        width: 50% !important;
-    }
-    
-    .dark-table.four-columns th:nth-child(4),
-    .dark-table.four-columns td:nth-child(4) {
-        width: 25% !important;
-    }
-    
-    .section-title {
-        font-weight: 600;
-        color: #58a6ff; /* Couleur bleue pour les titres de section */
-        font-size: 0.95em; /* Augmentation de la taille du texte */
-        margin-bottom: 0 !important; /* Pas de marge pour alignement */
-    }
-    
-    /* Style pour les textareas dans les tableaux */
-    .table-textarea {
-        width: 100%;
-        min-height: 60px;
-        background-color: #2D2D2D;
-        color: white;
-        border: 1px solid #555;
-        border-radius: 4px;
-        padding: 6px;
-        font-size: 0.9em; /* Augmentation de la taille du texte */
-        resize: vertical;
-    }
-    
-    /* Style pour les cellules de texte */
-    .table-text {
-        padding: 6px;
-        font-size: 0.9em; /* Augmentation de la taille du texte */
-        color: #e6edf3;
-    }
-    
-    /* Supprimer complètement les lignes vides */
-    .empty-row {
-        display: none;
-    }
-    
-    /* Style pour le data_editor afin de le faire ressembler au dark-table */
-    .stDataFrame {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 20px;
-        background-color: #0d1117;
-        font-size: 0.9em;
-        border: 1px solid #ffffff;
-    }
-    
-    .stDataFrame th, .stDataFrame td {
-        padding: 12px 16px;
-        text-align: left;
-        border: 1px solid #ffffff;
-        color: #e6edf3;
-    }
-    
-    .stDataFrame th {
-        background-color: #FF4B4B !important;
-        color: white !important;
-        font-weight: 600;
-        padding: 14px 16px;
-        font-size: 16px;
-        border: 1px solid #ffffff;
-    }
-    
-    .stDataFrame td:first-child {
-        font-weight: 600;
-        color: #58a6ff; /* Couleur bleue pour les titres de section */
-    }
-    
-    /* Auto-size pour les deux premières colonnes */
-    .stDataFrame td:nth-child(1) {
-        width: auto !important;
-        min-width: 100px;
-    }
-    
-    .stDataFrame td:nth-child(2) {
-        width: auto !important;
-        min-width: 150px;
-    }
-    
-    .stDataFrame td:nth-child(3) {
-        width: 50% !important;
-    }
-    
-    .stDataFrame td:nth-child(4) {
-        width: 25% !important;
-    }
-    
-    /* Style pour les cellules éditable (Informations) */
-    .stDataFrame td:nth-child(3) textarea {
-        background-color: #2D2D2D !important;
-        color: white !important;
-        border: 1px solid #555 !important;
-        border-radius: 4px !important;
-        padding: 6px !important;
-        min-height: 60px !important;
-        resize: vertical !important;
-    }
-    
-    /* Permettre le retour à la ligne avec Alt+Enter */
-    .stTextArea textarea {
-        white-space: pre-wrap !important;
-    }
-    
-    /* Élargir manuellement les lignes */
-    .stDataFrame tr {
-        height: auto !important;
-    }
-    
-    .stDataFrame td {
-        height: auto !important;
-        min-height: 60px !important;
-    }
-            /* Nouveau style pour les conseils IA */
-.ai-advice-box {
-    background-color: #1A1A1A;
-    border-left: 4px solid #FF4B4B;
-    padding: 1rem;
-    border-radius: 4px;
-    margin-top: 1rem;
-    color: #E0E0E0;
-}
-.ai-advice-box strong {
-    color: #FFFFFF;
-}
-    </style>
-""", unsafe_allow_html=True)
-
-# Vérification si un brief est chargé au début de l'application
-if "current_brief_name" not in st.session_state:
-    st.session_state.current_brief_name = ""
 
 # Création des onglets dans l'ordre demandé : Gestion, Avant-brief, Réunion de brief, Synthèse
 tabs = st.tabs([
@@ -1032,30 +713,6 @@ with tabs[1]:
 
 # ---------------- REUNION BRIEF ----------------           
 with tabs[2]:
-    # --- STYLE PERSONNALISÉ POUR LES CHAMPS ---
-    st.markdown("""
-        <style>
-            .stTextArea > div > label > div {
-                color: #A9A9A9; /* Texte du label */
-            }
-            .stTextArea > div > div > textarea {
-                background-color: #2F333B; /* Fond de la zone de texte */
-                color: white; /* Couleur du texte saisi */
-                border-color: #555555; /* Bordure des champs */
-            }
-            .stTextInput > div > div > input {
-                background-color: #2F333B;
-                color: white;
-                border-color: #555555;
-            }
-            div[data-testid="stForm"] {
-                padding: 1rem;
-                border: 1px solid #555555;
-                border-radius: 0.5rem;
-            }
-        </style>
-        """, unsafe_allow_html=True)
-    
     # Afficher le message de sauvegarde
     if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Réunion"):
         st.success(st.session_state.save_message)
@@ -1063,7 +720,7 @@ with tabs[2]:
         st.session_state.save_message_tab = None
 
     brief_display_name = f"Réunion de brief - {st.session_state.get('current_brief_name', 'Nom du Brief')}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
-    st.markdown(f"<h3 style='color: #FFFFFF;'>📝 {brief_display_name}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color: #333333;'>📝 {brief_display_name}</h3>", unsafe_allow_html=True)
 
     total_steps = 4
     step = st.session_state.reunion_step
