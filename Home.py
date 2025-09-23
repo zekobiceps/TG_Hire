@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from utils import *
+from datetime import datetime
 init_session_state()
 
 st.set_page_config(
@@ -39,49 +40,45 @@ st.markdown("""
 .dataframe tr:hover {
     background-color: #f0f0f0;
 }
-.dataframe td ul {
-    margin: 0;
-    padding-left: 20px;
+.block-container {
+    padding-top: 0 !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
-st.divider()
+# Roadmap des Fonctionnalités sans divider en haut
 st.header("🚀 Roadmap des Fonctionnalités")
 
-# Initialisation des données dans session_state
+# Initialisation des données dans session_state avec dates
 if "roadmap_data" not in st.session_state:
     st.session_state.roadmap_data = [
-        {"title": "Système de login avancé", "description": "Intégration OAuth ou JWT pour multi-utilisateurs.", "status": "À développer"},
-        {"title": "Export CSV des briefs", "description": "Génération de rapports pour Excel.", "status": "À développer"},
-        {"title": "Base de données SQLite", "description": "Stockage persistant des briefs avec UI de gestion.", "status": "En cours de développement"},
-        {"title": "Onglets de sourcing (Boolean, X-Ray)", "description": "Génération de requêtes et liens LinkedIn/Google.", "status": "Réalisé"},
-        {"title": "Générateur InMail", "description": "Messages personnalisés avec IA.", "status": "Réalisé"}
+        {"title": "Onglets de sourcing (Boolean, X-Ray)", "description": "Génération de requêtes et liens LinkedIn/Google.", "status": "Réalisé", "date": "2025-09-20 10:00"},
+        {"title": "Générateur InMail", "description": "Messages personnalisés avec IA.", "status": "Réalisé", "date": "2025-09-21 14:30"},
+        {"title": "Base de données SQLite", "description": "Stockage persistant des briefs avec UI de gestion.", "status": "En cours de développement", "date": "2025-09-22 09:15"},
+        {"title": "Export CSV des briefs", "description": "Génération de rapports pour Excel.", "status": "À développer", "date": "2025-09-23 11:00"},
+        {"title": "Système de login avancé", "description": "Intégration OAuth ou JWT pour multi-utilisateurs.", "status": "À développer", "date": "2025-09-23 12:00"}
     ]
 
-# Préparation des données pour le tableau
-to_do = [item["title"] for item in st.session_state.roadmap_data if item["status"] == "À développer"]
-in_progress = [item["title"] for item in st.session_state.roadmap_data if item["status"] == "En cours de développement"]
-done = [item["title"] for item in st.session_state.roadmap_data if item["status"] == "Réalisé"]
+# Mettre à jour la date lors de la modification
+for item in st.session_state.roadmap_data:
+    if "last_modified" not in item:
+        item["last_modified"] = item["date"]
+    else:
+        item["last_modified"] = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-# Conversion en DataFrame avec une ligne et trois colonnes
-data = {
-    "À développer": to_do,
-    "En cours de développement": in_progress,
-    "Réalisé": done
-}
-df_roadmap = pd.DataFrame([data])
+# Conversion en DataFrame avec tri chronologique (du plus récent au plus ancien)
+df_roadmap = pd.DataFrame(st.session_state.roadmap_data)
+df_roadmap = df_roadmap.sort_values(by="last_modified", ascending=False)
 
 # Affichage du tableau
-st.dataframe(df_roadmap, use_container_width=True)
+st.dataframe(df_roadmap[["title", "description", "status", "last_modified"]], use_container_width=True)
 
 # Menu en bas pour gérer les fonctionnalités
 st.divider()
 st.subheader("🛠️ Gestion des Fonctionnalités")
 
 # Sélection d'une fonctionnalité
-all_titles = [item["title"] for item in st.session_state.roadmap_data]
-selected_title = st.selectbox("Sélectionner une fonctionnalité", all_titles, index=None)
+selected_title = st.selectbox("Sélectionner une fonctionnalité", [item["title"] for item in st.session_state.roadmap_data], index=None)
 
 if selected_title:
     # Trouver l'élément sélectionné
@@ -101,6 +98,7 @@ if selected_title:
                 selected_item["title"] = new_title
                 selected_item["description"] = new_description
                 selected_item["status"] = new_status
+                selected_item["last_modified"] = datetime.now().strftime("%Y-%m-%d %H:%M")
                 st.success("✅ Modifications enregistrées !")
                 st.rerun()
 
@@ -120,7 +118,9 @@ if st.button("Ajouter"):
         st.session_state.roadmap_data.append({
             "title": new_title,
             "description": new_description,
-            "status": new_status
+            "status": new_status,
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "last_modified": datetime.now().strftime("%Y-%m-%d %H:%M")
         })
         st.success("✅ Fonctionnalité ajoutée !")
         st.rerun()
