@@ -18,7 +18,7 @@ st.markdown("""
     background-color: #f6f8fa;
     border: 1px solid #e1e4e8;
     border-radius: 6px;
-    padding: 8px;
+    padding: 0px; /* Suppression du padding supérieur pour enlever les blocs vides */
     margin: 8px;
     min-height: 400px;
 }
@@ -31,11 +31,11 @@ st.markdown("""
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 .kanban-card h4 {
-    margin: 0 0 8px 0;
+    margin: 0; /* Suppression des marges pour enlever les blocs vides au-dessus du titre */
     color: #24292f;
 }
 .kanban-card p {
-    margin: 0 0 8px 0;
+    margin: 0 0 8px 0; /* Garde une petite marge sous la description */
     color: #586069;
     font-size: 14px;
 }
@@ -43,14 +43,12 @@ st.markdown("""
     display: flex;
     gap: 4px;
 }
-</style>
-""", unsafe_allow_html=True)
-
-# Suppression du vide en haut
-st.markdown("""
-<style>
-.stApp > header { display: none; }
-.stApp { margin-top: -80px; }
+.stColumn + .stColumn {
+    border-left: 1px solid #e1e4e8;
+    padding-left: 8px;
+}
+/* Annulation de la marge supérieure pour ramener le contenu à sa place */
+.stApp { margin-top: 0; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -75,16 +73,6 @@ if "kanban_data" not in st.session_state:
 
 # Interface Kanban avec 3 colonnes
 col1, col2, col3 = st.columns(3)
-
-# Ajout de lignes entre colonnes via CSS
-st.markdown("""
-<style>
-.stColumn + .stColumn {
-    border-left: 1px solid #e1e4e8;
-    padding-left: 8px;
-}
-</style>
-""", unsafe_allow_html=True)
 
 with col1:
     st.markdown('<div class="kanban-column">', unsafe_allow_html=True)
