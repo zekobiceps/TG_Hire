@@ -93,10 +93,11 @@ else:
                 margin: 8px 0; 
                 border-left: 4px solid {priority_color[feature['priority']]};
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                color: #000000;
             ">
-            <div style="font-weight: bold; font-size: 14px;">📌 {feature['title']}</div>
-            <div style="font-size: 12px; color: #666; margin: 5px 0;">{feature['description']}</div>
-            <div style="font-size: 11px; color: #888;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
+            <div style="font-weight: bold; font-size: 14px; color: #000000;">📌 {feature['title']}</div>
+            <div style="font-size: 12px; color: #333333; margin: 5px 0;">{feature['description']}</div>
+            <div style="font-size: 11px; color: #666666;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
             </div>
             """, unsafe_allow_html=True)
     
@@ -114,10 +115,11 @@ else:
                 margin: 8px 0; 
                 border-left: 4px solid {priority_color[feature['priority']]};
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                color: #000000;
             ">
-            <div style="font-weight: bold; font-size: 14px;">⚡ {feature['title']}</div>
-            <div style="font-size: 12px; color: #666; margin: 5px 0;">{feature['description']}</div>
-            <div style="font-size: 11px; color: #888;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
+            <div style="font-weight: bold; font-size: 14px; color: #000000;">⚡ {feature['title']}</div>
+            <div style="font-size: 12px; color: #333333; margin: 5px 0;">{feature['description']}</div>
+            <div style="font-size: 11px; color: #666666;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
             </div>
             """, unsafe_allow_html=True)
     
@@ -135,10 +137,11 @@ else:
                 margin: 8px 0; 
                 border-left: 4px solid {priority_color[feature['priority']]};
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                color: #000000;
             ">
-            <div style="font-weight: bold; font-size: 14px;">✅ {feature['title']}</div>
-            <div style="font-size: 12px; color: #666; margin: 5px 0;">{feature['description']}</div>
-            <div style="font-size: 11px; color: #888;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
+            <div style="font-weight: bold; font-size: 14px; color: #000000;">✅ {feature['title']}</div>
+            <div style="font-size: 12px; color: #333333; margin: 5px 0;">{feature['description']}</div>
+            <div style="font-size: 11px; color: #666666;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
             </div>
             """, unsafe_allow_html=True)
     
@@ -177,7 +180,13 @@ else:
                 
                 if st.form_submit_button("💾 Ajouter la fonctionnalité"):
                     if new_title and new_description:
-                        new_id = max([f["id"] for features in st.session_state.features.values() for f in features]) + 1
+                        # Trouver le prochain ID disponible
+                        all_ids = []
+                        for status, features in st.session_state.features.items():
+                            for feature in features:
+                                all_ids.append(feature["id"])
+                        new_id = max(all_ids) + 1 if all_ids else 1
+                        
                         new_feature = {
                             "id": new_id,
                             "title": new_title,
