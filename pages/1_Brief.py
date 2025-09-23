@@ -1,3 +1,8 @@
+import streamlit as st
+
+# Vérification de la connexion
+if not st.session_state.get("logged_in", False):
+    st.stop()
 import sys, os 
 import streamlit as st
 from datetime import datetime
