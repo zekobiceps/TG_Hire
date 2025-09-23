@@ -1,6 +1,7 @@
 import streamlit as st
 from utils import *
 from datetime import datetime
+import pandas as pd
 
 # Initialisation de l'état de session
 init_session_state()
@@ -70,53 +71,10 @@ else:
     )
     
     st.title("📊 Roadmap Fonctionnelle")
-    st.write("Suivi du développement des fonctionnalités TG-Hire IA")
 
     st.sidebar.success("Choisissez une page ci-dessus.")
 
-    # --- GESTION DES FONCTIONNALITÉS ---
-    st.markdown("---")
-    
-    # Formulaire pour ajouter/modifier une fonctionnalité
-    with st.expander("➕ Ajouter une nouvelle fonctionnalité", expanded=False):
-        with st.form(key="feature_form"):
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                feature_title = st.text_input("Titre de la fonctionnalité *", placeholder="Ex: Intégration API LinkedIn")
-                feature_description = st.text_area("Description détaillée *", placeholder="Décrivez la fonctionnalité...", height=100)
-            
-            with col2:
-                feature_status = st.selectbox("Statut *", ["À développer", "En cours", "Réalisé"])
-                feature_priority = st.selectbox("Priorité *", ["Haute", "Moyenne", "Basse"])
-            
-            col_btn1, col_btn2 = st.columns(2)
-            with col_btn1:
-                submit_feature = st.form_submit_button("💾 Enregistrer la fonctionnalité", type="primary")
-            with col_btn2:
-                cancel_feature = st.form_submit_button("🗑️ Annuler")
-            
-            if submit_feature:
-                if feature_title and feature_description:
-                    # Générer un ID unique
-                    new_id = max([max([f["id"] for f in features]) for features in st.session_state.features.values()]) + 1
-                    
-                    new_feature = {
-                        "id": new_id,
-                        "title": feature_title,
-                        "description": feature_description,
-                        "priority": feature_priority,
-                        "date_ajout": datetime.now().strftime("%Y-%m-%d")
-                    }
-                    
-                    st.session_state.features[feature_status].append(new_feature)
-                    st.success(f"✅ Fonctionnalité '{feature_title}' ajoutée avec succès !")
-                    st.rerun()
-                else:
-                    st.error("❌ Veuillez remplir tous les champs obligatoires (*)")
-
     # --- TABLEAU KANBAN DES FONCTIONNALITÉS ---
-    st.markdown("## 📋 Tableau Kanban des Fonctionnalités")
     
     # Création des colonnes Kanban
     col1, col2, col3 = st.columns(3)
@@ -126,127 +84,71 @@ else:
         st.markdown("### 📋 À développer")
         st.markdown("---")
         for feature in st.session_state.features["À développer"]:
-            with st.container():
-                priority_color = {"Haute": "#f44336", "Moyenne": "#ff9800", "Basse": "#4caf50"}
-                st.markdown(f"""
-                <div style="
-                    background: #ffebee; 
-                    padding: 12px; 
-                    border-radius: 8px; 
-                    margin: 8px 0; 
-                    border-left: 4px solid {priority_color[feature['priority']]};
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                ">
-                <div style="font-weight: bold; font-size: 14px;">📌 {feature['title']}</div>
-                <div style="font-size: 12px; color: #666; margin: 5px 0;">{feature['description']}</div>
-                <div style="font-size: 11px; color: #888;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Boutons d'action pour chaque fonctionnalité
-                col_act1, col_act2, col_act3 = st.columns(3)
-                with col_act1:
-                    if st.button("✏️", key=f"edit_{feature['id']}", help="Modifier"):
-                        st.session_state.editing_feature = feature
-                with col_act2:
-                    if st.button("➡️", key=f"move_{feature['id']}", help="Déplacer vers En cours"):
-                        st.session_state.features["À développer"].remove(feature)
-                        st.session_state.features["En cours"].append(feature)
-                        st.rerun()
-                with col_act3:
-                    if st.button("🗑️", key=f"delete_{feature['id']}", help="Supprimer"):
-                        st.session_state.features["À développer"].remove(feature)
-                        st.rerun()
-                st.markdown("---")
+            priority_color = {"Haute": "#f44336", "Moyenne": "#ff9800", "Basse": "#4caf50"}
+            st.markdown(f"""
+            <div style="
+                background: #ffebee; 
+                padding: 12px; 
+                border-radius: 8px; 
+                margin: 8px 0; 
+                border-left: 4px solid {priority_color[feature['priority']]};
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            ">
+            <div style="font-weight: bold; font-size: 14px;">📌 {feature['title']}</div>
+            <div style="font-size: 12px; color: #666; margin: 5px 0;">{feature['description']}</div>
+            <div style="font-size: 11px; color: #888;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
+            </div>
+            """, unsafe_allow_html=True)
     
     # Colonne "En cours"
     with col2:
         st.markdown("### 🔄 En cours")
         st.markdown("---")
         for feature in st.session_state.features["En cours"]:
-            with st.container():
-                priority_color = {"Haute": "#f44336", "Moyenne": "#ff9800", "Basse": "#4caf50"}
-                st.markdown(f"""
-                <div style="
-                    background: #fff3e0; 
-                    padding: 12px; 
-                    border-radius: 8px; 
-                    margin: 8px 0; 
-                    border-left: 4px solid {priority_color[feature['priority']]};
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                ">
-                <div style="font-weight: bold; font-size: 14px;">⚡ {feature['title']}</div>
-                <div style="font-size: 12px; color: #666; margin: 5px 0;">{feature['description']}</div>
-                <div style="font-size: 11px; color: #888;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                col_act1, col_act2, col_act3, col_act4 = st.columns(4)
-                with col_act1:
-                    if st.button("✏️", key=f"edit_e_{feature['id']}", help="Modifier"):
-                        st.session_state.editing_feature = feature
-                with col_act2:
-                    if st.button("⬅️", key=f"move_back_{feature['id']}", help="Déplacer vers À développer"):
-                        st.session_state.features["En cours"].remove(feature)
-                        st.session_state.features["À développer"].append(feature)
-                        st.rerun()
-                with col_act3:
-                    if st.button("➡️", key=f"move_next_{feature['id']}", help="Déplacer vers Réalisé"):
-                        st.session_state.features["En cours"].remove(feature)
-                        st.session_state.features["Réalisé"].append(feature)
-                        st.rerun()
-                with col_act4:
-                    if st.button("🗑️", key=f"delete_e_{feature['id']}", help="Supprimer"):
-                        st.session_state.features["En cours"].remove(feature)
-                        st.rerun()
-                st.markdown("---")
+            priority_color = {"Haute": "#f44336", "Moyenne": "#ff9800", "Basse": "#4caf50"}
+            st.markdown(f"""
+            <div style="
+                background: #fff3e0; 
+                padding: 12px; 
+                border-radius: 8px; 
+                margin: 8px 0; 
+                border-left: 4px solid {priority_color[feature['priority']]};
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            ">
+            <div style="font-weight: bold; font-size: 14px;">⚡ {feature['title']}</div>
+            <div style="font-size: 12px; color: #666; margin: 5px 0;">{feature['description']}</div>
+            <div style="font-size: 11px; color: #888;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
+            </div>
+            """, unsafe_allow_html=True)
     
     # Colonne "Réalisé"
     with col3:
         st.markdown("### ✅ Réalisé")
         st.markdown("---")
         for feature in st.session_state.features["Réalisé"]:
-            with st.container():
-                priority_color = {"Haute": "#f44336", "Moyenne": "#ff9800", "Basse": "#4caf50"}
-                st.markdown(f"""
-                <div style="
-                    background: #e8f5e8; 
-                    padding: 12px; 
-                    border-radius: 8px; 
-                    margin: 8px 0; 
-                    border-left: 4px solid {priority_color[feature['priority']]};
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                ">
-                <div style="font-weight: bold; font-size: 14px;">✅ {feature['title']}</div>
-                <div style="font-size: 12px; color: #666; margin: 5px 0;">{feature['description']}</div>
-                <div style="font-size: 11px; color: #888;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                col_act1, col_act2, col_act3 = st.columns(3)
-                with col_act1:
-                    if st.button("✏️", key=f"edit_r_{feature['id']}", help="Modifier"):
-                        st.session_state.editing_feature = feature
-                with col_act2:
-                    if st.button("⬅️", key=f"move_back_r_{feature['id']}", help="Déplacer vers En cours"):
-                        st.session_state.features["Réalisé"].remove(feature)
-                        st.session_state.features["En cours"].append(feature)
-                        st.rerun()
-                with col_act3:
-                    if st.button("🗑️", key=f"delete_r_{feature['id']}", help="Supprimer"):
-                        st.session_state.features["Réalisé"].remove(feature)
-                        st.rerun()
-                st.markdown("---")
+            priority_color = {"Haute": "#f44336", "Moyenne": "#ff9800", "Basse": "#4caf50"}
+            st.markdown(f"""
+            <div style="
+                background: #e8f5e8; 
+                padding: 12px; 
+                border-radius: 8px; 
+                margin: 8px 0; 
+                border-left: 4px solid {priority_color[feature['priority']]};
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            ">
+            <div style="font-weight: bold; font-size: 14px;">✅ {feature['title']}</div>
+            <div style="font-size: 12px; color: #666; margin: 5px 0;">{feature['description']}</div>
+            <div style="font-size: 11px; color: #888;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
+            </div>
+            """, unsafe_allow_html=True)
     
-    # --- STATISTIQUES ---
+    # --- STATISTIQUES SIMPLES ---
     st.markdown("---")
-    st.markdown("## 📈 Statistiques de Progression")
     
     total_features = sum(len(features) for features in st.session_state.features.values())
     completed_features = len(st.session_state.features["Réalisé"])
-    in_progress_features = len(st.session_state.features["En cours"])
     
-    col_stats1, col_stats2, col_stats3, col_stats4 = st.columns(4)
+    col_stats1, col_stats2 = st.columns(2)
     
     with col_stats1:
         st.metric("Fonctionnalités totales", total_features)
@@ -254,61 +156,127 @@ else:
     with col_stats2:
         completion_rate = (completed_features / total_features * 100) if total_features > 0 else 0
         st.metric("Taux de réalisation", f"{completion_rate:.1f}%")
-    
-    with col_stats3:
-        st.metric("En développement", in_progress_features)
-    
-    with col_stats4:
-        st.metric("En attente", len(st.session_state.features["À développer"]))
-    
-    # Barre de progression
-    progress = completed_features / total_features if total_features > 0 else 0
-    st.progress(progress)
-    st.caption(f"Progression générale: {completed_features}/{total_features} fonctionnalités ({completion_rate:.1f}%)")
 
-    # --- EXPORT DES DONNÉES ---
+    # --- ONGLET DE GESTION ---
     st.markdown("---")
-    st.markdown("## 💾 Export des Données")
-    
-    col_export1, col_export2 = st.columns(2)
-    
-    with col_export1:
-        if st.button("📥 Exporter la roadmap (CSV)", use_container_width=True):
-            # Créer un DataFrame pour l'export
-            export_data = []
-            for status, features in st.session_state.features.items():
-                for feature in features:
-                    export_data.append({
-                        "Statut": status,
-                        "Titre": feature["title"],
-                        "Description": feature["description"],
-                        "Priorité": feature["priority"],
-                        "Date d'ajout": feature["date_ajout"]
-                    })
-            
-            df = pd.DataFrame(export_data)
-            csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                "Télécharger CSV",
-                csv,
-                "roadmap_tghire.csv",
-                "text/csv",
-                use_container_width=True
-            )
-    
-    with col_export2:
-        if st.button("🔄 Réinitialiser la roadmap", use_container_width=True):
-            if st.checkbox("Confirmer la réinitialisation (cette action est irréversible)"):
-                st.session_state.features = {
-                    "À développer": [],
-                    "En cours": [],
-                    "Réalisé": []
-                }
-                st.success("Roadmap réinitialisée !")
-                st.rerun()
+    with st.expander("🔧 Gestion des fonctionnalités", expanded=False):
+        tab1, tab2, tab3 = st.tabs(["➕ Ajouter", "✏️ Modifier", "🗑️ Supprimer"])
+        
+        with tab1:
+            st.subheader("Ajouter une nouvelle fonctionnalité")
+            with st.form(key="add_feature_form"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    new_title = st.text_input("Titre de la fonctionnalité *")
+                    new_description = st.text_area("Description *", height=100)
+                
+                with col2:
+                    new_status = st.selectbox("Statut *", ["À développer", "En cours", "Réalisé"])
+                    new_priority = st.selectbox("Priorité *", ["Haute", "Moyenne", "Basse"])
+                
+                if st.form_submit_button("💾 Ajouter la fonctionnalité"):
+                    if new_title and new_description:
+                        new_id = max([f["id"] for features in st.session_state.features.values() for f in features]) + 1
+                        new_feature = {
+                            "id": new_id,
+                            "title": new_title,
+                            "description": new_description,
+                            "priority": new_priority,
+                            "date_ajout": datetime.now().strftime("%Y-%m-%d")
+                        }
+                        st.session_state.features[new_status].append(new_feature)
+                        st.success("✅ Fonctionnalité ajoutée avec succès !")
+                        st.rerun()
+                    else:
+                        st.error("❌ Veuillez remplir tous les champs obligatoires")
+        
+        with tab2:
+            st.subheader("Modifier une fonctionnalité")
+            if total_features > 0:
+                # Liste des fonctionnalités pour modification
+                all_features = []
+                for status, features in st.session_state.features.items():
+                    for feature in features:
+                        all_features.append((feature["id"], f"{feature['title']} ({status})"))
+                
+                selected_feature_id = st.selectbox(
+                    "Sélectionner une fonctionnalité à modifier",
+                    options=[f[0] for f in all_features],
+                    format_func=lambda x: next((f[1] for f in all_features if f[0] == x), "")
+                )
+                
+                if selected_feature_id:
+                    # Trouver la fonctionnalité sélectionnée
+                    selected_feature = None
+                    old_status = None
+                    for status, features in st.session_state.features.items():
+                        for feature in features:
+                            if feature["id"] == selected_feature_id:
+                                selected_feature = feature
+                                old_status = status
+                                break
+                    
+                    if selected_feature:
+                        with st.form(key="edit_feature_form"):
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                edit_title = st.text_input("Titre", value=selected_feature["title"])
+                                edit_description = st.text_area("Description", value=selected_feature["description"], height=100)
+                            
+                            with col2:
+                                edit_status = st.selectbox("Statut", ["À développer", "En cours", "Réalisé"], 
+                                                         index=["À développer", "En cours", "Réalisé"].index(old_status))
+                                edit_priority = st.selectbox("Priorité", ["Haute", "Moyenne", "Basse"], 
+                                                           index=["Haute", "Moyenne", "Basse"].index(selected_feature["priority"]))
+                            
+                            if st.form_submit_button("💾 Enregistrer les modifications"):
+                                # Supprimer l'ancienne version
+                                st.session_state.features[old_status] = [f for f in st.session_state.features[old_status] if f["id"] != selected_feature_id]
+                                
+                                # Ajouter la nouvelle version
+                                updated_feature = {
+                                    "id": selected_feature_id,
+                                    "title": edit_title,
+                                    "description": edit_description,
+                                    "priority": edit_priority,
+                                    "date_ajout": selected_feature["date_ajout"]
+                                }
+                                st.session_state.features[edit_status].append(updated_feature)
+                                st.success("✅ Fonctionnalité modifiée avec succès !")
+                                st.rerun()
+            else:
+                st.info("Aucune fonctionnalité à modifier.")
+        
+        with tab3:
+            st.subheader("Supprimer une fonctionnalité")
+            if total_features > 0:
+                # Liste des fonctionnalités pour suppression
+                all_features = []
+                for status, features in st.session_state.features.items():
+                    for feature in features:
+                        all_features.append((feature["id"], f"{feature['title']} ({status})"))
+                
+                delete_feature_id = st.selectbox(
+                    "Sélectionner une fonctionnalité à supprimer",
+                    options=[f[0] for f in all_features],
+                    format_func=lambda x: next((f[1] for f in all_features if f[0] == x), ""),
+                    key="delete_select"
+                )
+                
+                if delete_feature_id:
+                    if st.button("🗑️ Supprimer définitivement", type="secondary"):
+                        # Trouver et supprimer la fonctionnalité
+                        for status, features in st.session_state.features.items():
+                            st.session_state.features[status] = [f for f in features if f["id"] != delete_feature_id]
+                        st.success("✅ Fonctionnalité supprimée avec succès !")
+                        st.rerun()
+            else:
+                st.info("Aucune fonctionnalité à supprimer.")
 
-    st.divider()
-    st.caption("📊 TG-Hire IA - Roadmap Fonctionnelle | Made with ❤️")
+    st.markdown("---")
+    st.caption("📊 TG-Hire IA - Roadmap Fonctionnelle | Version 1.0")
 
     # Bouton de déconnexion dans la sidebar
     if st.sidebar.button("Déconnexion"):
