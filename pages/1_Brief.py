@@ -367,7 +367,6 @@ st.title("🤖 TG-Hire IA - Brief")
 
 # Style CSS pour les onglets personnalisés et les tableaux améliorés
 
-# --- CSS minimal - identique à la page Annonces ---
 st.markdown("""
 <style>
 div[data-testid="stTabs"] button p {
@@ -378,8 +377,38 @@ div[data-testid="stTabs"] button p {
     white-space: pre-wrap !important;
 }
 
-/* SUPPRIMER TOUT STYLE PERSONNALISÉ POUR LES CHAMPS */
-/* Streamlit gère automatiquement l'apparence selon le thème */
+/* RÉINITIALISATION COMPLÈTE ET SPÉCIFIQUE */
+div[data-baseweb="input"] > div,
+div[data-baseweb="textarea"] > div,
+div[data-baseweb="select"] > div {
+    background-color: var(--background-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea,
+.stSelectbox > div > div > select,
+.stDateInput > div > div > input {
+    background-color: var(--background-color) !important;
+    color: var(--text-color) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+/* FORCER les couleurs de Streamlit */
+:root {
+    --background-color: #f0f2f6;
+    --text-color: #31333F;
+    --border-color: #d0d0d0;
+}
+
+/* Mode sombre */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --background-color: #0e1117;
+        --text-color: #fafafa;
+        --border-color: #555555;
+    }
+}
 </style>
 """, unsafe_allow_html=True)
 
