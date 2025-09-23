@@ -9,66 +9,155 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.title("🤖 TG-Hire IA - Assistant Recrutement")
-st.write("Bienvenue dans votre assistant de recrutement.")
-
 st.sidebar.success("Choisissez une page ci-dessus.")
 
-st.divider()
-st.caption("🤖 TG-Hire IA | Version 1")
+# CSS minimal pour le style Kanban (inspiré GitHub : cartes propres, colonnes nettes)
+st.markdown("""
+<style>
+.kanban-column {
+    background-color: #f6f8fa;
+    border: 1px solid #e1e4e8;
+    border-radius: 6px;
+    padding: 8px;
+    margin: 8px;
+    min-height: 400px;
+}
+.kanban-card {
+    background-color: white;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 12px;
+    margin: 8px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+.kanban-card h4 {
+    margin: 0 0 8px 0;
+    color: #24292f;
+}
+.kanban-card p {
+    margin: 0 0 8px 0;
+    color: #586069;
+    font-size: 14px;
+}
+.kanban-actions {
+    display: flex;
+    gap: 4px;
+}
+</style>
+""", unsafe_allow_html=True)
 
 st.divider()
-st.header("Roadmap des Fonctionnalités")
+st.header("🚀 Roadmap des Fonctionnalités")
 
-# Initialisation des fonctionnalités dans session_state
-if "roadmap" not in st.session_state:
-    st.session_state.roadmap = {
-        "À développer": ["Fonctionnalité 1", "Fonctionnalité 2"],
-        "En cours de développement": ["Fonctionnalité 3"],
-        "Réalisé": ["Fonctionnalité 4", "Fonctionnalité 5"]
+# Initialisation des données Kanban dans session_state (persistance)
+if "kanban_data" not in st.session_state:
+    st.session_state.kanban_data = {
+        "À développer": [
+            {"title": "Système de login avancé", "description": "Intégration OAuth ou JWT pour multi-utilisateurs.", "status": "À développer"},
+            {"title": "Export CSV des briefs", "description": "Génération de rapports pour Excel.", "status": "À développer"}
+        ],
+        "En cours de développement": [
+            {"title": "Base de données SQLite", "description": "Stockage persistant des briefs avec UI de gestion.", "status": "En cours"}
+        ],
+        "Réalisé": [
+            {"title": "Onglets de sourcing (Boolean, X-Ray)", "description": "Génération de requêtes et liens LinkedIn/Google.", "status": "Réalisé"},
+            {"title": "Générateur InMail", "description": "Messages personnalisés avec IA.", "status": "Réalisé"}
+        ]
     }
 
-# Kanban avec 3 colonnes
+# Interface Kanban avec 3 colonnes
 col1, col2, col3 = st.columns(3)
 
+def move_card(column_from, column_to, card_title):
+    """Fonction pour déplacer une carte entre colonnes"""
+    for card in st.session_state.kanban_data[column_from]:
+        if card["title"] == card_title:
+            st.session_state.kanban_data[column_from].remove(card)
+            card["status"] = "En cours" if column_to == "En cours de développement" else column_to
+            st.session_state.kanban_data[column_to].append(card)
+            st.rerun()
+            break
+
+# Colonne 1: À développer
 with col1:
-    st.subheader("À développer")
-    for func in st.session_state.roadmap["À développer"]:
-        st.write(func)
-        if st.button("Déplacer à En cours", key=f"to_progress_{func}"):
-            st.session_state.roadmap["À développer"].remove(func)
-            st.session_state.roadmap["En cours de développement"].append(func)
-            st.rerun()
+    st.markdown('<div class="kanban-column">', unsafe_allow_html=True)
+    st.subheader("📋 À développer")
+    for card in st.session_state.kanban_data["À développer"]:
+        st.markdown(f'<div class="kanban-card">', unsafe_allow_html=True)
+        st.markdown(f'<h4>{card["title"]}</h4>', unsafe_allow_html=True)
+        st.markdown(f'<p>{card["description"]}</p>', unsafe_allow_html=True)
+        col_btn = st.columns(1)
+        with col_btn[0]:
+            if st.button("➡️ En cours", key=f"move_to_progress_{card['title']}"):
+                move_card("À développer", "En cours de développement", card["title"])
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
+# Colonne 2: En cours de développement
 with col2:
-    st.subheader("En cours de développement")
-    for func in st.session_state.roadmap["En cours de développement"]:
-        st.write(func)
-        col_left, col_right = st.columns(2)
-        with col_left:
-            if st.button("Retour à À développer", key=f"to_todo_{func}"):
-                st.session_state.roadmap["En cours de développement"].remove(func)
-                st.session_state.roadmap["À développer"].append(func)
-                st.rerun()
-        with col_right:
-            if st.button("Déplacer à Réalisé", key=f"to_done_{func}"):
-                st.session_state.roadmap["En cours de développement"].remove(func)
-                st.session_state.roadmap["Réalisé"].append(func)
-                st.rerun()
+    st.markdown('<div class="kanban-column">', unsafe_allow_html=True)
+    st.subheader("🔄 En cours de développement")
+    for card in st.session_state.kanban_data["En cours de développement"]:
+        st.markdown(f'<div class="kanban-card">', unsafe_allow_html=True)
+        st.markdown(f'<h4>{card["title"]}</h4>', unsafe_allow_html=True)
+        st.markdown(f'<p>{card["description"]}</p>', unsafe_allow_html=True)
+        col_btn = st.columns(2)
+        with col_btn[0]:
+            if st.button("⬅️ À développer", key=f"move_to_todo_{card['title']}"):
+                move_card("En cours de développement", "À développer", card["title"])
+        with col_btn[1]:
+            if st.button("➡️ Réalisé", key=f"move_to_done_{card['title']}"):
+                move_card("En cours de développement", "Réalisé", card["title"])
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
+# Colonne 3: Réalisé
 with col3:
-    st.subheader("Réalisé")
-    for func in st.session_state.roadmap["Réalisé"]:
-        st.write(func)
-        if st.button("Retour à En cours", key=f"to_progress_from_done_{func}"):
-            st.session_state.roadmap["Réalisé"].remove(func)
-            st.session_state.roadmap["En cours de développement"].append(func)
-            st.rerun()
+    st.markdown('<div class="kanban-column">', unsafe_allow_html=True)
+    st.subheader("✅ Réalisé")
+    for card in st.session_state.kanban_data["Réalisé"]:
+        st.markdown(f'<div class="kanban-card">', unsafe_allow_html=True)
+        st.markdown(f'<h4>{card["title"]}</h4>', unsafe_allow_html=True)
+        st.markdown(f'<p>{card["description"]}</p>', unsafe_allow_html=True)
+        if st.button("⬅️ En cours", key=f"move_back_progress_{card['title']}"):
+            move_card("Réalisé", "En cours de développement", card["title"])
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-# Ajout d'une nouvelle fonctionnalité
+# Section pour ajouter une nouvelle fonctionnalité
 st.divider()
-new_func = st.text_input("Ajouter une nouvelle fonctionnalité")
-if st.button("Ajouter"):
-    if new_func:
-        st.session_state.roadmap["À développer"].append(new_func)
+st.subheader("➕ Ajouter une Nouvelle Fonctionnalité")
+new_title = st.text_input("Titre de la fonctionnalité")
+new_description = st.text_area("Description", height=60)
+if st.button("Ajouter à 'À développer'", type="primary"):
+    if new_title and new_description:
+        st.session_state.kanban_data["À développer"].append({
+            "title": new_title,
+            "description": new_description,
+            "status": "À développer"
+        })
+        st.success("✅ Fonctionnalité ajoutée !")
         st.rerun()
+    else:
+        st.error("Veuillez remplir le titre et la description.")
+
+# Bouton pour réinitialiser la roadmap (optionnel)
+if st.button("🔄 Réinitialiser la Roadmap"):
+    st.session_state.kanban_data = {
+        "À développer": [
+            {"title": "Système de login avancé", "description": "Intégration OAuth ou JWT pour multi-utilisateurs.", "status": "À développer"},
+            {"title": "Export CSV des briefs", "description": "Génération de rapports pour Excel.", "status": "À développer"}
+        ],
+        "En cours de développement": [
+            {"title": "Base de données SQLite", "description": "Stockage persistant des briefs avec UI de gestion.", "status": "En cours"}
+        ],
+        "Réalisé": [
+            {"title": "Onglets de sourcing (Boolean, X-Ray)", "description": "Génération de requêtes et liens LinkedIn/Google.", "status": "Réalisé"},
+            {"title": "Générateur InMail", "description": "Messages personnalisés avec IA.", "status": "Réalisé"}
+        ]
+    }
+    st.rerun()
+
+# Footer
+st.divider()
+st.caption("🤖 TG-Hire IA | Version 1")
