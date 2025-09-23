@@ -9,62 +9,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import time
 import re
 
-
-# -------------------- Personnalisation CSS --------------------
-st.markdown("""
-<style>
-    /* Cases de texte */
-    .stTextInput>div>div>input {
-        background-color: #f0f2f6;
-        border: 2px solid #4CAF50;
-        border-radius: 8px;
-        padding: 10px;
-    }
-    
-    /* Zones de texte */
-    .stTextArea>div>div>textarea {
-        background-color: #f0f2f6;
-        border: 2px solid #4CAF50;
-        border-radius: 8px;
-        padding: 10px;
-    }
-    
-    /* Boutons */
-    .stButton>button {
-        background-color: #4CAF50;
-        color: white;
-        border-radius: 8px;
-        padding: 10px 24px;
-        font-weight: bold;
-        border: none;
-        transition: all 0.3s;
-    }
-    
-    .stButton>button:hover {
-        background-color: #45a049;
-        transform: scale(1.05);
-    }
-    
-    /* Expanders */
-    .streamlit-expanderHeader {
-        background-color: #e8f5e9;
-        border-radius: 8px;
-        padding: 12px;
-        font-weight: bold;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-# --- CSS pour augmenter la taille du texte des onglets ---
-st.markdown("""
-<style>
-div[data-testid="stTabs"] button p {
-    font-size: 18px; 
-}
-</style>
-""", unsafe_allow_html=True)
-
-# --- Configuration de la clé API DeepSeek via Streamlit Secrets ---
+# -------------------- Configuration de la clé API DeepSeek via Streamlit Secrets ---
 try:
     API_KEY = st.secrets["DEEPSEEK_API_KEY"]
     if not API_KEY:
@@ -73,7 +18,7 @@ except KeyError:
     API_KEY = None
     st.error("❌ Le secret 'DEEPSEEK_API_KEY' est introuvable. Veuillez le configurer.")
 
-# --- Streamlit Page Config ---
+# -------------------- Streamlit Page Config --------------------
 st.set_page_config(
     page_title="Analyse CV AI",
     page_icon="📄",
@@ -81,135 +26,20 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS personnalisée pour le thème sombre ---
+# -------------------- CSS minimal comme la page Annonces --------------------
 st.markdown("""
-    <style>
-    /* Style général pour l'application */
-    .stApp {
-        background-color: #0E1117;
-        color: #FAFAFA;
-    }
-    
-    /* Style pour les onglets de navigation */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 0px;
-        background-color: #0E1117;
-        padding: 0px;
-        border-radius: 4px;
-        border: none !important;
-    }
-    
-    /* Style de base pour tous les onglets */
-    .stTabs [data-baseweb="tab"] {
-        background-color: #0E1117 !important;
-        color: white !important;
-        border: none !important;
-        border-right: 1px solid transparent !important; /* Bordure transparente entre les onglets */
-        border-radius: 0 !important;
-        padding: 10px 16px !important;
-        font-weight: 500 !important;
-        margin-right: 0 !important;
-        height: auto !important;
-    }
-    
-    /* Style pour l'onglet actif */
-    .stTabs [data-baseweb="tab"][aria-selected="true"] {
-        color: #FF0000 !important; /* Rouge vif pour le texte de l'onglet actif */
-        background-color: #0E1117 !important;
-        border: none !important;
-        border-bottom: 3px solid #FF0000 !important; /* Bordure inférieure rouge vif */
-    }
-    
-    /* Style pour les labels des champs de saisie et les titres de sections */
-    .stTextInput label, .stTextArea label, .stFileUploader label, .section-header {
-        font-size: 1.25rem;
-        font-weight: 600;
-        color: #FAFAFA;
-    }
-    
-    /* Style des options du widget radio pour le rapprochement */
-    .stRadio [data-baseweb="base-input"] {
-        flex-direction: row;
-        gap: 1.5rem; /* Réduire l'espace entre les options */
-    }
+<style>
+div[data-testid="stTabs"] button p {
+    font-size: 18px; 
+}
 
-    /* Style du texte des options du widget radio */
-    .stRadio label {
-        font-size: 1.1rem;
-    }
-    
-    /* Boutons principaux */
-    .stButton > button {
-        background-color: #dc2626;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        padding: 12px 24px;
-        font-weight: 600;
-        transition: all 0.3s ease;
-    }
-    
-    .stButton > button:hover {
-        background-color: #b91c1c;
-        transform: translateY(-2px);
-    }
-    
-    /* Boutons secondaires */
-    .stButton > button[kind="secondary"] {
-        background-color: #262730;
-        color: #FAFAFA;
-        border: 1px solid #FF4B4B;
-    }
-    
-    .stButton > button[kind="secondary"]:hover {
-        background-color: #3D3D4D;
-        color: #FAFAFA;
-    }
-    
-    /* Conteneurs et cartes */
-    .result-card {
-        background: #1E1E1E;
-        border-radius: 10px;
-        padding: 1.5rem;
-        margin: 1rem 0;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-        border-left: 4px solid #dc2626;
-        color: #FAFAFA;
-    }
-    
-    .metric-card {
-        background: #1E1E1E;
-        padding: 1.5rem;
-        border-radius: 10px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2);
-        text-align: center;
-        margin: 1rem 0;
-        color: #FAFAFA;
-    }
-    
-    /* Champs de saisie - Couleur foncée désirée */
-    .stTextInput input, .stTextArea textarea, .stFileUploader label, .stSelectbox [data-baseweb="select"] > div, .stDateInput input {
-        background-color: #1F1F1F !important; /* Gris plus sombre */
-        color: white !important;
-        border: 1px solid #555 !important;
-        border-radius: 4px !important;
-        padding: 8px !important;
-    }
-    
-    /* Titres des sections en blanc et sans bordure */
-    .section-header {
-        font-size: 1.5rem;
-        font-weight: 600;
-        color: #FAFAFA;
-        margin-bottom: 1rem;
-        padding-bottom: 0.5rem;
-        border-bottom: none;
-    }
-
-    </style>
+.stTextArea textarea {
+    white-space: pre-wrap !important;
+}
+</style>
 """, unsafe_allow_html=True)
 
-# --- Fonctions de traitement des CV ---
+# -------------------- Fonctions de traitement des CV --------------------
 def extract_text_from_pdf(file):
     """Extrait le texte d'un fichier PDF."""
     try:
@@ -273,7 +103,7 @@ def get_detailed_score_with_ai(job_description, resume_text):
             {"role": "user", "content": prompt}
         ],
         "stream": False,
-        "temperature": 0.0 # Vise une réponse déterministe
+        "temperature": 0.0
     }
 
     try:
@@ -350,12 +180,12 @@ def get_deepseek_analysis(text):
         st.error(f"❌ Erreur lors de l'analyse IA : {e}")
         return "Analyse IA échouée. Veuillez réessayer."
 
-# --- Gestion des pages via des onglets ---
+# -------------------- Gestion des pages via des onglets --------------------
 tab1, tab2 = st.tabs(["📊 Classement de CVs", "🎯 Analyse de Profil"])
 
-# --- Contenu de l'onglet Classement ---
+# -------------------- Contenu de l'onglet Classement --------------------
 with tab1:
-    st.markdown('<p class="section-header">📄 Informations du Poste</p>', unsafe_allow_html=True)
+    st.markdown("### 📄 Informations du Poste")
     
     job_title = st.text_input(
         "Intitulé du poste",
@@ -391,7 +221,7 @@ with tab1:
 
     st.markdown("---")
     
-    # Remplacer les cases à cocher par un widget radio
+    # Widget radio pour la méthode d'analyse
     analysis_method = st.radio(
         "Méthode d'analyse",
         ["Méthode du cosinus", "Utilisation de l'IA (DeepSeek)"],
@@ -447,7 +277,7 @@ with tab1:
                         "Score brut": [round(score, 4) for _, score in ranked_resumes]
                     })
                     
-                    st.markdown('<p class="section-header">🏆 Résultats du Classement</p>', unsafe_allow_html=True)
+                    st.markdown("### 🏆 Résultats du Classement")
                     
                     col1_m, col2_m, col3_m = st.columns(3)
                     with col1_m:
@@ -466,10 +296,10 @@ with tab1:
                     )
                     
                     st.markdown("---")
-                    st.markdown(f'<p class="section-header">🔍 Comment le score est-il calculé ? ({method_used})</p>', unsafe_allow_html=True)
+                    st.markdown(f"### 🔍 Comment le score est-il calculé ? ({method_used})")
                     if use_deepseek_ranking:
                         st.info("Le score est basé sur une évaluation IA. Pour une analyse détaillée, consultez les sections ci-dessous.")
-                        st.markdown('<p class="section-header">📝 Analyse détaillée de chaque CV</p>', unsafe_allow_html=True)
+                        st.markdown("### 📝 Analyse détaillée de chaque CV")
                         for file_name, score in ranked_resumes:
                             if file_name in explanations:
                                 with st.expander(f"Analyse détaillée pour : **{file_name}** (Score: {round(score * 100, 1)}%)", expanded=False):
@@ -482,7 +312,7 @@ with tab1:
                         """)
                     
                     st.markdown("---")
-                    st.markdown('<p class="section-header">💾 Exporter les Résultats</p>', unsafe_allow_html=True)
+                    st.markdown("### 💾 Exporter les Résultats")
                     csv = results_df.to_csv(index=False).encode('utf-8')
                     st.download_button(
                         "📥 Télécharger CSV", 
@@ -496,9 +326,9 @@ with tab1:
             else:
                 st.error("❌ Aucun CV valide à analyser")
 
-# --- Contenu de l'onglet Analyse de Profil ---
+# -------------------- Contenu de l'onglet Analyse de Profil --------------------
 with tab2:
-    st.markdown('<p class="section-header">📂 Importer des CVs pour analyse</p>', unsafe_allow_html=True)
+    st.markdown("### 📂 Importer des CVs pour analyse")
     uploaded_files_analysis = st.file_uploader(
         "Sélectionnez un ou plusieurs CVs (PDF)",
         type=["pdf"],
@@ -514,7 +344,7 @@ with tab2:
             if not API_KEY:
                 st.error("L'analyse IA ne peut pas être effectuée car la clé API n'est pas configurée.")
             else:
-                st.markdown('<p class="section-header">📋 Résultats des Analyses</p>', unsafe_allow_html=True)
+                st.markdown("### 📋 Résultats des Analyses")
                 for uploaded_file in uploaded_files_analysis:
                     with st.expander(f"Analyse du CV : **{uploaded_file.name}**", expanded=True):
                         with st.spinner(f"⏳ L'IA analyse le CV '{uploaded_file.name}', veuillez patienter..."):
@@ -536,11 +366,42 @@ with tab2:
                                     else:
                                         weak_points = ""
                                 else:
-                                    # Fallback si l'IA ne suit pas le format exact
                                     st.markdown(analysis_result)
 
                                 if strong_points or weak_points:
                                     with col_analysis1:
-                                        st.markdown(f'<div class="result-card">{strong_points}</div>', unsafe_allow_html=True)
+                                        st.info("**Points forts**")
+                                        st.markdown(strong_points)
                                     with col_analysis2:
-                                        st.markdown(f'<div class="result-card">{weak_points}</div>', unsafe_allow_html=True)
+                                        st.warning("**Points faibles**")
+                                        st.markdown(weak_points)
+
+# -------------------- Section supplémentaire pour les statistiques --------------------
+with st.sidebar:
+    st.markdown("### 📊 Statistiques")
+    
+    # Calculer quelques statistiques basiques
+    total_cvs_analyzed = len(uploaded_files_ranking) if uploaded_files_ranking else 0
+    st.metric("CVs analysés aujourd'hui", total_cvs_analyzed)
+    
+    st.markdown("---")
+    st.markdown("### 🔧 Configuration")
+    
+    # Test de connexion API
+    if st.button("Test Connexion API DeepSeek"):
+        if API_KEY:
+            try:
+                response = requests.get("https://api.deepseek.com/v1/models", 
+                                      headers={"Authorization": f"Bearer {API_KEY}"})
+                if response.status_code == 200:
+                    st.success("✅ Connexion API réussie")
+                else:
+                    st.error("❌ Erreur de connexion API")
+            except Exception as e:
+                st.error(f"❌ Erreur: {e}")
+        else:
+            st.error("❌ Clé API non configurée")
+
+# -------------------- Footer --------------------
+st.markdown("---")
+st.markdown("*Application d'analyse de CVs powered by DeepSeek AI*")
