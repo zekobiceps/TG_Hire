@@ -26,31 +26,15 @@ from utils import (
 
 # --- CSS pour le style light thème aligné avec Annonces ---
 st.markdown("""
-
 <style>
-/* Fond de l'application avec prise en charge du thème sombre */
+/* Fond de l'application */
 .stApp {
     background-color: #FFFFFF;
-}
-@media (prefers-color-scheme: dark) {
-    .stApp {
-        background-color: #1E1E1E;
-        color: #E0E0E0;
-    }
 }
 
 /* Style pour les onglets de navigation */
 div[data-testid="stTabs"] button p {
     font-size: 18px;
-}
-@media (prefers-color-scheme: dark) {
-    div[data-testid="stTabs"] button {
-        color: #E0E0E0;
-    }
-    div[data-testid="stTabs"] [aria-selected="true"] {
-        background-color: #333333;
-        color: #FFFFFF;
-    }
 }
 
 /* Style des inputs et textareas */
@@ -59,13 +43,6 @@ div[data-testid="stTabs"] button p {
     color: #333333;
     border-radius: 4px;
     border: none;
-}
-@media (prefers-color-scheme: dark) {
-    .stTextInput input, .stTextArea textarea, .stSelectbox > div > select, .stDateInput input {
-        background-color: #2F333B;
-        color: #E0E0E0;
-        border: 1px solid #444444;
-    }
 }
 
 /* Style des boutons */
@@ -87,22 +64,6 @@ div[data-testid="stTabs"] button p {
 .stButton > button:not([type="primary"]):hover {
     background-color: #D0D0D0;
 }
-@media (prefers-color-scheme: dark) {
-    .stButton > button[type="primary"] {
-        background-color: #4DA8DA;
-        color: #FFFFFF;
-    }
-    .stButton > button[type="primary"]:hover {
-        background-color: #3998C7;
-    }
-    .stButton > button:not([type="primary"]) {
-        background-color: #444444;
-        color: #E0E0E0;
-    }
-    .stButton > button:not([type="primary"]):hover {
-        background-color: #555555;
-    }
-}
 
 /* Style pour les expanders */
 .streamlit-expanderHeader {
@@ -110,12 +71,6 @@ div[data-testid="stTabs"] button p {
     color: #333333;
     border-radius: 5px;
     padding: 0.5rem;
-}
-@media (prefers-color-scheme: dark) {
-    .streamlit-expanderHeader {
-        background-color: #333333;
-        color: #E0E0E0;
-    }
 }
 
 /* Style pour les alertes */
@@ -134,14 +89,6 @@ div[data-testid="stTabs"] button p {
 .stError {
     background-color: #DC3545;
     color: #FFFFFF;
-}
-@media (prefers-color-scheme: dark) {
-    .stSuccess, .stInfo, .stError {
-        color: #FFFFFF;
-    }
-    .stWarning {
-        color: #333333;
-    }
 }
 
 /* Style pour la matrice KSA */
@@ -166,31 +113,12 @@ div[data-testid="stTabs"] button p {
     padding: 14px 16px;
     font-size: 16px;
 }
-@media (prefers-color-scheme: dark) {
-    .stDataFrame {
-        background-color: #1E1E1E;
-        border-color: #444444;
-    }
-    .stDataFrame th, .stDataFrame td {
-        border-color: #444444;
-        color: #E0E0E0;
-    }
-    .stDataFrame th {
-        background-color: #4DA8DA;
-    }
-}
 
 /* Style pour les formulaires */
 div[data-testid="stForm"] {
     padding: 1rem;
     border: 1px solid #CCCCCC;
     border-radius: 0.5rem;
-}
-@media (prefers-color-scheme: dark) {
-    div[data-testid="stForm"] {
-        border-color: #444444;
-        background-color: #2F333B;
-    }
 }
 
 /* Style pour les conseils IA */
@@ -205,18 +133,9 @@ div[data-testid="stForm"] {
 .ai-advice-box strong {
     color: #000000;
 }
-@media (prefers-color-scheme: dark) {
-    .ai-advice-box {
-        background-color: #2F333B;
-        border-left-color: #4DA8DA;
-        color: #E0E0E0;
-    }
-    .ai-advice-box strong {
-        color: #FFFFFF;
-    }
-}
 </style>
 """, unsafe_allow_html=True)
+
 
 def render_ksa_matrix():
     """Affiche la matrice KSA sous forme de tableau et permet l'ajout de critères."""
