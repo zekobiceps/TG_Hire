@@ -30,11 +30,17 @@ st.markdown("""
 /* Fond de l'application */
 .stApp {
     background-color: #FFFFFF;
+    color: #333333;
 }
 
 /* Style pour les onglets de navigation */
 div[data-testid="stTabs"] button p {
     font-size: 18px;
+    color: #333333;
+}
+div[data-testid="stTabs"] [aria-selected="true"] {
+    background-color: #E0E0E0;
+    color: #0066CC;
 }
 
 /* Style des inputs et textareas */
@@ -42,7 +48,7 @@ div[data-testid="stTabs"] button p {
     background-color: #F0F2F6;
     color: #333333;
     border-radius: 4px;
-    border: none;
+    border: 1px solid #CCCCCC;
 }
 
 /* Style des boutons */
@@ -51,6 +57,7 @@ div[data-testid="stTabs"] button p {
     color: white;
     border-radius: 5px;
     padding: 0.5rem 1rem;
+    border: none;
 }
 .stButton > button[type="primary"]:hover {
     background-color: #0055AA;
@@ -71,6 +78,7 @@ div[data-testid="stTabs"] button p {
     color: #333333;
     border-radius: 5px;
     padding: 0.5rem;
+    border: 1px solid #CCCCCC;
 }
 
 /* Style pour les alertes */
@@ -119,6 +127,7 @@ div[data-testid="stForm"] {
     padding: 1rem;
     border: 1px solid #CCCCCC;
     border-radius: 0.5rem;
+    background-color: #FFFFFF;
 }
 
 /* Style pour les conseils IA */
