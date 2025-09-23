@@ -371,11 +371,6 @@ st.markdown("""
 div[data-testid="stTabs"] button p {
     font-size: 18px; 
 }
-
-/* Style pour permettre le retour à la ligne avec Alt+Enter */
-.stTextArea textarea {
-    white-space: pre-wrap !important;
-}
 </style>
 """, unsafe_allow_html=True)
 
