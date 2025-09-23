@@ -41,6 +41,7 @@ div[data-testid="stTabs"] button p {
 div[data-testid="stTabs"] [aria-selected="true"] {
     background-color: #E0E0E0;
     color: #0066CC;
+    border-bottom: 2px solid #0066CC;
 }
 
 /* Style des inputs et textareas */
@@ -49,6 +50,7 @@ div[data-testid="stTabs"] [aria-selected="true"] {
     color: #333333;
     border-radius: 4px;
     border: 1px solid #CCCCCC;
+    padding: 0.5rem;
 }
 
 /* Style des boutons */
@@ -67,6 +69,7 @@ div[data-testid="stTabs"] [aria-selected="true"] {
     color: #333333;
     border: none;
     border-radius: 5px;
+    padding: 0.5rem 1rem;
 }
 .stButton > button:not([type="primary"]):hover {
     background-color: #D0D0D0;
