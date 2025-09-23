@@ -1,185 +1,158 @@
 import streamlit as st
-import pandas as pd
 from utils import *
 from datetime import datetime
+
+# Initialisation de l'état de session
 init_session_state()
 
-st.set_page_config(
-    page_title="TG-Hire IA - Assistant Recrutement",
-    page_icon="🤖",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-st.sidebar.success("Choisissez une page ci-dessus.")
-
-# CSS inspiré de Notion pour supprimer les espaces inutiles et styliser les cartes
-st.markdown("""
-<style>
-.stApp, .stMarkdown {
-    margin: 0 !important;
-    padding: 0 !important;
+# Stockage temporaire des utilisateurs (à remplacer par une base sécurisée)
+USERS = {
+    "user1@example.com": "password123",
+    "user2@example.com": "securepass"
 }
-.stColumns {
-    margin-top: 0 !important;
-}
-.notion-column {
-    background-color: #f7f9fa;
-    border: 1px solid #e0e2e4;
-    border-radius: 8px;
-    padding: 8px;
-    margin: 0 4px;
-    min-height: 400px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-.notion-card {
-    background-color: white;
-    border: 1px solid #e0e2e4;
-    border-radius: 6px;
-    padding: 12px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-.notion-card h4 {
-    margin: 0;
-    color: #1a1a1a;
-    font-size: 16px;
-    font-weight: 500;
-}
-.notion-card p {
-    margin: 0;
-    color: #4a4a4a;
-    font-size: 14px;
-}
-.notion-card .status {
-    margin: 0;
-    font-size: 12px;
-    color: #6b7280;
-}
-.status-to-do { color: #ef4444; } /* Rouge pour À développer */
-.status-in-progress { color: #f59e0b; } /* Orange pour En cours */
-.status-done { color: #10b981; } /* Vert pour Réalisé */
-.block-container {
-    padding-top: 0 !important;
-}
-</style>
-""", unsafe_allow_html=True)
 
-st.header("🚀 Roadmap des Fonctionnalités")
+# Vérification de l'état de connexion
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
 
-# Initialisation des données dans session_state avec last_modified
-if "roadmap_data" not in st.session_state:
-    st.session_state.roadmap_data = [
-        {"title": "Onglets de sourcing (Boolean, X-Ray)", "description": "Génération de requêtes et liens LinkedIn/Google.", "status": "Réalisé", "last_modified": "2025-09-20 10:00"},
-        {"title": "Générateur InMail", "description": "Messages personnalisés avec IA.", "status": "Réalisé", "last_modified": "2025-09-21 14:30"},
-        {"title": "Base de données SQLite", "description": "Stockage persistant des briefs avec UI de gestion.", "status": "En cours de développement", "last_modified": "2025-09-22 09:15"},
-        {"title": "Export CSV des briefs", "description": "Génération de rapports pour Excel.", "status": "À développer", "last_modified": "2025-09-23 11:00"},
-        {"title": "Système de login avancé", "description": "Intégration OAuth ou JWT pour multi-utilisateurs.", "status": "À développer", "last_modified": "2025-09-23 12:00"}
-    ]
+# Page de login
+if not st.session_state.logged_in:
+    st.set_page_config(
+        page_title="TG-Hire IA - Assistant Recrutement",
+        page_icon="🤖",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    st.title("🤖 TG-Hire IA - Assistant Recrutement")
+    st.write("Veuillez vous connecter pour accéder à l'outil.")
+    
+    email = st.text_input("Adresse Email", key="login_email")
+    password = st.text_input("Mot de Passe", type="password", key="login_password")
+    
+    if st.button("Se Connecter"):
+        if email in USERS and USERS[email] == password:
+            st.session_state.logged_in = True
+            st.success("Connexion réussie !")
+            st.rerun()
+        else:
+            st.error("Email ou mot de passe incorrect.")
+else:
+    # Page d'accueil après connexion
+    st.set_page_config(
+        page_title="TG-Hire IA - Assistant Recrutement",
+        page_icon="🤖",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    st.title("🤖 TG-Hire IA - Assistant Recrutement")
+    st.write("Bienvenue dans votre assistant de recrutement.")
 
-# Mettre à jour ou initialiser last_modified
-for item in st.session_state.roadmap_data:
-    if "last_modified" not in item:
-        item["last_modified"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+    st.sidebar.success("Choisissez une page ci-dessus.")
 
-# Organiser les données par statut et trier chronologiquement
-to_do = sorted([item for item in st.session_state.roadmap_data if item["status"] == "À développer"], key=lambda x: x["last_modified"], reverse=True)
-in_progress = sorted([item for item in st.session_state.roadmap_data if item["status"] == "En cours de développement"], key=lambda x: x["last_modified"], reverse=True)
-done = sorted([item for item in st.session_state.roadmap_data if item["status"] == "Réalisé"], key=lambda x: x["last_modified"], reverse=True)
+    # --- TABLEAU KANBAN DES FONCTIONNALITÉS ---
+    st.markdown("---")
+    st.subheader("📊 Tableau de Bord des Fonctionnalités")
+    
+    # Définition des fonctionnalités
+    features = {
+        "À développer": [
+            "Intégration avec LinkedIn API",
+            "Système de notifications en temps réel",
+            "Analyse de sentiment des entretiens",
+            "Tableau de bord analytics avancé",
+            "Export automatique vers ATS"
+        ],
+        "En cours": [
+            "Optimisation de l'IA de matching",
+            "Interface mobile responsive",
+            "Synchronisation cloud"
+        ],
+        "Réalisé": [
+            "Système d'authentification",
+            "Analyse basique de CV",
+            "Classement par similarité cosinus",
+            "Export PDF/Word des briefs",
+            "Matrice KSA interactive"
+        ]
+    }
+    
+    # Création des colonnes Kanban
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.markdown("### 📋 À développer")
+        st.markdown("---")
+        for feature in features["À développer"]:
+            with st.container():
+                st.markdown(f"""
+                <div style="
+                    background: #ffebee; 
+                    padding: 10px; 
+                    border-radius: 5px; 
+                    margin: 5px 0; 
+                    border-left: 4px solid #f44336;
+                ">
+                📌 {feature}
+                </div>
+                """, unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown("### 🔄 En cours")
+        st.markdown("---")
+        for feature in features["En cours"]:
+            with st.container():
+                st.markdown(f"""
+                <div style="
+                    background: #fff3e0; 
+                    padding: 10px; 
+                    border-radius: 5px; 
+                    margin: 5px 0; 
+                    border-left: 4px solid #ff9800;
+                ">
+                ⚡ {feature}
+                </div>
+                """, unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown("### ✅ Réalisé")
+        st.markdown("---")
+        for feature in features["Réalisé"]:
+            with st.container():
+                st.markdown(f"""
+                <div style="
+                    background: #e8f5e8; 
+                    padding: 10px; 
+                    border-radius: 5px; 
+                    margin: 5px 0; 
+                    border-left: 4px solid #4caf50;
+                ">
+                ✅ {feature}
+                </div>
+                """, unsafe_allow_html=True)
+    
+    # Statistiques rapides
+    st.markdown("---")
+    col_stats1, col_stats2, col_stats3 = st.columns(3)
+    
+    with col_stats1:
+        st.metric("Fonctionnalités totales", 
+                 len(features["À développer"]) + len(features["En cours"]) + len(features["Réalisé"]))
+    
+    with col_stats2:
+        st.metric("Taux de réalisation", 
+                 f"{(len(features['Réalisé']) / (len(features['À développer']) + len(features['En cours']) + len(features['Réalisé'])) * 100):.1f}%")
+    
+    with col_stats3:
+        st.metric("En développement", len(features["En cours"]))
+    
+    st.divider()
+    st.caption("🤖 TG-Hire IA | Made with ❤️")
 
-# Interface avec 3 colonnes inspirée de Notion
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.markdown('<div class="notion-column">', unsafe_allow_html=True)
-    st.subheader("📋 À développer")
-    for item in to_do:
-        st.markdown(f'<div class="notion-card">', unsafe_allow_html=True)
-        st.markdown(f'<h4>{item["title"]}</h4>', unsafe_allow_html=True)
-        st.markdown(f'<p>{item["description"]}</p>', unsafe_allow_html=True)
-        st.markdown(f'<span class="status status-to-do">Statut: {item["status"]}</span>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-with col2:
-    st.markdown('<div class="notion-column">', unsafe_allow_html=True)
-    st.subheader("🔄 En cours de développement")
-    for item in in_progress:
-        st.markdown(f'<div class="notion-card">', unsafe_allow_html=True)
-        st.markdown(f'<h4>{item["title"]}</h4>', unsafe_allow_html=True)
-        st.markdown(f'<p>{item["description"]}</p>', unsafe_allow_html=True)
-        st.markdown(f'<span class="status status-in-progress">Statut: {item["status"]}</span>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-with col3:
-    st.markdown('<div class="notion-column">', unsafe_allow_html=True)
-    st.subheader("✅ Réalisé")
-    for item in done:
-        st.markdown(f'<div class="notion-card">', unsafe_allow_html=True)
-        st.markdown(f'<h4>{item["title"]}</h4>', unsafe_allow_html=True)
-        st.markdown(f'<p>{item["description"]}</p>', unsafe_allow_html=True)
-        st.markdown(f'<span class="status status-done">Statut: {item["status"]}</span>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# Menu en bas pour gérer les fonctionnalités
-st.divider()
-st.subheader("🛠️ Gestion des Fonctionnalités")
-
-# Sélection d'une fonctionnalité
-selected_title = st.selectbox("Sélectionner une fonctionnalité", [item["title"] for item in st.session_state.roadmap_data], index=None)
-
-if selected_title:
-    # Trouver l'élément sélectionné
-    selected_item = next((item for item in st.session_state.roadmap_data if item["title"] == selected_title), None)
-    if selected_item:
-        # Modifier le titre et la description
-        new_title = st.text_input("Titre", value=selected_item["title"])
-        new_description = st.text_area("Description", value=selected_item["description"], height=60)
-
-        # Changer le statut
-        statuses = ["À développer", "En cours de développement", "Réalisé"]
-        new_status = st.selectbox("Statut", statuses, index=statuses.index(selected_item["status"]))
-
-        col_btn = st.columns(3)
-        with col_btn[0]:
-            if st.button("Enregistrer les Modifications"):
-                selected_item["title"] = new_title
-                selected_item["description"] = new_description
-                selected_item["status"] = new_status
-                selected_item["last_modified"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-                st.success("✅ Modifications enregistrées !")
-                st.rerun()
-
-        with col_btn[1]:
-            if st.button("Supprimer"):
-                st.session_state.roadmap_data.remove(selected_item)
-                st.success("✅ Fonctionnalité supprimée !")
-                st.rerun()
-
-# Section pour ajouter une nouvelle fonctionnalité
-st.subheader("➕ Ajouter une Nouvelle Fonctionnalité")
-new_title = st.text_input("Titre de la nouvelle fonctionnalité")
-new_description = st.text_area("Description", height=60)
-new_status = st.selectbox("Statut initial", ["À développer", "En cours de développement", "Réalisé"])
-if st.button("Ajouter"):
-    if new_title and new_description:
-        st.session_state.roadmap_data.append({
-            "title": new_title,
-            "description": new_description,
-            "status": new_status,
-            "last_modified": datetime.now().strftime("%Y-%m-%d %H:%M")
-        })
-        st.success("✅ Fonctionnalité ajoutée !")
+    # Bouton de déconnexion dans la sidebar
+    if st.sidebar.button("Déconnexion"):
+        st.session_state.logged_in = False
         st.rerun()
-    else:
-        st.error("Veuillez remplir le titre et la description.")
 
-# Footer
-st.divider()
-st.caption("🤖 TG-Hire IA | Version 1")
+    # Protéger les pages dans pages/ (arrête l'exécution si non connecté)
+    if not st.session_state.logged_in:
+        st.stop()
