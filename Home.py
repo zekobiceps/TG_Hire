@@ -13,40 +13,62 @@ st.set_page_config(
 
 st.sidebar.success("Choisissez une page ci-dessus.")
 
-# CSS pour supprimer les espaces inutiles et styliser le tableau
+# CSS inspiré de Notion pour supprimer les espaces inutiles et styliser les cartes
 st.markdown("""
 <style>
 .stApp, .stMarkdown {
     margin: 0 !important;
     padding: 0 !important;
 }
-.stDataFrame {
+.stColumns {
     margin-top: 0 !important;
 }
-.dataframe {
-    border-collapse: collapse;
-    width: 100%;
-}
-.dataframe th, .dataframe td {
-    border: 1px solid #e1e4e8;
+.notion-column {
+    background-color: #f7f9fa;
+    border: 1px solid #e0e2e4;
+    border-radius: 8px;
     padding: 8px;
-    text-align: left;
-    vertical-align: top;
+    margin: 0 4px;
+    min-height: 400px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
-.dataframe th {
-    background-color: #f6f8fa;
-    color: #24292f;
+.notion-card {
+    background-color: white;
+    border: 1px solid #e0e2e4;
+    border-radius: 6px;
+    padding: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
 }
-.dataframe tr:hover {
-    background-color: #f0f0f0;
+.notion-card h4 {
+    margin: 0;
+    color: #1a1a1a;
+    font-size: 16px;
+    font-weight: 500;
 }
+.notion-card p {
+    margin: 0;
+    color: #4a4a4a;
+    font-size: 14px;
+}
+.notion-card .status {
+    margin: 0;
+    font-size: 12px;
+    color: #6b7280;
+}
+.status-to-do { color: #ef4444; } /* Rouge pour À développer */
+.status-in-progress { color: #f59e0b; } /* Orange pour En cours */
+.status-done { color: #10b981; } /* Vert pour Réalisé */
 .block-container {
     padding-top: 0 !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# Roadmap des Fonctionnalités sans divider en haut
 st.header("🚀 Roadmap des Fonctionnalités")
 
 # Initialisation des données dans session_state avec last_modified
@@ -64,12 +86,46 @@ for item in st.session_state.roadmap_data:
     if "last_modified" not in item:
         item["last_modified"] = datetime.now().strftime("%Y-%m-%d %H:%M")
 
-# Conversion en DataFrame avec tri chronologique (du plus récent au plus ancien)
-df_roadmap = pd.DataFrame(st.session_state.roadmap_data)
-df_roadmap = df_roadmap.sort_values(by="last_modified", ascending=False)
+# Organiser les données par statut et trier chronologiquement
+to_do = sorted([item for item in st.session_state.roadmap_data if item["status"] == "À développer"], key=lambda x: x["last_modified"], reverse=True)
+in_progress = sorted([item for item in st.session_state.roadmap_data if item["status"] == "En cours de développement"], key=lambda x: x["last_modified"], reverse=True)
+done = sorted([item for item in st.session_state.roadmap_data if item["status"] == "Réalisé"], key=lambda x: x["last_modified"], reverse=True)
 
-# Affichage du tableau
-st.dataframe(df_roadmap[["title", "description", "status", "last_modified"]], use_container_width=True)
+# Interface avec 3 colonnes inspirée de Notion
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    st.markdown('<div class="notion-column">', unsafe_allow_html=True)
+    st.subheader("📋 À développer")
+    for item in to_do:
+        st.markdown(f'<div class="notion-card">', unsafe_allow_html=True)
+        st.markdown(f'<h4>{item["title"]}</h4>', unsafe_allow_html=True)
+        st.markdown(f'<p>{item["description"]}</p>', unsafe_allow_html=True)
+        st.markdown(f'<span class="status status-to-do">Statut: {item["status"]}</span>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with col2:
+    st.markdown('<div class="notion-column">', unsafe_allow_html=True)
+    st.subheader("🔄 En cours de développement")
+    for item in in_progress:
+        st.markdown(f'<div class="notion-card">', unsafe_allow_html=True)
+        st.markdown(f'<h4>{item["title"]}</h4>', unsafe_allow_html=True)
+        st.markdown(f'<p>{item["description"]}</p>', unsafe_allow_html=True)
+        st.markdown(f'<span class="status status-in-progress">Statut: {item["status"]}</span>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+with col3:
+    st.markdown('<div class="notion-column">', unsafe_allow_html=True)
+    st.subheader("✅ Réalisé")
+    for item in done:
+        st.markdown(f'<div class="notion-card">', unsafe_allow_html=True)
+        st.markdown(f'<h4>{item["title"]}</h4>', unsafe_allow_html=True)
+        st.markdown(f'<p>{item["description"]}</p>', unsafe_allow_html=True)
+        st.markdown(f'<span class="status status-done">Statut: {item["status"]}</span>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # Menu en bas pour gérer les fonctionnalités
 st.divider()
