@@ -1,4 +1,5 @@
 import streamlit as st
+import pandas as pd
 from utils import *
 init_session_state()
 
@@ -11,32 +12,31 @@ st.set_page_config(
 
 st.sidebar.success("Choisissez une page ci-dessus.")
 
-# CSS minimal pour un design propre sans artefacts
+# CSS pour supprimer les espaces inutiles et styliser le tableau
 st.markdown("""
 <style>
 .stApp, .stMarkdown {
     margin: 0 !important;
     padding: 0 !important;
 }
-.roadmap-item {
-    background-color: #f6f8fa;
+.stDataFrame {
+    margin-top: 0 !important;
+}
+.dataframe {
+    border-collapse: collapse;
+    width: 100%;
+}
+.dataframe th, .dataframe td {
     border: 1px solid #e1e4e8;
-    border-radius: 6px;
     padding: 8px;
-    margin: 4px 0;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+    text-align: left;
 }
-.roadmap-item h4 {
-    margin: 0;
+.dataframe th {
+    background-color: #f6f8fa;
     color: #24292f;
-    font-size: 16px;
 }
-.roadmap-item p {
-    margin: 0;
-    color: #586069;
-    font-size: 14px;
+.dataframe tr:hover {
+    background-color: #f0f0f0;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -54,13 +54,9 @@ if "roadmap_data" not in st.session_state:
         {"title": "Générateur InMail", "description": "Messages personnalisés avec IA.", "status": "Réalisé"}
     ]
 
-# Affichage de la roadmap
-st.subheader("Liste des Fonctionnalités")
-for item in st.session_state.roadmap_data:
-    st.markdown(f'<div class="roadmap-item">', unsafe_allow_html=True)
-    st.markdown(f'<h4>{item["title"]} <span style="color: #586069;">({item["status"]})</span></h4>', unsafe_allow_html=True)
-    st.markdown(f'<p>{item["description"]}</p>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+# Conversion en DataFrame pour affichage
+df_roadmap = pd.DataFrame(st.session_state.roadmap_data)
+st.dataframe(df_roadmap, use_container_width=True)
 
 # Menu en bas pour gérer les fonctionnalités
 st.divider()
