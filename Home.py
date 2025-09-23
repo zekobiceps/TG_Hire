@@ -30,6 +30,7 @@ st.markdown("""
     border: 1px solid #e1e4e8;
     padding: 8px;
     text-align: left;
+    vertical-align: top;
 }
 .dataframe th {
     background-color: #f6f8fa;
@@ -37,6 +38,10 @@ st.markdown("""
 }
 .dataframe tr:hover {
     background-color: #f0f0f0;
+}
+.dataframe td ul {
+    margin: 0;
+    padding-left: 20px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -54,8 +59,20 @@ if "roadmap_data" not in st.session_state:
         {"title": "Générateur InMail", "description": "Messages personnalisés avec IA.", "status": "Réalisé"}
     ]
 
-# Conversion en DataFrame pour affichage
-df_roadmap = pd.DataFrame(st.session_state.roadmap_data)
+# Préparation des données pour le tableau
+to_do = [item["title"] for item in st.session_state.roadmap_data if item["status"] == "À développer"]
+in_progress = [item["title"] for item in st.session_state.roadmap_data if item["status"] == "En cours de développement"]
+done = [item["title"] for item in st.session_state.roadmap_data if item["status"] == "Réalisé"]
+
+# Conversion en DataFrame avec une ligne et trois colonnes
+data = {
+    "À développer": to_do,
+    "En cours de développement": in_progress,
+    "Réalisé": done
+}
+df_roadmap = pd.DataFrame([data])
+
+# Affichage du tableau
 st.dataframe(df_roadmap, use_container_width=True)
 
 # Menu en bas pour gérer les fonctionnalités
@@ -63,7 +80,8 @@ st.divider()
 st.subheader("🛠️ Gestion des Fonctionnalités")
 
 # Sélection d'une fonctionnalité
-selected_title = st.selectbox("Sélectionner une fonctionnalité", [item["title"] for item in st.session_state.roadmap_data], index=None)
+all_titles = [item["title"] for item in st.session_state.roadmap_data]
+selected_title = st.selectbox("Sélectionner une fonctionnalité", all_titles, index=None)
 
 if selected_title:
     # Trouver l'élément sélectionné
