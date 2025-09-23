@@ -27,39 +27,32 @@ from utils import (
 # --- CSS pour le style light thème aligné avec Annonces ---
 st.markdown("""
 <style>
-/* Fond de l'application */
+/* Ajustement de la taille des onglets pour correspondre à Annonces */
+div[data-testid="stTabs"] button p {
+    font-size: 18px;
+    color: #333333;
+}
+
+/* Réinitialisation du fond de l'application à blanc */
 .stApp {
     background-color: #FFFFFF;
     color: #333333;
 }
 
-/* Style pour les onglets de navigation */
-div[data-testid="stTabs"] button p {
-    font-size: 18px;
-    color: #333333;
-}
-div[data-testid="stTabs"] [aria-selected="true"] {
-    background-color: #E0E0E0;
-    color: #0066CC;
-    border-bottom: 2px solid #0066CC;
-}
-
-/* Style des inputs et textareas */
+/* Style des inputs pour un fond clair */
 .stTextInput input, .stTextArea textarea, .stSelectbox > div > select, .stDateInput input {
     background-color: #F0F2F6;
     color: #333333;
-    border-radius: 4px;
     border: 1px solid #CCCCCC;
-    padding: 0.5rem;
+    border-radius: 4px;
 }
 
-/* Style des boutons */
+/* Style des boutons pour rester clairs */
 .stButton > button[type="primary"] {
     background-color: #0066CC;
     color: white;
     border-radius: 5px;
     padding: 0.5rem 1rem;
-    border: none;
 }
 .stButton > button[type="primary"]:hover {
     background-color: #0055AA;
@@ -67,83 +60,11 @@ div[data-testid="stTabs"] [aria-selected="true"] {
 .stButton > button:not([type="primary"]) {
     background-color: #E0E0E0;
     color: #333333;
-    border: none;
     border-radius: 5px;
     padding: 0.5rem 1rem;
 }
 .stButton > button:not([type="primary"]):hover {
     background-color: #D0D0D0;
-}
-
-/* Style pour les expanders */
-.streamlit-expanderHeader {
-    background-color: #E0E0E0;
-    color: #333333;
-    border-radius: 5px;
-    padding: 0.5rem;
-    border: 1px solid #CCCCCC;
-}
-
-/* Style pour les alertes */
-.stSuccess {
-    background-color: #28A745;
-    color: #FFFFFF;
-}
-.stWarning {
-    background-color: #FFC107;
-    color: #333333;
-}
-.stInfo {
-    background-color: #17A2B8;
-    color: #FFFFFF;
-}
-.stError {
-    background-color: #DC3545;
-    color: #FFFFFF;
-}
-
-/* Style pour la matrice KSA */
-.stDataFrame {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 20px;
-    background-color: #FFFFFF;
-    font-size: 0.9em;
-    border: 1px solid #CCCCCC;
-}
-.stDataFrame th, .stDataFrame td {
-    padding: 12px 16px;
-    text-align: left;
-    border: 1px solid #CCCCCC;
-    color: #333333;
-}
-.stDataFrame th {
-    background-color: #0066CC;
-    color: white;
-    font-weight: 600;
-    padding: 14px 16px;
-    font-size: 16px;
-}
-
-/* Style pour les formulaires */
-div[data-testid="stForm"] {
-    padding: 1rem;
-    border: 1px solid #CCCCCC;
-    border-radius: 0.5rem;
-    background-color: #FFFFFF;
-}
-
-/* Style pour les conseils IA */
-.ai-advice-box {
-    background-color: #F0F2F6;
-    border-left: 4px solid #0066CC;
-    padding: 1rem;
-    border-radius: 4px;
-    margin-top: 1rem;
-    color: #333333;
-}
-.ai-advice-box strong {
-    color: #000000;
 }
 </style>
 """, unsafe_allow_html=True)
