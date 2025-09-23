@@ -49,21 +49,19 @@ st.markdown("""
 # Roadmap des Fonctionnalités sans divider en haut
 st.header("🚀 Roadmap des Fonctionnalités")
 
-# Initialisation des données dans session_state avec dates
+# Initialisation des données dans session_state avec last_modified
 if "roadmap_data" not in st.session_state:
     st.session_state.roadmap_data = [
-        {"title": "Onglets de sourcing (Boolean, X-Ray)", "description": "Génération de requêtes et liens LinkedIn/Google.", "status": "Réalisé", "date": "2025-09-20 10:00"},
-        {"title": "Générateur InMail", "description": "Messages personnalisés avec IA.", "status": "Réalisé", "date": "2025-09-21 14:30"},
-        {"title": "Base de données SQLite", "description": "Stockage persistant des briefs avec UI de gestion.", "status": "En cours de développement", "date": "2025-09-22 09:15"},
-        {"title": "Export CSV des briefs", "description": "Génération de rapports pour Excel.", "status": "À développer", "date": "2025-09-23 11:00"},
-        {"title": "Système de login avancé", "description": "Intégration OAuth ou JWT pour multi-utilisateurs.", "status": "À développer", "date": "2025-09-23 12:00"}
+        {"title": "Onglets de sourcing (Boolean, X-Ray)", "description": "Génération de requêtes et liens LinkedIn/Google.", "status": "Réalisé", "last_modified": "2025-09-20 10:00"},
+        {"title": "Générateur InMail", "description": "Messages personnalisés avec IA.", "status": "Réalisé", "last_modified": "2025-09-21 14:30"},
+        {"title": "Base de données SQLite", "description": "Stockage persistant des briefs avec UI de gestion.", "status": "En cours de développement", "last_modified": "2025-09-22 09:15"},
+        {"title": "Export CSV des briefs", "description": "Génération de rapports pour Excel.", "status": "À développer", "last_modified": "2025-09-23 11:00"},
+        {"title": "Système de login avancé", "description": "Intégration OAuth ou JWT pour multi-utilisateurs.", "status": "À développer", "last_modified": "2025-09-23 12:00"}
     ]
 
-# Mettre à jour la date lors de la modification
+# Mettre à jour ou initialiser last_modified
 for item in st.session_state.roadmap_data:
     if "last_modified" not in item:
-        item["last_modified"] = item["date"]
-    else:
         item["last_modified"] = datetime.now().strftime("%Y-%m-%d %H:%M")
 
 # Conversion en DataFrame avec tri chronologique (du plus récent au plus ancien)
@@ -119,7 +117,6 @@ if st.button("Ajouter"):
             "title": new_title,
             "description": new_description,
             "status": new_status,
-            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "last_modified": datetime.now().strftime("%Y-%m-%d %H:%M")
         })
         st.success("✅ Fonctionnalité ajoutée !")
