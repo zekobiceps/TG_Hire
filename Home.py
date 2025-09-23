@@ -11,44 +11,64 @@ st.set_page_config(
 
 st.sidebar.success("Choisissez une page ci-dessus.")
 
-# CSS minimal pour le style Kanban (inspiré GitHub : cartes propres, colonnes nettes)
+# CSS optimisé pour supprimer les blocs vides
 st.markdown("""
 <style>
+/* Réinitialisation des marges et paddings par défaut */
+.stApp, .stMarkdown, .stSubheader {
+    margin: 0 !important;
+    padding: 0 !important;
+}
+
+/* Style des colonnes Kanban sans espaces inutiles */
 .kanban-column {
     background-color: #f6f8fa;
     border: 1px solid #e1e4e8;
     border-radius: 6px;
-    padding: 0px; /* Suppression du padding supérieur pour enlever les blocs vides */
-    margin: 8px;
+    padding: 0; /* Suppression totale du padding */
+    margin: 0; /* Suppression des marges */
     min-height: 400px;
+    display: flex;
+    flex-direction: column;
 }
+
+/* Style des cartes sans blocs vides */
 .kanban-card {
     background-color: white;
     border: 1px solid #d0d7de;
     border-radius: 6px;
-    padding: 12px;
-    margin: 8px 0;
+    padding: 8px; /* Réduction du padding pour coller les éléments */
+    margin: 4px 0; /* Réduction des marges verticales */
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 4px; /* Espacement léger entre titre et description */
 }
+
 .kanban-card h4 {
-    margin: 0; /* Suppression des marges pour enlever les blocs vides au-dessus du titre */
+    margin: 0; /* Pas de marge au-dessus du titre */
     color: #24292f;
+    font-size: 16px;
 }
+
 .kanban-card p {
-    margin: 0 0 8px 0; /* Garde une petite marge sous la description */
+    margin: 0; /* Pas de marge pour coller les éléments */
     color: #586069;
     font-size: 14px;
 }
-.kanban-actions {
-    display: flex;
-    gap: 4px;
-}
+
+/* Lignes entre colonnes */
 .stColumn + .stColumn {
     border-left: 1px solid #e1e4e8;
     padding-left: 8px;
 }
-/* Annulation de la marge supérieure pour ramener le contenu à sa place */
-.stApp { margin-top: 0; }
+
+/* Ajustement des titres de colonnes */
+.stSubheader {
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    padding-bottom: 4px !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
