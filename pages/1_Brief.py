@@ -366,6 +366,7 @@ with st.sidebar:
 st.title("🤖 TG-Hire IA - Brief")
 
 # Style CSS pour les onglets personnalisés et les tableaux améliorés
+
 st.markdown("""
 <style>
 div[data-testid="stTabs"] button p {
@@ -377,21 +378,50 @@ div[data-testid="stTabs"] button p {
     white-space: pre-wrap !important;
 }
 
-/* RÉINITIALISATION COMPLÈTE DES STYLES POUR LES CHAMPS */
-.stTextInput input, 
-.stTextArea textarea,
-.stSelectbox select,
-.stDateInput input,
-.stNumberInput input {
-    all: unset !important;
+/* RÉINITIALISATION CORRIGÉE - Ne supprime pas les styles essentiels */
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea,
+.stSelectbox > div > div > select,
+.stDateInput > div > div > input {
+    /* Réinitialisation douce - conserve les styles de base */
+    background-color: inherit !important;
+    color: inherit !important;
+    border: 1px solid #ccc !important;
+    border-radius: 4px !important;
+    padding: 8px 12px !important;
+    font-size: 14px !important;
+    height: auto !important;
+    min-height: 38px !important;
 }
 
-/* Supprime tous les arrière-plans personnalisés */
-div[data-baseweb="input"] > div,
-div[data-baseweb="textarea"] > div,
+/* S'assurer que le texte est visible et bien positionné */
+.stTextInput > div > div > input::placeholder,
+.stTextArea > div > div > textarea::placeholder {
+    color: #666 !important;
+    opacity: 1 !important;
+}
+
+/* Corriger l'affichage des selectbox */
 div[data-baseweb="select"] > div {
-    background-color: inherit !important;
-    border-color: inherit !important;
+    border-radius: 4px !important;
+    border: 1px solid #ccc !important;
+}
+
+/* S'assurer que le texte n'est pas tronqué */
+.stTextInput input, 
+.stTextArea textarea {
+    white-space: normal !important;
+    word-wrap: break-word !important;
+}
+
+/* Corriger la largeur des colonnes dans les tableaux */
+.stDataFrame {
+    width: 100% !important;
+}
+
+.stDataFrame td, .stDataFrame th {
+    padding: 8px !important;
+    white-space: normal !important;
 }
 </style>
 """, unsafe_allow_html=True)
