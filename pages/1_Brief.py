@@ -371,6 +371,29 @@ st.markdown("""
 div[data-testid="stTabs"] button p {
     font-size: 18px; 
 }
+
+/* Style pour permettre le retour à la ligne avec Alt+Enter */
+.stTextArea textarea {
+    white-space: pre-wrap !important;
+}
+
+/* RÉINITIALISATION COMPLÈTE DES STYLES POUR LES CHAMPS */
+.stTextInput input, 
+.stTextArea textarea,
+.stSelectbox select,
+.stDateInput input,
+.stNumberInput input {
+    /* Supprime tous les styles personnalisés */
+    all: unset !important;
+}
+
+/* Supprime tous les arrière-plans personnalisés */
+div[data-baseweb="input"] > div,
+div[data-baseweb="textarea"] > div,
+div[data-baseweb="select"] > div {
+    background-color: inherit !important;
+    border-color: inherit !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
