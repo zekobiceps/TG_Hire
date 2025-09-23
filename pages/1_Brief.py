@@ -26,81 +26,122 @@ from utils import (
 
 # --- CSS pour le style light thème aligné avec Annonces ---
 st.markdown("""
+
 <style>
-/* Fond de l'application */
+/* Fond de l'application avec prise en charge du thème sombre */
 .stApp {
-    background-color: #FFFFFF !important;
+    background-color: #FFFFFF;
+}
+@media (prefers-color-scheme: dark) {
+    .stApp {
+        background-color: #1E1E1E;
+        color: #E0E0E0;
+    }
 }
 
 /* Style pour les onglets de navigation */
 div[data-testid="stTabs"] button p {
     font-size: 18px;
 }
+@media (prefers-color-scheme: dark) {
+    div[data-testid="stTabs"] button {
+        color: #E0E0E0;
+    }
+    div[data-testid="stTabs"] [aria-selected="true"] {
+        background-color: #333333;
+        color: #FFFFFF;
+    }
+}
 
 /* Style des inputs et textareas */
-.stTextInput input, .stTextArea textarea {
-    background-color: #F0F2F6 !important;
-    color: #333333 !important;
-    border-radius: 4px !important;
-    border: none !important;
+.stTextInput input, .stTextArea textarea, .stSelectbox > div > select, .stDateInput input {
+    background-color: #F0F2F6;
+    color: #333333;
+    border-radius: 4px;
+    border: none;
 }
-.stSelectbox > div > select {
-    background-color: #F0F2F6 !important;
-    color: #333333 !important;
-    border: none !important;
-    border-radius: 4px !important;
-}
-.stDateInput input {
-    background-color: #F0F2F6 !important;
-    color: #333333 !important;
-    border-radius: 4px !important;
-    border: none !important;
+@media (prefers-color-scheme: dark) {
+    .stTextInput input, .stTextArea textarea, .stSelectbox > div > select, .stDateInput input {
+        background-color: #2F333B;
+        color: #E0E0E0;
+        border: 1px solid #444444;
+    }
 }
 
 /* Style des boutons */
 .stButton > button[type="primary"] {
-    background-color: #0066CC !important;
-    color: white !important;
-    border-radius: 5px !important;
-    padding: 0.5rem 1rem !important;
+    background-color: #0066CC;
+    color: white;
+    border-radius: 5px;
+    padding: 0.5rem 1rem;
 }
 .stButton > button[type="primary"]:hover {
-    background-color: #0055AA !important;
+    background-color: #0055AA;
 }
 .stButton > button:not([type="primary"]) {
-    background-color: #E0E0E0 !important;
-    color: #333333 !important;
-    border: none !important;
-    border-radius: 5px !important;
+    background-color: #E0E0E0;
+    color: #333333;
+    border: none;
+    border-radius: 5px;
 }
 .stButton > button:not([type="primary"]):hover {
-    background-color: #D0D0D0 !important;
+    background-color: #D0D0D0;
+}
+@media (prefers-color-scheme: dark) {
+    .stButton > button[type="primary"] {
+        background-color: #4DA8DA;
+        color: #FFFFFF;
+    }
+    .stButton > button[type="primary"]:hover {
+        background-color: #3998C7;
+    }
+    .stButton > button:not([type="primary"]) {
+        background-color: #444444;
+        color: #E0E0E0;
+    }
+    .stButton > button:not([type="primary"]):hover {
+        background-color: #555555;
+    }
 }
 
 /* Style pour les expanders */
 .streamlit-expanderHeader {
-    background-color: #E0E0E0 !important;
-    color: #333333 !important;
-    border-radius: 5px !important;
-    padding: 0.5rem !important;
+    background-color: #E0E0E0;
+    color: #333333;
+    border-radius: 5px;
+    padding: 0.5rem;
+}
+@media (prefers-color-scheme: dark) {
+    .streamlit-expanderHeader {
+        background-color: #333333;
+        color: #E0E0E0;
+    }
 }
 
 /* Style pour les alertes */
 .stSuccess {
-    background-color: #28A745 !important;
-    color: #FFFFFF !important;
+    background-color: #28A745;
+    color: #FFFFFF;
 }
 .stWarning {
-    background-color: #FFC107 !important;
-    color: #333333 !important;
+    background-color: #FFC107;
+    color: #333333;
 }
 .stInfo {
-    background-color: #17A2B8 !important;
-    color: #FFFFFF !important;
+    background-color: #17A2B8;
+    color: #FFFFFF;
 }
 .stError {
-    background-color: #DC3545 !important;
-    color: #FFFFFF !important;
+    background-color: #DC3545;
+    color: #FFFFFF;
+}
+@media (prefers-color-scheme: dark) {
+    .stSuccess, .stInfo, .stError {
+        color: #FFFFFF;
+    }
+    .stWarning {
+        color: #333333;
+    }
 }
 
 /* Style pour la matrice KSA */
@@ -108,7 +149,7 @@ div[data-testid="stTabs"] button p {
     width: 100%;
     border-collapse: collapse;
     margin-bottom: 20px;
-    background-color: #FFFFFF !important;
+    background-color: #FFFFFF;
     font-size: 0.9em;
     border: 1px solid #CCCCCC;
 }
@@ -119,11 +160,24 @@ div[data-testid="stTabs"] button p {
     color: #333333;
 }
 .stDataFrame th {
-    background-color: #0066CC !important;
-    color: white !important;
+    background-color: #0066CC;
+    color: white;
     font-weight: 600;
     padding: 14px 16px;
     font-size: 16px;
+}
+@media (prefers-color-scheme: dark) {
+    .stDataFrame {
+        background-color: #1E1E1E;
+        border-color: #444444;
+    }
+    .stDataFrame th, .stDataFrame td {
+        border-color: #444444;
+        color: #E0E0E0;
+    }
+    .stDataFrame th {
+        background-color: #4DA8DA;
+    }
 }
 
 /* Style pour les formulaires */
@@ -131,6 +185,12 @@ div[data-testid="stForm"] {
     padding: 1rem;
     border: 1px solid #CCCCCC;
     border-radius: 0.5rem;
+}
+@media (prefers-color-scheme: dark) {
+    div[data-testid="stForm"] {
+        border-color: #444444;
+        background-color: #2F333B;
+    }
 }
 
 /* Style pour les conseils IA */
@@ -144,6 +204,16 @@ div[data-testid="stForm"] {
 }
 .ai-advice-box strong {
     color: #000000;
+}
+@media (prefers-color-scheme: dark) {
+    .ai-advice-box {
+        background-color: #2F333B;
+        border-left-color: #4DA8DA;
+        color: #E0E0E0;
+    }
+    .ai-advice-box strong {
+        color: #FFFFFF;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
