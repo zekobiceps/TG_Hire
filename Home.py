@@ -24,15 +24,37 @@ if not st.session_state.logged_in:
         page_title="TG-Hire IA - Roadmap Fonctionnelle",
         page_icon="📊",
         layout="wide",
-        initial_sidebar_state="expanded"
+        initial_sidebar_state="collapsed"  # Sidebar réduite par défaut
     )
+    
+    # Appliquer le style CSS pour minimiser l'interface
+    st.markdown("""
+        <style>
+        /* Cacher les éléments inutiles */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        
+        /* Centrer le contenu */
+        .block-container {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        
+        /* Style minimaliste */
+        .stButton>button {
+            width: 100%;
+            border-radius: 8px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
     
     # Centrer le contenu de login
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
         # Afficher l'image au centre
-        st.image("tgcc.png", width=300, use_column_width=True)
+        st.image("tgcc.png", width=300, use_container_width=True)  # Correction ici
         
         # Formulaire de connexion
         with st.form("login_form"):
@@ -48,16 +70,6 @@ if not st.session_state.logged_in:
                     st.rerun()
                 else:
                     st.error("Email ou mot de passe incorrect.")
-    
-    # Cacher le titre principal sur la page de login
-    st.markdown("""
-        <style>
-        .main-header {
-            visibility: hidden;
-            display: none;
-        }
-        </style>
-    """, unsafe_allow_html=True)
 
 else:
     # Page d'accueil après connexion
@@ -65,13 +77,60 @@ else:
         page_title="TG-Hire IA - Roadmap Fonctionnelle",
         page_icon="📊",
         layout="wide",
-        initial_sidebar_state="expanded"
+        initial_sidebar_state="collapsed"  # Sidebar réduite
     )
     
-    st.title("📊 Roadmap Fonctionnelle")
+    # Appliquer le style CSS minimaliste
+    st.markdown("""
+        <style>
+        /* Logo en haut de la sidebar */
+        .sidebar .sidebar-content {
+            padding-top: 0rem;
+        }
+        
+        /* Cacher les éléments inutiles */
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        
+        /* Style minimaliste pour les cartes */
+        .feature-card {
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 8px 0;
+            border-left: 4px solid #6c757d;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        
+        /* Réduire l'espacement */
+        .block-container {
+            padding-top: 1rem;
+            padding-bottom: 1rem;
+        }
+        
+        /* Boutons plus compacts */
+        .stButton>button {
+            border-radius: 6px;
+            padding: 0.25rem 0.75rem;
+        }
+        </style>
+    """, unsafe_allow_html=True)
 
-    # Afficher le nom d'utilisateur dans la sidebar
-    st.sidebar.success(f"Connecté en tant que : {st.session_state.current_user}")
+    # Sidebar avec logo et informations utilisateur
+    with st.sidebar:
+        # Logo en haut
+        st.image("tgcc.png", width=150, use_container_width=True)
+        st.markdown("---")
+        st.success(f"👤 {st.session_state.current_user}")
+        
+        # Bouton de déconnexion
+        if st.button("🚪 Déconnexion", use_container_width=True):
+            st.session_state.logged_in = False
+            st.session_state.current_user = ""
+            st.rerun()
+
+    # Contenu principal
+    st.title("📊 Roadmap Fonctionnelle")
 
     # --- TABLEAU KANBAN DES FONCTIONNALITÉS ---
     
@@ -83,22 +142,13 @@ else:
         st.markdown("### 📋 À développer")
         st.markdown("---")
         for feature in st.session_state.features["À développer"]:
-            priority_color = {"Haute": "#f44336", "Moyenne": "#ff9800", "Basse": "#4caf50"}
+            priority_color = {"Haute": "#dc3545", "Moyenne": "#fd7e14", "Basse": "#198754"}
             
-            # Conteneur de la carte sans boutons de déplacement
             st.markdown(f"""
-            <div style="
-                background: #ffebee; 
-                padding: 12px; 
-                border-radius: 8px; 
-                margin: 8px 0; 
-                border-left: 4px solid {priority_color[feature['priority']]};
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                color: #000000;
-            ">
-            <div style="font-weight: bold; font-size: 14px; color: #000000;">📌 {feature['title']}</div>
-            <div style="font-size: 12px; color: #333333; margin: 5px 0;">{feature['description']}</div>
-            <div style="font-size: 11px; color: #666666;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
+            <div class="feature-card" style="border-left-color: {priority_color[feature['priority']]}">
+                <div style="font-weight: bold; font-size: 14px;">📌 {feature['title']}</div>
+                <div style="font-size: 12px; color: #495057; margin: 5px 0;">{feature['description']}</div>
+                <div style="font-size: 11px; color: #6c757d;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
             </div>
             """, unsafe_allow_html=True)
     
@@ -107,21 +157,13 @@ else:
         st.markdown("### 🔄 En cours")
         st.markdown("---")
         for feature in st.session_state.features["En cours"]:
-            priority_color = {"Haute": "#f44336", "Moyenne": "#ff9800", "Basse": "#4caf50"}
+            priority_color = {"Haute": "#dc3545", "Moyenne": "#fd7e14", "Basse": "#198754"}
             
             st.markdown(f"""
-            <div style="
-                background: #fff3e0; 
-                padding: 12px; 
-                border-radius: 8px; 
-                margin: 8px 0; 
-                border-left: 4px solid {priority_color[feature['priority']]};
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                color: #000000;
-            ">
-            <div style="font-weight: bold; font-size: 14px; color: #000000;">⚡ {feature['title']}</div>
-            <div style="font-size: 12px; color: #333333; margin: 5px 0;">{feature['description']}</div>
-            <div style="font-size: 11px; color: #666666;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
+            <div class="feature-card" style="border-left-color: {priority_color[feature['priority']]}">
+                <div style="font-weight: bold; font-size: 14px;">⚡ {feature['title']}</div>
+                <div style="font-size: 12px; color: #495057; margin: 5px 0;">{feature['description']}</div>
+                <div style="font-size: 11px; color: #6c757d;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
             </div>
             """, unsafe_allow_html=True)
     
@@ -130,21 +172,13 @@ else:
         st.markdown("### ✅ Réalisé")
         st.markdown("---")
         for feature in st.session_state.features["Réalisé"]:
-            priority_color = {"Haute": "#f44336", "Moyenne": "#ff9800", "Basse": "#4caf50"}
+            priority_color = {"Haute": "#dc3545", "Moyenne": "#fd7e14", "Basse": "#198754"}
             
             st.markdown(f"""
-            <div style="
-                background: #e8f5e8; 
-                padding: 12px; 
-                border-radius: 8px; 
-                margin: 8px 0; 
-                border-left: 4px solid {priority_color[feature['priority']]};
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                color: #000000;
-            ">
-            <div style="font-weight: bold; font-size: 14px; color: #000000;">✅ {feature['title']}</div>
-            <div style="font-size: 12px; color: #333333; margin: 5px 0;">{feature['description']}</div>
-            <div style="font-size: 11px; color: #666666;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
+            <div class="feature-card" style="border-left-color: {priority_color[feature['priority']]}">
+                <div style="font-weight: bold; font-size: 14px;">✅ {feature['title']}</div>
+                <div style="font-size: 12px; color: #495057; margin: 5px 0;">{feature['description']}</div>
+                <div style="font-size: 11px; color: #6c757d;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
             </div>
             """, unsafe_allow_html=True)
     
@@ -164,26 +198,24 @@ else:
         st.metric("Taux de réalisation", f"{completion_rate:.1f}%")
 
     # --- ONGLET DE GESTION ---
-    st.markdown("---")
-    with st.expander("🔧 Gestion avancée des fonctionnalités", expanded=False):
+    with st.expander("🔧 Gestion des fonctionnalités", expanded=False):
         tab1, tab2, tab3 = st.tabs(["➕ Ajouter", "✏️ Modifier", "🗑️ Supprimer"])
         
         with tab1:
-            st.subheader("Ajouter une nouvelle fonctionnalité")
+            st.subheader("Ajouter une fonctionnalité")
             with st.form(key="add_feature_form"):
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    new_title = st.text_input("Titre de la fonctionnalité *")
-                    new_description = st.text_area("Description *", height=100)
+                    new_title = st.text_input("Titre *")
+                    new_description = st.text_area("Description *", height=80)
                 
                 with col2:
                     new_status = st.selectbox("Statut *", ["À développer", "En cours", "Réalisé"])
                     new_priority = st.selectbox("Priorité *", ["Haute", "Moyenne", "Basse"])
                 
-                if st.form_submit_button("💾 Ajouter la fonctionnalité"):
+                if st.form_submit_button("💾 Ajouter"):
                     if new_title and new_description:
-                        # Trouver le prochain ID disponible
                         all_ids = []
                         for status, features in st.session_state.features.items():
                             for feature in features:
@@ -198,28 +230,26 @@ else:
                             "date_ajout": datetime.now().strftime("%Y-%m-%d")
                         }
                         st.session_state.features[new_status].append(new_feature)
-                        st.success("✅ Fonctionnalité ajoutée avec succès !")
+                        st.success("✅ Fonctionnalité ajoutée !")
                         st.rerun()
                     else:
-                        st.error("❌ Veuillez remplir tous les champs obligatoires")
+                        st.error("❌ Champs obligatoires manquants")
         
         with tab2:
             st.subheader("Modifier une fonctionnalité")
             if total_features > 0:
-                # Liste des fonctionnalités pour modification
                 all_features = []
                 for status, features in st.session_state.features.items():
                     for feature in features:
                         all_features.append((feature["id"], f"{feature['title']} ({status})"))
                 
                 selected_feature_id = st.selectbox(
-                    "Sélectionner une fonctionnalité à modifier",
+                    "Sélectionner une fonctionnalité",
                     options=[f[0] for f in all_features],
                     format_func=lambda x: next((f[1] for f in all_features if f[0] == x), "")
                 )
                 
                 if selected_feature_id:
-                    # Trouver la fonctionnalité sélectionnée
                     selected_feature = None
                     old_status = None
                     for status, features in st.session_state.features.items():
@@ -235,7 +265,7 @@ else:
                             
                             with col1:
                                 edit_title = st.text_input("Titre", value=selected_feature["title"])
-                                edit_description = st.text_area("Description", value=selected_feature["description"], height=100)
+                                edit_description = st.text_area("Description", value=selected_feature["description"], height=80)
                             
                             with col2:
                                 edit_status = st.selectbox("Statut", ["À développer", "En cours", "Réalisé"], 
@@ -243,11 +273,9 @@ else:
                                 edit_priority = st.selectbox("Priorité", ["Haute", "Moyenne", "Basse"], 
                                                            index=["Haute", "Moyenne", "Basse"].index(selected_feature["priority"]))
                             
-                            if st.form_submit_button("💾 Enregistrer les modifications"):
-                                # Supprimer l'ancienne version
+                            if st.form_submit_button("💾 Enregistrer"):
                                 st.session_state.features[old_status] = [f for f in st.session_state.features[old_status] if f["id"] != selected_feature_id]
                                 
-                                # Ajouter la nouvelle version
                                 updated_feature = {
                                     "id": selected_feature_id,
                                     "title": edit_title,
@@ -256,7 +284,7 @@ else:
                                     "date_ajout": selected_feature["date_ajout"]
                                 }
                                 st.session_state.features[edit_status].append(updated_feature)
-                                st.success("✅ Fonctionnalité modifiée avec succès !")
+                                st.success("✅ Fonctionnalité modifiée !")
                                 st.rerun()
             else:
                 st.info("Aucune fonctionnalité à modifier.")
@@ -264,7 +292,6 @@ else:
         with tab3:
             st.subheader("Supprimer une fonctionnalité")
             if total_features > 0:
-                # Liste des fonctionnalités pour suppression
                 all_features = []
                 for status, features in st.session_state.features.items():
                     for feature in features:
@@ -278,23 +305,17 @@ else:
                 )
                 
                 if delete_feature_id:
-                    if st.button("🗑️ Supprimer définitivement", type="secondary"):
-                        # Trouver et supprimer la fonctionnalité
+                    if st.button("🗑️ Supprimer", type="secondary", use_container_width=True):
                         for status, features in st.session_state.features.items():
                             st.session_state.features[status] = [f for f in features if f["id"] != delete_feature_id]
-                        st.success("✅ Fonctionnalité supprimée avec succès !")
+                        st.success("✅ Fonctionnalité supprimée !")
                         st.rerun()
             else:
                 st.info("Aucune fonctionnalité à supprimer.")
 
+    # Pied de page minimaliste
     st.markdown("---")
-    st.caption("📊 TG-Hire IA - Roadmap Fonctionnelle | Version 1.0")
-
-    # Bouton de déconnexion dans la sidebar
-    if st.sidebar.button("Déconnexion"):
-        st.session_state.logged_in = False
-        st.session_state.current_user = ""
-        st.rerun()
+    st.caption("TG-Hire IA - Roadmap Fonctionnelle v1.0")
 
     # Protéger les pages dans pages/ (arrête l'exécution si non connecté)
     if not st.session_state.logged_in:
