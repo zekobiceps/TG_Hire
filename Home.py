@@ -18,34 +18,101 @@ if "logged_in" not in st.session_state:
 if "current_user" not in st.session_state:
     st.session_state.current_user = ""
 
+# Appliquer le style CSS pour la barre de navigation avec logo
+st.markdown("""
+    <style>
+    /* Logo dans la barre de navigation */
+    .css-1vq4p4l {
+        padding-top: 0rem;
+        padding-bottom: 0rem;
+    }
+    
+    /* Barre de navigation personnalisée */
+    .navbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background-color: white;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        z-index: 999;
+        padding: 10px 0;
+    }
+    
+    .navbar-container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        max-width: 100%;
+        padding: 0 1rem;
+    }
+    
+    .navbar-logo {
+        height: 40px;
+    }
+    
+    .navbar-user {
+        font-size: 14px;
+        color: #666;
+    }
+    
+    /* Ajuster le contenu principal pour tenir compte de la navbar fixe */
+    .main .block-container {
+        padding-top: 80px;
+    }
+    
+    /* Cacher les éléments par défaut de Streamlit */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Style minimaliste */
+    .feature-card {
+        background: #f8f9fa;
+        padding: 12px;
+        border-radius: 8px;
+        margin: 8px 0;
+        border-left: 4px solid #6c757d;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    </style>
+    
+    <!-- Barre de navigation avec logo -->
+    <div class="navbar">
+        <div class="navbar-container">
+            <img src="https://via.placeholder.com/150x40/000000/FFFFFF?text=TGCC+Logo" class="navbar-logo" alt="TGCC Logo">
+            <div class="navbar-user" id="user-info"></div>
+        </div>
+    </div>
+    
+    <script>
+    // Mettre à jour les informations utilisateur
+    function updateUserInfo() {
+        const userInfo = document.getElementById('user-info');
+        if (userInfo) {
+            userInfo.textContent = window.streamlitSessionState?.current_user || '';
+        }
+    }
+    
+    // Exécuter après le chargement de la page
+    setTimeout(updateUserInfo, 100);
+    </script>
+""", unsafe_allow_html=True)
+
 # Page de login
 if not st.session_state.logged_in:
     st.set_page_config(
         page_title="TG-Hire IA - Roadmap Fonctionnelle",
         page_icon="📊",
         layout="wide",
-        initial_sidebar_state="collapsed"  # Sidebar réduite par défaut
+        initial_sidebar_state="collapsed"
     )
     
-    # Appliquer le style CSS pour minimiser l'interface
+    # Cacher temporairement la navbar sur la page de login
     st.markdown("""
         <style>
-        /* Cacher les éléments inutiles */
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-        
-        /* Centrer le contenu */
-        .block-container {
-            padding-top: 2rem;
-            padding-bottom: 2rem;
-        }
-        
-        /* Style minimaliste */
-        .stButton>button {
-            width: 100%;
-            border-radius: 8px;
-        }
+        .navbar { display: none; }
+        .main .block-container { padding-top: 2rem; }
         </style>
     """, unsafe_allow_html=True)
     
@@ -54,7 +121,7 @@ if not st.session_state.logged_in:
     
     with col2:
         # Afficher l'image au centre
-        st.image("tgcc.png", width=300, use_container_width=True)  # Correction ici
+        st.image("tgcc.png", width=300, use_container_width=True)
         
         # Formulaire de connexion
         with st.form("login_form"):
@@ -77,53 +144,19 @@ else:
         page_title="TG-Hire IA - Roadmap Fonctionnelle",
         page_icon="📊",
         layout="wide",
-        initial_sidebar_state="collapsed"  # Sidebar réduite
+        initial_sidebar_state="collapsed"
     )
     
-    # Appliquer le style CSS minimaliste
-    st.markdown("""
-        <style>
-        /* Logo en haut de la sidebar */
-        .sidebar .sidebar-content {
-            padding-top: 0rem;
-        }
-        
-        /* Cacher les éléments inutiles */
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        
-        /* Style minimaliste pour les cartes */
-        .feature-card {
-            background: #f8f9fa;
-            padding: 12px;
-            border-radius: 8px;
-            margin: 8px 0;
-            border-left: 4px solid #6c757d;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        
-        /* Réduire l'espacement */
-        .block-container {
-            padding-top: 1rem;
-            padding-bottom: 1rem;
-        }
-        
-        /* Boutons plus compacts */
-        .stButton>button {
-            border-radius: 6px;
-            padding: 0.25rem 0.75rem;
-        }
-        </style>
+    # Mettre à jour les infos utilisateur dans la navbar via JavaScript
+    st.markdown(f"""
+        <script>
+        document.getElementById('user-info').textContent = 'Connecté en tant que : {st.session_state.current_user}';
+        </script>
     """, unsafe_allow_html=True)
 
-    # Sidebar avec logo et informations utilisateur
+    # Sidebar minimaliste (optionnelle)
     with st.sidebar:
-        # Logo en haut
-        st.image("tgcc.png", width=150, use_container_width=True)
-        st.markdown("---")
-        st.success(f"👤 {st.session_state.current_user}")
-        
-        # Bouton de déconnexion
+        st.markdown("### Navigation")
         if st.button("🚪 Déconnexion", use_container_width=True):
             st.session_state.logged_in = False
             st.session_state.current_user = ""
