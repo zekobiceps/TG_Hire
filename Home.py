@@ -2,7 +2,6 @@ import streamlit as st
 from utils import *
 from datetime import datetime
 import pandas as pd
-import base64
 
 # Initialisation robuste de l'état de session
 if 'features' not in st.session_state:
@@ -31,14 +30,6 @@ USERS = {
     "user2@example.com": {"password": "securepass", "name": "Utilisateur Test"}
 }
 
-# Fonction pour afficher le logo en base64 (évite les problèmes de chemin)
-def get_logo_base64():
-    try:
-        with open("tgcc.png", "rb") as image_file:
-            return base64.b64encode(image_file.read()).decode()
-    except:
-        return ""
-
 # Appliquer le style CSS minimaliste
 st.markdown("""
     <style>
@@ -57,12 +48,21 @@ st.markdown("""
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
     
-    /* Centrer le contenu */
-    .centered {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        flex-direction: column;
+    /* Style pour le message de bienvenue */
+    .welcome-message {
+        text-align: center;
+        margin: 10px 0;
+    }
+    .welcome-text {
+        font-size: 14px;
+        font-weight: bold;
+        margin-bottom: 0;
+    }
+    .user-name {
+        font-size: 16px;
+        font-weight: bold;
+        color: #1f77b4;
+        margin-top: 0;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -107,29 +107,30 @@ else:
         initial_sidebar_state="expanded"
     )
     
-    # Header avec logo et message de bienvenue
-    col_logo, col_title, col_user = st.columns([1, 2, 1])
-    
-    with col_logo:
-        st.image("tgcc.png", width=100, use_container_width=True)
-    
-    with col_title:
-        st.title("📊 Roadmap Fonctionnelle")
-    
-    with col_user:
-        st.markdown(f"### Bienvenue {st.session_state.current_user}")
-
-    # Sidebar avec navigation
+    # Sidebar avec logo en haut et message de bienvenue formaté
     with st.sidebar:
+        # Logo en haut de la sidebar
         st.image("tgcc.png", width=150, use_container_width=True)
         st.markdown("---")
-        st.success(f"**Bienvenue {st.session_state.current_user}**")
+        
+        # Message de bienvenue formaté sur deux lignes
+        st.markdown(
+            f'<div class="welcome-message">'
+            f'<p class="welcome-text">Bienvenue</p>'
+            f'<p class="user-name">{st.session_state.current_user}</p>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+        
         st.markdown("---")
         
         if st.button("🚪 Déconnexion", use_container_width=True):
             st.session_state.logged_in = False
             st.session_state.current_user = ""
             st.rerun()
+
+    # Contenu principal - sans logo ni message de bienvenue
+    st.title("📊 Roadmap Fonctionnelle")
 
     # Vérification que les clés existent dans features
     for status in ["À développer", "En cours", "Réalisé"]:
