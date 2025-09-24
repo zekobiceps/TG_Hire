@@ -2,6 +2,7 @@ import streamlit as st
 from utils import *
 from datetime import datetime
 import pandas as pd
+import base64
 
 # Initialisation robuste de l'état de session
 if 'features' not in st.session_state:
@@ -30,44 +31,17 @@ USERS = {
     "user2@example.com": {"password": "securepass", "name": "Utilisateur Test"}
 }
 
-# Appliquer le style CSS pour la barre de navigation avec logo
+# Fonction pour afficher le logo en base64 (évite les problèmes de chemin)
+def get_logo_base64():
+    try:
+        with open("tgcc.png", "rb") as image_file:
+            return base64.b64encode(image_file.read()).decode()
+    except:
+        return ""
+
+# Appliquer le style CSS minimaliste
 st.markdown("""
     <style>
-    /* Barre de navigation personnalisée */
-    .navbar {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        background-color: white;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        z-index: 999;
-        padding: 10px 0;
-    }
-    
-    .navbar-container {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        max-width: 100%;
-        padding: 0 1rem;
-    }
-    
-    .navbar-logo {
-        height: 40px;
-    }
-    
-    .navbar-user {
-        font-size: 14px;
-        color: #666;
-        font-weight: bold;
-    }
-    
-    /* Ajuster le contenu principal pour tenir compte de la navbar fixe */
-    .main .block-container {
-        padding-top: 80px;
-    }
-    
     /* Cacher les éléments par défaut de Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
@@ -82,6 +56,14 @@ st.markdown("""
         border-left: 4px solid #6c757d;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
+    
+    /* Centrer le contenu */
+    .centered {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -93,14 +75,6 @@ if not st.session_state.logged_in:
         layout="wide",
         initial_sidebar_state="collapsed"
     )
-    
-    # Cacher temporairement la navbar sur la page de login
-    st.markdown("""
-        <style>
-        .navbar { display: none; }
-        .main .block-container { padding-top: 2rem; }
-        </style>
-    """, unsafe_allow_html=True)
     
     # Centrer le contenu de login
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -130,29 +104,32 @@ else:
         page_title="TG-Hire IA - Roadmap Fonctionnelle",
         page_icon="📊",
         layout="wide",
-        initial_sidebar_state="collapsed"
+        initial_sidebar_state="expanded"
     )
     
-    # Barre de navigation avec logo et message de bienvenue
-    st.markdown(f"""
-        <div class="navbar">
-            <div class="navbar-container">
-                <img src="tgcc.png" class="navbar-logo" alt="TGCC Logo" height="40">
-                <div class="navbar-user">Bienvenue {st.session_state.current_user}</div>
-            </div>
-        </div>
-    """, unsafe_allow_html=True)
+    # Header avec logo et message de bienvenue
+    col_logo, col_title, col_user = st.columns([1, 2, 1])
+    
+    with col_logo:
+        st.image("tgcc.png", width=100, use_container_width=True)
+    
+    with col_title:
+        st.title("📊 Roadmap Fonctionnelle")
+    
+    with col_user:
+        st.markdown(f"### Bienvenue {st.session_state.current_user}")
 
-    # Sidebar minimaliste
+    # Sidebar avec navigation
     with st.sidebar:
-        st.markdown("### Navigation")
+        st.image("tgcc.png", width=150, use_container_width=True)
+        st.markdown("---")
+        st.success(f"**Bienvenue {st.session_state.current_user}**")
+        st.markdown("---")
+        
         if st.button("🚪 Déconnexion", use_container_width=True):
             st.session_state.logged_in = False
             st.session_state.current_user = ""
             st.rerun()
-
-    # Contenu principal
-    st.title("📊 Roadmap Fonctionnelle")
 
     # Vérification que les clés existent dans features
     for status in ["À développer", "En cours", "Réalisé"]:
@@ -168,7 +145,7 @@ else:
     with col1:
         st.markdown("### 📋 À développer")
         st.markdown("---")
-        if "À développer" in st.session_state.features and st.session_state.features["À développer"]:
+        if st.session_state.features["À développer"]:
             for feature in st.session_state.features["À développer"]:
                 priority_color = {"Haute": "#dc3545", "Moyenne": "#fd7e14", "Basse": "#198754"}
                 
@@ -186,7 +163,7 @@ else:
     with col2:
         st.markdown("### 🔄 En cours")
         st.markdown("---")
-        if "En cours" in st.session_state.features and st.session_state.features["En cours"]:
+        if st.session_state.features["En cours"]:
             for feature in st.session_state.features["En cours"]:
                 priority_color = {"Haute": "#dc3545", "Moyenne": "#fd7e14", "Basse": "#198754"}
                 
@@ -204,7 +181,7 @@ else:
     with col3:
         st.markdown("### ✅ Réalisé")
         st.markdown("---")
-        if "Réalisé" in st.session_state.features and st.session_state.features["Réalisé"]:
+        if st.session_state.features["Réalisé"]:
             for feature in st.session_state.features["Réalisé"]:
                 priority_color = {"Haute": "#dc3545", "Moyenne": "#fd7e14", "Basse": "#198754"}
                 
@@ -222,7 +199,7 @@ else:
     st.markdown("---")
     
     total_features = sum(len(features) for features in st.session_state.features.values())
-    completed_features = len(st.session_state.features["Réalisé"]) if "Réalisé" in st.session_state.features else 0
+    completed_features = len(st.session_state.features["Réalisé"])
     
     col_stats1, col_stats2 = st.columns(2)
     
@@ -350,7 +327,7 @@ else:
             else:
                 st.info("Aucune fonctionnalité à supprimer.")
 
-    # Pied de page minimaliste
+    # Pied de page
     st.markdown("---")
     st.caption("TG-Hire IA - Roadmap Fonctionnelle v1.0")
 
