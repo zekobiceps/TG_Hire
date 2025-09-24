@@ -85,8 +85,6 @@ else:
         st.markdown("---")
         for feature in st.session_state.features["À développer"]:
             priority_color = {"Haute": "#f44336", "Moyenne": "#ff9800", "Basse": "#4caf50"}
-            
-            # Conteneur de la carte avec boutons de déplacement
             st.markdown(f"""
             <div style="
                 background: #ffebee; 
@@ -96,21 +94,12 @@ else:
                 border-left: 4px solid {priority_color[feature['priority']]};
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 color: #000000;
-                position: relative;
             ">
             <div style="font-weight: bold; font-size: 14px; color: #000000;">📌 {feature['title']}</div>
             <div style="font-size: 12px; color: #333333; margin: 5px 0;">{feature['description']}</div>
             <div style="font-size: 11px; color: #666666;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
             </div>
             """, unsafe_allow_html=True)
-            
-            # Boutons de déplacement
-            col_move1, col_move2 = st.columns(2)
-            with col_move1:
-                if st.button("➡️ Déplacer →", key=f"move_right_{feature['id']}", use_container_width=True):
-                    st.session_state.features["À développer"].remove(feature)
-                    st.session_state.features["En cours"].append(feature)
-                    st.rerun()
     
     # Colonne "En cours"
     with col2:
@@ -118,7 +107,6 @@ else:
         st.markdown("---")
         for feature in st.session_state.features["En cours"]:
             priority_color = {"Haute": "#f44336", "Moyenne": "#ff9800", "Basse": "#4caf50"}
-            
             st.markdown(f"""
             <div style="
                 background: #fff3e0; 
@@ -128,26 +116,12 @@ else:
                 border-left: 4px solid {priority_color[feature['priority']]};
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 color: #000000;
-                position: relative;
             ">
             <div style="font-weight: bold; font-size: 14px; color: #000000;">⚡ {feature['title']}</div>
             <div style="font-size: 12px; color: #333333; margin: 5px 0;">{feature['description']}</div>
             <div style="font-size: 11px; color: #666666;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
             </div>
             """, unsafe_allow_html=True)
-            
-            # Boutons de déplacement
-            col_move1, col_move2 = st.columns(2)
-            with col_move1:
-                if st.button("⬅️ ← Déplacer", key=f"move_left_{feature['id']}", use_container_width=True):
-                    st.session_state.features["En cours"].remove(feature)
-                    st.session_state.features["À développer"].append(feature)
-                    st.rerun()
-            with col_move2:
-                if st.button("➡️ Déplacer →", key=f"move_right_e_{feature['id']}", use_container_width=True):
-                    st.session_state.features["En cours"].remove(feature)
-                    st.session_state.features["Réalisé"].append(feature)
-                    st.rerun()
     
     # Colonne "Réalisé"
     with col3:
@@ -155,7 +129,6 @@ else:
         st.markdown("---")
         for feature in st.session_state.features["Réalisé"]:
             priority_color = {"Haute": "#f44336", "Moyenne": "#ff9800", "Basse": "#4caf50"}
-            
             st.markdown(f"""
             <div style="
                 background: #e8f5e8; 
@@ -165,19 +138,12 @@ else:
                 border-left: 4px solid {priority_color[feature['priority']]};
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 color: #000000;
-                position: relative;
             ">
             <div style="font-weight: bold; font-size: 14px; color: #000000;">✅ {feature['title']}</div>
             <div style="font-size: 12px; color: #333333; margin: 5px 0;">{feature['description']}</div>
             <div style="font-size: 11px; color: #666666;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
             </div>
             """, unsafe_allow_html=True)
-            
-            # Bouton de déplacement
-            if st.button("⬅️ ← Déplacer", key=f"move_left_r_{feature['id']}", use_container_width=True):
-                st.session_state.features["Réalisé"].remove(feature)
-                st.session_state.features["En cours"].append(feature)
-                st.rerun()
     
     # --- STATISTIQUES SIMPLES ---
     st.markdown("---")
@@ -196,7 +162,7 @@ else:
 
     # --- ONGLET DE GESTION ---
     st.markdown("---")
-    with st.expander("🔧 Gestion avancée des fonctionnalités", expanded=False):
+    with st.expander("🔧 Gestion des fonctionnalités", expanded=False):
         tab1, tab2, tab3 = st.tabs(["➕ Ajouter", "✏️ Modifier", "🗑️ Supprimer"])
         
         with tab1:
