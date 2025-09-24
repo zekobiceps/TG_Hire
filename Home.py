@@ -6,39 +6,17 @@ import pandas as pd
 # Initialisation de l'état de session
 init_session_state()
 
-# Stockage temporaire des utilisateurs (à remplacer par une base sécurisée)
+# Stockage temporaire des utilisateurs avec nom complet
 USERS = {
-    "user1@example.com": "password123",
-    "user2@example.com": "securepass"
+    "zakaria.fassih@tgcc.ma": {"password": "password123", "name": "Zakaria Fassih"},
+    "user2@example.com": {"password": "securepass", "name": "Utilisateur Test"}
 }
 
 # Vérification de l'état de connexion
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-
-# Initialisation des fonctionnalités dans session_state
-if "features" not in st.session_state:
-    st.session_state.features = {
-        "À développer": [
-            {"id": 1, "title": "Intégration avec LinkedIn API", "description": "Connexion API LinkedIn pour sourcing automatique", "priority": "Haute", "date_ajout": "2024-01-15"},
-            {"id": 2, "title": "Système de notifications en temps réel", "description": "Notifications push pour les nouveaux candidats", "priority": "Moyenne", "date_ajout": "2024-01-10"},
-            {"id": 3, "title": "Analyse de sentiment des entretiens", "description": "IA d'analyse des retours d'entretiens", "priority": "Basse", "date_ajout": "2024-01-08"},
-            {"id": 4, "title": "Tableau de bord analytics avancé", "description": "Statistiques détaillées et rapports", "priority": "Moyenne", "date_ajout": "2024-01-12"},
-            {"id": 5, "title": "Export automatique vers ATS", "description": "Intégration avec les systèmes ATS externes", "priority": "Haute", "date_ajout": "2024-01-05"}
-        ],
-        "En cours": [
-            {"id": 6, "title": "Optimisation de l'IA de matching", "description": "Amélioration des algorithmes de matching", "priority": "Haute", "date_ajout": "2024-01-20"},
-            {"id": 7, "title": "Interface mobile responsive", "description": "Adaptation pour mobile et tablette", "priority": "Moyenne", "date_ajout": "2024-01-18"},
-            {"id": 8, "title": "Synchronisation cloud", "description": "Sauvegarde et sync cloud", "priority": "Haute", "date_ajout": "2024-01-22"}
-        ],
-        "Réalisé": [
-            {"id": 9, "title": "Système d'authentification", "description": "Login sécurisé avec gestion des utilisateurs", "priority": "Haute", "date_ajout": "2024-01-03"},
-            {"id": 10, "title": "Analyse basique de CV", "description": "Extraction et analyse textuelle des CVs", "priority": "Haute", "date_ajout": "2024-01-02"},
-            {"id": 11, "title": "Classement par similarité cosinus", "description": "Algorithme de matching par similarité", "priority": "Moyenne", "date_ajout": "2024-01-01"},
-            {"id": 12, "title": "Export PDF/Word des briefs", "description": "Génération de documents exportables", "priority": "Moyenne", "date_ajout": "2023-12-28"},
-            {"id": 13, "title": "Matrice KSA interactive", "description": "Interface interactive pour la matrice compétences", "priority": "Haute", "date_ajout": "2023-12-25"}
-        ]
-    }
+if "current_user" not in st.session_state:
+    st.session_state.current_user = ""
 
 # Page de login
 if not st.session_state.logged_in:
@@ -55,8 +33,9 @@ if not st.session_state.logged_in:
     password = st.text_input("Mot de Passe", type="password", key="login_password")
     
     if st.button("Se Connecter"):
-        if email in USERS and USERS[email] == password:
+        if email in USERS and USERS[email]["password"] == password:
             st.session_state.logged_in = True
+            st.session_state.current_user = USERS[email]["name"]
             st.success("Connexion réussie !")
             st.rerun()
         else:
@@ -72,7 +51,8 @@ else:
     
     st.title("📊 Roadmap Fonctionnelle")
 
-    st.sidebar.success("Choisissez une page ci-dessus.")
+    # Afficher le nom d'utilisateur dans la sidebar
+    st.sidebar.success(f"Connecté en tant que : {st.session_state.current_user}")
 
     # --- TABLEAU KANBAN DES FONCTIONNALITÉS ---
     
@@ -85,6 +65,8 @@ else:
         st.markdown("---")
         for feature in st.session_state.features["À développer"]:
             priority_color = {"Haute": "#f44336", "Moyenne": "#ff9800", "Basse": "#4caf50"}
+            
+            # Conteneur de la carte avec boutons de déplacement
             st.markdown(f"""
             <div style="
                 background: #ffebee; 
@@ -94,12 +76,21 @@ else:
                 border-left: 4px solid {priority_color[feature['priority']]};
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 color: #000000;
+                position: relative;
             ">
             <div style="font-weight: bold; font-size: 14px; color: #000000;">📌 {feature['title']}</div>
             <div style="font-size: 12px; color: #333333; margin: 5px 0;">{feature['description']}</div>
             <div style="font-size: 11px; color: #666666;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
             </div>
             """, unsafe_allow_html=True)
+            
+            # Boutons de déplacement
+            col_move1, col_move2 = st.columns(2)
+            with col_move1:
+                if st.button("➡️ Déplacer →", key=f"move_right_{feature['id']}", use_container_width=True):
+                    st.session_state.features["À développer"].remove(feature)
+                    st.session_state.features["En cours"].append(feature)
+                    st.rerun()
     
     # Colonne "En cours"
     with col2:
@@ -107,6 +98,7 @@ else:
         st.markdown("---")
         for feature in st.session_state.features["En cours"]:
             priority_color = {"Haute": "#f44336", "Moyenne": "#ff9800", "Basse": "#4caf50"}
+            
             st.markdown(f"""
             <div style="
                 background: #fff3e0; 
@@ -116,12 +108,26 @@ else:
                 border-left: 4px solid {priority_color[feature['priority']]};
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 color: #000000;
+                position: relative;
             ">
             <div style="font-weight: bold; font-size: 14px; color: #000000;">⚡ {feature['title']}</div>
             <div style="font-size: 12px; color: #333333; margin: 5px 0;">{feature['description']}</div>
             <div style="font-size: 11px; color: #666666;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
             </div>
             """, unsafe_allow_html=True)
+            
+            # Boutons de déplacement
+            col_move1, col_move2 = st.columns(2)
+            with col_move1:
+                if st.button("⬅️ ← Déplacer", key=f"move_left_{feature['id']}", use_container_width=True):
+                    st.session_state.features["En cours"].remove(feature)
+                    st.session_state.features["À développer"].append(feature)
+                    st.rerun()
+            with col_move2:
+                if st.button("➡️ Déplacer →", key=f"move_right_e_{feature['id']}", use_container_width=True):
+                    st.session_state.features["En cours"].remove(feature)
+                    st.session_state.features["Réalisé"].append(feature)
+                    st.rerun()
     
     # Colonne "Réalisé"
     with col3:
@@ -129,6 +135,7 @@ else:
         st.markdown("---")
         for feature in st.session_state.features["Réalisé"]:
             priority_color = {"Haute": "#f44336", "Moyenne": "#ff9800", "Basse": "#4caf50"}
+            
             st.markdown(f"""
             <div style="
                 background: #e8f5e8; 
@@ -138,12 +145,19 @@ else:
                 border-left: 4px solid {priority_color[feature['priority']]};
                 box-shadow: 0 2px 4px rgba(0,0,0,0.1);
                 color: #000000;
+                position: relative;
             ">
             <div style="font-weight: bold; font-size: 14px; color: #000000;">✅ {feature['title']}</div>
             <div style="font-size: 12px; color: #333333; margin: 5px 0;">{feature['description']}</div>
             <div style="font-size: 11px; color: #666666;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
             </div>
             """, unsafe_allow_html=True)
+            
+            # Bouton de déplacement
+            if st.button("⬅️ ← Déplacer", key=f"move_left_r_{feature['id']}", use_container_width=True):
+                st.session_state.features["Réalisé"].remove(feature)
+                st.session_state.features["En cours"].append(feature)
+                st.rerun()
     
     # --- STATISTIQUES SIMPLES ---
     st.markdown("---")
@@ -162,7 +176,7 @@ else:
 
     # --- ONGLET DE GESTION ---
     st.markdown("---")
-    with st.expander("🔧 Gestion des fonctionnalités", expanded=False):
+    with st.expander("🔧 Gestion avancée des fonctionnalités", expanded=False):
         tab1, tab2, tab3 = st.tabs(["➕ Ajouter", "✏️ Modifier", "🗑️ Supprimer"])
         
         with tab1:
@@ -290,6 +304,7 @@ else:
     # Bouton de déconnexion dans la sidebar
     if st.sidebar.button("Déconnexion"):
         st.session_state.logged_in = False
+        st.session_state.current_user = ""
         st.rerun()
 
     # Protéger les pages dans pages/ (arrête l'exécution si non connecté)
