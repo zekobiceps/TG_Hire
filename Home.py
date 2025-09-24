@@ -3,8 +3,26 @@ from utils import *
 from datetime import datetime
 import pandas as pd
 
-# Initialisation de l'état de session
-init_session_state()
+# Initialisation robuste de l'état de session
+if 'features' not in st.session_state:
+    st.session_state.features = {
+        "À développer": [
+            {
+                "id": 1,
+                "title": "Interface de connexion sécurisée",
+                "description": "Développer une interface de connexion avec authentification",
+                "priority": "Haute",
+                "date_ajout": "2024-01-01"
+            }
+        ],
+        "En cours": [],
+        "Réalisé": []
+    }
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "current_user" not in st.session_state:
+    st.session_state.current_user = ""
 
 # Stockage temporaire des utilisateurs avec nom complet
 USERS = {
@@ -12,11 +30,60 @@ USERS = {
     "user2@example.com": {"password": "securepass", "name": "Utilisateur Test"}
 }
 
-# Vérification de l'état de connexion
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "current_user" not in st.session_state:
-    st.session_state.current_user = ""
+# Appliquer le style CSS pour la barre de navigation avec logo
+st.markdown("""
+    <style>
+    /* Barre de navigation personnalisée */
+    .navbar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        background-color: white;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        z-index: 999;
+        padding: 10px 0;
+    }
+    
+    .navbar-container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        max-width: 100%;
+        padding: 0 1rem;
+    }
+    
+    .navbar-logo {
+        height: 40px;
+    }
+    
+    .navbar-user {
+        font-size: 14px;
+        color: #666;
+        font-weight: bold;
+    }
+    
+    /* Ajuster le contenu principal pour tenir compte de la navbar fixe */
+    .main .block-container {
+        padding-top: 80px;
+    }
+    
+    /* Cacher les éléments par défaut de Streamlit */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Style minimaliste */
+    .feature-card {
+        background: #f8f9fa;
+        padding: 12px;
+        border-radius: 8px;
+        margin: 8px 0;
+        border-left: 4px solid #6c757d;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    </style>
+""", unsafe_allow_html=True)
 
 # Page de login
 if not st.session_state.logged_in:
@@ -24,28 +91,14 @@ if not st.session_state.logged_in:
         page_title="TG-Hire IA - Roadmap Fonctionnelle",
         page_icon="📊",
         layout="wide",
-        initial_sidebar_state="collapsed"  # Sidebar réduite par défaut
+        initial_sidebar_state="collapsed"
     )
     
-    # Appliquer le style CSS pour minimiser l'interface
+    # Cacher temporairement la navbar sur la page de login
     st.markdown("""
         <style>
-        /* Cacher les éléments inutiles */
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-        
-        /* Centrer le contenu */
-        .block-container {
-            padding-top: 2rem;
-            padding-bottom: 2rem;
-        }
-        
-        /* Style minimaliste */
-        .stButton>button {
-            width: 100%;
-            border-radius: 8px;
-        }
+        .navbar { display: none; }
+        .main .block-container { padding-top: 2rem; }
         </style>
     """, unsafe_allow_html=True)
     
@@ -54,7 +107,7 @@ if not st.session_state.logged_in:
     
     with col2:
         # Afficher l'image au centre
-        st.image("tgcc.png", width=300, use_container_width=True)  # Correction ici
+        st.image("tgcc.png", width=300, use_container_width=True)
         
         # Formulaire de connexion
         with st.form("login_form"):
@@ -77,53 +130,22 @@ else:
         page_title="TG-Hire IA - Roadmap Fonctionnelle",
         page_icon="📊",
         layout="wide",
-        initial_sidebar_state="collapsed"  # Sidebar réduite
+        initial_sidebar_state="collapsed"
     )
     
-    # Appliquer le style CSS minimaliste
-    st.markdown("""
-        <style>
-        /* Logo en haut de la sidebar */
-        .sidebar .sidebar-content {
-            padding-top: 0rem;
-        }
-        
-        /* Cacher les éléments inutiles */
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        
-        /* Style minimaliste pour les cartes */
-        .feature-card {
-            background: #f8f9fa;
-            padding: 12px;
-            border-radius: 8px;
-            margin: 8px 0;
-            border-left: 4px solid #6c757d;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        }
-        
-        /* Réduire l'espacement */
-        .block-container {
-            padding-top: 1rem;
-            padding-bottom: 1rem;
-        }
-        
-        /* Boutons plus compacts */
-        .stButton>button {
-            border-radius: 6px;
-            padding: 0.25rem 0.75rem;
-        }
-        </style>
+    # Barre de navigation avec logo et message de bienvenue
+    st.markdown(f"""
+        <div class="navbar">
+            <div class="navbar-container">
+                <img src="tgcc.png" class="navbar-logo" alt="TGCC Logo" height="40">
+                <div class="navbar-user">Bienvenue {st.session_state.current_user}</div>
+            </div>
+        </div>
     """, unsafe_allow_html=True)
 
-    # Sidebar avec logo et informations utilisateur
+    # Sidebar minimaliste
     with st.sidebar:
-        # Logo en haut
-        st.image("tgcc.png", width=150, use_container_width=True)
-        st.markdown("---")
-        st.success(f"👤 {st.session_state.current_user}")
-        
-        # Bouton de déconnexion
+        st.markdown("### Navigation")
         if st.button("🚪 Déconnexion", use_container_width=True):
             st.session_state.logged_in = False
             st.session_state.current_user = ""
@@ -131,6 +153,11 @@ else:
 
     # Contenu principal
     st.title("📊 Roadmap Fonctionnelle")
+
+    # Vérification que les clés existent dans features
+    for status in ["À développer", "En cours", "Réalisé"]:
+        if status not in st.session_state.features:
+            st.session_state.features[status] = []
 
     # --- TABLEAU KANBAN DES FONCTIONNALITÉS ---
     
@@ -141,52 +168,61 @@ else:
     with col1:
         st.markdown("### 📋 À développer")
         st.markdown("---")
-        for feature in st.session_state.features["À développer"]:
-            priority_color = {"Haute": "#dc3545", "Moyenne": "#fd7e14", "Basse": "#198754"}
-            
-            st.markdown(f"""
-            <div class="feature-card" style="border-left-color: {priority_color[feature['priority']]}">
-                <div style="font-weight: bold; font-size: 14px;">📌 {feature['title']}</div>
-                <div style="font-size: 12px; color: #495057; margin: 5px 0;">{feature['description']}</div>
-                <div style="font-size: 11px; color: #6c757d;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
-            </div>
-            """, unsafe_allow_html=True)
+        if "À développer" in st.session_state.features and st.session_state.features["À développer"]:
+            for feature in st.session_state.features["À développer"]:
+                priority_color = {"Haute": "#dc3545", "Moyenne": "#fd7e14", "Basse": "#198754"}
+                
+                st.markdown(f"""
+                <div class="feature-card" style="border-left-color: {priority_color[feature['priority']]}">
+                    <div style="font-weight: bold; font-size: 14px;">📌 {feature['title']}</div>
+                    <div style="font-size: 12px; color: #495057; margin: 5px 0;">{feature['description']}</div>
+                    <div style="font-size: 11px; color: #6c757d;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("Aucune fonctionnalité à développer")
     
     # Colonne "En cours"
     with col2:
         st.markdown("### 🔄 En cours")
         st.markdown("---")
-        for feature in st.session_state.features["En cours"]:
-            priority_color = {"Haute": "#dc3545", "Moyenne": "#fd7e14", "Basse": "#198754"}
-            
-            st.markdown(f"""
-            <div class="feature-card" style="border-left-color: {priority_color[feature['priority']]}">
-                <div style="font-weight: bold; font-size: 14px;">⚡ {feature['title']}</div>
-                <div style="font-size: 12px; color: #495057; margin: 5px 0;">{feature['description']}</div>
-                <div style="font-size: 11px; color: #6c757d;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
-            </div>
-            """, unsafe_allow_html=True)
+        if "En cours" in st.session_state.features and st.session_state.features["En cours"]:
+            for feature in st.session_state.features["En cours"]:
+                priority_color = {"Haute": "#dc3545", "Moyenne": "#fd7e14", "Basse": "#198754"}
+                
+                st.markdown(f"""
+                <div class="feature-card" style="border-left-color: {priority_color[feature['priority']]}">
+                    <div style="font-weight: bold; font-size: 14px;">⚡ {feature['title']}</div>
+                    <div style="font-size: 12px; color: #495057; margin: 5px 0;">{feature['description']}</div>
+                    <div style="font-size: 11px; color: #6c757d;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("Aucune fonctionnalité en cours")
     
     # Colonne "Réalisé"
     with col3:
         st.markdown("### ✅ Réalisé")
         st.markdown("---")
-        for feature in st.session_state.features["Réalisé"]:
-            priority_color = {"Haute": "#dc3545", "Moyenne": "#fd7e14", "Basse": "#198754"}
-            
-            st.markdown(f"""
-            <div class="feature-card" style="border-left-color: {priority_color[feature['priority']]}">
-                <div style="font-weight: bold; font-size: 14px;">✅ {feature['title']}</div>
-                <div style="font-size: 12px; color: #495057; margin: 5px 0;">{feature['description']}</div>
-                <div style="font-size: 11px; color: #6c757d;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
-            </div>
-            """, unsafe_allow_html=True)
+        if "Réalisé" in st.session_state.features and st.session_state.features["Réalisé"]:
+            for feature in st.session_state.features["Réalisé"]:
+                priority_color = {"Haute": "#dc3545", "Moyenne": "#fd7e14", "Basse": "#198754"}
+                
+                st.markdown(f"""
+                <div class="feature-card" style="border-left-color: {priority_color[feature['priority']]}">
+                    <div style="font-weight: bold; font-size: 14px;">✅ {feature['title']}</div>
+                    <div style="font-size: 12px; color: #495057; margin: 5px 0;">{feature['description']}</div>
+                    <div style="font-size: 11px; color: #6c757d;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.info("Aucune fonctionnalité réalisée")
     
     # --- STATISTIQUES SIMPLES ---
     st.markdown("---")
     
     total_features = sum(len(features) for features in st.session_state.features.values())
-    completed_features = len(st.session_state.features["Réalisé"])
+    completed_features = len(st.session_state.features["Réalisé"]) if "Réalisé" in st.session_state.features else 0
     
     col_stats1, col_stats2 = st.columns(2)
     
@@ -216,6 +252,7 @@ else:
                 
                 if st.form_submit_button("💾 Ajouter"):
                     if new_title and new_description:
+                        # Trouver le prochain ID disponible
                         all_ids = []
                         for status, features in st.session_state.features.items():
                             for feature in features:
@@ -317,6 +354,6 @@ else:
     st.markdown("---")
     st.caption("TG-Hire IA - Roadmap Fonctionnelle v1.0")
 
-    # Protéger les pages dans pages/ (arrête l'exécution si non connecté)
-    if not st.session_state.logged_in:
-        st.stop()
+# Protéger les pages dans pages/ (arrête l'exécution si non connecté)
+if not st.session_state.logged_in:
+    st.stop()
