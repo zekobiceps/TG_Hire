@@ -80,7 +80,7 @@ st.markdown("""
     <!-- Barre de navigation avec logo -->
     <div class="navbar">
         <div class="navbar-container">
-            <img src="https://via.placeholder.com/150x40/000000/FFFFFF?text=TGCC+Logo" class="navbar-logo" alt="TGCC Logo">
+            <img src="https://via.placeholder.com/150x40/000000/FFFFFF?text=tgcc.png" class="navbar-logo" alt="TGCC Logo">
             <div class="navbar-user" id="user-info"></div>
         </div>
     </div>
