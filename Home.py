@@ -64,6 +64,14 @@ st.markdown("""
         color: #1f77b4;
         margin-top: 0;
     }
+    
+    /* Style pour le logo en haut */
+    .logo-container {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 20px;
+        padding-top: 10px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -109,8 +117,11 @@ else:
     
     # Sidebar avec logo en haut et message de bienvenue formaté
     with st.sidebar:
-        # Logo en haut de la sidebar
+        # Logo en haut de la sidebar avec conteneur centré
+        st.markdown('<div class="logo-container">', unsafe_allow_html=True)
         st.image("tgcc.png", width=150, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        
         st.markdown("---")
         
         # Message de bienvenue formaté sur deux lignes
@@ -124,6 +135,33 @@ else:
         
         st.markdown("---")
         
+        # Menu de navigation
+        st.markdown("### Navigation")
+        
+        # Options du menu (vous pouvez personnaliser ces pages)
+        menu_options = {
+            "🏠 Home": "Home",
+            "📋 Brief": "Brief", 
+            "🔍 Tour de sourcing": "Tour de sourcing",
+            "📢 Annonces": "Annonces",
+            "👥 Entretien": "Entretien",
+            "👤 Candidats": "Candidats",
+            "📄 Analyse CV": "Analyse CV",
+            "🤖 Assistant IA": "Assistant IA",
+            "🗺️ Cartographie": "Cartographie",
+            "⚙️ test api": "test api",
+            "🏢 TGCC": "TGCC"
+        }
+        
+        # Afficher les options du menu
+        for option, page in menu_options.items():
+            if st.button(option, use_container_width=True, key=page):
+                # Ici vous pouvez ajouter la logique pour changer de page
+                st.info(f"Navigation vers {page}")
+        
+        st.markdown("---")
+        
+        # Bouton de déconnexion
         if st.button("🚪 Déconnexion", use_container_width=True):
             st.session_state.logged_in = False
             st.session_state.current_user = ""
