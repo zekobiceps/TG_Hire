@@ -64,7 +64,48 @@ st.markdown("""
         color: #1f77b4;
         margin-top: 0;
     }
+    
+    /* FORCER LE LOGO À ÊTRE EN HAUT */
+    .logo-top {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        text-align: center;
+        padding: 10px 0;
+        background: white;
+        z-index: 1000;
+    }
+    .sidebar-content {
+        margin-top: 80px !important;
+    }
     </style>
+    
+    <script>
+    // Script pour déplacer le logo en haut
+    function moveLogoToTop() {
+        const sidebar = document.querySelector('[data-testid="stSidebar"]');
+        if (sidebar) {
+            const images = sidebar.querySelectorAll('img');
+            if (images.length > 0) {
+                const logo = images[0];
+                // Créer un conteneur pour le logo en haut
+                const logoContainer = document.createElement('div');
+                logoContainer.className = 'logo-top';
+                logoContainer.appendChild(logo.cloneNode(true));
+                
+                // Insérer le logo en haut de la sidebar
+                sidebar.insertBefore(logoContainer, sidebar.firstChild);
+                
+                // Supprimer l'original
+                logo.remove();
+            }
+        }
+    }
+    
+    // Exécuter après le chargement
+    setTimeout(moveLogoToTop, 100);
+    </script>
 """, unsafe_allow_html=True)
 
 # Page de login
