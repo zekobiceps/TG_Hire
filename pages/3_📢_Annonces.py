@@ -9,7 +9,9 @@ except ImportError:
     st.error("Veuillez installer pypdf : pip install pypdf")
     st.stop()
 from io import BytesIO
-
+# Vérification de la connexion
+if not st.session_state.get("logged_in", False):
+    st.stop()
 # -------------------- Import utils --------------------
 UTILS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "utils.py"))
 spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
