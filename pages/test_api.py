@@ -57,13 +57,13 @@ st.markdown("""
 with st.form(key='annonce_form'):
     
     # Choix de la plateforme
-    plateforme = st.selectbox("Plateforme cible", ["JOBZYN", "TGCC"], key="annonce_plateforme")
+    plateforme = st.selectbox("Plateforme cible", ["JOBZYN", "TGCC", "LinkedIn"], key="annonce_plateforme")
     
     # Mode d'entrée : PDF ou manuel (uniquement pour TGCC)
     if plateforme == "TGCC":
         input_mode = st.radio("Mode d'entrée des infos du poste", ["Upload PDF fiche de poste", "Saisie manuelle"], key="input_mode")
     else:
-        input_mode = "Upload PDF fiche de poste"  # Pour JOBZYN, uniquement PDF
+        input_mode = "Upload PDF fiche de poste"  # Pour JOBZYN et LinkedIn, uniquement PDF
 
     fiche_text = ""
 
@@ -163,8 +163,10 @@ with st.form(key='annonce_form'):
     col_info1, col_info2 = st.columns(2)
     with col_info1:
         poste_final = st.text_input("Poste*", value=poste if 'poste' in locals() else "", 
-                                  help="Ex: Directeur des Projets BTP - Casablanca")
+                                  help="Ex: Directeur des Projets BTP")
     with col_info2:
+        localisation_finale = st.text_input("Localisation*", value=localisation if 'localisation' in locals() else "", 
+                                          help="Ex: Casablanca, Rabat, Tanger")
         entreprise = st.text_input("Entreprise*", value="TGCC", disabled=True)
 
     # Bouton pour générer via IA
@@ -176,9 +178,9 @@ with st.form(key='annonce_form'):
 
     # Génération IA avec spinner
     if generate_button:
-        if fiche_text and poste_final and entreprise:
+        if fiche_text and poste_final and entreprise and localisation_finale:
             # Prompt base
-            prompt_base = f"Basé sur cette fiche de poste : {fiche_text}\n\nGénère une annonce complète pour le poste {poste_final} chez {entreprise}."
+            prompt_base = f"Basé sur cette fiche de poste : {fiche_text}\n\nGénère une annonce complète pour le poste {poste_final} chez {entreprise} à {localisation_finale}."
 
             if plateforme == "JOBZYN":
                 prompt = prompt_base + """
@@ -209,6 +211,52 @@ with st.form(key='annonce_form'):
                 • Entretien RH
                 
                 Rends-la attractive et concise.
+                """
+            elif plateforme == "LinkedIn":
+                prompt = prompt_base + """
+                STRUCTURE OBLIGATOIRE POUR LINKEDIN:
+
+                Format LinkedIn court et percutant avec hashtags:
+
+                #TGCCrecrute
+
+                En tant que [Poste en gras avec emoji si pertinent], vous [mission principale en une phrase concise et impactante].
+
+                📍 Localisation: [Ville]
+                🏢 Type de contrat: [Type de contrat]
+                🎯 Profil recherché: [2-3 caractéristiques clés du profil]
+
+                Principales missions:
+                • [Mission 1 concise]
+                • [Mission 2 concise] 
+                • [Mission 3 concise]
+
+                Le poste est fait pour vous si:
+                ✅ [Critère 1]
+                ✅ [Critère 2]
+                ✅ [Critère 3]
+
+                Chez TGCC, nous vous offrons:
+                ✨ [Avantage 1]
+                ✨ [Avantage 2] 
+                ✨ [Avantage 3]
+
+                📞 L'équipe Développement RH est à votre écoute.
+
+                hashtag#[PosteSansEspace] hashtag#Recrutement hashtag#BTP hashtag#Carrière hashtag#Construction 
+                hashtag#RH hashtag#capitalhumain hashtag#developpementRH hashtag#OpportunitéProfessionnelle 
+                hashtag#maroc hashtag#Innovation hashtag#rejoigneznous hashtag#ConstruisonsEnsemble 
+                hashtag#TGCC hashtag#Building hashtag#afrique hashtag#RecrutementBTP hashtag#géniecivil 
+                hashtag#Emploigéniecivil hashtag#Depuisplusde30ans hashtag#annonces hashtag#bâtiment 
+                hashtag#ingénierie hashtag#ProjetsAmbitieux hashtag#recrute
+
+                RÈGLES STRICTES:
+                - Format court et percutant pour LinkedIn
+                - Utiliser des emojis pertinents
+                - Phrases courtes et impactantes
+                - Hashtags optimisés pour le recrutement BTP
+                - Ton professionnel mais engageant
+                - Mettre le poste en gras au début
                 """
             else:  # TGCC
                 prompt = prompt_base + """
@@ -304,12 +352,12 @@ contenu = st.text_area("Contenu de l'annonce (généré ou manuel)",
 
 # Bouton de sauvegarde
 if st.button("💾 Sauvegarder l'annonce", type="primary", use_container_width=True, key="btn_sauvegarder_annonce"):
-    if poste_final and entreprise and contenu:
+    if poste_final and entreprise and contenu and localisation_finale:
         annonce = {
             "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "poste": poste_final,
             "entreprise": entreprise,
-            "localisation": localisation if 'localisation' in locals() else "",
+            "localisation": localisation_finale,
             "contenu": contenu,
             "plateforme": plateforme,
         }
