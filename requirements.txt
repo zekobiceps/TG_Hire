@@ -60,3 +60,5 @@ json5
 pypdf
 scikit-learn
 beautifulsoup4
+pypdf>=3.0.0
+PyPDF2>=3.0.0
