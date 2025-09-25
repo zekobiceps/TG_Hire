@@ -623,6 +623,32 @@ def test_deepseek_connection():
         st.error(f"❌ Erreur de connexion à DeepSeek : {e}")
         return False
 
+# -------------------- Génération de contenu avec DeepSeek --------------------
+def deepseek_generate(prompt, max_tokens=2000, temperature=0.7):
+    """Génère du contenu via l'API DeepSeek."""
+    try:
+        from openai import OpenAI
+    except ImportError:
+        raise ImportError("Le module 'openai' n'est pas installé. Veuillez l'installer avec 'pip install openai'.")
+
+    api_key = st.secrets.get("DEEPSEEK_API_KEY")
+    if not api_key:
+        raise ValueError("Clé API DeepSeek non trouvée dans st.secrets")
+
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://api.deepseek.com/v1"
+    )
+
+    response = client.chat.completions.create(
+        model="deepseek-chat",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=temperature,
+        max_tokens=max_tokens
+    )
+
+    return response.choices[0].message.content
+
 # -------------------- Exemples contextuels --------------------
 def get_example_for_field(section_title, field_title):
     """Retourne un exemple contextuel pour un champ donné, adapté au BTP."""
