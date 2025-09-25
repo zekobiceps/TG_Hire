@@ -43,8 +43,11 @@ st.subheader("➕ Ajouter une annonce")
 # Choix de la plateforme
 plateforme = st.selectbox("Plateforme cible", ["JOBZYN", "TGCC"], key="annonce_plateforme")
 
-# Mode d'entrée : PDF ou manuel
-input_mode = st.radio("Mode d'entrée des infos du poste", ["Upload PDF fiche de poste", "Saisie manuelle"], key="input_mode")
+# Mode d'entrée : PDF ou manuel (uniquement pour TGCC)
+if plateforme == "TGCC":
+    input_mode = st.radio("Mode d'entrée des infos du poste", ["Upload PDF fiche de poste", "Saisie manuelle"], key="input_mode")
+else:
+    input_mode = "Upload PDF fiche de poste"  # Pour JOBZYN, uniquement PDF
 
 fiche_text = ""
 
@@ -60,221 +63,207 @@ if input_mode == "Upload PDF fiche de poste":
         except Exception as e:
             st.error(f"Erreur lors de l'extraction du PDF : {e}")
 else:
-    # Saisie manuelle : formulaire simple basé sur la check-list (sélection des indispensables + essentiels)
+    # Saisie manuelle : formulaire simple basé sur la check-list (uniquement pour TGCC)
     st.subheader("Remplissez les infos clés (basé sur la check-list LEDR)")
     
     col1, col2 = st.columns(2)
     
     with col1:
-        salaire = st.text_input("Salaire")
-        localisation = st.text_input("Localisation")
-        type_contrat = st.text_input("Type de contrat + durée")
-        date_demarrage = st.text_input("Date de démarrage")
-        objectif_poste = st.text_area("Objectif du poste")
-        missions = st.text_area("Missions")
-        competences = st.text_area("Compétences")
-        infos_entreprise = st.text_area("Infos sur l'entreprise")
-        comment_postuler = st.text_input("Comment postuler")
-        culture_valeurs = st.text_area("Culture, valeurs de l'entreprise")
-        competences_hierarchisees = st.text_area("Compétences hiérarchisées")
+        salaire = st.text_input("Salaire", help="Ex: 15 000 - 20 000 MAD, selon expérience")
+        localisation = st.text_input("Localisation", help="Ex: Casablanca, Rabat, Tanger, Marrakech")
+        type_contrat = st.text_input("Type de contrat", help="Ex: CDI, CDD, Stage, Alternance")
+        date_demarrage = st.text_input("Date de démarrage", help="Ex: Dès que possible, Septembre 2024")
+        objectif_poste = st.text_area("Objectif du poste", help="Ex: Assurer la gestion complète des projets BTP de l'entreprise")
+        missions = st.text_area("Missions principales", help="Ex: Gestion de chantier, coordination d'équipe, suivi budget")
+        competences = st.text_area("Compétences techniques", help="Ex: Maîtrise d'AutoCAD, gestion de projet, normes BTP")
+        infos_entreprise = st.text_area("Infos sur l'entreprise", help="Ex: Entreprise leader dans le BTP au Maroc depuis 20 ans")
         
     with col2:
-        contexte_recrutement = st.text_area("Contexte du recrutement")
-        description_equipe = st.text_area("Description de l'équipe")
-        presentation_manager = st.text_area("Présentation du manager")
-        position_hierarchique = st.text_input("Position hiérarchique")
-        responsabilites_autonomie = st.text_area("Les responsabilités / l'autonomie")
-        contact_recruteur = st.text_input("Le contact direct de la personne en charge du recrutement")
-        processus_recrutement = st.text_area("Processus de recrutement")
-        conditions_reussite = st.text_area("Conditions de réussite")
-        criteres_recrutement = st.text_area("Expliquer ses critères de recrutement")
-        evolution_missions = st.text_area("Évolution à court/moyen terme sur les missions du poste")
-        parcours_carriere = st.text_area("Parcours de carrière et de formation de l'entreprise")
+        culture_valeurs = st.text_area("Culture et valeurs", help="Ex: Qualité, Intégrité, Excellence, Ambition")
+        contexte_recrutement = st.text_area("Contexte du recrutement", help="Ex: Expansion de l'entreprise sur de nouveaux marchés")
+        description_equipe = st.text_area("Description de l'équipe", help="Ex: Équipe de 15 ingénieurs expérimentés")
+        position_hierarchique = st.text_input("Position hiérarchique", help="Ex: N+1, rattachement à la Direction")
+        responsabilites_autonomie = st.text_area("Responsabilités et autonomie", help="Ex: Autonomie complète sur les décisions techniques")
+        processus_recrutement = st.text_area("Processus de recrutement", help="Ex: 1. Analyse CV, 2. Entretien téléphonique, 3. Entretien technique, 4. Entretien RH")
+        evolution_missions = st.text_area("Évolution possible", help="Ex: Possibilité d'évolution vers un poste de direction")
+        parcours_carriere = st.text_area("Parcours de carrière", help="Ex: Formation continue, programmes de développement")
 
     fiche_text = f"""
     Salaire: {salaire}
     Localisation: {localisation}
-    Type de contrat + durée: {type_contrat}
+    Type de contrat: {type_contrat}
     Date de démarrage: {date_demarrage}
-    L'objectif du poste: {objectif_poste}
-    Missions: {missions}
-    Compétences: {competences}
+    Objectif du poste: {objectif_poste}
+    Missions principales: {missions}
+    Compétences techniques: {competences}
     Infos sur l'entreprise: {infos_entreprise}
-    Comment postuler: {comment_postuler}
-    Culture, valeurs de l'entreprise: {culture_valeurs}
-    Compétences hiérarchisées: {competences_hierarchisees}
+    Culture et valeurs: {culture_valeurs}
     Contexte du recrutement: {contexte_recrutement}
     Description de l'équipe: {description_equipe}
-    Présentation du manager: {presentation_manager}
     Position hiérarchique: {position_hierarchique}
-    Les responsabilités / l'autonomie: {responsabilites_autonomie}
-    Le contact direct de la personne en charge du recrutement: {contact_recruteur}
+    Responsabilités et autonomie: {responsabilites_autonomie}
     Processus de recrutement: {processus_recrutement}
-    Conditions de réussite: {conditions_reussite}
-    Expliquer ses critères de recrutement: {criteres_recrutement}
-    Évolution à court/moyen terme sur les missions du poste: {evolution_missions}
-    Parcours de carrière et de formation de l'entreprise: {parcours_carriere}
+    Évolution possible: {evolution_missions}
+    Parcours de carrière: {parcours_carriere}
     """
 
-# Check-list du PDF/screenshot (hardcodée pour l'intégrer au prompt)
+# Check-list simplifiée
 check_list = """
-L'indispensable: Salaire, Localisation, Type de Contrat + durée, Date de démarrage, L'objectif du poste, Missions, Compétences, infos sur l'entreprise, Comment postuler
-L'essentiel: Culture, valeurs de l'entreprise, Compétences hiérarchisées, Contexte du recrutement, Description de l'équipe, Présentation du manager, Position hiérarchique, Les responsabilités / l'autonomie, Le contact direct de la personne en charge du recrutement, Processus de recrutement
-L'exceptionnel: Conditions de réussite, Expliquer ses critères de recrutement, Évolution à court/ moyen terme sur les missions du poste, Parcours de carrière et de formation de l'entreprise, Infos sur la carrière ou la formation des personnes AVANT ce poste, Infos sur les projets à moyen, où long terme de l'équipe, L'accompagnement à la prise de poste : pré-boarding et d'onboarding
+Informations essentielles: Salaire, Localisation, Type de contrat, Date de démarrage, Objectif du poste, Missions, Compétences
+Informations complémentaires: Culture entreprise, Contexte recrutement, Équipe, Processus
 """
 
 col1, col2 = st.columns(2)
 with col1:
-    titre = st.text_input("Titre de l'annonce", key="annonce_titre")
-    poste = st.text_input("Poste concerné", key="annonce_poste")
+    titre = st.text_input("Titre de l'annonce", key="annonce_titre", help="Ex: Directeur des Projets BTP - Casablanca")
+    poste = st.text_input("Poste concerné", key="annonce_poste", help="Ex: Directeur Projets, Ingénieur BTP, Chef de Chantier")
 with col2:
-    entreprise = st.text_input("Entreprise", key="annonce_entreprise")
-    localisation_input = st.text_input("Localisation", key="annonce_loc")  # Peut être overwrite par PDF/manuel
+    entreprise = st.text_input("Entreprise", key="annonce_entreprise", help="Ex: TGCC, Vinci Maroc, Groupe Addoha")
+    localisation_input = st.text_input("Localisation", key="annonce_loc", help="Ex: Casablanca, Rabat, région de Souss-Massa")
 
-# Bouton pour générer via IA
-if st.button("🤖 Générer l'annonce via IA", type="secondary", use_container_width=True, key="btn_generer_annonce"):
+# Bouton pour générer via IA avec style rouge
+st.markdown("""
+    <style>
+    .red-button button {
+        background-color: #ff4444 !important;
+        color: white !important;
+        border: 1px solid #ff4444 !important;
+    }
+    .red-button button:hover {
+        background-color: #cc0000 !important;
+        border: 1px solid #cc0000 !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Génération IA avec spinner
+if st.button("💡 Générer l'annonce via IA", type="secondary", use_container_width=True, 
+             key="btn_generer_annonce", help="Génération automatique par intelligence artificielle"):
     if fiche_text:
         # Prompt base
         prompt_base = f"Utilise cette check-list pour inclure un maximum d'infos pertinentes dans l'annonce : {check_list}\n\nBasé sur cette fiche de poste : {fiche_text}\n\nGénère une annonce complète pour le poste {poste} chez {entreprise} à {localisation_input}."
 
         if plateforme == "JOBZYN":
-            prompt = prompt_base + "\nRestrict-toi strictement à ces blocs : Introduction au poste, Votre rôle, Votre équipe, Vos qualifications, Avantages, Processus de recrutement. Rends-la attractive et concise."
+            prompt = prompt_base + """
+            Structure obligatoire (sans titres en gras, directement le contenu):
+            
+            Introduction au poste:
+            [Description concise du poste et son importance]
+            
+            Votre rôle:
+            [Liste à puces des missions principales, sans sous-titres]
+            
+            Votre équipe:
+            [Description de l'environnement de travail et de l'équipe]
+            
+            Vos qualifications:
+            [Liste à puces des compétences et expériences requises]
+            
+            Avantages:
+            • Une formation continue adaptée
+            Chez nous, vous montez en compétences selon vos besoins.
+            
+            • Un environnement de travail dynamique
+            Vous êtes entouré(e) d'une équipe jeune et passionnée.
+            
+            • Des responsabilités significatives
+            Vous êtes au cœur de la réussite de nos projets.
+            
+            • Une culture d'excellence
+            Environnement challenging et bienveillant favorisant le dépassement de soi.
+            
+            Processus de recrutement:
+            • Analyse préalable de votre candidature
+            • Entretien de préqualification téléphonique  
+            • Entretien technique
+            • Entretien RH
+            
+            Rends-la attractive et concise.
+            """
         else:  # TGCC
             prompt = prompt_base + """
-CONTEXTE ET OBJECTIF
-Tu es un expert en rédaction d'annonces d'emploi qui doit créer des annonces hautement attractives et efficaces basées sur les meilleures pratiques du secteur. Ton objectif est de générer des annonces qui convertissent les lecteurs en candidats qualifiés.
+            CONTEXTE ET OBJECTIF
+            Tu es un expert en rédaction d'annonces d'emploi qui doit créer des annonces hautement attractives et efficaces basées sur les meilleures pratiques du secteur. Ton objectif est de générer des annonces qui convertissent les lecteurs en candidats qualifiés.
 
-RÈGLES FONDAMENTALES À APPLIQUER
-✅ CE QU'IL FAUT FAIRE (Inspiré de la bonne annonce) :
+            STRUCTURE OBLIGATOIRE (sans titres en gras, directement le contenu):
 
-STRUCTURE OPTIMALE :
+            Informations clés:
+            Entreprise: {entreprise}
+            Localisation: {localisation_input} 
+            Type de contrat: [type]
+            Poste: {poste}
 
-Titre accrocheur avec emoji → "Exemple 2024 → [Poste] – [Entreprise] – [Type de contrat] – [Lieu]"
+            Accroche engageante:
+            [2-3 questions rhétoriques adaptées au BTP]
 
-Informations clés en haut : Entreprise, Localisation, Contrat, Date, Salaire
+            Pourquoi nous avons besoin de vous:
+            [Contexte business adapté au secteur BTP marocain]
 
-Accroche qui interpelle par des questions rhétoriques sur les frustrations du métier
+            Ce que vous ferez:
+            [Liste à puces des missions quotidiennes, sans sous-titres]
 
-Section "Pourquoi nous avons besoin de vous" avec contexte business
+            Votre environnement:
+            [Description de l'équipe et de la culture d'entreprise basée sur: Qualité, Intégrité, Excellence, Ambition]
 
-Section "Ce que vous ferez" avec missions détaillées
+            Ce que nous recherchons:
+            [Liste à puces des compétences clés]
 
-Section "Ce que l'on recherche" avec compétences clés et bonus
+            Ce poste n'est pas pour vous si...
+            [Filtre naturel adapté au profil]
 
-Section "Ce poste n'est pas pour vous si..." pour filtrer naturellement
+            Avantages:
+            • Une formation continue adaptée
+            Chez nous, vous montez en compétences en termes de hard skills ou soft skills selon vos besoins.
 
-Processus de recrutement transparent
+            • Un environnement de travail dynamique
+            Vous êtes entouré(e) d'une équipe jeune et passionnée : c'est une réelle aventure professionnelle qui commence !
 
-TON ET STYLE :
+            • Des responsabilités significatives
+            Vous êtes au cœur de la réussite des projets de nos clients.
 
-Direct et authentique, comme une conversation
+            • Une culture d'excellence et d'intrapreneuriat
+            Environnement challenging et bienveillant favorisant le dépassement de soi, où les idées innovantes peuvent se développer.
 
-Utiliser "vous" pour s'adresser directement au candidat
+            Processus de recrutement:
+            • Analyse préalable de votre candidature
+            • Entretien de préqualification téléphonique  
+            • Entretien technique
+            • Entretien RH
 
-Ton franc et transparent sur les défis et avantages
+            RÈGLES STRICTES:
+            - Pas de titres en gras (**texte**)
+            - Pas de mention du salaire dans les avantages
+            - Pas de durée pour le type de contrat
+            - Phrases directes et naturelles
+            - Formatage propre avec des listes à puces
+            - Ton authentique et transparent
+            """
 
-Mise en valeur de l'autonomie et de la culture d'entreprise
-
-CONTENU ENGAGEANT :
-
-Expliquer la différence entre travailler ici et ailleurs
-
-Décrire l'environnement et l'équipe actuelle
-
-Précision sur le management et les perspectives
-
-❌ CE QU'IL FAUT ABSOLUMENT ÉVITER (Erreurs courantes) :
-
-NE PAS FAIRE UN SIMPLE DESCRIPTIF DE POSTE
-
-Une annonce est une PUBLICITÉ, pas un document administratif
-
-Éviter le jargon RH et les formulations bureaucratiques
-
-NE PAS TROP RACCOURCIR
-
-Une annonce courte perd son pouvoir de conviction
-
-Le candidat a besoin d'informations concrètes pour décider
-
-NE PAS CHERCHER À PLAIRE À TOUT LE MONDE
-
-Attirer, c'est accepter de repousser certaines personnes
-
-Mentionner clairement les inconvénients et défis
-
-ÉVITER LA LANGUE DE BOIS
-
-Supprimer les termes à géométrie variable : "taille humaine", "innovant", "responsable"
-
-Éliminer les adjectifs vides de sens
-
-Appliquer le test du "blab bla" : si on peut remplacer par "blab bla", supprimer
-
-FAIRE ATTENTION À LA FORME
-
-Éviter les blocs de texte denses
-
-Utiliser une hiérarchie claire : titres, listes, phrases courtes
-
-Vérifier que la plateforme conserve la mise en forme
-
-STRUCTURE OBLIGATOIRE DE L'ANNONCE
-TITRE ACCROCHEUR [Format standardisé]
-
-INFORMATIONS CLÉS [En haut, très visible]
-
-ACCROCHE ENGAGEANTE [2-3 questions rhétoriques]
-
-POURQUOI NOUS AVONS BESOIN DE VOUS [Contexte business]
-
-PRÉSENTATION DE L'ENTREPRISE [Culture, valeurs, spécificités]
-
-CE QUE VOUS FEREZ [Missions quotidiennes + ponctuelles]
-
-VOTRE ENVIRONNEMENT [Équipe, management, culture]
-
-CE QUE NOUS RECHERCHONS [Compétences clés + bonus]
-
-CE POSTE N'EST PAS POUR VOUS SI... [Filtre naturel]
-
-PROCESSUS DE RECRUTEMENT [Étapes transparentes]
-
-APPEL À L'ACTION [Comment postuler]
-
-EXEMPLE DE BONNE PRATIQUE À REPRODUIRE
-« Fatigué·e de devoir vous battre pour convaincre d'adopter des méthodes de recrutement efficaces ? Marre de ne pas avoir les outils nécessaires pour réussir dans votre métier ? »
-
-« Chez nous, vous n'aurez plus à vous soucier de ces problèmes. »
-
-« Ce poste n'est pas pour vous si... vous aimez recruter au feeling »
-
-DEMANDE SPÉCIFIQUE
-Quand je te fournirai les informations sur un poste à pourvoir, génère une annonce complète qui respecte scrupuleusement ces règles. L'annonce doit être prête à être publiée et optimisée pour attirer les candidats idéaux tout en filtrant naturellement les non-correspondants.
-
-Ton expertise doit se concentrer sur :
-
-La conversion des lecteurs en candidats qualifiés
-
-L'authenticité et la transparence
-
-La différenciation par rapport aux annonces traditionnelles
-
-L'optimisation pour les plateformes de recrutement. Rends-la authentique, transparente, avec accroche rhétorique, filtre naturel, etc."""
-
-        # Appel à l'IA (assumez que utils.deepseek_generate existe)
-        try:
-            generated_contenu = utils.deepseek_generate(prompt)  # Remplacez par votre fonction réelle
-            st.session_state["annonce_contenu"] = generated_contenu
-            st.success("Annonce générée avec succès !")
-        except Exception as e:
-            st.error(f"Erreur lors de la génération IA : {e}")
+        # Appel à l'IA avec spinner
+        with st.spinner("🔄 Génération en cours par l'IA... Veuillez patienter."):
+            try:
+                generated_contenu = utils.deepseek_generate(prompt)
+                # Nettoyer le contenu généré
+                generated_contenu = generated_contenu.replace('**', '')  # Enlever les **
+                generated_contenu = generated_contenu.replace('* ', '• ')  # Uniformiser les puces
+                st.session_state["annonce_contenu"] = generated_contenu
+                st.success("✅ Annonce générée avec succès !")
+            except Exception as e:
+                st.error(f"Erreur lors de la génération IA : {e}")
     else:
         st.warning("Fournissez une fiche de poste via PDF ou saisie manuelle.")
 
-contenu = st.text_area("Contenu de l'annonce (généré ou manuel)", key="annonce_contenu", height=300, value=st.session_state.get("annonce_contenu", ""))
+# Textarea pour le contenu avec gestion de la valeur par défaut
+if "annonce_contenu" not in st.session_state:
+    st.session_state["annonce_contenu"] = ""
 
-if st.button("💾 Publier l'annonce", type="primary", use_container_width=True, key="btn_publier_annonce"):
+contenu = st.text_area("Contenu de l'annonce (généré ou manuel)", 
+                       key="annonce_contenu", 
+                       height=300, 
+                       value=st.session_state.get("annonce_contenu", ""),
+                       help="Contenu de l'annonce généré par l'IA ou saisi manuellement")
+
+if st.button("💾 Sauvegarder l'annonce", type="primary", use_container_width=True, key="btn_publier_annonce"):
     if titre and poste and entreprise and contenu:
         annonce = {
             "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -286,7 +275,7 @@ if st.button("💾 Publier l'annonce", type="primary", use_container_width=True,
             "plateforme": plateforme,
         }
         st.session_state.annonces.append(annonce)
-        st.success("✅ Annonce publiée avec succès !")
+        st.success("✅ Annonce sauvegardée avec succès !")
         # Reset pour nouvelle saisie
         st.session_state["annonce_contenu"] = ""
     else:
@@ -295,10 +284,10 @@ if st.button("💾 Publier l'annonce", type="primary", use_container_width=True,
 st.divider()
 
 # -------------------- Liste des annonces --------------------
-st.subheader("📋 Annonces publiées")
+st.subheader("📋 Annonces sauvegardées")
 
 if not st.session_state.annonces:
-    st.info("Aucune annonce publiée pour le moment.")
+    st.info("Aucune annonce sauvegardée pour le moment.")
 else:
     for i, annonce in enumerate(st.session_state.annonces[::-1]):  # affichage dernière en premier
         with st.expander(f"{annonce['date']} - {annonce['titre']} ({annonce['poste']}) - {annonce['plateforme']}", expanded=False):
