@@ -63,8 +63,11 @@ def get_gsheet_client():
     try:
         # 1. Crée un fichier temporaire et y écrit le contenu JSON des secrets
         with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
-            # st.secrets["gcp_service_account"] contient déjà toutes les clés du JSON
-            json.dump(st.secrets["gcp_service_account"], temp_file)
+            
+            # 🚨 CORRECTION CRITIQUE : Conversion explicite en dict pour la sérialisation JSON
+            creds_data = dict(st.secrets["gcp_service_account"]) 
+            json.dump(creds_data, temp_file)
+            
             temp_file_path = temp_file.name
         
         # 2. Authentification via le fichier temporaire (méthode la plus stable)
@@ -82,13 +85,9 @@ def get_gsheet_client():
         return client
         
     except Exception as e:
-        # Si une erreur survient ici, elle est très probablement due à :
-        # - La clé privée n'est pas au format multiligne dans Streamlit secrets
-        # - Les dépendances (gspread, oauth2client) ne sont pas installées
         st.error(f"❌ Échec de l'authentification Google Sheets. Vérifiez les dépendances et le format de la clé dans les secrets Streamlit. Erreur : {e}")
         return None
-
-
+    
 # -------------------- FONCTIONS GOOGLE SHEETS --------------------
 
 @st.cache_data(ttl=600)
