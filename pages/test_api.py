@@ -4,13 +4,11 @@ import sqlite3
 import pandas as pd
 from datetime import datetime
 import importlib.util
+
 # Utiliser le répertoire actuel comme base
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
 os.chdir(PROJECT_ROOT)
-
-# Retrait du message : 📍 Répertoire de travail actuel
-# st.info(f"📍 Répertoire de travail actuel : {PROJECT_ROOT}")
 
 # Vérification de la connexion
 if not st.session_state.get("logged_in", False):
@@ -30,14 +28,11 @@ CV_DIR = os.path.join(PROJECT_ROOT, "cvs")
 if not os.path.exists(CV_DIR):
     try:
         os.makedirs(CV_DIR, exist_ok=True)
-        # Message retiré : 📁 Dossier CV_DIR créé avec succès
     except Exception as e:
         st.error(f"❌ Erreur lors de la création du dossier {CV_DIR} à {os.path.abspath(CV_DIR)}: {e}")
 
 # -------------------- Base de données SQLite --------------------
 DB_FILE = os.path.join(PROJECT_ROOT, "cartographie.db")
-# Message retiré : 📂 Base de données définie à : ...
-# st.info(f"📂 Base de données définie à : {os.path.abspath(DB_FILE)}")
 
 def check_table_exists():
     """Vérifie si la table candidats existe dans la base."""
@@ -47,9 +42,6 @@ def check_table_exists():
         c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='candidats'")
         exists = c.fetchone() is not None
         conn.close()
-        # Message retiré : ✅ Vérification table candidats : Existe...
-        # status = "Existe" if exists else "N'existe pas" 
-        # st.info(f"✅ Vérification table candidats : {status} dans {DB_FILE}.")
         return exists
     except Exception as e:
         st.error(f"❌ Erreur lors de la vérification de la table candidats dans {DB_FILE}: {e}")
@@ -75,7 +67,6 @@ def init_db():
         ''')
         conn.commit()
         conn.close()
-        # Message retiré : ✅ Base de données ... initialisée avec succès
     except Exception as e:
         st.error(f"❌ Erreur lors de l'initialisation de {DB_FILE} à {os.path.abspath(DB_FILE)}: {e}")
 
@@ -108,8 +99,6 @@ def load_data():
                 "notes": notes,
                 "cv_path": cv_path
             })
-        # Message retiré : ✅ Données chargées depuis ...
-        # st.info(f"✅ Données chargées depuis {DB_FILE} ({len(rows)} candidats trouvés).")
         return data
     except Exception as e:
         st.error(f"❌ Erreur lors du chargement des données depuis {DB_FILE}: {e}")
@@ -140,7 +129,6 @@ def save_candidat(quadrant, entry):
         ))
         conn.commit()
         conn.close()
-        # Message retiré : ✅ Candidat sauvegardé dans ...
     except Exception as e:
         st.error(f"❌ Erreur lors de la sauvegarde du candidat dans {DB_FILE}: {e}")
 
@@ -149,15 +137,13 @@ def delete_candidat(quadrant, index):
     try:
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
-        # La requête DELETE doit être basée sur l'ID pour être robuste, mais comme l'index est calculé à l'envers, nous devons ajuster
-        # Nous allons conserver la logique OFFSET pour la suppression, en supposant que l'ordre DESC par 'date' est fiable.
+        # Supprime en fonction de l'ordre inversé du quadrant (le dernier ajouté est à l'index 0)
         c.execute("SELECT id FROM candidats WHERE quadrant = ? ORDER BY date DESC LIMIT 1 OFFSET ?", (quadrant, index))
         result = c.fetchone()
         if result:
             candidate_id = result[0]
             c.execute("DELETE FROM candidats WHERE id = ?", (candidate_id,))
             conn.commit()
-            # Message retiré : ✅ Candidat supprimé de ...
         else:
             st.warning("⚠️ Candidat non trouvé dans la base.")
         conn.close()
@@ -182,12 +168,6 @@ tab1, tab2 = st.tabs(["Gestion des candidats", "Vue globale"])
 
 # -------------------- Onglet 1 : Gestion des candidats --------------------
 with tab1:
-    
-    # -------------------- Recherche (Déplacée pour être toujours visible) --------------------
-    st.subheader("🔍 Rechercher un candidat")
-    search_term = st.text_input("Rechercher par nom ou poste", key="carto_search")
-    
-    st.divider()
     
     # Choix quadrant
     quadrant_choisi = st.selectbox("Quadrant:", list(st.session_state.cartographie_data.keys()), key="carto_quadrant")
@@ -215,7 +195,6 @@ with tab1:
                     cv_path = os.path.join(CV_DIR, cv_filename)
                     with open(cv_path, "wb") as f:
                         f.write(cv_file.read())
-                    # Message retiré : ✅ CV sauvegardé dans ...
                 except Exception as e:
                     st.error(f"❌ Erreur lors de la sauvegarde du CV dans {cv_path}: {e}")
             entry = {
@@ -230,12 +209,18 @@ with tab1:
             st.session_state.cartographie_data[quadrant_choisi].append(entry)
             save_candidat(quadrant_choisi, entry)
             st.success(f"✅ {nom} ajouté à {quadrant_choisi}")
+            # Rerun pour recharger les données filtrées si un ajout a eu lieu
+            st.rerun() 
         else:
             st.warning("⚠️ Merci de remplir au minimum Nom + Poste")
 
     st.divider()
     
-    # Filtrage des candidats pour l'affichage (utilise la variable search_term déjà définie)
+    # -------------------- Recherche (Revenu à son ancienne place) --------------------
+    st.subheader("🔍 Rechercher un candidat")
+    search_term = st.text_input("Rechercher par nom ou poste", key="carto_search")
+    
+    # Filtrage des candidats pour l'affichage
     filtered_cands = [
         cand for cand in st.session_state.cartographie_data[quadrant_choisi][::-1]
         if not search_term or search_term.lower() in cand['nom'].lower() or search_term.lower() in cand['poste'].lower()
@@ -264,13 +249,15 @@ with tab1:
                 col1, col2 = st.columns(2)
                 with col1:
                     if st.button("🗑️ Supprimer", key=f"delete_carto_{quadrant_choisi}_{i}"):
+                        # Trouver l'index dans la liste originale non filtrée (ordre inverse)
                         original_index = len(st.session_state.cartographie_data[quadrant_choisi]) - 1 - st.session_state.cartographie_data[quadrant_choisi][::-1].index(cand)
+                        
                         if cand.get('cv_path') and os.path.exists(cand['cv_path']):
                             try:
                                 os.remove(cand['cv_path'])
-                                # Message retiré : ✅ CV ... supprimé.
                             except Exception as e:
                                 st.error(f"❌ Erreur lors de la suppression du CV dans {cand['cv_path']}: {e}")
+                                
                         st.session_state.cartographie_data[quadrant_choisi].pop(original_index)
                         delete_candidat(quadrant_choisi, original_index)
                         st.success("✅ Candidat supprimé")
@@ -315,7 +302,7 @@ with tab1:
                     key="export_db"
                 )
         else:
-            st.warning(f"⚠️ Base de données {DB_FILE} non trouvée.") # Raccourci le message
+            st.warning(f"⚠️ Base de données {DB_FILE} non trouvée.")
             
 # -------------------- Onglet 2 : Vue globale --------------------
 with tab2:
