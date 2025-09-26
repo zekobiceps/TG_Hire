@@ -5,10 +5,10 @@ import pandas as pd
 from datetime import datetime
 import importlib.util
 
-# Utiliser le répertoire actuel comme base (pas de changement forcé)
+# Utiliser le répertoire actuel comme base
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-os.chdir(BASE_DIR)
-PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))  # Monter d'un niveau vers le répertoire racine
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
+os.chdir(PROJECT_ROOT)
 st.info(f"📍 Répertoire de travail actuel : {PROJECT_ROOT}")
 
 # Vérification de la connexion
@@ -195,33 +195,33 @@ with tab1:
     notes = st.text_area("Notes / Observations", key="carto_notes", height=100)
     cv_file = st.file_uploader("Télécharger CV (PDF ou DOCX)", type=["pdf", "docx"], key="carto_cv")
 
-    if st.button("💾 Ajouter à la cartographie", type="primary", use_container_width=True, key="btn_add_carto"):
-        if nom and poste:
-            cv_path = None
-            if cv_file:
-                try:
-                    cv_filename = f"{nom}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{cv_file.name}"
-                    cv_path = os.path.join(CV_DIR, cv_filename)
-                    with open(cv_path, "wb") as f:
-                        f.write(cv_file.read())
-                    st.info(f"✅ CV sauvegardé dans {cv_path} à {os.path.abspath(cv_path)}. Vérification : {os.path.exists(cv_path)}")
-                except Exception as e:
-                    st.error(f"❌ Erreur lors de la sauvegarde du CV dans {cv_path}: {e}")
-            
-            entry = {
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "nom": nom,
-                "poste": poste,
-                "entreprise": entreprise,
-                "linkedin": linkedin,
-                "notes": notes,
-                "cv_path": cv_path
-            }
-            st.session_state.cartographie_data[quadrant_choisi].append(entry)
-            save_candidat(quadrant_choisi, entry)
-            st.success(f"✅ {nom} ajouté à {quadrant_choisi}")
-        else:
-            st.warning("⚠️ Merci de remplir au minimum Nom + Poste")
+if st.button("💾 Ajouter à la cartographie", type="primary", use_container_width=True, key="btn_add_carto"):
+    if nom and poste:
+        cv_path = None
+        if cv_file:
+            try:
+                cv_filename = f"{nom}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{cv_file.name}"
+                cv_path = os.path.join(CV_DIR, cv_filename)
+                with open(cv_path, "wb") as f:
+                    f.write(cv_file.read())
+                st.info(f"✅ CV sauvegardé dans {cv_path} à {os.path.abspath(cv_path)}. Vérification : {os.path.exists(cv_path)}")
+            except Exception as e:
+                st.error(f"❌ Erreur lors de la sauvegarde du CV dans {cv_path}: {e}")
+        
+        entry = {
+            "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "nom": nom,
+            "poste": poste,
+            "entreprise": entreprise,
+            "linkedin": linkedin,
+            "notes": notes,
+            "cv_path": cv_path
+        }
+        st.session_state.cartographie_data[quadrant_choisi].append(entry)
+        save_candidat(quadrant_choisi, entry)
+        st.success(f"✅ {nom} ajouté à {quadrant_choisi}")
+    else:
+        st.warning("⚠️ Merci de remplir au minimum Nom + Poste")
 
     st.divider()
 
