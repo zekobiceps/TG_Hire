@@ -45,7 +45,8 @@ def check_table_exists():
         c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='candidats'")
         exists = c.fetchone() is not None
         conn.close()
-        st.info(f"✅ Vérification table candidats : {'Existe' if exists else 'N\'existe pas'} dans {DB_FILE}.")
+        status = "Existe" if exists else "N'existe pas"  # Évite l'échappement dans l'expression
+        st.info(f"✅ Vérification table candidats : {status} dans {DB_FILE}.")
         return exists
     except Exception as e:
         st.error(f"❌ Erreur lors de la vérification de la table candidats dans {DB_FILE}: {e}")
