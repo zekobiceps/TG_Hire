@@ -4,14 +4,15 @@ import pandas as pd
 from datetime import datetime
 import importlib.util
 
-# --- Assurez-vous d'avoir exécuté 'pip install gspread' ---
+# --- NOUVELLES IMPORTATIONS POUR LA MÉTHODE DE SECOURS ---
 try:
     import gspread 
+    from oauth2client.service_account import ServiceAccountCredentials
 except ImportError:
-    st.error("❌ La bibliothèque 'gspread' n'est pas installée. Veuillez l'installer avec 'pip install gspread'.")
-    # Fonction de remplacement pour éviter un crash si l'import échoue
+    st.error("❌ Les bibliothèques 'gspread' ou 'oauth2client' ne sont pas installées. Veuillez vérifier vos dépendances.")
+    # Fonction de remplacement pour éviter un crash
     def save_to_google_sheet(quadrant, entry):
-        st.warning("⚠️ L'enregistrement sur Google Sheets est désactivé (gspread manquant).")
+        st.warning("⚠️ L'enregistrement sur Google Sheets est désactivé.")
         return False
 
 # --- CONFIGURATION GOOGLE SHEETS (VOS VALEURS) ---
@@ -28,7 +29,6 @@ if not st.session_state.get("logged_in", False):
     st.stop()
 
 # -------------------- Import utils --------------------
-# (Conserve cette section si vous utilisez un fichier utils.py)
 UTILS_PATH = os.path.abspath(os.path.join(PROJECT_ROOT, "utils.py"))
 spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
 utils = importlib.util.module_from_spec(spec)
@@ -45,22 +45,39 @@ if not os.path.exists(CV_DIR):
     except Exception as e:
         st.error(f"❌ Erreur lors de la création du dossier {CV_DIR}: {e}")
 
+# -------------------- FONCTION D'AUTHENTIFICATION RÉUTILISABLE --------------------
+def get_gsheet_client():
+    """Authentifie et retourne le client gspread en utilisant oauth2client et st.secrets."""
+    if "gcp_service_account" not in st.secrets:
+        st.error("❌ La clé 'gcp_service_account' n'est pas configurée dans secrets.toml.")
+        return None
+        
+    creds_info = st.secrets["gcp_service_account"]
+    scope = ["https://spreadsheets.google.com/feeds", 
+             'https://www.googleapis.com/auth/spreadsheets',
+             "https://www.googleapis.com/auth/drive.file", 
+             "https://www.googleapis.com/auth/drive"]
+    
+    # Authentification compatible avec les anciennes versions de gspread
+    credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
+    client = gspread.authorize(credentials)
+    return client
+
 # -------------------- FONCTIONS GOOGLE SHEETS --------------------
 
-@st.cache_data(ttl=600) # Mise en cache des données pour 10 minutes
+@st.cache_data(ttl=600)
 def load_data_from_sheet():
     """Charge toutes les données de la feuille Google Sheets et les organise par quadrant."""
-    if 'gspread' not in globals() or "gcp_service_account" not in st.secrets:
-        return {
+    try:
+        gc = get_gsheet_client()
+        if not gc: return {
             "🌟 Haut Potentiel": [], "💎 Rare & stratégique": [], 
             "⚡ Rapide à mobiliser": [], "📚 Facilement disponible": []
         }
-    try:
-        gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
+        
         sh = gc.open_by_url(GOOGLE_SHEET_URL)
         worksheet = sh.worksheet(WORKSHEET_NAME)
         
-        # Récupère toutes les données sous forme de dictionnaire (avec les noms de colonnes comme clés)
         rows = worksheet.get_all_records()
         
         data = {
@@ -68,8 +85,6 @@ def load_data_from_sheet():
             "⚡ Rapide à mobiliser": [], "📚 Facilement disponible": []
         }
         
-        # Le code suppose que votre feuille a les colonnes suivantes (exactement ces noms) : 
-        # Quadrant, Date, Nom, Poste, Entreprise, Linkedin, Notes, CV_Path
         for row in rows:
             quadrant = row.get('Quadrant') 
             
@@ -96,11 +111,10 @@ def load_data_from_sheet():
 
 def save_to_google_sheet(quadrant, entry):
     """Sauvegarde les données d'un candidat dans Google Sheets."""
-    if 'gspread' not in globals() or "gcp_service_account" not in st.secrets:
-         return False
-         
     try:
-        gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
+        gc = get_gsheet_client()
+        if not gc: return False
+
         sh = gc.open_by_url(GOOGLE_SHEET_URL)
         worksheet = sh.worksheet(WORKSHEET_NAME)
         
