@@ -5,16 +5,18 @@ import pandas as pd
 from datetime import datetime
 import importlib.util
 
-# Forcer le répertoire de travail à la racine du projet
-os.chdir('/workspaces/TG_Hire/')
-st.info(f"📍 Répertoire de travail actuel : {os.getcwd()}")
+# Utiliser le répertoire actuel comme base (pas de changement forcé)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+os.chdir(BASE_DIR)
+PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))  # Monter d'un niveau vers le répertoire racine
+st.info(f"📍 Répertoire de travail actuel : {PROJECT_ROOT}")
 
 # Vérification de la connexion
 if not st.session_state.get("logged_in", False):
     st.stop()
 
 # -------------------- Import utils --------------------
-UTILS_PATH = os.path.abspath(os.path.join(os.getcwd(), "utils.py"))
+UTILS_PATH = os.path.abspath(os.path.join(PROJECT_ROOT, "utils.py"))
 spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
 utils = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(utils)
@@ -23,7 +25,7 @@ spec.loader.exec_module(utils)
 utils.init_session_state()
 
 # -------------------- Dossier pour les CV --------------------
-CV_DIR = os.path.join(os.getcwd(), "cvs")
+CV_DIR = os.path.join(PROJECT_ROOT, "cvs")
 if not os.path.exists(CV_DIR):
     try:
         os.makedirs(CV_DIR, exist_ok=True)
@@ -32,7 +34,7 @@ if not os.path.exists(CV_DIR):
         st.error(f"❌ Erreur lors de la création du dossier {CV_DIR} à {os.path.abspath(CV_DIR)}: {e}")
 
 # -------------------- Base de données SQLite --------------------
-DB_FILE = os.path.join(os.getcwd(), "cartographie.db")
+DB_FILE = os.path.join(PROJECT_ROOT, "cartographie.db")
 st.info(f"📂 Base de données définie à : {os.path.abspath(DB_FILE)}")
 
 def check_table_exists():
@@ -140,18 +142,18 @@ def save_candidat(quadrant, entry):
 # Supprimer un candidat de SQLite
 def delete_candidat(quadrant, index):
     try:
-      conn = sqlite3.connect(DB_FILE)
-      c = conn.cursor()
-      c.execute("SELECT id FROM candidats WHERE quadrant = ? ORDER BY date DESC LIMIT 1 OFFSET ?", (quadrant, index))
-      result = c.fetchone()
-      if result:
-          candidate_id = result[0]
-          c.execute("DELETE FROM candidats WHERE id = ?", (candidate_id,))
-          conn.commit()
-          st.info(f"✅ Candidat supprimé de {DB_FILE}.")
-      else:
-          st.warning("⚠️ Candidat non trouvé dans la base.")
-      conn.close()
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("SELECT id FROM candidats WHERE quadrant = ? ORDER BY date DESC LIMIT 1 OFFSET ?", (quadrant, index))
+        result = c.fetchone()
+        if result:
+            candidate_id = result[0]
+            c.execute("DELETE FROM candidats WHERE id = ?", (candidate_id,))
+            conn.commit()
+            st.info(f"✅ Candidat supprimé de {DB_FILE}.")
+        else:
+            st.warning("⚠️ Candidat non trouvé dans la base.")
+        conn.close()
     except Exception as e:
         st.error(f"❌ Erreur lors de la suppression du candidat dans {DB_FILE}: {e}")
 
