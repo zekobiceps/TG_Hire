@@ -1,27 +1,24 @@
 import streamlit as st
 import os
-import sqlite3 # Import conservé pour la compatibilité des utilitaires, mais non utilisé
 import pandas as pd
 from datetime import datetime
 import importlib.util
 
-# --- NOUVEAU: Import gspread pour Google Sheets ---
-# Assurez-vous d'avoir exécuté 'pip install gspread'
+# --- Assurez-vous d'avoir exécuté 'pip install gspread' ---
 try:
     import gspread 
 except ImportError:
     st.error("❌ La bibliothèque 'gspread' n'est pas installée. Veuillez l'installer avec 'pip install gspread'.")
-    # Définit une fonction de remplacement pour éviter un crash si l'import échoue
+    # Fonction de remplacement pour éviter un crash si l'import échoue
     def save_to_google_sheet(quadrant, entry):
         st.warning("⚠️ L'enregistrement sur Google Sheets est désactivé (gspread manquant).")
         return False
 
 # --- CONFIGURATION GOOGLE SHEETS (VOS VALEURS) ---
-# L'URL utilisée doit correspondre à la feuille que vous avez partagée.
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1QLC_LzwQU5eKLRcaDglLd6csejLZSs1aauYFwzFk0ac/edit" 
-WORKSHEET_NAME = "Cartographie" # Nom de l'onglet exact dans votre feuille
+WORKSHEET_NAME = "Cartographie" 
 
-# Utiliser le répertoire actuel comme base
+# Chemin du projet pour la gestion des CV
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
 os.chdir(PROJECT_ROOT)
@@ -31,6 +28,7 @@ if not st.session_state.get("logged_in", False):
     st.stop()
 
 # -------------------- Import utils --------------------
+# (Conserve cette section si vous utilisez un fichier utils.py)
 UTILS_PATH = os.path.abspath(os.path.join(PROJECT_ROOT, "utils.py"))
 spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
 utils = importlib.util.module_from_spec(spec)
@@ -45,13 +43,10 @@ if not os.path.exists(CV_DIR):
     try:
         os.makedirs(CV_DIR, exist_ok=True)
     except Exception as e:
-        st.error(f"❌ Erreur lors de la création du dossier {CV_DIR} à {os.path.abspath(CV_DIR)}: {e}")
+        st.error(f"❌ Erreur lors de la création du dossier {CV_DIR}: {e}")
 
-# -------------------- Suppression des fonctions/références SQLite --------------------
-# Toutes les fonctions init_db, check_table_exists, load_data, save_candidat, delete_candidat sont retirées.
-# Les données seront chargées directement de Google Sheets.
+# -------------------- FONCTIONS GOOGLE SHEETS --------------------
 
-# -------------------- FONCTION GOOGLE SHEETS (Chargement) --------------------
 @st.cache_data(ttl=600) # Mise en cache des données pour 10 minutes
 def load_data_from_sheet():
     """Charge toutes les données de la feuille Google Sheets et les organise par quadrant."""
@@ -65,7 +60,7 @@ def load_data_from_sheet():
         sh = gc.open_by_url(GOOGLE_SHEET_URL)
         worksheet = sh.worksheet(WORKSHEET_NAME)
         
-        # Récupère toutes les données (en supposant que la première ligne est l'en-tête)
+        # Récupère toutes les données sous forme de dictionnaire (avec les noms de colonnes comme clés)
         rows = worksheet.get_all_records()
         
         data = {
@@ -73,13 +68,11 @@ def load_data_from_sheet():
             "⚡ Rapide à mobiliser": [], "📚 Facilement disponible": []
         }
         
-        # Assurez-vous que les colonnes dans votre Google Sheet sont: 
+        # Le code suppose que votre feuille a les colonnes suivantes (exactement ces noms) : 
         # Quadrant, Date, Nom, Poste, Entreprise, Linkedin, Notes, CV_Path
         for row in rows:
-            # Utilisez le nom de colonne exact de votre feuille
             quadrant = row.get('Quadrant') 
             
-            # Vérifiez si le quadrant est valide avant d'ajouter
             if quadrant in data:
                 data[quadrant].append({
                     "date": row.get("Date", "N/A"),
@@ -100,21 +93,18 @@ def load_data_from_sheet():
             "⚡ Rapide à mobiliser": [], "📚 Facilement disponible": []
         }
 
-# -------------------- FONCTION GOOGLE SHEETS (Sauvegarde) --------------------
+
 def save_to_google_sheet(quadrant, entry):
-    """Sauvegarde les données d'un candidat dans Google Sheets via gspread et st.secrets."""
+    """Sauvegarde les données d'un candidat dans Google Sheets."""
     if 'gspread' not in globals() or "gcp_service_account" not in st.secrets:
          return False
          
     try:
         gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
-        
-        # NOTE: On utilise open_by_url qui est plus fiable que open_by_key
         sh = gc.open_by_url(GOOGLE_SHEET_URL)
         worksheet = sh.worksheet(WORKSHEET_NAME)
         
-        # Le format de la ligne DOIT correspond à l'ordre de vos colonnes dans Google Sheets.
-        # Assurez-vous que vos colonnes Sheets sont: Quadrant, Date, Nom, Poste, Entreprise, Linkedin, Notes, CV_Path
+        # L'ordre doit correspondre à vos colonnes Sheets : Quadrant, Date, Nom, Poste, Entreprise, Linkedin, Notes, CV_Path
         row_data = [
             quadrant,
             entry["date"],
@@ -130,10 +120,10 @@ def save_to_google_sheet(quadrant, entry):
         return True
         
     except Exception as e:
-        st.error(f"❌ Échec de l'enregistrement dans Google Sheets. Vérifiez la configuration (URL, onglet, et partage). Erreur : {e}")
+        st.error(f"❌ Échec de l'enregistrement dans Google Sheets. Erreur : {e}")
         return False
         
-# Initialiser les données dans session_state
+# Initialiser/Charger les données
 if "cartographie_data" not in st.session_state:
     st.session_state.cartographie_data = load_data_from_sheet()
 
@@ -144,7 +134,7 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-st.title("🗺️ Cartographie des talents")
+st.title("🗺️ Cartographie des talents (Google Sheets)")
 
 # -------------------- Onglets --------------------
 tab1, tab2 = st.tabs(["Gestion des candidats", "Vue globale"])
@@ -190,14 +180,13 @@ with tab1:
                 "cv_path": cv_path
             }
             
-            # 1. Sauvegarde dans Google Sheets (UNIQUE SOURCE DE VÉRITÉ)
+            # Sauvegarde dans Google Sheets (UNIQUE SOURCE)
             if save_to_google_sheet(quadrant_choisi, entry):
                 st.success(f"✅ {nom} ajouté à {quadrant_choisi} (Google Sheets).")
-                # Mise à jour de la session state pour l'affichage (sans passer par SQLite)
-                st.session_state.cartographie_data[quadrant_choisi].append(entry)
+                # Invalide le cache pour forcer le rechargement
+                load_data_from_sheet.clear()
 
-            # 2. Rechargement des données (invalide le cache)
-            load_data_from_sheet.clear()
+            # Rechargement des données
             st.rerun() 
             
         else:
@@ -205,18 +194,18 @@ with tab1:
 
     st.divider()
     
-    # -------------------- Recherche --------------------
+    # -------------------- Recherche et Affichage --------------------
     st.subheader("🔍 Rechercher un candidat")
     search_term = st.text_input("Rechercher par nom ou poste", key="carto_search")
     
-    # Filtrage des candidats pour l'affichage
+    # Filtrage des candidats (en ordre inverse, le plus récent en premier)
     filtered_cands = [
         cand for cand in st.session_state.cartographie_data[quadrant_choisi][::-1]
         if not search_term or search_term.lower() in cand['nom'].lower() or search_term.lower() in cand['poste'].lower()
     ]
     
     # Affichage données
-    st.subheader(f"📋 Candidats dans : {quadrant_choisi}")
+    st.subheader(f"📋 Candidats dans : {quadrant_choisi} ({len(filtered_cands)})")
     if not filtered_cands:
         st.info("Aucun candidat correspondant dans ce quadrant.")
     else:
@@ -225,37 +214,38 @@ with tab1:
                 st.write(f"**Entreprise :** {cand.get('entreprise', 'Non spécifiée')}")
                 st.write(f"**LinkedIn :** {cand.get('linkedin', 'Non spécifié')}")
                 st.write(f"**Notes :** {cand.get('notes', '')}")
-                if cand.get('cv_path') and os.path.exists(cand['cv_path']):
-                    st.write(f"**CV :** {os.path.basename(cand['cv_path'])}")
-                    with open(cand['cv_path'], "rb") as f:
+                
+                # Gestion des CV locaux
+                cv_local_path = cand.get('cv_path')
+                if cv_local_path and os.path.exists(cv_local_path):
+                    st.write(f"**CV :** {os.path.basename(cv_local_path)}")
+                    with open(cv_local_path, "rb") as f:
                         st.download_button(
                             label="⬇️ Télécharger CV",
                             data=f,
-                            file_name=os.path.basename(cand['cv_path']),
-                            mime="application/pdf" if cand['cv_path'].endswith('.pdf') else "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            file_name=os.path.basename(cv_local_path),
+                            mime="application/pdf" if cv_local_path.endswith('.pdf') else "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                             key=f"download_cv_{quadrant_choisi}_{i}"
                         )
+                
                 col1, col2 = st.columns(2)
                 with col1:
-                    # NOTE: La suppression des candidats est complexe car elle nécessite 
-                    # d'identifier la ligne exacte dans Google Sheets. 
-                    # Pour simplifier, nous avons retiré la logique delete_candidat et 
-                    # laissons l'utilisateur supprimer le CV local s'il existe.
+                    # Bouton pour la suppression du CV local
                     if st.button("🗑️ Supprimer CV local", key=f"delete_carto_{quadrant_choisi}_{i}"):
-                        if cand.get('cv_path') and os.path.exists(cand['cv_path']):
+                        if cv_local_path and os.path.exists(cv_local_path):
                             try:
-                                os.remove(cand['cv_path'])
-                                st.success("✅ CV local supprimé.")
+                                os.remove(cv_local_path)
+                                st.success("✅ CV local supprimé. (L'entrée dans Google Sheets n'est pas affectée)")
                             except Exception as e:
                                 st.error(f"❌ Erreur lors de la suppression du CV local: {e}")
                         else:
                             st.warning("⚠️ Aucun CV local à supprimer pour ce candidat.")
-                        # On ne supprime pas de Sheets pour ne pas ajouter de complexité à l'API.
+                        st.rerun() 
                         
                 with col2:
-                    export_text = f"Nom: {cand['nom']}\nPoste: {cand['poste']}\nEntreprise: {cand['entreprise']}\nLinkedIn: {cand.get('linkedin', '')}\nNotes: {cand['notes']}\nCV: {os.path.basename(cand['cv_path']) if cand.get('cv_path') else 'Aucun'}"
+                    export_text = f"Nom: {cand['nom']}\nPoste: {cand['poste']}\nEntreprise: {cand['entreprise']}\nLinkedIn: {cand.get('linkedin', '')}\nNotes: {cand['notes']}\nCV: {os.path.basename(cand.get('cv_path', 'Aucun'))}"
                     st.download_button(
-                        "⬇️ Exporter",
+                        "⬇️ Exporter (Texte)",
                         data=export_text,
                         file_name=f"cartographie_{cand['nom']}.txt",
                         mime="text/plain",
@@ -264,25 +254,21 @@ with tab1:
 
     # Export global
     st.subheader("📤 Exporter toute la cartographie")
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("⬇️ Exporter en CSV"):
-            all_data = []
-            for quad, cands in st.session_state.cartographie_data.items():
-                for cand in cands:
-                    cand_copy = cand.copy()
-                    cand_copy['quadrant'] = quad
-                    all_data.append(cand_copy)
-            df = pd.DataFrame(all_data)
-            st.download_button(
-                "Télécharger CSV",
-                df.to_csv(index=False),
-                file_name="cartographie_talents.csv",
-                mime="text/csv",
-                key="export_csv"
-            )
-    with col2:
-        st.info("⚠️ L'export de la base SQLite a été retiré, utilisez l'export CSV ou la feuille Google Sheets comme source.")
+    if st.button("⬇️ Exporter en CSV (Global)"):
+        all_data = []
+        for quad, cands in st.session_state.cartographie_data.items():
+            for cand in cands:
+                cand_copy = cand.copy()
+                cand_copy['quadrant'] = quad
+                all_data.append(cand_copy)
+        df = pd.DataFrame(all_data)
+        st.download_button(
+            "Télécharger CSV",
+            df.to_csv(index=False),
+            file_name="cartographie_talents.csv",
+            mime="text/csv",
+            key="export_csv"
+        )
             
 # -------------------- Onglet 2 : Vue globale --------------------
 with tab2:
@@ -291,7 +277,7 @@ with tab2:
         import plotly.express as px
         counts = {k: len(st.session_state.cartographie_data[k]) for k in st.session_state.cartographie_data.keys()}
         if sum(counts.values()) > 0:
-            # Conversion en DataFrame pour Plotly
+            import pandas as pd
             df_counts = pd.DataFrame(list(counts.items()), columns=['Quadrant', 'Count'])
             
             fig = px.pie(
