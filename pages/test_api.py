@@ -30,7 +30,21 @@ if not os.path.exists(CV_DIR):
 # -------------------- Base de données SQLite --------------------
 DB_FILE = "cartographie.db"
 
+def check_table_exists():
+    """Vérifie si la table candidats existe dans la base."""
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='candidats'")
+        exists = c.fetchone() is not None
+        conn.close()
+        return exists
+    except Exception as e:
+        st.error(f"❌ Erreur lors de la vérification de la table candidats: {e}")
+        return False
+
 def init_db():
+    """Initialise la base de données et crée la table candidats si nécessaire."""
     try:
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
@@ -54,7 +68,8 @@ def init_db():
         st.error(f"❌ Erreur lors de l'initialisation de {DB_FILE}: {e}")
 
 # Initialiser la base de données
-init_db()
+if not os.path.exists(DB_FILE) or not check_table_exists():
+    init_db()
 
 # Charger les données depuis SQLite
 def load_data():
