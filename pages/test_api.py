@@ -6,28 +6,16 @@ import importlib.util
 import json 
 import tempfile 
 
-# --- IMPORTATIONS NÉCESSAIRES ---
+# --- NOUVELLES IMPORTATIONS ---
 try:
     import gspread 
+    # Cette librairie est nécessaire pour la méthode de secours compatible avec les anciens gspread
     from oauth2client.service_account import ServiceAccountCredentials
 except ImportError:
     st.error("❌ Les bibliothèques 'gspread' ou 'oauth2client' ne sont pas installées. Veuillez vérifier vos dépendances.")
     def save_to_google_sheet(quadrant, entry):
         st.warning("⚠️ L'enregistrement sur Google Sheets est désactivé (Dépendances manquantes).")
         return False
-
-# 🚨 DÉBUT DE LA CORRECTION CRITIQUE DE LA CLÉ PRIVÉE 🚨
-# Cette section écrase la clé corrompue par la version condensée correcte.
-if "gcp_service_account" in st.secrets and "private_key" in st.secrets["gcp_service_account"]:
-    
-    # VOTRE CLÉ PRIVÉE CONDENSÉE (sur une seule ligne logique)
-    # Ceci corrige l'erreur "Incorrect padding" causée par l'interface Streamlit Cloud.
-    CLE_CONDENSEE = "-----BEGIN PRIVATE KEY-----MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDdHmkxnpHOs55AYX1lDjh8sFJ5q4EVeXa4ATrCO6EgU2GJWmmCKIUH/D5/HK7L8GBZUuYIucFBD+8nS3TZw6+n8P+TGGWuhrmyjCRgKUg8ZUmeRs+qjH0E1D65uxbUCf3L9K74dvqPDKavJLwI9RG6Uxq17zer4lsWM89gDqzvpBoMphg6/N4jwPC/ctT1636PsHHEykCRCiKhtIqho4F0ZKdmtL3GT9YwHrePZi89gnf2idWWFZSCe/z++4Ca1GBN37Qe7acow16fmvNEobYkq+4EGOc0r2bRxSojBp3H7V3TD0rN9hPx1HL3BRKIkpGOMdKvfkv9zPU7POxcV0PvAgMBAAECggEALFQk7aQnAgPjZW/F9kTwERs+JZM66SW1JbVlZLwUlMjyhFlCTqw140Bv/QawikUR48ZpRHWM5zC9Fqkbb266H9aCPiiFdgQfZUqQHlEYYLdDl34FsuDATYAJZS27KV4pacKPc1NS7uuv3Ovl4HvVBoATmkavZ/+UmDJh0BWRGOdzQN6BPy3L/7J6xeqLpX7PEPQue1pOpfwgM52XZqy4yf7cttZKK4AoDKSnLrU8SG7sTz1+dheAyOyrzQE4PyR6jFglLAbOKUYkNt9YkIw1zkLD+TaRw/oZLbBqGhMV50VIPSDjgC6gFjQuZr+FOThP3crmzOulikOVuetUesESeQKBgQDy7n3YF2wZXP5wvrDksmAEaR+7HB3nr849rkeLuGreKwdyIPVqTz40h9U4TpSHRGTUAnKHuSxB4k9T5xSU0nU6vnBfubooBE+UoRUtf+sxrp7Z8qIFn7Mmde9aeI2IOO4TYnzj0n8Xw7rvaKXR5rwaNXvRZHoEs2xKE9dJ5tnD9wKBgQDpA4a9S6KOA8RQCxkGNmw48xxEWDkgGs1l+t4go3JafgFFTX6ZRGA/EMmAZK6/KX46LN/3mmVVUGuHfOewyU3BaUY8a+6QerDUghrNxo2vzSAS+hwRIaeflm/Di6xJZnLcKg2gL9gFOGXN7SgFUi2kolQpeT8nflwT1lt7S8RyQKBgQDTKwypMnL8+SET0C7kHUnpi5fRhfdY1jFo3H3ErmH3DWBDjPLHnnmpsL0bg0y25B3K9+AKmiAg4nQhn3o69btQIZFI6Y6+16Ulj4UIPcwp2/VuICKleShvoasvM0M32g8Yvg4UcZHWlqrZsNYMummsYPTWMJtMKEw0mt2iFDO5usQKBgQCkC4qBnE0eBELiQ13jxM7eLTHXv75iQJK50XHCjs85fLRTB8LPvPXcxDyV9keSAyrqGRG+NRxKORKbfZS1MhfyK7Q24nhf/eZEim1I5is7XdOde1NyLpxD2xpd6qMurhUfZ/nVHUEeaLUFm/87MKDXgETSFWkn/CPPUN3aCUC5GQKBgQDtopFYi66sm8syKTPbi6C5MCs04HWLKtwq3iwzk6u20/KpkU77/mDk/er/3zWHB43eBy559qGRIiCRw6VWuI6iW8UDB1hkw8D6ww0X67IxTG4LQsRXEyi2u/0J8GjMPCksZWDm/vIbbiHTIBdgxFSCq2ZVavwXRLKlCTQjBS8E0A==-----END PRIVATE KEY-----"
-    
-    # On écrase la clé corrompue dans les secrets par la version propre et condensée
-    st.secrets["gcp_service_account"]["private_key"] = CLE_CONDENSEE
-    
-# 🚨 FIN DU BLOC DE CORRECTION 🚨
 
 # --- CONFIGURATION GOOGLE SHEETS (VOS VALEURS) ---
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1QLC_LzwQU5eKLRcaDglLd6csejLZSs1aauYFwzFk0ac/edit" 
@@ -62,24 +50,22 @@ if not os.path.exists(CV_DIR):
     except Exception as e:
         st.error(f"❌ Erreur lors de la création du dossier {CV_DIR}: {e}")
 
-# -------------------- FONCTION D'AUTHENTIFICATION RÉUTILISABLE (MÉTHODE ROBUSTE) --------------------
-# -------------------- FONCTION D'AUTHENTIFICATION RÉUTILISABLE (CORRECTION FINALE) --------------------
+# -------------------- FONCTION D'AUTHENTIFICATION RÉUTILISABLE (CORRIGÉE) --------------------
 def get_gsheet_client():
     """
-    Authentifie en créant une copie du secret et en corrigeant manuellement
-    la clé privée pour éviter les erreurs de formatage Cloud.
+    Crée un fichier JSON temporaire à partir de st.secrets après avoir corrigé 
+    la clé privée pour contourner les erreurs de formatage Streamlit Cloud.
     """
     if "gcp_service_account" not in st.secrets:
         st.error("❌ La clé 'gcp_service_account' n'est pas configurée dans les secrets Streamlit.")
         return None
         
     try:
-        # 1. Crée une copie modifiable du secret
-        # Utilisation de dict() pour transformer AttrDict en dict standard
+        # 1. Crée une copie modifiable du secret (pour contourner l'erreur 'TypeError: Secrets does not support item assignment')
         creds_data = dict(st.secrets["gcp_service_account"]) 
         
-        # 2. Insère la clé privée condensée dans la copie (CORRECTION FINALE)
-        # Ceci contourne l'erreur de formatage Base64.
+        # 2. Insère la clé privée condensée (pour contourner l'erreur 'Incorrect padding')
+        # Cette chaîne est votre clé condensée, garantissant un format Base64 valide.
         CLE_CONDENSEE = "-----BEGIN PRIVATE KEY-----MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDdHmkxnpHOs55AYX1lDjh8sFJ5q4EVeXa4ATrCO6EgU2GJWmmCKIUH/D5/HK7L8GBZUuYIucFBD+8nS3TZw6+n8P+TGGWuhrmyjCRgKUg8ZUmeRs+qjH0E1D65uxbUCf3L9K74dvqPDKavJLwI9RG6Uxq17zer4lsWM89gDqzvpBoMphg6/N4jwPC/ctT1636PsHHEykCRCiKhtIqho4F0ZKdmtL3GT9YwHrePZi89gnf2idWWFZSCe/z++4Ca1GBN37Qe7acow16fmvNEobYkq+4EGOc0r2bRxSojBp3H7V3TD0rN9hPx1HL3BRKIkpGOMdKvfkv9zPU7POxcV0PvAgMBAAECggEALFQk7aQnAgPjZW/F9kTwERs+JZM66SW1JbVlZLwUlMjyhFlCTqw140Bv/QawikUR48ZpRHWM5zC9Fqkbb266H9aCPiiFdgQfZUqQHlEYYLdDl34FsuDATYAJZS27KV4pacKPc1NS7uuv3Ovl4HvVBoATmkavZ/+UmDJh0BWRGOdzQN6BPy3L/7J6xeqLpX7PEPQue1pOpfwgM52XZqy4yf7cttZKK4AoDKSnLrU8SG7sTz1+dheAyOyrzQE4PyR6jFglLAbOKUYkNt9YkIw1zkLD+TaRw/oZLbBqGhMV50VIPSDjgC6gFjQuZr+FOThP3crmzOulikOVuetUesESeQKBgQDy7n3YF2wZXP5wvrDkcmAEaR+7HB3nr849rkeLuGreKwdyIPVqTz40h9U4TpSHRGTUAnKHuSxB4k9T5xSU0nU6vnBfubooBE+UoRUtf+sxrp7Z8qIFn7Mmde9aeI2IOO4TYnzj0n8Xw7rvaKXR5rwaNXvRZHoEs2xKE9dJ5tnD9wKBgQDpA4a9S6KOA8RQCxkGNmw48xxEWDkgGs1l+t4go3JafgFFTX6ZRGA/EMmAZK6/KX46LN/3mmVVUGuHfOewyU3BaUY8a+6QerDUghrNxo2vzSAS+hwRIaeflm/Di6xJZnLcKg2gL9gFOGXN7SgFUi2kolQpeT8nflwT1lt7S8RyQKBgQDTKwypMnL8+SET0C7kHUnpi5fRhfdY1jFo3H3ErmH3DWBDjPLHnnmpsL0bg0y25B3K9+AKmiAg4nQhn3o69btQIZFI6Y6+16Ulj4UIPcwp2/VuICKleShvoasvM0M32g8Yvg4UcZHWlqrZsNYMummsYPTWMJtMKEw0mt2iFDO5usQKBgQCkC4qBnE0eBELiQ13jxM7eLTHXv75iQJK50XHCjs85fLRTB8LPvPXcxDyV9keSAyrqGRG+NRxKORKbfZS1MhfyK7Q24nhf/eZEim1I5is7XdOde1NyLpxD2xpd6qMurhUfZ/nVHUEeaLUFm/87MKDXgETSFWkn/CPPUN3aCUC5GQKBgQDtopFYi66sm8syKTPbi6C5MCs04HWLKtwq3iwzk6u20/KpkU77/mDk/er/3zWHB43eBy559qGRIiCRw6VWuI6iW8UDB1hkw8D6ww0X67IxTG4LQsRXEyi2u/0J8GjMPCksZWDm/vIbbiHTIBdgxFSCq2ZVavwXRLKlCTQjBS8E0A==-----END PRIVATE KEY-----"
         
         creds_data["private_key"] = CLE_CONDENSEE
