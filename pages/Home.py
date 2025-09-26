@@ -1,5 +1,11 @@
 import streamlit as st
-from ..utils import *  # Monte d'un niveau depuis /pages/ vers la racine
+import os
+import sys
+
+# Ajouter le répertoire racine au chemin de recherche
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+from utils import *  # Importe maintenant depuis la racine
+
 from datetime import datetime
 import pandas as pd
 
