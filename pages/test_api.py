@@ -5,6 +5,22 @@ import pandas as pd
 from datetime import datetime
 import importlib.util
 
+# --- NOUVEAU: Import gspread pour Google Sheets (assurez-vous d'avoir installé 'pip install gspread') ---
+try:
+    import gspread 
+except ImportError:
+    st.error("❌ La bibliothèque 'gspread' n'est pas installée. Veuillez l'installer avec 'pip install gspread'.")
+    # Si gspread n'est pas là, nous arrêtons l'exécution pour éviter les erreurs plus tard
+    # et nous définissons une fonction de remplacement pour éviter un crash.
+    def save_to_google_sheet(quadrant, entry):
+        st.warning("⚠️ L'enregistrement sur Google Sheets est désactivé (gspread manquant).")
+        return False
+
+# --- CONFIGURATION GOOGLE SHEETS (À PERSONNALISER) ---
+# 🚨 REMPLACEZ CES VALEURS PAR VOS VRAIES DONNÉES ! 
+GOOGLE_SHEET_URL = "VOTRE_URL_DE_FEUILLE_ICI" 
+WORKSHEET_NAME = "Candidats" # Nom de l'onglet exact dans votre feuille (ex: "Feuille1")
+
 # Utiliser le répertoire actuel comme base
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
@@ -137,7 +153,6 @@ def delete_candidat(quadrant, index):
     try:
         conn = sqlite3.connect(DB_FILE)
         c = conn.cursor()
-        # Supprime en fonction de l'ordre inversé du quadrant (le dernier ajouté est à l'index 0)
         c.execute("SELECT id FROM candidats WHERE quadrant = ? ORDER BY date DESC LIMIT 1 OFFSET ?", (quadrant, index))
         result = c.fetchone()
         if result:
@@ -150,6 +165,43 @@ def delete_candidat(quadrant, index):
     except Exception as e:
         st.error(f"❌ Erreur lors de la suppression du candidat dans {DB_FILE}: {e}")
 
+# -------------------- NOUVELLE FONCTION GOOGLE SHEETS --------------------
+def save_to_google_sheet(quadrant, entry):
+    """Sauvegarde les données d'un candidat dans Google Sheets via gspread et st.secrets."""
+    if 'gspread' not in globals():
+         # Ceci est géré par le bloc try/except en début de script, mais c'est une sécurité.
+         return False
+         
+    try:
+        # Vérification si la clé de service est configurée
+        if "gcp_service_account" not in st.secrets:
+            st.error("❌ La clé 'gcp_service_account' n'est pas configurée dans secrets.toml. Enregistrement Sheets impossible.")
+            return False
+            
+        gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
+        
+        sh = gc.open_by_url(GOOGLE_SHEET_URL)
+        worksheet = sh.worksheet(WORKSHEET_NAME)
+        
+        # Le format de la ligne DOIT correspondre à l'ordre de vos colonnes dans Google Sheets
+        row_data = [
+            quadrant,
+            entry["date"],
+            entry["nom"],
+            entry["poste"],
+            entry["entreprise"],
+            entry["linkedin"],
+            entry["notes"],
+            os.path.basename(entry["cv_path"]) if entry["cv_path"] else "N/A"
+        ]
+        
+        worksheet.append_row(row_data)
+        return True
+        
+    except Exception as e:
+        st.error(f"❌ Échec de l'enregistrement dans Google Sheets. Vérifiez l'URL, le nom de l'onglet et le partage. Erreur : {e}")
+        return False
+        
 # Initialiser les données dans session_state
 if "cartographie_data" not in st.session_state:
     st.session_state.cartographie_data = load_data()
@@ -206,9 +258,17 @@ with tab1:
                 "notes": notes,
                 "cv_path": cv_path
             }
+            
+            # 1. Sauvegarde dans Streamlit/SQLite
             st.session_state.cartographie_data[quadrant_choisi].append(entry)
             save_candidat(quadrant_choisi, entry)
-            st.success(f"✅ {nom} ajouté à {quadrant_choisi}")
+            st.success(f"✅ {nom} ajouté à {quadrant_choisi} (base locale).")
+            
+            # 2. Sauvegarde dans Google Sheets (NOUVEAU)
+            if 'gspread' in globals(): # Vérifie si l'import a réussi
+                if save_to_google_sheet(quadrant_choisi, entry):
+                    st.success("✅ Données également exportées dans Google Sheets.")
+
             # Rerun pour recharger les données filtrées si un ajout a eu lieu
             st.rerun() 
         else:
@@ -216,7 +276,7 @@ with tab1:
 
     st.divider()
     
-    # -------------------- Recherche (Revenu à son ancienne place) --------------------
+    # -------------------- Recherche --------------------
     st.subheader("🔍 Rechercher un candidat")
     search_term = st.text_input("Rechercher par nom ou poste", key="carto_search")
     
