@@ -12,6 +12,17 @@ from docx.shared import Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
 
+import streamlit as st
+
+def init_session_state():
+    if "cartographie_data" not in st.session_state:
+        st.session_state.cartographie_data = {
+            "🌟 Haut Potentiel": [],
+            "💎 Rare & stratégique": [],
+            "⚡ Rapide à mobiliser": [],
+            "📚 Facilement disponible": []
+        }
+        
 # -------------------- Disponibilité PDF & Word --------------------
 try:
     from reportlab.lib.pagesizes import A4
