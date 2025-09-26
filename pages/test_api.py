@@ -61,15 +61,16 @@ def get_gsheet_client():
         return None
         
     try:
-        # 1. Crée une copie modifiable du secret
+        # 1. Crée une copie modifiable du secret (pour contourner l'erreur 'TypeError')
         creds_data = dict(st.secrets["gcp_service_account"]) 
         
-        # 2. Insère la clé privée condensée (pour contourner l'erreur 'Incorrect padding'/'Invalid base64')
-        # Cette chaîne est votre clé condensée, garantissant un format Base64 valide.
+        # 2. Insère la clé privée condensée (pour contourner l'erreur 'Incorrect padding')
+        # La clé condensée est injectée ici directement.
         CLE_CONDENSEE = "-----BEGIN PRIVATE KEY-----MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDdHmkxnpHOs55AYX1lDjh8sFJ5q4EVeXa4ATrCO6EgU2GJWmmCKIUH/D5/HK7L8GBZUuYIucFBD+8nS3TZw6+n8P+TGGWuhrmyjCRgKUg8ZUmeRs+qjH0E1D65uxbUCf3L9K74dvqPDKavJLwI9RG6Uxq17zer4lsWM89gDqzvpBoMphg6/N4jwPC/ctT1636PsHHEykCRCiKhtIqho4F0ZKdmtL3GT9YwHrePZi89gnf2idWWFZSCe/z++4Ca1GBN37Qe7acow16fmvNEobYkq+4EGOc0r2bRxSojBp3H7V3TD0rN9hPx1HL3BRKIkpGOMdKvfkv9zPU7POxcV0PvAgMBAAECggEALFQk7aQnAgPjZW/F9kTwERs+JZM66SW1JbVlZLwUlMjyhFlCTqw140Bv/QawikUR48ZpRHWM5zC9Fqkbb266H9aCPiiFdgQfZUqQHlEYYLdDl34FsuDATYAJZS27KV4pacKPc1NS7uuv3Ovl4HvVBoATmkavZ/+UmDJh0BWRGOdzQN6BPy3L/7J6xeqLpX7PEPQue1pOpfwgM52XZqy4yf7cttZKK4AoDKSnLrU8SG7sTz1+dheAyOyrzQE4PyR6jFglLAbOKUYkNt9YkIw1zkLD+TaRw/oZLbBqGhMV50VIPSDjgC6gFjQuZr+FOThP3crmzOulikOVuetUesESeQKBgQDy7n3YF2wZXP5wvrDkcmAEaR+7HB3nr849rkeLuGreKwdyIPVqTz40h9U4TpSHRGTUAnKHuSxB4k9T5xSU0nU6vnBfubooBE+UoRUtf+sxrp7Z8qIFn7Mmde9aeI2IOO4TYnzj0n8Xw7rvaKXR5rwaNXvRZHoEs2xKE9dJ5tnD9wKBgQDpA4a9S6KOA8RQCxkGNmw48xxEWDkgGs1l+t4go3JafgFFTX6ZRGA/EMmAZK6/KX46LN/3mmVVUGuHfOewyU3BaUY8a+6QerDUghrNxo2vzSAS+hwRIaeflm/Di6xJZnLcKg2gL9gFOGXN7SgFUi2kolQpeT8nflwT1lt7S8RyQKBgQDTKwypMnL8+SET0C7kHUnpi5fRhfdY1jFo3H3ErmH3DWBDjPLHnnmpsL0bg0y25B3K9+AKmiAg4nQhn3o69btQIZFI6Y6+16Ulj4UIPcwp2/VuICKleShvoasvM0M32g8Yvg4UcZHWlqrZsNYMummsYPTWMJtMKEw0mt2iFDO5usQKBgQCkC4qBnE0eBELiQ13jxM7eLTHXv75iQJK50XHCjs85fLRTB8LPvPXcxDyV9keSAyrqGRG+NRxKORKbfZS1MhfyK7Q24nhf/eZEim1I5is7XdOde1NyLpxD2xpd6qMurhUfZ/nVHUEeaLUFm/87MKDXgETSFWkn/CPPUN3aCUC5GQKBgQDtopFYi66sm8syKTPbi6C5MCs04HWLKtwq3iwzk6u20/KpkU77/mDk/er/3zWHB43eBy559qGRIiCRw6VWuI6iW8UDB1hkw8D6ww0X67IxTG4LQsRXEyi2u/0J8GjMPCksZWDm/vIbbiHTIBdgxFSCq2ZVavwXRLKlCTQjBS8E0A==-----END PRIVATE KEY-----"
         
-        creds_data["private_key"] = CLE_CONDENSEE # Injecte la clé condensée
-        
+        # Le code corrige la clé privée en la remplaçant par la version condensée propre.
+        creds_data["private_key"] = CLE_CONDENSEE 
+
         # 3. Crée un fichier temporaire et y écrit le contenu JSON corrigé
         with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
             json.dump(creds_data, temp_file)
@@ -92,7 +93,6 @@ def get_gsheet_client():
     except Exception as e:
         st.error(f"❌ Échec de l'authentification Google Sheets. Erreur : {e}")
         return None
-
 
 # -------------------- FONCTIONS GOOGLE SHEETS --------------------
 
