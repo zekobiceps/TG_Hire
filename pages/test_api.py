@@ -4,9 +4,10 @@ import pandas as pd
 from datetime import datetime
 import importlib.util
 
-# --- NOUVELLES IMPORTATIONS POUR LA MÉTHODE DE SECOURS ---
+# --- NOUVELLES IMPORTATIONS POUR LA MÉTHODE DE SECOURS (oauth2client) ---
 try:
     import gspread 
+    # Cette librairie est nécessaire pour la méthode de secours compatible avec les anciens gspread
     from oauth2client.service_account import ServiceAccountCredentials
 except ImportError:
     st.error("❌ Les bibliothèques 'gspread' ou 'oauth2client' ne sont pas installées. Veuillez vérifier vos dépendances.")
@@ -22,7 +23,9 @@ WORKSHEET_NAME = "Cartographie"
 # Chemin du projet pour la gestion des CV
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
-os.chdir(PROJECT_ROOT)
+# Attention : os.chdir(PROJECT_ROOT) peut causer des problèmes sur Streamlit Cloud si non nécessaire.
+# Si vous avez besoin de changer de répertoire, assurez-vous que c'est bien la racine de votre projet.
+# Pour le reste du code, on utilise des chemins absolus (CV_DIR).
 
 # Vérification de la connexion
 if not st.session_state.get("logged_in", False):
@@ -32,10 +35,15 @@ if not st.session_state.get("logged_in", False):
 UTILS_PATH = os.path.abspath(os.path.join(PROJECT_ROOT, "utils.py"))
 spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
 utils = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(utils)
-
-# -------------------- Init session --------------------
-utils.init_session_state()
+try:
+    spec.loader.exec_module(utils)
+    # -------------------- Init session --------------------
+    utils.init_session_state()
+except Exception as e:
+    st.error(f"❌ Erreur lors du chargement de utils.py : {e}. Vérifiez que ce fichier existe.")
+    # Fallback pour init_session_state si utils échoue (pour ne pas crasher)
+    if "cartographie_data" not in st.session_state:
+        st.session_state.cartographie_data = {}
 
 # -------------------- Dossier pour les CV --------------------
 CV_DIR = os.path.join(PROJECT_ROOT, "cvs")
@@ -45,7 +53,7 @@ if not os.path.exists(CV_DIR):
     except Exception as e:
         st.error(f"❌ Erreur lors de la création du dossier {CV_DIR}: {e}")
 
-# -------------------- FONCTION D'AUTHENTIFICATION RÉUTILISABLE --------------------
+# -------------------- FONCTION D'AUTHENTIFICATION RÉUTILISABLE (Corrigée) --------------------
 def get_gsheet_client():
     """Authentifie et retourne le client gspread en utilisant oauth2client et st.secrets."""
     if "gcp_service_account" not in st.secrets:
@@ -58,17 +66,30 @@ def get_gsheet_client():
              "https://www.googleapis.com/auth/drive.file", 
              "https://www.googleapis.com/auth/drive"]
     
-    # Authentification compatible avec les anciennes versions de gspread
-    credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
-    client = gspread.authorize(credentials)
-    return client
+    try:
+        # Cette méthode est plus tolérante aux erreurs de formatage TOML/JSON
+        credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
+        client = gspread.authorize(credentials)
+        return client
+    except Exception as e:
+        st.error(f"❌ Erreur critique d'authentification Google Sheets. Vérifiez le format de la clé privée (doit être sur une seule ligne dans les secrets Streamlit). Erreur : {e}")
+        return None
+
 
 # -------------------- FONCTIONS GOOGLE SHEETS --------------------
 
 @st.cache_data(ttl=600)
 def load_data_from_sheet():
     """Charge toutes les données de la feuille Google Sheets et les organise par quadrant."""
+    # S'assure que gspread est importé
+    if 'gspread' not in globals():
+        return {
+            "🌟 Haut Potentiel": [], "💎 Rare & stratégique": [], 
+            "⚡ Rapide à mobiliser": [], "📚 Facilement disponible": []
+        }
+    
     try:
+        # Utilise la fonction d'authentification résiliente
         gc = get_gsheet_client()
         if not gc: return {
             "🌟 Haut Potentiel": [], "💎 Rare & stratégique": [], 
@@ -102,7 +123,8 @@ def load_data_from_sheet():
         return data
         
     except Exception as e:
-        st.error(f"❌ Échec du chargement des données depuis Google Sheets. Erreur : {e}")
+        # La connexion a réussi, mais l'ouverture/lecture a échoué (ex: nom de feuille incorrect, droits)
+        st.error(f"❌ Échec du chargement des données depuis Google Sheets (Vérifiez l'URL de la feuille ou les permissions). Erreur : {e}")
         return {
             "🌟 Haut Potentiel": [], "💎 Rare & stratégique": [], 
             "⚡ Rapide à mobiliser": [], "📚 Facilement disponible": []
@@ -111,7 +133,11 @@ def load_data_from_sheet():
 
 def save_to_google_sheet(quadrant, entry):
     """Sauvegarde les données d'un candidat dans Google Sheets."""
+    if 'gspread' not in globals():
+         return False
+         
     try:
+        # Utilise la fonction d'authentification résiliente
         gc = get_gsheet_client()
         if not gc: return False
 
@@ -214,7 +240,7 @@ with tab1:
     
     # Filtrage des candidats (en ordre inverse, le plus récent en premier)
     filtered_cands = [
-        cand for cand in st.session_state.cartographie_data[quadrant_choisi][::-1]
+        cand for cand in st.session_state.cartographie_data.get(quadrant_choisi, [])[::-1]
         if not search_term or search_term.lower() in cand['nom'].lower() or search_term.lower() in cand['poste'].lower()
     ]
     
@@ -231,24 +257,31 @@ with tab1:
                 
                 # Gestion des CV locaux
                 cv_local_path = cand.get('cv_path')
-                if cv_local_path and os.path.exists(cv_local_path):
-                    st.write(f"**CV :** {os.path.basename(cv_local_path)}")
-                    with open(cv_local_path, "rb") as f:
-                        st.download_button(
-                            label="⬇️ Télécharger CV",
-                            data=f,
-                            file_name=os.path.basename(cv_local_path),
-                            mime="application/pdf" if cv_local_path.endswith('.pdf') else "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            key=f"download_cv_{quadrant_choisi}_{i}"
-                        )
+                # Utilise os.path.join pour reconstruire le chemin correctement
+                full_cv_path = os.path.join(CV_DIR, cv_local_path) if cv_local_path and not os.path.isabs(cv_local_path) else cv_local_path
+
+                if full_cv_path and os.path.exists(full_cv_path):
+                    st.write(f"**CV :** {os.path.basename(full_cv_path)}")
+                    try:
+                        with open(full_cv_path, "rb") as f:
+                            st.download_button(
+                                label="⬇️ Télécharger CV",
+                                data=f,
+                                file_name=os.path.basename(full_cv_path),
+                                mime="application/pdf" if full_cv_path.lower().endswith('.pdf') else "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                key=f"download_cv_{quadrant_choisi}_{i}"
+                            )
+                    except Exception as e:
+                        st.error(f"❌ Erreur lors de la lecture du fichier CV : {e}")
+
                 
                 col1, col2 = st.columns(2)
                 with col1:
                     # Bouton pour la suppression du CV local
                     if st.button("🗑️ Supprimer CV local", key=f"delete_carto_{quadrant_choisi}_{i}"):
-                        if cv_local_path and os.path.exists(cv_local_path):
+                        if full_cv_path and os.path.exists(full_cv_path):
                             try:
-                                os.remove(cv_local_path)
+                                os.remove(full_cv_path)
                                 st.success("✅ CV local supprimé. (L'entrée dans Google Sheets n'est pas affectée)")
                             except Exception as e:
                                 st.error(f"❌ Erreur lors de la suppression du CV local: {e}")
