@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-import json
+import sqlite3
 import pandas as pd
 from datetime import datetime
 import importlib.util
@@ -23,31 +23,68 @@ CV_DIR = "cvs"
 if not os.path.exists(CV_DIR):
     try:
         os.makedirs(CV_DIR)
-        st.info(f"📁 Dossier {CV_DIR} créé avec succès.")
+        st.info(f"📁 Dossier {CV_DIR} créé avec succès à {os.path.abspath(CV_DIR)}.")
     except Exception as e:
         st.error(f"❌ Erreur lors de la création du dossier {CV_DIR}: {e}")
 
-# -------------------- Persistance des données --------------------
-DATA_FILE = "cartographie_data.json"
+# -------------------- Base de données SQLite --------------------
+DB_FILE = "cartographie.db"
 
-# Charger les données depuis le fichier JSON au démarrage
+def init_db():
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS candidats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                quadrant TEXT,
+                date TEXT,
+                nom TEXT,
+                poste TEXT,
+                entreprise TEXT,
+                linkedin TEXT,
+                notes TEXT,
+                cv_path TEXT
+            )
+        ''')
+        conn.commit()
+        conn.close()
+        st.info(f"✅ Base de données {DB_FILE} initialisée avec succès à {os.path.abspath(DB_FILE)}.")
+    except Exception as e:
+        st.error(f"❌ Erreur lors de l'initialisation de {DB_FILE}: {e}")
+
+# Initialiser la base de données
+init_db()
+
+# Charger les données depuis SQLite
 def load_data():
     try:
-        if os.path.exists(DATA_FILE):
-            with open(DATA_FILE, 'r') as f:
-                data = json.load(f)
-                st.info(f"✅ Fichier {DATA_FILE} chargé avec succès.")
-                return data
-        else:
-            st.info(f"ℹ️ Fichier {DATA_FILE} non trouvé, initialisation avec données par défaut.")
-            return {
-                "🌟 Haut Potentiel": [],
-                "💎 Rare & stratégique": [],
-                "⚡ Rapide à mobiliser": [],
-                "📚 Facilement disponible": []
-            }
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("SELECT quadrant, date, nom, poste, entreprise, linkedin, notes, cv_path FROM candidats")
+        rows = c.fetchall()
+        conn.close()
+        data = {
+            "🌟 Haut Potentiel": [],
+            "💎 Rare & stratégique": [],
+            "⚡ Rapide à mobiliser": [],
+            "📚 Facilement disponible": []
+        }
+        for row in rows:
+            quadrant, date, nom, poste, entreprise, linkedin, notes, cv_path = row
+            data[quadrant].append({
+                "date": date,
+                "nom": nom,
+                "poste": poste,
+                "entreprise": entreprise,
+                "linkedin": linkedin,
+                "notes": notes,
+                "cv_path": cv_path
+            })
+        st.info(f"✅ Données chargées depuis {DB_FILE} ({len(rows)} candidats trouvés).")
+        return data
     except Exception as e:
-        st.error(f"❌ Erreur lors du chargement de {DATA_FILE}: {e}")
+        st.error(f"❌ Erreur lors du chargement des données depuis {DB_FILE}: {e}")
         return {
             "🌟 Haut Potentiel": [],
             "💎 Rare & stratégique": [],
@@ -55,14 +92,47 @@ def load_data():
             "📚 Facilement disponible": []
         }
 
-# Sauvegarder les données dans le fichier JSON
-def save_data():
+# Sauvegarder un candidat dans SQLite
+def save_candidat(quadrant, entry):
     try:
-        with open(DATA_FILE, 'w') as f:
-            json.dump(st.session_state.cartographie_data, f, indent=2)
-        st.info(f"✅ Données sauvegardées dans {DATA_FILE}.")
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute('''
+            INSERT INTO candidats (quadrant, date, nom, poste, entreprise, linkedin, notes, cv_path)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            quadrant,
+            entry["date"],
+            entry["nom"],
+            entry["poste"],
+            entry["entreprise"],
+            entry["linkedin"],
+            entry["notes"],
+            entry["cv_path"]
+        ))
+        conn.commit()
+        conn.close()
+        st.info(f"✅ Candidat sauvegardé dans {DB_FILE}.")
     except Exception as e:
-        st.error(f"❌ Erreur lors de la sauvegarde dans {DATA_FILE}: {e}")
+        st.error(f"❌ Erreur lors de la sauvegarde du candidat dans {DB_FILE}: {e}")
+
+# Supprimer un candidat de SQLite
+def delete_candidat(quadrant, index):
+    try:
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        c.execute("SELECT id FROM candidats WHERE quadrant = ? ORDER BY date DESC LIMIT 1 OFFSET ?", (quadrant, index))
+        result = c.fetchone()
+        if result:
+            candidate_id = result[0]
+            c.execute("DELETE FROM candidats WHERE id = ?", (candidate_id,))
+            conn.commit()
+            st.info(f"✅ Candidat supprimé de {DB_FILE}.")
+        else:
+            st.warning("⚠️ Candidat non trouvé dans la base.")
+        conn.close()
+    except Exception as e:
+        st.error(f"❌ Erreur lors de la suppression du candidat dans {DB_FILE}: {e}")
 
 # Initialiser les données dans session_state
 if "cartographie_data" not in st.session_state:
@@ -124,7 +194,7 @@ with tab1:
                 "cv_path": cv_path
             }
             st.session_state.cartographie_data[quadrant_choisi].append(entry)
-            save_data()  # Sauvegarde dans le fichier JSON
+            save_candidat(quadrant_choisi, entry)
             st.success(f"✅ {nom} ajouté à {quadrant_choisi}")
         else:
             st.warning("⚠️ Merci de remplir au minimum Nom + Poste")
@@ -172,7 +242,7 @@ with tab1:
                             except Exception as e:
                                 st.error(f"❌ Erreur lors de la suppression du CV: {e}")
                         st.session_state.cartographie_data[quadrant_choisi].pop(original_index)
-                        save_data()  # Sauvegarde après suppression
+                        delete_candidat(quadrant_choisi, original_index)
                         st.success("✅ Candidat supprimé")
                         st.rerun()
                 with col2:
@@ -187,20 +257,35 @@ with tab1:
 
     # Export global
     st.subheader("📤 Exporter toute la cartographie")
-    if st.button("⬇️ Exporter en CSV"):
-        all_data = []
-        for quad, cands in st.session_state.cartographie_data.items():
-            for cand in cands:
-                cand_copy = cand.copy()
-                cand_copy['quadrant'] = quad
-                all_data.append(cand_copy)
-        df = pd.DataFrame(all_data)
-        st.download_button(
-            "Télécharger CSV",
-            df.to_csv(index=False),
-            file_name="cartographie_talents.csv",
-            mime="text/csv"
-        )
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("⬇️ Exporter en CSV"):
+            all_data = []
+            for quad, cands in st.session_state.cartographie_data.items():
+                for cand in cands:
+                    cand_copy = cand.copy()
+                    cand_copy['quadrant'] = quad
+                    all_data.append(cand_copy)
+            df = pd.DataFrame(all_data)
+            st.download_button(
+                "Télécharger CSV",
+                df.to_csv(index=False),
+                file_name="cartographie_talents.csv",
+                mime="text/csv",
+                key="export_csv"
+            )
+    with col2:
+        if os.path.exists(DB_FILE):
+            with open(DB_FILE, "rb") as f:
+                st.download_button(
+                    "⬇️ Exporter la base SQLite",
+                    data=f,
+                    file_name="cartographie.db",
+                    mime="application/octet-stream",
+                    key="export_db"
+                )
+        else:
+            st.warning(f"⚠️ Base de données {DB_FILE} non trouvée.")
 
 # -------------------- Onglet 2 : Vue globale --------------------
 with tab2:
