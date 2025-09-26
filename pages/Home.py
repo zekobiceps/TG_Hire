@@ -1,5 +1,6 @@
 import streamlit as st
 from utils import *
+from ..utils import *  # Monte d'un niveau depuis /pages/ vers la racine
 from datetime import datetime
 import pandas as pd
 
