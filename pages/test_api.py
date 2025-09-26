@@ -137,9 +137,15 @@ def save_to_google_sheet(quadrant, entry):
          return False
          
     try:
-        # Utilise la fonction d'authentification résiliente
         gc = get_gsheet_client()
-        if not gc: return False
+        if not gc:
+            # Affiche pourquoi le client n'est pas obtenu (l'erreur est dans get_gsheet_client)
+            st.warning("⚠️ Échec d'obtention du client Google Sheets (voir les erreurs d'authentification ci-dessus).")
+            return False
+
+        # --- LIGNE DE DÉBOGAGE TEMPORAIRE ---
+        st.info(f"Connexion réussie au client gspread (Tentative d'écriture dans : {WORKSHEET_NAME})")
+        # ------------------------------------
 
         sh = gc.open_by_url(GOOGLE_SHEET_URL)
         worksheet = sh.worksheet(WORKSHEET_NAME)
