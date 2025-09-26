@@ -5,21 +5,20 @@ import pandas as pd
 from datetime import datetime
 import importlib.util
 
-# --- NOUVEAU: Import gspread pour Google Sheets (assurez-vous d'avoir installé 'pip install gspread') ---
+# --- NOUVEAU: Import gspread pour Google Sheets ---
+# Assurez-vous d'avoir exécuté 'pip install gspread'
 try:
     import gspread 
 except ImportError:
     st.error("❌ La bibliothèque 'gspread' n'est pas installée. Veuillez l'installer avec 'pip install gspread'.")
-    # Si gspread n'est pas là, nous arrêtons l'exécution pour éviter les erreurs plus tard
-    # et nous définissons une fonction de remplacement pour éviter un crash.
+    # Définit une fonction de remplacement pour éviter un crash si l'import échoue
     def save_to_google_sheet(quadrant, entry):
         st.warning("⚠️ L'enregistrement sur Google Sheets est désactivé (gspread manquant).")
         return False
 
-# --- CONFIGURATION GOOGLE SHEETS (À PERSONNALISER) ---
-# 🚨 REMPLACEZ CES VALEURS PAR VOS VRAIES DONNÉES ! 
-GOOGLE_SHEET_URL = "VOTRE_URL_DE_FEUILLE_ICI" 
-WORKSHEET_NAME = "Candidats" # Nom de l'onglet exact dans votre feuille (ex: "Feuille1")
+# --- CONFIGURATION GOOGLE SHEETS (VOS VALEURS) ---
+GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1QLC_LzwQU5eKLRcaDglLd6csejLZSs1aauYFwzFk0ac/edit" 
+WORKSHEET_NAME = "Cartographie" # Nom de l'onglet exact dans votre feuille
 
 # Utiliser le répertoire actuel comme base
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -165,25 +164,20 @@ def delete_candidat(quadrant, index):
     except Exception as e:
         st.error(f"❌ Erreur lors de la suppression du candidat dans {DB_FILE}: {e}")
 
-# -------------------- NOUVELLE FONCTION GOOGLE SHEETS --------------------
+# -------------------- FONCTION GOOGLE SHEETS --------------------
 def save_to_google_sheet(quadrant, entry):
     """Sauvegarde les données d'un candidat dans Google Sheets via gspread et st.secrets."""
-    if 'gspread' not in globals():
-         # Ceci est géré par le bloc try/except en début de script, mais c'est une sécurité.
+    # S'assure que gspread est disponible et que la clé est dans secrets
+    if 'gspread' not in globals() or "gcp_service_account" not in st.secrets:
          return False
          
     try:
-        # Vérification si la clé de service est configurée
-        if "gcp_service_account" not in st.secrets:
-            st.error("❌ La clé 'gcp_service_account' n'est pas configurée dans secrets.toml. Enregistrement Sheets impossible.")
-            return False
-            
         gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
         
         sh = gc.open_by_url(GOOGLE_SHEET_URL)
         worksheet = sh.worksheet(WORKSHEET_NAME)
         
-        # Le format de la ligne DOIT correspondre à l'ordre de vos colonnes dans Google Sheets
+        # Le format de la ligne DOIT correspond à l'ordre de vos colonnes dans Google Sheets
         row_data = [
             quadrant,
             entry["date"],
@@ -199,7 +193,7 @@ def save_to_google_sheet(quadrant, entry):
         return True
         
     except Exception as e:
-        st.error(f"❌ Échec de l'enregistrement dans Google Sheets. Vérifiez l'URL, le nom de l'onglet et le partage. Erreur : {e}")
+        st.error(f"❌ Échec de l'enregistrement dans Google Sheets. Vérifiez la configuration (URL, onglet, et partage). Erreur : {e}")
         return False
         
 # Initialiser les données dans session_state
@@ -264,10 +258,9 @@ with tab1:
             save_candidat(quadrant_choisi, entry)
             st.success(f"✅ {nom} ajouté à {quadrant_choisi} (base locale).")
             
-            # 2. Sauvegarde dans Google Sheets (NOUVEAU)
-            if 'gspread' in globals(): # Vérifie si l'import a réussi
-                if save_to_google_sheet(quadrant_choisi, entry):
-                    st.success("✅ Données également exportées dans Google Sheets.")
+            # 2. Sauvegarde dans Google Sheets
+            if save_to_google_sheet(quadrant_choisi, entry):
+                st.success("✅ Données également exportées dans Google Sheets.")
 
             # Rerun pour recharger les données filtrées si un ajout a eu lieu
             st.rerun() 
