@@ -2,9 +2,9 @@ import streamlit as st
 import os
 import sys
 
-# Ajouter le répertoire racine au chemin de recherche (pas nécessaire si utils.py est dans la racine)
+# Ajouter le répertoire racine au chemin de recherche (optionnel si utils.py est dans la racine)
 sys.path.append(os.path.dirname(__file__))
-from utils import *  # utils.py doit être dans /workspaces/TG_Hire/
+from utils import *
 
 from datetime import datetime
 import pandas as pd
