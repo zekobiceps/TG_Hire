@@ -3,17 +3,18 @@ import os
 import pandas as pd
 from datetime import datetime
 import importlib.util
+import json # NOUVEL IMPORT
+import tempfile # NOUVEL IMPORT
 
 # --- NOUVELLES IMPORTATIONS POUR LA MÉTHODE DE SECOURS (oauth2client) ---
 try:
     import gspread 
-    # Cette librairie est nécessaire pour la méthode de secours compatible avec les anciens gspread
     from oauth2client.service_account import ServiceAccountCredentials
 except ImportError:
     st.error("❌ Les bibliothèques 'gspread' ou 'oauth2client' ne sont pas installées. Veuillez vérifier vos dépendances.")
-    # Fonction de remplacement pour éviter un crash
+    # Si ces dépendances sont absentes, l'enregistrement ne fonctionnera pas.
     def save_to_google_sheet(quadrant, entry):
-        st.warning("⚠️ L'enregistrement sur Google Sheets est désactivé.")
+        st.warning("⚠️ L'enregistrement sur Google Sheets est désactivé (Dépendances manquantes).")
         return False
 
 # --- CONFIGURATION GOOGLE SHEETS (VOS VALEURS) ---
@@ -23,9 +24,6 @@ WORKSHEET_NAME = "Cartographie"
 # Chemin du projet pour la gestion des CV
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
-# Attention : os.chdir(PROJECT_ROOT) peut causer des problèmes sur Streamlit Cloud si non nécessaire.
-# Si vous avez besoin de changer de répertoire, assurez-vous que c'est bien la racine de votre projet.
-# Pour le reste du code, on utilise des chemins absolus (CV_DIR).
 
 # Vérification de la connexion
 if not st.session_state.get("logged_in", False):
@@ -41,7 +39,6 @@ try:
     utils.init_session_state()
 except Exception as e:
     st.error(f"❌ Erreur lors du chargement de utils.py : {e}. Vérifiez que ce fichier existe.")
-    # Fallback pour init_session_state si utils échoue (pour ne pas crasher)
     if "cartographie_data" not in st.session_state:
         st.session_state.cartographie_data = {}
 
@@ -53,26 +50,42 @@ if not os.path.exists(CV_DIR):
     except Exception as e:
         st.error(f"❌ Erreur lors de la création du dossier {CV_DIR}: {e}")
 
-# -------------------- FONCTION D'AUTHENTIFICATION RÉUTILISABLE (Corrigée) --------------------
+# -------------------- FONCTION D'AUTHENTIFICATION RÉUTILISABLE (MÉTHODE ROBUSTE) --------------------
 def get_gsheet_client():
-    """Authentifie et retourne le client gspread en utilisant oauth2client et st.secrets."""
+    """
+    Crée un fichier JSON temporaire à partir de st.secrets pour contourner 
+    l'erreur de formatage Base64 dans Streamlit Cloud.
+    """
     if "gcp_service_account" not in st.secrets:
-        st.error("❌ La clé 'gcp_service_account' n'est pas configurée dans secrets.toml.")
+        st.error("❌ La clé 'gcp_service_account' n'est pas configurée dans les secrets Streamlit.")
         return None
         
-    creds_info = st.secrets["gcp_service_account"]
-    scope = ["https://spreadsheets.google.com/feeds", 
-             'https://www.googleapis.com/auth/spreadsheets',
-             "https://www.googleapis.com/auth/drive.file", 
-             "https://www.googleapis.com/auth/drive"]
-    
     try:
-        # Cette méthode est plus tolérante aux erreurs de formatage TOML/JSON
-        credentials = ServiceAccountCredentials.from_json_keyfile_dict(creds_info, scope)
+        # 1. Crée un fichier temporaire et y écrit le contenu JSON des secrets
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
+            # st.secrets["gcp_service_account"] contient déjà toutes les clés du JSON
+            json.dump(st.secrets["gcp_service_account"], temp_file)
+            temp_file_path = temp_file.name
+        
+        # 2. Authentification via le fichier temporaire (méthode la plus stable)
+        scope = ["https://spreadsheets.google.com/feeds", 
+                 'https://www.googleapis.com/auth/spreadsheets',
+                 "https://www.googleapis.com/auth/drive.file", 
+                 "https://www.googleapis.com/auth/drive"]
+        
+        credentials = ServiceAccountCredentials.from_json_keyfile_name(temp_file_path, scope)
         client = gspread.authorize(credentials)
+        
+        # 3. Supprime le fichier temporaire immédiatement après l'authentification
+        os.remove(temp_file_path)
+        
         return client
+        
     except Exception as e:
-        st.error(f"❌ Erreur critique d'authentification Google Sheets. Vérifiez le format de la clé privée (doit être sur une seule ligne dans les secrets Streamlit). Erreur : {e}")
+        # Si une erreur survient ici, elle est très probablement due à :
+        # - La clé privée n'est pas au format multiligne dans Streamlit secrets
+        # - Les dépendances (gspread, oauth2client) ne sont pas installées
+        st.error(f"❌ Échec de l'authentification Google Sheets. Vérifiez les dépendances et le format de la clé dans les secrets Streamlit. Erreur : {e}")
         return None
 
 
@@ -81,7 +94,6 @@ def get_gsheet_client():
 @st.cache_data(ttl=600)
 def load_data_from_sheet():
     """Charge toutes les données de la feuille Google Sheets et les organise par quadrant."""
-    # S'assure que gspread est importé
     if 'gspread' not in globals():
         return {
             "🌟 Haut Potentiel": [], "💎 Rare & stratégique": [], 
@@ -89,7 +101,6 @@ def load_data_from_sheet():
         }
     
     try:
-        # Utilise la fonction d'authentification résiliente
         gc = get_gsheet_client()
         if not gc: return {
             "🌟 Haut Potentiel": [], "💎 Rare & stratégique": [], 
@@ -123,8 +134,7 @@ def load_data_from_sheet():
         return data
         
     except Exception as e:
-        # La connexion a réussi, mais l'ouverture/lecture a échoué (ex: nom de feuille incorrect, droits)
-        st.error(f"❌ Échec du chargement des données depuis Google Sheets (Vérifiez l'URL de la feuille ou les permissions). Erreur : {e}")
+        st.error(f"❌ Échec du chargement des données depuis Google Sheets. Vérifiez les permissions du compte de service, l'URL et le nom de l'onglet ('{WORKSHEET_NAME}'). Erreur : {e}")
         return {
             "🌟 Haut Potentiel": [], "💎 Rare & stratégique": [], 
             "⚡ Rapide à mobiliser": [], "📚 Facilement disponible": []
@@ -138,14 +148,7 @@ def save_to_google_sheet(quadrant, entry):
          
     try:
         gc = get_gsheet_client()
-        if not gc:
-            # Affiche pourquoi le client n'est pas obtenu (l'erreur est dans get_gsheet_client)
-            st.warning("⚠️ Échec d'obtention du client Google Sheets (voir les erreurs d'authentification ci-dessus).")
-            return False
-
-        # --- LIGNE DE DÉBOGAGE TEMPORAIRE ---
-        st.info(f"Connexion réussie au client gspread (Tentative d'écriture dans : {WORKSHEET_NAME})")
-        # ------------------------------------
+        if not gc: return False
 
         sh = gc.open_by_url(GOOGLE_SHEET_URL)
         worksheet = sh.worksheet(WORKSHEET_NAME)
@@ -166,7 +169,7 @@ def save_to_google_sheet(quadrant, entry):
         return True
         
     except Exception as e:
-        st.error(f"❌ Échec de l'enregistrement dans Google Sheets. Erreur : {e}")
+        st.error(f"❌ Échec de l'enregistrement dans Google Sheets. Vérifiez les permissions d'écriture du compte de service. Erreur : {e}")
         return False
         
 # Initialiser/Charger les données
@@ -263,8 +266,7 @@ with tab1:
                 
                 # Gestion des CV locaux
                 cv_local_path = cand.get('cv_path')
-                # Utilise os.path.join pour reconstruire le chemin correctement
-                full_cv_path = os.path.join(CV_DIR, cv_local_path) if cv_local_path and not os.path.isabs(cv_local_path) else cv_local_path
+                full_cv_path = os.path.join(CV_DIR, os.path.basename(cv_local_path)) if cv_local_path else None
 
                 if full_cv_path and os.path.exists(full_cv_path):
                     st.write(f"**CV :** {os.path.basename(full_cv_path)}")
