@@ -6,13 +6,27 @@ import importlib.util
 import json # NOUVEL IMPORT
 import tempfile # NOUVEL IMPORT
 
+# Placez ce bloc juste après les imports (import json, import tempfile, etc.)
+
+# 🚨 SOLUTION FINALE POUR CONTOURNER LA MISE EN FORME DU CLOUD
+# Nous allons écraser la clé privée de st.secrets avec sa version condensée 
+# sur une seule ligne, en cas de formatage incorrect par l'interface Streamlit Cloud.
+# NOTE: Nous conservons le dictionnaire st.secrets["gcp_service_account"] existant
+# mais nous mettons à jour la clé problématique.
+if "gcp_service_account" in st.secrets and "private_key" in st.secrets["gcp_service_account"]:
+    
+    # ⚠️ Copiez et collez la chaîne condensée ci-dessous.
+    # Dans Python, c'est une seule ligne logique, même si l'éditeur peut l'afficher sur plusieurs.
+    CLE_CONDENSEE = "-----BEGIN PRIVATE KEY-----MIIEvwIBADANBgkqhkiG9w0BAQEFAASCBKkwggSlAgEAAoIBAQDdHmkxnpHOs55A... (collez votre très longue chaîne condensée ici) ...BS8E0A==-----END PRIVATE KEY-----"
+    
+    st.secrets["gcp_service_account"]["private_key"] = CLE_CONDENSEE
+    
 # --- NOUVELLES IMPORTATIONS POUR LA MÉTHODE DE SECOURS (oauth2client) ---
 try:
     import gspread 
     from oauth2client.service_account import ServiceAccountCredentials
 except ImportError:
     st.error("❌ Les bibliothèques 'gspread' ou 'oauth2client' ne sont pas installées. Veuillez vérifier vos dépendances.")
-    # Si ces dépendances sont absentes, l'enregistrement ne fonctionnera pas.
     def save_to_google_sheet(quadrant, entry):
         st.warning("⚠️ L'enregistrement sur Google Sheets est désactivé (Dépendances manquantes).")
         return False
@@ -54,7 +68,7 @@ if not os.path.exists(CV_DIR):
 def get_gsheet_client():
     """
     Crée un fichier JSON temporaire à partir de st.secrets pour contourner 
-    l'erreur de formatage Base64 dans Streamlit Cloud.
+    l'erreur de formatage et la conversion d'AttrDict.
     """
     if "gcp_service_account" not in st.secrets:
         st.error("❌ La clé 'gcp_service_account' n'est pas configurée dans les secrets Streamlit.")
@@ -63,14 +77,12 @@ def get_gsheet_client():
     try:
         # 1. Crée un fichier temporaire et y écrit le contenu JSON des secrets
         with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
-            
-            # 🚨 CORRECTION CRITIQUE : Conversion explicite en dict pour la sérialisation JSON
+            # CORRECTION : Conversion explicite en dict pour la sérialisation JSON
             creds_data = dict(st.secrets["gcp_service_account"]) 
             json.dump(creds_data, temp_file)
-            
             temp_file_path = temp_file.name
         
-        # 2. Authentification via le fichier temporaire (méthode la plus stable)
+        # 2. Authentification via le fichier temporaire
         scope = ["https://spreadsheets.google.com/feeds", 
                  'https://www.googleapis.com/auth/spreadsheets',
                  "https://www.googleapis.com/auth/drive.file", 
@@ -85,9 +97,11 @@ def get_gsheet_client():
         return client
         
     except Exception as e:
-        st.error(f"❌ Échec de l'authentification Google Sheets. Vérifiez les dépendances et le format de la clé dans les secrets Streamlit. Erreur : {e}")
+        # L'erreur "Incorrect padding" apparaît ici si la clé n'est pas sur une seule ligne.
+        st.error(f"❌ Échec de l'authentification Google Sheets. Erreur : {e}")
         return None
-    
+
+
 # -------------------- FONCTIONS GOOGLE SHEETS --------------------
 
 @st.cache_data(ttl=600)
@@ -133,7 +147,7 @@ def load_data_from_sheet():
         return data
         
     except Exception as e:
-        st.error(f"❌ Échec du chargement des données depuis Google Sheets. Vérifiez les permissions du compte de service, l'URL et le nom de l'onglet ('{WORKSHEET_NAME}'). Erreur : {e}")
+        st.error(f"❌ Échec du chargement des données depuis Google Sheets (Vérifiez les permissions d'accès et le nom de l'onglet). Erreur : {e}")
         return {
             "🌟 Haut Potentiel": [], "💎 Rare & stratégique": [], 
             "⚡ Rapide à mobiliser": [], "📚 Facilement disponible": []
@@ -168,7 +182,7 @@ def save_to_google_sheet(quadrant, entry):
         return True
         
     except Exception as e:
-        st.error(f"❌ Échec de l'enregistrement dans Google Sheets. Vérifiez les permissions d'écriture du compte de service. Erreur : {e}")
+        st.error(f"❌ Échec de l'enregistrement dans Google Sheets. Erreur : {e}")
         return False
         
 # Initialiser/Charger les données
