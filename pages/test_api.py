@@ -5,12 +5,16 @@ import pandas as pd
 from datetime import datetime
 import importlib.util
 
+# Forcer le répertoire de travail à la racine du projet
+os.chdir('/workspaces/TG_Hire/')
+st.info(f"📍 Répertoire de travail actuel : {os.getcwd()}")
+
 # Vérification de la connexion
 if not st.session_state.get("logged_in", False):
     st.stop()
 
 # -------------------- Import utils --------------------
-UTILS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "utils.py"))
+UTILS_PATH = os.path.abspath(os.path.join(os.getcwd(), "utils.py"))
 spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
 utils = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(utils)
@@ -19,16 +23,17 @@ spec.loader.exec_module(utils)
 utils.init_session_state()
 
 # -------------------- Dossier pour les CV --------------------
-CV_DIR = "cvs"
+CV_DIR = os.path.join(os.getcwd(), "cvs")
 if not os.path.exists(CV_DIR):
     try:
-        os.makedirs(CV_DIR)
+        os.makedirs(CV_DIR, exist_ok=True)
         st.info(f"📁 Dossier {CV_DIR} créé avec succès à {os.path.abspath(CV_DIR)}.")
     except Exception as e:
-        st.error(f"❌ Erreur lors de la création du dossier {CV_DIR}: {e}")
+        st.error(f"❌ Erreur lors de la création du dossier {CV_DIR} à {os.path.abspath(CV_DIR)}: {e}")
 
 # -------------------- Base de données SQLite --------------------
-DB_FILE = "cartographie.db"
+DB_FILE = os.path.join(os.getcwd(), "cartographie.db")
+st.info(f"📂 Base de données définie à : {os.path.abspath(DB_FILE)}")
 
 def check_table_exists():
     """Vérifie si la table candidats existe dans la base."""
@@ -38,9 +43,10 @@ def check_table_exists():
         c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='candidats'")
         exists = c.fetchone() is not None
         conn.close()
+        st.info(f"✅ Vérification table candidats : {'Existe' if exists else 'N\'existe pas'} dans {DB_FILE}.")
         return exists
     except Exception as e:
-        st.error(f"❌ Erreur lors de la vérification de la table candidats: {e}")
+        st.error(f"❌ Erreur lors de la vérification de la table candidats dans {DB_FILE}: {e}")
         return False
 
 def init_db():
@@ -65,7 +71,7 @@ def init_db():
         conn.close()
         st.info(f"✅ Base de données {DB_FILE} initialisée avec succès à {os.path.abspath(DB_FILE)}.")
     except Exception as e:
-        st.error(f"❌ Erreur lors de l'initialisation de {DB_FILE}: {e}")
+        st.error(f"❌ Erreur lors de l'initialisation de {DB_FILE} à {os.path.abspath(DB_FILE)}: {e}")
 
 # Initialiser la base de données
 if not os.path.exists(DB_FILE) or not check_table_exists():
@@ -127,25 +133,25 @@ def save_candidat(quadrant, entry):
         ))
         conn.commit()
         conn.close()
-        st.info(f"✅ Candidat sauvegardé dans {DB_FILE}.")
+        st.info(f"✅ Candidat sauvegardé dans {DB_FILE} à {os.path.abspath(DB_FILE)}. Vérification : {os.path.exists(DB_FILE)}")
     except Exception as e:
         st.error(f"❌ Erreur lors de la sauvegarde du candidat dans {DB_FILE}: {e}")
 
 # Supprimer un candidat de SQLite
 def delete_candidat(quadrant, index):
     try:
-        conn = sqlite3.connect(DB_FILE)
-        c = conn.cursor()
-        c.execute("SELECT id FROM candidats WHERE quadrant = ? ORDER BY date DESC LIMIT 1 OFFSET ?", (quadrant, index))
-        result = c.fetchone()
-        if result:
-            candidate_id = result[0]
-            c.execute("DELETE FROM candidats WHERE id = ?", (candidate_id,))
-            conn.commit()
-            st.info(f"✅ Candidat supprimé de {DB_FILE}.")
-        else:
-            st.warning("⚠️ Candidat non trouvé dans la base.")
-        conn.close()
+      conn = sqlite3.connect(DB_FILE)
+      c = conn.cursor()
+      c.execute("SELECT id FROM candidats WHERE quadrant = ? ORDER BY date DESC LIMIT 1 OFFSET ?", (quadrant, index))
+      result = c.fetchone()
+      if result:
+          candidate_id = result[0]
+          c.execute("DELETE FROM candidats WHERE id = ?", (candidate_id,))
+          conn.commit()
+          st.info(f"✅ Candidat supprimé de {DB_FILE}.")
+      else:
+          st.warning("⚠️ Candidat non trouvé dans la base.")
+      conn.close()
     except Exception as e:
         st.error(f"❌ Erreur lors de la suppression du candidat dans {DB_FILE}: {e}")
 
@@ -195,9 +201,9 @@ with tab1:
                     cv_path = os.path.join(CV_DIR, cv_filename)
                     with open(cv_path, "wb") as f:
                         f.write(cv_file.read())
-                    st.info(f"✅ CV sauvegardé dans {cv_path}.")
+                    st.info(f"✅ CV sauvegardé dans {cv_path} à {os.path.abspath(cv_path)}. Vérification : {os.path.exists(cv_path)}")
                 except Exception as e:
-                    st.error(f"❌ Erreur lors de la sauvegarde du CV: {e}")
+                    st.error(f"❌ Erreur lors de la sauvegarde du CV dans {cv_path}: {e}")
             
             entry = {
                 "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -255,7 +261,7 @@ with tab1:
                                 os.remove(cand['cv_path'])
                                 st.info(f"✅ CV {cand['cv_path']} supprimé.")
                             except Exception as e:
-                                st.error(f"❌ Erreur lors de la suppression du CV: {e}")
+                                st.error(f"❌ Erreur lors de la suppression du CV dans {cand['cv_path']}: {e}")
                         st.session_state.cartographie_data[quadrant_choisi].pop(original_index)
                         delete_candidat(quadrant_choisi, original_index)
                         st.success("✅ Candidat supprimé")
@@ -300,7 +306,7 @@ with tab1:
                     key="export_db"
                 )
         else:
-            st.warning(f"⚠️ Base de données {DB_FILE} non trouvée.")
+            st.warning(f"⚠️ Base de données {DB_FILE} non trouvée à {os.path.abspath(DB_FILE)}.")
 
 # -------------------- Onglet 2 : Vue globale --------------------
 with tab2:
