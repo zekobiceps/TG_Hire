@@ -42,6 +42,7 @@ if not os.path.exists(CV_DIR):
 def get_gsheet_client():
     """Authentifie avec Google Sheets en utilisant les secrets Streamlit."""
     try:
+        st.write("Fichiers dans .streamlit/ :", os.listdir(".streamlit/"))
         st.write("Secrets disponibles :", st.secrets)
         st.write("Type de st.secrets:", type(st.secrets))
         st.write("Contenu brut:", repr(st.secrets["gcp_service_account"]["private_key"]))
