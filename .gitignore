@@ -1,7 +1,18 @@
-venv/
+# Fichiers sensibles
+*.json
+.env
+.streamlit/secrets.toml
+service-account-key.json
+
+# Fichiers système
 __pycache__/
 *.pyc
-astute-anchor-418600-a746bd251976.json
-*.json
-!.streamlit/secrets.toml
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+
+# Streamlit
 .streamlit/
