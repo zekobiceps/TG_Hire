@@ -40,25 +40,41 @@ if not os.path.exists(CV_DIR):
 
 # -------------------- FONCTION D'AUTHENTIFICATION AVEC DÉBOGAGE --------------------
 def get_gsheet_client():
-    """Authentifie avec Google Sheets en utilisant les secrets Streamlit Cloud."""
+    """Authentifie avec Google Sheets - Solution alternative."""
     try:
-        # Debug: Afficher toutes les clés disponibles
-        st.sidebar.write("🔍 **Debug - Clés disponibles:**")
-        for key in st.secrets.keys():
-            st.sidebar.write(f"   - {key}")
-        
-        # Vérifier si la clé existe
         if 'GCP_SERVICE_ACCOUNT_JSON' not in st.secrets:
-            st.error("""
-            ❌ Configuration Google Sheets manquante.
-            
-            **Clés trouvées dans les secrets:** """ + ", ".join(st.secrets.keys()) + """
-            
-            **Pour Streamlit Cloud :**
-            - Vérifiez que GCP_SERVICE_ACCOUNT_JSON est bien dans les secrets
-            - Vérifiez le format du JSON (doit être sur une seule ligne)
-            """)
+            st.error("❌ GCP_SERVICE_ACCOUNT_JSON non trouvé dans les secrets")
             return None
+        
+        # Créer un fichier temporaire avec les credentials
+        import tempfile
+        import json
+        
+        json_data = st.secrets['GCP_SERVICE_ACCOUNT_JSON']
+        
+        # Créer un fichier temporaire
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            # Si c'est une string JSON, la parser d'abord
+            if isinstance(json_data, str):
+                parsed_json = json.loads(json_data)
+                json.dump(parsed_json, f)
+            else:
+                json.dump(json_data, f)
+            temp_file = f.name
+        
+        # Utiliser le fichier temporaire pour l'authentification
+        gc = gspread.service_account(filename=temp_file)
+        
+        # Nettoyer le fichier temporaire
+        import os
+        os.unlink(temp_file)
+        
+        st.sidebar.success("✅ Authentification réussie (méthode fichier temporaire)")
+        return gc
+        
+    except Exception as e:
+        st.error(f"❌ Erreur d'authentification : {e}")
+        return None
         
         # Debug: Afficher le type et les premiers caractères
         json_data = st.secrets['GCP_SERVICE_ACCOUNT_JSON']
