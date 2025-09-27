@@ -1,12 +1,9 @@
-# Fichier requirements.txt final et optimisé
-
-# --- Interface et Visualisation ---
+--- Interface et Visualisation ---
 streamlit
 altair
 plotly
 pydeck
-
-# --- Manipulation de Données & Fichiers ---
+--- Manipulation de Données & Fichiers ---
 pandas
 numpy
 python-docx
@@ -14,16 +11,15 @@ pypdf
 PyMuPDF
 json5
 lxml
-
-# --- Intelligence Artificielle & Machine Learning ---
+--- Intelligence Artificielle & Machine Learning ---
 scikit-learn
 openai
 torch
 torchvision
 sentence-transformers
-spacy # <-- Juste la bibliothèque, le code gère le téléchargement du modèle
-
-# --- APIs & Connecteurs ---
+spacy
+https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.8.0/fr_core_news_sm-3.8.0-py3-none-any.whl
+--- APIs & Connecteurs ---
 requests
 beautifulsoup4
 GitPython
