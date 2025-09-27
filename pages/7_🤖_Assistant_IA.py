@@ -11,7 +11,7 @@ import random
 try:
     import groq
     import google.generativeai as genai
-    from google.oauth2 import service_account # Ajout nécessaire pour get_google_credentials
+    from google.oauth2 import service_account 
 except ImportError:
     st.error("❌ Bibliothèques manquantes. Exécutez : pip install groq google-generativeai google-auth")
     st.stop()
@@ -22,14 +22,15 @@ if "conversation_history" not in st.session_state:
 if "selected_model" not in st.session_state:
     st.session_state.selected_model = "Groq" 
 if "response_length" not in st.session_state:
-    st.session_state.response_length = "Normale"
+    st.session_state.response_length = "Courte"
 if "last_token_usage" not in st.session_state:
     st.session_state.last_token_usage = 0
 if "placeholder" not in st.session_state:
+    # --- NOUVEAUTÉ : "Ex: " ajouté aux placeholders ---
     placeholders = [
-        "Quelles sont les missions clés d'un conducteur de travaux dans le BTP au Maroc ?",
-        "Rédige une offre d'emploi pour un chef de projet BTP à Casablanca.",
-        "Propose 5 questions techniques pour un entretien avec un ingénieur en génie civil."
+        "Ex: Quelles sont les missions clés d'un conducteur de travaux au Maroc ?",
+        "Ex: Rédige une offre d'emploi pour un chef de projet à Casablanca.",
+        "Ex: Propose 5 questions techniques pour un entretien avec un ingénieur."
     ]
     st.session_state.placeholder = random.choice(placeholders)
 
@@ -52,7 +53,6 @@ Tes réponses doivent être :
 4.  **Adaptables** : Tu dois ajuster la longueur de ta réponse (courte, normale, détaillée) selon la demande.
 """
 
-# --- FONCTION MANQUANTE AJOUTÉE ICI ---
 def get_google_credentials():
     """Crée les identifiants du compte de service à partir des secrets Streamlit."""
     try:
@@ -72,33 +72,6 @@ def get_google_credentials():
     except Exception as e:
         st.error(f"❌ Erreur de chargement des identifiants Google: {e}")
         return None
-
-def get_cogenai_response(prompt, history, length):
-    # --- VÉRIFIEZ CE NOM DE MODÈLE ---
-    MODEL_NAME = "Qwen3"   # Mettez ici le nom exact du modèle trouvé sur leur site
-
-    BASE_URL = "https://cogenai.kalavai.net/v1"
-    api_key = st.secrets.get("COGEN_API_KEY")
-    if not api_key: return {"content": "Erreur: Clé API CoGenAI manquante.", "usage": 0}
-    
-    final_prompt = f"{prompt}\n\n(Instruction: Fournir une réponse de longueur '{length}')"
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history + [{"role": "user", "content": final_prompt}]
-    
-    try:
-        response = requests.post(
-            f"{BASE_URL}/chat/completions",
-            headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
-            json={"model": MODEL_NAME, "messages": messages, "max_tokens": 2048}
-        )
-        response.raise_for_status()
-        data = response.json()
-        content = data["choices"][0]["message"]["content"]
-        usage = data.get("usage", {}).get("total_tokens", 0)
-        return {"content": content, "usage": usage}
-    except requests.exceptions.JSONDecodeError:
-        return {"content": f"❌ Erreur API CoGenAI: La réponse du serveur n'est pas en format JSON. Voici la réponse brute :\n\n---\n{response.text}\n---", "usage": 0}
-    except Exception as e:
-        return {"content": f"❌ Erreur API CoGenAI: {e}", "usage": 0}
 
 def get_deepseek_response(prompt, history, length):
     api_key = st.secrets.get("DEEPSEEK_API_KEY")
@@ -138,9 +111,8 @@ def get_groq_response(prompt, history, length):
         usage = chat_completion.usage.total_tokens
         return {"content": content, "usage": usage}
     except Exception as e:
-        return {"content": f"❌ Erreur API Groq: {e}", "usage": 0}
+        return {"content": f"❌ Erreur API Groq: {e}", "usage":0}
 
-# --- FONCTION GEMINI CORRIGÉE ---
 def get_gemini_response(prompt, history, length):
     creds = get_google_credentials() 
     if not creds:
@@ -150,7 +122,7 @@ def get_gemini_response(prompt, history, length):
     
     try:
         genai.configure(credentials=creds) 
-        model = genai.GenerativeModel('gemini-1.5-flash-latest') # Utilisation d'un modèle plus récent et stable
+        model = genai.GenerativeModel('gemini-1.5-pro-latest')
         response = model.generate_content(final_prompt)
         content = response.text
         usage = model.count_tokens(final_prompt).total_tokens
@@ -166,25 +138,25 @@ def get_ai_response(prompt, history, model, length):
         return get_deepseek_response(prompt, history, length)
     elif model == "Gemini":
         return get_gemini_response(prompt, history, length)
-    elif model == "CoGenAI":
-        return get_cogenai_response(prompt, history, length)
     else:
         return {"content": "Erreur: Modèle non reconnu.", "usage": 0}
 
 # -------------------- INTERFACE PRINCIPALE --------------------
-st.title("🤖 Assistant IA pour le Recrutement BTP")
+# --- NOUVEAUTÉ : Titre mis à jour ---
+st.title("🤖 Assistant IA pour le Recrutement")
 
+# --- SÉLECTEURS DANS LA BARRE LATÉRALE ---
 with st.sidebar:
     st.subheader("⚙️ Paramètres")
     st.session_state.selected_model = st.selectbox(
         "🧠 Choisir le modèle IA :",
-        ("Groq", "DeepSeek", "Gemini", "CoGenAI")
+        ("Groq", "DeepSeek", "Gemini") # CoGenAI retiré
     )
     
     st.session_state.response_length = st.selectbox(
         "📄 Longueur de la réponse :",
         ("Courte", "Normale", "Détaillée"),
-        index=1 
+        index=0 # --- NOUVEAUTÉ : "Courte" par défaut ---
     )
 
     st.divider()
@@ -193,6 +165,7 @@ with st.sidebar:
     st.metric("Tokens de la dernière réponse", f"{st.session_state.last_token_usage}")
     st.caption("Le nombre de tokens mesure la 'quantité de travail' de l'IA.")
 
+# --- ZONE DE SAISIE ET BOUTONS ---
 user_input = st.text_area(
     "💬 Posez votre question ici :",
     key="assistant_input",
@@ -232,11 +205,19 @@ if send_button and user_input.strip():
     st.session_state.conversation_history.append({"role": "assistant", "content": ai_response})
     st.session_state.last_token_usage = token_usage
     
+    placeholders = [
+        "Ex: Quelles sont les missions clés d'un conducteur de travaux au Maroc ?",
+        "Ex: Rédige une offre d'emploi pour un chef de projet à Casablanca.",
+        "Ex: Propose 5 questions techniques pour un entretien avec un ingénieur."
+    ]
+    st.session_state.placeholder = random.choice(placeholders)
+    
     st.rerun()
 
 elif send_button and not user_input.strip():
     st.warning("⚠️ Veuillez écrire une question avant de générer une réponse.")
 
+# --- AFFICHAGE DE L'HISTORIQUE ---
 st.subheader("📜 Historique de la conversation")
 if not st.session_state.conversation_history:
     st.info("La conversation n'a pas encore commencé.")
