@@ -65,3 +65,5 @@ google-auth>=2.40.3
 google-auth-oauthlib>=1.2.2
 google-api-python-client
 google-auth-httplib2
+groq
+google-generativeai
