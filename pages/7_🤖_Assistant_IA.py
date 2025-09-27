@@ -1,173 +1,214 @@
 import streamlit as st
-
-# Vérification de la connexion
-if not st.session_state.get("logged_in", False):
-    st.stop()
-    
-import streamlit as st
 import importlib.util
 import os
 import requests
 import json
 import time
 from datetime import datetime
-import fitz
-from PIL import Image
+import random
 
-# Initialization of session state variables
+# --- NOUVEAUX IMPORTS POUR LES MODÈLES IA ---
+try:
+    import groq
+    import google.generativeai as genai
+except ImportError:
+    st.error("❌ Bibliothèques Groq ou Gemini manquantes. Exécutez : pip install groq google-generativeai")
+    st.stop()
+
+# --- VÉRIFICATION DE CONNEXION (si nécessaire) ---
+# if not st.session_state.get("logged_in", False):
+#     st.error("🛑 Veuillez vous connecter pour accéder à cette page.")
+#     st.stop()
+    
+# --- INITIALISATION DU SESSION STATE ---
 if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = []
+if "selected_model" not in st.session_state:
+    st.session_state.selected_model = "Groq" # Modèle par défaut
+if "response_length" not in st.session_state:
+    st.session_state.response_length = "Normale" # Longueur par défaut
+if "placeholder" not in st.session_state:
+    # Liste de 10 placeholders aléatoires
+    placeholders = [
+        "Quelles sont les missions clés d'un conducteur de travaux dans le BTP au Maroc ?",
+        "Rédige une offre d'emploi pour un chef de projet BTP à Casablanca.",
+        "Propose 5 questions techniques pour un entretien avec un ingénieur en génie civil.",
+        "Comment évaluer les soft skills d'un chargé d'affaires BTP ?",
+        "Quels sont les salaires moyens pour un dessinateur-projeteur à Rabat ?",
+        "Liste les compétences indispensables pour un responsable QSE dans la construction.",
+        "Comment attirer des profils pénuriques comme les grutiers au Maroc ?",
+        "Analyse ce profil : 'Ingénieur d'état, 5 ans d'expérience en suivi de chantiers routiers'.",
+        "Donne-moi des arguments pour convaincre un candidat de rejoindre notre entreprise de BTP.",
+        "Quelles sont les réglementations marocaines importantes à connaître pour un poste RH dans le BTP ?"
+    ]
+    st.session_state.placeholder = random.choice(placeholders)
 
-# -------------------- Import utils --------------------
-# This assumes utils.py is in the parent directory.
-# If not, adjust the path accordingly.
-try:
-    UTILS_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "utils.py"))
-    spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
-    utils = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(utils)
-    utils.init_session_state()
-except (FileNotFoundError, AttributeError):
-    # Fallback for local testing without utils.py
-    st.info("utils.py not found. Initializing session state directly.")
-    if "conversation_history" not in st.session_state:
-        st.session_state.conversation_history = []
-    # Add other state variables if necessary for your app
-    if "current_brief_name" not in st.session_state:
-        st.session_state.current_brief_name = None
-
-# -------------------- Page config --------------------
+# --- CONFIGURATION DE LA PAGE ---
 st.set_page_config(
-    page_title="TG-Hire IA - Assistant IA",
+    page_title="TG-Hire IA - Assistant Recrutement",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# -------------------- API Configuration --------------------
-def get_deepseek_response(prompt):
-    """Get a response from the DeepSeek AI model."""
+# -------------------- CONFIGURATION DES APIS --------------------
+
+# --- PROMPT SYSTÈME COMMUN ---
+# Contexte précis pour guider tous les modèles IA
+SYSTEM_PROMPT = """
+Tu es 'TG-Hire Assistant', un expert IA spécialisé dans le recrutement pour le secteur du BTP (Bâtiment et Travaux Publics) au Maroc.
+Ton rôle est d'aider un recruteur humain à optimiser ses tâches quotidiennes.
+Tes réponses doivent être :
+1.  **Contextualisées** : Toujours adaptées au marché de l'emploi marocain et aux spécificités du secteur du BTP (terminologie, types de postes, réglementations locales).
+2.  **Professionnelles et Précises** : Fournis des informations concrètes, structurées et directement utilisables.
+3.  **Orientées Action** : Propose des listes, des questions, des modèles de texte, etc.
+4.  **Adaptables** : Tu dois ajuster la longueur et le niveau de détail de ta réponse (courte, normale, détaillée) selon la demande de l'utilisateur.
+"""
+
+def get_deepseek_response(prompt, history, length):
     api_key = st.secrets.get("DEEPSEEK_API_KEY")
-    if not api_key:
-        st.error("❌ Clé API DeepSeek non trouvée dans st.secrets.")
-        return "Erreur: Clé API manquante."
+    if not api_key: return "Erreur: Clé API DeepSeek manquante."
     
-    url = "https://api.deepseek.com/v1/chat/completions"
-    headers = {
-        "Content-Type": "application/json",
-        "Authorization": f"Bearer {api_key}"
-    }
-    
-    # Use a system prompt to align the AI for recruitment
-    system_prompt = "Vous êtes un assistant de recrutement IA hautement qualifié. Votre objectif est d'aider les recruteurs à rédiger des fiches de poste, à extraire des compétences clés, à générer des questions d'entretien et à analyser des profils de candidats. Vos réponses doivent être professionnelles, précises, et directement applicables au contexte du recrutement."
-
-    messages = [{"role": "system", "content": system_prompt}]
-    
-    # Add conversation history to maintain context
-    for msg in st.session_state.conversation_history:
-        messages.append({"role": msg["role"], "content": msg["content"]})
-    
-    # Add the new user prompt
-    messages.append({"role": "user", "content": prompt})
-
-    data = {
-        "model": "deepseek-coder",
-        "messages": messages,
-        "stream": False,
-        "max_tokens": 1500,
-    }
+    final_prompt = f"{prompt}\n\n(Instruction: Fournir une réponse de longueur '{length}')"
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history + [{"role": "user", "content": final_prompt}]
     
     try:
-        response = requests.post(url, headers=headers, json=data)
-        if response.status_code == 200:
-            return response.json()["choices"][0]["message"]["content"]
-        else:
-            return f"Erreur API: {response.status_code} - {response.text}"
+        response = requests.post(
+            "https://api.deepseek.com/v1/chat/completions",
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+            json={"model": "deepseek-chat", "messages": messages, "max_tokens": 2048}
+        )
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"]
     except Exception as e:
-        return f"Erreur lors de l'appel API: {e}"
+        return f"❌ Erreur API DeepSeek: {e}"
 
-# -------------------- Main app logic --------------------
-selected_page = st.sidebar.selectbox("Sélectionner une page", ['Chat Bot', 'PDF Analysis'])
-
-# -------------------- Chat Bot --------------------
-if selected_page == "Chat Bot":
-    st.title("🤖 Assistant IA de Recrutement")
+def get_groq_response(prompt, history, length):
+    api_key = st.secrets.get("GROQ_API_KEY")
+    if not api_key: return "Erreur: Clé API Groq manquante."
     
-    st.info("Pose une question à ton assistant IA spécialisé en recrutement.")
+    final_prompt = f"{prompt}\n\n(Instruction: Fournir une réponse de longueur '{length}')"
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history + [{"role": "user", "content": final_prompt}]
     
-    # User input
-    user_input = st.text_area("💬 Pose ta question :", key="assistant_input", height=120)
-
-    # Action buttons
-    col1, col2 = st.columns(2)
-    with col1:
-        send_button = st.button("🚀 Envoyer", type="primary", key="assistant_send")
-    with col2:
-        reset_button = st.button("🧹 Réinitialiser", key="assistant_reset")
-    
-    if reset_button:
-        st.session_state.conversation_history = []
-        st.success("🗑️ Historique effacé")
-        st.rerun()
-
-    if send_button and user_input.strip():
-        # Append user message
-        st.session_state.conversation_history.append(
-            {"role": "user", "content": user_input, "time": datetime.now().strftime("%H:%M")}
+    try:
+        client = groq.Groq(api_key=api_key)
+        chat_completion = client.chat.completions.create(
+            messages=messages,
+            model="llama3-8b-8192",
         )
-        
-        # Get AI response
-        with st.spinner('⏳ L\'assistant IA est en train de réfléchir...'):
-            ai_response = get_deepseek_response(user_input)
+        return chat_completion.choices[0].message.content
+    except Exception as e:
+        return f"❌ Erreur API Groq: {e}"
 
-        # Append assistant message
-        st.session_state.conversation_history.append(
-            {"role": "assistant", "content": ai_response, "time": datetime.now().strftime("%H:%M")}
-        )
-        st.rerun()
-    elif send_button and not user_input.strip():
-        st.warning("⚠️ Veuillez écrire une question avant d’envoyer.")
+def get_gemini_response(prompt, history, length):
+    api_key = st.secrets.get("GEMINI_API_KEY")
+    if not api_key: return "Erreur: Clé API Gemini manquante."
+    
+    final_prompt = f"{SYSTEM_PROMPT}\n\nHistorique de la conversation:\n{json.dumps(history)}\n\nNouvelle question:\n{prompt}\n\n(Instruction: Fournir une réponse de longueur '{length}')"
+    
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        response = model.generate_content(final_prompt)
+        return response.text
+    except Exception as e:
+        return f"❌ Erreur API Gemini: {e}"
 
-    st.divider()
-
-    # Display chat history
-    st.subheader("📜 Historique de la conversation")
-    if not st.session_state.conversation_history:
-        st.info("Aucune conversation pour l’instant. Pose une question pour commencer !")
+# --- ROUTEUR DE MODÈLE ---
+def get_ai_response(prompt, history, model, length):
+    if model == "Groq":
+        return get_groq_response(prompt, history, length)
+    elif model == "DeepSeek":
+        return get_deepseek_response(prompt, history, length)
+    elif model == "Gemini":
+        return get_gemini_response(prompt, history, length)
     else:
-        for i, conv in enumerate(st.session_state.conversation_history):
-            role = "🧑 Toi" if conv["role"] == "user" else "🤖 Assistant"
-            # Using st.chat_message for a cleaner look
-            with st.chat_message(conv["role"]):
-                st.write(conv["content"])
+        return "Erreur: Modèle non reconnu."
 
-# -------------------- PDF Analysis --------------------
-elif selected_page == "PDF Analysis":
-    st.header("Upload a PDF and Get Insights :page_facing_up:")
+# -------------------- INTERFACE PRINCIPALE --------------------
+st.title("🤖 Assistant IA pour le Recrutement BTP")
+st.info("Posez une question à votre assistant spécialisé pour le marché marocain du BTP.")
+
+# --- SÉLECTEURS DANS LA BARRE LATÉRALE ---
+with st.sidebar:
+    st.subheader("⚙️ Paramètres")
+    st.session_state.selected_model = st.radio(
+        "🧠 Choisir le modèle IA :",
+        ("Groq", "DeepSeek", "Gemini"),
+        horizontal=True,
+    )
+    st.session_state.response_length = st.radio(
+        "📄 Longueur de la réponse :",
+        ("Courte", "Normale", "Détaillée"),
+        horizontal=True,
+    )
+
+# --- ZONE DE SAISIE ET BOUTONS ---
+user_input = st.text_area(
+    "💬 Posez votre question ici :",
+    key="assistant_input",
+    height=120,
+    placeholder=st.session_state.placeholder # Placeholder aléatoire
+)
+
+col1, col2 = st.columns([3, 1]) # Donne plus de place au bouton principal
+with col1:
+    send_button = st.button("💡 Générer par l'IA", type="primary", use_container_width=True)
+with col2:
+    reset_button = st.button("🧹 Effacer", use_container_width=True)
+
+if reset_button:
+    st.session_state.conversation_history = []
+    st.success("🗑️ Historique de la conversation effacé !")
+    time.sleep(1) # Petit délai pour voir le message
+    st.rerun()
+
+if send_button and user_input.strip():
+    # Extrait uniquement le rôle et le contenu pour l'historique de l'API
+    api_history = [{"role": msg["role"], "content": msg["content"]} for msg in st.session_state.conversation_history]
     
-    uploaded_pdf = st.file_uploader("Choose a PDF file", accept_multiple_files=False, type=["pdf"])
+    # Ajoute le message de l'utilisateur à l'historique d'affichage
+    st.session_state.conversation_history.append({"role": "user", "content": user_input})
+    
+    # Récupère la réponse de l'IA
+    with st.spinner(f"⏳ L'assistant {st.session_state.selected_model} réfléchit..."):
+        ai_response = get_ai_response(
+            user_input, 
+            api_history, 
+            st.session_state.selected_model,
+            st.session_state.response_length
+        )
 
-    if uploaded_pdf is not None:
-        try:
-            pdf_text = ""
-            with fitz.open(stream=uploaded_pdf.read(), filetype="pdf") as doc:
-                for page in doc:
-                    pdf_text += page.get_text()
+    # Ajoute la réponse de l'IA à l'historique d'affichage
+    st.session_state.conversation_history.append({"role": "assistant", "content": ai_response})
+    
+    # Change le placeholder pour la prochaine question
+    st.session_state.placeholder = random.choice([
+        "Quelles sont les missions clés d'un conducteur de travaux dans le BTP au Maroc ?",
+        "Rédige une offre d'emploi pour un chef de projet BTP à Casablanca.",
+        "Propose 5 questions techniques pour un entretien avec un ingénieur en génie civil.",
+        "Comment évaluer les soft skills d'un chargé d'affaires BTP ?",
+        "Quels sont les salaires moyens pour un dessinateur-projeteur à Rabat ?",
+        "Liste les compétences indispensables pour un responsable QSE dans la construction.",
+        "Comment attirer des profils pénuriques comme les grutiers au Maroc ?",
+        "Analyse ce profil : 'Ingénieur d'état, 5 ans d'expérience en suivi de chantiers routiers'.",
+        "Donne-moi des arguments pour convaincre un candidat de rejoindre notre entreprise de BTP.",
+        "Quelles sont les réglementations marocaines importantes à connaître pour un poste RH dans le BTP ?"
+    ])
+    st.rerun()
 
-            st.text_area("Extracted Text from PDF:", pdf_text, height=300, disabled=True)
+elif send_button and not user_input.strip():
+    st.warning("⚠️ Veuillez écrire une question avant de générer une réponse.")
 
-            if st.button(":orange[Analyze PDF]"):
-                if not pdf_text.strip():
-                    st.error("❌ Le document est vide ou l'extraction a échoué.")
-                else:
-                    with st.spinner('Analyzing PDF...'):
-                        analysis_prompt = f"Analyse le texte suivant extrait d'un PDF et fournissez une synthèse structurée des points clés. Le texte est : {pdf_text}"
-                        full_response = get_deepseek_response(analysis_prompt)
-                        
-                        st.subheader(":blue[PDF Analysis Response]")
-                        st.write(full_response)
-                        
-                        st.session_state.analysis_response = full_response
-                        
-        except Exception as e:
-            st.error(f"❌ Erreur lors du traitement du PDF : {e}")
+st.divider()
+
+# --- AFFICHAGE DE L'HISTORIQUE DE CONVERSATION (INVERSÉ) ---
+st.subheader("📜 Historique de la conversation")
+if not st.session_state.conversation_history:
+    st.info("La conversation n'a pas encore commencé. Posez une question pour démarrer !")
+else:
+    # Itère sur la liste inversée pour afficher le plus récent en premier
+    for conv in reversed(st.session_state.conversation_history):
+        # Utilise st.chat_message pour une interface de chat moderne
+        with st.chat_message(conv["role"]):
+            st.markdown(conv["content"])
