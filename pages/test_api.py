@@ -81,11 +81,6 @@ def get_gsheet_client():
         
         st.sidebar.success("✅ Authentification Google Sheets réussie!")
         return gc
-        # Après avoir obtenu service_account_info, ajoutez :
-        st.sidebar.write("🔍 Private key preview:")
-        st.sidebar.text_area("Clé privée (premieres lignes)", 
-                    service_account_info['private_key'][:200], 
-                    height=100)
         
     except Exception as e:
         st.error(f"❌ Erreur d'authentification: {str(e)}")
