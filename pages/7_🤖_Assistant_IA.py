@@ -54,7 +54,6 @@ st.set_page_config(
 # -------------------- CONFIGURATION DES APIS --------------------
 
 # --- PROMPT SYSTÈME COMMUN ---
-# Contexte précis pour guider tous les modèles IA
 SYSTEM_PROMPT = """
 Tu es 'TG-Hire Assistant', un expert IA spécialisé dans le recrutement pour le secteur du BTP (Bâtiment et Travaux Publics) au Maroc.
 Ton rôle est d'aider un recruteur humain à optimiser ses tâches quotidiennes.
@@ -64,6 +63,13 @@ Tes réponses doivent être :
 3.  **Orientées Action** : Propose des listes, des questions, des modèles de texte, etc.
 4.  **Adaptables** : Tu dois ajuster la longueur et le niveau de détail de ta réponse (courte, normale, détaillée) selon la demande de l'utilisateur.
 """
+
+# --- MODÈLE DE COÛT DES TOKENS (pour l'affichage) ---
+TOKEN_COSTS = {
+    "Groq": "Consommation de tokens très rapide et à très faible coût.",
+    "DeepSeek": "Consommation de tokens à faible coût, bon équilibre performance/prix.",
+    "Gemini": "Consommation de tokens à coût modéré, modèle puissant de Google."
+}
 
 def get_deepseek_response(prompt, history, length):
     api_key = st.secrets.get("DEEPSEEK_API_KEY")
@@ -94,7 +100,7 @@ def get_groq_response(prompt, history, length):
         client = groq.Groq(api_key=api_key)
         chat_completion = client.chat.completions.create(
             messages=messages,
-            model="llama3-8b-8192",
+            model="llama-3.1-8b-instant",
         )
         return chat_completion.choices[0].message.content
     except Exception as e:
@@ -108,7 +114,7 @@ def get_gemini_response(prompt, history, length):
     
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-pro')
         response = model.generate_content(final_prompt)
         return response.text
     except Exception as e:
@@ -137,11 +143,19 @@ with st.sidebar:
         ("Groq", "DeepSeek", "Gemini"),
         horizontal=True,
     )
-    st.session_state.response_length = st.radio(
+    
+    # --- NOUVEAUTÉ : Affichage du coût des tokens ---
+    st.caption(TOKEN_COSTS.get(st.session_state.selected_model, "Information non disponible."))
+    
+    st.divider()
+
+    # --- NOUVEAUTÉ : Menu déroulant pour la longueur ---
+    st.session_state.response_length = st.selectbox(
         "📄 Longueur de la réponse :",
         ("Courte", "Normale", "Détaillée"),
-        horizontal=True,
+        index=1 # "Normale" est sélectionnée par défaut
     )
+
 
 # --- ZONE DE SAISIE ET BOUTONS ---
 user_input = st.text_area(
@@ -151,7 +165,7 @@ user_input = st.text_area(
     placeholder=st.session_state.placeholder # Placeholder aléatoire
 )
 
-col1, col2 = st.columns([3, 1]) # Donne plus de place au bouton principal
+col1, col2 = st.columns([3, 1])
 with col1:
     send_button = st.button("💡 Générer par l'IA", type="primary", use_container_width=True)
 with col2:
@@ -160,18 +174,16 @@ with col2:
 if reset_button:
     st.session_state.conversation_history = []
     st.success("🗑️ Historique de la conversation effacé !")
-    time.sleep(1) # Petit délai pour voir le message
+    time.sleep(1)
     st.rerun()
 
 if send_button and user_input.strip():
-    # Extrait uniquement le rôle et le contenu pour l'historique de l'API
     api_history = [{"role": msg["role"], "content": msg["content"]} for msg in st.session_state.conversation_history]
     
-    # Ajoute le message de l'utilisateur à l'historique d'affichage
     st.session_state.conversation_history.append({"role": "user", "content": user_input})
     
-    # Récupère la réponse de l'IA
-    with st.spinner(f"⏳ L'assistant {st.session_state.selected_model} réfléchit..."):
+    # --- NOUVEAUTÉ : Texte du spinner modifié ---
+    with st.spinner("⏳ Génération d'une réponse par l'IA en cours..."):
         ai_response = get_ai_response(
             user_input, 
             api_history, 
@@ -179,11 +191,10 @@ if send_button and user_input.strip():
             st.session_state.response_length
         )
 
-    # Ajoute la réponse de l'IA à l'historique d'affichage
     st.session_state.conversation_history.append({"role": "assistant", "content": ai_response})
     
     # Change le placeholder pour la prochaine question
-    st.session_state.placeholder = random.choice([
+    placeholders = [
         "Quelles sont les missions clés d'un conducteur de travaux dans le BTP au Maroc ?",
         "Rédige une offre d'emploi pour un chef de projet BTP à Casablanca.",
         "Propose 5 questions techniques pour un entretien avec un ingénieur en génie civil.",
@@ -194,7 +205,8 @@ if send_button and user_input.strip():
         "Analyse ce profil : 'Ingénieur d'état, 5 ans d'expérience en suivi de chantiers routiers'.",
         "Donne-moi des arguments pour convaincre un candidat de rejoindre notre entreprise de BTP.",
         "Quelles sont les réglementations marocaines importantes à connaître pour un poste RH dans le BTP ?"
-    ])
+    ]
+    st.session_state.placeholder = random.choice(placeholders)
     st.rerun()
 
 elif send_button and not user_input.strip():
@@ -207,8 +219,6 @@ st.subheader("📜 Historique de la conversation")
 if not st.session_state.conversation_history:
     st.info("La conversation n'a pas encore commencé. Posez une question pour démarrer !")
 else:
-    # Itère sur la liste inversée pour afficher le plus récent en premier
     for conv in reversed(st.session_state.conversation_history):
-        # Utilise st.chat_message pour une interface de chat moderne
         with st.chat_message(conv["role"]):
             st.markdown(conv["content"])
