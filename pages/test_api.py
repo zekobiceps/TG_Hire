@@ -41,27 +41,19 @@ if not os.path.exists(CV_DIR):
 
 # -------------------- FONCTION D'AUTHENTIFICATION CORRIGÉE --------------------
 def get_gsheet_client():
-    """Authentification avec la section structurée des secrets"""
+    """Authentification simplifiée avec la section structurée des secrets"""
     try:
-        # Vérifier d'abord si la section existe
-        if "gcp_service_account" not in st.secrets:
-            st.error("❌ Section 'gcp_service_account' manquante dans les secrets.")
-            return None
-        
-        # Construire le dictionnaire à partir de la section
-        service_account_info = dict(st.secrets["gcp_service_account"])
-        
-        # Créer un fichier temporaire
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            json.dump(service_account_info, f, indent=2)
-            temp_file = f.name
-        
-        gc = gspread.service_account(filename=temp_file)
-        os.unlink(temp_file)
-        
+        import gspread
+        from google.oauth2 import service_account
+
+        # Créer les credentials directement à partir de la section
+        credentials = service_account.Credentials.from_service_account_info(
+            st.secrets["gcp_service_account"],
+            scopes=["https://www.googleapis.com/auth/spreadsheets"]
+        )
+        gc = gspread.authorize(credentials)
         st.sidebar.success("✅ Authentification Google Sheets réussie!")
         return gc
-        
     except Exception as e:
         st.error(f"❌ Erreur d'authentification: {str(e)}")
         return None
