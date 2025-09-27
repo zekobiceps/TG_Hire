@@ -1,4 +1,4 @@
-# Fichier requirements.txt final
+# Fichier requirements.txt final et optimisé
 
 # --- Interface et Visualisation ---
 streamlit
@@ -11,18 +11,13 @@ pandas
 numpy
 python-docx
 pypdf
-PyMuPDF
-json5
-lxml
 
 # --- Intelligence Artificielle & Machine Learning ---
 scikit-learn
-openai
-torch
-torchvision
 sentence-transformers
-# Correction pour spaCy : on fixe la version et on ajoute le modèle
+torch
 spacy==3.7.5
+# Lien direct pour installer le modèle spaCy (le plus fiable)
 https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.7.0/fr_core_news_sm-3.7.0-py3-none-any.whl
 
 # --- APIs & Connecteurs ---
