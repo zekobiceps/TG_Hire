@@ -24,7 +24,7 @@ import importlib.util
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1QLC_LzwQU5eKLRcaDglLd6csejLZSs1aauYFwzFk0ac/edit"
 WORKSHEET_NAME = "Cartographie"
 # --- ID DU DOSSIER GOOGLE DRIVE POUR LES CVS ---
-GOOGLE_DRIVE_FOLDER_ID = "1mWh1k2A72YI2H0DEabe5aIC6vSAP5aFQ" 
+GOOGLE_DRIVE_FOLDER_ID = "1mWh1k2A72YI2H0DEabe5aIC6vSAP5aFQ" # ID de votre dossier Drive inséré ici
 
 # --- GESTION DES CHEMINS (uniquement pour 'utils.py') ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -42,8 +42,6 @@ except Exception as e:
     if "cartographie_data" not in st.session_state:
         st.session_state.cartographie_data = {}
 
-# Le dossier CV local n'est plus nécessaire, sa création a été supprimée.
-
 # -------------------- FONCTIONS D'AUTHENTIFICATION --------------------
 def get_google_credentials():
     """Crée les identifiants à partir des secrets Streamlit."""
@@ -51,14 +49,14 @@ def get_google_credentials():
         service_account_info = {
             "type": st.secrets["GCP_TYPE"],
             "project_id": st.secrets["GCP_PROJECT_ID"],
-            "private_key_id": st.secrets.get("GCP_PRIVATE_KEY_ID", ""), # Optionnel mais bon à avoir
+            "private_key_id": st.secrets.get("GCP_PRIVATE_KEY_ID", ""),
             "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n'),
             "client_email": st.secrets["GCP_CLIENT_EMAIL"],
-            "client_id": st.secrets.get("GCP_CLIENT_ID", ""), # Optionnel
-            "auth_uri": st.secrets.get("GCP_AUTH_URI", "https://accounts.google.com/o/oauth2/auth"), # Optionnel
+            "client_id": st.secrets.get("GCP_CLIENT_ID", ""),
+            "auth_uri": st.secrets.get("GCP_AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
             "token_uri": st.secrets["GCP_TOKEN_URI"],
-            "auth_provider_x509_cert_url": st.secrets.get("GCP_AUTH_PROVIDER_CERT_URL", "https://www.googleapis.com/oauth2/v1/certs"), # Optionnel
-            "client_x509_cert_url": st.secrets.get("GCP_CLIENT_CERT_URL", "") # Optionnel
+            "auth_provider_x509_cert_url": st.secrets.get("GCP_AUTH_PROVIDER_CERT_URL", "https://www.googleapis.com/oauth2/v1/certs"),
+            "client_x509_cert_url": st.secrets.get("GCP_CLIENT_CERT_URL", "")
         }
         return service_account.Credentials.from_service_account_info(service_account_info)
     except Exception as e:
@@ -75,7 +73,6 @@ def get_gsheet_client():
                 "https://www.googleapis.com/auth/drive.readonly",
             ])
             gc = gspread.Client(auth=scoped_creds)
-            # Test de connexion
             gc.open_by_url(GOOGLE_SHEET_URL)
             return gc
     except Exception as e:
@@ -108,7 +105,6 @@ def upload_cv_to_drive(file_name, file_object):
             'parents': [GOOGLE_DRIVE_FOLDER_ID]
         }
         
-        # Utiliser io.BytesIO pour envelopper le contenu du fichier uploadé
         file_content = io.BytesIO(file_object.getvalue())
         
         media = MediaIoBaseUpload(file_content, mimetype=file_object.type, resumable=True)
@@ -124,7 +120,7 @@ def upload_cv_to_drive(file_name, file_object):
 
     except Exception as e:
         st.error(f"❌ Échec de l'upload sur Google Drive : {e}")
-        st.warning("⚠️ Vérifiez que l'email de service a les droits 'Contributeur' sur le dossier Drive.")
+        st.warning("⚠️ Vérifiez que l'email de service a les droits 'Gestionnaire de contenu' sur le Drive Partagé.")
         return None
 
 # -------------------- FONCTIONS GOOGLE SHEETS --------------------
@@ -160,7 +156,7 @@ def load_data_from_sheet():
                     "entreprise": row.get("Entreprise", "N/A"),
                     "linkedin": row.get("Linkedin", "N/A"),
                     "notes": row.get("Notes", ""),
-                    "cv_link": row.get("CV_Link", None) # Changé de CV_Path à CV_Link
+                    "cv_link": row.get("CV_Link", None)
                 })
         
         total_candidats = sum(len(v) for v in data.values())
@@ -180,8 +176,6 @@ def save_to_google_sheet(quadrant, entry):
         sh = gc.open_by_url(GOOGLE_SHEET_URL)
         worksheet = sh.worksheet(WORKSHEET_NAME)
         
-        # Assurez-vous que les en-têtes de votre Google Sheet sont dans cet ordre
-        # Quadrant, Date, Nom, Poste, Entreprise, Linkedin, Notes, CV_Link
         row_data = [
             quadrant, entry["date"], entry["nom"], entry["poste"],
             entry["entreprise"], entry["linkedin"], entry["notes"],
@@ -203,7 +197,6 @@ if "cartographie_data" not in st.session_state:
 st.set_page_config(page_title="TG-Hire IA - Cartographie", page_icon="🗺️", layout="wide", initial_sidebar_state="expanded")
 st.title("🗺️ Cartographie des talents")
 
-# Bouton de test de connexion
 if st.sidebar.button("🔍 Tester les connexions Google (Débug)"):
     st.sidebar.write("=== DÉBOGAGE CONNEXIONS GOOGLE ===")
     st.sidebar.write("1. Test d'authentification Sheets...")
@@ -272,12 +265,9 @@ with tab1:
                 st.write(f"**LinkedIn :** {cand.get('linkedin', 'Non spécifié')}")
                 st.write(f"**Notes :** {cand.get('notes', '')}")
                 
-                # --- AFFICHAGE DU LIEN GOOGLE DRIVE ---
                 cv_drive_link = cand.get('cv_link')
                 if cv_drive_link and cv_drive_link.startswith('http'):
                     st.markdown(f"**CV :** [Ouvrir depuis Google Drive]({cv_drive_link})", unsafe_allow_html=True)
-                
-                # Le bouton de suppression locale a été enlevé.
                 
                 export_text = f"Nom: {cand['nom']}\nPoste: {cand['poste']}\nEntreprise: {cand['entreprise']}\nLinkedIn: {cand.get('linkedin', '')}\nNotes: {cand['notes']}\nCV: {cand.get('cv_link', 'Aucun')}"
                 st.download_button(
