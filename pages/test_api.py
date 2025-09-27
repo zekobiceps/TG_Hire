@@ -41,40 +41,32 @@ if not os.path.exists(CV_DIR):
 
 # -------------------- FONCTION D'AUTHENTIFICATION CORRIGÉE --------------------
 def get_gsheet_client():
-    """Authentification simplifiée et renforcée"""
+    """Authentification avec la nouvelle clé"""
     try:
         import gspread
-        from google.oauth2 import service_account
-        import json
-
-        # 1. Récupérer et nettoyer la clé privée
-        private_key = st.secrets["GCP_PRIVATE_KEY"].strip()
-
-        # 2. Construire l'objet d'information du compte de service
+        
+        # Méthode directe et simplifiée
         service_account_info = {
             "type": st.secrets["GCP_TYPE"],
             "project_id": st.secrets["GCP_PROJECT_ID"],
-            "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
-            "private_key": private_key,
+            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n'),
             "client_email": st.secrets["GCP_CLIENT_EMAIL"],
-            "token_uri": st.secrets["GCP_TOKEN_URI"],
+            "token_uri": st.secrets["GCP_TOKEN_URI"]
         }
-
-        # 3. Créer les credentials en utilisant la méthode recommandée par Google
-        credentials = service_account.Credentials.from_service_account_info(
-            service_account_info,
-            scopes=["https://www.googleapis.com/auth/spreadsheets"]
-        )
-
-        # 4. Créer le client gspread
-        gc = gspread.authorize(credentials)
-
+        
+        gc = gspread.service_account_from_dict(service_account_info)
+        
+        # Test immédiat de la connexion
+        sh = gc.open_by_url("https://docs.google.com/spreadsheets/d/1QLC_LzwQU5eKLRcaDglLd6csejLZSs1aauYFwzFk0ac/edit")
+        worksheet = sh.worksheet("Cartographie")
+        
         st.sidebar.success("✅ Authentification Google Sheets réussie!")
         return gc
-
+        
     except Exception as e:
-        st.error(f"❌ Erreur d'authentification détaillée : {str(e)}")
+        st.error(f"❌ Erreur d'authentification: {str(e)}")
         return None
+
 # -------------------- FONCTIONS GOOGLE SHEETS --------------------
 @st.cache_data(ttl=600)
 def load_data_from_sheet():
@@ -84,8 +76,8 @@ def load_data_from_sheet():
         if not gc:
             st.warning("⚠️ Impossible de se connecter à Google Sheets")
             return {
-                "🌟 Haut Potentiel": [], "💎 Rare & stratégique": [],
-                "⚡ Rapide à mobiliser": [], "📚 Facilement disponible": []
+                "🔍 Profils Identifiés": [], "✅ Candidats Qualifiés": [],
+                "🚀 Talents d'Avenir": [], "💎 Profils Stratégiques": []
             }
         
         # Ouvrir la feuille Google Sheets
@@ -93,14 +85,25 @@ def load_data_from_sheet():
         worksheet = sh.worksheet(WORKSHEET_NAME)
         rows = worksheet.get_all_records()
         
-        # Organiser les données par quadrant
+        # Organiser les données par quadrant avec les nouveaux noms
         data = {
-            "🌟 Haut Potentiel": [], "💎 Rare & stratégique": [],
-            "⚡ Rapide à mobiliser": [], "📚 Facilement disponible": []
+            "🔍 Profils Identifiés": [], "✅ Candidats Qualifiés": [],
+            "🚀 Talents d'Avenir": [], "💎 Profils Stratégiques": []
+        }
+        
+        # Mapping des anciens noms vers les nouveaux pour la compatibilité
+        quadrant_mapping = {
+            "🌟 Haut Potentiel": "🚀 Talents d'Avenir",
+            "💎 Rare & stratégique": "💎 Profils Stratégiques", 
+            "⚡ Rapide à mobiliser": "✅ Candidats Qualifiés",
+            "📚 Facilement disponible": "🔍 Profils Identifiés"
         }
         
         for row in rows:
             quadrant = row.get('Quadrant', '').strip()
+            # Utiliser le mapping si l'ancien nom existe, sinon utiliser tel quel
+            quadrant = quadrant_mapping.get(quadrant, quadrant)
+            
             if quadrant in data:
                 data[quadrant].append({
                     "date": row.get("Date", "N/A"),
@@ -112,14 +115,15 @@ def load_data_from_sheet():
                     "cv_path": row.get("CV_Path", None)
                 })
         
-        st.sidebar.success(f"✅ Données chargées: {sum(len(v) for v in data.values())} candidats")
+        total_candidats = sum(len(v) for v in data.values())
+        st.sidebar.success(f"✅ Données chargées: {total_candidats} candidats")
         return data
         
     except Exception as e:
         st.error(f"❌ Échec du chargement des données depuis Google Sheets : {e}")
         return {
-            "🌟 Haut Potentiel": [], "💎 Rare & stratégique": [],
-            "⚡ Rapide à mobiliser": [], "📚 Facilement disponible": []
+            "🔍 Profils Identifiés": [], "✅ Candidats Qualifiés": [],
+            "🚀 Talents d'Avenir": [], "💎 Profils Stratégiques": []
         }
 
 def save_to_google_sheet(quadrant, entry):
@@ -164,34 +168,23 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.title("🗺️ Cartographie des talents (Google Sheets)")
-
+st.title("🗺️ Cartographie des talents")
 
 # Bouton de test de connexion
-# Dans votre sidebar, remplacez le bouton de test par :
-def debug_secrets():
-    st.write("=== VÉRIFICATION DES SECRETS ===")
+if st.sidebar.button("🔍 Tester la connexion Google Sheets (Débug)"):
+    st.sidebar.write("=== DÉBOGAGE CONNEXION GOOGLE SHEETS ===")
     
-    # Vérifier chaque secret
-    secrets_to_check = ['GCP_TYPE', 'GCP_PROJECT_ID', 'GCP_PRIVATE_KEY', 'GCP_CLIENT_EMAIL']
-    
-    for secret in secrets_to_check:
+    # Vérifier les secrets
+    st.sidebar.write("1. Vérification des secrets...")
+    required_secrets = ['GCP_TYPE', 'GCP_PROJECT_ID', 'GCP_PRIVATE_KEY', 'GCP_CLIENT_EMAIL']
+    for secret in required_secrets:
         if secret in st.secrets:
-            value = st.secrets[secret]
+            st.sidebar.write(f"✅ {secret}: Présent")
             if secret == 'GCP_PRIVATE_KEY':
-                st.write(f"✅ {secret}: Présent ({len(value)} caractères)")
-                st.write(f"   Début: {value[:30]}")
-                st.write(f"   Fin: {value[-30:]}")
-                if "BEGIN PRIVATE KEY" in value and "END PRIVATE KEY" in value:
-                    st.success("   Format de clé correct")
-                else:
-                    st.error("   ❌ Format de clé INCORRECT")
-            else:
-                st.write(f"✅ {secret}: {value}")
+                key_preview = st.secrets[secret][:50] + "..." if len(st.secrets[secret]) > 50 else st.secrets[secret]
+                st.sidebar.write(f"   Extrait: {key_preview}")
         else:
-            st.error(f"❌ {secret}: Manquant")
-
-# Appelez cette fonction dans votre bouton de test
+            st.sidebar.write(f"❌ {secret}: Manquant")
     
     # Tester la connexion
     st.sidebar.write("2. Test d'authentification...")
@@ -210,7 +203,7 @@ def debug_secrets():
         st.sidebar.error("❌ Échec de l'authentification")
 
 # -------------------- Onglets --------------------
-tab1, tab2 = st.tabs(["Gestion des candidats", "Vue globale"])
+tab1, tab2, tab3 = st.tabs(["Gestion des candidats", "Vue globale", "Guide des quadrants"])
 
 # -------------------- Onglet 1 : Gestion des candidats --------------------
 with tab1:
@@ -239,6 +232,7 @@ with tab1:
                     cv_path = os.path.join(CV_DIR, cv_filename)
                     with open(cv_path, "wb") as f:
                         f.write(cv_file.read())
+                    st.success(f"✅ CV sauvegardé dans: {cv_path}")
                 except Exception as e:
                     st.error(f"❌ Erreur lors de la sauvegarde du CV dans {cv_path}: {e}")
             
@@ -253,7 +247,7 @@ with tab1:
             }
             
             if save_to_google_sheet(quadrant_choisi, entry):
-                st.success(f"✅ {nom} ajouté à {quadrant_choisi} (Google Sheets).")
+                st.success(f"✅ {nom} ajouté à {quadrant_choisi}.")
                 # Recharger les données
                 st.cache_data.clear()
                 st.session_state.cartographie_data = load_data_from_sheet()
@@ -343,23 +337,46 @@ with tab1:
 
 # -------------------- Onglet 2 : Vue globale --------------------
 with tab2:
-    st.subheader("📊 Vue globale de la cartographie")
+    total_profils = sum(len(v) for v in st.session_state.cartographie_data.values())
+    st.subheader(f"📊 Vue globale de la cartographie ({total_profils} profils)")
+    
     try:
         import plotly.express as px
         counts = {k: len(st.session_state.cartographie_data[k]) for k in st.session_state.cartographie_data.keys()}
         
         if sum(counts.values()) > 0:
-            df_counts = pd.DataFrame(list(counts.items()), columns=['Quadrant', 'Count'])
+            df_counts = pd.DataFrame(list(counts.items()), columns=['Quadrant', 'Nombre'])
             fig = px.pie(
                 df_counts,
                 names='Quadrant',
-                values='Count',
+                values='Nombre',
                 title="Répartition des candidats par quadrant",
-                color_discrete_sequence=["#636EFA", "#EF553B", "#00CC96", "#AB63FA"]
+                color_discrete_sequence=["#636EFA", "#EF553B", "#00CC96", "#AB63FA"],
+                hover_data={'Nombre': True},
+                labels={'Nombre': 'Nombre de profils'}
             )
+            fig.update_traces(hovertemplate='<b>%{label}</b><br>Nombre: %{value}<br>Pourcentage: %{percent}<extra></extra>')
             st.plotly_chart(fig)
         else:
             st.info("Aucun candidat dans la cartographie pour l'instant.")
             
     except ImportError:
         st.warning("⚠️ La bibliothèque Plotly n'est pas installée. Le dashboard n'est pas disponible. Installez Plotly avec 'pip install plotly'.")
+
+# -------------------- Onglet 3 : Guide des quadrants --------------------
+with tab3:
+    st.subheader("📚 Guide des quadrants de la cartographie")
+    
+    st.markdown("""
+    ### 1. 🔍 Profils Identifiés
+    **Il s'agit de notre vivier de sourcing fondamental.** Cette catégorie rassemble les talents prometteurs repérés sur le marché qui correspondent à nos métiers. Ils n'ont pas encore été contactés mais représentent la base de nos futures recherches.
+
+    ### 2. ✅ Candidats Qualifiés  
+    **Ce sont les profils identifiés avec qui un premier contact positif a été établi.** Leur intérêt est validé et leurs compétences clés correspondent à nos besoins. Ils forment notre vivier de talents "chaud", prêts à être mobilisés pour un processus de recrutement.
+
+    ### 3. 🚀 Talents d'Avenir
+    **Cette catégorie regroupe les profils à fort potentiel d'évolution, de leadership ou d'innovation.** Plus que leurs compétences actuelles, nous ciblons ici leur capacité à devenir les leaders et les experts de demain. Ce sont nos investissements pour le futur.
+
+    ### 4. 💎 Profils Stratégiques
+    **Le sommet de notre cartographie.** Ce groupe exclusif contient les experts rares et les leaders confirmés dont les compétences sont critiques pour notre avantage concurrentiel. L'approche est directe, personnalisée et prioritaire.
+    """)
