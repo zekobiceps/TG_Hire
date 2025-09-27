@@ -11,8 +11,9 @@ import random
 try:
     import groq
     import google.generativeai as genai
+    from google.oauth2 import service_account # Ajout nécessaire pour get_google_credentials
 except ImportError:
-    st.error("❌ Bibliothèques Groq ou Gemini manquantes. Exécutez : pip install groq google-generativeai")
+    st.error("❌ Bibliothèques manquantes. Exécutez : pip install groq google-generativeai google-auth")
     st.stop()
     
 # --- INITIALISATION DU SESSION STATE ---
@@ -51,10 +52,30 @@ Tes réponses doivent être :
 4.  **Adaptables** : Tu dois ajuster la longueur de ta réponse (courte, normale, détaillée) selon la demande.
 """
 
+# --- FONCTION MANQUANTE AJOUTÉE ICI ---
+def get_google_credentials():
+    """Crée les identifiants du compte de service à partir des secrets Streamlit."""
+    try:
+        creds_json = {
+            "type": st.secrets["GCP_TYPE"],
+            "project_id": st.secrets["GCP_PROJECT_ID"],
+            "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
+            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n'),
+            "client_email": st.secrets["GCP_CLIENT_EMAIL"],
+            "client_id": st.secrets["GCP_CLIENT_ID"],
+            "auth_uri": st.secrets["GCP_AUTH_URI"],
+            "token_uri": st.secrets["GCP_TOKEN_URI"],
+            "auth_provider_x509_cert_url": st.secrets["GCP_AUTH_PROVIDER_CERT_URL"],
+            "client_x509_cert_url": st.secrets["GCP_CLIENT_CERT_URL"]
+        }
+        return service_account.Credentials.from_service_account_info(creds_json)
+    except Exception as e:
+        st.error(f"❌ Erreur de chargement des identifiants Google: {e}")
+        return None
+
 def get_cogenai_response(prompt, history, length):
-    # --- INFO CRITIQUE MANQUANTE ---
-    # Remplacez le placeholder ci-dessous par le nom exact du modèle CoGenAI
-    MODEL_NAME = "NOM_DU_MODELE_COGENAI_ICI"   # <--- À REMPLIR
+    # --- VÉRIFIEZ CE NOM DE MODÈLE ---
+    MODEL_NAME = "Qwen3"   # Mettez ici le nom exact du modèle trouvé sur leur site
 
     BASE_URL = "https://cogenai.kalavai.net/v1"
     api_key = st.secrets.get("COGEN_API_KEY")
@@ -74,6 +95,8 @@ def get_cogenai_response(prompt, history, length):
         content = data["choices"][0]["message"]["content"]
         usage = data.get("usage", {}).get("total_tokens", 0)
         return {"content": content, "usage": usage}
+    except requests.exceptions.JSONDecodeError:
+        return {"content": f"❌ Erreur API CoGenAI: La réponse du serveur n'est pas en format JSON. Voici la réponse brute :\n\n---\n{response.text}\n---", "usage": 0}
     except Exception as e:
         return {"content": f"❌ Erreur API CoGenAI: {e}", "usage": 0}
 
@@ -117,18 +140,20 @@ def get_groq_response(prompt, history, length):
     except Exception as e:
         return {"content": f"❌ Erreur API Groq: {e}", "usage": 0}
 
+# --- FONCTION GEMINI CORRIGÉE ---
 def get_gemini_response(prompt, history, length):
-    api_key = st.secrets.get("GEMINI_API_KEY")
-    if not api_key: return {"content": "Erreur: Clé API Gemini manquante.", "usage": 0}
-    
+    creds = get_google_credentials() 
+    if not creds:
+        return {"content": "Erreur: Impossible de charger les identifiants du compte de service Google.", "usage": 0}
+
     final_prompt = f"{SYSTEM_PROMPT}\n\nHistorique:\n{json.dumps(history)}\n\nQuestion:\n{prompt}\n\n(Instruction: Fournir une réponse de longueur '{length}')"
     
     try:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-pro')
+        genai.configure(credentials=creds) 
+        model = genai.GenerativeModel('gemini-1.5-flash-latest') # Utilisation d'un modèle plus récent et stable
         response = model.generate_content(final_prompt)
         content = response.text
-        usage = response.usage_metadata.total_token_count
+        usage = model.count_tokens(final_prompt).total_tokens
         return {"content": content, "usage": usage}
     except Exception as e:
         return {"content": f"❌ Erreur API Gemini: {e}", "usage": 0}
@@ -149,7 +174,6 @@ def get_ai_response(prompt, history, model, length):
 # -------------------- INTERFACE PRINCIPALE --------------------
 st.title("🤖 Assistant IA pour le Recrutement BTP")
 
-# --- SÉLECTEURS DANS LA BARRE LATÉRALE ---
 with st.sidebar:
     st.subheader("⚙️ Paramètres")
     st.session_state.selected_model = st.selectbox(
@@ -169,8 +193,6 @@ with st.sidebar:
     st.metric("Tokens de la dernière réponse", f"{st.session_state.last_token_usage}")
     st.caption("Le nombre de tokens mesure la 'quantité de travail' de l'IA.")
 
-
-# --- ZONE DE SAISIE ET BOUTONS ---
 user_input = st.text_area(
     "💬 Posez votre question ici :",
     key="assistant_input",
@@ -215,7 +237,6 @@ if send_button and user_input.strip():
 elif send_button and not user_input.strip():
     st.warning("⚠️ Veuillez écrire une question avant de générer une réponse.")
 
-# --- AFFICHAGE DE L'HISTORIQUE ---
 st.subheader("📜 Historique de la conversation")
 if not st.session_state.conversation_history:
     st.info("La conversation n'a pas encore commencé.")
