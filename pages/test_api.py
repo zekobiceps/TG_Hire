@@ -1,10 +1,15 @@
 import streamlit as st
-# --- NOUVEAUX IMPORTS POUR GOOGLE DRIVE ---
+import os
+import io
+import pandas as pd
+from datetime import datetime
+import importlib.util
+
+# --- IMPORTS POUR GOOGLE API ---
 try:
     from google.oauth2 import service_account
     from googleapiclient.discovery import build
     from googleapiclient.http import MediaIoBaseUpload
-    import io
 except ImportError:
     st.error("❌ Bibliothèques Google API manquantes. Exécutez : pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib")
     st.stop()
@@ -15,16 +20,10 @@ except ImportError:
     st.error("❌ La bibliothèque 'gspread' n'est pas installée. Installez-la avec 'pip install gspread'.")
     st.stop()
     
-import os
-import pandas as pd
-from datetime import datetime
-import importlib.util
-
 # --- CONFIGURATION GOOGLE ---
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1QLC_LzwQU5eKLRcaDglLd6csejLZSs1aauYFwzFk0ac/edit"
 WORKSHEET_NAME = "Cartographie"
 # --- ID DU DOSSIER GOOGLE DRIVE POUR LES CVS ---
-# !!! VÉRIFIEZ BIEN QUE CET ID EST CELUI DU DOSSIER DANS LE DRIVE PARTAGÉ !!!
 GOOGLE_DRIVE_FOLDER_ID = "1mWh1k2A72YI2H0DEabe5aIC6vSAP5aFQ" 
 
 # --- GESTION DES CHEMINS (uniquement pour 'utils.py') ---
@@ -92,7 +91,7 @@ def get_drive_service():
         st.error(f"❌ Erreur d'authentification Google Drive: {str(e)}")
     return None
 
-# -------------------- FONCTION D'UPLOAD SUR GOOGLE DRIVE (CORRIGÉE) --------------------
+# -------------------- FONCTION D'UPLOAD SUR GOOGLE DRIVE --------------------
 def upload_cv_to_drive(file_name, file_object):
     """Envoie un fichier CV sur Google Drive et retourne son lien partageable."""
     try:
@@ -110,13 +109,11 @@ def upload_cv_to_drive(file_name, file_object):
         
         media = MediaIoBaseUpload(file_content, mimetype=file_object.type, resumable=True)
         
-        # --- LE CORRECTIF EST ICI ---
-        # Ajout de supportsAllDrives=True pour que l'API cherche dans les Drives Partagés
         file = drive_service.files().create(
             body=file_metadata,
             media_body=media,
             fields='id, webViewLink',
-            supportsAllDrives=True  # <-- CETTE LIGNE CORRIGE L'ERREUR 404
+            supportsAllDrives=True
         ).execute()
         
         st.success(f"✅ CV '{file_name}' uploadé sur Google Drive.")
@@ -233,7 +230,12 @@ with tab1:
         if nom and poste:
             cv_link = None
             if cv_file:
-                cv_filename = f"{nom.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}_{cv_file.name}"
+                # --- LA MODIFICATION EST ICI ---
+                # Récupérer l'extension du fichier original (ex: .pdf)
+                _, file_extension = os.path.splitext(cv_file.name)
+                # Créer le nom du fichier en utilisant uniquement le nom du candidat
+                cv_filename = f"{nom}{file_extension}"
+                
                 cv_link = upload_cv_to_drive(cv_filename, cv_file)
             
             entry = {
