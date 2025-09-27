@@ -39,11 +39,12 @@ if not os.path.exists(CV_DIR):
         st.error(f"❌ Erreur lors de la création du dossier {CV_DIR}: {e}")
 
 # -------------------- FONCTION D'AUTHENTIFICATION --------------------
+# -------------------- FONCTION D'AUTHENTIFICATION CORRIGÉE --------------------
 def get_gsheet_client():
-    """Authentifie avec Google Sheets - Version simplifiée"""
+    """Authentifie avec Google Sheets en utilisant la configuration directe."""
     try:
-        # Méthode directe avec les secrets
-        service_account_info = {
+        # Configuration directe - ne dépend plus des secrets Streamlit
+        SERVICE_ACCOUNT_INFO = {
             "type": "service_account",
             "project_id": "astute-anchor-418600",
             "private_key_id": "a746bd2519769b7e7bf4068b1874c415f9c94fab",
@@ -84,12 +85,14 @@ xFSCq2ZVavwXRLKlCTQjBS8E0A==
             "universe_domain": "googleapis.com"
         }
         
-        gc = gspread.service_account_from_dict(service_account_info)
-        st.success("✅ Authentification Google Sheets réussie (méthode directe)")
+        gc = gspread.service_account_from_dict(SERVICE_ACCOUNT_INFO)
+        st.success("✅ Authentification Google Sheets réussie (configuration directe)")
         return gc
-        
     except Exception as e:
         st.error(f"❌ Échec de l'authentification Google Sheets. Erreur : {e}")
+        # Afficher plus de détails pour le débogage
+        import traceback
+        st.error(f"🔍 Détails de l'erreur: {traceback.format_exc()}")
         return None
 # -------------------- FONCTIONS GOOGLE SHEETS --------------------
 @st.cache_data(ttl=600)
