@@ -169,37 +169,29 @@ st.title("🗺️ Cartographie des talents (Google Sheets)")
 
 # Bouton de test de connexion
 # Dans votre sidebar, remplacez le bouton de test par :
-if st.sidebar.button("🔍 Tester la connexion Google Sheets (Débug)"):
-    st.sidebar.write("=== DÉBOGAGE CONNEXION GOOGLE SHEETS ===")
+def debug_secrets():
+    st.write("=== VÉRIFICATION DES SECRETS ===")
     
-    # Vérifier les secrets
-    st.sidebar.write("1. Vérification des secrets...")
-    required_secrets = ['GCP_TYPE', 'GCP_PROJECT_ID', 'GCP_PRIVATE_KEY', 'GCP_CLIENT_EMAIL']
-    for secret in required_secrets:
+    # Vérifier chaque secret
+    secrets_to_check = ['GCP_TYPE', 'GCP_PROJECT_ID', 'GCP_PRIVATE_KEY', 'GCP_CLIENT_EMAIL']
+    
+    for secret in secrets_to_check:
         if secret in st.secrets:
-            st.sidebar.write(f"✅ {secret}: Présent")
+            value = st.secrets[secret]
             if secret == 'GCP_PRIVATE_KEY':
-                # Afficher un extrait de la clé
-                key_preview = st.secrets[secret][:50] + "..." if len(st.secrets[secret]) > 50 else st.secrets[secret]
-                st.sidebar.write(f"   Extrait: {key_preview}")
+                st.write(f"✅ {secret}: Présent ({len(value)} caractères)")
+                st.write(f"   Début: {value[:30]}")
+                st.write(f"   Fin: {value[-30:]}")
+                if "BEGIN PRIVATE KEY" in value and "END PRIVATE KEY" in value:
+                    st.success("   Format de clé correct")
+                else:
+                    st.error("   ❌ Format de clé INCORRECT")
+            else:
+                st.write(f"✅ {secret}: {value}")
         else:
-            st.sidebar.write(f"❌ {secret}: Manquant")
-    
-    # Tester la connexion
-    st.sidebar.write("2. Test d'authentification...")
-    gc = get_gsheet_client()
-    
-    if gc:
-        st.sidebar.write("3. Test d'accès à la feuille...")
-        try:
-            sh = gc.open_by_url(GOOGLE_SHEET_URL)
-            worksheet = sh.worksheet(WORKSHEET_NAME)
-            st.sidebar.success("✅ Connexion Google Sheets fonctionnelle!")
-            st.sidebar.write(f"📊 Feuille: {WORKSHEET_NAME}")
-        except Exception as e:
-            st.sidebar.error(f"❌ Erreur d'accès: {e}")
-    else:
-        st.sidebar.error("❌ Échec de l'authentification")
+            st.error(f"❌ {secret}: Manquant")
+
+# Appelez cette fonction dans votre bouton de test
 
 # -------------------- Onglets --------------------
 tab1, tab2 = st.tabs(["Gestion des candidats", "Vue globale"])
