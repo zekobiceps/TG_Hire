@@ -41,19 +41,32 @@ if not os.path.exists(CV_DIR):
 
 # -------------------- FONCTION D'AUTHENTIFICATION CORRIGÉE --------------------
 def get_gsheet_client():
-    """Authentification simplifiée avec la section structurée des secrets"""
+    """Authentification corrigée avec les secrets racines"""
     try:
+        # Récupère la clé privée et remplace les \n par de vrais sauts de ligne
+        private_key_content = st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n')
+        
+        # Construit le dictionnaire d'identification
+        service_account_info = {
+            "type": st.secrets["GCP_TYPE"],
+            "project_id": st.secrets["GCP_PROJECT_ID"],
+            "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
+            "private_key": private_key_content,  # Utilise la clé corrigée
+            "client_email": st.secrets["GCP_CLIENT_EMAIL"],
+            "client_id": st.secrets["GCP_CLIENT_ID"],
+            "auth_uri": st.secrets["GCP_AUTH_URI"],
+            "token_uri": st.secrets["GCP_TOKEN_URI"],
+            "auth_provider_x509_cert_url": st.secrets["GCP_AUTH_PROVIDER_CERT_URL"],
+            "client_x509_cert_url": st.secrets["GCP_CLIENT_CERT_URL"],
+            "universe_domain": st.secrets["GCP_UNIVERSE_DOMAIN"]
+        }
+        
+        # Méthode directe sans fichier temporaire (plus robuste)
         import gspread
-        from google.oauth2 import service_account
-
-        # Créer les credentials directement à partir de la section
-        credentials = service_account.Credentials.from_service_account_info(
-            st.secrets["gcp_service_account"],
-            scopes=["https://www.googleapis.com/auth/spreadsheets"]
-        )
-        gc = gspread.authorize(credentials)
+        gc = gspread.service_account_from_dict(service_account_info)
         st.sidebar.success("✅ Authentification Google Sheets réussie!")
         return gc
+        
     except Exception as e:
         st.error(f"❌ Erreur d'authentification: {str(e)}")
         return None
