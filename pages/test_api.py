@@ -166,25 +166,6 @@ st.set_page_config(
 
 st.title("🗺️ Cartographie des talents (Google Sheets)")
 
-def debug_private_key():
-    """Fonction de debug pour vérifier la clé privée"""
-    try:
-        private_key = st.secrets["GCP_PRIVATE_KEY"]
-        st.write("✅ Clé privée présente")
-        st.write(f"Longueur: {len(private_key)} caractères")
-        st.write(f"Commence par: {private_key[:50]}")
-        st.write(f"Termine par: {private_key[-50:]}")
-        
-        # Vérifier le format
-        if "-----BEGIN PRIVATE KEY-----" in private_key and "-----END PRIVATE KEY-----" in private_key:
-            st.success("✅ Format de clé correct")
-        else:
-            st.error("❌ Format de clé incorrect")
-            
-    except Exception as e:
-        st.error(f"❌ Erreur: {e}")
-
-# Appelez cette fonction dans votre bouton de debug
 
 # Bouton de test de connexion
 # Dans votre sidebar, remplacez le bouton de test par :
