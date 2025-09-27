@@ -43,9 +43,8 @@ def get_gsheet_client():
     """Authentifie avec Google Sheets en utilisant les secrets Streamlit."""
     try:
         st.write("Secrets disponibles :", st.secrets)
-        st.write(st.secrets["gcp_service_account"]["private_key"])
         if "gcp_service_account" not in st.secrets:
-            st.error("❌ La clé 'gcp_service_account' n'est pas configurée dans les secrets Streamlit.")
+            st.error("❌ La clé 'gcp_service_account' n'est pas configurée dans les secrets Streamlit. Vérifiez secrets.toml ou l'onglet Secrets.")
             return None
         gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
         st.write("Authentification réussie avec gspread.service_account_from_dict")
