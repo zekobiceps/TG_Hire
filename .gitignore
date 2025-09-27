@@ -2,8 +2,9 @@ venv/
 __pycache__/
 *.pyc
 astute-anchor-418600-a746bd251976.json
-# Streamlit secrets - ignore the folder but allow secrets.toml
-.streamlit/
-!.streamlit/secrets.toml
 # Fichiers de configuration sensibles
 *.json
+# Streamlit secrets
+!.streamlit/secrets.toml
+.streamlit/
+#d
