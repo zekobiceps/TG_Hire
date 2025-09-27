@@ -1,4 +1,7 @@
-# Fichier requirements.txt final et optimisé
+# requirements.txt - VERSION FINALE
+
+# --- On force l'utilisation d'une version stable de Python ---
+python-version: "3.11"
 
 # --- Interface et Visualisation ---
 streamlit
@@ -22,7 +25,8 @@ torch
 torchvision
 sentence-transformers
 spacy
-fr-core-news-sm
+# Lien direct et fiable pour installer le modèle spaCy
+https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.7.0/fr_core_news_sm-3.7.0-py3-none-any.whl
 
 # --- APIs & Connecteurs ---
 requests
