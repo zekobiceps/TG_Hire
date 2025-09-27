@@ -1,9 +1,10 @@
---- Interface et Visualisation ---
+# Interface et Visualisation
 streamlit
 altair
 plotly
 pydeck
---- Manipulation de Données & Fichiers ---
+
+# Manipulation de Données & Fichiers
 pandas
 numpy
 python-docx
@@ -11,7 +12,8 @@ pypdf
 PyMuPDF
 json5
 lxml
---- Intelligence Artificielle & Machine Learning ---
+
+# Intelligence Artificielle & Machine Learning
 scikit-learn
 openai
 torch
@@ -19,7 +21,8 @@ torchvision
 sentence-transformers
 spacy~=3.8.0
 https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.8.0/fr_core_news_sm-3.8.0-py3-none-any.whl
---- APIs & Connecteurs ---
+
+# APIs & Connecteurs
 requests
 beautifulsoup4
 GitPython
