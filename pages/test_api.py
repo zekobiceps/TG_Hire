@@ -1,29 +1,40 @@
 import streamlit as st
+# --- NOUVEAUX IMPORTS POUR GOOGLE DRIVE ---
+try:
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaIoBaseUpload
+    import io
+except ImportError:
+    st.error("❌ Bibliothèques Google API manquantes. Exécutez : pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib")
+    st.stop()
+
 try:
     import gspread
 except ImportError:
     st.error("❌ La bibliothèque 'gspread' n'est pas installée. Installez-la avec 'pip install gspread'.")
     st.stop()
+    
 import os
 import pandas as pd
 from datetime import datetime
 import importlib.util
-import json
-import tempfile
 
-# --- CONFIGURATION GOOGLE SHEETS ---
+# --- CONFIGURATION GOOGLE ---
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1QLC_LzwQU5eKLRcaDglLd6csejLZSs1aauYFwzFk0ac/edit"
 WORKSHEET_NAME = "Cartographie"
+# --- ID DU DOSSIER GOOGLE DRIVE POUR LES CVS ---
+GOOGLE_DRIVE_FOLDER_ID = "1mWh1k2A72YI2H0DEabe5aIC6vSAP5aFQ" 
 
-# Chemin du projet pour la gestion des CV
+# --- GESTION DES CHEMINS (uniquement pour 'utils.py') ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
 
 # -------------------- Import utils --------------------
 UTILS_PATH = os.path.abspath(os.path.join(PROJECT_ROOT, "utils.py"))
-spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
-utils = importlib.util.module_from_spec(spec)
 try:
+    spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
+    utils = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(utils)
     utils.init_session_state()
 except Exception as e:
@@ -31,67 +42,107 @@ except Exception as e:
     if "cartographie_data" not in st.session_state:
         st.session_state.cartographie_data = {}
 
-# -------------------- Dossier pour les CV --------------------
-CV_DIR = os.path.join(PROJECT_ROOT, "cvs")
-if not os.path.exists(CV_DIR):
-    try:
-        os.makedirs(CV_DIR, exist_ok=True)
-    except Exception as e:
-        st.error(f"❌ Erreur lors de la création du dossier {CV_DIR}: {e}")
+# Le dossier CV local n'est plus nécessaire, sa création a été supprimée.
 
-# -------------------- FONCTION D'AUTHENTIFICATION CORRIGÉE --------------------
-def get_gsheet_client():
-    """Authentification avec la nouvelle clé"""
+# -------------------- FONCTIONS D'AUTHENTIFICATION --------------------
+def get_google_credentials():
+    """Crée les identifiants à partir des secrets Streamlit."""
     try:
-        import gspread
-        
-        # Méthode directe et simplifiée
         service_account_info = {
             "type": st.secrets["GCP_TYPE"],
             "project_id": st.secrets["GCP_PROJECT_ID"],
+            "private_key_id": st.secrets.get("GCP_PRIVATE_KEY_ID", ""), # Optionnel mais bon à avoir
             "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n'),
             "client_email": st.secrets["GCP_CLIENT_EMAIL"],
-            "token_uri": st.secrets["GCP_TOKEN_URI"]
+            "client_id": st.secrets.get("GCP_CLIENT_ID", ""), # Optionnel
+            "auth_uri": st.secrets.get("GCP_AUTH_URI", "https://accounts.google.com/o/oauth2/auth"), # Optionnel
+            "token_uri": st.secrets["GCP_TOKEN_URI"],
+            "auth_provider_x509_cert_url": st.secrets.get("GCP_AUTH_PROVIDER_CERT_URL", "https://www.googleapis.com/oauth2/v1/certs"), # Optionnel
+            "client_x509_cert_url": st.secrets.get("GCP_CLIENT_CERT_URL", "") # Optionnel
+        }
+        return service_account.Credentials.from_service_account_info(service_account_info)
+    except Exception as e:
+        st.error(f"❌ Erreur de format des secrets Google: {e}")
+        return None
+
+def get_gsheet_client():
+    """Authentification pour Google Sheets."""
+    try:
+        creds = get_google_credentials()
+        if creds:
+            scoped_creds = creds.with_scopes([
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive.readonly",
+            ])
+            gc = gspread.Client(auth=scoped_creds)
+            # Test de connexion
+            gc.open_by_url(GOOGLE_SHEET_URL)
+            return gc
+    except Exception as e:
+        st.error(f"❌ Erreur d'authentification Google Sheets: {str(e)}")
+    return None
+
+def get_drive_service():
+    """Authentification pour Google Drive."""
+    try:
+        creds = get_google_credentials()
+        if creds:
+            scoped_creds = creds.with_scopes(["https://www.googleapis.com/auth/drive"])
+            service = build('drive', 'v3', credentials=scoped_creds)
+            return service
+    except Exception as e:
+        st.error(f"❌ Erreur d'authentification Google Drive: {str(e)}")
+    return None
+
+# -------------------- FONCTION D'UPLOAD SUR GOOGLE DRIVE --------------------
+def upload_cv_to_drive(file_name, file_object):
+    """Envoie un fichier CV sur Google Drive et retourne son lien partageable."""
+    try:
+        drive_service = get_drive_service()
+        if not drive_service:
+            st.error("❌ Connexion à Google Drive impossible.")
+            return None
+
+        file_metadata = {
+            'name': file_name,
+            'parents': [GOOGLE_DRIVE_FOLDER_ID]
         }
         
-        gc = gspread.service_account_from_dict(service_account_info)
+        # Utiliser io.BytesIO pour envelopper le contenu du fichier uploadé
+        file_content = io.BytesIO(file_object.getvalue())
         
-        # Test immédiat de la connexion
-        sh = gc.open_by_url("https://docs.google.com/spreadsheets/d/1QLC_LzwQU5eKLRcaDglLd6csejLZSs1aauYFwzFk0ac/edit")
-        worksheet = sh.worksheet("Cartographie")
+        media = MediaIoBaseUpload(file_content, mimetype=file_object.type, resumable=True)
         
-        st.sidebar.success("✅ Authentification Google Sheets réussie!")
-        return gc
+        file = drive_service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id, webViewLink'
+        ).execute()
         
+        st.success(f"✅ CV '{file_name}' uploadé sur Google Drive.")
+        return file.get('webViewLink')
+
     except Exception as e:
-        st.error(f"❌ Erreur d'authentification: {str(e)}")
+        st.error(f"❌ Échec de l'upload sur Google Drive : {e}")
+        st.warning("⚠️ Vérifiez que l'email de service a les droits 'Contributeur' sur le dossier Drive.")
         return None
 
 # -------------------- FONCTIONS GOOGLE SHEETS --------------------
 @st.cache_data(ttl=600)
 def load_data_from_sheet():
-    """Charge toutes les données de la feuille Google Sheets et les organise par quadrant."""
+    """Charge toutes les données de la feuille Google Sheets."""
     try:
         gc = get_gsheet_client()
         if not gc:
             st.warning("⚠️ Impossible de se connecter à Google Sheets")
-            return {
-                "🔍 Profils Identifiés": [], "✅ Candidats Qualifiés": [],
-                "🚀 Talents d'Avenir": [], "💎 Profils Stratégiques": []
-            }
+            return { "🔍 Profils Identifiés": [], "✅ Candidats Qualifiés": [], "🚀 Talents d'Avenir": [], "💎 Profils Stratégiques": [] }
         
-        # Ouvrir la feuille Google Sheets
         sh = gc.open_by_url(GOOGLE_SHEET_URL)
         worksheet = sh.worksheet(WORKSHEET_NAME)
         rows = worksheet.get_all_records()
         
-        # Organiser les données par quadrant avec les nouveaux noms
-        data = {
-            "🔍 Profils Identifiés": [], "✅ Candidats Qualifiés": [],
-            "🚀 Talents d'Avenir": [], "💎 Profils Stratégiques": []
-        }
+        data = { "🔍 Profils Identifiés": [], "✅ Candidats Qualifiés": [], "🚀 Talents d'Avenir": [], "💎 Profils Stratégiques": [] }
         
-        # Mapping des anciens noms vers les nouveaux pour la compatibilité
         quadrant_mapping = {
             "🌟 Haut Potentiel": "🚀 Talents d'Avenir",
             "💎 Rare & stratégique": "💎 Profils Stratégiques", 
@@ -100,10 +151,7 @@ def load_data_from_sheet():
         }
         
         for row in rows:
-            quadrant = row.get('Quadrant', '').strip()
-            # Utiliser le mapping si l'ancien nom existe, sinon utiliser tel quel
-            quadrant = quadrant_mapping.get(quadrant, quadrant)
-            
+            quadrant = quadrant_mapping.get(row.get('Quadrant', '').strip(), row.get('Quadrant', '').strip())
             if quadrant in data:
                 data[quadrant].append({
                     "date": row.get("Date", "N/A"),
@@ -112,7 +160,7 @@ def load_data_from_sheet():
                     "entreprise": row.get("Entreprise", "N/A"),
                     "linkedin": row.get("Linkedin", "N/A"),
                     "notes": row.get("Notes", ""),
-                    "cv_path": row.get("CV_Path", None)
+                    "cv_link": row.get("CV_Link", None) # Changé de CV_Path à CV_Link
                 })
         
         total_candidats = sum(len(v) for v in data.values())
@@ -121,34 +169,25 @@ def load_data_from_sheet():
         
     except Exception as e:
         st.error(f"❌ Échec du chargement des données depuis Google Sheets : {e}")
-        return {
-            "🔍 Profils Identifiés": [], "✅ Candidats Qualifiés": [],
-            "🚀 Talents d'Avenir": [], "💎 Profils Stratégiques": []
-        }
+        return { "🔍 Profils Identifiés": [], "✅ Candidats Qualifiés": [], "🚀 Talents d'Avenir": [], "💎 Profils Stratégiques": [] }
 
 def save_to_google_sheet(quadrant, entry):
-    """Sauvegarde les données d'un candidat dans Google Sheets."""
+    """Sauvegarde un candidat dans Google Sheets avec le lien du CV."""
     try:
         gc = get_gsheet_client()
-        if not gc:
-            return False
+        if not gc: return False
             
         sh = gc.open_by_url(GOOGLE_SHEET_URL)
         worksheet = sh.worksheet(WORKSHEET_NAME)
         
-        # Préparer les données pour la nouvelle ligne
+        # Assurez-vous que les en-têtes de votre Google Sheet sont dans cet ordre
+        # Quadrant, Date, Nom, Poste, Entreprise, Linkedin, Notes, CV_Link
         row_data = [
-            quadrant,
-            entry["date"],
-            entry["nom"],
-            entry["poste"],
-            entry["entreprise"],
-            entry["linkedin"],
-            entry["notes"],
-            os.path.basename(entry["cv_path"]) if entry["cv_path"] else "N/A"
+            quadrant, entry["date"], entry["nom"], entry["poste"],
+            entry["entreprise"], entry["linkedin"], entry["notes"],
+            entry["cv_link"] if entry["cv_link"] else "N/A"
         ]
         
-        # Ajouter la nouvelle ligne
         worksheet.append_row(row_data)
         return True
         
@@ -161,94 +200,52 @@ if "cartographie_data" not in st.session_state:
     st.session_state.cartographie_data = load_data_from_sheet()
 
 # -------------------- INTERFACE UTILISATEUR --------------------
-st.set_page_config(
-    page_title="TG-Hire IA - Cartographie",
-    page_icon="🗺️",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
+st.set_page_config(page_title="TG-Hire IA - Cartographie", page_icon="🗺️", layout="wide", initial_sidebar_state="expanded")
 st.title("🗺️ Cartographie des talents")
 
 # Bouton de test de connexion
-if st.sidebar.button("🔍 Tester la connexion Google Sheets (Débug)"):
-    st.sidebar.write("=== DÉBOGAGE CONNEXION GOOGLE SHEETS ===")
-    
-    # Vérifier les secrets
-    st.sidebar.write("1. Vérification des secrets...")
-    required_secrets = ['GCP_TYPE', 'GCP_PROJECT_ID', 'GCP_PRIVATE_KEY', 'GCP_CLIENT_EMAIL']
-    for secret in required_secrets:
-        if secret in st.secrets:
-            st.sidebar.write(f"✅ {secret}: Présent")
-            if secret == 'GCP_PRIVATE_KEY':
-                key_preview = st.secrets[secret][:50] + "..." if len(st.secrets[secret]) > 50 else st.secrets[secret]
-                st.sidebar.write(f"   Extrait: {key_preview}")
-        else:
-            st.sidebar.write(f"❌ {secret}: Manquant")
-    
-    # Tester la connexion
-    st.sidebar.write("2. Test d'authentification...")
+if st.sidebar.button("🔍 Tester les connexions Google (Débug)"):
+    st.sidebar.write("=== DÉBOGAGE CONNEXIONS GOOGLE ===")
+    st.sidebar.write("1. Test d'authentification Sheets...")
     gc = get_gsheet_client()
+    if gc: st.sidebar.success("✅ Authentification Google Sheets OK!")
+    else: st.sidebar.error("❌ Échec authentification Google Sheets.")
     
-    if gc:
-        st.sidebar.write("3. Test d'accès à la feuille...")
-        try:
-            sh = gc.open_by_url(GOOGLE_SHEET_URL)
-            worksheet = sh.worksheet(WORKSHEET_NAME)
-            st.sidebar.success("✅ Connexion Google Sheets fonctionnelle!")
-            st.sidebar.write(f"📊 Feuille: {WORKSHEET_NAME}")
-        except Exception as e:
-            st.sidebar.error(f"❌ Erreur d'accès: {e}")
-    else:
-        st.sidebar.error("❌ Échec de l'authentification")
+    st.sidebar.write("2. Test d'authentification Drive...")
+    drive_service = get_drive_service()
+    if drive_service: st.sidebar.success("✅ Authentification Google Drive OK!")
+    else: st.sidebar.error("❌ Échec authentification Google Drive.")
 
 # -------------------- Onglets --------------------
 tab1, tab2, tab3 = st.tabs(["Gestion des candidats", "Vue globale", "Guide des quadrants"])
 
-# -------------------- Onglet 1 : Gestion des candidats --------------------
 with tab1:
     quadrant_choisi = st.selectbox("Quadrant:", list(st.session_state.cartographie_data.keys()), key="carto_quadrant")
     st.subheader("➕ Ajouter un candidat")
     
     col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        nom = st.text_input("Nom du candidat", key="carto_nom")
-    with col2:
-        poste = st.text_input("Poste", key="carto_poste")
-    with col3:
-        entreprise = st.text_input("Entreprise", key="carto_entreprise")
-    with col4:
-        linkedin = st.text_input("Lien LinkedIn", key="carto_linkedin")
+    with col1: nom = st.text_input("Nom du candidat", key="carto_nom")
+    with col2: poste = st.text_input("Poste", key="carto_poste")
+    with col3: entreprise = st.text_input("Entreprise", key="carto_entreprise")
+    with col4: linkedin = st.text_input("Lien LinkedIn", key="carto_linkedin")
     
     notes = st.text_area("Notes / Observations", key="carto_notes", height=100)
     cv_file = st.file_uploader("Télécharger CV (PDF ou DOCX)", type=["pdf", "docx"], key="carto_cv")
 
     if st.button("💾 Ajouter à la cartographie", type="primary", use_container_width=True, key="btn_add_carto"):
         if nom and poste:
-            cv_path = None
+            cv_link = None
             if cv_file:
-                try:
-                    cv_filename = f"{nom}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{cv_file.name}"
-                    cv_path = os.path.join(CV_DIR, cv_filename)
-                    with open(cv_path, "wb") as f:
-                        f.write(cv_file.read())
-                    st.success(f"✅ CV sauvegardé dans: {cv_path}")
-                except Exception as e:
-                    st.error(f"❌ Erreur lors de la sauvegarde du CV dans {cv_path}: {e}")
+                cv_filename = f"{nom.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d')}_{cv_file.name}"
+                cv_link = upload_cv_to_drive(cv_filename, cv_file)
             
             entry = {
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "nom": nom,
-                "poste": poste,
-                "entreprise": entreprise,
-                "linkedin": linkedin,
-                "notes": notes,
-                "cv_path": cv_path
+                "date": datetime.now().strftime("%Y-%m-%d %H:%M"), "nom": nom, "poste": poste,
+                "entreprise": entreprise, "linkedin": linkedin, "notes": notes, "cv_link": cv_link
             }
             
             if save_to_google_sheet(quadrant_choisi, entry):
                 st.success(f"✅ {nom} ajouté à {quadrant_choisi}.")
-                # Recharger les données
                 st.cache_data.clear()
                 st.session_state.cartographie_data = load_data_from_sheet()
                 st.rerun()
@@ -275,45 +272,19 @@ with tab1:
                 st.write(f"**LinkedIn :** {cand.get('linkedin', 'Non spécifié')}")
                 st.write(f"**Notes :** {cand.get('notes', '')}")
                 
-                cv_local_path = cand.get('cv_path')
-                full_cv_path = os.path.join(CV_DIR, os.path.basename(cv_local_path)) if cv_local_path else None
+                # --- AFFICHAGE DU LIEN GOOGLE DRIVE ---
+                cv_drive_link = cand.get('cv_link')
+                if cv_drive_link and cv_drive_link.startswith('http'):
+                    st.markdown(f"**CV :** [Ouvrir depuis Google Drive]({cv_drive_link})", unsafe_allow_html=True)
                 
-                if full_cv_path and os.path.exists(full_cv_path):
-                    st.write(f"**CV :** {os.path.basename(full_cv_path)}")
-                    try:
-                        with open(full_cv_path, "rb") as f:
-                            st.download_button(
-                                label="⬇️ Télécharger CV",
-                                data=f,
-                                file_name=os.path.basename(full_cv_path),
-                                mime="application/pdf" if full_cv_path.lower().endswith('.pdf') else "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                key=f"download_cv_{quadrant_choisi}_{i}"
-                            )
-                    except Exception as e:
-                        st.error(f"❌ Erreur lors de la lecture du fichier CV : {e}")
+                # Le bouton de suppression locale a été enlevé.
                 
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("🗑️ Supprimer CV local", key=f"delete_carto_{quadrant_choisi}_{i}"):
-                        if full_cv_path and os.path.exists(full_cv_path):
-                            try:
-                                os.remove(full_cv_path)
-                                st.success("✅ CV local supprimé. (L'entrée dans Google Sheets n'est pas affectée)")
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"❌ Erreur lors de la suppression du CV local: {e}")
-                        else:
-                            st.warning("⚠️ Aucun CV local à supprimer pour ce candidat.")
-                
-                with col2:
-                    export_text = f"Nom: {cand['nom']}\nPoste: {cand['poste']}\nEntreprise: {cand['entreprise']}\nLinkedIn: {cand.get('linkedin', '')}\nNotes: {cand['notes']}\nCV: {os.path.basename(cand.get('cv_path', 'Aucun'))}"
-                    st.download_button(
-                        "⬇️ Exporter (Texte)",
-                        data=export_text,
-                        file_name=f"cartographie_{cand['nom']}.txt",
-                        mime="text/plain",
-                        key=f"download_carto_{quadrant_choisi}_{i}"
-                    )
+                export_text = f"Nom: {cand['nom']}\nPoste: {cand['poste']}\nEntreprise: {cand['entreprise']}\nLinkedIn: {cand.get('linkedin', '')}\nNotes: {cand['notes']}\nCV: {cand.get('cv_link', 'Aucun')}"
+                st.download_button(
+                    "⬇️ Exporter (Texte)", data=export_text,
+                    file_name=f"cartographie_{cand['nom']}.txt", mime="text/plain",
+                    key=f"download_carto_{quadrant_choisi}_{i}"
+                )
 
     st.subheader("📤 Exporter toute la cartographie")
     if st.button("⬇️ Exporter en CSV (Global)"):
@@ -325,17 +296,10 @@ with tab1:
                 all_data.append(cand_copy)
         
         df = pd.DataFrame(all_data)
-        csv_data = df.to_csv(index=False)
+        csv_data = df.to_csv(index=False).encode('utf-8')
         
-        st.download_button(
-            "Télécharger CSV",
-            data=csv_data,
-            file_name="cartographie_talents.csv",
-            mime="text/csv",
-            key="export_csv"
-        )
+        st.download_button("Télécharger CSV", data=csv_data, file_name="cartographie_talents.csv", mime="text/csv", key="export_csv")
 
-# -------------------- Onglet 2 : Vue globale --------------------
 with tab2:
     total_profils = sum(len(v) for v in st.session_state.cartographie_data.values())
     st.subheader(f"📊 Vue globale de la cartographie ({total_profils} profils)")
@@ -346,27 +310,18 @@ with tab2:
         
         if sum(counts.values()) > 0:
             df_counts = pd.DataFrame(list(counts.items()), columns=['Quadrant', 'Nombre'])
-            fig = px.pie(
-                df_counts,
-                names='Quadrant',
-                values='Nombre',
-                title="Répartition des candidats par quadrant",
-                color_discrete_sequence=["#636EFA", "#EF553B", "#00CC96", "#AB63FA"],
-                hover_data={'Nombre': True},
-                labels={'Nombre': 'Nombre de profils'}
-            )
+            fig = px.pie(df_counts, names='Quadrant', values='Nombre', title="Répartition des candidats par quadrant",
+                         color_discrete_sequence=["#636EFA", "#EF553B", "#00CC96", "#AB63FA"])
             fig.update_traces(hovertemplate='<b>%{label}</b><br>Nombre: %{value}<br>Pourcentage: %{percent}<extra></extra>')
-            st.plotly_chart(fig)
+            st.plotly_chart(fig, use_container_width=True)
         else:
             st.info("Aucun candidat dans la cartographie pour l'instant.")
             
     except ImportError:
         st.warning("⚠️ La bibliothèque Plotly n'est pas installée. Le dashboard n'est pas disponible. Installez Plotly avec 'pip install plotly'.")
 
-# -------------------- Onglet 3 : Guide des quadrants --------------------
 with tab3:
     st.subheader("📚 Guide des quadrants de la cartographie")
-    
     st.markdown("""
     ### 1. 🔍 Profils Identifiés
     **Il s'agit de notre vivier de sourcing fondamental.** Cette catégorie rassemble les talents prometteurs repérés sur le marché qui correspondent à nos métiers. Ils n'ont pas encore été contactés mais représentent la base de nos futures recherches.
