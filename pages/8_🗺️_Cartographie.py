@@ -306,6 +306,11 @@ with tab2:
         
         if sum(counts.values()) > 0:
             df_counts = pd.DataFrame(list(counts.items()), columns=['Quadrant', 'Nombre'])
+            
+            # --- MODIFICATION ICI ---
+            # On filtre le DataFrame pour ne garder que les lignes où le nombre est supérieur à 0
+            df_counts = df_counts[df_counts['Nombre'] > 0]
+            
             fig = px.pie(df_counts, names='Quadrant', values='Nombre', title="Répartition des candidats par quadrant",
                          color_discrete_sequence=["#636EFA", "#EF553B", "#00CC96", "#AB63FA"])
             fig.update_traces(hovertemplate='<b>%{label}</b><br>Nombre: %{value}<br>Pourcentage: %{percent}<extra></extra>')
