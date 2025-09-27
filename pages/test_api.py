@@ -17,9 +17,6 @@ WORKSHEET_NAME = "Cartographie"
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
 
-# Vérification de la connexion
-if not st.session_state.get("logged_in", False):
-    st.stop()
 
 # -------------------- Import utils --------------------
 UTILS_PATH = os.path.abspath(os.path.join(PROJECT_ROOT, "utils.py"))
