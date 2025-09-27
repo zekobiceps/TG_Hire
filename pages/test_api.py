@@ -41,34 +41,39 @@ if not os.path.exists(CV_DIR):
 
 # -------------------- FONCTION D'AUTHENTIFICATION CORRIGÉE --------------------
 def get_gsheet_client():
-    """Authentification corrigée avec les secrets racines"""
+    """Authentification simplifiée et renforcée"""
     try:
-        # Récupère la clé privée et remplace les \n par de vrais sauts de ligne
-        private_key_content = st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n')
-        
-        # Construit le dictionnaire d'identification
+        import gspread
+        from google.oauth2 import service_account
+        import json
+
+        # 1. Récupérer et nettoyer la clé privée
+        private_key = st.secrets["GCP_PRIVATE_KEY"].strip()
+
+        # 2. Construire l'objet d'information du compte de service
         service_account_info = {
             "type": st.secrets["GCP_TYPE"],
             "project_id": st.secrets["GCP_PROJECT_ID"],
             "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
-            "private_key": private_key_content,  # Utilise la clé corrigée
+            "private_key": private_key,
             "client_email": st.secrets["GCP_CLIENT_EMAIL"],
-            "client_id": st.secrets["GCP_CLIENT_ID"],
-            "auth_uri": st.secrets["GCP_AUTH_URI"],
             "token_uri": st.secrets["GCP_TOKEN_URI"],
-            "auth_provider_x509_cert_url": st.secrets["GCP_AUTH_PROVIDER_CERT_URL"],
-            "client_x509_cert_url": st.secrets["GCP_CLIENT_CERT_URL"],
-            "universe_domain": st.secrets["GCP_UNIVERSE_DOMAIN"]
         }
-        
-        # Méthode directe sans fichier temporaire (plus robuste)
-        import gspread
-        gc = gspread.service_account_from_dict(service_account_info)
+
+        # 3. Créer les credentials en utilisant la méthode recommandée par Google
+        credentials = service_account.Credentials.from_service_account_info(
+            service_account_info,
+            scopes=["https://www.googleapis.com/auth/spreadsheets"]
+        )
+
+        # 4. Créer le client gspread
+        gc = gspread.authorize(credentials)
+
         st.sidebar.success("✅ Authentification Google Sheets réussie!")
         return gc
-        
+
     except Exception as e:
-        st.error(f"❌ Erreur d'authentification: {str(e)}")
+        st.error(f"❌ Erreur d'authentification détaillée : {str(e)}")
         return None
 # -------------------- FONCTIONS GOOGLE SHEETS --------------------
 @st.cache_data(ttl=600)
