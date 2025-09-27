@@ -2,8 +2,8 @@
 
 # --- Interface et Visualisation ---
 streamlit
-plotly 
 altair
+plotly
 pydeck
 
 # --- Manipulation de Données & Fichiers ---
@@ -17,8 +17,11 @@ lxml
 
 # --- Intelligence Artificielle & Machine Learning ---
 scikit-learn
-sentence-transformers
+openai
 torch
+torchvision
+sentence-transformers
+spacy # <-- Juste la bibliothèque, le code gère le téléchargement du modèle
 
 # --- APIs & Connecteurs ---
 requests
