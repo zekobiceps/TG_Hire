@@ -7,39 +7,28 @@ import time
 from datetime import datetime
 import random
 
-# --- NOUVEAUX IMPORTS POUR LES MODÈLES IA ---
+# --- IMPORTS POUR LES MODÈLES IA ---
 try:
     import groq
     import google.generativeai as genai
 except ImportError:
     st.error("❌ Bibliothèques Groq ou Gemini manquantes. Exécutez : pip install groq google-generativeai")
     st.stop()
-
-# --- VÉRIFICATION DE CONNEXION (si nécessaire) ---
-# if not st.session_state.get("logged_in", False):
-#     st.error("🛑 Veuillez vous connecter pour accéder à cette page.")
-#     st.stop()
     
 # --- INITIALISATION DU SESSION STATE ---
 if "conversation_history" not in st.session_state:
     st.session_state.conversation_history = []
 if "selected_model" not in st.session_state:
-    st.session_state.selected_model = "Groq" # Modèle par défaut
+    st.session_state.selected_model = "Groq" 
 if "response_length" not in st.session_state:
-    st.session_state.response_length = "Normale" # Longueur par défaut
+    st.session_state.response_length = "Normale"
+if "last_token_usage" not in st.session_state:
+    st.session_state.last_token_usage = 0
 if "placeholder" not in st.session_state:
-    # Liste de 10 placeholders aléatoires
     placeholders = [
         "Quelles sont les missions clés d'un conducteur de travaux dans le BTP au Maroc ?",
         "Rédige une offre d'emploi pour un chef de projet BTP à Casablanca.",
-        "Propose 5 questions techniques pour un entretien avec un ingénieur en génie civil.",
-        "Comment évaluer les soft skills d'un chargé d'affaires BTP ?",
-        "Quels sont les salaires moyens pour un dessinateur-projeteur à Rabat ?",
-        "Liste les compétences indispensables pour un responsable QSE dans la construction.",
-        "Comment attirer des profils pénuriques comme les grutiers au Maroc ?",
-        "Analyse ce profil : 'Ingénieur d'état, 5 ans d'expérience en suivi de chantiers routiers'.",
-        "Donne-moi des arguments pour convaincre un candidat de rejoindre notre entreprise de BTP.",
-        "Quelles sont les réglementations marocaines importantes à connaître pour un poste RH dans le BTP ?"
+        "Propose 5 questions techniques pour un entretien avec un ingénieur en génie civil."
     ]
     st.session_state.placeholder = random.choice(placeholders)
 
@@ -52,28 +41,45 @@ st.set_page_config(
 )
 
 # -------------------- CONFIGURATION DES APIS --------------------
-
-# --- PROMPT SYSTÈME COMMUN ---
 SYSTEM_PROMPT = """
 Tu es 'TG-Hire Assistant', un expert IA spécialisé dans le recrutement pour le secteur du BTP (Bâtiment et Travaux Publics) au Maroc.
 Ton rôle est d'aider un recruteur humain à optimiser ses tâches quotidiennes.
 Tes réponses doivent être :
-1.  **Contextualisées** : Toujours adaptées au marché de l'emploi marocain et aux spécificités du secteur du BTP (terminologie, types de postes, réglementations locales).
-2.  **Professionnelles et Précises** : Fournis des informations concrètes, structurées et directement utilisables.
+1.  **Contextualisées** : Toujours adaptées au marché de l'emploi marocain et aux spécificités du secteur du BTP.
+2.  **Professionnelles et Précises** : Fournis des informations concrètes et structurées.
 3.  **Orientées Action** : Propose des listes, des questions, des modèles de texte, etc.
-4.  **Adaptables** : Tu dois ajuster la longueur et le niveau de détail de ta réponse (courte, normale, détaillée) selon la demande de l'utilisateur.
+4.  **Adaptables** : Tu dois ajuster la longueur de ta réponse (courte, normale, détaillée) selon la demande.
 """
 
-# --- MODÈLE DE COÛT DES TOKENS (pour l'affichage) ---
-TOKEN_COSTS = {
-    "Groq": "Consommation de tokens très rapide et à très faible coût.",
-    "DeepSeek": "Consommation de tokens à faible coût, bon équilibre performance/prix.",
-    "Gemini": "Consommation de tokens à coût modéré, modèle puissant de Google."
-}
+def get_cogenai_response(prompt, history, length):
+    # --- INFO CRITIQUE MANQUANTE ---
+    # Remplacez le placeholder ci-dessous par le nom exact du modèle CoGenAI
+    MODEL_NAME = "NOM_DU_MODELE_COGENAI_ICI"   # <--- À REMPLIR
+
+    BASE_URL = "https://cogenai.kalavai.net/v1"
+    api_key = st.secrets.get("COGEN_API_KEY")
+    if not api_key: return {"content": "Erreur: Clé API CoGenAI manquante.", "usage": 0}
+    
+    final_prompt = f"{prompt}\n\n(Instruction: Fournir une réponse de longueur '{length}')"
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history + [{"role": "user", "content": final_prompt}]
+    
+    try:
+        response = requests.post(
+            f"{BASE_URL}/chat/completions",
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+            json={"model": MODEL_NAME, "messages": messages, "max_tokens": 2048}
+        )
+        response.raise_for_status()
+        data = response.json()
+        content = data["choices"][0]["message"]["content"]
+        usage = data.get("usage", {}).get("total_tokens", 0)
+        return {"content": content, "usage": usage}
+    except Exception as e:
+        return {"content": f"❌ Erreur API CoGenAI: {e}", "usage": 0}
 
 def get_deepseek_response(prompt, history, length):
     api_key = st.secrets.get("DEEPSEEK_API_KEY")
-    if not api_key: return "Erreur: Clé API DeepSeek manquante."
+    if not api_key: return {"content": "Erreur: Clé API DeepSeek manquante.", "usage": 0}
     
     final_prompt = f"{prompt}\n\n(Instruction: Fournir une réponse de longueur '{length}')"
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history + [{"role": "user", "content": final_prompt}]
@@ -85,13 +91,16 @@ def get_deepseek_response(prompt, history, length):
             json={"model": "deepseek-chat", "messages": messages, "max_tokens": 2048}
         )
         response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"]
+        data = response.json()
+        content = data["choices"][0]["message"]["content"]
+        usage = data.get("usage", {}).get("total_tokens", 0)
+        return {"content": content, "usage": usage}
     except Exception as e:
-        return f"❌ Erreur API DeepSeek: {e}"
+        return {"content": f"❌ Erreur API DeepSeek: {e}", "usage": 0}
 
 def get_groq_response(prompt, history, length):
     api_key = st.secrets.get("GROQ_API_KEY")
-    if not api_key: return "Erreur: Clé API Groq manquante."
+    if not api_key: return {"content": "Erreur: Clé API Groq manquante.", "usage": 0}
     
     final_prompt = f"{prompt}\n\n(Instruction: Fournir une réponse de longueur '{length}')"
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history + [{"role": "user", "content": final_prompt}]
@@ -102,23 +111,27 @@ def get_groq_response(prompt, history, length):
             messages=messages,
             model="llama-3.1-8b-instant",
         )
-        return chat_completion.choices[0].message.content
+        content = chat_completion.choices[0].message.content
+        usage = chat_completion.usage.total_tokens
+        return {"content": content, "usage": usage}
     except Exception as e:
-        return f"❌ Erreur API Groq: {e}"
+        return {"content": f"❌ Erreur API Groq: {e}", "usage": 0}
 
 def get_gemini_response(prompt, history, length):
     api_key = st.secrets.get("GEMINI_API_KEY")
-    if not api_key: return "Erreur: Clé API Gemini manquante."
+    if not api_key: return {"content": "Erreur: Clé API Gemini manquante.", "usage": 0}
     
-    final_prompt = f"{SYSTEM_PROMPT}\n\nHistorique de la conversation:\n{json.dumps(history)}\n\nNouvelle question:\n{prompt}\n\n(Instruction: Fournir une réponse de longueur '{length}')"
+    final_prompt = f"{SYSTEM_PROMPT}\n\nHistorique:\n{json.dumps(history)}\n\nQuestion:\n{prompt}\n\n(Instruction: Fournir une réponse de longueur '{length}')"
     
     try:
         genai.configure(api_key=api_key)
         model = genai.GenerativeModel('gemini-pro')
         response = model.generate_content(final_prompt)
-        return response.text
+        content = response.text
+        usage = response.usage_metadata.total_token_count
+        return {"content": content, "usage": usage}
     except Exception as e:
-        return f"❌ Erreur API Gemini: {e}"
+        return {"content": f"❌ Erreur API Gemini: {e}", "usage": 0}
 
 # --- ROUTEUR DE MODÈLE ---
 def get_ai_response(prompt, history, model, length):
@@ -128,33 +141,33 @@ def get_ai_response(prompt, history, model, length):
         return get_deepseek_response(prompt, history, length)
     elif model == "Gemini":
         return get_gemini_response(prompt, history, length)
+    elif model == "CoGenAI":
+        return get_cogenai_response(prompt, history, length)
     else:
-        return "Erreur: Modèle non reconnu."
+        return {"content": "Erreur: Modèle non reconnu.", "usage": 0}
 
 # -------------------- INTERFACE PRINCIPALE --------------------
 st.title("🤖 Assistant IA pour le Recrutement BTP")
-st.info("Posez une question à votre assistant spécialisé pour le marché marocain du BTP.")
 
 # --- SÉLECTEURS DANS LA BARRE LATÉRALE ---
 with st.sidebar:
     st.subheader("⚙️ Paramètres")
-    st.session_state.selected_model = st.radio(
+    st.session_state.selected_model = st.selectbox(
         "🧠 Choisir le modèle IA :",
-        ("Groq", "DeepSeek", "Gemini"),
-        horizontal=True,
+        ("Groq", "DeepSeek", "Gemini", "CoGenAI")
     )
     
-    # --- NOUVEAUTÉ : Affichage du coût des tokens ---
-    st.caption(TOKEN_COSTS.get(st.session_state.selected_model, "Information non disponible."))
-    
-    st.divider()
-
-    # --- NOUVEAUTÉ : Menu déroulant pour la longueur ---
     st.session_state.response_length = st.selectbox(
         "📄 Longueur de la réponse :",
         ("Courte", "Normale", "Détaillée"),
-        index=1 # "Normale" est sélectionnée par défaut
+        index=1 
     )
+
+    st.divider()
+
+    st.subheader("📊 Utilisation")
+    st.metric("Tokens de la dernière réponse", f"{st.session_state.last_token_usage}")
+    st.caption("Le nombre de tokens mesure la 'quantité de travail' de l'IA.")
 
 
 # --- ZONE DE SAISIE ET BOUTONS ---
@@ -162,7 +175,7 @@ user_input = st.text_area(
     "💬 Posez votre question ici :",
     key="assistant_input",
     height=120,
-    placeholder=st.session_state.placeholder # Placeholder aléatoire
+    placeholder=st.session_state.placeholder
 )
 
 col1, col2 = st.columns([3, 1])
@@ -173,7 +186,8 @@ with col2:
 
 if reset_button:
     st.session_state.conversation_history = []
-    st.success("🗑️ Historique de la conversation effacé !")
+    st.session_state.last_token_usage = 0
+    st.success("🗑️ Historique effacé !")
     time.sleep(1)
     st.rerun()
 
@@ -182,42 +196,29 @@ if send_button and user_input.strip():
     
     st.session_state.conversation_history.append({"role": "user", "content": user_input})
     
-    # --- NOUVEAUTÉ : Texte du spinner modifié ---
     with st.spinner("⏳ Génération d'une réponse par l'IA en cours..."):
-        ai_response = get_ai_response(
+        response_dict = get_ai_response(
             user_input, 
             api_history, 
             st.session_state.selected_model,
             st.session_state.response_length
         )
 
+    ai_response = response_dict["content"]
+    token_usage = response_dict["usage"]
+
     st.session_state.conversation_history.append({"role": "assistant", "content": ai_response})
+    st.session_state.last_token_usage = token_usage
     
-    # Change le placeholder pour la prochaine question
-    placeholders = [
-        "Quelles sont les missions clés d'un conducteur de travaux dans le BTP au Maroc ?",
-        "Rédige une offre d'emploi pour un chef de projet BTP à Casablanca.",
-        "Propose 5 questions techniques pour un entretien avec un ingénieur en génie civil.",
-        "Comment évaluer les soft skills d'un chargé d'affaires BTP ?",
-        "Quels sont les salaires moyens pour un dessinateur-projeteur à Rabat ?",
-        "Liste les compétences indispensables pour un responsable QSE dans la construction.",
-        "Comment attirer des profils pénuriques comme les grutiers au Maroc ?",
-        "Analyse ce profil : 'Ingénieur d'état, 5 ans d'expérience en suivi de chantiers routiers'.",
-        "Donne-moi des arguments pour convaincre un candidat de rejoindre notre entreprise de BTP.",
-        "Quelles sont les réglementations marocaines importantes à connaître pour un poste RH dans le BTP ?"
-    ]
-    st.session_state.placeholder = random.choice(placeholders)
     st.rerun()
 
 elif send_button and not user_input.strip():
     st.warning("⚠️ Veuillez écrire une question avant de générer une réponse.")
 
-st.divider()
-
-# --- AFFICHAGE DE L'HISTORIQUE DE CONVERSATION (INVERSÉ) ---
+# --- AFFICHAGE DE L'HISTORIQUE ---
 st.subheader("📜 Historique de la conversation")
 if not st.session_state.conversation_history:
-    st.info("La conversation n'a pas encore commencé. Posez une question pour démarrer !")
+    st.info("La conversation n'a pas encore commencé.")
 else:
     for conv in reversed(st.session_state.conversation_history):
         with st.chat_message(conv["role"]):
