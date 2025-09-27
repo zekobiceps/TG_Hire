@@ -41,60 +41,46 @@ if not os.path.exists(CV_DIR):
 
 # -------------------- FONCTION D'AUTHENTIFICATION CORRIGÉE --------------------
 def get_gsheet_client():
-    """Authentifie avec Google Sheets - Version corrigée."""
+    """Authentifie avec Google Sheets - Approche alternative."""
     try:
-        # Vérifier si la clé existe
         if 'GCP_SERVICE_ACCOUNT_JSON' not in st.secrets:
             st.error("❌ GCP_SERVICE_ACCOUNT_JSON non trouvé dans les secrets")
             return None
         
+        # Extraire directement les valeurs nécessaires
         json_data = st.secrets['GCP_SERVICE_ACCOUNT_JSON']
         
-        # Debug: Afficher le type
-        st.sidebar.write(f"🔍 Type des données: {type(json_data)}")
-        
-        # Méthode 1: Si c'est déjà un dictionnaire
-        if isinstance(json_data, dict):
-            service_account_info = json_data
-        # Méthode 2: Si c'est une string JSON
-        elif isinstance(json_data, str):
-            try:
-                # Nettoyer la string - corriger l'échappement des \n
-                cleaned_json = json_data.replace('\\n', '\n')
-                service_account_info = json.loads(cleaned_json)
-            except json.JSONDecodeError as e:
-                st.error(f"❌ Erreur de parsing JSON: {e}")
-                return None
+        if isinstance(json_data, str):
+            # Nettoyer et parser le JSON
+            json_data = json_data.replace('\\n', '\n')
+            data = json.loads(json_data)
         else:
-            st.error(f"❌ Type de données inattendu: {type(json_data)}")
-            return None
+            data = json_data
         
-        # Vérifier que les champs requis existent
-        required_fields = ['type', 'project_id', 'private_key', 'client_email']
-        for field in required_fields:
-            if field not in service_account_info:
-                st.error(f"❌ Champ manquant dans le service account: {field}")
-                return None
-        
-        # Vérifier que la private_key a les bons sauts de ligne
-        private_key = service_account_info['private_key']
-        if '\\n' in private_key:
-            service_account_info['private_key'] = private_key.replace('\\n', '\n')
+        # Créer manuellement le dictionnaire d'authentification
+        service_account_info = {
+            "type": data["type"],
+            "project_id": data["project_id"],
+            "private_key_id": data["private_key_id"],
+            "private_key": data["private_key"].replace('\\n', '\n'),
+            "client_email": data["client_email"],
+            "client_id": data["client_id"],
+            "auth_uri": data["auth_uri"],
+            "token_uri": data["token_uri"],
+            "auth_provider_x509_cert_url": data["auth_provider_x509_cert_url"],
+            "client_x509_cert_url": data["client_x509_cert_url"]
+        }
         
         # Créer un fichier temporaire
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             json.dump(service_account_info, f, indent=2)
             temp_file = f.name
         
-        # Utiliser le fichier temporaire
         gc = gspread.service_account(filename=temp_file)
-        
-        # Nettoyer
         os.unlink(temp_file)
         
         st.sidebar.success("✅ Authentification Google Sheets réussie!")
         return gc
-    
         # Après avoir obtenu service_account_info, ajoutez :
         st.sidebar.write("🔍 Private key preview:")
         st.sidebar.text_area("Clé privée (premieres lignes)", 
@@ -103,8 +89,6 @@ def get_gsheet_client():
         
     except Exception as e:
         st.error(f"❌ Erreur d'authentification: {str(e)}")
-        import traceback
-        st.error(f"🔍 Détails: {traceback.format_exc()}")
         return None
 
 # -------------------- FONCTIONS GOOGLE SHEETS --------------------
