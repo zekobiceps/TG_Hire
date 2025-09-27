@@ -41,35 +41,45 @@ if not os.path.exists(CV_DIR):
 
 # -------------------- FONCTION D'AUTHENTIFICATION CORRIGÉE --------------------
 def get_gsheet_client():
-    """Authentifie avec Google Sheets - Approche alternative."""
+    """Authentifie avec Google Sheets - Version corrigée pour TOML."""
     try:
         if 'GCP_SERVICE_ACCOUNT_JSON' not in st.secrets:
             st.error("❌ GCP_SERVICE_ACCOUNT_JSON non trouvé dans les secrets")
             return None
         
-        # Extraire directement les valeurs nécessaires
         json_data = st.secrets['GCP_SERVICE_ACCOUNT_JSON']
         
-        if isinstance(json_data, str):
-            # Nettoyer et parser le JSON
-            json_data = json_data.replace('\\n', '\n')
-            data = json.loads(json_data)
-        else:
-            data = json_data
+        st.sidebar.write(f"🔍 Type des données: {type(json_data)}")
         
-        # Créer manuellement le dictionnaire d'authentification
-        service_account_info = {
-            "type": data["type"],
-            "project_id": data["project_id"],
-            "private_key_id": data["private_key_id"],
-            "private_key": data["private_key"].replace('\\n', '\n'),
-            "client_email": data["client_email"],
-            "client_id": data["client_id"],
-            "auth_uri": data["auth_uri"],
-            "token_uri": data["token_uri"],
-            "auth_provider_x509_cert_url": data["auth_provider_x509_cert_url"],
-            "client_x509_cert_url": data["client_x509_cert_url"]
-        }
+        # Si c'est déjà un dictionnaire (TOML a bien parsé)
+        if isinstance(json_data, dict):
+            service_account_info = json_data
+        # Si c'est une string (TOML l'a traité comme string)
+        elif isinstance(json_data, str):
+            try:
+                # Nettoyer les échappements TOML
+                cleaned_json = json_data.replace('\\n', '\n')
+                service_account_info = json.loads(cleaned_json)
+            except json.JSONDecodeError as e:
+                st.error(f"❌ Erreur de parsing JSON: {e}")
+                st.sidebar.text("JSON problématique:")
+                st.sidebar.text(json_data[:200])
+                return None
+        else:
+            st.error(f"❌ Type de données inattendu: {type(json_data)}")
+            return None
+        
+        # Vérifier les champs requis
+        required_fields = ['type', 'project_id', 'private_key', 'client_email']
+        for field in required_fields:
+            if field not in service_account_info:
+                st.error(f"❌ Champ manquant: {field}")
+                return None
+        
+        # S'assurer que la private_key a les bons sauts de ligne
+        private_key = service_account_info['private_key']
+        if '\\n' in private_key:
+            service_account_info['private_key'] = private_key.replace('\\n', '\n')
         
         # Créer un fichier temporaire
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
@@ -84,6 +94,8 @@ def get_gsheet_client():
         
     except Exception as e:
         st.error(f"❌ Erreur d'authentification: {str(e)}")
+        import traceback
+        st.error(f"🔍 Détails: {traceback.format_exc()}")
         return None
 
 # -------------------- FONCTIONS GOOGLE SHEETS --------------------
