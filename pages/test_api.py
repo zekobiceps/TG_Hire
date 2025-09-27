@@ -41,87 +41,36 @@ if not os.path.exists(CV_DIR):
 
 # -------------------- FONCTION D'AUTHENTIFICATION CORRIGÉE --------------------
 def get_gsheet_client():
-    """Authentifie avec Google Sheets - Version corrigée pour Streamlit Cloud."""
+    """Authentification avec secrets individuels."""
     try:
-        # Vérifier si les secrets sont disponibles
-        if 'GCP_SERVICE_ACCOUNT_JSON' not in st.secrets:
-            st.error("❌ GCP_SERVICE_ACCOUNT_JSON non trouvé dans les secrets")
-            st.info("🔍 Clés disponibles dans les secrets:")
-            for key in st.secrets.keys():
-                st.write(f"- {key}")
-            return None
-        
-        json_data = st.secrets['GCP_SERVICE_ACCOUNT_JSON']
-        
-        # Debug: Afficher le type
-        st.sidebar.write(f"🔍 Type des données: {type(json_data)}")
-        
-        # Nettoyer la chaîne JSON des caractères de contrôle invalides
-        if isinstance(json_data, str):
-            # Afficher un extrait pour debug
-            st.sidebar.write(f"🔍 Extrait JSON (avant nettoyage): {json_data[:200]}")
-            
-            # Nettoyer les caractères de contrôle invalides
-            import re
-            cleaned_json = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', json_data)
-            
-            # Gérer les échappements TOML/JSON
-            cleaned_json = cleaned_json.replace('\\n', '\n').replace('\\\\', '\\')
-            
-            st.sidebar.write(f"🔍 Extrait JSON (après nettoyage): {cleaned_json[:200]}")
-            
-            try:
-                service_account_info = json.loads(cleaned_json)
-            except json.JSONDecodeError as e:
-                st.error(f"❌ Erreur de parsing JSON après nettoyage: {e}")
-                # Essayer une autre méthode de nettoyage
-                try:
-                    # Méthode alternative: extraire le JSON avec regex
-                    json_match = re.search(r'\{.*\}', cleaned_json, re.DOTALL)
-                    if json_match:
-                        cleaned_json_alt = json_match.group()
-                        service_account_info = json.loads(cleaned_json_alt)
-                    else:
-                        raise ValueError("Aucun JSON valide trouvé")
-                except Exception as e2:
-                    st.error(f"❌ Échec de la récupération du JSON: {e2}")
-                    return None
-                    
-        elif isinstance(json_data, dict):
-            service_account_info = json_data
-        else:
-            st.error(f"❌ Type de données inattendu: {type(json_data)}")
-            return None
-        
-        # Vérifier les champs requis
-        required_fields = ['type', 'project_id', 'private_key', 'client_email']
-        for field in required_fields:
-            if field not in service_account_info:
-                st.error(f"❌ Champ manquant: {field}")
-                st.sidebar.write(f"Champs disponibles: {list(service_account_info.keys())}")
-                return None
-        
-        # S'assurer que la private_key a les bons sauts de ligne
-        private_key = service_account_info['private_key']
-        if '\\n' in private_key:
-            service_account_info['private_key'] = private_key.replace('\\n', '\n')
+        # Construire le dictionnaire service account
+        service_account_info = {
+            "type": st.secrets["GCP_TYPE"],
+            "project_id": st.secrets["GCP_PROJECT_ID"],
+            "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
+            "private_key": st.secrets["GCP_PRIVATE_KEY"],
+            "client_email": st.secrets["GCP_CLIENT_EMAIL"],
+            "client_id": st.secrets["GCP_CLIENT_ID"],
+            "auth_uri": st.secrets["GCP_AUTH_URI"],
+            "token_uri": st.secrets["GCP_TOKEN_URI"],
+            "auth_provider_x509_cert_url": st.secrets["GCP_AUTH_PROVIDER_CERT_URL"],
+            "client_x509_cert_url": st.secrets["GCP_CLIENT_CERT_URL"],
+            "universe_domain": st.secrets["GCP_UNIVERSE_DOMAIN"]
+        }
         
         # Créer un fichier temporaire
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
             json.dump(service_account_info, f, indent=2)
             temp_file = f.name
         
-        # Authentification
         gc = gspread.service_account(filename=temp_file)
-        os.unlink(temp_file)  # Nettoyer le fichier temporaire
+        os.unlink(temp_file)
         
         st.sidebar.success("✅ Authentification Google Sheets réussie!")
         return gc
         
     except Exception as e:
         st.error(f"❌ Erreur d'authentification: {str(e)}")
-        import traceback
-        st.error(f"🔍 Détails: {traceback.format_exc()}")
         return None
 # -------------------- FONCTIONS GOOGLE SHEETS --------------------
 @st.cache_data(ttl=600)
@@ -215,12 +164,38 @@ st.set_page_config(
 st.title("🗺️ Cartographie des talents (Google Sheets)")
 
 # Bouton de test de connexion
-if st.sidebar.button("🔍 Tester la connexion Google Sheets"):
+# Dans votre sidebar, remplacez le bouton de test par :
+if st.sidebar.button("🔍 Tester la connexion Google Sheets (Débug)"):
+    st.sidebar.write("=== DÉBOGAGE CONNEXION GOOGLE SHEETS ===")
+    
+    # Vérifier les secrets
+    st.sidebar.write("1. Vérification des secrets...")
+    required_secrets = ['GCP_TYPE', 'GCP_PROJECT_ID', 'GCP_PRIVATE_KEY', 'GCP_CLIENT_EMAIL']
+    for secret in required_secrets:
+        if secret in st.secrets:
+            st.sidebar.write(f"✅ {secret}: Présent")
+            if secret == 'GCP_PRIVATE_KEY':
+                # Afficher un extrait de la clé
+                key_preview = st.secrets[secret][:50] + "..." if len(st.secrets[secret]) > 50 else st.secrets[secret]
+                st.sidebar.write(f"   Extrait: {key_preview}")
+        else:
+            st.sidebar.write(f"❌ {secret}: Manquant")
+    
+    # Tester la connexion
+    st.sidebar.write("2. Test d'authentification...")
     gc = get_gsheet_client()
+    
     if gc:
-        st.sidebar.success("✅ Connexion Google Sheets fonctionnelle")
+        st.sidebar.write("3. Test d'accès à la feuille...")
+        try:
+            sh = gc.open_by_url(GOOGLE_SHEET_URL)
+            worksheet = sh.worksheet(WORKSHEET_NAME)
+            st.sidebar.success("✅ Connexion Google Sheets fonctionnelle!")
+            st.sidebar.write(f"📊 Feuille: {WORKSHEET_NAME}")
+        except Exception as e:
+            st.sidebar.error(f"❌ Erreur d'accès: {e}")
     else:
-        st.sidebar.error("❌ Échec de la connexion")
+        st.sidebar.error("❌ Échec de l'authentification")
 
 # -------------------- Onglets --------------------
 tab1, tab2 = st.tabs(["Gestion des candidats", "Vue globale"])
