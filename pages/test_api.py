@@ -24,7 +24,7 @@ import importlib.util
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1QLC_LzwQU5eKLRcaDglLd6csejLZSs1aauYFwzFk0ac/edit"
 WORKSHEET_NAME = "Cartographie"
 # --- ID DU DOSSIER GOOGLE DRIVE POUR LES CVS ---
-GOOGLE_DRIVE_FOLDER_ID = "1mWh1k2A72YI2H0DEabe5aIC6vSAP5aFQ" # ID de votre dossier Drive inséré ici
+GOOGLE_DRIVE_FOLDER_ID = "1Op0cV3HFjLHqubSbCFY7yYdRkRuNi26C" # ID de votre dossier Drive inséré ici
 
 # --- GESTION DES CHEMINS (uniquement pour 'utils.py') ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
