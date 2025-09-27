@@ -57,17 +57,28 @@ def extract_text_from_pdf(file):
     except Exception as e:
         return f"Erreur d'extraction du texte: {str(e)}"
 
-# --- MÉTHODE 1 : SIMILARITÉ COSINUS ---
-def rank_resumes_with_cosine(job_description, resumes):
+# --- MÉTHODE 1 : SIMILARITÉ COSINUS (AVEC LOGIQUE) ---
+def rank_resumes_with_cosine(job_description, resumes, file_names):
     try:
         documents = [job_description] + resumes
-        vectorizer = TfidfVectorizer().fit_transform(documents)
-        vectors = vectorizer.toarray()
+        vectorizer = TfidfVectorizer(stop_words='english').fit(documents)
+        vectors = vectorizer.transform(documents).toarray()
+        
         cosine_similarities = cosine_similarity([vectors[0]], vectors[1:]).flatten()
-        return {"scores": cosine_similarities}
+        
+        logic = {}
+        feature_names = vectorizer.get_feature_names_out()
+        for i, resume_text in enumerate(resumes):
+            jd_vector = vectors[0]
+            resume_vector = vectors[i+1]
+            common_keywords_indices = (jd_vector > 0) & (resume_vector > 0)
+            common_keywords = feature_names[common_keywords_indices]
+            logic[file_names[i]] = {"Mots-clés communs importants": list(common_keywords[:10])}
+
+        return {"scores": cosine_similarities, "logic": logic}
     except Exception as e:
         st.error(f"❌ Erreur Cosinus: {e}")
-        return {"scores": []}
+        return {"scores": [], "logic": {}}
 
 # --- MÉTHODE 2 : WORD EMBEDDINGS ---
 def rank_resumes_with_embeddings(job_description, resumes):
@@ -80,64 +91,89 @@ def rank_resumes_with_embeddings(job_description, resumes):
         st.error(f"❌ Erreur Sémantique : {e}")
         return {"scores": []}
 
-# --- ANALYSE PAR REGEX ---
+# --- ANALYSE PAR REGEX AMÉLIORÉE ---
 def regex_analysis(text):
     text_lower = text.lower()
-    # --- NOUVELLE LISTE DE COMPÉTENCES PLUS PERTINENTE POUR UN POSTE JUNIOR ---
-    SKILLS_TECH = ["archivage", "ged", "numérisation", "classer", "classement", "inventaire", "documents"]
-    SKILLS_SOFT = ["rigueur", "méthode", "esprit d’équipe", "organisation", "autonomie"]
     
-    found_tech = {skill for skill in SKILLS_TECH if re.search(r'\b' + re.escape(skill) + r'\b', text_lower)}
-    found_soft = {skill for skill in SKILLS_SOFT if re.search(r'\b' + re.escape(skill) + r'\b', text_lower)}
-    
-    experience_match = re.search(r"(\d+)\s*(ans|années)\s*d'expérience", text_lower)
-    experience = int(experience_match.group(1)) if experience_match else 0
+    education_level = 0
+    edu_patterns = {
+        5: r'bac\s*\+\s*5|master|ingénieur',
+        3: r'bac\s*\+\s*3|licence',
+        2: r'bac\s*\+\s*2|bts|dut',
+        0: r'baccalauréat'
+    }
+    for level, pattern in edu_patterns.items():
+        if re.search(pattern, text_lower):
+            education_level = level
+            break
+            
+    experience_match = re.search(r"(\d+)\s*à\s*(\d+)\s*ans|(\d+)\s*(?:ans|années)", text_lower)
+    experience = 0
+    if experience_match:
+        if experience_match.group(1):
+            experience = int(experience_match.group(1)) 
+        else:
+            experience = int(experience_match.group(3))
+
+    skills = []
+    profile_section_match = re.search(r"profil recherché\s*:(.*?)(?:\n\n|\Z)", text_lower, re.DOTALL | re.IGNORECASE)
+    if profile_section_match:
+        profile_section = profile_section_match.group(1)
+        # On extrait les mots de plus de 4 lettres
+        words = re.findall(r'\b[a-zA-ZÀ-ÿ-]{4,}\b', profile_section)
+        stop_words = ["profil", "recherché", "maîtrise", "bonne", "expérience", "esprit", "basé", "casablanca", "missions", "principales", "confirmée"]
+        skills = [word for word in words if word not in stop_words]
+
     return {
-        "Compétences Techniques": list(found_tech),
-        "Compétences Comportementales": list(found_soft),
-        "Années d'expérience détectées": experience
+        "Niveau d'études": education_level,
+        "Années d'expérience": experience,
+        "Compétences clés extraites": list(set(skills))
     }
 
-# --- SCORING PAR RÈGLES AVEC REGEX (LOGIQUE AMÉLIORÉE) ---
+# --- SCORING PAR RÈGLES AVEC REGEX AMÉLIORÉ ---
 def rank_resumes_with_rules(job_description, resumes, file_names):
     jd_entities = regex_analysis(job_description)
     results = []
     
-    TECH_SKILL_WEIGHT = 15
-    SOFT_SKILL_WEIGHT = 5
+    SKILL_WEIGHT = 5
+    EDUCATION_WEIGHT = 30
+    EXPERIENCE_WEIGHT = 20
     
     for i, resume_text in enumerate(resumes):
         resume_entities = regex_analysis(resume_text)
         current_score = 0
         logic = {}
         
-        common_tech_skills = set(jd_entities["Compétences Techniques"]) & set(resume_entities["Compétences Techniques"])
-        score_from_tech = len(common_tech_skills) * TECH_SKILL_WEIGHT
-        current_score += score_from_tech
-        logic['Compétences Techniques trouvées'] = f"{list(common_tech_skills)} (+{score_from_tech} pts)"
-        
-        common_soft_skills = set(jd_entities["Compétences Comportementales"]) & set(resume_entities["Compétences Comportementales"])
-        score_from_soft = len(common_soft_skills) * SOFT_SKILL_WEIGHT
-        current_score += score_from_soft
-        logic['Compétences Comportementales trouvées'] = f"{list(common_soft_skills)} (+{score_from_soft} pts)"
-        
-        results.append({
-            "file_name": file_names[i],
-            "score": current_score,
-            "logic": logic
-        })
+        common_skills = set(jd_entities["Compétences clés extraites"]) & set(resume_text.lower().split())
+        score_from_skills = len(common_skills) * SKILL_WEIGHT
+        current_score += score_from_skills
+        logic['Compétences correspondantes'] = f"{list(common_skills)} (+{score_from_skills} pts)"
 
-    max_possible_score = (len(jd_entities["Compétences Techniques"]) * TECH_SKILL_WEIGHT) + (len(jd_entities["Compétences Comportementales"]) * SOFT_SKILL_WEIGHT)
+        score_from_edu = 0
+        if resume_entities["Niveau d'études"] >= jd_entities["Niveau d'études"]:
+            score_from_edu = EDUCATION_WEIGHT
+            current_score += score_from_edu
+        logic['Niveau d\'études'] = f"Candidat: Bac+{resume_entities['Niveau d\'études']} vs Requis: Bac+{jd_entities['Niveau d\'études']} (+{score_from_edu} pts)"
+        
+        score_from_exp = 0
+        if resume_entities["Années d'expérience"] >= jd_entities["Années d'expérience"]:
+            score_from_exp = EXPERIENCE_WEIGHT
+            current_score += score_from_exp
+        logic['Expérience'] = f"Candidat: {resume_entities['Années d\'expérience']} ans vs Requis: {jd_entities['Années d\'expérience']} ans (+{score_from_exp} pts)"
+        
+        results.append({"file_name": file_names[i], "score": current_score, "logic": logic})
+
+    max_score = (len(jd_entities["Compétences clés extraites"]) * SKILL_WEIGHT) + EDUCATION_WEIGHT + EXPERIENCE_WEIGHT
     
-    if max_possible_score > 0:
+    if max_score > 0:
         for res in results:
-            res["score"] = min(res["score"] / max_possible_score, 1.0) # Plafonner à 100%
+            res["score"] = min(res["score"] / max_score, 1.0)
             
     return results
 
-# --- MÉTHODE 4 : ANALYSE PAR IA (LOGIQUE DE PARSING CORRIGÉE) ---
+# --- MÉTHODE 4 : ANALYSE PAR IA (PARSING CORRIGÉ) ---
 def get_detailed_score_with_ai(job_description, resume_text):
-    if not API_KEY: return {"score": 0.0, "explanation": "❌ Analyse IA impossible. Clé API non configurée."}
+    if not API_KEY: return {"score": 0.0, "explanation": "❌ Analyse IA impossible."}
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
     prompt = f"""
@@ -155,8 +191,7 @@ def get_detailed_score_with_ai(job_description, resume_text):
         response = requests.post(url, headers=headers, data=json.dumps(payload))
         response.raise_for_status()
         full_response_text = response.json()["choices"][0]["message"]["content"]
-        # --- CORRECTION : Logique plus robuste pour extraire le score ---
-        score_match = re.search(r"Score:\s*(\d+)%", full_response_text)
+        score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", full_response_text, re.IGNORECASE)
         score = int(score_match.group(1)) / 100 if score_match else 0.0
         return {"score": score, "explanation": full_response_text}
     except Exception as e:
@@ -165,24 +200,15 @@ def get_detailed_score_with_ai(job_description, resume_text):
 
 def rank_resumes_with_ai(job_description, resumes, file_names):
     scores_data = []
-    for i, resume_text in enumerate(resumes):
-        detailed_response = get_detailed_score_with_ai(job_description, resume_text)
-        scores_data.append({
-            "file_name": file_names[i],
-            "score": detailed_response["score"],
-            "explanation": detailed_response["explanation"]
-        })
-    return {"scores": [d["score"] for d in scores_data], "explanations": {d["file_name"]: d["explanation"] for d in scores_data}}
+    for resume_text in resumes:
+        scores_data.append(get_detailed_score_with_ai(job_description, resume_text))
+    return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
 
 def get_deepseek_analysis(text):
     if not API_KEY: return "Analyse impossible."
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
-    prompt = f"""
-    En tant qu'expert en recrutement, analyse le CV suivant.
-    Identifie les points forts et les points faibles de ce candidat sous des titres dédiés.
-    Voici le texte du CV : {text}
-    """
+    prompt = f"En tant qu'expert en recrutement, analyse le CV suivant et identifie les points forts et faibles. Texte du CV : {text}"
     payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}]}
     try:
         response = requests.post(url, headers=headers, data=json.dumps(payload))
@@ -193,16 +219,14 @@ def get_deepseek_analysis(text):
 
 # -------------------- Interface Utilisateur --------------------
 st.title("📄 Analyseur de CVs Intelligent")
-
 tab1, tab2, tab3 = st.tabs(["📊 Classement de CVs", "🎯 Analyse de Profil", "📖 Guide des Méthodes"])
 
-# --- ONGLET CLASSEMENT ---
 with tab1:
     st.markdown("### 📄 Informations du Poste")
     col1, col2 = st.columns([2, 1])
     with col1:
         job_title = st.text_input("Intitulé du poste", placeholder="Ex: Archiviste Junior")
-        job_description = st.text_area("Description du poste", height=200, key="jd_ranking", placeholder="Collez la description complète du poste ici...")
+        job_description = st.text_area("Description du poste", height=200, key="jd_ranking", placeholder="Collez la description...")
     with col2:
         st.markdown("#### 📤 Importer des CVs")
         uploaded_files_ranking = st.file_uploader("Importer des CVs", type=["pdf"], accept_multiple_files=True, key="ranking_uploader")
@@ -235,11 +259,11 @@ with tab1:
                 logic = {r["file_name"]: r["logic"] for r in rule_results}
             elif analysis_method == "Méthode Sémantique (Embeddings)":
                 results = rank_resumes_with_embeddings(job_description, resumes)
-            else: # Cosinus par défaut
-                results = rank_resumes_with_cosine(job_description, resumes)
+            else: # Cosinus
+                results = rank_resumes_with_cosine(job_description, resumes, file_names)
+                logic = results.get("logic")
 
             scores = results.get("scores", [])
-            # --- CORRECTION BUG ValueError ---
             if scores is not None and len(scores) > 0:
                 ranked_resumes = sorted(zip(file_names, scores), key=lambda x: x[1], reverse=True)
                 results_df = pd.DataFrame(ranked_resumes, columns=["Nom du CV", "Score brut"])
@@ -250,45 +274,42 @@ with tab1:
                 st.dataframe(results_df[["Rang", "Nom du CV", "Score"]], use_container_width=True, hide_index=True)
                 
                 if logic:
-                    st.markdown("### 🧠 Logique de Scoring (Règles)")
+                    st.markdown("### 🧠 Logique de Scoring")
                     for _, row in results_df.iterrows():
                         file_name = row["Nom du CV"]
                         with st.expander(f"Détail du score pour : **{file_name}**"):
-                            st.json(logic.get(file_name, "Aucun détail disponible."))
+                            st.json(logic.get(file_name, {}))
 
                 if explanations:
                     st.markdown("### 📝 Analyse détaillée par l'IA")
                     for _, row in results_df.iterrows():
                         file_name = row["Nom du CV"]
-                        score = row["Score brut"]
-                        with st.expander(f"Analyse pour : **{file_name}** (Score: {score*100:.1f}%)"):
-                            st.markdown(explanations.get(file_name, "Aucune explication disponible."))
+                        with st.expander(f"Analyse pour : **{file_name}**"):
+                            st.markdown(explanations.get(file_name, "N/A"))
             else:
-                st.error("L'analyse n'a retourné aucun score. Veuillez vérifier les CVs ou la description de poste.")
+                st.error("L'analyse n'a retourné aucun score.")
 
-
-# --- ONGLET ANALYSE DE PROFIL ---
 with tab2:
-    st.markdown("### 📂 Importer un ou plusieurs CVs pour une analyse individuelle")
-    uploaded_files_analysis = st.file_uploader("Importer des CVs", type=["pdf"], key="analysis_uploader", accept_multiple_files=True)
+    st.markdown("### 📂 Importer un ou plusieurs CVs")
+    uploaded_files_analysis = st.file_uploader("Importer des CVs", type=["pdf"], key="analysis_uploader_single", accept_multiple_files=True)
     
     analysis_type_single = st.selectbox(
         "Type d'analyse souhaité",
         ("Analyse par IA (DeepSeek)", "Analyse par Regex (Extraction d'entités)", "Analyse par la Méthode Sémantique", "Analyse par la Méthode Cosinus")
     )
     captions = {
-        "Analyse par IA (DeepSeek)": "Analyse qualitative (points forts/faibles) par un LLM. Consomme vos tokens !",
-        "Analyse par Regex (Extraction d'entités)": "Extrait des informations structurées (compétences, etc.) sur la base de mots-clés.",
-        "Analyse par la Méthode Sémantique": "Calcule un score de pertinence basé sur le sens des phrases (nécessite une description de poste).",
+        "Analyse par IA (DeepSeek)": "Analyse qualitative (points forts/faibles). Consomme vos tokens !",
+        "Analyse par Regex (Extraction d'entités)": "Extrait des informations structurées (compétences, diplômes, etc.).",
+        "Analyse par la Méthode Sémantique": "Calcule un score de pertinence basé sur le sens (nécessite une description de poste).",
         "Analyse par la Méthode Cosinus": "Calcule un score de pertinence basé sur les mots-clés (nécessite une description de poste)."
     }
     st.caption(captions.get(analysis_type_single))
 
     job_desc_single = ""
     if "Analyse par la Méthode" in analysis_type_single:
-        job_desc_single = st.text_area("Description du poste pour le calcul du score", height=150, key="jd_single")
+        job_desc_single = st.text_area("Description de poste pour le calcul du score", height=150, key="jd_single")
 
-    if uploaded_files_analysis and st.button("🚀 Lancer l'analyse", type="primary", use_container_width=True):
+    if uploaded_files_analysis and st.button("🚀 Lancer l'analyse", type="primary", use_container_width=True, key="btn_single_analysis"):
         for uploaded_file in uploaded_files_analysis:
             with st.expander(f"Résultat pour : **{uploaded_file.name}**", expanded=True):
                 with st.spinner("Analyse en cours..."):
@@ -308,54 +329,52 @@ with tab2:
                         elif "Méthode Cosinus" in analysis_type_single:
                             if not job_desc_single: st.warning("Veuillez fournir une description de poste.")
                             else:
-                                score = rank_resumes_with_cosine(job_desc_single, [text])["scores"][0]
+                                score = rank_resumes_with_cosine(job_desc_single, [text], [uploaded_file.name])["scores"][0]
                                 st.metric("Score de Pertinence Cosinus", f"{score*100:.1f}%")
-                        else: # Analyse IA par défaut
+                        else: # Analyse IA
                             analysis_result = get_deepseek_analysis(text)
                             st.markdown(analysis_result)
 
-# --- ONGLET GUIDE DES MÉTHODES ---
 with tab3:
     st.header("📖 Comprendre les Méthodes d'Analyse")
     st.markdown("Chaque méthode a ses propres forces et faiblesses. Voici un guide pour vous aider à choisir la plus adaptée à votre besoin.")
     
     st.subheader("1. Méthode Cosinus (Basée sur les Mots-clés)")
     st.markdown("""
-    - **Principe** : Cette méthode transforme le CV et l'annonce en listes de mots-clés, puis compte combien de mots importants sont communs aux deux documents.
-    - **Comment ça marche ?** Elle utilise un modèle mathématique (TF-IDF) pour donner plus de poids aux mots rares et importants (comme "archivage") qu'aux mots très courants (comme "le", "de"). Le score représente la similarité de ces "sacs de mots-clés".
+    - **Principe** : Compare la fréquence des mots exacts entre le CV et l'annonce.
+    - **Comment ça marche ?** Elle utilise un modèle mathématique (TF-IDF) pour donner plus de poids aux mots rares et importants. Le score représente la similarité de ces "sacs de mots-clés".
     - **Idéal pour** : Un premier tri très rapide et grossier.
     - **Avantages** : ✅ Extrêmement rapide, ne nécessite aucune IA externe.
-    - **Limites** : ❌ Ne comprend absolument pas le contexte ou les synonymes. Pour lui, "GED" et "EDMS" sont deux termes complètement différents.
+    - **Limites** : ❌ Ne comprend absolument pas le contexte ou les synonymes.
     """)
     
     st.subheader("2. Méthode Sémantique (Basée sur les Embeddings)")
     st.markdown("""
-    - **Principe** : Utilise un modèle de langage pré-entraîné pour convertir les phrases en vecteurs numériques qui représentent leur signification.
-    - **Comment ça marche ?** Au lieu de comparer des mots, on compare la "direction" de ces vecteurs dans un espace à plusieurs dimensions. Deux vecteurs qui pointent dans la même direction représentent des idées sémantiquement similaires.
-    - **Idéal pour** : Obtenir un score de pertinence plus intelligent qui comprend les nuances du langage.
-    - **Avantages** : ✅ Comprend le contexte, les synonymes et les concepts similaires. C'est un excellent équilibre entre vitesse et intelligence.
-    - **Limites** : ❌ Un peu plus lente que la méthode cosinus car elle fait appel à un modèle de deep learning.
+    - **Principe** : Utilise une IA pour convertir les phrases en vecteurs de sens, puis compare ces vecteurs.
+    - **Comment ça marche ?** Au lieu de comparer des mots, on compare la "direction" de ces vecteurs. Deux vecteurs qui pointent dans la même direction représentent des idées sémantiquement similaires.
+    - **Idéal pour** : Obtenir un score plus intelligent qui comprend les nuances du langage.
+    - **Avantages** : ✅ Comprend le contexte et les synonymes. Excellent équilibre entre vitesse et intelligence.
+    - **Limites** : ❌ Un peu plus lente que la méthode cosinus.
     """)
 
     st.subheader("3. Scoring par Règles (Basé sur Regex)")
     st.markdown("""
-    - **Principe** : Imite la façon dont un recruteur humain lit un CV en cherchant des informations spécifiques. On définit des règles claires (ex: "trouver ces compétences", "vérifier les années d'expérience") et on attribue des points.
-    - **Comment ça marche ?** Le code utilise des expressions régulières (Regex) pour rechercher des mots-clés précis et des schémas de texte dans le CV. Un score est ensuite calculé en fonction de ce qui a été trouvé.
+    - **Principe** : Imite la façon dont un recruteur humain lit un CV. On définit des règles claires (compétences, expérience, diplôme) et on attribue des points.
+    - **Comment ça marche ?** Le code extrait dynamiquement les exigences de l'annonce, puis recherche ces éléments dans chaque CV pour calculer un score.
     - **Idéal pour** : Des postes où les critères sont très clairs et objectifs.
-    - **Avantages** : ✅ Totalement transparent (le détail du score peut être affiché), 100% personnalisable et sans dépendances complexes.
-    - **Limites** : ❌ Très rigide. Si une compétence est formulée différemment de ce qui est prévu dans les règles, elle ne sera pas détectée.
+    - **Avantages** : ✅ Totalement transparent (le détail du score est affiché), 100% personnalisable et sans dépendances complexes.
+    - **Limites** : ❌ Très rigide. Si une compétence est formulée différemment, elle ne sera pas détectée.
     """)
     
     st.subheader("4. Analyse par IA (Basée sur un LLM)")
     st.markdown("""
-    - **Principe** : C'est la méthode la plus avancée. On envoie le CV et l'annonce à un grand modèle de langage (ici, DeepSeek), en lui demandant d'agir comme un expert en recrutement.
-    - **Comment ça marche ?** L'IA lit et comprend les deux textes, puis utilise sa vaste connaissance pour évaluer la pertinence, identifier les forces/faiblesses, et formuler une explication.
+    - **Principe** : On envoie le CV et l'annonce à un grand modèle de langage (DeepSeek) en lui demandant d'agir comme un expert en recrutement.
+    - **Comment ça marche ?** L'IA lit et comprend les deux textes, puis utilise sa vaste connaissance pour évaluer la pertinence et formuler une explication.
     - **Idéal pour** : Obtenir une analyse fine et contextuelle, similaire à celle d'un premier entretien.
     - **Avantages** : ✅ La plus précise et la plus "humaine". Comprend les nuances et fournit des explications de haute qualité.
     - **Limites** : ❌ La plus lente, et chaque analyse **consomme vos tokens !**
     """)
 
-# --- SIDEBAR ---
 with st.sidebar:
     st.markdown("### 🔧 Configuration")
     if st.button("Test Connexion API DeepSeek"):
