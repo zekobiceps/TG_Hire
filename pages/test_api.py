@@ -42,15 +42,27 @@ if not os.path.exists(CV_DIR):
 def get_gsheet_client():
     """Authentifie avec Google Sheets en utilisant les secrets Streamlit."""
     try:
-        st.write("Fichiers dans .streamlit/ :", os.listdir(".streamlit/"))
-        st.write("Secrets disponibles :", st.secrets)
-        st.write("Type de st.secrets:", type(st.secrets))
-        st.write("Contenu brut:", repr(st.secrets["gcp_service_account"]["private_key"]))
-        if "gcp_service_account" not in st.secrets:
-            st.error("❌ La clé 'gcp_service_account' n'est pas configurée dans les secrets Streamlit. Vérifiez secrets.toml ou l'onglet Secrets.")
+        if not all(key in st.secrets for key in ["GCP_TYPE", "GCP_PRIVATE_KEY"]):
+            st.error("❌ Les clés GCP ne sont pas configurées dans les secrets Streamlit.")
             return None
-        gc = gspread.service_account_from_dict(st.secrets["gcp_service_account"])
-        st.write("Authentification réussie avec gspread.service_account_from_dict")
+        
+        # Reconstruire le dictionnaire du service account
+        service_account_info = {
+            "type": st.secrets["GCP_TYPE"],
+            "project_id": st.secrets["GCP_PROJECT_ID"],
+            "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
+            "private_key": st.secrets["GCP_PRIVATE_KEY"],
+            "client_email": st.secrets["GCP_CLIENT_EMAIL"],
+            "client_id": st.secrets["GCP_CLIENT_ID"],
+            "auth_uri": st.secrets["GCP_AUTH_URI"],
+            "token_uri": st.secrets["GCP_TOKEN_URI"],
+            "auth_provider_x509_cert_url": st.secrets["GCP_AUTH_PROVIDER_CERT_URL"],
+            "client_x509_cert_url": st.secrets["GCP_CLIENT_CERT_URL"],
+            "universe_domain": st.secrets["GCP_UNIVERSE_DOMAIN"]
+        }
+        
+        gc = gspread.service_account_from_dict(service_account_info)
+        st.success("✅ Authentification Google Sheets réussie")
         return gc
     except Exception as e:
         st.error(f"❌ Échec de l'authentification Google Sheets. Erreur : {e}")
