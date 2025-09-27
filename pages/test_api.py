@@ -53,26 +53,42 @@ def get_gsheet_client():
         
         json_data = st.secrets['GCP_SERVICE_ACCOUNT_JSON']
         
-        # Debug: Afficher le type et un extrait
+        # Debug: Afficher le type
         st.sidebar.write(f"🔍 Type des données: {type(json_data)}")
-        if isinstance(json_data, str):
-            st.sidebar.write(f"🔍 Extrait JSON: {json_data[:100]}...")
         
-        # Gérer différents formats de données
-        if isinstance(json_data, dict):
-            service_account_info = json_data
-        elif isinstance(json_data, str):
+        # Nettoyer la chaîne JSON des caractères de contrôle invalides
+        if isinstance(json_data, str):
+            # Afficher un extrait pour debug
+            st.sidebar.write(f"🔍 Extrait JSON (avant nettoyage): {json_data[:200]}")
+            
+            # Nettoyer les caractères de contrôle invalides
+            import re
+            cleaned_json = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', json_data)
+            
+            # Gérer les échappements TOML/JSON
+            cleaned_json = cleaned_json.replace('\\n', '\n').replace('\\\\', '\\')
+            
+            st.sidebar.write(f"🔍 Extrait JSON (après nettoyage): {cleaned_json[:200]}")
+            
             try:
-                # Nettoyer la chaîne JSON
-                cleaned_json = json_data.strip()
-                # Gérer les échappements TOML/JSON
-                cleaned_json = cleaned_json.replace('\\n', '\n').replace('\\\\', '\\')
                 service_account_info = json.loads(cleaned_json)
             except json.JSONDecodeError as e:
-                st.error(f"❌ Erreur de parsing JSON: {e}")
-                st.sidebar.text("JSON problématique (début):")
-                st.sidebar.text(cleaned_json[:200])
-                return None
+                st.error(f"❌ Erreur de parsing JSON après nettoyage: {e}")
+                # Essayer une autre méthode de nettoyage
+                try:
+                    # Méthode alternative: extraire le JSON avec regex
+                    json_match = re.search(r'\{.*\}', cleaned_json, re.DOTALL)
+                    if json_match:
+                        cleaned_json_alt = json_match.group()
+                        service_account_info = json.loads(cleaned_json_alt)
+                    else:
+                        raise ValueError("Aucun JSON valide trouvé")
+                except Exception as e2:
+                    st.error(f"❌ Échec de la récupération du JSON: {e2}")
+                    return None
+                    
+        elif isinstance(json_data, dict):
+            service_account_info = json_data
         else:
             st.error(f"❌ Type de données inattendu: {type(json_data)}")
             return None
@@ -107,14 +123,6 @@ def get_gsheet_client():
         import traceback
         st.error(f"🔍 Détails: {traceback.format_exc()}")
         return None
-# Ajoutez ceci temporairement pour debugger
-st.sidebar.write("Secrets disponibles:", list(st.secrets.keys()))
-if 'GCP_SERVICE_ACCOUNT_JSON' in st.secrets:
-    sa_data = st.secrets['GCP_SERVICE_ACCOUNT_JSON']
-    st.sidebar.write("Type de GCP_SERVICE_ACCOUNT_JSON:", type(sa_data))
-    if isinstance(sa_data, dict):
-        st.sidebar.write("Clés disponibles:", list(sa_data.keys()))
-        
 # -------------------- FONCTIONS GOOGLE SHEETS --------------------
 @st.cache_data(ttl=600)
 def load_data_from_sheet():
