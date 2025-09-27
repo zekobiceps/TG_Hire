@@ -1,333 +1,290 @@
 import streamlit as st
-import os
-import io
 import pandas as pd
-from datetime import datetime
-import importlib.util
+import io
+import requests
+import json
+from pypdf import PdfReader
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import time
+import re
 
-# --- IMPORTS POUR GOOGLE API ---
-try:
-    from google.oauth2 import service_account
-    from googleapiclient.discovery import build
-    from googleapiclient.http import MediaIoBaseUpload
-except ImportError:
-    st.error("❌ Bibliothèques Google API manquantes. Exécutez : pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib")
-    st.stop()
+# --- NOUVEAUTÉ : Imports pour les nouvelles méthodes ---
+from sentence_transformers import SentenceTransformer, util
+import spacy
 
+# -------------------- Configuration de la clé API DeepSeek --------------------
 try:
-    import gspread
-except ImportError:
-    st.error("❌ La bibliothèque 'gspread' n'est pas installée. Installez-la avec 'pip install gspread'.")
-    st.stop()
+    API_KEY = st.secrets["DEEPSEEK_API_KEY"]
+except KeyError:
+    API_KEY = None
+    st.error("❌ Le secret 'DEEPSEEK_API_KEY' est introuvable. Veuillez le configurer.")
+
+# -------------------- Streamlit Page Config --------------------
+st.set_page_config(
+    page_title="Analyse CV AI",
+    page_icon="📄",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# -------------------- CSS --------------------
+st.markdown("""
+<style>
+div[data-testid="stTabs"] button p {
+    font-size: 18px; 
+}
+.stTextArea textarea {
+    white-space: pre-wrap !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# -------------------- Chargement des modèles ML (mis en cache) --------------------
+
+# --- NOUVEAUTÉ : Mise en cache des modèles pour la performance ---
+@st.cache_resource
+def load_spacy_model():
+    """Charge le modèle spaCy une seule fois."""
+    return spacy.load("fr_core_news_sm")
+
+@st.cache_resource
+def load_embedding_model():
+    """Charge le modèle SentenceTransformer une seule fois."""
+    return SentenceTransformer('all-MiniLM-L6-v2')
+
+# Charger les modèles au démarrage
+nlp = load_spacy_model()
+embedding_model = load_embedding_model()
+
+
+# -------------------- Fonctions de traitement des CV --------------------
+def extract_text_from_pdf(file):
+    """Extrait le texte d'un fichier PDF."""
+    try:
+        pdf = PdfReader(file)
+        text = ""
+        for page in pdf.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+        return text.strip() if text else "Aucun texte lisible trouvé."
+    except Exception as e:
+        return f"Erreur d'extraction du texte: {str(e)}"
+
+# --- MÉTHODE 1 : SIMILARITÉ COSINUS (EXISTANTE) ---
+def rank_resumes_with_cosine(job_description, resumes):
+    """Classe les CVs en utilisant la similarité cosinus (TF-IDF)."""
+    try:
+        documents = [job_description] + resumes
+        vectorizer = TfidfVectorizer().fit_transform(documents)
+        vectors = vectorizer.toarray()
+        cosine_similarities = cosine_similarity([vectors[0]], vectors[1:]).flatten()
+        return cosine_similarities
+    except Exception as e:
+        st.error(f"❌ Erreur Cosinus: {e}")
+        return []
+
+# --- NOUVEAUTÉ : MÉTHODE 2 : WORD EMBEDDINGS ---
+def rank_resumes_with_embeddings(job_description, resumes):
+    """Classe les CVs en utilisant la similarité sémantique (Sentence-BERT)."""
+    try:
+        # Encodage des textes en vecteurs sémantiques
+        jd_embedding = embedding_model.encode(job_description, convert_to_tensor=True)
+        resume_embeddings = embedding_model.encode(resumes, convert_to_tensor=True)
+        
+        # Calcul de la similarité cosinus sur les vecteurs sémantiques
+        cosine_scores = util.pytorch_cos_sim(jd_embedding, resume_embeddings)
+        return cosine_scores.flatten().cpu().numpy()
+    except Exception as e:
+        st.error(f"❌ Erreur Embeddings: {e}")
+        return []
+
+# --- NOUVEAUTÉ : MÉTHODE 3 : SCORING PAR RÈGLES (NER) ---
+def rank_resumes_with_ner(job_description, resumes):
+    """Classe les CVs en utilisant un scoring basé sur des règles et la NER."""
     
-# --- CONFIGURATION GOOGLE ---
-GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1QLC_LzwQU5eKLRcaDglLd6csejLZSs1aauYFwzFk0ac/edit"
-WORKSHEET_NAME = "Cartographie"
-# --- ID DU DOSSIER GOOGLE DRIVE POUR LES CVS ---
-GOOGLE_DRIVE_FOLDER_ID = "1mWh1k2A72YI2H0DEabe5aIC6vSAP5aFQ" 
-
-# --- GESTION DES CHEMINS (uniquement pour 'utils.py') ---
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
-
-# -------------------- Import utils --------------------
-UTILS_PATH = os.path.abspath(os.path.join(PROJECT_ROOT, "utils.py"))
-try:
-    spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
-    utils = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(utils)
-    utils.init_session_state()
-except Exception as e:
-    st.error(f"❌ Erreur lors du chargement de utils.py : {e}. Vérifiez que ce fichier existe.")
-    if "cartographie_data" not in st.session_state:
-        st.session_state.cartographie_data = {}
-
-# -------------------- FONCTIONS D'AUTHENTIFICATION --------------------
-def get_google_credentials():
-    """Crée les identifiants à partir des secrets Streamlit."""
-    try:
-        service_account_info = {
-            "type": st.secrets["GCP_TYPE"],
-            "project_id": st.secrets["GCP_PROJECT_ID"],
-            "private_key_id": st.secrets.get("GCP_PRIVATE_KEY_ID", ""),
-            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n'),
-            "client_email": st.secrets["GCP_CLIENT_EMAIL"],
-            "client_id": st.secrets.get("GCP_CLIENT_ID", ""),
-            "auth_uri": st.secrets.get("GCP_AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
-            "token_uri": st.secrets["GCP_TOKEN_URI"],
-            "auth_provider_x509_cert_url": st.secrets.get("GCP_AUTH_PROVIDER_CERT_URL", "https://www.googleapis.com/oauth2/v1/certs"),
-            "client_x509_cert_url": st.secrets.get("GCP_CLIENT_CERT_URL", "")
-        }
-        return service_account.Credentials.from_service_account_info(service_account_info)
-    except Exception as e:
-        st.error(f"❌ Erreur de format des secrets Google: {e}")
-        return None
-
-def get_gsheet_client():
-    """Authentification pour Google Sheets."""
-    try:
-        creds = get_google_credentials()
-        if creds:
-            scoped_creds = creds.with_scopes([
-                "https://www.googleapis.com/auth/spreadsheets",
-                "https://www.googleapis.com/auth/drive.readonly",
-            ])
-            gc = gspread.Client(auth=scoped_creds)
-            gc.open_by_url(GOOGLE_SHEET_URL)
-            return gc
-    except Exception as e:
-        st.error(f"❌ Erreur d'authentification Google Sheets: {str(e)}")
-    return None
-
-def get_drive_service():
-    """Authentification pour Google Drive."""
-    try:
-        creds = get_google_credentials()
-        if creds:
-            scoped_creds = creds.with_scopes(["https://www.googleapis.com/auth/drive"])
-            service = build('drive', 'v3', credentials=scoped_creds)
-            return service
-    except Exception as e:
-        st.error(f"❌ Erreur d'authentification Google Drive: {str(e)}")
-    return None
-
-# -------------------- FONCTION D'UPLOAD SUR GOOGLE DRIVE --------------------
-def upload_cv_to_drive(file_name, file_object):
-    """Envoie un fichier CV sur Google Drive et retourne son lien partageable."""
-    try:
-        drive_service = get_drive_service()
-        if not drive_service:
-            st.error("❌ Connexion à Google Drive impossible.")
-            return None
-
-        file_metadata = {
-            'name': file_name,
-            'parents': [GOOGLE_DRIVE_FOLDER_ID]
-        }
+    # --- PERSONNALISEZ VOS RÈGLES ICI ---
+    # Définissez les compétences clés que vous recherchez
+    SKILLS_TECH = ["python", "sql", "pandas", "streamlit", "docker", "git"]
+    SKILLS_SOFT = ["gestion de projet", "communication", "leadership", "agile"]
+    
+    scores = []
+    for resume_text in resumes:
+        doc = nlp(resume_text.lower())
         
-        file_content = io.BytesIO(file_object.getvalue())
+        current_score = 0
         
-        media = MediaIoBaseUpload(file_content, mimetype=file_object.type, resumable=True)
+        # Règle 1 : Points pour les compétences techniques
+        found_tech_skills = [skill for skill in SKILLS_TECH if skill in doc.text]
+        current_score += len(found_tech_skills) * 10 # 10 points par compétence technique
         
-        file = drive_service.files().create(
-            body=file_metadata,
-            media_body=media,
-            fields='id, webViewLink',
-            supportsAllDrives=True
-        ).execute()
+        # Règle 2 : Points pour les soft skills
+        found_soft_skills = [skill for skill in SKILLS_SOFT if skill in doc.text]
+        current_score += len(found_soft_skills) * 5 # 5 points par soft skill
         
-        st.success(f"✅ CV '{file_name}' uploadé sur Google Drive.")
-        return file.get('webViewLink')
-
-    except Exception as e:
-        st.error(f"❌ Échec de l'upload sur Google Drive : {e}")
-        st.warning("⚠️ Vérifiez que l'ID du dossier est correct et que le compte de service est bien 'Gestionnaire de contenu' du Drive Partagé.")
-        return None
-
-# -------------------- FONCTIONS GOOGLE SHEETS --------------------
-@st.cache_data(ttl=600)
-def load_data_from_sheet():
-    """Charge toutes les données de la feuille Google Sheets."""
-    try:
-        gc = get_gsheet_client()
-        if not gc:
-            st.warning("⚠️ Impossible de se connecter à Google Sheets")
-            return { "🔍 Profils Identifiés": [], "✅ Candidats Qualifiés": [], "🚀 Talents d'Avenir": [], "💎 Profils Stratégiques": [] }
-        
-        sh = gc.open_by_url(GOOGLE_SHEET_URL)
-        worksheet = sh.worksheet(WORKSHEET_NAME)
-        rows = worksheet.get_all_records()
-        
-        data = { "🔍 Profils Identifiés": [], "✅ Candidats Qualifiés": [], "🚀 Talents d'Avenir": [], "💎 Profils Stratégiques": [] }
-        
-        quadrant_mapping = {
-            "🌟 Haut Potentiel": "🚀 Talents d'Avenir",
-            "💎 Rare & stratégique": "💎 Profils Stratégiques", 
-            "⚡ Rapide à mobiliser": "✅ Candidats Qualifiés",
-            "📚 Facilement disponible": "🔍 Profils Identifiés"
-        }
-        
-        for row in rows:
-            quadrant = quadrant_mapping.get(row.get('Quadrant', '').strip(), row.get('Quadrant', '').strip())
-            if quadrant in data:
-                data[quadrant].append({
-                    "date": row.get("Date", "N/A"),
-                    "nom": row.get("Nom", "N/A"),
-                    "poste": row.get("Poste", "N/A"),
-                    "entreprise": row.get("Entreprise", "N/A"),
-                    "linkedin": row.get("Linkedin", "N/A"),
-                    "notes": row.get("Notes", ""),
-                    "cv_link": row.get("CV_Link", None)
-                })
-        
-        total_candidats = sum(len(v) for v in data.values())
-        st.sidebar.success(f"✅ Données chargées: {total_candidats} candidats")
-        return data
-        
-    except Exception as e:
-        st.error(f"❌ Échec du chargement des données depuis Google Sheets : {e}")
-        return { "🔍 Profils Identifiés": [], "✅ Candidats Qualifiés": [], "🚀 Talents d'Avenir": [], "💎 Profils Stratégiques": [] }
-
-def save_to_google_sheet(quadrant, entry):
-    """Sauvegarde un candidat dans Google Sheets avec le lien du CV."""
-    try:
-        gc = get_gsheet_client()
-        if not gc: return False
+        # Règle 3 : Points pour l'expérience (exemple simple)
+        if re.search(r"(\d+)\s*(ans|années)\s*d'expérience", doc.text):
+            current_score += 15 # Bonus si le nombre d'années est mentionné
             
-        sh = gc.open_by_url(GOOGLE_SHEET_URL)
-        worksheet = sh.worksheet(WORKSHEET_NAME)
-        
-        row_data = [
-            quadrant, entry["date"], entry["nom"], entry["poste"],
-            entry["entreprise"], entry["linkedin"], entry["notes"],
-            entry["cv_link"] if entry["cv_link"] else "N/A"
-        ]
-        
-        worksheet.append_row(row_data)
-        return True
-        
-    except Exception as e:
-        st.error(f"❌ Échec de l'enregistrement dans Google Sheets : {e}")
-        return False
+        scores.append(current_score)
 
-# -------------------- INITIALISATION --------------------
-if "cartographie_data" not in st.session_state:
-    st.session_state.cartographie_data = load_data_from_sheet()
+    # Normaliser les scores entre 0 et 1 pour la cohérence
+    max_score = sum([10 for _ in SKILLS_TECH]) + sum([5 for _ in SKILLS_SOFT]) + 15
+    if max_score > 0:
+        normalized_scores = [s / max_score for s in scores]
+    else:
+        normalized_scores = [0.0 for _ in scores]
+        
+    return normalized_scores
+
+# --- MÉTHODE 4 : ANALYSE PAR IA (EXISTANTE) ---
+def get_detailed_score_with_ai(job_description, resume_text):
+    """Évalue la pertinence d'un CV en utilisant l'IA."""
+    # ... (Le reste de votre fonction get_detailed_score_with_ai reste identique) ...
+    if not API_KEY:
+        return {"score": 0.0, "explanation": "❌ Analyse IA impossible. Clé API non configurée."}
+    url = "https://api.deepseek.com/v1/chat/completions"
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
+    prompt = f"""
+    En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
+    Fournis ta réponse en deux parties :
+    1. Un score de correspondance en pourcentage (ex: "Score: 85%").
+    2. Une analyse détaillée expliquant les points forts et les points à améliorer.
+
+    ---
+    Description du poste:
+    {job_description}
+    ---
+    Texte du CV:
+    {resume_text}
+    ---
+    """
+    payload = {"model": "deepseek-chat", "messages": [{"role": "system", "content": "You are a professional recruiter assistant."}, {"role": "user", "content": prompt}], "stream": False, "temperature": 0.0}
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response.raise_for_status()
+        full_response_text = response.json()["choices"][0]["message"]["content"].strip()
+        score_match = re.search(r"Score:\s*(\d+)%", full_response_text)
+        score = int(score_match.group(1)) / 100 if score_match else 0.0
+        return {"score": score, "explanation": full_response_text}
+    except Exception as e:
+        st.warning(f"⚠️ Erreur IA: {e}")
+        return {"score": 0.0, "explanation": "❌ Analyse IA échouée."}
+
+def rank_resumes_with_ai(job_description, resumes, file_names):
+    """Classe les CVs en utilisant l'IA."""
+    # ... (Votre fonction rank_resumes_with_ai reste identique) ...
+    scores_data = []
+    for i, resume_text in enumerate(resumes):
+        detailed_response = get_detailed_score_with_ai(job_description, resume_text)
+        scores_data.append({"file_name": file_names[i], "score": detailed_response["score"], "explanation": detailed_response["explanation"]})
+    return scores_data
+
+# ... (Votre fonction get_deepseek_analysis pour l'onglet 2 reste identique) ...
+def get_deepseek_analysis(text):
+    #...
+    return "Analyse..."
+
 
 # -------------------- INTERFACE UTILISATEUR --------------------
-st.set_page_config(page_title="TG-Hire IA - Cartographie", page_icon="🗺️", layout="wide", initial_sidebar_state="expanded")
-st.title("🗺️ Cartographie des talents")
+st.title("📄 Analyseur de CVs Intelligent")
 
-if st.sidebar.button("🔍 Tester les connexions Google (Débug)"):
-    st.sidebar.write("=== DÉBOGAGE CONNEXIONS GOOGLE ===")
-    st.sidebar.write("1. Test d'authentification Sheets...")
-    gc = get_gsheet_client()
-    if gc: st.sidebar.success("✅ Authentification Google Sheets OK!")
-    else: st.sidebar.error("❌ Échec authentification Google Sheets.")
-    
-    st.sidebar.write("2. Test d'authentification Drive...")
-    drive_service = get_drive_service()
-    if drive_service: st.sidebar.success("✅ Authentification Google Drive OK!")
-    else: st.sidebar.error("❌ Échec authentification Google Drive.")
+tab1, tab2 = st.tabs(["📊 Classement de CVs", "🎯 Analyse de Profil"])
 
-# -------------------- Onglets --------------------
-tab1, tab2, tab3 = st.tabs(["Gestion des candidats", "Vue globale", "Guide des quadrants"])
-
+# -------------------- ONGLET 1 : CLASSEMENT --------------------
 with tab1:
-    quadrant_choisi = st.selectbox("Quadrant:", list(st.session_state.cartographie_data.keys()), key="carto_quadrant")
-    st.subheader("➕ Ajouter un candidat")
+    st.markdown("### 📄 Informations du Poste")
+    job_description = st.text_area("Description du poste", placeholder="Coller la description complète du poste ici...", height=250)
     
-    col1, col2, col3, col4 = st.columns(4)
-    with col1: nom = st.text_input("Nom du candidat", key="carto_nom")
-    with col2: poste = st.text_input("Poste", key="carto_poste")
-    with col3: entreprise = st.text_input("Entreprise", key="carto_entreprise")
-    with col4: linkedin = st.text_input("Lien LinkedIn", key="carto_linkedin")
+    st.markdown("### 📤 Importer des CVs")
+    uploaded_files_ranking = st.file_uploader(
+        "Sélectionnez les CVs (PDF)",
+        type=["pdf"],
+        accept_multiple_files=True,
+        key="ranking_uploader"
+    )
     
-    notes = st.text_area("Notes / Observations", key="carto_notes", height=100)
-    cv_file = st.file_uploader("Télécharger CV (PDF ou DOCX)", type=["pdf", "docx"], key="carto_cv")
-
-    if st.button("💾 Ajouter à la cartographie", type="primary", use_container_width=True, key="btn_add_carto"):
-        if nom and poste:
-            cv_link = None
-            if cv_file:
-                # --- LA MODIFICATION EST ICI ---
-                # Récupérer l'extension du fichier original (ex: .pdf)
-                _, file_extension = os.path.splitext(cv_file.name)
-                # Créer le nom du fichier en utilisant uniquement le nom du candidat
-                cv_filename = f"{nom}{file_extension}"
-                
-                cv_link = upload_cv_to_drive(cv_filename, cv_file)
+    st.markdown("---")
+    
+    # --- NOUVEAUTÉ : Sélecteur avec les 4 méthodes ---
+    analysis_method = st.radio(
+        "✨ Choisissez votre méthode d'analyse",
+        [
+            "Similarité Cosinus (Mots-clés)", 
+            "Similarité Sémantique (Embeddings)", 
+            "Scoring par Règles (NER)", 
+            "Analyse par IA (DeepSeek)"
+        ],
+        index=0,
+        help="""
+        - **Cosinus**: Rapide, basé sur la fréquence des mots-clés.
+        - **Sémantique**: Plus intelligent, comprend le sens des phrases.
+        - **Règles (NER)**: Transparent, basé sur des critères que vous pouvez définir dans le code.
+        - **IA DeepSeek**: Le plus puissant, analyse contextuelle complète (utilise votre clé API).
+        """
+    )
+    
+    if st.button("🔍 Analyser et Classer les CVs", type="primary", use_container_width=True, disabled=not (uploaded_files_ranking and job_description)):
+        with st.spinner("🔍 Analyse en cours... Cette opération peut prendre quelques instants."):
+            resumes, file_names = [], []
+            for file in uploaded_files_ranking:
+                text = extract_text_from_pdf(file)
+                if not "Erreur" in text:
+                    resumes.append(text)
+                    file_names.append(file.name)
             
-            entry = {
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M"), "nom": nom, "poste": poste,
-                "entreprise": entreprise, "linkedin": linkedin, "notes": notes, "cv_link": cv_link
-            }
+            scores = []
+            explanations = None
             
-            if save_to_google_sheet(quadrant_choisi, entry):
-                st.success(f"✅ {nom} ajouté à {quadrant_choisi}.")
-                st.cache_data.clear()
-                st.session_state.cartographie_data = load_data_from_sheet()
-                st.rerun()
-        else:
-            st.warning("⚠️ Merci de remplir au minimum Nom + Poste")
+            if analysis_method == "Similarité Cosinus (Mots-clés)":
+                scores = rank_resumes_with_cosine(job_description, resumes)
+            elif analysis_method == "Similarité Sémantique (Embeddings)":
+                scores = rank_resumes_with_embeddings(job_description, resumes)
+            elif analysis_method == "Scoring par Règles (NER)":
+                scores = rank_resumes_with_ner(job_description, resumes)
+            elif analysis_method == "Analyse par IA (DeepSeek)":
+                ai_results = rank_resumes_with_ai(job_description, resumes, file_names)
+                scores = [res["score"] for res in ai_results]
+                explanations = {res["file_name"]: res["explanation"] for res in ai_results}
 
-    st.divider()
-    st.subheader("🔍 Rechercher un candidat")
-    search_term = st.text_input("Rechercher par nom ou poste", key="carto_search")
-    
-    filtered_cands = [
-        cand for cand in st.session_state.cartographie_data.get(quadrant_choisi, [])[::-1]
-        if not search_term or search_term.lower() in cand['nom'].lower() or search_term.lower() in cand['poste'].lower()
-    ]
-    
-    st.subheader(f"📋 Candidats dans : {quadrant_choisi} ({len(filtered_cands)})")
-    
-    if not filtered_cands:
-        st.info("Aucun candidat correspondant dans ce quadrant.")
-    else:
-        for i, cand in enumerate(filtered_cands):
-            with st.expander(f"{cand['nom']} - {cand['poste']} ({cand['date']})", expanded=False):
-                st.write(f"**Entreprise :** {cand.get('entreprise', 'Non spécifiée')}")
-                st.write(f"**LinkedIn :** {cand.get('linkedin', 'Non spécifié')}")
-                st.write(f"**Notes :** {cand.get('notes', '')}")
+            if len(scores) > 0:
+                ranked_resumes = sorted(zip(file_names, scores), key=lambda x: x[1], reverse=True)
                 
-                cv_drive_link = cand.get('cv_link')
-                if cv_drive_link and cv_drive_link.startswith('http'):
-                    st.markdown(f"**CV :** [Ouvrir depuis Google Drive]({cv_drive_link})", unsafe_allow_html=True)
+                results_df = pd.DataFrame({
+                    "Rang": range(1, len(ranked_resumes) + 1),
+                    "Nom du CV": [name for name, _ in ranked_resumes],
+                    "Score": [f"{score * 100:.1f}%" for _, score in ranked_resumes],
+                })
                 
-                export_text = f"Nom: {cand['nom']}\nPoste: {cand['poste']}\nEntreprise: {cand['entreprise']}\nLinkedIn: {cand.get('linkedin', '')}\nNotes: {cand['notes']}\nCV: {cand.get('cv_link', 'Aucun')}"
-                st.download_button(
-                    "⬇️ Exporter (Texte)", data=export_text,
-                    file_name=f"cartographie_{cand['nom']}.txt", mime="text/plain",
-                    key=f"download_carto_{quadrant_choisi}_{i}"
-                )
+                st.markdown("### 🏆 Résultats du Classement")
+                st.dataframe(results_df, use_container_width=True, hide_index=True)
 
-    st.subheader("📤 Exporter toute la cartographie")
-    if st.button("⬇️ Exporter en CSV (Global)"):
-        all_data = []
-        for quad, cands in st.session_state.cartographie_data.items():
-            for cand in cands:
-                cand_copy = cand.copy()
-                cand_copy['quadrant'] = quad
-                all_data.append(cand_copy)
-        
-        df = pd.DataFrame(all_data)
-        csv_data = df.to_csv(index=False).encode('utf-8')
-        
-        st.download_button("Télécharger CSV", data=csv_data, file_name="cartographie_talents.csv", mime="text/csv", key="export_csv")
+                if explanations:
+                    st.markdown("### 📝 Analyse détaillée par l'IA")
+                    for file_name, score in ranked_resumes:
+                        with st.expander(f"**{file_name}** (Score: {score * 100:.1f}%)"):
+                            st.markdown(explanations[file_name])
+            else:
+                st.error("❌ Aucun CV n'a pu être analysé.")
 
+# -------------------- ONGLET 2 : ANALYSE DE PROFIL --------------------
 with tab2:
-    total_profils = sum(len(v) for v in st.session_state.cartographie_data.values())
-    st.subheader(f"📊 Vue globale de la cartographie ({total_profils} profils)")
+    st.markdown("### 📂 Importer un CV pour une analyse détaillée")
+    uploaded_file_analysis = st.file_uploader(
+        "Sélectionnez un CV (PDF)",
+        type=["pdf"],
+        accept_multiple_files=False, # Un seul fichier pour l'analyse détaillée
+        key="analysis_uploader"
+    )
     
-    try:
-        import plotly.express as px
-        counts = {k: len(st.session_state.cartographie_data[k]) for k in st.session_state.cartographie_data.keys()}
-        
-        if sum(counts.values()) > 0:
-            df_counts = pd.DataFrame(list(counts.items()), columns=['Quadrant', 'Nombre'])
-            fig = px.pie(df_counts, names='Quadrant', values='Nombre', title="Répartition des candidats par quadrant",
-                         color_discrete_sequence=["#636EFA", "#EF553B", "#00CC96", "#AB63FA"])
-            fig.update_traces(hovertemplate='<b>%{label}</b><br>Nombre: %{value}<br>Pourcentage: %{percent}<extra></extra>')
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("Aucun candidat dans la cartographie pour l'instant.")
-            
-    except ImportError:
-        st.warning("⚠️ La bibliothèque Plotly n'est pas installée. Le dashboard n'est pas disponible. Installez Plotly avec 'pip install plotly'.")
-
-with tab3:
-    st.subheader("📚 Guide des quadrants de la cartographie")
-    st.markdown("""
-    ### 1. 🔍 Profils Identifiés
-    **Il s'agit de notre vivier de sourcing fondamental.** Cette catégorie rassemble les talents prometteurs repérés sur le marché qui correspondent à nos métiers. Ils n'ont pas encore été contactés mais représentent la base de nos futures recherches.
-
-    ### 2. ✅ Candidats Qualifiés  
-    **Ce sont les profils identifiés avec qui un premier contact positif a été établi.** Leur intérêt est validé et leurs compétences clés correspondent à nos besoins. Ils forment notre vivier de talents "chaud", prêts à être mobilisés pour un processus de recrutement.
-
-    ### 3. 🚀 Talents d'Avenir
-    **Cette catégorie regroupe les profils à fort potentiel d'évolution, de leadership ou d'innovation.** Plus que leurs compétences actuelles, nous ciblons ici leur capacité à devenir les leaders et les experts de demain. Ce sont nos investissements pour le futur.
-
-    ### 4. 💎 Profils Stratégiques
-    **Le sommet de notre cartographie.** Ce groupe exclusif contient les experts rares et les leaders confirmés dont les compétences sont critiques pour notre avantage concurrentiel. L'approche est directe, personnalisée et prioritaire.
-    """)
+    if uploaded_file_analysis:
+        if st.button("🚀 Lancer l'analyse du profil", type="primary", use_container_width=True):
+            with st.spinner("⏳ L'IA analyse le profil..."):
+                text = extract_text_from_pdf(uploaded_file_analysis)
+                if "Erreur" in text:
+                    st.error(f"❌ Erreur d'extraction: {text}")
+                else:
+                    analysis_result = get_deepseek_analysis(text) # Assurez-vous que cette fonction est complète
+                    st.markdown("### 📋 Analyse du Profil")
+                    st.markdown(analysis_result)

@@ -66,3 +66,7 @@ google-api-python-client
 google-auth-httplib2
 groq
 google-generativeai
+sentence-transformers
+spacy
+torch
+torchvision
