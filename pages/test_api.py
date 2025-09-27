@@ -42,30 +42,60 @@ if not os.path.exists(CV_DIR):
 def get_gsheet_client():
     """Authentifie avec Google Sheets en utilisant les secrets Streamlit."""
     try:
-        if not all(key in st.secrets for key in ["GCP_TYPE", "GCP_PRIVATE_KEY"]):
-            st.error("❌ Les clés GCP ne sont pas configurées dans les secrets Streamlit.")
+        # Debug: Afficher toutes les clés disponibles
+        st.write("🔍 Clés disponibles dans st.secrets:")
+        for key in st.secrets.keys():
+            st.write(f"   - {key}")
+        
+        # Vérifier si la section GCP_SERVICE_ACCOUNT existe
+        if "GCP_SERVICE_ACCOUNT" not in st.secrets:
+            st.error("❌ La section 'GCP_SERVICE_ACCOUNT' n'est pas trouvée dans les secrets.")
+            st.info("📋 Voici ce qui est disponible dans les secrets:")
+            for key, value in st.secrets.items():
+                st.write(f"   {key}: {type(value)}")
             return None
         
-        # Reconstruire le dictionnaire du service account
+        # Récupérer les informations du service account
+        gcp_secrets = st.secrets["GCP_SERVICE_ACCOUNT"]
+        st.write("🔍 Clés dans GCP_SERVICE_ACCOUNT:")
+        for key in gcp_secrets.keys():
+            st.write(f"   - {key}")
+        
+        # Vérifier les clés requises
+        required_keys = ["type", "project_id", "private_key_id", "private_key", "client_email"]
+        missing_keys = [key for key in required_keys if key not in gcp_secrets]
+        
+        if missing_keys:
+            st.error(f"❌ Clés manquantes dans GCP_SERVICE_ACCOUNT: {missing_keys}")
+            return None
+        
+        # Construire le dictionnaire du service account
         service_account_info = {
-            "type": st.secrets["GCP_TYPE"],
-            "project_id": st.secrets["GCP_PROJECT_ID"],
-            "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
-            "private_key": st.secrets["GCP_PRIVATE_KEY"],
-            "client_email": st.secrets["GCP_CLIENT_EMAIL"],
-            "client_id": st.secrets["GCP_CLIENT_ID"],
-            "auth_uri": st.secrets["GCP_AUTH_URI"],
-            "token_uri": st.secrets["GCP_TOKEN_URI"],
-            "auth_provider_x509_cert_url": st.secrets["GCP_AUTH_PROVIDER_CERT_URL"],
-            "client_x509_cert_url": st.secrets["GCP_CLIENT_CERT_URL"],
-            "universe_domain": st.secrets["GCP_UNIVERSE_DOMAIN"]
+            "type": gcp_secrets["type"],
+            "project_id": gcp_secrets["project_id"],
+            "private_key_id": gcp_secrets["private_key_id"],
+            "private_key": gcp_secrets["private_key"],
+            "client_email": gcp_secrets["client_email"],
+            "client_id": gcp_secrets.get("client_id", ""),
+            "auth_uri": gcp_secrets.get("auth_uri", "https://accounts.google.com/o/oauth2/auth"),
+            "token_uri": gcp_secrets.get("token_uri", "https://oauth2.googleapis.com/token"),
+            "auth_provider_x509_cert_url": gcp_secrets.get("auth_provider_x509_cert_url", "https://www.googleapis.com/oauth2/v1/certs"),
+            "client_x509_cert_url": gcp_secrets.get("client_x509_cert_url", ""),
+            "universe_domain": gcp_secrets.get("universe_domain", "googleapis.com")
         }
         
+        # Nettoyer la private_key (supprimer les éventuels \\n)
+        service_account_info["private_key"] = service_account_info["private_key"].replace("\\n", "\n")
+        
+        st.write("✅ Configuration GCP chargée avec succès")
         gc = gspread.service_account_from_dict(service_account_info)
         st.success("✅ Authentification Google Sheets réussie")
         return gc
+        
     except Exception as e:
         st.error(f"❌ Échec de l'authentification Google Sheets. Erreur : {e}")
+        import traceback
+        st.error(f"🔍 Détails de l'erreur: {traceback.format_exc()}")
         return None
 
 # -------------------- FONCTIONS GOOGLE SHEETS --------------------
