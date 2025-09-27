@@ -2,8 +2,8 @@
 
 # --- Interface et Visualisation ---
 streamlit
-plotly 
 altair
+plotly
 pydeck
 
 # --- Manipulation de Données & Fichiers ---
@@ -11,14 +11,17 @@ pandas
 numpy
 python-docx
 pypdf
+PyMuPDF
+json5
+lxml
 
 # --- Intelligence Artificielle & Machine Learning ---
 scikit-learn
-sentence-transformers
+openai
 torch
-spacy==3.7.5
-# Lien direct pour installer le modèle spaCy (le plus fiable)
-https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.7.0/fr_core_news_sm-3.7.0-py3-none-any.whl
+torchvision
+sentence-transformers
+spacy # <-- Juste la bibliothèque, le code gère le téléchargement du modèle
 
 # --- APIs & Connecteurs ---
 requests

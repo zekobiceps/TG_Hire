@@ -9,9 +9,10 @@ from sklearn.metrics.pairwise import cosine_similarity
 import time
 import re
 
-# Nouveaux imports pour les méthodes sémantiques et NER
+# Imports pour les méthodes sémantiques et NER
 from sentence_transformers import SentenceTransformer, util
 import spacy
+import spacy.cli # <-- NOUVEL IMPORT pour le téléchargement automatique
 import torch
 
 # -------------------- Configuration de la clé API DeepSeek --------------------
@@ -42,24 +43,33 @@ div[data-testid="stTabs"] button p {
 """, unsafe_allow_html=True)
 
 # -------------------- Chargement des modèles ML (mis en cache) --------------------
+
+# --- NOUVELLE FONCTION ROBUSTE POUR CHARGER LE MODÈLE SPACY ---
 @st.cache_resource
 def load_spacy_model():
-    """Charge le modèle spaCy une seule fois."""
+    """Charge le modèle spaCy. S'il n'est pas trouvé, le télécharge automatiquement."""
+    model_name = "fr_core_news_sm"
     try:
-        return spacy.load("fr_core_news_sm")
+        # On essaie de charger le modèle
+        nlp = spacy.load(model_name)
     except OSError:
-        st.error("❌ Modèle spaCy 'fr_core_news_sm' non trouvé. Assurez-vous qu'il est dans requirements.txt.")
-        return None
+        # Si le modèle n'est pas trouvé, on le télécharge
+        st.info(f"Téléchargement du modèle spaCy '{model_name}'... (Cette opération n'a lieu qu'une seule fois)")
+        spacy.cli.download(model_name)
+        nlp = spacy.load(model_name)
+    return nlp
 
 @st.cache_resource
 def load_embedding_model():
     """Charge le modèle SentenceTransformer une seule fois."""
     return SentenceTransformer('all-MiniLM-L6-v2')
 
+# Charger les modèles au démarrage
+# La gestion des erreurs est maintenant à l'intérieur de la fonction
 nlp = load_spacy_model()
 embedding_model = load_embedding_model()
 
-# -------------------- Fonctions de traitement --------------------
+# -------------------- Fonctions de traitement des CV --------------------
 def extract_text_from_pdf(file):
     """Extrait le texte d'un fichier PDF."""
     try:
@@ -102,7 +112,6 @@ def ner_analysis(text):
     """Analyse un texte avec NER pour extraire des entités."""
     if not nlp: return {}
     doc = nlp(text.lower())
-    # Personnalisez vos listes de compétences ici
     SKILLS_TECH = ["ged", "edms", "archivage", "dématérialisation", "numérisation", "sap", "aconex", "oracle", "jira"]
     SKILLS_SOFT = ["gestion de projet", "communication", "leadership", "rigueur", "analyse", "collaboration", "animation d'équipe"]
     
@@ -399,3 +408,4 @@ with st.sidebar:
                 st.error(f"❌ Erreur: {e}")
         else:
             st.error("❌ Clé API non configurée")
+
