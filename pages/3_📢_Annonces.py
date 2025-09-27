@@ -37,7 +37,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-st.title("📢 Gestion des annonces")
+st.title("📢  Gestion des annonces")
 
 # -------------------- Styles CSS --------------------
 st.markdown("""
