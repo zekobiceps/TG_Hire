@@ -24,7 +24,8 @@ import importlib.util
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1QLC_LzwQU5eKLRcaDglLd6csejLZSs1aauYFwzFk0ac/edit"
 WORKSHEET_NAME = "Cartographie"
 # --- ID DU DOSSIER GOOGLE DRIVE POUR LES CVS ---
-GOOGLE_DRIVE_FOLDER_ID = "1Op0cV3HFjLHqubSbCFY7yYdRkRuNi26C" # ID de votre dossier Drive inséré ici
+# !!! VÉRIFIEZ BIEN QUE CET ID EST CELUI DU DOSSIER DANS LE DRIVE PARTAGÉ !!!
+GOOGLE_DRIVE_FOLDER_ID = "1mWh1k2A72YI2H0DEabe5aIC6vSAP5aFQ" 
 
 # --- GESTION DES CHEMINS (uniquement pour 'utils.py') ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -91,7 +92,7 @@ def get_drive_service():
         st.error(f"❌ Erreur d'authentification Google Drive: {str(e)}")
     return None
 
-# -------------------- FONCTION D'UPLOAD SUR GOOGLE DRIVE --------------------
+# -------------------- FONCTION D'UPLOAD SUR GOOGLE DRIVE (CORRIGÉE) --------------------
 def upload_cv_to_drive(file_name, file_object):
     """Envoie un fichier CV sur Google Drive et retourne son lien partageable."""
     try:
@@ -109,10 +110,13 @@ def upload_cv_to_drive(file_name, file_object):
         
         media = MediaIoBaseUpload(file_content, mimetype=file_object.type, resumable=True)
         
+        # --- LE CORRECTIF EST ICI ---
+        # Ajout de supportsAllDrives=True pour que l'API cherche dans les Drives Partagés
         file = drive_service.files().create(
             body=file_metadata,
             media_body=media,
-            fields='id, webViewLink'
+            fields='id, webViewLink',
+            supportsAllDrives=True  # <-- CETTE LIGNE CORRIGE L'ERREUR 404
         ).execute()
         
         st.success(f"✅ CV '{file_name}' uploadé sur Google Drive.")
@@ -120,7 +124,7 @@ def upload_cv_to_drive(file_name, file_object):
 
     except Exception as e:
         st.error(f"❌ Échec de l'upload sur Google Drive : {e}")
-        st.warning("⚠️ Vérifiez que l'email de service a les droits 'Gestionnaire de contenu' sur le Drive Partagé.")
+        st.warning("⚠️ Vérifiez que l'ID du dossier est correct et que le compte de service est bien 'Gestionnaire de contenu' du Drive Partagé.")
         return None
 
 # -------------------- FONCTIONS GOOGLE SHEETS --------------------
