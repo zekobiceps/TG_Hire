@@ -38,31 +38,47 @@ if not os.path.exists(CV_DIR):
     except Exception as e:
         st.error(f"❌ Erreur lors de la création du dossier {CV_DIR}: {e}")
 
-# -------------------- FONCTION D'AUTHENTIFICATION SÉCURISÉE --------------------
+# -------------------- FONCTION D'AUTHENTIFICATION AVEC DÉBOGAGE --------------------
 def get_gsheet_client():
     """Authentifie avec Google Sheets en utilisant les secrets Streamlit Cloud."""
     try:
-        # Vérifier si la clé secrète existe
+        # Debug: Afficher toutes les clés disponibles
+        st.sidebar.write("🔍 **Debug - Clés disponibles:**")
+        for key in st.secrets.keys():
+            st.sidebar.write(f"   - {key}")
+        
+        # Vérifier si la clé existe
         if 'GCP_SERVICE_ACCOUNT_JSON' not in st.secrets:
             st.error("""
             ❌ Configuration Google Sheets manquante.
             
-            Pour Streamlit Cloud :
-            - Ajoutez GCP_SERVICE_ACCOUNT_JSON dans les secrets de l'application
-            - Allez dans Settings → Secrets de votre app Streamlit Cloud
+            **Clés trouvées dans les secrets:** """ + ", ".join(st.secrets.keys()) + """
+            
+            **Pour Streamlit Cloud :**
+            - Vérifiez que GCP_SERVICE_ACCOUNT_JSON est bien dans les secrets
+            - Vérifiez le format du JSON (doit être sur une seule ligne)
             """)
             return None
         
-        # Charger la configuration depuis les secrets
-        service_account_info = json.loads(st.secrets['GCP_SERVICE_ACCOUNT_JSON'])
+        # Debug: Afficher le type et les premiers caractères
+        json_data = st.secrets['GCP_SERVICE_ACCOUNT_JSON']
+        st.sidebar.write(f"🔍 **Type de GCP_SERVICE_ACCOUNT_JSON:** {type(json_data)}")
+        st.sidebar.write(f"🔍 **Premiers 100 caractères:** {json_data[:100]}...")
+        
+        # Essayer de parser le JSON
+        try:
+            service_account_info = json.loads(json_data)
+            st.sidebar.write("✅ JSON parsé avec succès")
+        except json.JSONDecodeError as e:
+            st.error(f"❌ Erreur de parsing JSON : {e}")
+            st.info("💡 Essayez de mettre le JSON sur une seule ligne dans les secrets")
+            return None
         
         # Authentifier avec gspread
         gc = gspread.service_account_from_dict(service_account_info)
+        st.sidebar.success("✅ Authentification Google Sheets réussie")
         return gc
         
-    except json.JSONDecodeError as e:
-        st.error(f"❌ Erreur de format JSON dans les secrets : {e}")
-        return None
     except Exception as e:
         st.error(f"❌ Échec de l'authentification Google Sheets : {e}")
         return None
@@ -74,6 +90,7 @@ def load_data_from_sheet():
     try:
         gc = get_gsheet_client()
         if not gc:
+            st.warning("⚠️ Impossible de se connecter à Google Sheets")
             return {
                 "🌟 Haut Potentiel": [], "💎 Rare & stratégique": [],
                 "⚡ Rapide à mobiliser": [], "📚 Facilement disponible": []
@@ -103,6 +120,7 @@ def load_data_from_sheet():
                     "cv_path": row.get("CV_Path", None)
                 })
         
+        st.sidebar.success(f"✅ Données chargées: {sum(len(v) for v in data.values())} candidats")
         return data
         
     except Exception as e:
@@ -142,9 +160,24 @@ def save_to_google_sheet(quadrant, entry):
         st.error(f"❌ Échec de l'enregistrement dans Google Sheets : {e}")
         return False
 
-# Initialiser/Charger les données
+# -------------------- INITIALISATION --------------------
 if "cartographie_data" not in st.session_state:
     st.session_state.cartographie_data = load_data_from_sheet()
+
+# -------------------- INTERFACE UTILISATEUR --------------------
+st.set_page_config(
+    page_title="TG-Hire IA - Cartographie",
+    page_icon="🗺️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+st.title("🗺️ Cartographie des talents (Google Sheets)")
+
+# Afficher le statut de connexion
+if st.sidebar.button("🔍 Tester la connexion Google Sheets"):
+    gc = get_gsheet_client()
+    if gc:
+        st.sidebar.success("✅ Connexion Google Sheets fonctionnelle")
 
 # -------------------- Page config --------------------
 st.set_page_config(
