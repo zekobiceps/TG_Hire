@@ -13,7 +13,7 @@ python-docx
 pypdf
 PyMuPDF
 json5
-lxml # Nécessaire pour pandas et docx
+lxml
 
 # --- Intelligence Artificielle & Machine Learning ---
 scikit-learn
@@ -23,8 +23,7 @@ torch
 torchvision
 sentence-transformers
 spacy
-# Lien direct pour télécharger et installer le modèle français pour spaCy
-https://github.com/explosion/spacy-models/releases/download/fr_core_news_sm-3.7.0/fr_core_news_sm-3.7.0-py3-none-any.whl
+fr-core-news-sm # <-- NOUVELLE FAÇON D'INSTALLER LE MODÈLE
 
 # --- APIs & Connecteurs ---
 requests

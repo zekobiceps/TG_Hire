@@ -9,6 +9,11 @@ from sklearn.metrics.pairwise import cosine_similarity
 import time
 import re
 
+# --- AJOUTEZ CE BLOC DE DÉBOGAGE AU TOUT DÉBUT DE VOTRE FICHIER ---
+st.subheader("🕵️ Secrets de l'application (pour le débogage)")
+st.write(st.secrets.to_dict())
+# --- FIN DU BLOC DE DÉBOGAGE ---
+
 # --- NOUVEAUTÉ : Imports pour les nouvelles méthodes ---
 from sentence_transformers import SentenceTransformer, util
 import spacy
