@@ -192,6 +192,22 @@ def debug_secrets():
             st.error(f"❌ {secret}: Manquant")
 
 # Appelez cette fonction dans votre bouton de test
+    
+    # Tester la connexion
+    st.sidebar.write("2. Test d'authentification...")
+    gc = get_gsheet_client()
+    
+    if gc:
+        st.sidebar.write("3. Test d'accès à la feuille...")
+        try:
+            sh = gc.open_by_url(GOOGLE_SHEET_URL)
+            worksheet = sh.worksheet(WORKSHEET_NAME)
+            st.sidebar.success("✅ Connexion Google Sheets fonctionnelle!")
+            st.sidebar.write(f"📊 Feuille: {WORKSHEET_NAME}")
+        except Exception as e:
+            st.sidebar.error(f"❌ Erreur d'accès: {e}")
+    else:
+        st.sidebar.error("❌ Échec de l'authentification")
 
 # -------------------- Onglets --------------------
 tab1, tab2 = st.tabs(["Gestion des candidats", "Vue globale"])
