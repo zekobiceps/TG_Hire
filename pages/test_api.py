@@ -9,6 +9,7 @@ import pandas as pd
 from datetime import datetime
 import importlib.util
 import json
+import tempfile
 
 # --- CONFIGURATION GOOGLE SHEETS ---
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1QLC_LzwQU5eKLRcaDglLd6csejLZSs1aauYFwzFk0ac/edit"
@@ -38,65 +39,72 @@ if not os.path.exists(CV_DIR):
     except Exception as e:
         st.error(f"❌ Erreur lors de la création du dossier {CV_DIR}: {e}")
 
-# -------------------- FONCTION D'AUTHENTIFICATION AVEC DÉBOGAGE --------------------
+# -------------------- FONCTION D'AUTHENTIFICATION CORRIGÉE --------------------
 def get_gsheet_client():
-    """Authentifie avec Google Sheets - Solution alternative."""
+    """Authentifie avec Google Sheets - Version corrigée."""
     try:
+        # Vérifier si la clé existe
         if 'GCP_SERVICE_ACCOUNT_JSON' not in st.secrets:
             st.error("❌ GCP_SERVICE_ACCOUNT_JSON non trouvé dans les secrets")
             return None
         
-        # Créer un fichier temporaire avec les credentials
-        import tempfile
-        import json
-        
         json_data = st.secrets['GCP_SERVICE_ACCOUNT_JSON']
+        
+        # Debug: Afficher le type
+        st.sidebar.write(f"🔍 Type des données: {type(json_data)}")
+        
+        # Méthode 1: Si c'est déjà un dictionnaire
+        if isinstance(json_data, dict):
+            service_account_info = json_data
+        # Méthode 2: Si c'est une string JSON
+        elif isinstance(json_data, str):
+            try:
+                # Nettoyer la string - corriger l'échappement des \n
+                cleaned_json = json_data.replace('\\n', '\n')
+                service_account_info = json.loads(cleaned_json)
+            except json.JSONDecodeError as e:
+                st.error(f"❌ Erreur de parsing JSON: {e}")
+                return None
+        else:
+            st.error(f"❌ Type de données inattendu: {type(json_data)}")
+            return None
+        
+        # Vérifier que les champs requis existent
+        required_fields = ['type', 'project_id', 'private_key', 'client_email']
+        for field in required_fields:
+            if field not in service_account_info:
+                st.error(f"❌ Champ manquant dans le service account: {field}")
+                return None
+        
+        # Vérifier que la private_key a les bons sauts de ligne
+        private_key = service_account_info['private_key']
+        if '\\n' in private_key:
+            service_account_info['private_key'] = private_key.replace('\\n', '\n')
         
         # Créer un fichier temporaire
         with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
-            # Si c'est une string JSON, la parser d'abord
-            if isinstance(json_data, str):
-                parsed_json = json.loads(json_data)
-                json.dump(parsed_json, f)
-            else:
-                json.dump(json_data, f)
+            json.dump(service_account_info, f, indent=2)
             temp_file = f.name
         
-        # Utiliser le fichier temporaire pour l'authentification
+        # Utiliser le fichier temporaire
         gc = gspread.service_account(filename=temp_file)
         
-        # Nettoyer le fichier temporaire
-        import os
+        # Nettoyer
         os.unlink(temp_file)
         
-        st.sidebar.success("✅ Authentification réussie (méthode fichier temporaire)")
+        st.sidebar.success("✅ Authentification Google Sheets réussie!")
         return gc
+    
+        # Après avoir obtenu service_account_info, ajoutez :
+        st.sidebar.write("🔍 Private key preview:")
+        st.sidebar.text_area("Clé privée (premieres lignes)", 
+                    service_account_info['private_key'][:200], 
+                    height=100)
         
     except Exception as e:
-        st.error(f"❌ Erreur d'authentification : {e}")
-        return None
-        
-        # Debug: Afficher le type et les premiers caractères
-        json_data = st.secrets['GCP_SERVICE_ACCOUNT_JSON']
-        st.sidebar.write(f"🔍 **Type de GCP_SERVICE_ACCOUNT_JSON:** {type(json_data)}")
-        st.sidebar.write(f"🔍 **Premiers 100 caractères:** {json_data[:100]}...")
-        
-        # Essayer de parser le JSON
-        try:
-            service_account_info = json.loads(json_data)
-            st.sidebar.write("✅ JSON parsé avec succès")
-        except json.JSONDecodeError as e:
-            st.error(f"❌ Erreur de parsing JSON : {e}")
-            st.info("💡 Essayez de mettre le JSON sur une seule ligne dans les secrets")
-            return None
-        
-        # Authentifier avec gspread
-        gc = gspread.service_account_from_dict(service_account_info)
-        st.sidebar.success("✅ Authentification Google Sheets réussie")
-        return gc
-        
-    except Exception as e:
-        st.error(f"❌ Échec de l'authentification Google Sheets : {e}")
+        st.error(f"❌ Erreur d'authentification: {str(e)}")
+        import traceback
+        st.error(f"🔍 Détails: {traceback.format_exc()}")
         return None
 
 # -------------------- FONCTIONS GOOGLE SHEETS --------------------
@@ -187,22 +195,16 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
 st.title("🗺️ Cartographie des talents (Google Sheets)")
 
-# Afficher le statut de connexion
+# Bouton de test de connexion
 if st.sidebar.button("🔍 Tester la connexion Google Sheets"):
     gc = get_gsheet_client()
     if gc:
         st.sidebar.success("✅ Connexion Google Sheets fonctionnelle")
-
-# -------------------- Page config --------------------
-st.set_page_config(
-    page_title="TG-Hire IA - Cartographie",
-    page_icon="🗺️",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-st.title("🗺️ Cartographie des talents (Google Sheets)")
+    else:
+        st.sidebar.error("❌ Échec de la connexion")
 
 # -------------------- Onglets --------------------
 tab1, tab2 = st.tabs(["Gestion des candidats", "Vue globale"])
