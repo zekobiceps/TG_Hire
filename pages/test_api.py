@@ -120,14 +120,15 @@ def regex_analysis(text):
     total_experience_months = 0
     date_patterns = re.findall(r'(\d{1,2}/\d{4})\s*-\s*(\d{1,2}/\d{4}|aujourd\'hui|jour)|([a-zA-Z]+\.?\s+\d{4})\s*-\s*([a-zA-Z]+\.?\s+\d{4}|aujourd\'hui|jour)', text, re.IGNORECASE)
     
-    month_map = {"janvier": 1, "février": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6, "juillet": 7, "août": 8, "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12, "jan": 1, "fév": 2, "mar": 3, "avr": 4, "mai": 5, "juin": 6, "juil": 7, "aoû": 8, "sep": 9, "oct": 10, "nov": 11, "déc": 12}
+    month_map = {"janvier": 1, "février": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6, "juillet": 7, "août": 8, "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12, "jan": 1, "fév": 2, "mar": 3, "avr": 4, "may": 5, "jun": 6, "juil": 7, "aoû": 8, "sep": 9, "oct": 10, "nov": 11, "déc": 12}
     
     def parse_date(date_str):
-        date_str = date_str.lower().strip().replace('.', '')
+        date_str = date_str.lower().strip().replace('.','').replace('û','u')
         for month_fr, month_num in month_map.items():
             if month_fr in date_str:
                 date_str = date_str.replace(month_fr, str(month_num))
-                return datetime.strptime(re.sub(r'[^\d/]', '', date_str), '%m/%Y')
+                # Gérer les formats comme "7/2019" ou "juillet 2019"
+                return datetime.strptime(re.sub(r'[^\d/]', '', date_str).strip(), '%m/%Y')
         return datetime.strptime(date_str, '%m/%Y')
 
     for match in date_patterns:
