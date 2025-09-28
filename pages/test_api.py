@@ -693,85 +693,59 @@ with tabs[1]:
 
     # Formulaire avec expanders et champs éditable
     with st.form(key="avant_brief_form"):
-        for section in sections:
-            with st.expander(f"📋 {section['title']}", expanded=False):
-                for title, key, placeholder in section["fields"]:
-                    # Larger height for all fields
-                    height = 150  # Increased from 100 for all fields
-                    current_value = brief_data.get(key, st.session_state.get(key, ""))
-                    st.text_area(title, value=current_value, key=key, placeholder=placeholder, height=height)
-                    # Afficher le conseil généré juste en dessous du champ avec meilleur formatage
-                    if f"advice_{key}" in st.session_state and st.session_state[f"advice_{key}"]:
-                        advice_and_example = st.session_state[f'advice_{key}'].split('\n**Exemple :**\n')
-                        advice_text = advice_and_example[0].strip()
-                        example_text = advice_and_example[1].strip() if len(advice_and_example) > 1 else ""
+            for section in sections:
+                with st.expander(f"📋 {section['title']}", expanded=False):
+                    for title, key, placeholder in section["fields"]:
+                        current_value = brief_data.get(key, st.session_state.get(key, ""))
+                        st.text_area(title, value=current_value, key=key, placeholder=placeholder, height=150)
+
+            col_save, col_cancel = st.columns(2)
+            with col_save:
+                if st.form_submit_button("💾 Enregistrer modifications", type="primary", use_container_width=True):
+                    if st.session_state.current_brief_name:
+                        current_brief_name = st.session_state.current_brief_name
+                        brief_to_update = st.session_state.saved_briefs[current_brief_name]
                         
-                        st.markdown(f"""
-<div class="ai-advice-box">
-    <strong>Conseil :</strong> {advice_text}<br>
-    <strong>Exemple :</strong> {example_text}
-</div>
-""", unsafe_allow_html=True)
+                        # 1. Mise à jour des données de la session (avec clés en minuscules)
+                        all_field_keys = [field[1] for section in sections for field in section['fields']]
+                        for key in all_field_keys:
+                            brief_to_update[key] = st.session_state.get(key)
+                        
+                        # 2. Sauvegarde locale (qui utilise les clés en minuscules)
+                        save_briefs()
+                        
+                        # 3. CRÉATION DU PAYLOAD POUR GOOGLE SHEETS (LA CORRECTION EST ICI)
+                        payload_for_gsheet = brief_to_update.copy()
+                        
+                        # Dictionnaire de traduction
+                        mapping = {
+                            "poste_intitule": "POSTE_INTITULE", "manager_nom": "MANAGER_NOM", "recruteur": "RECRUTEUR",
+                            "affectation_type": "AFFECTATION_TYPE", "affectation_nom": "AFFECTATION_NOM", "date_brief": "DATE_BRIEF",
+                            "raison_ouverture": "RAISON_OUVERTURE", "impact_strategique": "IMPACT_STRATEGIQUE",
+                            "rattachement": "RATTACHEMENT", "taches_principales": "TACHES_PRINCIPALES",
+                            "must_have_experience": "MUST_HAVE_EXP", "must_have_diplomes": "MUST_HAVE_DIP",
+                            "must_have_competences": "MUST_HAVE_COMPETENCES", "must_have_softskills": "MUST_HAVE_SOFTSKILLS",
+                            "nice_to_have_experience": "NICE_TO_HAVE_EXP", "nice_to_have_diplomes": "NICE_TO_HAVE_DIP",
+                            "nice_to_have_competences": "NICE_TO_HAVE_COMPETENCES",
+                            "entreprises_profil": "ENTREPRISES_PROFIL", "synonymes_poste": "SYNONYMES_POSTE",
+                            "canaux_profil": "CANAUX_PROFIL", "budget": "BUDGET", "commentaires": "COMMENTAIRES",
+                            "notes_libres": "NOTES_LIBRES"
+                        }
 
-        # Boutons Enregistrer et Annuler dans le formulaire
-        col_save, col_cancel = st.columns([1, 1])
-        with col_save:
-            if st.form_submit_button("💾 TEST DE SAUVEGARDE", type="primary", use_container_width=True, key="save_reunion"):
-                if st.session_state.current_brief_name:
-                    current_brief_name = st.session_state.current_brief_name
-                    
-                    # --- LOGIQUE DE SAUVEGARDE CORRIGÉE ---
+                        # On ajoute les clés en MAJUSCULES au payload
+                        for session_key, gsheet_key in mapping.items():
+                            if session_key in payload_for_gsheet:
+                                payload_for_gsheet[gsheet_key] = payload_for_gsheet[session_key]
 
-                    # 1. On charge le dictionnaire complet du brief actuel (avec les données de Gestion et Avant-brief)
-                    brief_data_to_save = st.session_state.saved_briefs.get(current_brief_name, {}).copy()
-                    if not brief_data_to_save:
-                        st.error(f"Erreur critique : Impossible de trouver les données du brief '{current_brief_name}'.")
-                        st.stop()
+                        # 4. Envoi à Google Sheets avec le payload correctement formaté
+                        save_brief_to_gsheet(current_brief_name, payload_for_gsheet)
+                        
+                        st.success("✅ Modifications sauvegardées avec succès sur Google Sheets.")
+                        st.rerun()
 
-                    # 2. On met à jour ce dictionnaire avec TOUTES les informations de la réunion
-                    
-                    # Données des étapes 3 et 4
-                    brief_data_to_save.update({
-                        "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
-                        "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
-                        "processus_evaluation": st.session_state.get("processus_evaluation", ""),
-                        "manager_notes": st.session_state.get("manager_notes", "")
-                    })
-
-                    # Données de la matrice KSA (étape 2)
-                    ksa_matrix_df = st.session_state.get("ksa_matrix", pd.DataFrame())
-                    brief_data_to_save["ksa_matrix"] = ksa_matrix_df # Garde le format DataFrame pour l'app
-
-                    # Données des commentaires manager (étape 1)
-                    manager_comments_dict = brief_data_to_save.get("manager_comments", {})
-
-                    # 3. On sauvegarde cette version complète localement
-                    st.session_state.saved_briefs[current_brief_name] = brief_data_to_save
-                    save_briefs()
-
-                    # 4. On prépare le payload final pour Google Sheets
-                    # On convertit les DataFrames/dict en JSON où nécessaire
-                    payload_for_gsheet = brief_data_to_save.copy()
-                    payload_for_gsheet['KSA_MATRIX_JSON'] = ksa_matrix_df.to_json(orient='records')
-                    payload_for_gsheet['MANAGER_COMMENTS_JSON'] = json.dumps(manager_comments_dict, ensure_ascii=False)
-
-                    # On s'assure que les clés correspondent aux en-têtes GSheet (majuscules)
-                    # Note : La fonction save_brief_to_gsheet s'en occupe déjà, mais c'est une bonne pratique
-                    
-                    # 5. On envoie le dictionnaire COMPLET à Google Sheets
-                    save_brief_to_gsheet(current_brief_name, payload_for_gsheet)
-                    
-                    # Finalisation
-                    st.session_state.reunion_completed = True
-                    st.session_state.save_message = "✅ Données de réunion sauvegardées et synchronisées avec succès !"
-                    st.session_state.save_message_tab = "Réunion"
+            with col_cancel:
+                if st.form_submit_button("Annuler", use_container_width=True):
                     st.rerun()
-                else:
-                    st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
-        
-        with col_cancel:
-            if st.form_submit_button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion"):
-                delete_current_brief()
 
 # ---------------- REUNION BRIEF ----------------           
 with tabs[2]:
