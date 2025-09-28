@@ -127,7 +127,6 @@ def regex_analysis(text):
         for month_fr, month_num in month_map.items():
             if month_fr in date_str:
                 date_str = date_str.replace(month_fr, str(month_num))
-                # Gérer les formats comme "7/2019" ou "juillet 2019"
                 return datetime.strptime(re.sub(r'[^\d/]', '', date_str).strip(), '%m/%Y')
         return datetime.strptime(date_str, '%m/%Y')
 
