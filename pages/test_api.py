@@ -162,6 +162,7 @@ def regex_analysis(text):
         "Compétences clés extraites": list(set(skills))
     }
 
+
 # --- SCORING PAR RÈGLES AVEC REGEX AMÉLIORÉ ---
 def rank_resumes_with_rules(job_description, resumes, file_names):
     jd_entities = regex_analysis(job_description)
