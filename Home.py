@@ -1,45 +1,24 @@
 import streamlit as st
-import os
-import sys
 import gspread
 from google.oauth2 import service_account
 from datetime import datetime
 import pandas as pd
 
-# Optionnel: Ajouter le répertoire racine au chemin de recherche
-# sys.path.append(os.path.dirname(__file__))
-# from utils import *
-
 # --- CONFIGURATION ---
 USERS_SHEET_URL = "https://docs.google.com/spreadsheets/d/1fodJWGccSaDmlSEDkJblZoQE-lcifxpnOg5RYf3ovTg/edit?gid=0#gid=0"
 USERS_WORKSHEET_NAME = "Logininfo"
-### AJOUT ###
-FEATURES_WORKSHEET_NAME = "Features" # Nom de la feuille pour les tâches
+FEATURES_WORKSHEET_NAME = "Features"
 
-# --- INITIALISATION DE L'ÉTAT DE SESSION ---
-if 'features' not in st.session_state:
-    st.session_state.features = {"À développer": [], "En cours": [], "Réalisé": []}
-
-if "logged_in" not in st.session_state:
-    st.session_state.logged_in = False
-if "current_user" not in st.session_state:
-    st.session_state.current_user = ""
-if "users" not in st.session_state:
-    st.session_state.users = {}
-### AJOUT ###
-if 'data_loaded' not in st.session_state:
-    st.session_state.data_loaded = False
-    
-### AJOUT : Amélioration de la connexion à Google Sheets ###
+# --- GESTION DE LA CONNEXION GOOGLE SHEETS ---
 @st.cache_resource
 def get_gsheet_client():
-    """Crée et retourne un client gspread authentifié pour éviter les reconnexions inutiles."""
+    """Crée et retourne un client gspread authentifié."""
     try:
         service_account_info = {
             "type": st.secrets["GCP_TYPE"],
             "project_id": st.secrets["GCP_PROJECT_ID"],
             "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
-            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n').strip(), 
+            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n').strip(),
             "client_email": st.secrets["GCP_CLIENT_EMAIL"],
             "client_id": st.secrets["GCP_CLIENT_ID"],
             "auth_uri": st.secrets["GCP_AUTH_URI"],
@@ -52,7 +31,19 @@ def get_gsheet_client():
         st.error(f"❌ Erreur de connexion à Google Sheets. Vérifiez vos secrets. Détails: {e}")
         return None
 
-# --- FONCTIONS ---
+# --- INITIALISATION DE L'ÉTAT DE SESSION ---
+if 'features' not in st.session_state:
+    st.session_state.features = {"À développer": [], "En cours": [], "Réalisé": []}
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+if "current_user" not in st.session_state:
+    st.session_state.current_user = ""
+if "users" not in st.session_state:
+    st.session_state.users = {}
+if 'data_loaded' not in st.session_state:
+    st.session_state.data_loaded = False
+
+# --- FONCTIONS DE GESTION DES DONNÉES ---
 def load_users_from_gsheet():
     """Charge les utilisateurs depuis Google Sheets."""
     try:
@@ -61,19 +52,11 @@ def load_users_from_gsheet():
         spreadsheet = gc.open_by_url(USERS_SHEET_URL)
         worksheet = spreadsheet.worksheet(USERS_WORKSHEET_NAME)
         records = worksheet.get_all_records()
-        users = {}
-        for record in records:
-            email = str(record.get("email", "")).strip().lower()
-            password = str(record.get("password", "")).strip()
-            name = str(record.get("name", "")).strip()
-            if email and password and name:
-                users[email] = {"password": password, "name": name}
-        return users
+        return {str(r.get("email", "")).strip().lower(): {"password": str(r.get("password", "")), "name": str(r.get("name", ""))} for r in records if r.get("email")}
     except Exception as e:
         st.error(f"❌ Erreur lors du chargement des utilisateurs: {e}")
         return {}
 
-### AJOUT : Fonctions pour charger et sauvegarder les tâches ###
 def load_features_from_gsheet():
     """Charge les fonctionnalités depuis la feuille Google Sheets."""
     features_by_status = {"À développer": [], "En cours": [], "Réalisé": []}
@@ -90,8 +73,8 @@ def load_features_from_gsheet():
                 features_by_status[status].append(record)
         return features_by_status
     except gspread.exceptions.WorksheetNotFound:
-         st.error(f"La feuille '{FEATURES_WORKSHEET_NAME}' est introuvable. Veuillez la créer.")
-         return features_by_status
+        st.error(f"La feuille '{FEATURES_WORKSHEET_NAME}' est introuvable.")
+        return features_by_status
     except Exception as e:
         st.error(f"❌ Erreur lors du chargement des fonctionnalités : {e}")
         return features_by_status
@@ -111,26 +94,16 @@ def save_features_to_gsheet():
                 all_features.append(feature_copy)
 
         if all_features:
-            df = pd.DataFrame(all_features)
-            df = df[['id', 'title', 'description', 'priority', 'status', 'date_ajout']]
+            df = pd.DataFrame(all_features)[['id', 'title', 'description', 'priority', 'status', 'date_ajout']]
             worksheet.clear()
             worksheet.update([df.columns.values.tolist()] + df.values.tolist())
         else:
             worksheet.clear()
             worksheet.update_row(1, ['id', 'title', 'description', 'priority', 'status', 'date_ajout'])
     except Exception as e:
-        st.error(f"❌ Erreur lors de la sauvegarde des fonctionnalités : {e}")
+        st.error(f"❌ Erreur lors de la sauvegarde : {e}")
 
-def debug_session_state():
-    """Affiche l'état actuel de la session pour débogage."""
-    with st.expander("🔧 Mode Débogage (État de la Session)"):
-        st.json(st.session_state)
-
-# --- CHARGEMENT INITIAL DES UTILISATEURS ---
-if not st.session_state.users:
-    st.session_state.users = load_users_from_gsheet()
-
-# --- STYLES CSS (conservés tels quels) ---
+# --- STYLES CSS ---
 st.markdown("""
     <style>
     #MainMenu, footer, header { visibility: hidden; }
@@ -145,13 +118,12 @@ st.markdown("""
     .priority-Haute { border-left-color: #dc3545; }
     .priority-Moyenne { border-left-color: #ffc107; }
     .priority-Basse { border-left-color: #28a745; }
-    /* Styles pour le message de bienvenue */
-    .welcome-message { text-align: center; margin: 10px 0; }
-    .welcome-text { font-size: 14px; font-weight: bold; margin-bottom: 0; }
-    .user-name { font-size: 16px; font-weight: bold; color: #1f77b4; margin-top: 0; }
-    html[data-theme='dark'] .user-name { color: #5dade2; }
     </style>
 """, unsafe_allow_html=True)
+
+# --- CHARGEMENT INITIAL DES UTILISATEURS ---
+if not st.session_state.users:
+    st.session_state.users = load_users_from_gsheet()
 
 # --- PAGE DE CONNEXION ---
 if not st.session_state.logged_in:
@@ -167,33 +139,30 @@ if not st.session_state.logged_in:
                 if email in st.session_state.users and st.session_state.users[email]["password"] == password:
                     st.session_state.logged_in = True
                     st.session_state.current_user = st.session_state.users[email]["name"]
-                    st.success("Connexion réussie !")
                     st.rerun()
                 else:
                     st.error("Email ou mot de passe incorrect.")
+    st.stop()
+
 # --- PAGE PRINCIPALE (APRÈS CONNEXION) ---
 else:
-    ### AJOUT : Logique de chargement des données au début de la session ###
     if not st.session_state.data_loaded:
         with st.spinner("Chargement des fonctionnalités..."):
             st.session_state.features = load_features_from_gsheet()
         st.session_state.data_loaded = True
 
     st.set_page_config(page_title="TG-Hire IA - Roadmap", layout="wide", initial_sidebar_state="expanded")
-    
+
     # --- BARRE LATÉRALE ---
     with st.sidebar:
         st.image("tgcc.png", use_container_width=True)
         st.markdown("---")
-        st.markdown(f'<div class="welcome-message"><p class="welcome-text">Bienvenue</p><p class="user-name">{st.session_state.current_user}</p></div>', unsafe_allow_html=True)
-        st.markdown("---")
+        st.markdown(f"**Bienvenue, {st.session_state.current_user}**")
         if st.button("🚪 Déconnexion", use_container_width=True):
             st.session_state.logged_in = False
             st.session_state.current_user = ""
-            st.session_state.data_loaded = False # MODIFIÉ : Réinitialisation
+            st.session_state.data_loaded = False
             st.rerun()
-        if st.button("🔧 Activer le Débogage", use_container_width=True):
-            debug_session_state()
 
     # --- CONTENU PRINCIPAL ---
     st.title("📊 Roadmap Fonctionnelle")
@@ -207,7 +176,7 @@ else:
         if status == "À développer": col = col1
         elif status == "En cours": col = col2
         else: col = col3
-        
+
         with col:
             st.header(f"{emoji} {status}")
             if st.session_state.features.get(status):
@@ -222,11 +191,21 @@ else:
             else:
                 st.info(f"Aucune tâche dans '{status}'.")
 
+    # --- TAUX DE RÉALISATION ---
     st.markdown("---")
-    
+    realise_count = len(st.session_state.features.get("Réalisé", []))
+    total_count = sum(len(features) for features in st.session_state.features.values())
+
+    if total_count > 0:
+        completion_rate = realise_count / total_count
+        st.subheader(f"Taux de Réalisation : {completion_rate:.1%}")
+        st.progress(completion_rate)
+    else:
+        st.subheader("Taux de Réalisation : N/A")
+        st.progress(0)
+
     # --- GESTION DES FONCTIONNALITÉS ---
-    with st.expander("⚙️ Gérer les fonctionnalités (Ajouter, Modifier, Supprimer)", expanded=False):
-        total_features = sum(len(features) for features in st.session_state.features.values())
+    with st.expander("⚙️ Gérer les fonctionnalités", expanded=False):
         form_tab1, form_tab2, form_tab3 = st.tabs(["➕ Ajouter", "✏️ Modifier", "🗑️ Supprimer"])
 
         # Onglet Ajouter
@@ -244,7 +223,7 @@ else:
                             "priority": new_priority, "date_ajout": datetime.now().strftime("%Y-%m-%d")
                         }
                         st.session_state.features["À développer"].append(new_feature)
-                        save_features_to_gsheet() ### AJOUT ###
+                        save_features_to_gsheet()
                         st.success("✅ Fonctionnalité ajoutée !")
                         st.rerun()
                     else:
@@ -272,7 +251,7 @@ else:
                                 st.session_state.features[old_status] = [f for f in st.session_state.features[old_status] if f["id"] != selected_feature_id]
                                 updated_feature = {**feature_to_edit, "title": edit_title, "description": edit_description, "priority": edit_priority}
                                 st.session_state.features[edit_status].append(updated_feature)
-                                save_features_to_gsheet() ### AJOUT ###
+                                save_features_to_gsheet()
                                 st.success("✅ Fonctionnalité modifiée !")
                                 st.rerun()
             else:
@@ -291,15 +270,10 @@ else:
                 if delete_feature_id and st.button("🗑️ Confirmer la suppression", type="primary", use_container_width=True):
                     for status in st.session_state.features:
                         st.session_state.features[status] = [f for f in st.session_state.features[status] if f["id"] != delete_feature_id]
-                    save_features_to_gsheet() ### AJOUT ###
+                    save_features_to_gsheet()
                     st.success("✅ Fonctionnalité supprimée !")
                     st.rerun()
             else:
                 st.info("Aucune fonctionnalité à supprimer.")
 
-    st.caption("TG-Hire IA - Roadmap Fonctionnelle v2.0 (Persistante)")
-
-# Arrêter l'exécution si l'utilisateur n'est pas connecté pour protéger les autres pages
-# (Cette ligne n'est plus nécessaire car la logique est gérée au début)
-# if not st.session_state.logged_in:
-#    st.stop()
+    st.caption("TG-Hire IA - Roadmap Fonctionnelle v2.1")
