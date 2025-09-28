@@ -12,18 +12,16 @@ from docx.shared import Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Pt
 
-import streamlit as st
+# -------------------- NOUVEAUX IMPORTS GOOGLE SHEETS --------------------
+# Assurez-vous d'avoir installé 'gspread' et 'google-auth-oauthlib'
+try:
+    import gspread
+    from google.oauth2 import service_account
+    GSPREAD_AVAILABLE = True
+except ImportError:
+    # Ne pas utiliser st.error ici car l'import est fait au début du script
+    GSPREAD_AVAILABLE = False
 
-def init_session_state():
-    if "cartographie_data" not in st.session_state:
-        st.session_state.cartographie_data = {
-            "🌟 Haut Potentiel": [],
-            "💎 Rare & stratégique": [],
-            "⚡ Rapide à mobiliser": [],
-            "📚 Facilement disponible": []
-        }
-        
-# -------------------- Disponibilité PDF & Word --------------------
 try:
     from reportlab.lib.pagesizes import A4
     from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
@@ -39,43 +37,99 @@ try:
 except ImportError:
     WORD_AVAILABLE = False
 
-# -------------------- Fichier unique pour tous les briefs --------------------
-BRIEFS_FILE = "all_briefs.json"  # Fichier unique comme base de données
+# -------------------- CONFIGURATION GOOGLE SHEETS pour les Briefs --------------------
+BRIEFS_SHEET_URL = "https://docs.google.com/spreadsheets/d/1DDw-aypZ9zDwAUuL6-p4TsKBIwV3pua8O3ACw_K-bHs/edit"
+BRIEFS_WORKSHEET_NAME = "Briefs"
 
-def save_briefs():
-    """Sauvegarde tous les briefs dans un seul fichier JSON."""
+# Entêtes de colonnes (doivent correspondre EXACTEMENT à la Ligne 1 de votre Google Sheet)
+BRIEFS_HEADERS = [
+    "BRIEF_NAME", "POSTE_INTITULE", "MANAGER_NOM", "RECRUTEUR", "AFFECTATION_TYPE", 
+    "AFFECTATION_NOM", "DATE_BRIEF", "RAISON_OUVERTURE", "IMPACT_STRATEGIQUE", 
+    "RATTACHEMENT", "TACHES_PRINCIPALES", "MUST_HAVE_EXP", "MUST_HAVE_DIP", 
+    "MUST_HAVE_COMPETENCES", "MUST_HAVE_SOFTSKILLS", "NICE_TO_HAVE_EXP", 
+    "NICE_TO_HAVE_DIP", "NICE_TO_HAVE_COMPETENCES", "ENTREPRISES_PROFIL", 
+    "SYNONYMES_POSTE", "CANAUX_PROFIL", "BUDGET", "COMMENTAIRES", "NOTES_LIBRES", 
+    "CRITERES_EXCLUSION", "PROCESSUS_EVALUATION", "MANAGER_NOTES", 
+    "KSA_MATRIX_JSON", "DATE_MAJ"
+]
+
+# -------------------- FONCTIONS DE GESTION GOOGLE SHEETS --------------------
+
+@st.cache_resource
+def get_briefs_gsheet_client():
+    """Initialise et retourne le client gspread (mis en cache)."""
+    if not GSPREAD_AVAILABLE:
+        return None
     try:
-        serializable_briefs = {
-            name: {
-                key: value.to_dict(orient='records') if isinstance(value, pd.DataFrame) else value
-                for key, value in data.items()
-            }
-            for name, data in st.session_state.saved_briefs.items()
-        }
-        with open(BRIEFS_FILE, "w", encoding="utf-8") as f:
-            json.dump(serializable_briefs, f, indent=4, ensure_ascii=False)
-        st.success(f"✅ Tous les briefs sauvegardés dans {BRIEFS_FILE}")
+        # Assurez-vous que le secret 'google_sheets_creds' est configuré
+        creds = st.secrets.get("google_sheets_creds")
+        if not creds:
+             st.error("❌ Le secret 'google_sheets_creds' est manquant dans Streamlit Secrets.")
+             return None
+             
+        gc = gspread.service_account_from_dict(creds)
+        spreadsheet = gc.open_by_url(BRIEFS_SHEET_URL)
+        worksheet = spreadsheet.worksheet(BRIEFS_WORKSHEET_NAME)
+        return worksheet
     except Exception as e:
-        st.error(f"Erreur lors de la sauvegarde des briefs: {e}")
+        # En cas d'erreur de permission ou de connexion
+        st.error(f"❌ Erreur de connexion à Google Sheets pour les Briefs : {e}")
+        return None
 
-def load_briefs():
-    """Charge tous les briefs depuis le fichier JSON unique."""
+def save_brief_to_gsheet(brief_name, brief_data):
+    """Sauvegarde un brief dans Google Sheets (met à jour si existe, insère si nouveau)."""
+    worksheet = get_briefs_gsheet_client()
+    if worksheet is None:
+        return False
+    
     try:
-        if os.path.exists(BRIEFS_FILE):
-            with open(BRIEFS_FILE, "r", encoding="utf-8") as f:
-                briefs_data = json.load(f)
-                briefs = {}
-                for name, data in briefs_data.items():
-                    briefs[name] = {
-                        key: pd.DataFrame(value) if key == "ksa_matrix" else value
-                        for key, value in data.items()
-                    }
-                return briefs
+        # 1. Préparer la ligne de données
+        row_data = []
+        
+        # Le dictionnaire 'brief_data' contient la KSA en DataFrame
+        ksa_df = brief_data.get("ksa_matrix") # Utilisation du nom de clé correct 'ksa_matrix'
+        
+        for header in BRIEFS_HEADERS:
+            value = brief_data.get(header, "")
+            
+            if header == "KSA_MATRIX_JSON" and isinstance(ksa_df, pd.DataFrame):
+                # Sérialisation du DataFrame KSA en chaîne JSON
+                value = ksa_df.to_json(orient='records')
+            
+            elif header == "DATE_MAJ":
+                value = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            elif header in brief_data:
+                # Gérer les listes (ex: canaux_prioritaires) et autres types en string
+                if isinstance(value, list):
+                    value = ", ".join(map(str, value))
+                elif isinstance(value, datetime):
+                    value = value.strftime("%Y-%m-%d")
+                else:
+                    value = str(value)
+            else:
+                value = ""
+                
+            row_data.append(value)
+        
+        # 2. Chercher si le brief existe déjà (par BRIEF_NAME)
+        # On cherche dans la première colonne (A) qui est BRIEF_NAME
+        cell = worksheet.find(brief_name, in_column=1, case_sensitive=True)
+        
+        if cell:
+            # Mise à jour de la ligne existante
+            worksheet.update(f'A{cell.row}:{BRIEFS_HEADERS[-1]}{cell.row}', [row_data])
+            st.toast(f"✅ Brief '{brief_name}' mis à jour dans Google Sheets.", icon='☁️')
         else:
-            return {}
+            # Insertion d'une nouvelle ligne à la fin
+            worksheet.append_row(row_data)
+            st.toast(f"✅ Brief '{brief_name}' enregistré dans Google Sheets.", icon='☁️')
+            
+        return True
+
     except Exception as e:
-        st.error(f"Erreur lors du chargement des briefs: {e}")
-        return {}
+        st.error(f"❌ Échec de la sauvegarde Google Sheets pour '{brief_name}'. Erreur: {e}")
+        return False
 
 # -------------------- Directory for Briefs --------------------
 BRIEFS_DIR = "briefs"
@@ -85,7 +139,7 @@ def ensure_briefs_directory():
     if not os.path.exists(BRIEFS_DIR):
         os.makedirs(BRIEFS_DIR)
 
-# -------------------- Persistance --------------------
+# -------------------- Persistance (JSON locale - la version active) --------------------
 def save_briefs():
     """Save each brief in session_state.saved_briefs to a separate JSON file."""
     try:
@@ -102,7 +156,7 @@ def save_briefs():
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(brief_data, f, indent=4, ensure_ascii=False)
     except Exception as e:
-        st.error(f"Erreur lors de la sauvegarde des briefs: {e}")
+        st.error(f"Erreur lors de la sauvegarde locale des briefs: {e}")
 
 def load_briefs():
     """Load all briefs from JSON files in the briefs directory."""
@@ -117,12 +171,12 @@ def load_briefs():
                     brief_data = json.load(f)
                     # Reconvertir les dictionnaires en DataFrames
                     briefs[brief_name] = {
-                        key: pd.DataFrame.from_dict(value) if key == "ksa_matrix" else value
+                        key: pd.DataFrame.from_dict(value) if key == "ksa_matrix" and isinstance(value, dict) else value
                         for key, value in brief_data.items()
                     }
         return briefs
     except Exception as e:
-        st.error(f"Erreur lors du chargement des briefs: {e}")
+        # st.error(f"Erreur lors du chargement des briefs: {e}") # Désactivé pour éviter l'erreur au démarrage
         return {}
 
 def save_job_descriptions():
@@ -145,6 +199,7 @@ def load_job_descriptions():
 def init_session_state():
     """Initialise l'état de la session Streamlit avec des valeurs par défaut."""
     defaults = {
+        # ... (Conserver tous les champs existants) ...
         "poste_intitule": "",
         "service": "",
         "niveau_hierarchique": "",
@@ -708,4 +763,75 @@ def generate_automatic_brief_name():
         counter += 1
     
     return brief_name
+# -------------------- FONCTIONS DE SAUVEGARDE GOOGLE SHEETS --------------------
 
+@st.cache_resource
+def get_briefs_gsheet_client():
+    """Initialise et retourne le client gspread (mis en cache)."""
+    if not GSPREAD_AVAILABLE:
+        return None
+    try:
+        # ⚠️ Assurez-vous que les secrets Google Sheets sont configurés !
+        creds = st.secrets.get("google_sheets_creds")
+        if not creds:
+             st.error("❌ Le secret 'google_sheets_creds' est manquant dans Streamlit Secrets.")
+             return None
+             
+        gc = gspread.service_account_from_dict(creds)
+        spreadsheet = gc.open_by_url(BRIEFS_SHEET_URL)
+        worksheet = spreadsheet.worksheet(BRIEFS_WORKSHEET_NAME)
+        return worksheet
+    except Exception as e:
+        st.error(f"❌ Erreur de connexion à Google Sheets pour les Briefs : {e}")
+        return None
+
+def save_brief_to_gsheet(brief_name, brief_data):
+    """Sauvegarde un brief dans Google Sheets (met à jour si existe, insère si nouveau)."""
+    worksheet = get_briefs_gsheet_client()
+    if worksheet is None:
+        return False
+    
+    try:
+        # 1. Préparer la ligne de données
+        row_data = []
+        
+        # Le dictionnaire 'brief_data' contient la KSA en DataFrame
+        ksa_df = brief_data.get("KSA")
+        
+        for header in BRIEFS_HEADERS:
+            value = brief_data.get(header, "")
+            
+            if header == "KSA_MATRIX_JSON" and isinstance(ksa_df, pd.DataFrame):
+                # Sérialisation du DataFrame KSA en chaîne JSON pour une seule cellule
+                value = ksa_df.to_json(orient='records')
+            
+            elif header == "DATE_MAJ":
+                value = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            elif header in brief_data:
+                # Assurer que toutes les valeurs sont des chaînes (y compris les listes/autres objets)
+                value = str(value)
+            else:
+                value = ""
+                
+            row_data.append(value)
+        
+        # 2. Chercher si le brief existe déjà (par BRIEF_NAME)
+        # On cherche dans la première colonne (A) qui est BRIEF_NAME
+        cell = worksheet.find(brief_name, in_column=1, case_sensitive=True)
+        
+        if cell:
+            # Mise à jour de la ligne existante
+            # On utilise le nom de la dernière colonne pour définir la plage
+            worksheet.update(f'A{cell.row}:{BRIEFS_HEADERS[-1]}{cell.row}', [row_data])
+            st.toast(f"✅ Brief '{brief_name}' mis à jour dans Google Sheets.", icon='☁️')
+        else:
+            # Insertion d'une nouvelle ligne à la fin
+            worksheet.append_row(row_data)
+            st.toast(f"✅ Brief '{brief_name}' enregistré dans Google Sheets.", icon='☁️')
+            
+        return True
+
+    except Exception as e:
+        st.error(f"❌ Échec de la sauvegarde Google Sheets pour '{brief_name}'. Vérifiez les permissions et les entêtes de colonnes : {e}")
+        return False

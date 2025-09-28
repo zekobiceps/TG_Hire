@@ -1,440 +1,1138 @@
 import streamlit as st
-import pandas as pd
-import io
-import requests
-import json
-from pypdf import PdfReader
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
-import time
-import re
+
+# Vérification de la connexion
+if not st.session_state.get("logged_in", False):
+    st.stop()
+import sys, os 
 from datetime import datetime
+import json
+import pandas as pd
 
-# Imports pour la méthode sémantique
-from sentence_transformers import SentenceTransformer, util
-import torch
+# ✅ permet d'accéder à utils.py à la racine
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-# -------------------- Configuration de la clé API DeepSeek --------------------
-# --- CORRECTION : Déplacé à l'intérieur des fonctions pour éviter l'erreur au démarrage ---
+from utils import (
+    init_session_state,
+    PDF_AVAILABLE,
+    WORD_AVAILABLE,
+    save_briefs,
+    load_briefs,
+    get_example_for_field,
+    export_brief_pdf,
+    export_brief_word,
+    generate_checklist_advice,
+    filter_briefs,
+    generate_automatic_brief_name,
+    save_library,
+    generate_ai_question,
+    test_deepseek_connection,
+    # --- NOUVEL IMPORT GOOGLE SHEETS ---
+    save_brief_to_gsheet,
+)
 
-# -------------------- Streamlit Page Config --------------------
+# --- CSS pour augmenter la taille du texte des onglets ---
+# Style simplifié pour ressembler à la page Annonces
+st.markdown("""
+    <style>
+    /* Style minimal pour les onglets */
+    .stTabs [data-baseweb="tab"] {
+        height: auto !important;
+        padding: 10px 16px !important;
+    }
+    
+    /* Style pour les boutons principaux */
+    .stButton > button {
+        border-radius: 4px;
+        padding: 0.5rem 1rem;
+        font-weight: 500;
+    }
+    
+    /* Style pour les expanders */
+    .streamlit-expanderHeader {
+        font-weight: 600;
+    }
+    
+    /* Style pour les dataframes */
+    .stDataFrame {
+        width: 100%;
+    }
+    
+    /* Style pour les textareas */
+    .stTextArea textarea {
+        min-height: 100px;
+        resize: vertical;
+    }
+    
+    /* Permettre le retour à la ligne avec Alt+Enter */
+    .stTextArea textarea {
+        white-space: pre-wrap !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+def render_ksa_matrix():
+    """Affiche la matrice KSA sous forme de tableau et permet l'ajout de critères."""
+    
+    # Ajout des explications dans un expander
+    with st.expander("ℹ️ Explications de la méthode KSA", expanded=False):
+        st.markdown("""
+### Méthode KSA (Knowledge, Skills, Abilities)
+- **Knowledge (Connaissances)** : Savoirs théoriques nécessaires. Ex: Connaissances en normes de sécurité BTP (ISO 45001).
+- **Skills (Compétences)** : Aptitudes pratiques acquises. Ex: Maîtrise d'AutoCAD pour dessiner des plans de chantier.
+- **Abilities (Aptitudes)** : Capacités innées ou développées. Ex: Capacité à gérer des crises sur chantier.
+
+### Types de questions :
+- **Comportementale** : Basée sur des expériences passées (méthode STAR: Situation, Tâche, Action, Résultat). Ex: "Décrivez une situation où vous avez résolu un conflit d'équipe."
+- **Situationnelle** : Hypothétique, pour évaluer la réaction future. Ex: "Que feriez-vous si un délai de chantier était menacé ?"
+- **Technique** : Évalue les connaissances spécifiques. Ex: "Expliquez comment vous utilisez AutoCAD pour la modélisation BTP."
+- **Générale** : Questions ouvertes sur l'expérience globale. Ex: "Parlez-moi de votre parcours en BTP."
+        """)
+    
+    # Initialiser les données KSA si elles n'existent pas
+    if "ksa_matrix" not in st.session_state:
+        st.session_state.ksa_matrix = pd.DataFrame(columns=[
+            "Rubrique", 
+            "Critère", 
+            "Type de question", 
+            "Cible / Standard attendu", 
+            "Échelle d'évaluation (1-5)", 
+            "Évaluateur"
+        ])
+    
+    # Dictionnaire des placeholders pour "Cible / Standard attendu"
+    placeholder_dict = {
+        "Comportementale": "Ex: Décrivez une situation où vous avez géré une équipe sous pression (méthode STAR: Situation, Tâche, Action, Résultat).",
+        "Situationnelle": "Ex: Que feriez-vous si un délai de chantier était menacé par un retard de livraison ?",
+        "Technique": "Ex: Expliquez comment vous utilisez AutoCAD pour la modélisation de structures BTP.",
+        "Générale": "Ex: Parlez-moi de votre expérience globale dans le secteur BTP."
+    }
+    
+    # Expander pour ajouter un nouveau critère
+    with st.expander("➕ Ajouter un critère", expanded=True):
+        # CSS pour améliorer l'apparence avec 3 colonnes et styliser la réponse
+        st.markdown("""
+        <style>
+            .stTextInput, .stSelectbox, .stSlider, .stTextArea {
+                margin-bottom: 5px;
+                padding: 5px;
+                border-radius: 8px;
+                background-color: #2a2a2a;
+                color: #ffffff;
+            }
+            .stTextInput > div > input, .stTextArea > div > textarea {
+                background-color: #2a2a2a;
+                color: #ffffff;
+                border: 1px solid #555555;
+                border-radius: 8px;
+            }
+            .stSelectbox > div > select {
+                background-color: #2a2a2a;
+                color: #ffffff;
+                border: 1px solid #555555;
+                border-radius: 8px;
+            }
+            .stButton > button {
+                background-color: #FF0000;
+                color: white;
+                border-radius: 8px;
+                padding: 5px 10px;
+                margin-top: 5px;
+            }
+            .stButton > button:hover {
+                background-color: #FF3333;
+            }
+            .st-expander {
+                border: 1px solid #555555;
+                border-radius: 8px;
+                background-color: #1e1e1e;
+                padding: 5px;
+            }
+            .ai-response {
+                margin-top: 10px;
+                padding: 5px;
+                background-color: #28a745; /* Vert pour la réponse en bas */
+                border-radius: 8px;
+                color: #ffffff;
+            }
+            .success-icon {
+                display: inline-block;
+                margin-right: 5px;
+                color: #28a745; /* Vert pour l'icône ✅ */
+            }
+            .stSuccess { /* Override green from st.success */
+                background-color: #28a745 !important;
+                color: #ffffff !important;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Formulaire pour ajouter un critère avec 3 colonnes
+        with st.form(key="add_ksa_criterion_form"):
+            # "Cible / Standard attendu" en haut, sur toute la largeur
+            st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
+            cible = st.text_area("Cible / Standard attendu", 
+                                  placeholder="Définissez la cible ou le standard attendu pour ce critère.", 
+                                  key="new_cible", height=100)
+            st.markdown("</div>", unsafe_allow_html=True)
+            
+            # Champs en 3 colonnes
+            col1, col2, col3 = st.columns([1, 1, 1.5])
+            with col1:
+                st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
+                rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique")
+                st.markdown("</div>", unsafe_allow_html=True)
+            with col2:
+                st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
+                critere = st.text_input("Critère", placeholder="", key="new_critere")
+                type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], 
+                                             key="new_type_question")
+                st.markdown("</div>", unsafe_allow_html=True)
+            with col3:
+                st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
+                evaluation = st.slider("Échelle d'évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
+                evaluateur = st.selectbox("Évaluateur", ["Manager", "Recruteur", "Les deux"], key="new_evaluateur")
+                st.markdown("</div>", unsafe_allow_html=True)
+            
+            # --- Section pour demander une question à l'IA ---
+            st.markdown("---")
+            st.markdown("**Demander une question à l'IA**")
+            
+            # Champ de saisie et checkbox sur des lignes séparées
+            ai_prompt = st.text_input("Décrivez ce que l'IA doit générer :", placeholder="Ex: une question générale pour évaluer la maîtrise des techniques de sourcing par un chargé de recrutement", 
+                                      key="ai_prompt")
+            st.checkbox("⚡ Mode rapide (réponse concise)", key="concise_checkbox")
+            
+            # Boutons sur une ligne distincte
+            col_buttons = st.columns([1, 1])
+            with col_buttons[0]:
+                if st.form_submit_button("💡 Générer question IA", use_container_width=True):
+                    if ai_prompt:
+                        try:
+                            ai_response = generate_ai_question(ai_prompt, concise=st.session_state.concise_checkbox)
+                            st.session_state.ai_response = ai_response
+                        except Exception as e:
+                            st.error(f"Erreur lors de la génération de la question : {e}")
+                    else:
+                        st.error("Veuillez entrer un prompt pour l'IA")
+            
+            # Bouton pour ajouter le critère
+            with col_buttons[1]:
+                if st.form_submit_button("➕ Ajouter le critère", use_container_width=True):
+                    if not critere or not cible:
+                        st.error("Veuillez remplir au moins le critère et la cible.")
+                    else:
+                        new_row = pd.DataFrame([{
+                            "Rubrique": rubrique,
+                            "Critère": critere,
+                            "Type de question": type_question,
+                            "Cible / Standard attendu": cible,
+                            "Échelle d'évaluation (1-5)": evaluation,
+                            "Évaluateur": evaluateur
+                        }])
+                        st.session_state.ksa_matrix = pd.concat([st.session_state.ksa_matrix, new_row], ignore_index=True)
+                        st.success("✅ Critère ajouté avec succès !")
+                        st.rerun()
+
+        # Afficher la réponse générée uniquement en bas
+        if "ai_response" in st.session_state and st.session_state.ai_response:
+            st.markdown(f"<div class='ai-response'>{st.session_state.ai_response}</div>", unsafe_allow_html=True)
+
+    # Afficher la matrice KSA sous forme de data_editor
+    if not st.session_state.ksa_matrix.empty:
+        st.session_state.ksa_matrix = st.data_editor(
+            st.session_state.ksa_matrix,
+            hide_index=True,
+            column_config={
+                "Rubrique": st.column_config.SelectboxColumn(
+                    "Rubrique",
+                    options=["Knowledge", "Skills", "Abilities"],
+                    required=True,
+                ),
+                "Critère": st.column_config.TextColumn(
+                    "Critère",
+                    help="Critère spécifique à évaluer.",
+                    required=True,
+                ),
+                "Type de question": st.column_config.SelectboxColumn(
+                    "Type de question",
+                    options=["Comportementale", "Situationnelle", "Technique", "Générale"],
+                    help="Type de question pour l'entretien.",
+                    required=True,
+                ),
+                "Cible / Standard attendu": st.column_config.TextColumn(
+                    "Cible / Standard attendu",
+                    help="Objectif ou standard à évaluer pour ce critère.",
+                    required=True,
+                ),
+                "Échelle d'évaluation (1-5)": st.column_config.NumberColumn(
+                    "Échelle d'évaluation (1-5)",
+                    help="Notez la réponse du candidat de 1 à 5.",
+                    min_value=1,
+                    max_value=5,
+                    step=1,
+                    format="%d"
+                ),
+                "Évaluateur": st.column_config.SelectboxColumn(
+                    "Évaluateur",
+                    options=["Manager", "Recruteur", "Les deux"],
+                    help="Qui évalue ce critère.",
+                    required=True,
+                ),
+            },
+            num_rows="dynamic",
+            use_container_width=True,
+        )
+
+def delete_current_brief():
+    """Supprime le brief actuel et retourne à l'onglet Gestion"""
+    if "current_brief_name" in st.session_state and st.session_state.current_brief_name:
+        brief_name = st.session_state.current_brief_name
+        file_path = os.path.join("briefs", f"{brief_name}.json")
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            st.session_state.saved_briefs.pop(brief_name, None)
+            save_briefs()
+            
+            # Réinitialiser l'état de la session
+            st.session_state.current_brief_name = ""
+            st.session_state.avant_brief_completed = True
+            st.session_state.reunion_completed = True
+            st.session_state.reunion_step = 1
+            
+            # Réinitialiser les champs du formulaire
+            keys_to_reset = [
+                "manager_nom", "niveau_hierarchique", "affectation_type", 
+                "recruteur", "affectation_nom", "date_brief", "raison_ouverture",
+                "impact_strategique", "rattachement", "taches_principales",
+                "must_have_experience", "must_have_diplomes", "must_have_competences",
+                "must_have_softskills", "nice_to_have_experience", "nice_to_have_diplomes",
+                "nice_to_have_competences", "entreprises_profil", "synonymes_poste",
+                "canaux_profil", "budget", "commentaires", "notes_libres"
+            ]
+            
+            for key in keys_to_reset:
+                if key in st.session_state:
+                    del st.session_state[key]
+            
+            st.success(f"✅ Brief '{brief_name}' supprimé avec succès")
+            # Rediriger vers l'onglet Gestion
+            st.session_state.brief_phase = "📁 Gestion"
+            st.rerun()
+
+# ---------------- INIT ----------------
+# NOTE: L'appel init_session_state() est déplacé ici pour être avant st.set_page_config() si possible, 
+# ou laissé là où il était si la structure de votre fichier l'exige. Je le garde ici pour le moment.
+init_session_state() 
 st.set_page_config(
-    page_title="Analyse CV AI",
-    page_icon="📄",
+    page_title="TG-Hire IA - Brief",
+    page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# -------------------- CSS --------------------
+if "brief_phase" not in st.session_state:
+    st.session_state.brief_phase = "📁 Gestion"
+
+if "reunion_step" not in st.session_state:
+    st.session_state.reunion_step = 1
+
+if "filtered_briefs" not in st.session_state:
+    st.session_state.filtered_briefs = {}
+
+# Variables pour gérer l'accès aux onglets (tous débloqués)
+if "avant_brief_completed" not in st.session_state:
+    st.session_state.avant_brief_completed = True
+
+if "reunion_completed" not in st.session_state:
+    st.session_state.reunion_completed = True
+
+# Message persistant jusqu'à changement d'onglet
+if "current_tab" not in st.session_state:
+    st.session_state.current_tab = "Gestion"
+if "save_message" not in st.session_state:
+    st.session_state.save_message = None
+if "save_message_tab" not in st.session_state:
+    st.session_state.save_message_tab = None
+
+# -------------------- Sidebar --------------------
+with st.sidebar:
+    st.title("📊 Statistiques Brief")
+    
+    # Calculer quelques statistiques
+    total_briefs = len(load_briefs())
+    completed_briefs = sum(1 for b in load_briefs().values() 
+                          if b.get("ksa_data") and any(b["ksa_data"].values()))
+    
+    st.metric("📋 Briefs créés", total_briefs)
+    st.metric("✅ Briefs complétés", completed_briefs)
+    
+    st.divider()
+    if st.button("Tester DeepSeek", key="test_deepseek"):
+        test_deepseek_connection()
+
+# ---------------- NAVIGATION PRINCIPALE ----------------
+st.title("🤖 TG-Hire IA - Brief")
+
+# Style CSS pour les onglets personnalisés et les tableaux améliorés
+
 st.markdown("""
 <style>
 div[data-testid="stTabs"] button p {
     font-size: 18px; 
 }
+
 .stTextArea textarea {
     white-space: pre-wrap !important;
+}
+
+/* RÉINITIALISATION COMPLÈTE ET SPÉCIFIQUE */
+div[data-baseweb="input"] > div,
+div[data-baseweb="textarea"] > div,
+div[data-baseweb="select"] > div {
+    background-color: var(--background-color) !important;
+    border-color: var(--border-color) !important;
+}
+
+.stTextInput > div > div > input,
+.stTextArea > div > div > textarea,
+.stSelectbox > div > div > select,
+.stDateInput > div > div > input {
+    background-color: var(--background-color) !important;
+    color: var(--text-color) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+/* FORCER les couleurs de Streamlit */
+:root {
+    --background-color: #f0f2f6;
+    --text-color: #31333F;
+    --border-color: #d0d0d0;
+}
+
+/* Mode sombre */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --background-color: #0e1117;
+        --text-color: #fafafa;
+        --border-color: #555555;
+    }
 }
 </style>
 """, unsafe_allow_html=True)
 
-# -------------------- Chargement des modèles ML (mis en cache) --------------------
-@st.cache_resource
-def load_embedding_model():
-    """Charge le modèle SentenceTransformer une seule fois."""
-    return SentenceTransformer('all-MiniLM-L6-v2')
+# Vérification si un brief est chargé au début de l'application
+if "current_brief_name" not in st.session_state:
+    st.session_state.current_brief_name = ""
 
-embedding_model = load_embedding_model()
+# Création des onglets dans l'ordre demandé : Gestion, Avant-brief, Réunion de brief, Synthèse
+tabs = st.tabs([
+    "📁 Gestion", 
+    "🔄 Avant-brief", 
+    "✅ Réunion de brief", 
+    "📝 Synthèse"
+])
 
-# -------------------- Fonctions de traitement --------------------
-def get_api_key():
-    """Récupère la clé API depuis les secrets et gère l'erreur."""
-    try:
-        api_key = st.secrets["DEEPSEEK_API_KEY"]
-        if not api_key:
-            st.error("❌ La clé API DeepSeek est vide dans les secrets. Veuillez la vérifier.")
-            return None
-        return api_key
-    except KeyError:
-        st.error("❌ Le secret 'DEEPSEEK_API_KEY' est introuvable. Veuillez le configurer dans les paramètres de votre application Streamlit.")
-        return None
+# ---------------- ONGLET GESTION ----------------
+with tabs[0]:
+    # Afficher le message de sauvegarde seulement pour cet onglet
+    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Gestion"):
+        st.success(st.session_state.save_message)
+        st.session_state.save_message = None
+        st.session_state.save_message_tab = None
 
-def extract_text_from_pdf(file):
-    try:
-        pdf = PdfReader(file)
-        text = "".join(page.extract_text() for page in pdf.pages if page.extract_text())
-        return text.strip() if text else "Aucun texte lisible trouvé."
-    except Exception as e:
-        return f"Erreur d'extraction du texte: {str(e)}"
+    # Charger les briefs depuis le fichier JSON unique
+    st.session_state.saved_briefs = load_briefs()
 
-# --- MÉTHODE 1 : SIMILARITÉ COSINUS (AVEC LOGIQUE) ---
-def rank_resumes_with_cosine(job_description, resumes, file_names):
-    try:
-        documents = [job_description] + resumes
-        vectorizer = TfidfVectorizer(stop_words='english').fit(documents)
-        vectors = vectorizer.transform(documents).toarray()
+    # Organiser les sections Informations de base et Filtrer les briefs en 2 colonnes
+    col_info, col_filter = st.columns(2)
+    
+    # Section Informations de base
+    with col_info:
+        st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Informations de base</h3>', unsafe_allow_html=True)
         
-        cosine_similarities = cosine_similarity([vectors[0]], vectors[1:]).flatten()
+        # Organiser en 3 colonnes
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.text_input("Poste à recruter", key="poste_intitule")
+        with col2:
+            st.text_input("Manager", key="manager_nom")
+        with col3:
+            st.selectbox("Recruteur", ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"], key="recruteur")
         
-        logic = {}
-        feature_names = vectorizer.get_feature_names_out()
-        for i, resume_text in enumerate(resumes):
-            jd_vector = vectors[0]
-            resume_vector = vectors[i+1]
-            common_keywords_indices = (jd_vector > 0) & (resume_vector > 0)
-            common_keywords = feature_names[common_keywords_indices]
-            logic[file_names[i]] = {"Mots-clés communs importants": list(common_keywords[:10])}
-
-        return {"scores": cosine_similarities, "logic": logic}
-    except Exception as e:
-        st.error(f"❌ Erreur Cosinus: {e}")
-        return {"scores": [], "logic": {}}
-
-# --- MÉTHODE 2 : WORD EMBEDDINGS (AVEC LOGIQUE) ---
-def rank_resumes_with_embeddings(job_description, resumes, file_names):
-    try:
-        jd_embedding = embedding_model.encode(job_description, convert_to_tensor=True)
-        resume_embeddings = embedding_model.encode(resumes, convert_to_tensor=True)
-        cosine_scores = util.pytorch_cos_sim(jd_embedding, resume_embeddings)
-        scores = cosine_scores.flatten().cpu().numpy()
-
-        logic = {}
-        jd_sentences = [s.strip() for s in job_description.split('.') if len(s.strip()) > 10]
-        if not jd_sentences: jd_sentences = [job_description]
-        jd_sent_embeddings = embedding_model.encode(jd_sentences, convert_to_tensor=True)
-
-        for i, resume_text in enumerate(resumes):
-            resume_sentences = [s.strip() for s in resume_text.split('\n') if len(s.strip()) > 10]
-            if not resume_sentences: continue
-            resume_sent_embeddings = embedding_model.encode(resume_sentences, convert_to_tensor=True)
-            
-            similarity_matrix = util.pytorch_cos_sim(resume_sent_embeddings, jd_sent_embeddings)
-            best_matches = {}
-            for jd_idx, jd_sent in enumerate(jd_sentences):
-                best_match_score, best_match_idx = torch.max(similarity_matrix[:, jd_idx], dim=0)
-                if best_match_score > 0.5: # Seuil de pertinence
-                     best_matches[jd_sent] = resume_sentences[best_match_idx.item()]
-            logic[file_names[i]] = {"Phrases les plus pertinentes (Annonce -> CV)": best_matches}
-
-        return {"scores": scores, "logic": logic}
-    except Exception as e:
-        st.error(f"❌ Erreur Sémantique : {e}")
-        return {"scores": [], "logic": {}}
-
-# --- ANALYSE PAR REGEX AMÉLIORÉE (AVEC CALCUL D'EXPÉRIENCE) ---
-def regex_analysis(text):
-    text_lower = text.lower()
-    
-    # --- CALCUL D'EXPÉRIENCE BASÉ SUR LES DATES ---
-    total_experience_months = 0
-    date_patterns = re.findall(r'(\d{1,2}/\d{4})\s*-\s*(\d{1,2}/\d{4}|aujourd\'hui|jour)|([a-zA-Z]+\.?\s+\d{4})\s*-\s*([a-zA-Z]+\.?\s+\d{4}|aujourd\'hui|jour)', text, re.IGNORECASE)
-    
-    month_map = {"janvier": 1, "février": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6, "juillet": 7, "août": 8, "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12, "jan": 1, "fév": 2, "mar": 3, "avr": 4, "may": 5, "jun": 6, "juil": 7, "aoû": 8, "sep": 9, "oct": 10, "nov": 11, "déc": 12}
-    
-    def parse_date(date_str):
-        date_str = date_str.lower().strip().replace('.','').replace('û','u')
-        for month_fr, month_num in month_map.items():
-            if month_fr in date_str:
-                date_str = date_str.replace(month_fr, str(month_num))
-                return datetime.strptime(re.sub(r'[^\d/]', '', date_str).strip(), '%m/%Y')
-        return datetime.strptime(date_str, '%m/%Y')
-
-    for match in date_patterns:
-        try:
-            start_str, end_str = match[0] or match[2], match[1] or match[3]
-            
-            start_date = parse_date(start_str)
-            end_date = datetime.now() if "aujourd'hui" in end_str.lower() or "jour" in end_str.lower() else parse_date(end_str)
-
-            duration = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
-            total_experience_months += duration if duration > 0 else 0
-        except Exception:
-            continue
-
-    total_experience_years = round(total_experience_months / 12)
-
-    education_level = 0
-    edu_patterns = {5: r'bac\s*\+\s*5|master|ingénieur', 3: r'bac\s*\+\s*3|licence', 2: r'bac\s*\+\s*2|bts|dut', 0: r'baccalauréat'}
-    for level, pattern in edu_patterns.items():
-        if re.search(pattern, text_lower):
-            education_level = level
-            break
-            
-    skills = []
-    profile_section_match = re.search(r"profil recherché\s*:(.*?)(?:\n\n|\Z)", text_lower, re.DOTALL | re.IGNORECASE)
-    if profile_section_match:
-        profile_section = profile_section_match.group(1)
-        words = re.findall(r'\b[a-zA-ZÀ-ÿ-]{4,}\b', profile_section)
-        stop_words = ["profil", "recherché", "maîtrise", "bonne", "expérience", "esprit", "basé", "casablanca", "missions", "principales", "confirmée", "idéalement", "selon"]
-        skills = [word for word in words if word not in stop_words]
-
-    return {
-        "Niveau d'études": education_level,
-        "Années d'expérience": total_experience_years,
-        "Compétences clés extraites": list(set(skills))
-    }
-
-# --- SCORING PAR RÈGLES AVEC REGEX AMÉLIORÉ ---
-def rank_resumes_with_rules(job_description, resumes, file_names):
-    jd_entities = regex_analysis(job_description)
-    results = []
-    
-    SKILL_WEIGHT = 5
-    EDUCATION_WEIGHT = 30
-    EXPERIENCE_WEIGHT = 20
-    
-    for i, resume_text in enumerate(resumes):
-        resume_entities = regex_analysis(resume_text)
-        current_score = 0
-        logic = {}
+        col4, col5, col6 = st.columns(3)
+        with col4:
+            st.selectbox("Type d'affectation", ["Chantier", "Siège", "Dépôt"], key="affectation_type")
+        with col5:
+            st.text_input("Nom affectation", key="affectation_nom")
+        with col6:
+            st.date_input("Date du brief", key="date_brief", value=datetime.today())
         
-        jd_skills = jd_entities["Compétences clés extraites"]
-        common_skills = [skill for skill in jd_skills if re.search(r'\b' + re.escape(skill) + r'\b', resume_text.lower())]
-        
-        score_from_skills = len(common_skills) * SKILL_WEIGHT
-        current_score += score_from_skills
-        logic['Compétences correspondantes'] = f"{common_skills} (+{score_from_skills} pts)"
-
-        score_from_edu = 0
-        if resume_entities["Niveau d'études"] >= jd_entities["Niveau d'études"]:
-            score_from_edu = EDUCATION_WEIGHT
-            current_score += score_from_edu
-        logic['Niveau d\'études'] = f"Candidat: Bac+{resume_entities['Niveau d\'études']} vs Requis: Bac+{jd_entities['Niveau d\'études']} (+{score_from_edu} pts)"
-        
-        score_from_exp = 0
-        if resume_entities["Années d'expérience"] >= jd_entities["Années d'expérience"]:
-            score_from_exp = EXPERIENCE_WEIGHT
-            current_score += score_from_exp
-        logic['Expérience'] = f"Candidat: {resume_entities['Années d\'expérience']} ans vs Requis: {jd_entities['Années d\'expérience']} ans (+{score_from_exp} pts)"
-        
-        results.append({"file_name": file_names[i], "score": current_score, "logic": logic})
-
-    max_score = (len(jd_entities["Compétences clés extraites"]) * SKILL_WEIGHT) + EDUCATION_WEIGHT + EXPERIENCE_WEIGHT
-    
-    if max_score > 0:
-        for res in results:
-            res["score"] = min(res["score"] / max_score, 1.0)
-            
-    return results
-
-# --- MÉTHODE 4 : ANALYSE PAR IA (PARSING CORRIGÉ) ---
-def get_detailed_score_with_ai(job_description, resume_text):
-    API_KEY = get_api_key()
-    if not API_KEY: return {"score": 0.0, "explanation": "❌ Analyse IA impossible."}
-    url = "https://api.deepseek.com/v1/chat/completions"
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
-    prompt = f"""
-    En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
-    Fournis ta réponse en deux parties :
-    1. Un score de correspondance en pourcentage (ex: "Score: 85%").
-    2. Une analyse détaillée expliquant les points forts et les points à améliorer.
-    ---
-    Description du poste: {job_description}
-    ---
-    Texte du CV: {resume_text}
-    """
-    payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.0}
-    try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
-        response.raise_for_status()
-        full_response_text = response.json()["choices"][0]["message"]["content"]
-        score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", full_response_text, re.IGNORECASE)
-        score = int(score_match.group(1)) / 100 if score_match else 0.0
-        return {"score": score, "explanation": full_response_text}
-    except Exception as e:
-        st.warning(f"⚠️ Erreur IA : {e}")
-        return {"score": 0.0, "explanation": "Erreur"}
-
-def rank_resumes_with_ai(job_description, resumes, file_names):
-    scores_data = []
-    for resume_text in resumes:
-        scores_data.append(get_detailed_score_with_ai(job_description, resume_text))
-    return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
-
-def get_deepseek_analysis(text):
-    API_KEY = get_api_key()
-    if not API_KEY: return "Analyse impossible."
-    url = "https://api.deepseek.com/v1/chat/completions"
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
-    prompt = f"En tant qu'expert en recrutement, analyse le CV suivant et identifie les points forts et faibles. Texte du CV : {text}"
-    payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}]}
-    try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
-        response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"]
-    except Exception as e:
-        return f"Erreur IA : {e}"
-
-# -------------------- Interface Utilisateur --------------------
-st.title("📄 Analyseur de CVs Intelligent")
-tab1, tab2, tab3 = st.tabs(["📊 Classement de CVs", "🎯 Analyse de Profil", "📖 Guide des Méthodes"])
-
-with tab1:
-    st.markdown("### 📄 Informations du Poste")
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        job_title = st.text_input("Intitulé du poste", placeholder="Ex: Archiviste Junior")
-        job_description = st.text_area("Description du poste", height=200, key="jd_ranking", placeholder="Collez la description...")
-    with col2:
-        st.markdown("#### 📤 Importer des CVs")
-        uploaded_files_ranking = st.file_uploader("Importer des CVs", type=["pdf"], accept_multiple_files=True, key="ranking_uploader")
-    
-    st.markdown("---")
-    
-    analysis_method = st.radio(
-        "✨ Choisissez votre méthode de classement",
-        ["Méthode Cosinus (Mots-clés)", "Méthode Sémantique (Embeddings)", "Scoring par Règles (Regex)", "Analyse par IA (DeepSeek)"],
-        index=0, help="Consultez l'onglet 'Guide des Méthodes'."
-    )
-
-    if st.button("🔍 Analyser et Classer", type="primary", use_container_width=True, disabled=not (uploaded_files_ranking and job_description)):
-        resumes, file_names = [], []
-        with st.spinner("Lecture des fichiers PDF..."):
-            for file in uploaded_files_ranking:
-                text = extract_text_from_pdf(file)
-                if not "Erreur" in text:
-                    resumes.append(text)
-                    file_names.append(file.name)
-        
-        with st.spinner("Analyse des CVs en cours..."):
-            results, explanations, logic = {}, None, None
-            if analysis_method == "Analyse par IA (DeepSeek)":
-                results = rank_resumes_with_ai(job_description, resumes, file_names)
-                explanations = results.get("explanations")
-            elif analysis_method == "Scoring par Règles (Regex)":
-                rule_results = rank_resumes_with_rules(job_description, resumes, file_names)
-                results = {"scores": [r["score"] for r in rule_results]}
-                logic = {r["file_name"]: r["logic"] for r in rule_results}
-            elif analysis_method == "Méthode Sémantique (Embeddings)":
-                results = rank_resumes_with_embeddings(job_description, resumes, file_names)
-                logic = results.get("logic")
-            else: # Cosinus
-                results = rank_resumes_with_cosine(job_description, resumes, file_names)
-                logic = results.get("logic")
-
-            scores = results.get("scores", [])
-            if scores is not None and len(scores) > 0:
-                ranked_resumes = sorted(zip(file_names, scores), key=lambda x: x[1], reverse=True)
-                results_df = pd.DataFrame(ranked_resumes, columns=["Nom du CV", "Score brut"])
-                results_df["Rang"] = range(1, len(results_df) + 1)
-                results_df["Score"] = results_df["Score brut"].apply(lambda x: f"{x*100:.1f}%")
+        # Boutons Créer et Annuler
+        col_create, col_cancel = st.columns(2)
+        with col_create:
+            # --- BLOC DE CRÉATION DE BRIEF CORRIGÉ ET MIS À JOUR AVEC GOOGLE SHEETS ---
+            if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
+                brief_name = generate_automatic_brief_name()
+                st.session_state.current_brief_name = brief_name
                 
-                st.markdown("### 🏆 Résultats du Classement")
-                st.dataframe(results_df[["Rang", "Nom du CV", "Score"]], use_container_width=True, hide_index=True)
+                # --- NOUVEAU: Collecte complète des données pour GSheets et Local ---
+                brief_data = {
+                    "BRIEF_NAME": brief_name, # Clé unique pour Google Sheets
+                    "poste_intitule": st.session_state.poste_intitule,
+                    "manager_nom": st.session_state.manager_nom,
+                    "recruteur": st.session_state.recruteur,
+                    "affectation_type": st.session_state.affectation_type,
+                    "affectation_nom": st.session_state.affectation_nom,
+                    "date_brief": str(st.session_state.date_brief),
+                    "brief_type": "Standard",
+                    "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()), # DataFrame
+                    "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
+                    "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
+                    "processus_evaluation": st.session_state.get("processus_evaluation", ""),
+                    "manager_comments": st.session_state.get("manager_comments", {}),
+                    "manager_notes": st.session_state.get("manager_notes", ""),
+                    # Ajout des autres champs requis par GSheets (doivent être initialisés ou mis à jour)
+                    "RAISON_OUVERTURE": "", # Exemple d'initialisation manquante
+                    "IMPACT_STRATEGIQUE": "",
+                    "RATTACHEMENT": "",
+                    "TACHES_PRINCIPALES": "",
+                    "MUST_HAVE_EXP": "",
+                    "MUST_HAVE_DIP": "",
+                    "MUST_HAVE_COMPETENCES": "",
+                    "MUST_HAVE_SOFTSKILLS": "",
+                    "NICE_TO_HAVE_EXP": "",
+                    "NICE_TO_HAVE_DIP": "",
+                    "NICE_TO_HAVE_COMPETENCES": "",
+                    "ENTREPRISES_PROFIL": "",
+                    "SYNONYMES_POSTE": "",
+                    "CANAUX_PROFIL": "",
+                    "BUDGET": "",
+                    "COMMENTAIRES": "",
+                    "NOTES_LIBRES": "",
+                }
                 
-                if logic:
-                    st.markdown("### 🧠 Logique de Scoring")
-                    for _, row in results_df.iterrows():
-                        file_name = row["Nom du CV"]
-                        with st.expander(f"Détail du score pour : **{file_name}**"):
-                            st.json(logic.get(file_name, {}))
-
-                if explanations:
-                    st.markdown("### 📝 Analyse détaillée par l'IA")
-                    for _, row in results_df.iterrows():
-                        file_name = row["Nom du CV"]
-                        with st.expander(f"Analyse pour : **{file_name}**"):
-                            st.markdown(explanations.get(file_name, "N/A"))
+                # Mise à jour de l'état de session
+                st.session_state.saved_briefs[brief_name] = brief_data
+                
+                # 1. Sauvegarde JSON locale
+                save_briefs()  
+                
+                # 2. Sauvegarde Google Sheets
+                save_brief_to_gsheet(brief_name, brief_data)
+                
+                # Rechargement et message de succès
+                st.session_state.saved_briefs = load_briefs()
+                st.session_state.save_message = f"✅ Brief '{brief_name}' créé avec succès"
+                st.session_state.save_message_tab = "Gestion"
+                st.rerun()
+        with col_cancel:
+            if st.button("🗑️ Annuler", type="secondary", use_container_width=True, key="cancel_brief"):
+                # Reset fields
+                st.session_state.poste_intitule = ""
+                st.session_state.manager_nom = ""
+                st.session_state.recruteur = ""
+                st.session_state.affectation_type = ""
+                st.session_state.affectation_nom = ""
+                st.session_state.date_brief = datetime.today()
+                st.rerun()
+    
+    # Section Filtrage
+    with col_filter:
+        st.markdown('<h3 style="margin-bottom: 0.3rem;">🔍 Filtrer les briefs</h3>', unsafe_allow_html=True)
+        
+        # Organiser en 3 colonnes
+        col_filter1, col_filter2, col_filter3 = st.columns(3)
+        with col_filter1:
+            st.date_input("Date", key="filter_date", value=None)
+        with col_filter2:
+            st.text_input("Recruteur", key="filter_recruteur")
+        with col_filter3:
+            st.text_input("Manager", key="filter_manager")
+        
+        col_filter4, col_filter5, col_filter6 = st.columns(3)
+        with col_filter4:
+            st.selectbox("Affectation", ["", "Chantier", "Siège", "Dépôt"], key="filter_affectation")
+        with col_filter5:
+            st.text_input("Nom affectation", key="filter_nom_affectation")
+        with col_filter6:
+            st.selectbox("Type de brief", ["", "Standard", "Urgent", "Stratégique"], key="filter_brief_type")
+        
+        # Bouton Filtrer
+        if st.button("🔎 Filtrer", use_container_width=True, key="apply_filter"):
+            filter_month = st.session_state.filter_date.strftime("%m") if st.session_state.filter_date else ""
+            st.session_state.filtered_briefs = filter_briefs(
+                st.session_state.saved_briefs,  # Utiliser les briefs en mémoire
+                filter_month,
+                st.session_state.filter_recruteur,
+                st.session_state.filter_brief_type,
+                st.session_state.filter_manager,
+                st.session_state.filter_affectation,
+                st.session_state.filter_nom_affectation
+            )
+            st.session_state.show_filtered_results = True
+            st.rerun()
+        
+        # Affichage des résultats en dessous du bouton Filtrer
+        if st.session_state.show_filtered_results:
+            st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
+            briefs_to_show = st.session_state.filtered_briefs
+            
+            if briefs_to_show:
+                for name, data in briefs_to_show.items():
+                    col_brief1, col_brief2, col_brief3, col_brief4 = st.columns([3, 1, 1, 1])
+                    with col_brief1:
+                        st.write(f"**{name}** - Manager: {data.get('manager_nom', 'N/A')} - Affectation: {data.get('affectation_nom', 'N/A')}")
+                    with col_brief2:
+                        if st.button("📝 Éditer", key=f"edit_{name}"):
+                            st.session_state.current_brief_name = name
+                            st.session_state.avant_brief_completed = True
+                            st.rerun()
+                    with col_brief3:
+                        if st.button("🗑️ Supprimer", key=f"delete_{name}"):
+                            st.session_state.saved_briefs.pop(name, None)
+                            save_briefs()  # Sauvegarde locale
+                            st.session_state.saved_briefs = load_briefs()  # Recharge pour mise à jour
+                            
+                            # NOTE: La suppression de Google Sheets nécessite une fonction supplémentaire
+                            # mais nous allons conserver la logique de suppression locale ici.
+                            
+                            st.session_state.filtered_briefs = filter_briefs(
+                                st.session_state.saved_briefs,
+                                st.session_state.filter_date.strftime("%m") if st.session_state.filter_date else "",
+                                st.session_state.filter_recruteur,
+                                st.session_state.filter_brief_type,
+                                st.session_state.filter_manager,
+                                st.session_state.filter_affectation,
+                                st.session_state.filter_nom_affectation
+                            )
+                            st.session_state.save_message = f"✅ Brief '{name}' supprimé avec succès"
+                            st.session_state.save_message_tab = "Gestion"
+                            st.rerun()
+                    with col_brief4:
+                        if st.button("📄 Exporter", key=f"export_{name}"):
+                            st.session_state.current_brief_name = name
+                            if PDF_AVAILABLE:
+                                pdf_buf = export_brief_pdf()
+                                if pdf_buf:
+                                    st.download_button(
+                                        "⬇️ Télécharger PDF",
+                                        data=pdf_buf,
+                                        file_name=f"{name}.pdf",
+                                        mime="application/pdf",
+                                        key=f"download_pdf_{name}"
+                                    )
+                            if WORD_AVAILABLE:
+                                word_buf = export_brief_word()
+                                if word_buf:
+                                    st.download_button(
+                                        "⬇️ Télécharger Word",
+                                        data=word_buf,
+                                        file_name=f"{name}.docx",
+                                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                        key=f"download_word_{name}"
+                                    )
             else:
-                st.error("L'analyse n'a retourné aucun score.")
+                st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
 
-with tab2:
-    st.markdown("### 📂 Importer un ou plusieurs CVs")
-    uploaded_files_analysis = st.file_uploader("Importer des CVs", type=["pdf"], key="analysis_uploader_single", accept_multiple_files=True)
+# ---------------- AVANT-BRIEF ----------------
+with tabs[1]:
+    # Afficher le message de sauvegarde seulement pour cet onglet
+    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Avant-brief"):
+        st.success(st.session_state.save_message)
+        st.session_state.save_message = None
+        st.session_state.save_message_tab = None
+
+    # Afficher les informations du brief en cours
+    brief_display_name = f"Avant-brief - {st.session_state.current_brief_name}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
+    st.subheader(f"🔄 {brief_display_name}")
     
-    analysis_type_single = st.selectbox(
-        "Type d'analyse souhaité",
-        ("Analyse par IA (DeepSeek)", "Analyse par Regex (Extraction d'entités)", "Analyse par la Méthode Sémantique", "Analyse par la Méthode Cosinus")
-    )
-    captions = {
-        "Analyse par IA (DeepSeek)": "Analyse qualitative (points forts/faibles). Consomme vos tokens !",
-        "Analyse par Regex (Extraction d'entités)": "Extrait des informations structurées (compétences, diplômes, etc.).",
-        "Analyse par la Méthode Sémantique": "Calcule un score de pertinence basé sur le sens (nécessite une description de poste).",
-        "Analyse par la Méthode Cosinus": "Calcule un score de pertinence basé sur les mots-clés (nécessite une description de poste)."
-    }
-    st.caption(captions.get(analysis_type_single))
+    # Liste des sections et champs pour les text_area
+    sections = [
+        {
+            "title": "Contexte du poste",
+            "fields": [
+                ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"),
+                ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"),
+                ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"),
+            ]
+        },
+        {
+            "title": "Must-have (Indispensables)",
+            "fields": [
+                ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
+                ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
+                ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"),
+                ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"),
+            ]
+        },
+        {
+            "title": "Nice-to-have (Atouts)",
+            "fields": [
+                ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
+                ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
+                ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
+            ]
+        },
+        {
+            "title": "Conditions et contraintes",
+            "fields": [
+                ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
+                ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
+            ]
+        },
+        {
+            "title": "Sourcing et marché",
+            "fields": [
+                ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
+                ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
+                ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
+            ]
+        },
+        {
+            "title": "Profils pertinents",
+            "fields": [
+                ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
+                ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
+                ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
+            ]
+        },
+        {
+            "title": "Notes libres",
+            "fields": [
+                ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
+                ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
+            ]
+        },
+    ]
 
-    job_desc_single = ""
-    if "Analyse par la Méthode" in analysis_type_single:
-        job_desc_single = st.text_area("Description de poste pour le calcul du score", height=150, key="jd_single")
+    # Contrôles pour générer les conseils IA avec sélection de champ
+    col1, col2 = st.columns([1, 1])  # Equal width columns
+    with col1:
+        field_options = [f"{section['title']} - {title}" for section in sections for title, key, _ in section["fields"]]
+        selected_field = st.selectbox("Choisir un champ", field_options, index=0)
+    with col2:
+        if st.button("💡 Générer par l'IA", key="generate_advice_btn", type="primary", help="Génère un conseil IA pour le champ sélectionné"):
+            section_title, field_title = selected_field.split(" - ", 1)
+            # Clear all advice before generating new one
+            for section in sections:
+                for title, key, _ in section["fields"]:
+                    st.session_state[f"advice_{key}"] = ""
+            # Generate advice for the selected field
+            for section in sections:
+                if section["title"] == section_title:
+                    for title, key, _ in section["fields"]:
+                        if title == field_title:
+                            advice = generate_checklist_advice(section["title"], title)
+                            if advice != "Pas de conseil disponible.":
+                                example = get_example_for_field(section["title"], title)
+                                st.session_state[f"advice_{key}"] = f"{advice}\n**Exemple :**\n{example}"
 
-    if uploaded_files_analysis and st.button("🚀 Lancer l'analyse", type="primary", use_container_width=True, key="btn_single_analysis"):
-        for uploaded_file in uploaded_files_analysis:
-            with st.expander(f"Résultat pour : **{uploaded_file.name}**", expanded=True):
-                with st.spinner("Analyse en cours..."):
-                    text = extract_text_from_pdf(uploaded_file)
-                    if "Erreur" in text:
-                        st.error(f"❌ {text}")
-                    else:
-                        if analysis_type_single == "Analyse par Regex (Extraction d'entités)":
-                            entities = regex_analysis(text)
-                            st.info("**Entités extraites par la méthode Regex**")
-                            st.json(entities)
-                        elif "Méthode Sémantique" in analysis_type_single:
-                            if not job_desc_single: st.warning("Veuillez fournir une description de poste.")
-                            else:
-                                result = rank_resumes_with_embeddings(job_desc_single, [text], [uploaded_file.name])
-                                score = result["scores"][0]
-                                st.metric("Score de Pertinence Sémantique", f"{score*100:.1f}%")
-                        elif "Méthode Cosinus" in analysis_type_single:
-                            if not job_desc_single: st.warning("Veuillez fournir une description de poste.")
-                            else:
-                                result = rank_resumes_with_cosine(job_desc_single, [text], [uploaded_file.name])
-                                score = result["scores"][0]
-                                st.metric("Score de Pertinence Cosinus", f"{score*100:.1f}%")
-                        else: # Analyse IA
-                            analysis_result = get_deepseek_analysis(text)
-                            st.markdown(analysis_result)
+    brief_data = load_briefs().get(st.session_state.current_brief_name, {})
 
-with tab3:
-    st.header("📖 Comprendre les Méthodes d'Analyse")
-    st.markdown("Chaque méthode a ses propres forces et faiblesses. Voici un guide pour vous aider à choisir la plus adaptée à votre besoin.")
-    
-    st.subheader("1. Méthode Cosinus (Basée sur les Mots-clés)")
-    st.markdown("""
-    - **Principe** : Compare la fréquence des mots exacts entre le CV et l'annonce.
-    - **Comment ça marche ?** Elle utilise un modèle mathématique (TF-IDF) pour donner plus de poids aux mots rares et importants. Le score représente la similarité de ces "sacs de mots-clés".
-    - **Idéal pour** : Un premier tri très rapide et grossier.
-    - **Avantages** : ✅ Extrêmement rapide, ne nécessite aucune IA externe.
-    - **Limites** : ❌ Ne comprend absolument pas le contexte ou les synonymes.
-    """)
-    
-    st.subheader("2. Méthode Sémantique (Basée sur les Embeddings)")
-    st.markdown("""
-    - **Principe** : Utilise une IA pour convertir les phrases en vecteurs de sens, puis compare ces vecteurs.
-    - **Comment ça marche ?** Au lieu de comparer des mots, on compare la "direction" de ces vecteurs. Deux vecteurs qui pointent dans la même direction représentent des idées sémantiquement similaires.
-    - **Idéal pour** : Obtenir un score plus intelligent qui comprend les nuances du langage.
-    - **Avantages** : ✅ Comprend le contexte et les synonymes. Excellent équilibre entre vitesse et intelligence.
-    - **Limites** : ❌ Un peu plus lente que la méthode cosinus.
-    """)
+    # Initialiser les conseils dans session_state si non existants
+    for section in sections:
+        for title, key, _ in section["fields"]:
+            if f"advice_{key}" not in st.session_state:
+                st.session_state[f"advice_{key}"] = ""
 
-    st.subheader("3. Scoring par Règles (Basé sur Regex)")
-    st.markdown("""
-    - **Principe** : Imite la façon dont un recruteur humain lit un CV. On définit des règles claires (compétences, expérience, diplôme) et on attribue des points.
-    - **Comment ça marche ?** Le code extrait dynamiquement les exigences de l'annonce, puis recherche ces éléments dans chaque CV pour calculer un score.
-    - **Idéal pour** : Des postes où les critères sont très clairs et objectifs.
-    - **Avantages** : ✅ Totalement transparent (le détail du score est affiché), 100% personnalisable et sans dépendances complexes.
-    - **Limites** : ❌ Très rigide. Si une compétence est formulée différemment, elle ne sera pas détectée.
-    """)
-    
-    st.subheader("4. Analyse par IA (Basée sur un LLM)")
-    st.markdown("""
-    - **Principe** : On envoie le CV et l'annonce à un grand modèle de langage (DeepSeek) en lui demandant d'agir comme un expert en recrutement.
-    - **Comment ça marche ?** L'IA lit et comprend les deux textes, puis utilise sa vaste connaissance pour évaluer la pertinence et formuler une explication.
-    - **Idéal pour** : Obtenir une analyse fine et contextuelle, similaire à celle d'un premier entretien.
-    - **Avantages** : ✅ La plus précise et la plus "humaine". Comprend les nuances et fournit des explications de haute qualité.
-    - **Limites** : ❌ La plus lente, et chaque analyse **consomme vos tokens !**
-    """)
+    # Formulaire avec expanders et champs éditable
+    with st.form(key="avant_brief_form"):
+        for section in sections:
+            with st.expander(f"📋 {section['title']}", expanded=False):
+                for title, key, placeholder in section["fields"]:
+                    # Larger height for all fields
+                    height = 150  # Increased from 100 for all fields
+                    current_value = brief_data.get(key, st.session_state.get(key, ""))
+                    st.text_area(title, value=current_value, key=key, placeholder=placeholder, height=height)
+                    # Afficher le conseil généré juste en dessous du champ avec meilleur formatage
+                    if f"advice_{key}" in st.session_state and st.session_state[f"advice_{key}"]:
+                        advice_and_example = st.session_state[f'advice_{key}'].split('\n**Exemple :**\n')
+                        advice_text = advice_and_example[0].strip()
+                        example_text = advice_and_example[1].strip() if len(advice_and_example) > 1 else ""
+                        
+                        st.markdown(f"""
+<div class="ai-advice-box">
+    <strong>Conseil :</strong> {advice_text}<br>
+    <strong>Exemple :</strong> {example_text}
+</div>
+""", unsafe_allow_html=True)
 
-with st.sidebar:
-    st.markdown("### 🔧 Configuration")
-    if st.button("Test Connexion API DeepSeek"):
-        API_KEY = get_api_key()
-        if API_KEY:
-            try:
-                response = requests.get("https://api.deepseek.com/v1/models", headers={"Authorization": f"Bearer {API_KEY}"})
-                if response.status_code == 200:
-                    st.success("✅ Connexion API réussie")
+        # Boutons Enregistrer et Annuler dans le formulaire
+        col_save, col_cancel = st.columns([1, 1])
+        with col_save:
+            if st.form_submit_button("💾 Enregistrer modifications", type="primary", use_container_width=True):
+                if st.session_state.current_brief_name:
+                    update_data = {key: st.session_state[key] for _, key, _ in [item for sublist in [s["fields"] for s in sections] for item in sublist]}
+                    
+                    current_brief_name = st.session_state.current_brief_name
+                    
+                    # Mise à jour du brief local
+                    st.session_state.saved_briefs[current_brief_name].update(update_data)
+                    st.session_state.saved_briefs[current_brief_name]["ksa_matrix"] = st.session_state.get("ksa_matrix", pd.DataFrame()) # Assurer la présence de KSA
+                    
+                    save_briefs() # Sauvegarde locale
+                    
+                    # --- NOUVEAU: Sauvegarde Google Sheets ---
+                    brief_data_to_save = st.session_state.saved_briefs[current_brief_name]
+                    save_brief_to_gsheet(current_brief_name, brief_data_to_save)
+                    
+                    st.session_state.avant_brief_completed = True
+                    st.session_state.save_message = "✅ Modifications sauvegardées"
+                    st.session_state.save_message_tab = "Avant-brief"
+                    st.rerun()
                 else:
-                    st.error(f"❌ Erreur de connexion ({response.status_code})")
-            except Exception as e:
-                st.error(f"❌ Erreur: {e}")
+                    st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
+        
+        with col_cancel:
+            if st.form_submit_button("🗑️ Annuler", type="secondary", use_container_width=True):
+                st.session_state.current_brief_name = ""
+                st.session_state.avant_brief_completed = False
+                st.rerun()
+
+# ---------------- REUNION BRIEF ----------------           
+with tabs[2]:
+    # --- STYLE PERSONNALISÉ POUR LES CHAMPS ---
+    st.markdown("""
+        <style>
+            .stTextArea > div > label > div {
+                color: #A9A9A9; /* Texte du label */
+            }
+            .stTextArea > div > div > textarea {
+                background-color: #2F333B; /* Fond de la zone de texte */
+                color: white; /* Couleur du texte saisi */
+                border-color: #555555; /* Bordure des champs */
+            }
+            .stTextInput > div > div > input {
+                background-color: #2F333B;
+                color: white;
+                border-color: #555555;
+            }
+            div[data-testid="stForm"] {
+                padding: 1rem;
+                border: 1px solid #555555;
+                border-radius: 0.5rem;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+    
+    # Afficher le message de sauvegarde
+    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Réunion"):
+        st.success(st.session_state.save_message)
+        st.session_state.save_message = None
+        st.session_state.save_message_tab = None
+
+    brief_display_name = f"Réunion de brief - {st.session_state.get('current_brief_name', 'Nom du Brief')}_{st.session_state.get('manager_nom', 'N/A')}_{st.session_state.get('affectation_nom', 'N/A')}"
+    st.markdown(f"<h3 style='color: #FFFFFF;'>📝 {brief_display_name}</h3>", unsafe_allow_html=True)
+
+    total_steps = 4
+    step = st.session_state.reunion_step
+    
+    st.progress(int((step / total_steps) * 100), text=f"**Étape {step} sur {total_steps}**")
+
+    if step == 1:
+        with st.expander("📋 Portrait robot candidat - Validation", expanded=True):
+            data = []
+            field_keys = []
+            comment_keys = []
+            k = 1
+            brief_data = load_briefs().get(st.session_state.current_brief_name, {})
+            for section in sections:
+                for i, (field_name, field_key, placeholder) in enumerate(section["fields"]):
+                    value = brief_data.get(field_key, "")
+                    section_title = section["title"] if i == 0 else ""
+                    data.append([section_title, field_name, value, ""])
+                    field_keys.append(field_key)
+                    comment_keys.append(f"manager_comment_{k}")
+                    k += 1
+            df = pd.DataFrame(data, columns=["Section", "Détails", "Informations", "Commentaires du manager"])
+
+            edited_df = st.data_editor(
+                df,
+                column_config={
+                    "Section": st.column_config.TextColumn("Section", disabled=True, width="small"),
+                    "Détails": st.column_config.TextColumn("Détails", disabled=True, width="medium"),
+                    "Informations": st.column_config.TextColumn("Informations", width="medium", disabled=True),
+                    "Commentaires du manager": st.column_config.TextColumn("Commentaires du manager", width="medium")
+                },
+                use_container_width=True,
+                hide_index=True,
+                num_rows="fixed"
+            )
+
+            if st.button("💾 Sauvegarder commentaires", type="primary", key="save_comments_step1"):
+                for i in range(len(edited_df)):
+                    if edited_df["Détails"].iloc[i] != "":
+                        comment_key = comment_keys[i]
+                        st.session_state[comment_key] = edited_df["Commentaires du manager"].iloc[i]
+                st.session_state.save_message = "✅ Commentaires sauvegardés"
+                st.session_state.save_message_tab = "Réunion"
+                st.rerun()
+
+    elif step == 2:
+        with st.expander("📊 Matrice KSA - Validation manager", expanded=True):
+            with st.expander("ℹ️ Explications de la méthode KSA", expanded=False):
+                st.markdown("""
+                    ### Méthode KSA (Knowledge, Skills, Abilities)
+                    La méthode KSA permet de décomposer un poste en trois catégories de compétences pour une évaluation plus précise.
+                    
+                    #### 🧠 Knowledge (Connaissances)
+                    Ce sont les connaissances théoriques ou factuelles qu'un candidat doit posséder.
+                    - **Exemple 1 :** Connaissances des protocoles de sécurité IT (ISO 27001).
+                    - **Exemple 2 :** Maîtrise des concepts de la comptabilité analytique.
+                    - **Exemple 3 :** Connaissance approfondie des langages de programmation Python et R.
+                    
+                    #### 💪 Skills (Compétences)
+                    Ce sont les compétences pratiques et techniques que l'on acquiert par la pratique.
+                    - **Exemple 1 :** Capacité à utiliser le logiciel Adobe Photoshop pour le design graphique.
+                    - **Exemple 2 :** Expertise en négociation commerciale pour la conclusion de contrats.
+                    - **Exemple 3 :** Maîtrise de la gestion de projet Agile ou Scrum.
+                    
+                    #### ✨ Abilities (Aptitudes)
+                    Ce sont les aptitudes plus générales ou innées, often liées au comportement.
+                    - **Exemple 1 :** Capacité à gérer le stress et la pression.
+                    - **Exemple 2 :** Aptitude à communiquer clairement des idées complexes.
+                    - **Exemple 3 :** Capacité à travailler en équipe et à collaborer efficacement.
+                    """, unsafe_allow_html=True)
+
+            with st.expander("➕ Ajouter un critère", expanded=True):
+                with st.form(key="add_criteria_form"):
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique")
+                    with col2:
+                        critere = st.text_input("Critère", placeholder="Ex: Leadership", key="new_critere")
+                    with col3:
+                        type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], key="new_type_question")
+                    with col4:
+                        evaluateur = st.selectbox("Qui évalue ce critère ?", ["Recruteur", "Manager", "Les deux"], key="new_evaluateur")
+
+                    # Réduction de la largeur de la question pour une seule ligne
+                    col_q_text, col_slider = st.columns([2, 1])
+
+                    with col_q_text:
+                        question = st.text_input("Question pour l'entretien", placeholder="Ex: Parlez-moi d'une situation où vous avez dû faire preuve de leadership.", key="new_question")
+                    with col_slider:
+                         evaluation = st.slider("Évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
+                    
+                    # Nouvelle section pour l'IA avec le label modifié
+                    ai_prompt = st.text_input("Décrivez ce que l'IA doit générer comme Question", placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", key="ai_prompt_input")
+                    
+                    # Case à cocher placée juste après le champ de texte et avant le bouton
+                    concise_mode = st.checkbox("⚡ Mode rapide (réponse concise)", key="concise_mode")
+                    
+                    st.markdown("---")
+                    
+                    col_ai, col_add = st.columns(2)
+                    with col_ai:
+                        if st.form_submit_button("💡 Générer question IA", type="primary", use_container_width=True):
+                            if ai_prompt:
+                                with st.spinner("Génération en cours..."):
+                                    try:
+                                        # Ajout du paramètre pour le mode concis
+                                        ai_response = generate_ai_question(ai_prompt, concise_mode)
+                                        # Nettoyer la réponse de l'IA si elle a un format indésirable
+                                        if ai_response.strip().startswith("Question:"):
+                                            ai_response = ai_response.strip().replace("Question:", "", 1).strip()
+                                        st.session_state.ai_generated_question = ai_response
+                                    except Exception as e:
+                                        st.error(f"Erreur lors de la génération : {e}")
+                            else:
+                                st.error("Veuillez entrer un prompt pour l'IA.")
+                    
+                    with col_add:
+                        if st.form_submit_button("➕ Ajouter le critère", type="secondary", use_container_width=True):
+                            if not critere or not question:
+                                st.error("Veuillez remplir au moins le critère et la question.")
+                            else:
+                                st.session_state.ksa_matrix = pd.concat([st.session_state.ksa_matrix, pd.DataFrame([{
+                                    "Rubrique": rubrique,
+                                    "Critère": critere,
+                                    "Type de question": type_question,
+                                    "Question pour l'entretien": question,
+                                    "Évaluation (1-5)": evaluation,
+                                    "Évaluateur": evaluateur
+                                }])], ignore_index=True)
+                                st.success("✅ Critère ajouté avec succès !")
+                                st.rerun()
+
+                if "ai_generated_question" in st.session_state and st.session_state.ai_generated_question:
+                    st.success(f"**Question :** `{st.session_state.ai_generated_question}`")
+                    st.session_state.ai_generated_question = ""
+            
+            st.dataframe(st.session_state.ksa_matrix, use_container_width=True, hide_index=True)
+            
+            if not st.session_state.ksa_matrix.empty:
+                avg_rating = st.session_state.ksa_matrix["Évaluation (1-5)"].mean()
+                st.markdown(f"**<div style='font-size: 24px;'>Note cible de l'ensemble des critères : 🎯 {avg_rating:.2f} / 5</div>**", unsafe_allow_html=True)
+
+    elif step == 3:
+        with st.expander("💡 Stratégie et Processus", expanded=True):
+            st.info("Définissez les canaux de sourcing et les critères d'évaluation.")
+            st.multiselect("🎯 Canaux prioritaires", ["LinkedIn", "Jobboards", "Cooptation", "Réseaux sociaux", "Chasse de tête"], key="canaux_prioritaires")
+            
+            st.markdown("---")
+            st.subheader("Critères d'exclusion et Processus d'évaluation")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.text_area("🚫 Critères d'exclusion", key="criteres_exclusion", height=150, 
+                             placeholder="Ex: ne pas avoir d'expérience dans le secteur public...")
+            with col2:
+                st.text_area("✅ Processus d'évaluation (détails)", key="processus_evaluation", height=150, 
+                             placeholder="Ex: Entretien RH (30min), Test technique, Entretien manager (60min)...")
+        
+    elif step == 4:
+        with st.expander("📝 Notes générales du manager", expanded=True):
+            st.info("Ajoutez des notes ou des commentaires finaux pour le brief.")
+            st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=250, 
+                         placeholder="Ajoutez vos commentaires et notes généraux...")
+
+        st.markdown("---")
+        col_save, col_cancel = st.columns([1, 1])
+        with col_save:
+            if st.button("💾 Enregistrer la réunion", type="primary", use_container_width=True, key="save_reunion"):
+                if st.session_state.current_brief_name:
+                    manager_comments = {}
+                    for i in range(1, 21):
+                        comment_key = f"manager_comment_{i}"
+                        if comment_key in st.session_state:
+                            manager_comments[comment_key] = st.session_state[comment_key]
+                    existing_briefs = load_briefs()
+                    current_brief_name = st.session_state.current_brief_name # Récupérer le nom
+                    
+                    # 1. Mise à jour du brief local (code existant)
+                    if current_brief_name in existing_briefs:
+                        existing_briefs[current_brief_name].update({
+                            "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()),
+                            "manager_notes": st.session_state.get("manager_notes", ""),
+                            "manager_comments": manager_comments,
+                            "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
+                            "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
+                            "processus_evaluation": st.session_state.get("processus_evaluation", "")
+                        })
+                        st.session_state.saved_briefs = existing_briefs
+                    else:
+                        st.session_state.saved_briefs[current_brief_name].update({
+                            "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()),
+                            "manager_notes": st.session_state.get("manager_notes", ""),
+                            "manager_comments": manager_comments,
+                            "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
+                            "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
+                            "processus_evaluation": st.session_state.get("processus_evaluation", "")
+                        })
+
+                    save_briefs() # Sauvegarde locale
+                    
+                    # --- NOUVEAU: Sauvegarde Google Sheets ---
+                    brief_data_to_save = st.session_state.saved_briefs[current_brief_name]
+                    save_brief_to_gsheet(current_brief_name, brief_data_to_save)
+                    
+                    st.session_state.reunion_completed = True
+                    st.session_state.save_message = "✅ Données de réunion sauvegardées"
+                    st.session_state.save_message_tab = "Réunion"
+                    st.rerun()
+                else:
+                    st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
+        
+        with col_cancel:
+            if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion"):
+                delete_current_brief()
+
+    # ---- Navigation wizard ----
+    col1, col2, col3 = st.columns([1, 6, 1])
+    with col1:
+        if step > 1:
+            if st.button("⬅️ Précédent", key="prev_step"):
+                st.session_state.reunion_step -= 1
+                st.rerun()
+    with col3:
+        if step < total_steps:
+            if st.button("Suivant ➡️", key="next_step"):
+                st.session_state.reunion_step += 1
+                st.rerun()
+
+# ---------------- SYNTHÈSE ----------------
+with tabs[3]:
+    # Afficher le message de sauvegarde seulement pour cet onglet
+    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Synthèse"):
+        st.success(st.session_state.save_message)
+        st.session_state.save_message = None
+        st.session_state.save_message_tab = None
+
+    # Vérifier si un brief est chargé et si la réunion est terminée
+    if not st.session_state.current_brief_name:
+        st.warning("⚠️ Veuillez créer ou sélectionner un brief dans l'onglet Gestion avant d'accéder à cette section.")
+    elif not st.session_state.reunion_completed:
+        st.warning("⚠️ Veuillez compléter la réunion de brief avant d'accéder à cette section.")
+    else:
+        st.subheader(f"📝 Synthèse - {st.session_state.current_brief_name}")
+        
+        # Afficher les données du brief
+        brief_data = load_briefs().get(st.session_state.current_brief_name, {})
+        st.write("### Informations générales")
+        st.write(f"- **Poste :** {brief_data.get('poste_intitule', 'N/A')}")
+        st.write(f"- **Manager :** {brief_data.get('manager_nom', 'N/A')}")
+        st.write(f"- **Affectation :** {brief_data.get('affectation_nom', 'N/A')} ({brief_data.get('affectation_type', 'N/A')})")
+        st.write(f"- **Date :** {brief_data.get('date_brief', 'N/A')}")
+        
+        st.write("### Détails du brief")
+        for section in sections:
+            with st.expander(f"📋 {section['title']}"):
+                for title, key, _ in section["fields"]:
+                    value = brief_data.get(key, st.session_state.get(key, ""))
+                    if value:
+                        st.write(f"- **{title} :** {value}")
+        
+        # Afficher la matrice KSA si disponible
+        if "ksa_matrix" in st.session_state and not st.session_state.ksa_matrix.empty:
+            st.subheader("📊 Matrice KSA")
+            st.dataframe(st.session_state.ksa_matrix, use_container_width=True, hide_index=True)
+        
+        # Sauvegarde de la synthèse
+        st.write("### Actions")
+        col_save, col_cancel = st.columns([1, 1])
+        with col_save:
+            if st.button("💾 Confirmer sauvegarde", type="primary", use_container_width=True, key="save_synthese"):
+                if st.session_state.current_brief_name:
+                    save_briefs()
+                    
+                    # --- NOUVEAU: Sauvegarde Google Sheets ---
+                    brief_data_to_save = load_briefs().get(st.session_state.current_brief_name, {})
+                    save_brief_to_gsheet(st.session_state.current_brief_name, brief_data_to_save)
+                    
+                    st.session_state.save_message = f"✅ Brief '{st.session_state.current_brief_name}' sauvegardé avec succès !"
+                    st.session_state.save_message_tab = "Synthèse"
+                    st.rerun()
+                else:
+                    st.error("❌ Aucun brief à sauvegarder. Veuillez d'abord créer un brief.")
+        
+        with col_cancel:
+            if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_synthese"):
+                delete_current_brief()
+
+        # -------- EXPORT PDF/WORD --------
+        st.subheader("📄 Export du Brief complet")
+        col1, col2 = st.columns(2)
+        with col1:
+            if PDF_AVAILABLE:
+                if st.session_state.current_brief_name:
+                    pdf_buf = export_brief_pdf()
+                    if pdf_buf:
+                        st.download_button("⬇️ Télécharger PDF", data=pdf_buf,
+                                         file_name=f"{st.session_state.current_brief_name}.pdf", mime="application/pdf")
+                else:
+                    st.info("ℹ️ Créez d'abord un brief pour l'exporter")
+            else:
+                st.info("⚠️ PDF non dispo (pip install reportlab)")
+        with col2:
+            if WORD_AVAILABLE:
+                if st.session_state.current_brief_name:
+                    word_buf = export_brief_word()
+                    if word_buf:
+                        st.download_button("⬇️ Télécharger Word", data=word_buf,
+                                         file_name=f"{st.session_state.current_brief_name}.docx",
+                                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                else:
+                    st.info("ℹ️ Créez d'abord un brief pour l'exporter")
+            else:
+                st.info("⚠️ Word non dispo (pip install python-docx)")
