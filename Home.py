@@ -239,7 +239,7 @@ else:
         else:
             st.info("Aucune fonctionnalité réalisée.")
 
-    # Gestion des fonctionnalités (ajout, modification, suppression)
+    # Gestion des fonctionnalités dans un expander
     with st.expander("⚙️ Gestion des fonctionnalités", expanded=False):
         col4, col5, col6 = st.columns(3)
 
