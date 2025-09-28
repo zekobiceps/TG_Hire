@@ -970,25 +970,28 @@ with tabs[2]:
         with col_cancel:
             if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion"):
                 delete_current_brief()
-
     elif step == 4:
             st.subheader("Étape 4 : Finalisation")
-            with st.expander("📝 Notes générales du manager", expanded=True):
-                st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=250)
-
-            st.markdown("---")
             
-            col_save, col_cancel = st.columns(2)
-            with col_save:
-                if st.button("💾 Enregistrer la réunion", type="primary", use_container_width=True, key="save_reunion_final"):
+            # On crée un formulaire pour la soumission finale
+            with st.form(key="reunion_final_form"):
+                with st.expander("📝 Notes générales du manager", expanded=True):
+                    st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=250)
+
+                st.markdown("---")
+                
+                # Le bouton de sauvegarde est maintenant un bouton de soumission de formulaire
+                submitted = st.form_submit_button(
+                    "💾 Enregistrer la réunion", # ✅ CORRECTION
+                    type="primary", 
+                    use_container_width=True
+                )
+
+                if submitted:
                     if st.session_state.current_brief_name:
                         current_brief_name = st.session_state.current_brief_name
-                        
                         brief_data_to_save = st.session_state.saved_briefs.get(current_brief_name, {}).copy()
-                        if not brief_data_to_save:
-                            st.error(f"Erreur critique : Impossible de trouver les données du brief '{current_brief_name}'.")
-                            st.stop()
-
+                        
                         brief_data_to_save.update({
                             "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
                             "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
@@ -1016,10 +1019,11 @@ with tabs[2]:
                         st.rerun()
                     else:
                         st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
-            
-            with col_cancel:
-                if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion_final"):
-                    delete_current_brief()
+
+            # Le bouton Annuler reste un bouton normal, à l'extérieur du formulaire
+            if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion_final"):
+                delete_current_brief()
+    
 
     # ---- Navigation wizard ----
     col1, col2, col3 = st.columns([1, 6, 1])
