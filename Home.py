@@ -42,18 +42,12 @@ if "users" not in st.session_state:
 def load_users_from_gsheet():
     """Charge les utilisateurs (email, password, name) depuis la feuille Google Sheets."""
     try:
-        # Débogage : Afficher les clés disponibles dans st.secrets
-        st.write("Clés disponibles dans st.secrets :", list(st.secrets.keys()))
-        if not all(key in st.secrets for key in ["GCP_TYPE", "GCP_PROJECT_ID", "GCP_PRIVATE_KEY_ID", "GCP_PRIVATE_KEY", "GCP_CLIENT_EMAIL", "GCP_CLIENT_ID", "GCP_AUTH_URI", "GCP_TOKEN_URI", "GCP_AUTH_PROVIDER_CERT_URL", "GCP_CLIENT_CERT_URL"]):
-            st.error("❌ Certaines clés de secret GCP sont manquantes. Vérifiez votre configuration dans Streamlit Cloud.")
-            return {}
-
-        # Construire le dictionnaire d'authentification à partir des secrets
+        # Utiliser les secrets GCP (comme dans utils.py)
         service_account_info = {
             "type": st.secrets["GCP_TYPE"],
             "project_id": st.secrets["GCP_PROJECT_ID"],
             "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
-            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n').strip(),
+            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n').strip(), 
             "client_email": st.secrets["GCP_CLIENT_EMAIL"],
             "client_id": st.secrets["GCP_CLIENT_ID"],
             "auth_uri": st.secrets["GCP_AUTH_URI"],
@@ -66,7 +60,7 @@ def load_users_from_gsheet():
         spreadsheet = gc.open_by_url(USERS_SHEET_URL)
         worksheet = spreadsheet.worksheet(USERS_WORKSHEET_NAME)
         
-        # Charger les données
+        # Charger les données (en supposant que la ligne 1 est les en-têtes : A1 = "email", B1 = "password", C1 = "name")
         records = worksheet.get_all_records()
         
         users = {}
@@ -78,6 +72,9 @@ def load_users_from_gsheet():
                 users[email] = {"password": password, "name": name}
         
         return users
+    except KeyError as e:
+        st.error(f"❌ Clé de secret manquante : {e}. Vérifiez les secrets GCP dans Streamlit Cloud.")
+        return {}
     except Exception as e:
         st.error(f"❌ Erreur lors du chargement des utilisateurs depuis Google Sheets : {e}")
         return {}
@@ -89,11 +86,7 @@ def debug_session_state():
         st.json(st.session_state)
 
 # Charger les utilisateurs au démarrage
-# st.session_state.users = load_users_from_gsheet()  # Commentez cette ligne pour utiliser le contournement
-st.session_state.users = {  # Décommentez cette ligne pour le contournement temporaire
-    "zakaria.fassih@tgcc.ma": {"password": "password123", "name": "Zakaria Fassih"},
-    "user2@example.com": {"password": "securepass", "name": "Utilisateur Test"}
-}
+st.session_state.users = load_users_from_gsheet()
 
 # Appliquer le style CSS minimaliste
 st.markdown("""
@@ -197,24 +190,20 @@ else:
     # Contenu principal - sans logo ni message de bienvenue
     st.title("📊 Roadmap Fonctionnelle")
 
-    # Vérification que les clés existent dans features
-    for status in ["À développer", "En cours", "Réalisé"]:
-        if status not in st.session_state.features:
-            st.session_state.features[status] = []
+    # Vérification des onglets
+    tab1, tab2, tab3 = st.tabs(["À développer", "En cours", "Réalisé"])
 
-    # --- TABLEAU KANBAN DES FONCTIONNALITÉS ---
-    col1, col2, col3 = st.columns(3)
-    
-    # Colonne "À développer"
-    with col1:
-        st.markdown("### 📋 À développer")
-        st.markdown("---")
+    # --- Onglet 1: À développer ---
+    with tab1:
+        st.subheader("Fonctionnalités à développer")
+        
+        # Formulaire pour ajouter une nouvelle fonctionnalité
         with st.form(key="add_feature_form"):
-            col1a, col1b = st.columns(2)
-            with col1a:
+            col1, col2 = st.columns(2)
+            with col1:
                 new_title = st.text_input("Titre", key="new_title")
                 new_description = st.text_area("Description", key="new_description", height=80)
-            with col1b:
+            with col2:
                 new_priority = st.selectbox("Priorité", ["Haute", "Moyenne", "Basse"], key="new_priority")
             
             if st.form_submit_button("➕ Ajouter"):
@@ -233,7 +222,9 @@ else:
                 else:
                     st.error("Veuillez remplir le titre et la description.")
 
-        if st.session_state.features["À développer"]:
+        # Afficher les fonctionnalités
+        total_features = sum(len(features) for features in st.session_state.features.values())
+        if total_features > 0:
             for feature in st.session_state.features["À développer"]:
                 with st.container():
                     st.markdown(f"""
@@ -244,12 +235,11 @@ else:
                         </div>
                     """, unsafe_allow_html=True)
         else:
-            st.info("Aucune fonctionnalité à développer.")
+            st.info("Aucune fonctionnalité à afficher.")
 
-    # Colonne "En cours"
-    with col2:
-        st.markdown("### 🔄 En cours")
-        st.markdown("---")
+    # --- Onglet 2: En cours ---
+    with tab2:
+        st.subheader("Fonctionnalités en cours")
         if st.session_state.features["En cours"]:
             for feature in st.session_state.features["En cours"]:
                 with st.container():
@@ -263,10 +253,9 @@ else:
         else:
             st.info("Aucune fonctionnalité en cours.")
 
-    # Colonne "Réalisé"
-    with col3:
-        st.markdown("### ✅ Réalisé")
-        st.markdown("---")
+    # --- Onglet 3: Réalisé ---
+    with tab3:
+        st.subheader("Fonctionnalités réalisées")
         if st.session_state.features["Réalisé"]:
             for feature in st.session_state.features["Réalisé"]:
                 with st.container():
@@ -312,7 +301,6 @@ else:
 
         with tab5:
             st.subheader("Modifier une fonctionnalité")
-            total_features = sum(len(features) for features in st.session_state.features.values())
             if total_features > 0:
                 all_features = []
                 for status, features in st.session_state.features.items():
@@ -367,7 +355,6 @@ else:
         
         with tab6:
             st.subheader("Supprimer une fonctionnalité")
-            total_features = sum(len(features) for features in st.session_state.features.values())
             if total_features > 0:
                 all_features = []
                 for status, features in st.session_state.features.items():
