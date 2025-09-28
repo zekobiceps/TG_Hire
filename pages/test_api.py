@@ -982,14 +982,14 @@ with tabs[2]:
                 
                 # Le bouton de sauvegarde est maintenant un bouton de soumission de formulaire
                 submitted = st.form_submit_button(
-                    "💾 Enregistrer la réunion",
+                    "💾 Enregistrer la réunion", # ✅ CORRECTION
                     type="primary", 
                     use_container_width=True
                 )
 
                 if submitted:
+                    # Votre logique de sauvegarde s'exécute ici lorsque le formulaire est soumis
                     if st.session_state.current_brief_name:
-                        # ... (Toute votre logique de sauvegarde que nous avons corrigée) ...
                         current_brief_name = st.session_state.current_brief_name
                         brief_data_to_save = st.session_state.saved_briefs.get(current_brief_name, {}).copy()
                         
