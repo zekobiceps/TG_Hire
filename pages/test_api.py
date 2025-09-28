@@ -369,25 +369,32 @@ with tabs[0]:
     with col_info:
         st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Informations de base</h3>', unsafe_allow_html=True)
         
+        # Load brief data if editing
+        brief_data = {}
+        if st.session_state.current_brief_name:
+            brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
+        
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.text_input("Poste à recruter", key="poste_intitule", value=st.session_state.get("poste_intitule", ""))
+            st.text_input("Poste à recruter", key="poste_intitule", value=brief_data.get("poste_intitule", st.session_state.get("poste_intitule", "")))
         with col2:
-            st.text_input("Manager", key="manager_nom", value=st.session_state.get("manager_nom", ""))
+            st.text_input("Manager", key="manager_nom", value=brief_data.get("manager_nom", st.session_state.get("manager_nom", "")))
         with col3:
             st.selectbox("Recruteur", ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"], key="recruteur",
-                        index=["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"].index(st.session_state.get("recruteur", "Zakaria"))
-                        if st.session_state.get("recruteur") in ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"] else 0)
+                        index=["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"].index(
+                            brief_data.get("recruteur", st.session_state.get("recruteur", "Zakaria"))
+                        ) if brief_data.get("recruteur", st.session_state.get("recruteur", "Zakaria")) in ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"] else 0)
         
         col4, col5, col6 = st.columns(3)
         with col4:
             st.selectbox("Type d'affectation", ["Chantier", "Siège", "Dépôt"], key="affectation_type",
-                        index=["Chantier", "Siège", "Dépôt"].index(st.session_state.get("affectation_type", "Chantier"))
-                        if st.session_state.get("affectation_type") in ["Chantier", "Siège", "Dépôt"] else 0)
+                        index=["Chantier", "Siège", "Dépôt"].index(
+                            brief_data.get("affectation_type", st.session_state.get("affectation_type", "Chantier"))
+                        ) if brief_data.get("affectation_type", st.session_state.get("affectation_type", "Chantier")) in ["Chantier", "Siège", "Dépôt"] else 0)
         with col5:
-            st.text_input("Nom affectation", key="affectation_nom", value=st.session_state.get("affectation_nom", ""))
+            st.text_input("Nom affectation", key="affectation_nom", value=brief_data.get("affectation_nom", st.session_state.get("affectation_nom", "")))
         with col6:
-            st.date_input("Date du brief", key="date_brief", value=st.session_state.get("date_brief", datetime.today()))
+            st.date_input("Date du brief", key="date_brief", value=brief_data.get("date_brief", st.session_state.get("date_brief", datetime.today())))
         
         col_create, col_cancel = st.columns(2)
         with col_create:
@@ -501,38 +508,7 @@ with tabs[0]:
                             st.session_state.avant_brief_completed = True
                             st.session_state.saved_briefs = load_briefs()
                             brief_data = st.session_state.saved_briefs.get(name, {})
-                            gestion_keys = ["poste_intitule", "manager_nom", "recruteur", "affectation_type", "affectation_nom"]
-                            for key in gestion_keys + all_field_keys:
-                                value = brief_data.get(key, "")
-                                if isinstance(value, (list, dict)):
-                                    value = json.dumps(value)
-                                elif isinstance(value, pd.DataFrame):
-                                    value = value.to_json(orient='records')
-                                st.session_state[key] = value
-                            if "date_brief" in brief_data and brief_data["date_brief"]:
-                                try:
-                                    st.session_state["date_brief"] = datetime.strptime(brief_data["date_brief"], "%Y-%m-%d")
-                                except ValueError:
-                                    st.session_state["date_brief"] = datetime.today()
-                            else:
-                                st.session_state["date_brief"] = datetime.today()
-                            if "ksa_matrix" in brief_data:
-                                ksa_data = brief_data["ksa_matrix"]
-                                if isinstance(ksa_data, pd.DataFrame):
-                                    st.session_state.ksa_matrix = ksa_data
-                                elif isinstance(ksa_data, str):
-                                    try:
-                                        st.session_state.ksa_matrix = pd.read_json(ksa_data)
-                                    except:
-                                        st.session_state.ksa_matrix = pd.DataFrame()
-                                elif isinstance(ksa_data, list):
-                                    st.session_state.ksa_matrix = pd.DataFrame(ksa_data)
-                                else:
-                                    st.session_state.ksa_matrix = pd.DataFrame()
-                            else:
-                                st.session_state.ksa_matrix = pd.DataFrame()
-                            if "manager_comments" in brief_data:
-                                st.session_state.manager_comments = brief_data["manager_comments"]
+                            # No direct st.session_state[key] = value here; values are set via widget defaults
                             st.rerun()
                     with col_brief3:
                         if st.button("🗑️ Supprimer", key=f"delete_{name}"):
@@ -574,7 +550,6 @@ with tabs[0]:
                                         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                                         key=f"download_word_{name}"
                                     )
-
             else:
                 st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
 
@@ -824,7 +799,7 @@ with tabs[2]:
                                               index=["Knowledge", "Skills", "Abilities"].index(st.session_state.get("new_rubrique", "Knowledge"))
                                               if st.session_state.get("new_rubrique") in ["Knowledge", "Skills", "Abilities"] else 0)
                     with col2:
-                        critere = st.text_input("Critère", placeholder="Ex: Leadership", key="new_critere")
+                        st.text_input("Critère", placeholder="Ex: Leadership", key="new_critere")
                     with col3:
                         type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], 
                                                    key="new_type_question",
@@ -868,12 +843,12 @@ with tabs[2]:
                     
                     with col_add:
                         if st.form_submit_button("➕ Ajouter le critère", type="secondary", use_container_width=True):
-                            if not critere or not question:
+                            if not st.session_state.new_critere or not question:
                                 st.error("Veuillez remplir au moins le critère et la question.")
                             else:
                                 st.session_state.ksa_matrix = pd.concat([st.session_state.ksa_matrix, pd.DataFrame([{
                                     "Rubrique": rubrique,
-                                    "Critère": critere,
+                                    "Critère": st.session_state.new_critere,
                                     "Type de question": type_question,
                                     "Question pour l'entretien": question,
                                     "Évaluation (1-5)": evaluation,
