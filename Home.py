@@ -157,7 +157,7 @@ else:
     with st.sidebar:
         st.image("tgcc.png", use_container_width=True)
         st.markdown("---")
-        st.markdown(f"**Bienvenue, {st.session_state.current_user}**")
+        st.markdown(f"**Bienvenue  {st.session_state.current_user}**")
         if st.button("🚪 Déconnexion", use_container_width=True):
             st.session_state.logged_in = False
             st.session_state.current_user = ""
