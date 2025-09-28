@@ -25,13 +25,6 @@ from utils import (
     save_brief_to_gsheet,
 )
 
-# --- Debug reportlab import ---
-try:
-    import reportlab
-    print(f"reportlab version: {reportlab.__version__}")
-except ImportError as e:
-    print(f"Failed to import reportlab: {e}")
-
 # --- CSS pour augmenter la taille du texte des onglets ---
 st.markdown("""
     <style>
@@ -510,7 +503,13 @@ with tabs[0]:
                             brief_data = st.session_state.saved_briefs.get(name, {})
                             gestion_keys = ["poste_intitule", "manager_nom", "recruteur", "affectation_type", "affectation_nom"]
                             for key in gestion_keys + all_field_keys:
-                                st.session_state[key] = brief_data.get(key, "")
+                                # Ensure value is a string or compatible type to avoid StreamlitAPIException
+                                value = brief_data.get(key, "")
+                                if isinstance(value, (list, dict)):
+                                    value = json.dumps(value)
+                                elif isinstance(value, pd.DataFrame):
+                                    value = value.to_json(orient='records')
+                                st.session_state[key] = value
                             if "date_brief" in brief_data and brief_data["date_brief"]:
                                 try:
                                     st.session_state["date_brief"] = datetime.strptime(brief_data["date_brief"], "%Y-%m-%d")
@@ -818,34 +817,36 @@ with tabs[2]:
 
             with st.expander("➕ Ajouter un critère", expanded=True):
                 with st.form(key="add_criteria_form"):
-                    col1, col2, col3, col4 = st.columns(4)
+                    col1, col2, col3, col4 = st.columns(4)  # Restored original 4-column layout
                     
                     with col1:
                         rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique",
                                               index=["Knowledge", "Skills", "Abilities"].index(st.session_state.get("new_rubrique", "Knowledge"))
                                               if st.session_state.get("new_rubrique") in ["Knowledge", "Skills", "Abilities"] else 0)
                     with col2:
-                        critere = st.text_input("Critère", placeholder="Ex: Leadership", key="new_critere", value=st.session_state.get("new_critere", ""))
+                        critere = st.text_input("Critère", placeholder="Ex: Leadership", key="new_critere")
+                    with col3:
                         type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], 
                                                    key="new_type_question",
                                                    index=["Comportementale", "Situationnelle", "Technique", "Générale"].index(st.session_state.get("new_type_question", "Comportementale"))
                                                    if st.session_state.get("new_type_question") in ["Comportementale", "Situationnelle", "Technique", "Générale"] else 0)
-                    with col3:
+                    with col4:
                         evaluateur = st.selectbox("Qui évalue ce critère ?", ["Recruteur", "Manager", "Les deux"], key="new_evaluateur",
                                                 index=["Recruteur", "Manager", "Les deux"].index(st.session_state.get("new_evaluateur", "Recruteur"))
                                                 if st.session_state.get("new_evaluateur") in ["Recruteur", "Manager", "Les deux"] else 0)
-                    with col4:
-                        evaluation = st.slider("Évaluation (1-5)", min_value=1, max_value=5, value=st.session_state.get("new_evaluation", 3), step=1, key="new_evaluation")
+
+                    col_q_text, col_slider = st.columns([2, 1])  # Adjusted for original layout
                     
-                    col_q_text, _ = st.columns([2, 1])
                     with col_q_text:
                         question = st.text_input("Question pour l'entretien", 
                                                placeholder="Ex: Parlez-moi d'une situation où vous avez dû faire preuve de leadership.", 
-                                               key="new_question", value=st.session_state.get("new_question", ""))
+                                               key="new_question")
+                    with col_slider:
+                        evaluation = st.slider("Évaluation (1-5)", min_value=1, max_value=5, value=3, step=1, key="new_evaluation")
                     
                     ai_prompt = st.text_input("Décrivez ce que l'IA doit générer comme Question", 
                                             placeholder="Ex: Donne-moi une question pour évaluer la gestion de projets", 
-                                            key="ai_prompt_input", value=st.session_state.get("ai_prompt_input", ""))
+                                            key="ai_prompt_input")
                     concise_mode = st.checkbox("⚡ Mode rapide (réponse concise)", key="concise_mode")
                     
                     st.markdown("---")
@@ -856,7 +857,7 @@ with tabs[2]:
                             if ai_prompt:
                                 with st.spinner("Génération en cours..."):
                                     try:
-                                        ai_response = generate_ai_question(ai_prompt, concise_mode)
+                                        ai_response = generate_ai_question(ai_prompt, concise=concise_mode)
                                         if ai_response.strip().startswith("Question:"):
                                             ai_response = ai_response.strip().replace("Question:", "", 1).strip()
                                         st.session_state.ai_generated_question = ai_response
@@ -1062,8 +1063,12 @@ with tabs[3]:
                 if st.session_state.current_brief_name:
                     pdf_buf = export_brief_pdf()
                     if pdf_buf:
-                        st.download_button("⬇️ Télécharger PDF", data=pdf_buf,
-                                        file_name=f"{st.session_state.current_brief_name}.pdf", mime="application/pdf")
+                        st.download_button(
+                            "⬇️ Télécharger PDF",
+                            data=pdf_buf,
+                            file_name=f"{st.session_state.current_brief_name}.pdf",
+                            mime="application/pdf"
+                        )
                 else:
                     st.info("ℹ️ Créez d'abord un brief pour l'exporter")
             else:
@@ -1073,9 +1078,12 @@ with tabs[3]:
                 if st.session_state.current_brief_name:
                     word_buf = export_brief_word()
                     if word_buf:
-                        st.download_button("⬇️ Télécharger Word", data=word_buf,
-                                        file_name=f"{st.session_state.current_brief_name}.docx",
-                                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                        st.download_button(
+                            "⬇️ Télécharger Word",
+                            data=word_buf,
+                            file_name=f"{st.session_state.current_brief_name}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                        )
                 else:
                     st.info("ℹ️ Créez d'abord un brief pour l'exporter")
             else:

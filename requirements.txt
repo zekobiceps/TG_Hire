@@ -1,6 +1,6 @@
 # --- Interface et Visualisation ---
 streamlit
-plotly 
+plotly
 altair
 pydeck
 
@@ -29,3 +29,7 @@ google-auth-httplib2
 google-auth-oauthlib
 groq
 google-generativeai
+openai  # Added to support DeepSeek API
+
+# --- PDF Generation ---
+reportlab  # Added to support PDF export
