@@ -503,7 +503,6 @@ with tabs[0]:
                             brief_data = st.session_state.saved_briefs.get(name, {})
                             gestion_keys = ["poste_intitule", "manager_nom", "recruteur", "affectation_type", "affectation_nom"]
                             for key in gestion_keys + all_field_keys:
-                                # Ensure value is a string or compatible type to avoid StreamlitAPIException
                                 value = brief_data.get(key, "")
                                 if isinstance(value, (list, dict)):
                                     value = json.dumps(value)
@@ -634,23 +633,28 @@ with tabs[1]:
                     for title, key, _ in section["fields"]:
                         if title == field_title:
                             advice = generate_checklist_advice(section["title"], title)
-                            if advice != "Pas de conseil disponible.":
+                            if advice:
                                 example = get_example_for_field(section["title"], title)
                                 st.session_state[f"advice_{key}"] = f"{advice}\n**Exemple :**\n{example}"
+                            else:
+                                st.session_state[f"advice_{key}"] = "Aucun conseil disponible pour ce champ."
+
+    # Display advice immediately after generation
+    for section in sections:
+        with st.expander(f"📋 {section['title']}", expanded=False):
+            for title, key, placeholder in section["fields"]:
+                current_value = st.session_state.get(key, "")
+                st.text_area(title, value=current_value, key=key, placeholder=placeholder, height=150)
+                if st.session_state.get(f"advice_{key}", ""):
+                    st.info(f"**Conseil IA :**\n{st.session_state[f'advice_{key}']}")
 
     brief_data = load_briefs().get(st.session_state.current_brief_name, {})
 
-    for section in sections:
-        for title, key, _ in section["fields"]:
-            if f"advice_{key}" not in st.session_state:
-                st.session_state[f"advice_{key}"] = ""
-
     with st.form(key="avant_brief_form"):
         for section in sections:
-            with st.expander(f"📋 {section['title']}", expanded=False):
-                for title, key, placeholder in section["fields"]:
-                    current_value = st.session_state.get(key, brief_data.get(key, ""))
-                    st.text_area(title, value=current_value, key=key, placeholder=placeholder, height=150)
+            for title, key, placeholder in section["fields"]:
+                current_value = st.session_state.get(key, brief_data.get(key, ""))
+                st.text_area(title, value=current_value, key=key, placeholder=placeholder, height=150)
 
         col_save, col_cancel = st.columns(2)
         with col_save:
@@ -817,7 +821,7 @@ with tabs[2]:
 
             with st.expander("➕ Ajouter un critère", expanded=True):
                 with st.form(key="add_criteria_form"):
-                    col1, col2, col3, col4 = st.columns(4)  # Restored original 4-column layout
+                    col1, col2, col3, col4 = st.columns(4)
                     
                     with col1:
                         rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique",
@@ -835,7 +839,7 @@ with tabs[2]:
                                                 index=["Recruteur", "Manager", "Les deux"].index(st.session_state.get("new_evaluateur", "Recruteur"))
                                                 if st.session_state.get("new_evaluateur") in ["Recruteur", "Manager", "Les deux"] else 0)
 
-                    col_q_text, col_slider = st.columns([2, 1])  # Adjusted for original layout
+                    col_q_text, col_slider = st.columns([2, 1])
                     
                     with col_q_text:
                         question = st.text_input("Question pour l'entretien", 
@@ -989,9 +993,6 @@ with tabs[2]:
                     st.rerun()
                 else:
                     st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
-
-            if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion_final"):
-                delete_current_brief()
 
     col1, col2, col3 = st.columns([1, 6, 1])
     with col1:
