@@ -432,6 +432,9 @@ with st.sidebar:
         if API_KEY:
             try:
                 response = requests.get("https://api.deepseek.com/v1/models", headers={"Authorization": f"Bearer {API_KEY}"})
-                st.success("✅ Connexion API réussie") if response.status_code == 200 else st.error(f"❌ Erreur de connexion ({response.status_code})")
+                if response.status_code == 200:
+                    st.success("✅ Connexion API réussie")
+                else:
+                    st.error(f"❌ Erreur de connexion ({response.status_code})")
             except Exception as e:
                 st.error(f"❌ Erreur: {e}")
