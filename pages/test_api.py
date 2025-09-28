@@ -8,17 +8,14 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import time
 import re
+from datetime import datetime
 
 # Imports pour la méthode sémantique
 from sentence_transformers import SentenceTransformer, util
 import torch
 
 # -------------------- Configuration de la clé API DeepSeek --------------------
-try:
-    API_KEY = st.secrets["DEEPSEEK_API_KEY"]
-except KeyError:
-    API_KEY = None
-    st.error("❌ Le secret 'DEEPSEEK_API_KEY' est introuvable. Veuillez le configurer.")
+# --- CORRECTION : Déplacé à l'intérieur des fonctions pour éviter l'erreur au démarrage ---
 
 # -------------------- Streamlit Page Config --------------------
 st.set_page_config(
@@ -49,6 +46,18 @@ def load_embedding_model():
 embedding_model = load_embedding_model()
 
 # -------------------- Fonctions de traitement --------------------
+def get_api_key():
+    """Récupère la clé API depuis les secrets et gère l'erreur."""
+    try:
+        api_key = st.secrets["DEEPSEEK_API_KEY"]
+        if not api_key:
+            st.error("❌ La clé API DeepSeek est vide dans les secrets. Veuillez la vérifier.")
+            return None
+        return api_key
+    except KeyError:
+        st.error("❌ Le secret 'DEEPSEEK_API_KEY' est introuvable. Veuillez le configurer dans les paramètres de votre application Streamlit.")
+        return None
+
 def extract_text_from_pdf(file):
     try:
         pdf = PdfReader(file)
@@ -80,53 +89,87 @@ def rank_resumes_with_cosine(job_description, resumes, file_names):
         st.error(f"❌ Erreur Cosinus: {e}")
         return {"scores": [], "logic": {}}
 
-# --- MÉTHODE 2 : WORD EMBEDDINGS ---
-def rank_resumes_with_embeddings(job_description, resumes):
+# --- MÉTHODE 2 : WORD EMBEDDINGS (AVEC LOGIQUE) ---
+def rank_resumes_with_embeddings(job_description, resumes, file_names):
     try:
         jd_embedding = embedding_model.encode(job_description, convert_to_tensor=True)
         resume_embeddings = embedding_model.encode(resumes, convert_to_tensor=True)
         cosine_scores = util.pytorch_cos_sim(jd_embedding, resume_embeddings)
-        return {"scores": cosine_scores.flatten().cpu().numpy()}
+        scores = cosine_scores.flatten().cpu().numpy()
+
+        logic = {}
+        jd_sentences = [s.strip() for s in job_description.split('.') if len(s.strip()) > 10]
+        if not jd_sentences: jd_sentences = [job_description]
+        jd_sent_embeddings = embedding_model.encode(jd_sentences, convert_to_tensor=True)
+
+        for i, resume_text in enumerate(resumes):
+            resume_sentences = [s.strip() for s in resume_text.split('\n') if len(s.strip()) > 10]
+            if not resume_sentences: continue
+            resume_sent_embeddings = embedding_model.encode(resume_sentences, convert_to_tensor=True)
+            
+            similarity_matrix = util.pytorch_cos_sim(resume_sent_embeddings, jd_sent_embeddings)
+            best_matches = {}
+            for jd_idx, jd_sent in enumerate(jd_sentences):
+                best_match_score, best_match_idx = torch.max(similarity_matrix[:, jd_idx], dim=0)
+                if best_match_score > 0.5: # Seuil de pertinence
+                     best_matches[jd_sent] = resume_sentences[best_match_idx.item()]
+            logic[file_names[i]] = {"Phrases les plus pertinentes (Annonce -> CV)": best_matches}
+
+        return {"scores": scores, "logic": logic}
     except Exception as e:
         st.error(f"❌ Erreur Sémantique : {e}")
-        return {"scores": []}
+        return {"scores": [], "logic": {}}
 
-# --- ANALYSE PAR REGEX AMÉLIORÉE ---
+# --- ANALYSE PAR REGEX AMÉLIORÉE (AVEC CALCUL D'EXPÉRIENCE) ---
 def regex_analysis(text):
     text_lower = text.lower()
     
+    # --- CALCUL D'EXPÉRIENCE BASÉ SUR LES DATES ---
+    total_experience_months = 0
+    date_patterns = re.findall(r'(\d{1,2}/\d{4})\s*-\s*(\d{1,2}/\d{4}|aujourd\'hui|jour)|([a-zA-Z]+\.?\s+\d{4})\s*-\s*([a-zA-Z]+\.?\s+\d{4}|aujourd\'hui|jour)', text, re.IGNORECASE)
+    
+    month_map = {"janvier": 1, "février": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6, "juillet": 7, "août": 8, "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12, "jan": 1, "fév": 2, "mar": 3, "avr": 4, "may": 5, "jun": 6, "juil": 7, "aoû": 8, "sep": 9, "oct": 10, "nov": 11, "déc": 12}
+    
+    def parse_date(date_str):
+        date_str = date_str.lower().strip().replace('.','').replace('û','u')
+        for month_fr, month_num in month_map.items():
+            if month_fr in date_str:
+                date_str = date_str.replace(month_fr, str(month_num))
+                return datetime.strptime(re.sub(r'[^\d/]', '', date_str).strip(), '%m/%Y')
+        return datetime.strptime(date_str, '%m/%Y')
+
+    for match in date_patterns:
+        try:
+            start_str, end_str = match[0] or match[2], match[1] or match[3]
+            
+            start_date = parse_date(start_str)
+            end_date = datetime.now() if "aujourd'hui" in end_str.lower() or "jour" in end_str.lower() else parse_date(end_str)
+
+            duration = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
+            total_experience_months += duration if duration > 0 else 0
+        except Exception:
+            continue
+
+    total_experience_years = round(total_experience_months / 12)
+
     education_level = 0
-    edu_patterns = {
-        5: r'bac\s*\+\s*5|master|ingénieur',
-        3: r'bac\s*\+\s*3|licence',
-        2: r'bac\s*\+\s*2|bts|dut',
-        0: r'baccalauréat'
-    }
+    edu_patterns = {5: r'bac\s*\+\s*5|master|ingénieur', 3: r'bac\s*\+\s*3|licence', 2: r'bac\s*\+\s*2|bts|dut', 0: r'baccalauréat'}
     for level, pattern in edu_patterns.items():
         if re.search(pattern, text_lower):
             education_level = level
             break
             
-    experience_match = re.search(r"(\d+)\s*à\s*(\d+)\s*ans|(\d+)\s*(?:ans|années)", text_lower)
-    experience = 0
-    if experience_match:
-        if experience_match.group(1):
-            experience = int(experience_match.group(1)) 
-        else:
-            experience = int(experience_match.group(3))
-
     skills = []
     profile_section_match = re.search(r"profil recherché\s*:(.*?)(?:\n\n|\Z)", text_lower, re.DOTALL | re.IGNORECASE)
     if profile_section_match:
         profile_section = profile_section_match.group(1)
-        # On extrait les mots de plus de 4 lettres
         words = re.findall(r'\b[a-zA-ZÀ-ÿ-]{4,}\b', profile_section)
-        stop_words = ["profil", "recherché", "maîtrise", "bonne", "expérience", "esprit", "basé", "casablanca", "missions", "principales", "confirmée"]
+        stop_words = ["profil", "recherché", "maîtrise", "bonne", "expérience", "esprit", "basé", "casablanca", "missions", "principales", "confirmée", "idéalement", "selon"]
         skills = [word for word in words if word not in stop_words]
 
     return {
         "Niveau d'études": education_level,
-        "Années d'expérience": experience,
+        "Années d'expérience": total_experience_years,
         "Compétences clés extraites": list(set(skills))
     }
 
@@ -144,10 +187,12 @@ def rank_resumes_with_rules(job_description, resumes, file_names):
         current_score = 0
         logic = {}
         
-        common_skills = set(jd_entities["Compétences clés extraites"]) & set(resume_text.lower().split())
+        jd_skills = jd_entities["Compétences clés extraites"]
+        common_skills = [skill for skill in jd_skills if re.search(r'\b' + re.escape(skill) + r'\b', resume_text.lower())]
+        
         score_from_skills = len(common_skills) * SKILL_WEIGHT
         current_score += score_from_skills
-        logic['Compétences correspondantes'] = f"{list(common_skills)} (+{score_from_skills} pts)"
+        logic['Compétences correspondantes'] = f"{common_skills} (+{score_from_skills} pts)"
 
         score_from_edu = 0
         if resume_entities["Niveau d'études"] >= jd_entities["Niveau d'études"]:
@@ -173,6 +218,7 @@ def rank_resumes_with_rules(job_description, resumes, file_names):
 
 # --- MÉTHODE 4 : ANALYSE PAR IA (PARSING CORRIGÉ) ---
 def get_detailed_score_with_ai(job_description, resume_text):
+    API_KEY = get_api_key()
     if not API_KEY: return {"score": 0.0, "explanation": "❌ Analyse IA impossible."}
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
@@ -205,6 +251,7 @@ def rank_resumes_with_ai(job_description, resumes, file_names):
     return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
 
 def get_deepseek_analysis(text):
+    API_KEY = get_api_key()
     if not API_KEY: return "Analyse impossible."
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
@@ -258,7 +305,8 @@ with tab1:
                 results = {"scores": [r["score"] for r in rule_results]}
                 logic = {r["file_name"]: r["logic"] for r in rule_results}
             elif analysis_method == "Méthode Sémantique (Embeddings)":
-                results = rank_resumes_with_embeddings(job_description, resumes)
+                results = rank_resumes_with_embeddings(job_description, resumes, file_names)
+                logic = results.get("logic")
             else: # Cosinus
                 results = rank_resumes_with_cosine(job_description, resumes, file_names)
                 logic = results.get("logic")
@@ -324,12 +372,14 @@ with tab2:
                         elif "Méthode Sémantique" in analysis_type_single:
                             if not job_desc_single: st.warning("Veuillez fournir une description de poste.")
                             else:
-                                score = rank_resumes_with_embeddings(job_desc_single, [text])["scores"][0]
+                                result = rank_resumes_with_embeddings(job_desc_single, [text], [uploaded_file.name])
+                                score = result["scores"][0]
                                 st.metric("Score de Pertinence Sémantique", f"{score*100:.1f}%")
                         elif "Méthode Cosinus" in analysis_type_single:
                             if not job_desc_single: st.warning("Veuillez fournir une description de poste.")
                             else:
-                                score = rank_resumes_with_cosine(job_desc_single, [text], [uploaded_file.name])["scores"][0]
+                                result = rank_resumes_with_cosine(job_desc_single, [text], [uploaded_file.name])
+                                score = result["scores"][0]
                                 st.metric("Score de Pertinence Cosinus", f"{score*100:.1f}%")
                         else: # Analyse IA
                             analysis_result = get_deepseek_analysis(text)
@@ -378,11 +428,10 @@ with tab3:
 with st.sidebar:
     st.markdown("### 🔧 Configuration")
     if st.button("Test Connexion API DeepSeek"):
+        API_KEY = get_api_key()
         if API_KEY:
             try:
                 response = requests.get("https://api.deepseek.com/v1/models", headers={"Authorization": f"Bearer {API_KEY}"})
                 st.success("✅ Connexion API réussie") if response.status_code == 200 else st.error(f"❌ Erreur de connexion ({response.status_code})")
             except Exception as e:
                 st.error(f"❌ Erreur: {e}")
-        else:
-            st.error("❌ Clé API non configurée")
