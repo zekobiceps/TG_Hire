@@ -180,40 +180,24 @@ def save_briefs():
         st.error(f"Erreur lors de la sauvegarde locale des briefs: {e}")
 
 def load_briefs():
-    """Load all briefs from JSON files in the briefs directory and sync with Google Sheets."""
+    """Load all briefs exclusively from Google Sheets."""
     try:
-        ensure_briefs_directory()
         briefs = {}
-        # Load local JSON files
-        for file_name in os.listdir(BRIEFS_DIR):
-            if file_name.endswith(".json"):
-                brief_name = file_name[:-5]  # Remove .json extension
-                file_path = os.path.join(BRIEFS_DIR, file_name)
-                with open(file_path, "r", encoding="utf-8") as f:
-                    brief_data = json.load(f)
-                    # Reconvertir les dictionnaires en DataFrames si nécessaire
-                    briefs[brief_name] = {
-                        key: pd.DataFrame.from_dict(value) if key == "ksa_matrix" and isinstance(value, dict) else value
-                        for key, value in brief_data.items()
-                    }
-        
-        # Sync with Google Sheets
         worksheet = get_briefs_gsheet_client()
         if worksheet:
             records = worksheet.get_all_records()
             for record in records:
                 brief_name = record.get("BRIEF_NAME")
-                if brief_name and brief_name not in briefs:
+                if brief_name:
                     briefs[brief_name] = record
                     if "KSA_MATRIX_JSON" in record and record["KSA_MATRIX_JSON"]:
-                        record["ksa_matrix"] = pd.DataFrame.from_records(json.loads(record["KSA_MATRIX_JSON"]))
-                    file_path = os.path.join(BRIEFS_DIR, f"{brief_name}.json")
-                    with open(file_path, "w", encoding="utf-8") as f:
-                        json.dump(record, f, indent=4, ensure_ascii=False)
-        
+                        try:
+                            record["ksa_matrix"] = pd.DataFrame.from_records(json.loads(record["KSA_MATRIX_JSON"]))
+                        except json.JSONDecodeError:
+                            record["ksa_matrix"] = pd.DataFrame()  # Fallback si JSON invalide
         return briefs
     except Exception as e:
-        st.warning(f"Erreur lors du chargement des briefs (local ou Google Sheets): {e}")
+        st.warning(f"Erreur lors du chargement des briefs depuis Google Sheets : {e}")
         return {}
 
 def count_briefs_from_gsheet():
@@ -222,8 +206,10 @@ def count_briefs_from_gsheet():
     if worksheet:
         try:
             return len(worksheet.get_all_records())
+            st.write("Records from Google Sheets:", records)  # Juste après records = worksheet.get_all_records()
         except Exception as e:
             st.error(f"Erreur lors du comptage des briefs dans Google Sheets : {e}")
+            
     return 0
 
 def save_job_descriptions():
