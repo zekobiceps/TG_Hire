@@ -770,64 +770,51 @@ with tabs[1]:
                     current_brief_name = st.session_state.current_brief_name
                     brief_to_update = st.session_state.saved_briefs[current_brief_name]
                     
-                    # 1. Collecte des données des champs (clés en minuscules)
+                    # 1. Collecte et mise à jour locale (clés en minuscules)
                     sections_fields = [item for sublist in [s["fields"] for s in sections] for item in sublist]
                     update_data = {key: st.session_state[key] for _, key, _ in sections_fields}
                     
-                    # 2. Mise à jour du brief local (qui est en minuscules)
                     brief_to_update.update(update_data)
                     brief_to_update["ksa_matrix"] = st.session_state.get("ksa_matrix", pd.DataFrame()) 
                     
-                    # 3. Préparation pour Google Sheets (copie du brief local)
-                    # Initialisation avec les données de la session Streamlit
-                    brief_data_for_gsheet = brief_to_update.copy()
+                    # 2. Préparation pour Google Sheets (création d'un dictionnaire COMPLET à partir de st.session_state)
+                    brief_data_for_gsheet = {}
+
+                    # Inclure TOUS les champs nécessaires des deux onglets, en utilisant la valeur de session actuelle
+                    # La clé de la session (minuscule) est utilisée pour récupérer la valeur,
+                    # et la clé de GSheet (MAJUSCULE) est utilisée pour le dictionnaire d'envoi.
                     
-                    # MAPPING EXPLICITE : On s'assure que les clés GSheet existent en MAJUSCULES
-                    
-                    # Mapping 1: Champs avec un nom différent dans GSheet (ex: must_have_experience -> MUST_HAVE_EXP)
-                    explicit_map = {
-                        "must_have_experience": "MUST_HAVE_EXP",
-                        "must_have_diplomes": "MUST_HAVE_DIP",
-                        "nice_to_have_experience": "NICE_TO_HAVE_EXP",
-                        "nice_to_have_diplomes": "NICE_TO_HAVE_DIP",
-                        # Ces deux sont corrects, mais inclus pour la robustesse du code :
-                        "must_have_competences": "MUST_HAVE_COMPETENCES", 
-                        "must_have_softskills": "MUST_HAVE_SOFTSKILLS",
-                        "nice_to_have_competences": "NICE_TO_HAVE_COMPETENCES",
-                    }
-                    
-                    for session_key, gsheet_key in explicit_map.items():
-                        if session_key in brief_data_for_gsheet:
-                            brief_data_for_gsheet[gsheet_key] = brief_data_for_gsheet[session_key]
-                            
-                    # Mapping 2: Champs avec une correspondance directe en UPPER (ex: raison_ouverture -> RAISON_OUVERTURE)
-                    direct_map_keys = [
-                        "raison_ouverture", "impact_strategique", "rattachement", 
-                        "taches_principales", "entreprises_profil", "synonymes_poste", 
-                        "canaux_profil", "criteres_exclusion", "processus_evaluation", 
-                        "manager_notes"
-                    ]
-                    
-                    for session_key in direct_map_keys:
-                        if session_key in brief_data_for_gsheet:
-                            # Ajoute la clé en MAJUSCULES
-                            brief_data_for_gsheet[session_key.upper()] = brief_data_for_gsheet[session_key]
-                            
-                    # MAPPING DES CLÉS DE L'ONGLET GESTION (nécessaire pour l'update de ligne complète)
+                    # Champs de GESTION/BASE
+                    brief_data_for_gsheet["BRIEF_NAME"] = current_brief_name
                     brief_data_for_gsheet["POSTE_INTITULE"] = st.session_state.poste_intitule
                     brief_data_for_gsheet["MANAGER_NOM"] = st.session_state.manager_nom
                     brief_data_for_gsheet["RECRUTEUR"] = st.session_state.recruteur
                     brief_data_for_gsheet["AFFECTATION_TYPE"] = st.session_state.affectation_type
                     brief_data_for_gsheet["AFFECTATION_NOM"] = st.session_state.affectation_nom
                     brief_data_for_gsheet["DATE_BRIEF"] = st.session_state.date_brief
-                    brief_data_for_gsheet["BRIEF_NAME"] = current_brief_name
+
+                    # Champs AVANT-BRIEF (avec mapping MUST_HAVE_EXP, etc.)
+                    for _, session_key, _ in sections_fields:
+                        gsheet_key = session_key.upper()
+                        
+                        # Gestion des noms de colonnes GSheet abrégés
+                        if session_key == "must_have_experience": gsheet_key = "MUST_HAVE_EXP"
+                        elif session_key == "must_have_diplomes": gsheet_key = "MUST_HAVE_DIP"
+                        elif session_key == "nice_to_have_experience": gsheet_key = "NICE_TO_HAVE_EXP"
+                        elif session_key == "nice_to_have_diplomes": gsheet_key = "NICE_TO_HAVE_DIP"
+                        
+                        brief_data_for_gsheet[gsheet_key] = st.session_state.get(session_key, "")
+
+                    # Champs de RÉUNION (initialisés à partir de session pour l'envoi GSheet)
+                    brief_data_for_gsheet["CRITERES_EXCLUSION"] = st.session_state.get("criteres_exclusion", "")
+                    brief_data_for_gsheet["PROCESSUS_EVALUATION"] = st.session_state.get("processus_evaluation", "")
+                    brief_data_for_gsheet["MANAGER_NOTES"] = st.session_state.get("manager_notes", "")
                     brief_data_for_gsheet["ksa_matrix"] = brief_to_update.get("ksa_matrix", pd.DataFrame())
-
-
-                    # 4. Sauvegarde JSON locale
+                    
+                    # 3. Sauvegarde JSON locale
                     save_briefs() 
                     
-                    # 5. Sauvegarde Google Sheets
+                    # 4. Sauvegarde Google Sheets
                     save_brief_to_gsheet(current_brief_name, brief_data_for_gsheet)
                     
                     st.session_state.avant_brief_completed = True
