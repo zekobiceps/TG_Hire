@@ -243,8 +243,16 @@ def rank_resumes_with_ai(job_description, resumes, file_names):
 
 def get_deepseek_analysis(text):
     if not API_KEY: return "Analyse impossible."
-    # ... (Votre fonction reste identique)
-    return "Analyse..."
+    url = "https://api.deepseek.com/v1/chat/completions"
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
+    prompt = f"En tant qu'expert en recrutement, analyse le CV suivant et identifie les points forts et faibles. Texte du CV : {text}"
+    payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}]}
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        return f"Erreur IA : {e}"
 
 # -------------------- Interface Utilisateur --------------------
 st.title("📄 Analyseur de CVs Intelligent")
