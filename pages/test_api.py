@@ -470,45 +470,52 @@ with tabs[0]:
         # Boutons Créer et Annuler
         col_create, col_cancel = st.columns(2)
         with col_create:
-            # --- BLOC DE CRÉATION DE BRIEF CORRIGÉ ET MIS À JOUR AVEC GOOGLE SHEETS ---
             if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
                 brief_name = generate_automatic_brief_name()
                 st.session_state.current_brief_name = brief_name
                 
-                # --- NOUVEAU: Collecte complète des données pour GSheets et Local ---
+                # --- BLOC CORRIGÉ: Mapping des données vers les en-têtes GSheet ---
                 brief_data = {
-                    "BRIEF_NAME": brief_name, # Clé unique pour Google Sheets
-                    "poste_intitule": st.session_state.poste_intitule,
-                    "manager_nom": st.session_state.manager_nom,
-                    "recruteur": st.session_state.recruteur,
-                    "affectation_type": st.session_state.affectation_type,
-                    "affectation_nom": st.session_state.affectation_nom,
-                    "date_brief": str(st.session_state.date_brief),
+                    # CLÉS DE GESTION (nécessaires pour GSheet et le fonctionnement interne)
+                    "BRIEF_NAME": brief_name, 
+                    "poste_intitule": st.session_state.poste_intitule, # Conservé pour le nommage local
+                    "manager_nom": st.session_state.manager_nom,       # Conservé pour le nommage local
+                    
+                    # MAPPING DIRECT VERS LES EN-TÊTES GOOGLE SHEETS
+                    "POSTE_INTITULE": st.session_state.poste_intitule,
+                    "MANAGER_NOM": st.session_state.manager_nom,
+                    "RECRUTEUR": st.session_state.recruteur,
+                    "AFFECTATION_TYPE": st.session_state.affectation_type,
+                    "AFFECTATION_NOM": st.session_state.affectation_nom,
+                    "DATE_BRIEF": str(st.session_state.date_brief),
+                    
+                    # INITIALISATION DES AUTRES CHAMPS GSheets (utiliser .get pour prendre les valeurs déjà en session)
+                    "RAISON_OUVERTURE": st.session_state.get("raison_ouverture", ""),
+                    "IMPACT_STRATEGIQUE": st.session_state.get("impact_strategique", ""),
+                    "RATTACHEMENT": st.session_state.get("rattachement", ""),
+                    "TACHES_PRINCIPALES": st.session_state.get("taches_principales", ""),
+                    "MUST_HAVE_EXP": st.session_state.get("must_have_experience", ""),
+                    "MUST_HAVE_DIP": st.session_state.get("must_have_diplomes", ""),
+                    "MUST_HAVE_COMPETENCES": st.session_state.get("must_have_competences", ""),
+                    "MUST_HAVE_SOFTSKILLS": st.session_state.get("must_have_softskills", ""),
+                    "NICE_TO_HAVE_EXP": st.session_state.get("nice_to_have_experience", ""),
+                    "NICE_TO_HAVE_DIP": st.session_state.get("nice_to_have_diplomes", ""),
+                    "NICE_TO_HAVE_COMPETENCES": st.session_state.get("nice_to_have_competences", ""),
+                    "ENTREPRISES_PROFIL": st.session_state.get("entreprises_profil", ""),
+                    "SYNONYMES_POSTE": st.session_state.get("synonymes_poste", ""),
+                    "CANAUX_PROFIL": st.session_state.get("canaux_profil", ""),
+                    "BUDGET": st.session_state.get("budget", ""),
+                    "COMMENTAIRES": st.session_state.get("commentaires", ""),
+                    "NOTES_LIBRES": st.session_state.get("notes_libres", ""),
+                    "CRITERES_EXCLUSION": st.session_state.get("criteres_exclusion", ""),
+                    "PROCESSUS_EVALUATION": st.session_state.get("processus_evaluation", ""),
+                    "MANAGER_NOTES": st.session_state.get("manager_notes", ""),
+                    "KSA_MATRIX_JSON": st.session_state.get("KSA_MATRIX_JSON", ""), # Sera un dictionnaire vide ici
+                    
+                    # DONNÉES INTERNES STREAMLIT (non envoyées directement à GSheet, mais nécessaires)
                     "brief_type": "Standard",
-                    "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()), # DataFrame
-                    "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
-                    "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
-                    "processus_evaluation": st.session_state.get("processus_evaluation", ""),
+                    "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()),
                     "manager_comments": st.session_state.get("manager_comments", {}),
-                    "manager_notes": st.session_state.get("manager_notes", ""),
-                    # Ajout des autres champs requis par GSheets (doivent être initialisés ou mis à jour)
-                    "RAISON_OUVERTURE": "", # Exemple d'initialisation manquante
-                    "IMPACT_STRATEGIQUE": "",
-                    "RATTACHEMENT": "",
-                    "TACHES_PRINCIPALES": "",
-                    "MUST_HAVE_EXP": "",
-                    "MUST_HAVE_DIP": "",
-                    "MUST_HAVE_COMPETENCES": "",
-                    "MUST_HAVE_SOFTSKILLS": "",
-                    "NICE_TO_HAVE_EXP": "",
-                    "NICE_TO_HAVE_DIP": "",
-                    "NICE_TO_HAVE_COMPETENCES": "",
-                    "ENTREPRISES_PROFIL": "",
-                    "SYNONYMES_POSTE": "",
-                    "CANAUX_PROFIL": "",
-                    "BUDGET": "",
-                    "COMMENTAIRES": "",
-                    "NOTES_LIBRES": "",
                 }
                 
                 # Mise à jour de l'état de session
@@ -518,6 +525,7 @@ with tabs[0]:
                 save_briefs()  
                 
                 # 2. Sauvegarde Google Sheets
+                # La fonction save_brief_to_gsheet utilise les clés majuscules pour le mapping.
                 save_brief_to_gsheet(brief_name, brief_data)
                 
                 # Rechargement et message de succès
