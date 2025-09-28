@@ -187,44 +187,16 @@ else:
             st.session_state.current_user = ""
             st.rerun()
 
-    # Contenu principal - sans logo ni message de bienvenue
+    # Contenu principal - Kanban avec trois colonnes
     st.title("📊 Roadmap Fonctionnelle")
 
-    # Vérification des onglets
-    tab1, tab2, tab3 = st.tabs(["À développer", "En cours", "Réalisé"])
+    # Layout Kanban avec trois colonnes
+    col1, col2, col3 = st.columns(3)
 
-    # --- Onglet 1: À développer ---
-    with tab1:
-        st.subheader("Fonctionnalités à développer")
-        
-        # Formulaire pour ajouter une nouvelle fonctionnalité
-        with st.form(key="add_feature_form"):
-            col1, col2 = st.columns(2)
-            with col1:
-                new_title = st.text_input("Titre", key="new_title")
-                new_description = st.text_area("Description", key="new_description", height=80)
-            with col2:
-                new_priority = st.selectbox("Priorité", ["Haute", "Moyenne", "Basse"], key="new_priority")
-            
-            if st.form_submit_button("➕ Ajouter"):
-                if new_title and new_description:
-                    max_id = max((f["id"] for status in st.session_state.features.values() for f in status), default=0)
-                    new_feature = {
-                        "id": max_id + 1,
-                        "title": new_title,
-                        "description": new_description,
-                        "priority": new_priority,
-                        "date_ajout": datetime.now().strftime("%Y-%m-%d")
-                    }
-                    st.session_state.features["À développer"].append(new_feature)
-                    st.success("✅ Fonctionnalité ajoutée !")
-                    st.rerun()
-                else:
-                    st.error("Veuillez remplir le titre et la description.")
-
-        # Afficher les fonctionnalités
+    with col1:
+        st.subheader("À développer")
         total_features = sum(len(features) for features in st.session_state.features.values())
-        if total_features > 0:
+        if st.session_state.features["À développer"]:
             for feature in st.session_state.features["À développer"]:
                 with st.container():
                     st.markdown(f"""
@@ -235,11 +207,10 @@ else:
                         </div>
                     """, unsafe_allow_html=True)
         else:
-            st.info("Aucune fonctionnalité à afficher.")
+            st.info("Aucune fonctionnalité à développer.")
 
-    # --- Onglet 2: En cours ---
-    with tab2:
-        st.subheader("Fonctionnalités en cours")
+    with col2:
+        st.subheader("En cours")
         if st.session_state.features["En cours"]:
             for feature in st.session_state.features["En cours"]:
                 with st.container():
@@ -253,9 +224,8 @@ else:
         else:
             st.info("Aucune fonctionnalité en cours.")
 
-    # --- Onglet 3: Réalisé ---
-    with tab3:
-        st.subheader("Fonctionnalités réalisées")
+    with col3:
+        st.subheader("Réalisé")
         if st.session_state.features["Réalisé"]:
             for feature in st.session_state.features["Réalisé"]:
                 with st.container():
@@ -271,18 +241,14 @@ else:
 
     # Gestion des fonctionnalités (ajout, modification, suppression)
     with st.expander("⚙️ Gestion des fonctionnalités", expanded=False):
-        tab4, tab5, tab6 = st.tabs(["Ajouter", "Modifier", "Supprimer"])
+        col4, col5, col6 = st.columns(3)
 
-        with tab4:
-            st.subheader("Ajouter une fonctionnalité")
-            with st.form(key="add_feature_form_expanded"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    new_title = st.text_input("Titre", key="new_title_expanded")
-                    new_description = st.text_area("Description", key="new_description_expanded", height=80)
-                with col2:
-                    new_priority = st.selectbox("Priorité", ["Haute", "Moyenne", "Basse"], key="new_priority_expanded")
-                
+        with col4:
+            st.subheader("Ajouter")
+            with st.form(key="add_feature_form"):
+                new_title = st.text_input("Titre", key="new_title")
+                new_description = st.text_area("Description", key="new_description", height=80)
+                new_priority = st.selectbox("Priorité", ["Haute", "Moyenne", "Basse"], key="new_priority")
                 if st.form_submit_button("➕ Ajouter"):
                     if new_title and new_description:
                         max_id = max((f["id"] for status in st.session_state.features.values() for f in status), default=0)
@@ -299,8 +265,8 @@ else:
                     else:
                         st.error("Veuillez remplir le titre et la description.")
 
-        with tab5:
-            st.subheader("Modifier une fonctionnalité")
+        with col5:
+            st.subheader("Modifier")
             if total_features > 0:
                 all_features = []
                 for status, features in st.session_state.features.items():
@@ -325,21 +291,14 @@ else:
                     
                     if selected_feature:
                         with st.form(key="edit_feature_form"):
-                            col1, col2 = st.columns(2)
-                            
-                            with col1:
-                                edit_title = st.text_input("Titre", value=selected_feature["title"])
-                                edit_description = st.text_area("Description", value=selected_feature["description"], height=80)
-                            
-                            with col2:
-                                edit_status = st.selectbox("Statut", ["À développer", "En cours", "Réalisé"], 
-                                                         index=["À développer", "En cours", "Réalisé"].index(old_status))
-                                edit_priority = st.selectbox("Priorité", ["Haute", "Moyenne", "Basse"], 
-                                                           index=["Haute", "Moyenne", "Basse"].index(selected_feature["priority"]))
-                            
+                            edit_title = st.text_input("Titre", value=selected_feature["title"])
+                            edit_description = st.text_area("Description", value=selected_feature["description"], height=80)
+                            edit_status = st.selectbox("Statut", ["À développer", "En cours", "Réalisé"], 
+                                                     index=["À développer", "En cours", "Réalisé"].index(old_status))
+                            edit_priority = st.selectbox("Priorité", ["Haute", "Moyenne", "Basse"], 
+                                                       index=["Haute", "Moyenne", "Basse"].index(selected_feature["priority"]))
                             if st.form_submit_button("💾 Enregistrer"):
                                 st.session_state.features[old_status] = [f for f in st.session_state.features[old_status] if f["id"] != selected_feature_id]
-                                
                                 updated_feature = {
                                     "id": selected_feature_id,
                                     "title": edit_title,
@@ -352,9 +311,9 @@ else:
                                 st.rerun()
             else:
                 st.info("Aucune fonctionnalité à modifier.")
-        
-        with tab6:
-            st.subheader("Supprimer une fonctionnalité")
+
+        with col6:
+            st.subheader("Supprimer")
             if total_features > 0:
                 all_features = []
                 for status, features in st.session_state.features.items():
@@ -362,7 +321,7 @@ else:
                         all_features.append((feature["id"], f"{feature['title']} ({status})"))
                 
                 delete_feature_id = st.selectbox(
-                    "Sélectionner une fonctionnalité à supprimer",
+                    "Sélectionner une fonctionnalité",
                     options=[f[0] for f in all_features],
                     format_func=lambda x: next((f[1] for f in all_features if f[0] == x), ""),
                     key="delete_select"
