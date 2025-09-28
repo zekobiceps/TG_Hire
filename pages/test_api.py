@@ -973,24 +973,47 @@ with tabs[2]:
     elif step == 4:
             st.subheader("Étape 4 : Finalisation")
             
-            # Create a form for the final submission
+            # On crée un formulaire pour la soumission finale
             with st.form(key="reunion_final_form"):
                 with st.expander("📝 Notes générales du manager", expanded=True):
                     st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=250)
 
                 st.markdown("---")
                 
-                # The save button is now a form submit button
+                # Le bouton de sauvegarde est maintenant un bouton de soumission de formulaire
                 submitted = st.form_submit_button(
-                    "💾 Enregistrer la réunion", # ✅ CORRECTION
+                    "💾 Enregistrer la réunion",
                     type="primary", 
                     use_container_width=True
                 )
 
                 if submitted:
-                    # Your existing saving logic runs here when the form is submitted
                     if st.session_state.current_brief_name:
-                        # ... (The rest of your saving and data processing logic) ...
+                        # ... (Toute votre logique de sauvegarde que nous avons corrigée) ...
+                        current_brief_name = st.session_state.current_brief_name
+                        brief_data_to_save = st.session_state.saved_briefs.get(current_brief_name, {}).copy()
+                        
+                        brief_data_to_save.update({
+                            "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
+                            "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
+                            "processus_evaluation": st.session_state.get("processus_evaluation", ""),
+                            "manager_notes": st.session_state.get("manager_notes", "")
+                        })
+                        
+                        ksa_matrix_df = st.session_state.get("ksa_matrix", pd.DataFrame())
+                        brief_data_to_save["ksa_matrix"] = ksa_matrix_df
+                        manager_comments_dict = brief_data_to_save.get("manager_comments", {})
+                        
+                        st.session_state.saved_briefs[current_brief_name] = brief_data_to_save
+                        save_briefs()
+                        
+                        payload_for_gsheet = brief_data_to_save.copy()
+                        if not ksa_matrix_df.empty:
+                            payload_for_gsheet['KSA_MATRIX_JSON'] = ksa_matrix_df.to_json(orient='records')
+                        if manager_comments_dict:
+                            payload_for_gsheet['MANAGER_COMMENTS_JSON'] = json.dumps(manager_comments_dict, ensure_ascii=False)
+                        
+                        save_brief_to_gsheet(current_brief_name, payload_for_gsheet)
                         
                         st.session_state.reunion_completed = True
                         st.success("✅ Données de réunion sauvegardées et synchronisées avec succès !")
@@ -998,7 +1021,7 @@ with tabs[2]:
                     else:
                         st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
 
-            # Any other buttons, like a "Cancel" button, should remain outside the form
+            # Le bouton Annuler reste un bouton normal, à l'extérieur du formulaire
             if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion_final"):
                 delete_current_brief()
 
