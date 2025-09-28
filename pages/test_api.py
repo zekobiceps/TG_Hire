@@ -282,15 +282,15 @@ if "save_message_tab" not in st.session_state:
 with st.sidebar:
     st.title("📊 Statistiques Brief")
     
+    # Cette ligne appelle la fonction pour charger toutes les données de la feuille, 
+    # puis len() compte le nombre total de briefs.
     total_briefs = len(load_briefs())
-    completed_briefs = sum(1 for b in load_briefs().values() 
-                          if b.get("ksa_data") and any(b["ksa_data"].values()))
     
+    # Cette ligne affiche le total que vous avez calculé.
     st.metric("📋 Briefs créés", total_briefs)
-    st.metric("✅ Briefs complétés", completed_briefs)
-    
+
     st.divider()
-    if st.button("Tester DeepSeek", key="test_deepseek"):
+    if st.button("Tester Connexion IA", key="test_deepseek"):
         test_deepseek_connection()
 
 # ---------------- NAVIGATION PRINCIPALE ----------------
