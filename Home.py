@@ -1,6 +1,8 @@
 import streamlit as st
 import os
 import sys
+import gspread
+from google.oauth2 import service_account
 
 # Ajouter le répertoire racine au chemin de recherche (optionnel si utils.py est dans la racine)
 sys.path.append(os.path.dirname(__file__))
@@ -8,6 +10,10 @@ from utils import *
 
 from datetime import datetime
 import pandas as pd
+
+# URL de la feuille Google Sheets pour les utilisateurs
+USERS_SHEET_URL = "https://docs.google.com/spreadsheets/d/1fodJWGccSaDmlSEDkJblZoQE-lcifxpnOg5RYf3ovTg/edit?gid=0#gid=0"
+USERS_WORKSHEET_NAME = "Logininfo"  # Nom de la feuille mis à jour
 
 # Initialisation robuste de l'état de session
 if 'features' not in st.session_state:
@@ -29,12 +35,58 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "current_user" not in st.session_state:
     st.session_state.current_user = ""
+if "users" not in st.session_state:
+    st.session_state.users = {}
 
-# Stockage temporaire des utilisateurs avec nom complet
-USERS = {
-    "zakaria.fassih@tgcc.ma": {"password": "password123", "name": "Zakaria Fassih"},
-    "user2@example.com": {"password": "securepass", "name": "Utilisateur Test"}
-}
+# Fonction pour charger les utilisateurs depuis Google Sheets
+def load_users_from_gsheet():
+    """Charge les utilisateurs (email, password, name) depuis la feuille Google Sheets."""
+    try:
+        # Utiliser les secrets GCP (comme dans utils.py)
+        service_account_info = {
+            "type": st.secrets["GCP_TYPE"],
+            "project_id": st.secrets["GCP_PROJECT_ID"],
+            "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
+            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n').strip(), 
+            "client_email": st.secrets["GCP_CLIENT_EMAIL"],
+            "client_id": st.secrets["GCP_CLIENT_ID"],
+            "auth_uri": st.secrets["GCP_AUTH_URI"],
+            "token_uri": st.secrets["GCP_TOKEN_URI"],
+            "auth_provider_x509_cert_url": st.secrets["GCP_AUTH_PROVIDER_CERT_URL"],
+            "client_x509_cert_url": st.secrets["GCP_CLIENT_CERT_URL"]
+        }
+        
+        gc = gspread.service_account_from_dict(service_account_info)
+        spreadsheet = gc.open_by_url(USERS_SHEET_URL)
+        worksheet = spreadsheet.worksheet(USERS_WORKSHEET_NAME)
+        
+        # Charger les données (en supposant que la ligne 1 est les en-têtes : A1 = "email", B1 = "password", C1 = "name")
+        records = worksheet.get_all_records()
+        
+        users = {}
+        for record in records:
+            email = record.get("email", "").strip().lower()
+            password = record.get("password", "").strip()
+            name = record.get("name", "").strip()
+            if email and password and name:
+                users[email] = {"password": password, "name": name}
+        
+        return users
+    except KeyError as e:
+        st.error(f"❌ Clé de secret manquante : {e}. Vérifiez les secrets GCP dans Streamlit Cloud.")
+        return {}
+    except Exception as e:
+        st.error(f"❌ Erreur lors du chargement des utilisateurs depuis Google Sheets : {e}")
+        return {}
+
+# Fonction de débogage
+def debug_session_state():
+    """Affiche l'état actuel de la session pour débogage."""
+    with st.expander("🔧 Mode Débogage (État de la Session)"):
+        st.json(st.session_state)
+
+# Charger les utilisateurs au démarrage
+st.session_state.users = load_users_from_gsheet()
 
 # Appliquer le style CSS minimaliste
 st.markdown("""
@@ -96,9 +148,9 @@ if not st.session_state.logged_in:
             password = st.text_input("Mot de Passe", type="password", key="login_password")
             
             if st.form_submit_button("Se Connecter"):
-                if email in USERS and USERS[email]["password"] == password:
+                if email in st.session_state.users and st.session_state.users[email]["password"] == password:
                     st.session_state.logged_in = True
-                    st.session_state.current_user = USERS[email]["name"]
+                    st.session_state.current_user = st.session_state.users[email]["name"]
                     st.success("Connexion réussie !")
                     st.rerun()
                 else:
@@ -138,125 +190,116 @@ else:
     # Contenu principal - sans logo ni message de bienvenue
     st.title("📊 Roadmap Fonctionnelle")
 
-    # Vérification que les clés existent dans features
-    for status in ["À développer", "En cours", "Réalisé"]:
-        if status not in st.session_state.features:
-            st.session_state.features[status] = []
+    # Vérification des onglets
+    tab1, tab2, tab3 = st.tabs(["À développer", "En cours", "Réalisé"])
 
-    # --- TABLEAU KANBAN DES FONCTIONNALITÉS ---
-    
-    # Création des colonnes Kanban
-    col1, col2, col3 = st.columns(3)
-    
-    # Colonne "À développer"
-    with col1:
-        st.markdown("### 📋 À développer")
-        st.markdown("---")
-        if st.session_state.features["À développer"]:
+    # --- Onglet 1: À développer ---
+    with tab1:
+        st.subheader("Fonctionnalités à développer")
+        
+        # Formulaire pour ajouter une nouvelle fonctionnalité
+        with st.form(key="add_feature_form"):
+            col1, col2 = st.columns(2)
+            with col1:
+                new_title = st.text_input("Titre", key="new_title")
+                new_description = st.text_area("Description", key="new_description", height=80)
+            with col2:
+                new_priority = st.selectbox("Priorité", ["Haute", "Moyenne", "Basse"], key="new_priority")
+            
+            if st.form_submit_button("➕ Ajouter"):
+                if new_title and new_description:
+                    max_id = max((f["id"] for status in st.session_state.features.values() for f in status), default=0)
+                    new_feature = {
+                        "id": max_id + 1,
+                        "title": new_title,
+                        "description": new_description,
+                        "priority": new_priority,
+                        "date_ajout": datetime.now().strftime("%Y-%m-%d")
+                    }
+                    st.session_state.features["À développer"].append(new_feature)
+                    st.success("✅ Fonctionnalité ajoutée !")
+                    st.rerun()
+                else:
+                    st.error("Veuillez remplir le titre et la description.")
+
+        # Afficher les fonctionnalités
+        total_features = sum(len(features) for features in st.session_state.features.values())
+        if total_features > 0:
             for feature in st.session_state.features["À développer"]:
-                priority_color = {"Haute": "#dc3545", "Moyenne": "#fd7e14", "Basse": "#198754"}
-                
-                st.markdown(f"""
-                <div class="feature-card" style="border-left-color: {priority_color[feature['priority']]}">
-                    <div style="font-weight: bold; font-size: 14px;">📌 {feature['title']}</div>
-                    <div style="font-size: 12px; color: #495057; margin: 5px 0;">{feature['description']}</div>
-                    <div style="font-size: 11px; color: #6c757d;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                with st.container():
+                    st.markdown(f"""
+                        <div class="feature-card">
+                            <strong>{feature['title']}</strong> ({feature['priority']})
+                            <p>{feature['description']}</p>
+                            <small>Ajouté le : {feature['date_ajout']}</small>
+                        </div>
+                    """, unsafe_allow_html=True)
         else:
-            st.info("Aucune fonctionnalité à développer")
-    
-    # Colonne "En cours"
-    with col2:
-        st.markdown("### 🔄 En cours")
-        st.markdown("---")
+            st.info("Aucune fonctionnalité à afficher.")
+
+    # --- Onglet 2: En cours ---
+    with tab2:
+        st.subheader("Fonctionnalités en cours")
         if st.session_state.features["En cours"]:
             for feature in st.session_state.features["En cours"]:
-                priority_color = {"Haute": "#dc3545", "Moyenne": "#fd7e14", "Basse": "#198754"}
-                
-                st.markdown(f"""
-                <div class="feature-card" style="border-left-color: {priority_color[feature['priority']]}">
-                    <div style="font-weight: bold; font-size: 14px;">⚡ {feature['title']}</div>
-                    <div style="font-size: 12px; color: #495057; margin: 5px 0;">{feature['description']}</div>
-                    <div style="font-size: 11px; color: #6c757d;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                with st.container():
+                    st.markdown(f"""
+                        <div class="feature-card">
+                            <strong>{feature['title']}</strong> ({feature['priority']})
+                            <p>{feature['description']}</p>
+                            <small>Ajouté le : {feature['date_ajout']}</small>
+                        </div>
+                    """, unsafe_allow_html=True)
         else:
-            st.info("Aucune fonctionnalité en cours")
-    
-    # Colonne "Réalisé"
-    with col3:
-        st.markdown("### ✅ Réalisé")
-        st.markdown("---")
+            st.info("Aucune fonctionnalité en cours.")
+
+    # --- Onglet 3: Réalisé ---
+    with tab3:
+        st.subheader("Fonctionnalités réalisées")
         if st.session_state.features["Réalisé"]:
             for feature in st.session_state.features["Réalisé"]:
-                priority_color = {"Haute": "#dc3545", "Moyenne": "#fd7e14", "Basse": "#198754"}
-                
-                st.markdown(f"""
-                <div class="feature-card" style="border-left-color: {priority_color[feature['priority']]}">
-                    <div style="font-weight: bold; font-size: 14px;">✅ {feature['title']}</div>
-                    <div style="font-size: 12px; color: #495057; margin: 5px 0;">{feature['description']}</div>
-                    <div style="font-size: 11px; color: #6c757d;">Priorité: {feature['priority']} | Ajout: {feature['date_ajout']}</div>
-                </div>
-                """, unsafe_allow_html=True)
+                with st.container():
+                    st.markdown(f"""
+                        <div class="feature-card">
+                            <strong>{feature['title']}</strong> ({feature['priority']})
+                            <p>{feature['description']}</p>
+                            <small>Ajouté le : {feature['date_ajout']}</small>
+                        </div>
+                    """, unsafe_allow_html=True)
         else:
-            st.info("Aucune fonctionnalité réalisée")
-    
-    # --- STATISTIQUES SIMPLES ---
-    st.markdown("---")
-    
-    total_features = sum(len(features) for features in st.session_state.features.values())
-    completed_features = len(st.session_state.features["Réalisé"])
-    
-    col_stats1, col_stats2 = st.columns(2)
-    
-    with col_stats1:
-        st.metric("Fonctionnalités totales", total_features)
-    
-    with col_stats2:
-        completion_rate = (completed_features / total_features * 100) if total_features > 0 else 0
-        st.metric("Taux de réalisation", f"{completion_rate:.1f}%")
+            st.info("Aucune fonctionnalité réalisée.")
 
-    # --- ONGLET DE GESTION ---
-    with st.expander("🔧 Gestion des fonctionnalités", expanded=False):
-        tab1, tab2, tab3 = st.tabs(["➕ Ajouter", "✏️ Modifier", "🗑️ Supprimer"])
-        
-        with tab1:
+    # Gestion des fonctionnalités (ajout, modification, suppression)
+    with st.expander("⚙️ Gestion des fonctionnalités", expanded=False):
+        tab4, tab5, tab6 = st.tabs(["Ajouter", "Modifier", "Supprimer"])
+
+        with tab4:
             st.subheader("Ajouter une fonctionnalité")
-            with st.form(key="add_feature_form"):
+            with st.form(key="add_feature_form_expanded"):
                 col1, col2 = st.columns(2)
-                
                 with col1:
-                    new_title = st.text_input("Titre *")
-                    new_description = st.text_area("Description *", height=80)
-                
+                    new_title = st.text_input("Titre", key="new_title_expanded")
+                    new_description = st.text_area("Description", key="new_description_expanded", height=80)
                 with col2:
-                    new_status = st.selectbox("Statut *", ["À développer", "En cours", "Réalisé"])
-                    new_priority = st.selectbox("Priorité *", ["Haute", "Moyenne", "Basse"])
+                    new_priority = st.selectbox("Priorité", ["Haute", "Moyenne", "Basse"], key="new_priority_expanded")
                 
-                if st.form_submit_button("💾 Ajouter"):
+                if st.form_submit_button("➕ Ajouter"):
                     if new_title and new_description:
-                        # Trouver le prochain ID disponible
-                        all_ids = []
-                        for status, features in st.session_state.features.items():
-                            for feature in features:
-                                all_ids.append(feature["id"])
-                        new_id = max(all_ids) + 1 if all_ids else 1
-                        
+                        max_id = max((f["id"] for status in st.session_state.features.values() for f in status), default=0)
                         new_feature = {
-                            "id": new_id,
+                            "id": max_id + 1,
                             "title": new_title,
                             "description": new_description,
                             "priority": new_priority,
                             "date_ajout": datetime.now().strftime("%Y-%m-%d")
                         }
-                        st.session_state.features[new_status].append(new_feature)
+                        st.session_state.features["À développer"].append(new_feature)
                         st.success("✅ Fonctionnalité ajoutée !")
                         st.rerun()
                     else:
-                        st.error("❌ Champs obligatoires manquants")
-        
-        with tab2:
+                        st.error("Veuillez remplir le titre et la description.")
+
+        with tab5:
             st.subheader("Modifier une fonctionnalité")
             if total_features > 0:
                 all_features = []
@@ -310,7 +353,7 @@ else:
             else:
                 st.info("Aucune fonctionnalité à modifier.")
         
-        with tab3:
+        with tab6:
             st.subheader("Supprimer une fonctionnalité")
             if total_features > 0:
                 all_features = []
@@ -337,6 +380,10 @@ else:
     # Pied de page
     st.markdown("---")
     st.caption("TG-Hire IA - Roadmap Fonctionnelle v1.0")
+
+    # Activer le débogage si nécessaire
+    if st.sidebar.button("🔧 Activer le Débogage"):
+        debug_session_state()
 
 # Protéger les pages dans pages/ (arrête l'exécution si non connecté)
 if not st.session_state.logged_in:
