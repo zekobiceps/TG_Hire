@@ -789,19 +789,23 @@ with tabs[1]:
                     
                     # Mapping explicite des clés de session (minuscules) vers les clés GSheet (majuscules)
                     mapping = {
-                        "poste_intitule": "POSTE_INTITULE", "manager_nom": "MANAGER_NOM", "recruteur": "RECRUTEUR",
-                        "affectation_type": "AFFECTATION_TYPE", "affectation_nom": "AFFECTATION_NOM", "date_brief": "DATE_BRIEF",
-                        "raison_ouverture": "RAISON_OUVERTURE", "impact_strategique": "IMPACT_STRATEGIQUE",
-                        "rattachement": "RATTACHEMENT", "taches_principales": "TACHES_PRINCIPALES",
-                        "must_have_experience": "MUST_HAVE_EXP", "must_have_diplomes": "MUST_HAVE_DIP",
-                        "must_have_competences": "MUST_HAVE_COMPETENCES", "must_have_softskills": "MUST_HAVE_SOFTSKILLS",
-                        "nice_to_have_experience": "NICE_TO_HAVE_EXP", "nice_to_have_diplomes": "NICE_TO_HAVE_DIP",
-                        "nice_to_have_competences": "NICE_TO_HAVE_COMPETENCES",
-                        "entreprises_profil": "ENTREPRISES_PROFIL", "synonymes_poste": "SYNONYMES_POSTE",
-                        "canaux_profil": "CANAUX_PROFIL", "budget": "BUDGET", "commentaires": "COMMENTAIRES",
-                        "notes_libres": "NOTES_LIBRES", "criteres_exclusion": "CRITERES_EXCLUSION",
-                        "processus_evaluation": "PROCESSUS_EVALUATION", "manager_notes": "MANAGER_NOTES"
-                    }
+    "poste_intitule": "POSTE_INTITULE", "manager_nom": "MANAGER_NOM", "recruteur": "RECRUTEUR",
+    "affectation_type": "AFFECTATION_TYPE", "affectation_nom": "AFFECTATION_NOM", "date_brief": "DATE_BRIEF",
+    "raison_ouverture": "RAISON_OUVERTURE", "impact_strategique": "IMPACT_STRATEGIQUE",
+    "rattachement": "RATTACHEMENT", "taches_principales": "TACHES_PRINCIPALES",
+    "must_have_experience": "MUST_HAVE_EXP", "must_have_diplomes": "MUST_HAVE_DIP",
+    "must_have_competences": "MUST_HAVE_COMPETENCES", "must_have_softskills": "MUST_HAVE_SOFTSKILLS",
+    "nice_to_have_experience": "NICE_TO_HAVE_EXP", "nice_to_have_diplomes": "NICE_TO_HAVE_DIP",
+    "nice_to_have_competences": "NICE_TO_HAVE_COMPETENCES",
+    "entreprises_profil": "ENTREPRISES_PROFIL", "synonymes_poste": "SYNONYMES_POSTE",
+    "canaux_profil": "CANAUX_PROFIL", "budget": "BUDGET", "commentaires": "COMMENTAIRES",
+    "notes_libres": "NOTES_LIBRES", "criteres_exclusion": "CRITERES_EXCLUSION",
+    "processus_evaluation": "PROCESSUS_EVALUATION", "manager_notes": "MANAGER_NOTES",
+    # AJOUTS IMPORTANTS CI-DESSOUS :
+    "profil_link_1": "LIEN_PROFIL_1",
+    "profil_link_2": "LIEN_PROFIL_2",
+    "profil_link_3": "LIEN_PROFIL_3"
+}
                     
                     # Appliquer le mapping : on ajoute les clés en MAJUSCULES au payload
                     for session_key, gsheet_key in mapping.items():
