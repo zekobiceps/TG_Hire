@@ -652,62 +652,64 @@ with tabs[1]:
     
     # Liste des sections et champs pour les text_area
     sections = [
-        {
-            "title": "Contexte du poste",
-            "fields": [
-                ("Raison de l'ouverture", "raison_ouverture", "Remplacement, création de poste, nouveau projet..."),
-                ("Impact stratégique", "impact_strategique", "En quoi ce poste est-il clé pour les objectifs de l'entreprise ?"),
-                ("Tâches principales", "taches_principales", "Lister les missions et responsabilités clés du poste."),
-            ]
-        },
-        {
-            "title": "Must-have (Indispensables)",
-            "fields": [
-                ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
-                ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
-                ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"),
-                ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"),
-            ]
-        },
-        {
-            "title": "Nice-to-have (Atouts)",
-            "fields": [
-                ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
-                ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
-                ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
-            ]
-        },
-        {
-            "title": "Conditions et contraintes",
-            "fields": [
-                ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
-                ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
-            ]
-        },
-        {
-            "title": "Sourcing et marché",
-            "fields": [
-                ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
-                ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
-                ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
-            ]
-        },
-        {
-            "title": "Profils pertinents",
-            "fields": [
-                ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
-                ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
-                ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
-            ]
-        },
-        {
-            "title": "Notes libres",
-            "fields": [
-                ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
-                ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
-            ]
-        },
-    ]
+    {
+        "title": "Contexte du poste",
+        "fields": [
+            ("Raison de l'ouverture", "raison_ouverture", "Remplacement, création de poste, nouveau projet..."),
+            ("Impact stratégique", "impact_strategique", "En quoi ce poste est-il clé pour les objectifs de l'entreprise ?"),
+            ("Tâches principales", "taches_principales", "Lister les missions et responsabilités clés du poste."),
+        ]
+    },
+    {
+        "title": "Must-have (Indispensables)",
+        "fields": [
+            ("Expérience", "must_have_experience", "Nombre d'années minimum, expériences similaires dans le secteur"),
+            ("Connaissances / Diplômes / Certifications", "must_have_diplomes", "Diplômes exigés, certifications spécifiques"),
+            ("Compétences / Outils", "must_have_competences", "Techniques, logiciels, méthodes à maîtriser"),
+            ("Soft skills / aptitudes comportementales", "must_have_softskills", "Leadership, rigueur, communication, autonomie"),
+        ]
+    },
+    {
+        "title": "Nice-to-have (Atouts)",
+        "fields": [
+            ("Expérience additionnelle", "nice_to_have_experience", "Ex. projets internationaux, multi-sites"),
+            ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", "Diplômes ou certifications supplémentaires appréciés"),
+            ("Compétences complémentaires", "nice_to_have_competences", "Compétences supplémentaires non essentielles mais appréciées"),
+        ]
+    },
+    {
+        "title": "Conditions et contraintes",
+        "fields": [
+            ("Localisation", "rattachement", "Site principal, télétravail, déplacements"),
+            ("Budget recrutement", "budget", "Salaire indicatif, avantages, primes éventuelles"),
+        ]
+    },
+    {
+        "title": "Sourcing et marché",
+        "fields": [
+            ("Entreprises où trouver ce profil", "entreprises_profil", "Concurrents, secteurs similaires"),
+            ("Synonymes / intitulés proches", "synonymes_poste", "Titres alternatifs pour affiner le sourcing"),
+            ("Canaux à utiliser", "canaux_profil", "LinkedIn, jobboards, cabinet, cooptation, réseaux professionnels"),
+        ]
+    },
+    {
+        "title": "Profils pertinents",
+        "fields": [
+            # Ces champs ne sont pas dans l'image et n'iront pas dans Google Sheets,
+            # mais nous les gardons pour l'application locale.
+            ("Lien profil 1", "profil_link_1", "URL du profil LinkedIn ou autre"),
+            ("Lien profil 2", "profil_link_2", "URL du profil LinkedIn ou autre"),
+            ("Lien profil 3", "profil_link_3", "URL du profil LinkedIn ou autre"),
+        ]
+    },
+    {
+        "title": "Notes libres",
+        "fields": [
+            ("Points à discuter ou à clarifier avec le manager", "commentaires", "Points à discuter ou à clarifier"),
+            ("Case libre", "notes_libres", "Pour tout point additionnel ou remarque spécifique"),
+        ]
+    },
+]
 
     # Contrôles pour générer les conseils IA avec sélection de champ
     col1, col2 = st.columns([1, 1])  # Equal width columns
