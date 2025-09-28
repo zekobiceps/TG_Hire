@@ -3,19 +3,18 @@ import os
 import sys
 import gspread
 from google.oauth2 import service_account
-
-# Ajouter le répertoire racine au chemin de recherche (optionnel si utils.py est dans la racine)
-sys.path.append(os.path.dirname(__file__))
-from utils import *
-
 from datetime import datetime
 import pandas as pd
 
-# URL de la feuille Google Sheets pour les utilisateurs
-USERS_SHEET_URL = "https://docs.google.com/spreadsheets/d/1fodJWGccSaDmlSEDkJblZoQE-lcifxpnOg5RYf3ovTg/edit?gid=0#gid=0"
-USERS_WORKSHEET_NAME = "Logininfo"  # Nom de la feuille mis à jour
+# Optionnel: Ajouter le répertoire racine au chemin de recherche
+# sys.path.append(os.path.dirname(__file__))
+# from utils import *
 
-# Initialisation robuste de l'état de session
+# --- CONFIGURATION ---
+USERS_SHEET_URL = "https://docs.google.com/spreadsheets/d/1fodJWGccSaDmlSEDkJblZoQE-lcifxpnOg5RYf3ovTg/edit?gid=0#gid=0"
+USERS_WORKSHEET_NAME = "Logininfo"
+
+# --- INITIALISATION DE L'ÉTAT DE SESSION ---
 if 'features' not in st.session_state:
     st.session_state.features = {
         "À développer": [
@@ -38,11 +37,10 @@ if "current_user" not in st.session_state:
 if "users" not in st.session_state:
     st.session_state.users = {}
 
-# Fonction pour charger les utilisateurs depuis Google Sheets
+# --- FONCTIONS ---
 def load_users_from_gsheet():
-    """Charge les utilisateurs (email, password, name) depuis la feuille Google Sheets."""
+    """Charge les utilisateurs depuis Google Sheets en utilisant les secrets Streamlit."""
     try:
-        # Utiliser les secrets GCP (comme dans utils.py)
         service_account_info = {
             "type": st.secrets["GCP_TYPE"],
             "project_id": st.secrets["GCP_PROJECT_ID"],
@@ -60,7 +58,6 @@ def load_users_from_gsheet():
         spreadsheet = gc.open_by_url(USERS_SHEET_URL)
         worksheet = spreadsheet.worksheet(USERS_WORKSHEET_NAME)
         
-        # Charger les données (en supposant que la ligne 1 est les en-têtes : A1 = "email", B1 = "password", C1 = "name")
         records = worksheet.get_all_records()
         
         users = {}
@@ -79,16 +76,16 @@ def load_users_from_gsheet():
         st.error(f"❌ Erreur lors du chargement des utilisateurs depuis Google Sheets : {e}")
         return {}
 
-# Fonction de débogage
 def debug_session_state():
     """Affiche l'état actuel de la session pour débogage."""
     with st.expander("🔧 Mode Débogage (État de la Session)"):
         st.json(st.session_state)
 
-# Charger les utilisateurs au démarrage
-st.session_state.users = load_users_from_gsheet()
+# --- CHARGEMENT INITIAL ---
+if not st.session_state.users:
+    st.session_state.users = load_users_from_gsheet()
 
-# Appliquer le style CSS minimaliste
+# --- STYLES CSS ---
 st.markdown("""
     <style>
     /* Cacher les éléments par défaut de Streamlit */
@@ -96,15 +93,29 @@ st.markdown("""
     footer {visibility: hidden;}
     header {visibility: hidden;}
     
-    /* Style minimaliste */
+    /* Style pour les cartes de fonctionnalités (Kanban) */
     .feature-card {
-        background: #f8f9fa;
+        background: #ffffff;
         padding: 12px;
         border-radius: 8px;
-        margin: 8px 0;
-        border-left: 4px solid #6c757d;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        margin-bottom: 10px;
+        border-left: 5px solid #6c757d;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        transition: box-shadow 0.3s ease-in-out;
     }
+    .feature-card:hover {
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .feature-card p {
+        margin: 5px 0 0 0;
+        color: #495057;
+    }
+    .feature-card small {
+        color: #6c757d;
+    }
+    .priority-Haute { border-left-color: #dc3545; }
+    .priority-Moyenne { border-left-color: #ffc107; }
+    .priority-Basse { border-left-color: #28a745; }
     
     /* Style pour le message de bienvenue */
     .welcome-message {
@@ -125,29 +136,27 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Page de login
+
+# --- PAGE DE CONNEXION ---
 if not st.session_state.logged_in:
     st.set_page_config(
-        page_title="TG-Hire IA - Roadmap Fonctionnelle",
+        page_title="TG-Hire IA - Connexion",
         page_icon="📊",
-        layout="wide",
+        layout="centered",
         initial_sidebar_state="collapsed"
     )
     
-    # Centrer le contenu de login
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
-        # Afficher l'image au centre
-        st.image("tgcc.png", width=300, use_container_width=True)
+        st.image("tgcc.png", use_container_width=True)
         
-        # Formulaire de connexion
         with st.form("login_form"):
             st.subheader("Connexion")
             email = st.text_input("Adresse Email", key="login_email")
             password = st.text_input("Mot de Passe", type="password", key="login_password")
             
-            if st.form_submit_button("Se Connecter"):
+            if st.form_submit_button("Se Connecter", use_container_width=True):
                 if email in st.session_state.users and st.session_state.users[email]["password"] == password:
                     st.session_state.logged_in = True
                     st.session_state.current_user = st.session_state.users[email]["name"]
@@ -156,8 +165,8 @@ if not st.session_state.logged_in:
                 else:
                     st.error("Email ou mot de passe incorrect.")
 
+# --- PAGE PRINCIPALE (APRÈS CONNEXION) ---
 else:
-    # Page d'accueil après connexion
     st.set_page_config(
         page_title="TG-Hire IA - Roadmap Fonctionnelle",
         page_icon="📊",
@@ -165,13 +174,11 @@ else:
         initial_sidebar_state="expanded"
     )
     
-    # Sidebar avec logo en haut et message de bienvenue formaté
+    # --- BARRE LATÉRALE ---
     with st.sidebar:
-        # Logo en haut de la sidebar
-        st.image("tgcc.png", width=150, use_container_width=True)
+        st.image("tgcc.png", use_container_width=True)
         st.markdown("---")
         
-        # Message de bienvenue formaté sur deux lignes
         st.markdown(
             f'<div class="welcome-message">'
             f'<p class="welcome-text">Bienvenue</p>'
@@ -186,104 +193,80 @@ else:
             st.session_state.logged_in = False
             st.session_state.current_user = ""
             st.rerun()
-
-    # Contenu principal - sans logo ni message de bienvenue
-    st.title("📊 Roadmap Fonctionnelle")
-
-    # Vérification des onglets
-    tab1, tab2, tab3 = st.tabs(["À développer", "En cours", "Réalisé"])
-
-    # --- Onglet 1: À développer ---
-    with tab1:
-        st.subheader("Fonctionnalités à développer")
-        
-        # Formulaire pour ajouter une nouvelle fonctionnalité
-        with st.form(key="add_feature_form"):
-            col1, col2 = st.columns(2)
-            with col1:
-                new_title = st.text_input("Titre", key="new_title")
-                new_description = st.text_area("Description", key="new_description", height=80)
-            with col2:
-                new_priority = st.selectbox("Priorité", ["Haute", "Moyenne", "Basse"], key="new_priority")
             
-            if st.form_submit_button("➕ Ajouter"):
-                if new_title and new_description:
-                    max_id = max((f["id"] for status in st.session_state.features.values() for f in status), default=0)
-                    new_feature = {
-                        "id": max_id + 1,
-                        "title": new_title,
-                        "description": new_description,
-                        "priority": new_priority,
-                        "date_ajout": datetime.now().strftime("%Y-%m-%d")
-                    }
-                    st.session_state.features["À développer"].append(new_feature)
-                    st.success("✅ Fonctionnalité ajoutée !")
-                    st.rerun()
-                else:
-                    st.error("Veuillez remplir le titre et la description.")
+        if st.button("🔧 Activer le Débogage", use_container_width=True):
+            debug_session_state()
 
-        # Afficher les fonctionnalités
-        total_features = sum(len(features) for features in st.session_state.features.values())
-        if total_features > 0:
-            for feature in st.session_state.features["À développer"]:
-                with st.container():
-                    st.markdown(f"""
-                        <div class="feature-card">
-                            <strong>{feature['title']}</strong> ({feature['priority']})
-                            <p>{feature['description']}</p>
-                            <small>Ajouté le : {feature['date_ajout']}</small>
-                        </div>
-                    """, unsafe_allow_html=True)
-        else:
-            st.info("Aucune fonctionnalité à afficher.")
+    # --- CONTENU PRINCIPAL ---
+    st.title("📊 Roadmap Fonctionnelle")
+    st.markdown("---")
 
-    # --- Onglet 2: En cours ---
-    with tab2:
-        st.subheader("Fonctionnalités en cours")
+    # --- TABLEAU KANBAN ---
+    col1, col2, col3 = st.columns(3)
+
+    # Colonne 1: À développer
+    with col1:
+        st.header("📝 À développer")
+        for feature in st.session_state.features["À développer"]:
+            st.markdown(f"""
+                <div class="feature-card priority-{feature['priority']}">
+                    <strong>{feature['title']}</strong>
+                    <p>{feature['description']}</p>
+                    <small>Ajouté le : {feature['date_ajout']} | Priorité : {feature['priority']}</small>
+                </div>
+            """, unsafe_allow_html=True)
+
+    # Colonne 2: En cours
+    with col2:
+        st.header("⏳ En cours")
         if st.session_state.features["En cours"]:
             for feature in st.session_state.features["En cours"]:
-                with st.container():
-                    st.markdown(f"""
-                        <div class="feature-card">
-                            <strong>{feature['title']}</strong> ({feature['priority']})
-                            <p>{feature['description']}</p>
-                            <small>Ajouté le : {feature['date_ajout']}</small>
-                        </div>
-                    """, unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div class="feature-card priority-{feature['priority']}">
+                        <strong>{feature['title']}</strong>
+                        <p>{feature['description']}</p>
+                        <small>Ajouté le : {feature['date_ajout']} | Priorité : {feature['priority']}</small>
+                    </div>
+                """, unsafe_allow_html=True)
         else:
-            st.info("Aucune fonctionnalité en cours.")
+            st.info("Aucune tâche en cours.")
 
-    # --- Onglet 3: Réalisé ---
-    with tab3:
-        st.subheader("Fonctionnalités réalisées")
+    # Colonne 3: Réalisé
+    with col3:
+        st.header("✅ Réalisé")
         if st.session_state.features["Réalisé"]:
             for feature in st.session_state.features["Réalisé"]:
-                with st.container():
-                    st.markdown(f"""
-                        <div class="feature-card">
-                            <strong>{feature['title']}</strong> ({feature['priority']})
-                            <p>{feature['description']}</p>
-                            <small>Ajouté le : {feature['date_ajout']}</small>
-                        </div>
-                    """, unsafe_allow_html=True)
+                st.markdown(f"""
+                    <div class="feature-card priority-{feature['priority']}">
+                        <strong>{feature['title']}</strong>
+                        <p>{feature['description']}</p>
+                        <small>Ajouté le : {feature['date_ajout']} | Priorité : {feature['priority']}</small>
+                    </div>
+                """, unsafe_allow_html=True)
         else:
-            st.info("Aucune fonctionnalité réalisée.")
+            st.info("Aucune tâche réalisée.")
 
-    # Gestion des fonctionnalités (ajout, modification, suppression)
-    with st.expander("⚙️ Gestion des fonctionnalités", expanded=False):
-        tab4, tab5, tab6 = st.tabs(["Ajouter", "Modifier", "Supprimer"])
+    st.markdown("---")
+    
+    # --- GESTION DES FONCTIONNALITÉS ---
+    with st.expander("⚙️ Gérer les fonctionnalités (Ajouter, Modifier, Supprimer)", expanded=False):
+        
+        # Obtenir le nombre total de fonctionnalités pour les vérifications
+        total_features = sum(len(features) for features in st.session_state.features.values())
+        
+        form_tab1, form_tab2, form_tab3 = st.tabs(["➕ Ajouter", "✏️ Modifier", "🗑️ Supprimer"])
 
-        with tab4:
-            st.subheader("Ajouter une fonctionnalité")
-            with st.form(key="add_feature_form_expanded"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    new_title = st.text_input("Titre", key="new_title_expanded")
-                    new_description = st.text_area("Description", key="new_description_expanded", height=80)
-                with col2:
-                    new_priority = st.selectbox("Priorité", ["Haute", "Moyenne", "Basse"], key="new_priority_expanded")
+        # Onglet Ajouter
+        with form_tab1:
+            with st.form(key="add_feature_form"):
+                col_form1, col_form2 = st.columns(2)
+                with col_form1:
+                    new_title = st.text_input("Titre", key="new_title")
+                    new_description = st.text_area("Description", key="new_description", height=100)
+                with col_form2:
+                    new_priority = st.selectbox("Priorité", ["Haute", "Moyenne", "Basse"], key="new_priority")
                 
-                if st.form_submit_button("➕ Ajouter"):
+                if st.form_submit_button("Ajouter la fonctionnalité", use_container_width=True):
                     if new_title and new_description:
                         max_id = max((f["id"] for status in st.session_state.features.values() for f in status), default=0)
                         new_feature = {
@@ -299,47 +282,42 @@ else:
                     else:
                         st.error("Veuillez remplir le titre et la description.")
 
-        with tab5:
-            st.subheader("Modifier une fonctionnalité")
+        # Onglet Modifier
+        with form_tab2:
             if total_features > 0:
-                all_features = []
-                for status, features in st.session_state.features.items():
-                    for feature in features:
-                        all_features.append((feature["id"], f"{feature['title']} ({status})"))
+                all_features = [(f["id"], f"{f['title']} ({status})") for status, features in st.session_state.features.items() for f in features]
                 
                 selected_feature_id = st.selectbox(
-                    "Sélectionner une fonctionnalité",
+                    "Sélectionner une fonctionnalité à modifier",
                     options=[f[0] for f in all_features],
-                    format_func=lambda x: next((f[1] for f in all_features if f[0] == x), "")
+                    format_func=lambda x: next((f[1] for f in all_features if f[0] == x), ""),
+                    key="edit_select"
                 )
                 
                 if selected_feature_id:
-                    selected_feature = None
-                    old_status = None
-                    for status, features in st.session_state.features.items():
-                        for feature in features:
-                            if feature["id"] == selected_feature_id:
-                                selected_feature = feature
-                                old_status = status
-                                break
+                    # Trouver la fonctionnalité et son statut actuel
+                    selected_feature, old_status = next(
+                        ((f, s) for s, fs in st.session_state.features.items() for f in fs if f["id"] == selected_feature_id), 
+                        (None, None)
+                    )
                     
                     if selected_feature:
                         with st.form(key="edit_feature_form"):
-                            col1, col2 = st.columns(2)
-                            
-                            with col1:
+                            col_edit1, col_edit2 = st.columns(2)
+                            with col_edit1:
                                 edit_title = st.text_input("Titre", value=selected_feature["title"])
-                                edit_description = st.text_area("Description", value=selected_feature["description"], height=80)
-                            
-                            with col2:
+                                edit_description = st.text_area("Description", value=selected_feature["description"], height=100)
+                            with col_edit2:
                                 edit_status = st.selectbox("Statut", ["À développer", "En cours", "Réalisé"], 
-                                                         index=["À développer", "En cours", "Réalisé"].index(old_status))
+                                                           index=["À développer", "En cours", "Réalisé"].index(old_status))
                                 edit_priority = st.selectbox("Priorité", ["Haute", "Moyenne", "Basse"], 
-                                                           index=["Haute", "Moyenne", "Basse"].index(selected_feature["priority"]))
+                                                             index=["Haute", "Moyenne", "Basse"].index(selected_feature["priority"]))
                             
-                            if st.form_submit_button("💾 Enregistrer"):
+                            if st.form_submit_button("💾 Enregistrer les modifications", use_container_width=True):
+                                # Supprimer l'ancienne version
                                 st.session_state.features[old_status] = [f for f in st.session_state.features[old_status] if f["id"] != selected_feature_id]
                                 
+                                # Ajouter la version mise à jour
                                 updated_feature = {
                                     "id": selected_feature_id,
                                     "title": edit_title,
@@ -353,13 +331,10 @@ else:
             else:
                 st.info("Aucune fonctionnalité à modifier.")
         
-        with tab6:
-            st.subheader("Supprimer une fonctionnalité")
+        # Onglet Supprimer
+        with form_tab3:
             if total_features > 0:
-                all_features = []
-                for status, features in st.session_state.features.items():
-                    for feature in features:
-                        all_features.append((feature["id"], f"{feature['title']} ({status})"))
+                all_features = [(f["id"], f"{f['title']} ({status})") for status, features in st.session_state.features.items() for f in features]
                 
                 delete_feature_id = st.selectbox(
                     "Sélectionner une fonctionnalité à supprimer",
@@ -368,23 +343,16 @@ else:
                     key="delete_select"
                 )
                 
-                if delete_feature_id:
-                    if st.button("🗑️ Supprimer", type="secondary", use_container_width=True):
-                        for status, features in st.session_state.features.items():
-                            st.session_state.features[status] = [f for f in features if f["id"] != delete_feature_id]
-                        st.success("✅ Fonctionnalité supprimée !")
-                        st.rerun()
+                if delete_feature_id and st.button("🗑️ Confirmer la suppression", type="primary", use_container_width=True):
+                    for status in st.session_state.features:
+                        st.session_state.features[status] = [f for f in st.session_state.features[status] if f["id"] != delete_feature_id]
+                    st.success("✅ Fonctionnalité supprimée !")
+                    st.rerun()
             else:
                 st.info("Aucune fonctionnalité à supprimer.")
 
-    # Pied de page
-    st.markdown("---")
-    st.caption("TG-Hire IA - Roadmap Fonctionnelle v1.0")
+    st.caption("TG-Hire IA - Roadmap Fonctionnelle v1.1 (Kanban View)")
 
-    # Activer le débogage si nécessaire
-    if st.sidebar.button("🔧 Activer le Débogage"):
-        debug_session_state()
-
-# Protéger les pages dans pages/ (arrête l'exécution si non connecté)
+# Arrêter l'exécution si l'utilisateur n'est pas connecté pour protéger les autres pages
 if not st.session_state.logged_in:
     st.stop()
