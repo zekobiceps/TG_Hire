@@ -42,12 +42,18 @@ if "users" not in st.session_state:
 def load_users_from_gsheet():
     """Charge les utilisateurs (email, password, name) depuis la feuille Google Sheets."""
     try:
-        # Utiliser les secrets GCP (comme dans utils.py)
+        # Débogage : Afficher les clés disponibles dans st.secrets
+        st.write("Clés disponibles dans st.secrets :", list(st.secrets.keys()))
+        if not all(key in st.secrets for key in ["GCP_TYPE", "GCP_PROJECT_ID", "GCP_PRIVATE_KEY_ID", "GCP_PRIVATE_KEY", "GCP_CLIENT_EMAIL", "GCP_CLIENT_ID", "GCP_AUTH_URI", "GCP_TOKEN_URI", "GCP_AUTH_PROVIDER_CERT_URL", "GCP_CLIENT_CERT_URL"]):
+            st.error("❌ Certaines clés de secret GCP sont manquantes. Vérifiez votre configuration dans Streamlit Cloud.")
+            return {}
+
+        # Construire le dictionnaire d'authentification à partir des secrets
         service_account_info = {
             "type": st.secrets["GCP_TYPE"],
             "project_id": st.secrets["GCP_PROJECT_ID"],
             "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
-            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n').strip(), 
+            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n').strip(),
             "client_email": st.secrets["GCP_CLIENT_EMAIL"],
             "client_id": st.secrets["GCP_CLIENT_ID"],
             "auth_uri": st.secrets["GCP_AUTH_URI"],
@@ -60,7 +66,7 @@ def load_users_from_gsheet():
         spreadsheet = gc.open_by_url(USERS_SHEET_URL)
         worksheet = spreadsheet.worksheet(USERS_WORKSHEET_NAME)
         
-        # Charger les données (en supposant que la ligne 1 est les en-têtes : A1 = "email", B1 = "password", C1 = "name")
+        # Charger les données
         records = worksheet.get_all_records()
         
         users = {}
@@ -72,9 +78,6 @@ def load_users_from_gsheet():
                 users[email] = {"password": password, "name": name}
         
         return users
-    except KeyError as e:
-        st.error(f"❌ Clé de secret manquante : {e}. Vérifiez les secrets GCP dans Streamlit Cloud.")
-        return {}
     except Exception as e:
         st.error(f"❌ Erreur lors du chargement des utilisateurs depuis Google Sheets : {e}")
         return {}
