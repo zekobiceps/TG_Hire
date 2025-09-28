@@ -716,7 +716,7 @@ with tabs[1]:
         # Boutons Enregistrer et Annuler dans le formulaire
         col_save, col_cancel = st.columns([1, 1])
         with col_save:
-            if st.button("💾 TEST DE SAUVEGARDE", type="primary", use_container_width=True, key="save_reunion"):
+            if st.form_submit_button("💾 TEST DE SAUVEGARDE", type="primary", use_container_width=True, key="save_reunion"):
                 if st.session_state.current_brief_name:
                     current_brief_name = st.session_state.current_brief_name
                     
@@ -770,7 +770,7 @@ with tabs[1]:
                     st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
         
         with col_cancel:
-            if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion"):
+            if st.form_submit_button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion"):
                 delete_current_brief()
 
 # ---------------- REUNION BRIEF ----------------           
@@ -980,16 +980,16 @@ with tabs[2]:
 
                 st.markdown("---")
                 
-                # Le bouton de sauvegarde est le seul bouton à l'intérieur du formulaire
+                # Le bouton de sauvegarde est maintenant un bouton de soumission de formulaire
                 submitted = st.form_submit_button(
-                    "💾 Enregistrer la réunion",
+                    "💾 Enregistrer la réunion", # ✅ CORRECTION
                     type="primary", 
                     use_container_width=True
                 )
 
                 if submitted:
+                    # Votre logique de sauvegarde s'exécute ici lorsque le formulaire est soumis
                     if st.session_state.current_brief_name:
-                        # Votre logique de sauvegarde s'exécute ici
                         current_brief_name = st.session_state.current_brief_name
                         brief_data_to_save = st.session_state.saved_briefs.get(current_brief_name, {}).copy()
                         
@@ -1021,6 +1021,9 @@ with tabs[2]:
                     else:
                         st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
 
+            # Le bouton Annuler reste un bouton normal, à l'extérieur du formulaire
+            if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion_final"):
+                delete_current_brief()
 
     # ---- Navigation wizard ----
     col1, col2, col3 = st.columns([1, 6, 1])
@@ -1080,7 +1083,7 @@ with tabs[3]:
                 if st.session_state.current_brief_name:
                     save_briefs()
                     
-                    # --- NOUVEAU: Sauvegarde Google Sheets ---
+                    # --- NOUVEL: Sauvegarde Google Sheets ---
                     brief_data_to_save = load_briefs().get(st.session_state.current_brief_name, {})
                     save_brief_to_gsheet(st.session_state.current_brief_name, brief_data_to_save)
                     
