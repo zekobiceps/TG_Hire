@@ -870,43 +870,67 @@ with tabs[2]:
     st.progress(int((step / total_steps) * 100), text=f"**Étape {step} sur {total_steps}**")
 
     if step == 1:
-        with st.expander("📋 Portrait robot candidat - Validation", expanded=True):
-            data = []
-            field_keys = []
-            comment_keys = []
-            k = 1
-            brief_data = load_briefs().get(st.session_state.current_brief_name, {})
+        st.subheader("Étape 1 : Validation du brief et commentaires du manager")
+        with st.expander("📝 Portrait robot du candidat - Validation", expanded=True):
+            
+            # Charger les données du brief actuel pour obtenir les informations
+            brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
+            # Charger les commentaires existants (s'ils existent)
+            manager_comments = brief_data.get("manager_comments", {})
+
+            # --- Création du tableau de données ---
+            table_data = []
+            # On utilise la liste 'sections' de l'onglet Avant-brief pour construire le tableau
             for section in sections:
-                for i, (field_name, field_key, placeholder) in enumerate(section["fields"]):
-                    value = brief_data.get(field_key, "")
-                    section_title = section["title"] if i == 0 else ""
-                    data.append([section_title, field_name, value, ""])
-                    field_keys.append(field_key)
-                    comment_keys.append(f"manager_comment_{k}")
-                    k += 1
-            df = pd.DataFrame(data, columns=["Section", "Détails", "Informations", "Commentaires du manager"])
+                # On ignore la section "Profils pertinents" qui contient des liens
+                if section["title"] == "Profils pertinents":
+                    continue
+                
+                for title, key, _ in section["fields"]:
+                    # On ajoute une ligne pour chaque champ
+                    table_data.append({
+                        "Section": section["title"],
+                        "Détails": title,
+                        "Informations": brief_data.get(key, ""),
+                        # On récupère le commentaire existant pour ce champ
+                        "Commentaires du manager": manager_comments.get(key, ""),
+                        "_key": key # Clé interne pour retrouver le champ lors de la sauvegarde
+                    })
+            
+            if not table_data:
+                st.warning("Veuillez d'abord remplir l'onglet 'Avant-brief'.")
+            else:
+                df = pd.DataFrame(table_data)
 
-            edited_df = st.data_editor(
-                df,
-                column_config={
-                    "Section": st.column_config.TextColumn("Section", disabled=True, width="small"),
-                    "Détails": st.column_config.TextColumn("Détails", disabled=True, width="medium"),
-                    "Informations": st.column_config.TextColumn("Informations", width="medium", disabled=True),
-                    "Commentaires du manager": st.column_config.TextColumn("Commentaires du manager", width="medium")
-                },
-                use_container_width=True,
-                hide_index=True,
-                num_rows="fixed"
-            )
+                # --- Affichage du tableau éditable ---
+                edited_df = st.data_editor(
+                    df,
+                    column_config={
+                        "Section": st.column_config.TextColumn("Section", disabled=True, width="small"),
+                        "Détails": st.column_config.TextColumn("Détails", disabled=True, width="medium"),
+                        "Informations": st.column_config.TextColumn("Informations", disabled=True, width="large"),
+                        "Commentaires du manager": st.column_config.TextColumn("Commentaires du manager", help="Le manager peut ajouter ses commentaires ici.", width="large"),
+                        "_key": None, # On cache la colonne de la clé interne
+                    },
+                    use_container_width=True,
+                    hide_index=True,
+                    key="manager_comments_editor"
+                )
 
-            if st.button("💾 Sauvegarder commentaires", type="primary", key="save_comments_step1"):
-                for i in range(len(edited_df)):
-                    if edited_df["Détails"].iloc[i] != "":
-                        comment_key = comment_keys[i]
-                        st.session_state[comment_key] = edited_df["Commentaires du manager"].iloc[i]
-                st.session_state.save_message = "✅ Commentaires sauvegardés"
-                st.session_state.save_message_tab = "Réunion"
-                st.rerun()
+                # --- Logique de sauvegarde des commentaires ---
+                if st.button("💾 Enregistrer les commentaires", type="primary"):
+                    # Créer un dictionnaire pour stocker les commentaires {clé: commentaire}
+                    comments_to_save = {}
+                    for index, row in edited_df.iterrows():
+                        # On enregistre uniquement les commentaires non vides
+                        if row["Commentaires du manager"]:
+                            comments_to_save[row["_key"]] = row["Commentaires du manager"]
+                    
+                    # On sauvegarde ce dictionnaire dans l'état de la session
+                    st.session_state.saved_briefs[st.session_state.current_brief_name]["manager_comments"] = comments_to_save
+                    
+                    st.success("✅ Commentaires sauvegardés avec succès !")
+                    st.rerun()
 
     elif step == 2:
         with st.expander("📊 Matrice KSA - Validation manager", expanded=True):
@@ -1032,45 +1056,47 @@ with tabs[2]:
         with col_save:
             if st.button("💾 Enregistrer la réunion", type="primary", use_container_width=True, key="save_reunion"):
                 if st.session_state.current_brief_name:
-                    manager_comments = {}
-                    for i in range(1, 21):
-                        comment_key = f"manager_comment_{i}"
-                        if comment_key in st.session_state:
-                            manager_comments[comment_key] = st.session_state[comment_key]
                     existing_briefs = load_briefs()
-                    current_brief_name = st.session_state.current_brief_name # Récupérer le nom
-                    
-                    # 1. Mise à jour du brief local (code existant)
+                    current_brief_name = st.session_state.current_brief_name
+
                     if current_brief_name in existing_briefs:
+                        # --- NOUVELLE LOGIQUE DE SAUVEGARDE ---
+
+                        # 1. Récupérer le dictionnaire de commentaires sauvegardé à l'étape 1
+                        manager_comments = existing_briefs[current_brief_name].get("manager_comments", {})
+                        
+                        # 2. Convertir ce dictionnaire en chaîne JSON pour Google Sheets
+                        manager_comments_json = json.dumps(manager_comments, indent=4, ensure_ascii=False)
+
+                        # 3. Mettre à jour le brief avec toutes les données des étapes de la réunion
                         existing_briefs[current_brief_name].update({
                             "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()),
                             "manager_notes": st.session_state.get("manager_notes", ""),
-                            "manager_comments": manager_comments,
+                            "manager_comments": manager_comments, # On garde le format dict pour l'app
                             "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
                             "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
                             "processus_evaluation": st.session_state.get("processus_evaluation", "")
                         })
+                        
+                        # 4. Sauvegarde locale
                         st.session_state.saved_briefs = existing_briefs
+                        save_briefs()
+                        
+                        # 5. Préparation des données pour l'envoi à Google Sheets
+                        brief_data_to_save = existing_briefs[current_brief_name].copy()
+                        # On ajoute la version JSON pour la colonne GSheet dédiée
+                        brief_data_to_save['MANAGER_COMMENTS_JSON'] = manager_comments_json
+                        
+                        # Envoi à Google Sheets
+                        save_brief_to_gsheet(current_brief_name, brief_data_to_save)
+                        
+                        # Finalisation et rechargement de la page
+                        st.session_state.reunion_completed = True
+                        st.session_state.save_message = "✅ Données de réunion sauvegardées avec succès !"
+                        st.session_state.save_message_tab = "Réunion"
+                        st.rerun()
                     else:
-                        st.session_state.saved_briefs[current_brief_name].update({
-                            "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()),
-                            "manager_notes": st.session_state.get("manager_notes", ""),
-                            "manager_comments": manager_comments,
-                            "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
-                            "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
-                            "processus_evaluation": st.session_state.get("processus_evaluation", "")
-                        })
-
-                    save_briefs() # Sauvegarde locale
-                    
-                    # --- NOUVEAU: Sauvegarde Google Sheets ---
-                    brief_data_to_save = st.session_state.saved_briefs[current_brief_name]
-                    save_brief_to_gsheet(current_brief_name, brief_data_to_save)
-                    
-                    st.session_state.reunion_completed = True
-                    st.session_state.save_message = "✅ Données de réunion sauvegardées"
-                    st.session_state.save_message_tab = "Réunion"
-                    st.rerun()
+                        st.error(f"Erreur : Le brief '{current_brief_name}' n'a pas été trouvé.")
                 else:
                     st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
         
