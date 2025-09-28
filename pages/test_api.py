@@ -655,9 +655,9 @@ with tabs[1]:
         {
             "title": "Contexte du poste",
             "fields": [
-                ("Raison de l'ouverture", "raison_ouverture", "Remplacement / Création / Évolution interne"),
-                ("Mission globale", "impact_strategique", "Résumé du rôle et objectif principal"),
-                ("Tâches principales", "taches_principales", "Ex. gestion de projet complexe, coordination multi-sites, respect délais et budget"),
+                ("Raison de l'ouverture", "raison_ouverture", "Remplacement, création de poste, nouveau projet..."),
+                ("Impact stratégique", "impact_strategique", "En quoi ce poste est-il clé pour les objectifs de l'entreprise ?"),
+                ("Tâches principales", "taches_principales", "Lister les missions et responsabilités clés du poste."),
             ]
         },
         {
@@ -766,59 +766,52 @@ with tabs[1]:
         with col_save:
             if st.form_submit_button("💾 Enregistrer modifications", type="primary", use_container_width=True):
                 if st.session_state.current_brief_name:
-                    
                     current_brief_name = st.session_state.current_brief_name
                     brief_to_update = st.session_state.saved_briefs[current_brief_name]
                     
-                    # 1. Collecte et mise à jour locale (clés en minuscules)
-                    sections_fields = [item for sublist in [s["fields"] for s in sections] for item in sublist]
-                    update_data = {key: st.session_state[key] for _, key, _ in sections_fields}
+                    # --- 1. MISE À JOUR DES DONNÉES LOCALES ---
+                    # Itérer sur la structure 'sections' pour récupérer toutes les clés de l'onglet et mettre à jour le dictionnaire local
+                    all_field_keys = [field[1] for section in sections for field in section['fields']]
+                    for key in all_field_keys:
+                        brief_to_update[key] = st.session_state.get(key)
                     
-                    brief_to_update.update(update_data)
+                    # Mettre à jour la matrice KSA également
                     brief_to_update["ksa_matrix"] = st.session_state.get("ksa_matrix", pd.DataFrame()) 
                     
-                    # 2. Préparation pour Google Sheets (création d'un dictionnaire COMPLET à partir de st.session_state)
-                    brief_data_for_gsheet = {}
-
-                    # Inclure TOUS les champs nécessaires des deux onglets, en utilisant la valeur de session actuelle
-                    # La clé de la session (minuscule) est utilisée pour récupérer la valeur,
-                    # et la clé de GSheet (MAJUSCULE) est utilisée pour le dictionnaire d'envoi.
-                    
-                    # Champs de GESTION/BASE
-                    brief_data_for_gsheet["BRIEF_NAME"] = current_brief_name
-                    brief_data_for_gsheet["POSTE_INTITULE"] = st.session_state.poste_intitule
-                    brief_data_for_gsheet["MANAGER_NOM"] = st.session_state.manager_nom
-                    brief_data_for_gsheet["RECRUTEUR"] = st.session_state.recruteur
-                    brief_data_for_gsheet["AFFECTATION_TYPE"] = st.session_state.affectation_type
-                    brief_data_for_gsheet["AFFECTATION_NOM"] = st.session_state.affectation_nom
-                    brief_data_for_gsheet["DATE_BRIEF"] = st.session_state.date_brief
-
-                    # Champs AVANT-BRIEF (avec mapping MUST_HAVE_EXP, etc.)
-                    for _, session_key, _ in sections_fields:
-                        gsheet_key = session_key.upper()
-                        
-                        # Gestion des noms de colonnes GSheet abrégés
-                        if session_key == "must_have_experience": gsheet_key = "MUST_HAVE_EXP"
-                        elif session_key == "must_have_diplomes": gsheet_key = "MUST_HAVE_DIP"
-                        elif session_key == "nice_to_have_experience": gsheet_key = "NICE_TO_HAVE_EXP"
-                        elif session_key == "nice_to_have_diplomes": gsheet_key = "NICE_TO_HAVE_DIP"
-                        
-                        brief_data_for_gsheet[gsheet_key] = st.session_state.get(session_key, "")
-
-                    # Champs de RÉUNION (initialisés à partir de session pour l'envoi GSheet)
-                    brief_data_for_gsheet["CRITERES_EXCLUSION"] = st.session_state.get("criteres_exclusion", "")
-                    brief_data_for_gsheet["PROCESSUS_EVALUATION"] = st.session_state.get("processus_evaluation", "")
-                    brief_data_for_gsheet["MANAGER_NOTES"] = st.session_state.get("manager_notes", "")
-                    brief_data_for_gsheet["ksa_matrix"] = brief_to_update.get("ksa_matrix", pd.DataFrame())
-                    
-                    # 3. Sauvegarde JSON locale
+                    # Sauvegarde JSON locale (qui utilise les clés de session comme 'raison_ouverture')
                     save_briefs() 
                     
-                    # 4. Sauvegarde Google Sheets
+                    # --- 2. PRÉPARATION ET SAUVEGARDE VERS GOOGLE SHEETS ---
+                    # Créer une copie du brief mis à jour pour construire le payload GSheets
+                    brief_data_for_gsheet = brief_to_update.copy()
+                    
+                    # Mapping explicite des clés de session (minuscules) vers les clés GSheet (majuscules)
+                    mapping = {
+                        "poste_intitule": "POSTE_INTITULE", "manager_nom": "MANAGER_NOM", "recruteur": "RECRUTEUR",
+                        "affectation_type": "AFFECTATION_TYPE", "affectation_nom": "AFFECTATION_NOM", "date_brief": "DATE_BRIEF",
+                        "raison_ouverture": "RAISON_OUVERTURE", "impact_strategique": "IMPACT_STRATEGIQUE",
+                        "rattachement": "RATTACHEMENT", "taches_principales": "TACHES_PRINCIPALES",
+                        "must_have_experience": "MUST_HAVE_EXP", "must_have_diplomes": "MUST_HAVE_DIP",
+                        "must_have_competences": "MUST_HAVE_COMPETENCES", "must_have_softskills": "MUST_HAVE_SOFTSKILLS",
+                        "nice_to_have_experience": "NICE_TO_HAVE_EXP", "nice_to_have_diplomes": "NICE_TO_HAVE_DIP",
+                        "nice_to_have_competences": "NICE_TO_HAVE_COMPETENCES",
+                        "entreprises_profil": "ENTREPRISES_PROFIL", "synonymes_poste": "SYNONYMES_POSTE",
+                        "canaux_profil": "CANAUX_PROFIL", "budget": "BUDGET", "commentaires": "COMMENTAIRES",
+                        "notes_libres": "NOTES_LIBRES", "criteres_exclusion": "CRITERES_EXCLUSION",
+                        "processus_evaluation": "PROCESSUS_EVALUATION", "manager_notes": "MANAGER_NOTES"
+                    }
+                    
+                    # Appliquer le mapping : on ajoute les clés en MAJUSCULES au payload
+                    for session_key, gsheet_key in mapping.items():
+                        if session_key in brief_data_for_gsheet:
+                            brief_data_for_gsheet[gsheet_key] = brief_data_for_gsheet[session_key]
+                    
+                    # Sauvegarde vers Google Sheets avec le dictionnaire correctement mappé
                     save_brief_to_gsheet(current_brief_name, brief_data_for_gsheet)
                     
+                    # --- 3. FINALISATION ---
                     st.session_state.avant_brief_completed = True
-                    st.session_state.save_message = "✅ Modifications sauvegardées"
+                    st.session_state.save_message = "✅ Modifications sauvegardées avec succès."
                     st.session_state.save_message_tab = "Avant-brief"
                     st.rerun()
                 else:
