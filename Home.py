@@ -210,8 +210,93 @@ else:
 
     # --- GESTION DES FONCTIONNALITÉS ---
     with st.expander("⚙️ Gérer les fonctionnalités", expanded=False):
-        # ... (le code de gestion reste identique)
         form_tab1, form_tab2, form_tab3 = st.tabs(["➕ Ajouter", "✏️ Modifier", "🗑️ Supprimer"])
-        # (votre code pour ajouter, modifier, supprimer reste ici)
+
+        with form_tab1:
+            st.subheader("Ajouter une fonctionnalité")
+            with st.form(key="add_feature_form"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    new_title = st.text_input("Titre")
+                    new_description = st.text_area("Description", height=80)
+                with col2:
+                    new_priority = st.selectbox("Priorité", ["Haute", "Moyenne", "Basse"])
+                    new_status = st.selectbox("Statut", ["À développer", "En cours", "Réalisé"])
+                
+                if st.form_submit_button("➕ Ajouter"):
+                    if new_title and new_description:
+                        max_id = max((f["id"] for status in st.session_state.features.values() for f in status), default=0) + 1
+                        new_feature = {
+                            "id": max_id,
+                            "title": new_title,
+                            "description": new_description,
+                            "priority": new_priority,
+                            "date_ajout": datetime.now().strftime("%Y-%m-%d"),
+                            "status": new_status  # Ajouté pour correspondre à la structure
+                        }
+                        st.session_state.features[new_status].append(new_feature)
+                        save_features_to_gsheet()
+                        st.success("✅ Fonctionnalité ajoutée !")
+                        st.rerun()
+                    else:
+                        st.error("Veuillez remplir le titre et la description.")
+
+        with form_tab2:
+            st.subheader("Modifier une fonctionnalité")
+            total_features = sum(len(features) for features in st.session_state.features.values())
+            if total_features > 0:
+                all_features = [(f["id"], f"{f['title']} ({f['status']})") for status in st.session_state.features for f in st.session_state.features[status]]
+                selected_feature_id = st.selectbox("Sélectionner une fonctionnalité", options=[f[0] for f in all_features], format_func=lambda x: next((f[1] for f in all_features if f[0] == x), ""))
+                
+                if selected_feature_id:
+                    selected_feature = next((f for status in st.session_state.features for f in st.session_state.features[status] if f["id"] == selected_feature_id), None)
+                    old_status = selected_feature["status"] if selected_feature else "À développer"
+                    
+                    if selected_feature:
+                        with st.form(key="edit_feature_form"):
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                edit_title = st.text_input("Titre", value=selected_feature["title"])
+                                edit_description = st.text_area("Description", value=selected_feature["description"], height=80)
+                            with col2:
+                                edit_priority = st.selectbox("Priorité", ["Haute", "Moyenne", "Basse"], index=["Haute", "Moyenne", "Basse"].index(selected_feature["priority"]))
+                                edit_status = st.selectbox("Statut", ["À développer", "En cours", "Réalisé"], index=["À développer", "En cours", "Réalisé"].index(old_status))
+                            
+                            if st.form_submit_button("💾 Enregistrer"):
+                                if edit_title and edit_description:
+                                    st.session_state.features[old_status] = [f for f in st.session_state.features[old_status] if f["id"] != selected_feature_id]
+                                    updated_feature = {
+                                        "id": selected_feature_id,
+                                        "title": edit_title,
+                                        "description": edit_description,
+                                        "priority": edit_priority,
+                                        "date_ajout": selected_feature["date_ajout"],
+                                        "status": edit_status
+                                    }
+                                    st.session_state.features[edit_status].append(updated_feature)
+                                    save_features_to_gsheet()
+                                    st.success("✅ Fonctionnalité modifiée !")
+                                    st.rerun()
+                                else:
+                                    st.error("Veuillez remplir le titre et la description.")
+            else:
+                st.info("Aucune fonctionnalité à modifier.")
+
+        with form_tab3:
+            st.subheader("Supprimer une fonctionnalité")
+            total_features = sum(len(features) for features in st.session_state.features.values())
+            if total_features > 0:
+                all_features = [(f["id"], f"{f['title']} ({f['status']})") for status in st.session_state.features for f in st.session_state.features[status]]
+                delete_feature_id = st.selectbox("Sélectionner une fonctionnalité à supprimer", options=[f[0] for f in all_features], format_func=lambda x: next((f[1] for f in all_features if f[0] == x), ""))
+                
+                if delete_feature_id:
+                    if st.button("🗑️ Supprimer", type="primary", use_container_width=True):
+                        for status in st.session_state.features:
+                            st.session_state.features[status] = [f for f in st.session_state.features[status] if f["id"] != delete_feature_id]
+                        save_features_to_gsheet()
+                        st.success("✅ Fonctionnalité supprimée !")
+                        st.rerun()
+            else:
+                st.info("Aucune fonctionnalité à supprimer.")
 
     st.caption("TG-Hire IA - Roadmap Fonctionnelle v2.2")
