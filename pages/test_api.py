@@ -973,23 +973,23 @@ with tabs[2]:
     elif step == 4:
             st.subheader("Étape 4 : Finalisation")
             
-            # Create a form for the final submission
+            # On crée un formulaire pour la soumission finale
             with st.form(key="reunion_final_form"):
                 with st.expander("📝 Notes générales du manager", expanded=True):
                     st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=250)
 
                 st.markdown("---")
                 
-                # The save button MUST be a form_submit_button inside the form
+                # Le bouton de sauvegarde est le seul bouton à l'intérieur du formulaire
                 submitted = st.form_submit_button(
-                    "💾 Enregistrer la réunion", 
+                    "💾 Enregistrer la réunion",
                     type="primary", 
                     use_container_width=True
                 )
 
                 if submitted:
                     if st.session_state.current_brief_name:
-                        # Your saving logic runs here
+                        # Votre logique de sauvegarde s'exécute ici
                         current_brief_name = st.session_state.current_brief_name
                         brief_data_to_save = st.session_state.saved_briefs.get(current_brief_name, {}).copy()
                         
@@ -1021,9 +1021,6 @@ with tabs[2]:
                     else:
                         st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
 
-            # The "Cancel" button remains a normal button OUTSIDE the form
-            if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion_final"):
-                delete_current_brief()
 
     # ---- Navigation wizard ----
     col1, col2, col3 = st.columns([1, 6, 1])
