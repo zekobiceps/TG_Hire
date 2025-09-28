@@ -770,51 +770,57 @@ with tabs[1]:
                     current_brief_name = st.session_state.current_brief_name
                     brief_to_update = st.session_state.saved_briefs[current_brief_name]
                     
-                    # 1. Collecte des données des champs (clés en minuscules: raison_ouverture, must_have_experience, etc.)
-                    update_data = {key: st.session_state[key] for _, key, _ in [item for sublist in [s["fields"] for s in sections] for item in sublist]}
+                    # 1. Collecte des données des champs (clés en minuscules)
+                    sections_fields = [item for sublist in [s["fields"] for s in sections] for item in sublist]
+                    update_data = {key: st.session_state[key] for _, key, _ in sections_fields}
                     
-                    # 2. Mise à jour du brief local avec les nouvelles valeurs
+                    # 2. Mise à jour du brief local (qui est en minuscules)
                     brief_to_update.update(update_data)
                     brief_to_update["ksa_matrix"] = st.session_state.get("ksa_matrix", pd.DataFrame()) 
                     
-                    # 3. Préparation pour Google Sheets (création d'un dictionnaire pour le mapping)
-                    brief_data_for_gsheet = {}
+                    # 3. Préparation pour Google Sheets (copie du brief local)
+                    # Initialisation avec les données de la session Streamlit
+                    brief_data_for_gsheet = brief_to_update.copy()
                     
-                    # Map: Données internes (minuscules) et GSheet Headers (majuscules)
-                    # NOTE: Nous incluons TOUS les champs nécessaires à GSheet ici,
-                    # y compris ceux de l'onglet GESTION (poste_intitule, manager_nom, etc.)
+                    # MAPPING EXPLICITE : On s'assure que les clés GSheet existent en MAJUSCULES
                     
-                    # Utiliser les données des deux onglets
-                    all_session_keys = set(brief_to_update.keys()) | set(st.session_state.keys())
+                    # Mapping 1: Champs avec un nom différent dans GSheet (ex: must_have_experience -> MUST_HAVE_EXP)
+                    explicit_map = {
+                        "must_have_experience": "MUST_HAVE_EXP",
+                        "must_have_diplomes": "MUST_HAVE_DIP",
+                        "nice_to_have_experience": "NICE_TO_HAVE_EXP",
+                        "nice_to_have_diplomes": "NICE_TO_HAVE_DIP",
+                        # Ces deux sont corrects, mais inclus pour la robustesse du code :
+                        "must_have_competences": "MUST_HAVE_COMPETENCES", 
+                        "must_have_softskills": "MUST_HAVE_SOFTSKILLS",
+                        "nice_to_have_competences": "NICE_TO_HAVE_COMPETENCES",
+                    }
                     
-                    for key in all_session_keys:
-                        value = brief_to_update.get(key) if key in brief_to_update else st.session_state.get(key)
-                        
-                        # On ne mappe que les clés de champs de données valides (str, pd.DataFrame, list)
-                        if isinstance(value, (str, list, pd.DataFrame)) or key in ("date_brief", "recruteur"):
-                            # Utiliser la clé GSheet en MAJUSCULES
-                            gsheet_key = key.upper()
+                    for session_key, gsheet_key in explicit_map.items():
+                        if session_key in brief_data_for_gsheet:
+                            brief_data_for_gsheet[gsheet_key] = brief_data_for_gsheet[session_key]
                             
-                            # Cas spéciaux où la clé GSheet est différente (ex: must_have_experience -> MUST_HAVE_EXP)
-                            if key == "must_have_experience": gsheet_key = "MUST_HAVE_EXP"
-                            elif key == "must_have_diplomes": gsheet_key = "MUST_HAVE_DIP"
-                            # Ajoutez tous les autres cas si les noms GSheet ne sont pas le simple UPPER_UNDERSCORE
-                            
-                            # Si la clé GSheet est déjà dans le dictionnaire des headers, on la mappe
-                            brief_data_for_gsheet[gsheet_key] = value
-
-                    # Assurer les clés obligatoires de GSheet
-                    brief_data_for_gsheet["BRIEF_NAME"] = current_brief_name
+                    # Mapping 2: Champs avec une correspondance directe en UPPER (ex: raison_ouverture -> RAISON_OUVERTURE)
+                    direct_map_keys = [
+                        "raison_ouverture", "impact_strategique", "rattachement", 
+                        "taches_principales", "entreprises_profil", "synonymes_poste", 
+                        "canaux_profil", "criteres_exclusion", "processus_evaluation", 
+                        "manager_notes"
+                    ]
                     
-                    # Ajout des données de l'onglet Gestion (si elles ne sont pas déjà incluses)
+                    for session_key in direct_map_keys:
+                        if session_key in brief_data_for_gsheet:
+                            # Ajoute la clé en MAJUSCULES
+                            brief_data_for_gsheet[session_key.upper()] = brief_data_for_gsheet[session_key]
+                            
+                    # MAPPING DES CLÉS DE L'ONGLET GESTION (nécessaire pour l'update de ligne complète)
                     brief_data_for_gsheet["POSTE_INTITULE"] = st.session_state.poste_intitule
                     brief_data_for_gsheet["MANAGER_NOM"] = st.session_state.manager_nom
                     brief_data_for_gsheet["RECRUTEUR"] = st.session_state.recruteur
                     brief_data_for_gsheet["AFFECTATION_TYPE"] = st.session_state.affectation_type
                     brief_data_for_gsheet["AFFECTATION_NOM"] = st.session_state.affectation_nom
                     brief_data_for_gsheet["DATE_BRIEF"] = st.session_state.date_brief
-                    
-                    # Assurer la KSA (qui est un DataFrame)
+                    brief_data_for_gsheet["BRIEF_NAME"] = current_brief_name
                     brief_data_for_gsheet["ksa_matrix"] = brief_to_update.get("ksa_matrix", pd.DataFrame())
 
 
@@ -822,7 +828,6 @@ with tabs[1]:
                     save_briefs() 
                     
                     # 5. Sauvegarde Google Sheets
-                    # Nous envoyons brief_data_for_gsheet qui contient toutes les clés GSheet nécessaires.
                     save_brief_to_gsheet(current_brief_name, brief_data_for_gsheet)
                     
                     st.session_state.avant_brief_completed = True
