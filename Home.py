@@ -2,7 +2,8 @@ import streamlit as st
 import os
 import sys
 import gspread
-from google.oauth2 import service_account
+from google.oauth2.service_account import Credentials
+from google.auth.transport.requests import Request
 
 # Ajouter le répertoire racine au chemin de recherche (optionnel si utils.py est dans la racine)
 sys.path.append(os.path.dirname(__file__))
@@ -42,21 +43,25 @@ if "users" not in st.session_state:
 def load_users_from_gsheet():
     """Charge les utilisateurs (email, password, name) depuis la feuille Google Sheets."""
     try:
-        # Utiliser les secrets GCP
-        service_account_info = {
-            "type": st.secrets["GCP_TYPE"],
-            "project_id": st.secrets["GCP_PROJECT_ID"],
-            "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
-            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n').strip(), 
-            "client_email": st.secrets["GCP_CLIENT_EMAIL"],
-            "client_id": st.secrets["GCP_CLIENT_ID"],
-            "auth_uri": st.secrets["GCP_AUTH_URI"],
-            "token_uri": st.secrets["GCP_TOKEN_URI"],
-            "auth_provider_x509_cert_url": st.secrets["GCP_AUTH_PROVIDER_CERT_URL"],
-            "client_x509_cert_url": st.secrets["GCP_CLIENT_CERT_URL"]
-        }
-        
-        gc = gspread.service_account_from_dict(service_account_info)
+        # Charger les credentials depuis secrets.toml ou un fichier local
+        if "GCP_CREDENTIALS" in st.secrets:
+            # Si les credentials sont stockés sous une clé unique dans secrets.toml
+            credentials_info = st.secrets["GCP_CREDENTIALS"]
+            credentials = Credentials.from_service_account_info(credentials_info)
+        else:
+            # Si vous utilisez un fichier JSON local (pour tests locaux)
+            credentials_file = "credentials.json"
+            if os.path.exists(credentials_file):
+                credentials = Credentials.from_service_account_file(credentials_file)
+            else:
+                st.error("❌ Fichier credentials.json manquant ou secrets GCP non configurés. Vérifiez votre setup.")
+                return {}
+
+        # Rafraîchir les credentials si nécessaire
+        if credentials.expired and credentials.refresh_token:
+            credentials.refresh(Request())
+
+        gc = gspread.authorize(credentials)
         spreadsheet = gc.open_by_url(USERS_SHEET_URL)
         worksheet = spreadsheet.worksheet(USERS_WORKSHEET_NAME)
         
@@ -72,9 +77,6 @@ def load_users_from_gsheet():
                 users[email] = {"password": password, "name": name}
         
         return users
-    except KeyError as e:
-        st.error(f"❌ Clé de secret manquante : {e}. Vérifiez les secrets GCP dans Streamlit Cloud.")
-        return {}
     except Exception as e:
         st.error(f"❌ Erreur lors du chargement des utilisateurs depuis Google Sheets : {e}")
         return {}
