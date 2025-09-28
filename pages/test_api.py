@@ -639,22 +639,17 @@ with tabs[1]:
                             else:
                                 st.session_state[f"advice_{key}"] = "Aucun conseil disponible pour ce champ."
 
-    # Display advice immediately after generation
-    for section in sections:
-        with st.expander(f"📋 {section['title']}", expanded=False):
-            for title, key, placeholder in section["fields"]:
-                current_value = st.session_state.get(key, "")
-                st.text_area(title, value=current_value, key=key, placeholder=placeholder, height=150)
-                if st.session_state.get(f"advice_{key}", ""):
-                    st.info(f"**Conseil IA :**\n{st.session_state[f'advice_{key}']}")
-
     brief_data = load_briefs().get(st.session_state.current_brief_name, {})
 
     with st.form(key="avant_brief_form"):
         for section in sections:
-            for title, key, placeholder in section["fields"]:
-                current_value = st.session_state.get(key, brief_data.get(key, ""))
-                st.text_area(title, value=current_value, key=key, placeholder=placeholder, height=150)
+            with st.expander(f"📋 {section['title']}", expanded=False):
+                for title, key, placeholder in section["fields"]:
+                    unique_key = f"{section['title'].replace(' ', '_')}_{key}"
+                    current_value = st.session_state.get(key, brief_data.get(key, ""))
+                    st.text_area(title, value=current_value, key=unique_key, placeholder=placeholder, height=150)
+                    if st.session_state.get(f"advice_{key}", ""):
+                        st.info(f"**Conseil IA :**\n{st.session_state[f'advice_{key}']}")
 
         col_save, col_cancel = st.columns(2)
         with col_save:
@@ -665,7 +660,8 @@ with tabs[1]:
                     
                     all_field_keys = [field[1] for section in sections for field in section['fields']]
                     for key in all_field_keys:
-                        brief_to_update[key] = st.session_state.get(key)
+                        unique_key = f"{next(s['title'].replace(' ', '_') for s in sections if key in [f[1] for f in s['fields']])}_{key}"
+                        brief_to_update[key] = st.session_state.get(unique_key, "")
                     
                     save_briefs()
                     
