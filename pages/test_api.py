@@ -1023,6 +1023,35 @@ with tabs[2]:
                         if manager_comments_dict:
                             payload_for_gsheet['MANAGER_COMMENTS_JSON'] = json.dumps(manager_comments_dict, ensure_ascii=False)
                         
+                        # Appliquer le mapping
+                        mapping = {
+                            "poste_intitule": "POSTE_INTITULE", "manager_nom": "MANAGER_NOM", "recruteur": "RECRUTEUR",
+                            "affectation_type": "AFFECTATION_TYPE", "affectation_nom": "AFFECTATION_NOM", "date_brief": "DATE_BRIEF",
+                            "raison_ouverture": "RAISON_OUVERTURE", "impact_strategique": "IMPACT_STRATEGIQUE",
+                            "rattachement": "RATTACHEMENT", "taches_principales": "TACHES_PRINCIPALES",
+                            "must_have_experience": "MUST_HAVE_EXP", "must_have_diplomes": "MUST_HAVE_DIP",
+                            "must_have_competences": "MUST_HAVE_COMPETENCES", "must_have_softskills": "MUST_HAVE_SOFTSKILLS",
+                            "nice_to_have_experience": "NICE_TO_HAVE_EXP", "nice_to_have_diplomes": "NICE_TO_HAVE_DIP",
+                            "nice_to_have_competences": "NICE_TO_HAVE_COMPETENCES",
+                            "entreprises_profil": "ENTREPRISES_PROFIL", "synonymes_poste": "SYNONYMES_POSTE",
+                            "canaux_profil": "CANAUX_PROFIL", "budget": "BUDGET", "commentaires": "COMMENTAIRES",
+                            "notes_libres": "NOTES_LIBRES",
+                            "profil_link_1": "LIEN_PROFIL_1",
+                            "profil_link_2": "LIEN_PROFIL_2",
+                            "profil_link_3": "LIEN_PROFIL_3",
+                            "canaux_prioritaires": "CANAUX_PRIORITAIRES",
+                            "criteres_exclusion": "CRITERES_EXCLUSION",
+                            "processus_evaluation": "PROCESSUS_EVALUATION",
+                            "manager_notes": "MANAGER_NOTES"
+                        }
+                        for session_key, gsheet_key in mapping.items():
+                            if session_key in payload_for_gsheet:
+                                value = payload_for_gsheet[session_key]
+                                if isinstance(value, list):
+                                    payload_for_gsheet[gsheet_key] = json.dumps(value, ensure_ascii=False)
+                                else:
+                                    payload_for_gsheet[gsheet_key] = value
+                        
                         save_brief_to_gsheet(current_brief_name, payload_for_gsheet)
                         
                         st.session_state.reunion_completed = True
