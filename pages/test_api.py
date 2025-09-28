@@ -716,7 +716,7 @@ with tabs[1]:
         # Boutons Enregistrer et Annuler dans le formulaire
         col_save, col_cancel = st.columns([1, 1])
         with col_save:
-            if st.button("💾 Enregistrer la réunion", type="primary", use_container_width=True, key="save_reunion"):
+            if st.button("💾 TEST DE SAUVEGARDE", type="primary", use_container_width=True, key="save_reunion"):
                 if st.session_state.current_brief_name:
                     current_brief_name = st.session_state.current_brief_name
                     
