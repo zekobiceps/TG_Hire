@@ -114,22 +114,29 @@ else:
     )
     
     # Sidebar avec logo en haut et message de bienvenue formaté
-with st.sidebar:
-    st.title("📊 Statistiques Brief")
-    
-    # On utilise st.session_state.saved_briefs qui est déjà chargé
-    total_briefs = len(st.session_state.saved_briefs)
-    st.metric("📋 Briefs créés", total_briefs)
+    with st.sidebar:
+        # Logo en haut de la sidebar
+        st.image("tgcc.png", width=150, use_container_width=True)
+        st.markdown("---")
+        
+        # Message de bienvenue formaté sur deux lignes
+        st.markdown(
+            f'<div class="welcome-message">'
+            f'<p class="welcome-text">Bienvenue</p>'
+            f'<p class="user-name">{st.session_state.current_user}</p>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+        
+        st.markdown("---")
+        
+        if st.button("🚪 Déconnexion", use_container_width=True):
+            st.session_state.logged_in = False
+            st.session_state.current_user = ""
+            st.rerun()
 
-    # --- MENU DE NAVIGATION ---
-    # C'est cette partie qui ajoute l'emoji à "Home"
-    # Elle sera affichée au-dessus des autres pages générées automatiquement
-    st.page_link("Home.py", label="🏠 Home", icon="🏠")
-
-    st.divider() # Ligne de séparation visuelle
-    
-    if st.button("Tester Connexion IA", key="test_deepseek"):
-        test_deepseek_connection()
+    # Contenu principal - sans logo ni message de bienvenue
+    st.title("📊 Roadmap Fonctionnelle")
 
     # Vérification que les clés existent dans features
     for status in ["À développer", "En cours", "Réalisé"]:
