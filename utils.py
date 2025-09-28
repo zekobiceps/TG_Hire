@@ -143,8 +143,14 @@ def save_brief_to_gsheet(brief_name, brief_data):
         return True
 
     except Exception as e:
-        st.error(f"❌ Échec de la sauvegarde Google Sheets pour '{brief_name}'. Erreur: {e}")
-        return False
+        # 🚨 CORRECTION POUR DIAGNOSTIC : Afficher l'erreur complète
+        st.error(f"❌ Échec critique de l'API Google Sheets pour '{brief_name}'. Erreur brute : {e}")
+        # Laissez cette ligne ci-dessous si elle existe
+        # st.toast(f"❌ Échec de la sauvegarde Google Sheets pour '{brief_name}'.", icon='☁️')
+        
+        # Ajoutez un raise pour imprimer la trace complète dans la console terminale
+        raise e 
+        # return False # Ne pas oublier de commenter ou supprimer le return False
 
 # -------------------- Directory for Briefs --------------------
 BRIEFS_DIR = "briefs"
