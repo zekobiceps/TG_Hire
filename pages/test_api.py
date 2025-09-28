@@ -706,18 +706,18 @@ with tabs[1]:
                         current_brief_name = st.session_state.current_brief_name
                         brief_to_update = st.session_state.saved_briefs[current_brief_name]
                         
-                        # 1. Mise à jour des données de la session (avec clés en minuscules)
+                        # 1. Mise à jour des données de la session
                         all_field_keys = [field[1] for section in sections for field in section['fields']]
                         for key in all_field_keys:
                             brief_to_update[key] = st.session_state.get(key)
                         
-                        # 2. Sauvegarde locale (qui utilise les clés en minuscules)
+                        # 2. Sauvegarde locale
                         save_briefs()
                         
-                        # 3. CRÉATION DU PAYLOAD POUR GOOGLE SHEETS (LA CORRECTION EST ICI)
+                        # 3. CRÉATION DU PAYLOAD POUR GOOGLE SHEETS
                         payload_for_gsheet = brief_to_update.copy()
                         
-                        # Dictionnaire de traduction
+                        # Dictionnaire de traduction (mapping)
                         mapping = {
                             "poste_intitule": "POSTE_INTITULE", "manager_nom": "MANAGER_NOM", "recruteur": "RECRUTEUR",
                             "affectation_type": "AFFECTATION_TYPE", "affectation_nom": "AFFECTATION_NOM", "date_brief": "DATE_BRIEF",
@@ -729,7 +729,11 @@ with tabs[1]:
                             "nice_to_have_competences": "NICE_TO_HAVE_COMPETENCES",
                             "entreprises_profil": "ENTREPRISES_PROFIL", "synonymes_poste": "SYNONYMES_POSTE",
                             "canaux_profil": "CANAUX_PROFIL", "budget": "BUDGET", "commentaires": "COMMENTAIRES",
-                            "notes_libres": "NOTES_LIBRES"
+                            "notes_libres": "NOTES_LIBRES",
+                            # 👇 LIGNES AJOUTÉES CI-DESSOUS 👇
+                            "profil_link_1": "LIEN_PROFIL_1",
+                            "profil_link_2": "LIEN_PROFIL_2",
+                            "profil_link_3": "LIEN_PROFIL_3"
                         }
 
                         # On ajoute les clés en MAJUSCULES au payload
