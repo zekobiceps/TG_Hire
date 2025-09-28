@@ -131,22 +131,31 @@ def save_brief_to_gsheet(brief_name, brief_data):
                 
             row_data.append(value)
         
+        # ... (code pour chercher la cellule) ...
         cell = worksheet.find(brief_name, in_column=1, case_sensitive=True)
         
+        # Déterminer la lettre de la dernière colonne (la longueur de BRIEFS_HEADERS donne le nombre de colonnes)
+        LAST_COL_LETTER = col_to_letter(len(BRIEFS_HEADERS))
+        
         if cell:
-            worksheet.update(f'A{cell.row}:{BRIEFS_HEADERS[-1]}{cell.row}', [row_data])
+            # Mise à jour de la ligne existante
+            # Range: De la première colonne (A) jusqu'à la dernière colonne (LAST_COL_LETTER) à la ligne de la cellule trouvée
+            range_to_update = f'A{cell.row}:{LAST_COL_LETTER}{cell.row}' 
+            
+            # --- C'EST ICI QUE LA MISE À JOUR EST CORRECTEMENT FORMATÉE ---
+            worksheet.update(range_to_update, [row_data])
             st.toast(f"✅ Brief '{brief_name}' mis à jour dans Google Sheets.", icon='☁️')
         else:
+            # Insertion d'une nouvelle ligne à la fin
             worksheet.append_row(row_data)
             st.toast(f"✅ Brief '{brief_name}' enregistré dans Google Sheets.", icon='☁️')
             
         return True
 
     except Exception as e:
-        # 🚨 DÉBOGAGE CRITIQUE : Afficher l'erreur complète dans Streamlit et forcer le crash des logs
-        st.error(f"❌ ÉCHEC CRITIQUE: La sauvegarde Google Sheets a échoué pour '{brief_name}'.")
-        st.exception(e) # Affiche le traceback complet dans l'application
-        return False # Empêche le succès local de masquer l'échec GSheet
+        # La ligne de débogage que vous avez vue
+        st.error(f"❌ ÉCHEC CRITIQUE: La sauvegarde Google Sheets a échoué pour '{brief_name}'. API Error: {e}")
+        return False
 
 # -------------------- Directory for Briefs --------------------
 BRIEFS_DIR = "briefs"
@@ -746,3 +755,13 @@ def generate_automatic_brief_name():
         counter += 1
     
     return brief_name
+
+# Ajoutez ceci dans la section des fonctions utilitaires, par exemple
+def col_to_letter(col_index):
+    """Convertit l'index de colonne (base 1) en lettre Excel (e.g., 1 -> A, 27 -> AA)"""
+    letter = ''
+    while col_index > 0:
+        # divmod(a, b) retourne (a // b, a % b)
+        col_index, remainder = divmod(col_index - 1, 26)
+        letter = chr(65 + remainder) + letter
+    return letter
