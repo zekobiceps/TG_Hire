@@ -2,8 +2,7 @@ import streamlit as st
 import os
 import sys
 import gspread
-from google.oauth2.service_account import Credentials
-from google.auth.transport.requests import Request
+from google.oauth2 import service_account
 
 # Ajouter le répertoire racine au chemin de recherche (optionnel si utils.py est dans la racine)
 sys.path.append(os.path.dirname(__file__))
@@ -43,25 +42,27 @@ if "users" not in st.session_state:
 def load_users_from_gsheet():
     """Charge les utilisateurs (email, password, name) depuis la feuille Google Sheets."""
     try:
-        # Charger les credentials depuis secrets.toml ou un fichier local
-        if "GCP_CREDENTIALS" in st.secrets:
-            # Si les credentials sont stockés sous une clé unique dans secrets.toml
-            credentials_info = st.secrets["GCP_CREDENTIALS"]
-            credentials = Credentials.from_service_account_info(credentials_info)
-        else:
-            # Si vous utilisez un fichier JSON local (pour tests locaux)
-            credentials_file = "credentials.json"
-            if os.path.exists(credentials_file):
-                credentials = Credentials.from_service_account_file(credentials_file)
-            else:
-                st.error("❌ Fichier credentials.json manquant ou secrets GCP non configurés. Vérifiez votre setup.")
-                return {}
+        # Construire le dictionnaire d'authentification à partir des secrets
+        service_account_info = {
+            "type": st.secrets["GCP_TYPE"],
+            "project_id": st.secrets["GCP_PROJECT_ID"],
+            "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
+            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace("\\n", "\n").strip(),
+            "client_email": st.secrets["GCP_CLIENT_EMAIL"],
+            "client_id": st.secrets["GCP_CLIENT_ID"],
+            "auth_uri": st.secrets["GCP_AUTH_URI"],
+            "token_uri": st.secrets["GCP_TOKEN_URI"],
+            "auth_provider_x509_cert_url": st.secrets["GCP_AUTH_PROVIDER_CERT_URL"],
+            "client_x509_cert_url": st.secrets["GCP_CLIENT_CERT_URL"]
+        }
+        
+        # Vérifier si toutes les clés nécessaires sont présentes
+        required_keys = ["type", "project_id", "private_key_id", "private_key", "client_email", "client_id", "auth_uri", "token_uri", "auth_provider_x509_cert_url", "client_x509_cert_url"]
+        if not all(key in service_account_info and service_account_info[key] for key in required_keys):
+            st.error("❌ Certaines clés de secret GCP sont manquantes. Vérifiez votre secrets.toml.")
+            return {}
 
-        # Rafraîchir les credentials si nécessaire
-        if credentials.expired and credentials.refresh_token:
-            credentials.refresh(Request())
-
-        gc = gspread.authorize(credentials)
+        gc = gspread.service_account_from_dict(service_account_info)
         spreadsheet = gc.open_by_url(USERS_SHEET_URL)
         worksheet = spreadsheet.worksheet(USERS_WORKSHEET_NAME)
         
