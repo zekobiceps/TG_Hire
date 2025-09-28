@@ -8,7 +8,6 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import time
 import re
-from datetime import datetime
 
 # Imports pour la méthode sémantique
 from sentence_transformers import SentenceTransformer, util
@@ -81,87 +80,55 @@ def rank_resumes_with_cosine(job_description, resumes, file_names):
         st.error(f"❌ Erreur Cosinus: {e}")
         return {"scores": [], "logic": {}}
 
-# --- MÉTHODE 2 : WORD EMBEDDINGS (AVEC LOGIQUE) ---
-def rank_resumes_with_embeddings(job_description, resumes, file_names):
+# --- MÉTHODE 2 : WORD EMBEDDINGS ---
+def rank_resumes_with_embeddings(job_description, resumes):
     try:
         jd_embedding = embedding_model.encode(job_description, convert_to_tensor=True)
         resume_embeddings = embedding_model.encode(resumes, convert_to_tensor=True)
         cosine_scores = util.pytorch_cos_sim(jd_embedding, resume_embeddings)
-        scores = cosine_scores.flatten().cpu().numpy()
-
-        # --- NOUVEAUTÉ : Extraction de la logique pour la sémantique ---
-        logic = {}
-        jd_sentences = job_description.split('.')
-        jd_sent_embeddings = embedding_model.encode(jd_sentences, convert_to_tensor=True)
-
-        for i, resume_text in enumerate(resumes):
-            resume_sentences = resume_text.split('.')
-            resume_sent_embeddings = embedding_model.encode(resume_sentences, convert_to_tensor=True)
-            
-            # Trouver les phrases les plus similaires
-            similarity_matrix = util.pytorch_cos_sim(resume_sent_embeddings, jd_sent_embeddings)
-            best_matches = {}
-            for sent_idx, jd_sent in enumerate(jd_sentences):
-                if len(jd_sent.strip()) > 10: # Ignorer les phrases trop courtes
-                    best_match_score, best_match_idx = torch.max(similarity_matrix[:, sent_idx], dim=0)
-                    if best_match_score > 0.6: # Seuil de pertinence
-                         best_matches[jd_sent.strip()] = resume_sentences[best_match_idx].strip()
-            logic[file_names[i]] = {"Phrases les plus pertinentes correspondantes (Annonce -> CV)": best_matches}
-
-        return {"scores": scores, "logic": logic}
+        return {"scores": cosine_scores.flatten().cpu().numpy()}
     except Exception as e:
         st.error(f"❌ Erreur Sémantique : {e}")
-        return {"scores": [], "logic": {}}
+        return {"scores": []}
 
-# --- ANALYSE PAR REGEX AMÉLIORÉE (AVEC CALCUL D'EXPÉRIENCE) ---
+# --- ANALYSE PAR REGEX AMÉLIORÉE ---
 def regex_analysis(text):
     text_lower = text.lower()
     
-    # --- NOUVEAUTÉ : Calcul d'expérience basé sur les dates ---
-    total_experience_months = 0
-    # Cherche des formats comme "MM/AAAA - MM/AAAA" ou "Mois AAAA - Mois AAAA"
-    date_ranges = re.findall(r'(\d{2}/\d{4})\s*-\s*(\d{2}/\d{4})|([a-zA-Z]+\.?\s+\d{4})\s*-\s*([a-zA-Z]+\.?\s+\d{4})', text)
-    
-    for match in date_ranges:
-        try:
-            start_str, end_str = match[0] or match[2], match[1] or match[3]
-            # Gérer "aujourd'hui" ou "à ce jour"
-            if "aujourd'hui" in end_str.lower() or "jour" in end_str.lower():
-                end_date = datetime.now()
-            else:
-                end_date = datetime.strptime(end_str.replace('.',''), '%m/%Y' if '/' in start_str else '%b %Y')
-
-            start_date = datetime.strptime(start_str.replace('.',''), '%m/%Y' if '/' in start_str else '%b %Y')
-            
-            duration = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
-            total_experience_months += duration
-        except Exception:
-            continue # Ignorer les dates mal formatées
-
-    total_experience_years = round(total_experience_months / 12)
-
-    # ... (Le reste de l'extraction des compétences et diplômes reste identique) ...
     education_level = 0
-    edu_patterns = {5: r'bac\s*\+\s*5|master|ingénieur', 3: r'bac\s*\+\s*3|licence', 2: r'bac\s*\+\s*2|bts|dut', 0: r'baccalauréat'}
+    edu_patterns = {
+        5: r'bac\s*\+\s*5|master|ingénieur',
+        3: r'bac\s*\+\s*3|licence',
+        2: r'bac\s*\+\s*2|bts|dut',
+        0: r'baccalauréat'
+    }
     for level, pattern in edu_patterns.items():
         if re.search(pattern, text_lower):
             education_level = level
             break
             
+    experience_match = re.search(r"(\d+)\s*à\s*(\d+)\s*ans|(\d+)\s*(?:ans|années)", text_lower)
+    experience = 0
+    if experience_match:
+        if experience_match.group(1):
+            experience = int(experience_match.group(1)) 
+        else:
+            experience = int(experience_match.group(3))
+
     skills = []
     profile_section_match = re.search(r"profil recherché\s*:(.*?)(?:\n\n|\Z)", text_lower, re.DOTALL | re.IGNORECASE)
     if profile_section_match:
         profile_section = profile_section_match.group(1)
+        # On extrait les mots de plus de 4 lettres
         words = re.findall(r'\b[a-zA-ZÀ-ÿ-]{4,}\b', profile_section)
         stop_words = ["profil", "recherché", "maîtrise", "bonne", "expérience", "esprit", "basé", "casablanca", "missions", "principales", "confirmée"]
         skills = [word for word in words if word not in stop_words]
 
     return {
         "Niveau d'études": education_level,
-        "Années d'expérience calculées": total_experience_years,
+        "Années d'expérience": experience,
         "Compétences clés extraites": list(set(skills))
     }
-
 
 # --- SCORING PAR RÈGLES AVEC REGEX AMÉLIORÉ ---
 def rank_resumes_with_rules(job_description, resumes, file_names):
