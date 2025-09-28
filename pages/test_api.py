@@ -1046,53 +1046,55 @@ with tabs[2]:
                          placeholder="Ajoutez vos commentaires et notes généraux...")
 
         st.markdown("---")
-        col_save, col_cancel = st.columns([1, 1])
-        with col_save:
-            if st.button("💾 Enregistrer la réunion", type="primary", use_container_width=True, key="save_reunion"):
-                if st.session_state.current_brief_name:
-                    existing_briefs = load_briefs()
-                    current_brief_name = st.session_state.current_brief_name
-
-                    if current_brief_name in existing_briefs:
-                        # --- NOUVELLE LOGIQUE DE SAUVEGARDE ---
-
-                        # 1. Récupérer le dictionnaire de commentaires sauvegardé à l'étape 1
-                        manager_comments = existing_briefs[current_brief_name].get("manager_comments", {})
+        
+        # Le formulaire commence ici
+        with st.form(key="reunion_final_form"):
+            # Boutons de soumission et d'annulation
+            col_save, col_cancel = st.columns([1, 1])
+            with col_save:
+                # 👇 LA CORRECTION EST ICI 👇
+                if st.form_submit_button("💾 Enregistrer la réunion", type="primary", use_container_width=True):
+                    if st.session_state.current_brief_name:
+                        # ... (votre logique de sauvegarde reste identique)
                         
-                        # 2. Convertir ce dictionnaire en chaîne JSON pour Google Sheets
-                        manager_comments_json = json.dumps(manager_comments, indent=4, ensure_ascii=False)
-
-                        # 3. Mettre à jour le brief avec toutes les données des étapes de la réunion
-                        existing_briefs[current_brief_name].update({
-                            "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()),
-                            "manager_notes": st.session_state.get("manager_notes", ""),
-                            "manager_comments": manager_comments, # On garde le format dict pour l'app
+                        # (Code de la sauvegarde complète que je vous ai fourni précédemment)
+                        current_brief_name = st.session_state.current_brief_name
+                        brief_data_to_save = st.session_state.saved_briefs.get(current_brief_name, {}).copy()
+                        if not brief_data_to_save:
+                            st.error(f"Erreur critique : Impossible de trouver les données du brief '{current_brief_name}'.")
+                            st.stop()
+                        
+                        brief_data_to_save.update({
                             "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
                             "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
-                            "processus_evaluation": st.session_state.get("processus_evaluation", "")
+                            "processus_evaluation": st.session_state.get("processus_evaluation", ""),
+                            "manager_notes": st.session_state.get("manager_notes", "")
                         })
                         
-                        # 4. Sauvegarde locale
-                        st.session_state.saved_briefs = existing_briefs
+                        ksa_matrix_df = st.session_state.get("ksa_matrix", pd.DataFrame())
+                        brief_data_to_save["ksa_matrix"] = ksa_matrix_df
+                        manager_comments_dict = brief_data_to_save.get("manager_comments", {})
+                        
+                        st.session_state.saved_briefs[current_brief_name] = brief_data_to_save
                         save_briefs()
                         
-                        # 5. Préparation des données pour l'envoi à Google Sheets
-                        brief_data_to_save = existing_briefs[current_brief_name].copy()
-                        # On ajoute la version JSON pour la colonne GSheet dédiée
-                        brief_data_to_save['MANAGER_COMMENTS_JSON'] = manager_comments_json
+                        payload_for_gsheet = brief_data_to_save.copy()
+                        payload_for_gsheet['KSA_MATRIX_JSON'] = ksa_matrix_df.to_json(orient='records')
+                        payload_for_gsheet['MANAGER_COMMENTS_JSON'] = json.dumps(manager_comments_dict, ensure_ascii=False)
                         
-                        # Envoi à Google Sheets
-                        save_brief_to_gsheet(current_brief_name, brief_data_to_save)
+                        save_brief_to_gsheet(current_brief_name, payload_for_gsheet)
                         
-                        # Finalisation et rechargement de la page
                         st.session_state.reunion_completed = True
-                        st.session_state.save_message = "✅ Données de réunion sauvegardées avec succès !"
+                        st.session_state.save_message = "✅ Données de réunion sauvegardées et synchronisées avec succès !"
                         st.session_state.save_message_tab = "Réunion"
                         st.rerun()
                     else:
-                        st.error(f"Erreur : Le brief '{current_brief_name}' n'a pas été trouvé.")
-                else:
-                    st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
+                        st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
+
+            # Le bouton "Annuler" n'est pas dans le formulaire, donc il reste un st.button normal
+            with col_cancel:
+                if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion"):
+                    delete_current_brief()
         
         with col_cancel:
             if st.button("🗑️ Annuler le Brief", type="secondary", use_container_width=True, key="cancel_reunion"):
