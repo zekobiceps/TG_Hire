@@ -1,8 +1,4 @@
 import streamlit as st
-
-# Vérification de la connexion
-if not st.session_state.get("logged_in", False):
-    st.stop()
 import sys, os 
 from datetime import datetime
 import json
@@ -770,55 +766,38 @@ with tabs[1]:
         with col_save:
             if st.form_submit_button("💾 Enregistrer modifications", type="primary", use_container_width=True):
                 if st.session_state.current_brief_name:
-                    # 1. Collecte des données mises à jour (clés en minuscules)
+                    
+                    # 1. Collecte des données des champs (clés en minuscules: raison_ouverture, must_have_experience, etc.)
                     update_data = {key: st.session_state[key] for _, key, _ in [item for sublist in [s["fields"] for s in sections] for item in sublist]}
                     
                     current_brief_name = st.session_state.current_brief_name
                     
-                    # 2. Mise à jour du brief local
-                    st.session_state.saved_briefs[current_brief_name].update(update_data)
-                    st.session_state.saved_briefs[current_brief_name]["ksa_matrix"] = st.session_state.get("ksa_matrix", pd.DataFrame()) 
+                    # Référence au brief dans l'état de session
+                    brief_to_update = st.session_state.saved_briefs[current_brief_name]
                     
-                    save_briefs() # Sauvegarde locale
+                    # 2. Mise à jour du brief local avec les nouvelles valeurs (clés en minuscules)
+                    brief_to_update.update(update_data)
+                    brief_to_update["ksa_matrix"] = st.session_state.get("ksa_matrix", pd.DataFrame()) 
                     
-                    # --- DÉBUT CORRECTION GSHEET ---
-                    brief_data_to_save = st.session_state.saved_briefs[current_brief_name]
+                    # 3. Préparation pour Google Sheets (création d'un dictionnaire avec les clés GSheet en MAJUSCULES)
+                    brief_data_for_gsheet = brief_to_update.copy()
                     
-                    # CRÉER UN DICTIONNAIRE TEMPORAIRE AVEC DES CLÉS EN MAJUSCULES POUR GSheet
-                    gsheet_update_data = {
-                        k.upper().replace('_', ''): v for k, v in brief_data_to_save.items()
-                    }
-                    # Assurer le mapping des clés spécifiques GSheet
-                    # Note: Les clés comme 'raison_ouverture' seront mappées à 'RAISONOUVERTURE', 
-                    # mais vos headers GSheet utilisent des underscores (ex: RAISON_OUVERTURE).
-                    # La fonction save_brief_to_gsheet.py gère le mapping 'raison_ouverture' -> 'RAISON_OUVERTURE'
-                    # en utilisant brief_data.get(header). Assurons-nous d'avoir toutes les données.
+                    # Mappage des champs en minuscules de la session vers les majuscules de GSheets
+                    # Cela garantit que save_brief_to_gsheet.py trouve toutes les clés qu'elle cherche.
+                    for key, value in brief_data_for_gsheet.items():
+                        # Utilise la clé en MAJUSCULES (ex: RAISON_OUVERTURE)
+                        # uniquement si la clé est en minuscules (pour éviter de casser les clés internes comme brief_name)
+                        if key.islower() and key in update_data:
+                            brief_data_for_gsheet[key.upper()] = value
+                            
+                    # La clé de nom est également souvent en minuscules dans le dictionnaire
+                    brief_data_for_gsheet['BRIEF_NAME'] = current_brief_name
                     
-                    # Le plus simple est de mettre toutes les données en majuscules dans la session
-                    # MAIS CECI CASSE L'APPLICATION.
+                    # 4. Sauvegarde JSON locale (utilise brief_to_update)
+                    save_briefs() 
                     
-                    # Solution: S'assurer que le dictionnaire envoyé contient les clés en minuscules
-                    # ET que les clés GSheet spécifiques sont incluses.
-                    
-                    # On s'assure que toutes les données des champs sont bien dans brief_data_to_save.
-                    for key, value in update_data.items():
-                         brief_data_to_save[key] = value
-
-                    # La fonction save_brief_to_gsheet cherche les clés en MAJUSCULES (ex: RAISON_OUVERTURE).
-                    # Nous devons soit renommer les clés ici, soit s'assurer que save_brief_to_gsheet 
-                    # vérifie à la fois les MAJUSCULES ET les minuscules.
-                    
-                    # OPTION SÛRE : Renommer les clés ici avant l'envoi
-                    final_data_for_gsheet = brief_data_to_save.copy()
-                    for key, value in update_data.items():
-                        # Utilise le nom de champ de session (ex: raison_ouverture)
-                        # et met sa version MAJUSCULE_UNDERSCORE (ex: RAISON_OUVERTURE)
-                        # dans le dictionnaire pour le mapping GSheet.
-                        final_data_for_gsheet[key.upper()] = value
-                    
-                    # Envoi à Google Sheets
-                    save_brief_to_gsheet(current_brief_name, final_data_for_gsheet)
-                    # --- FIN CORRECTION GSHEET ---
+                    # 5. Sauvegarde Google Sheets (utilise brief_data_for_gsheet)
+                    save_brief_to_gsheet(current_brief_name, brief_data_for_gsheet)
                     
                     st.session_state.avant_brief_completed = True
                     st.session_state.save_message = "✅ Modifications sauvegardées"
@@ -826,7 +805,7 @@ with tabs[1]:
                     st.rerun()
                 else:
                     st.error("❌ Veuillez d'abord créer et sauvegarder un brief dans l'onglet Gestion")
-        
+
         with col_cancel:
             if st.form_submit_button("🗑️ Annuler", type="secondary", use_container_width=True):
                 st.session_state.current_brief_name = ""
