@@ -134,29 +134,21 @@ def save_brief_to_gsheet(brief_name, brief_data):
                 
             row_data.append(value)
         
-        # ... (code pour chercher la cellule) ...
         cell = worksheet.find(brief_name, in_column=1, case_sensitive=True)
         
-        # Déterminer la lettre de la dernière colonne (la longueur de BRIEFS_HEADERS donne le nombre de colonnes)
         LAST_COL_LETTER = col_to_letter(len(BRIEFS_HEADERS))
         
         if cell:
-            # Mise à jour de la ligne existante
-            # Range: De la première colonne (A) jusqu'à la dernière colonne (LAST_COL_LETTER) à la ligne de la cellule trouvée
             range_to_update = f'A{cell.row}:{LAST_COL_LETTER}{cell.row}' 
-            
-            # --- C'EST ICI QUE LA MISE À JOUR EST CORRECTEMENT FORMATÉE ---
             worksheet.update(range_to_update, [row_data])
             st.toast(f"✅ Brief '{brief_name}' mis à jour dans Google Sheets.", icon='☁️')
         else:
-            # Insertion d'une nouvelle ligne à la fin
             worksheet.append_row(row_data)
             st.toast(f"✅ Brief '{brief_name}' enregistré dans Google Sheets.", icon='☁️')
             
         return True
 
     except Exception as e:
-        # La ligne de débogage que vous avez vue
         st.error(f"❌ ÉCHEC CRITIQUE: La sauvegarde Google Sheets a échoué pour '{brief_name}'. API Error: {e}")
         return False
 
@@ -188,25 +180,51 @@ def save_briefs():
         st.error(f"Erreur lors de la sauvegarde locale des briefs: {e}")
 
 def load_briefs():
-    """Load all briefs from JSON files in the briefs directory."""
+    """Load all briefs from JSON files in the briefs directory and sync with Google Sheets."""
     try:
         ensure_briefs_directory()
         briefs = {}
+        # Load local JSON files
         for file_name in os.listdir(BRIEFS_DIR):
             if file_name.endswith(".json"):
                 brief_name = file_name[:-5]  # Remove .json extension
                 file_path = os.path.join(BRIEFS_DIR, file_name)
                 with open(file_path, "r", encoding="utf-8") as f:
                     brief_data = json.load(f)
-                    # Reconvertir les dictionnaires en DataFrames
+                    # Reconvertir les dictionnaires en DataFrames si nécessaire
                     briefs[brief_name] = {
                         key: pd.DataFrame.from_dict(value) if key == "ksa_matrix" and isinstance(value, dict) else value
                         for key, value in brief_data.items()
                     }
+        
+        # Sync with Google Sheets
+        worksheet = get_briefs_gsheet_client()
+        if worksheet:
+            records = worksheet.get_all_records()
+            for record in records:
+                brief_name = record.get("BRIEF_NAME")
+                if brief_name and brief_name not in briefs:
+                    briefs[brief_name] = record
+                    if "KSA_MATRIX_JSON" in record and record["KSA_MATRIX_JSON"]:
+                        record["ksa_matrix"] = pd.DataFrame.from_records(json.loads(record["KSA_MATRIX_JSON"]))
+                    file_path = os.path.join(BRIEFS_DIR, f"{brief_name}.json")
+                    with open(file_path, "w", encoding="utf-8") as f:
+                        json.dump(record, f, indent=4, ensure_ascii=False)
+        
         return briefs
     except Exception as e:
-        # st.error(f"Erreur lors du chargement des briefs: {e}") # Désactivé pour éviter l'erreur au démarrage
+        st.warning(f"Erreur lors du chargement des briefs (local ou Google Sheets): {e}")
         return {}
+
+def count_briefs_from_gsheet():
+    """Count the number of briefs in Google Sheets as a fallback."""
+    worksheet = get_briefs_gsheet_client()
+    if worksheet:
+        try:
+            return len(worksheet.get_all_records())
+        except Exception as e:
+            st.error(f"Erreur lors du comptage des briefs dans Google Sheets : {e}")
+    return 0
 
 def save_job_descriptions():
     """Sauvegarde les fiches de poste dans job_descriptions.json."""
@@ -346,182 +364,124 @@ def filter_briefs(briefs, month, recruteur, brief_type, manager, affectation, no
             continue
     return filtered
 
-# -------------------- Export PDF --------------------
+# -------------------- Exportation PDF --------------------
 def export_brief_pdf():
-    if not PDF_AVAILABLE:
+    """Exporte un brief au format PDF."""
+    if not PDF_AVAILABLE or not st.session_state.current_brief_name:
         return None
     
+    brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4)
     styles = getSampleStyleSheet()
     story = []
 
     story.append(Paragraph("📋 Brief Recrutement", styles['Heading1']))
-    story.append(Spacer(1, 20))
+    story.append(Spacer(1, 12))
 
-    # --- SECTION 1: Identité
+    # Section 1: Identité du poste
     story.append(Paragraph("1. Identité du poste", styles['Heading2']))
-    infos = [
-        ["Intitulé", st.session_state.get("poste_intitule", "")],
-        ["Service", st.session_state.get("service", "")],
-        ["Niveau Hiérarchique", st.session_state.get("niveau_hierarchique", "")],
-        ["Type de Contrat", st.session_state.get("type_contrat", "")],
-        ["Localisation", st.session_state.get("localisation", "")],
-        ["Budget Salaire", st.session_state.get("budget_salaire", "")],
-        ["Date Prise de Poste", str(st.session_state.get("date_prise_poste", ""))]
-    ]
-    story.append(Table(infos, colWidths=[150, 300], style=[("GRID", (0, 0), (-1, -1), 1, colors.black)]))
-    story.append(Spacer(1, 15))
+    story.append(Paragraph(f"Intitulé: {brief_data.get('poste_intitule', '')}", styles['Normal']))
+    story.append(Paragraph(f"Service: {brief_data.get('affectation_nom', '')}", styles['Normal']))
+    story.append(Paragraph(f"Niveau Hiérarchique: {brief_data.get('niveau_hierarchique', 'N/A')}", styles['Normal']))  # Placeholder
+    story.append(Paragraph(f"Type de Contrat: {brief_data.get('affectation_type', 'N/A')}", styles['Normal']))  # Adjust if needed
+    story.append(Paragraph(f"Localisation: {brief_data.get('rattachement', '')}", styles['Normal']))
+    story.append(Paragraph(f"Budget Salaire: {brief_data.get('budget', '')}", styles['Normal']))
+    story.append(Paragraph(f"Date Prise de Poste: {brief_data.get('date_brief', '')}", styles['Normal']))
+    story.append(Spacer(1, 12))
 
-    # --- SECTION 2: Contexte & Enjeux
+    # Section 2: Contexte & Enjeux
     story.append(Paragraph("2. Contexte & Enjeux", styles['Heading2']))
-    for field in ["raison_ouverture", "impact_strategique", "rattachement", "taches_principales"]:
-        if field in st.session_state and st.session_state[field]:
-            story.append(Paragraph(f"<b>{field.replace('_', ' ').title()}:</b> {st.session_state[field]}", styles['Normal']))
-            story.append(Spacer(1, 5))
-    story.append(Spacer(1, 15))
+    context_text = f"{brief_data.get('raison_ouverture', '')} {brief_data.get('impact_strategique', '')}"
+    story.append(Paragraph(context_text, styles['Normal']))
+    story.append(Spacer(1, 12))
 
-    # --- SECTION 3: Exigences
+    # Section 3: Exigences
     story.append(Paragraph("3. Exigences", styles['Heading2']))
-    for field in [
-        "must_have_experience", "must_have_diplomes", "must_have_competences", "must_have_softskills",
-        "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences"
-    ]:
-        if field in st.session_state and st.session_state[field]:
-            story.append(Paragraph(f"<b>{field.replace('_', ' ').title()}:</b> {st.session_state[field]}", styles['Normal']))
-            story.append(Spacer(1, 5))
-    story.append(Spacer(1, 15))
+    story.append(Paragraph(f"Expérience: {brief_data.get('must_have_experience', '')}", styles['Normal']))
+    story.append(Paragraph(f"Diplômes: {brief_data.get('must_have_diplomes', '')}", styles['Normal']))
+    story.append(Paragraph(f"Compétences: {brief_data.get('must_have_competences', '')}", styles['Normal']))
+    story.append(Paragraph(f"Soft Skills: {brief_data.get('must_have_softskills', '')}", styles['Normal']))
+    story.append(Spacer(1, 12))
 
-    # --- SECTION 4: Matrice KSA
+    # Section 4: Matrice KSA
     story.append(Paragraph("4. Matrice KSA", styles['Heading2']))
-    if not st.session_state.ksa_matrix.empty:
-        header = ["Rubrique", "Critère", "Cible / Standard attendu", "Échelle d'évaluation (1-5)", "Évaluateur"]
-        table_data = [header]
-        for _, row in st.session_state.ksa_matrix.iterrows():
-            table_data.append([
-                str(row.get("Rubrique", "")),
-                str(row.get("Critère", "")),
-                str(row.get("Cible / Standard attendu", "")),
-                str(row.get("Échelle d'évaluation (1-5)", "")),
-                str(row.get("Évaluateur", ""))
-            ])
-        t = Table(table_data, colWidths=[100, 100, 150, 50, 50], style=[("GRID", (0, 0), (-1, -1), 1, colors.black), ('BACKGROUND', (0, 0), (-1, 0), colors.grey)])
-        story.append(t)
+    ksa_matrix = brief_data.get("ksa_matrix")
+    if isinstance(ksa_matrix, pd.DataFrame) and not ksa_matrix.empty:
+        for _, row in ksa_matrix.iterrows():
+            ksa_text = f"- {row.get('Rubrique', '')}: {row.get('Critère', '')} (Question: {row.get('Question pour l\'entretien', '')}, Éval: {row.get('Évaluation (1-5)', '')})"
+            story.append(Paragraph(ksa_text, styles['Normal']))
     else:
         story.append(Paragraph("Aucune donnée KSA disponible.", styles['Normal']))
-    story.append(Spacer(1, 15))
+    story.append(Spacer(1, 12))
 
-    # --- SECTION 5: Stratégie Recrutement
+    # Section 5: Stratégie Recrutement
     story.append(Paragraph("5. Stratégie Recrutement", styles['Heading2']))
-    strategy_fields = ["canaux_prioritaires", "criteres_exclusion", "processus_evaluation"]
-    for field in strategy_fields:
-        if field in st.session_state and st.session_state[field]:
-            value = ", ".join(st.session_state[field]) if field == "canaux_prioritaires" else st.session_state[field]
-            story.append(Paragraph(f"<b>{field.replace('_', ' ').title()}:</b> {value}", styles['Normal']))
-            story.append(Spacer(1, 5))
-    story.append(Spacer(1, 15))
+    story.append(Paragraph(f"Canaux: {brief_data.get('canaux_profil', '')}", styles['Normal']))
+    story.append(Paragraph(f"Critères d'exclusion: {brief_data.get('criteres_exclusion', '')}", styles['Normal']))
+    story.append(Spacer(1, 12))
 
-    # --- SECTION 6: Notes du Manager
+    # Section 6: Notes du Manager
     story.append(Paragraph("6. Notes du Manager", styles['Heading2']))
-    if st.session_state.get("manager_notes"):
-        story.append(Paragraph(f"<b>Notes Générales:</b> {st.session_state.manager_notes}", styles['Normal']))
-        story.append(Spacer(1, 5))
-    for i in range(1, 21):
-        comment_key = f"manager_comment_{i}"
-        if comment_key in st.session_state.get("manager_comments", {}) and st.session_state.manager_comments[comment_key]:
-            story.append(Paragraph(f"<b>Commentaire {i}:</b> {st.session_state.manager_comments[comment_key]}", styles['Normal']))
-            story.append(Spacer(1, 5))
-    story.append(Spacer(1, 15))
+    story.append(Paragraph(brief_data.get("manager_notes", ""), styles['Normal']))
 
     doc.build(story)
     buffer.seek(0)
-    return buffer
+    return buffer.getvalue()
 
-# -------------------- Export Word --------------------
+# -------------------- Exportation Word --------------------
 def export_brief_word():
-    if not WORD_AVAILABLE:
+    """Exporte un brief au format Word."""
+    if not WORD_AVAILABLE or not st.session_state.current_brief_name:
         return None
-
+    
+    brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
     doc = Document()
     doc.add_heading("📋 Brief Recrutement", 0)
 
-    # --- SECTION 1: Identité
-    doc.add_heading("1. Identité du poste", level=2)
-    info_table = doc.add_table(rows=0, cols=2)
-    info_table.autofit = True
-    for label, value in [
-        ["Intitulé", st.session_state.get("poste_intitule", "")],
-        ["Service", st.session_state.get("service", "")],
-        ["Niveau Hiérarchique", st.session_state.get("niveau_hierarchique", "")],
-        ["Type de Contrat", st.session_state.get("type_contrat", "")],
-        ["Localisation", st.session_state.get("localisation", "")],
-        ["Budget Salaire", st.session_state.get("budget_salaire", "")],
-        ["Date Prise de Poste", str(st.session_state.get("date_prise_poste", ""))]
-    ]:
-        row_cells = info_table.add_row().cells
-        row_cells[0].text = label
-        row_cells[1].text = value
-    doc.add_paragraph()
+    # Section 1: Identité du poste
+    doc.add_heading("1. Identité du poste", level=1)
+    doc.add_paragraph(f"Intitulé: {brief_data.get('poste_intitule', '')}")
+    doc.add_paragraph(f"Service: {brief_data.get('affectation_nom', '')}")
+    doc.add_paragraph(f"Niveau Hiérarchique: {brief_data.get('niveau_hierarchique', 'N/A')}")  # Placeholder
+    doc.add_paragraph(f"Type de Contrat: {brief_data.get('affectation_type', 'N/A')}")  # Adjust if needed
+    doc.add_paragraph(f"Localisation: {brief_data.get('rattachement', '')}")
+    doc.add_paragraph(f"Budget Salaire: {brief_data.get('budget', '')}")
+    doc.add_paragraph(f"Date Prise de Poste: {brief_data.get('date_brief', '')}")
 
-    # --- SECTION 2: Contexte & Enjeux
-    doc.add_heading("2. Contexte & Enjeux", level=2)
-    for field in ["raison_ouverture", "impact_strategique", "rattachement", "taches_principales"]:
-        if field in st.session_state and st.session_state[field]:
-            doc.add_paragraph(f"{field.replace('_', ' ').title()}: {st.session_state[field]}")
-    doc.add_paragraph()
+    # Section 2: Contexte & Enjeux
+    doc.add_heading("2. Contexte & Enjeux", level=1)
+    doc.add_paragraph(f"{brief_data.get('raison_ouverture', '')} {brief_data.get('impact_strategique', '')}")
 
-    # --- SECTION 3: Exigences
-    doc.add_heading("3. Exigences", level=2)
-    for field in [
-        "must_have_experience", "must_have_diplomes", "must_have_competences", "must_have_softskills",
-        "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences"
-    ]:
-        if field in st.session_state and st.session_state[field]:
-            doc.add_paragraph(f"{field.replace('_', ' ').title()}: {st.session_state[field]}")
-    doc.add_paragraph()
+    # Section 3: Exigences
+    doc.add_heading("3. Exigences", level=1)
+    doc.add_paragraph(f"Expérience: {brief_data.get('must_have_experience', '')}")
+    doc.add_paragraph(f"Diplômes: {brief_data.get('must_have_diplomes', '')}")
+    doc.add_paragraph(f"Compétences: {brief_data.get('must_have_competences', '')}")
+    doc.add_paragraph(f"Soft Skills: {brief_data.get('must_have_softskills', '')}")
 
-    # --- SECTION 4: Matrice KSA
-    doc.add_heading("4. Matrice KSA", level=2)
-    if not st.session_state.ksa_matrix.empty:
-        ksa_table = doc.add_table(rows=1, cols=5)
-        ksa_table.autofit = True
-        header_cells = ksa_table.rows[0].cells
-        header_labels = ["Rubrique", "Critère", "Cible / Standard attendu", "Échelle d'évaluation (1-5)", "Évaluateur"]
-        for i, label in enumerate(header_labels):
-            header_cells[i].text = label
-        for _, row in st.session_state.ksa_matrix.iterrows():
-            row_cells = ksa_table.add_row().cells
-            row_cells[0].text = str(row.get("Rubrique", ""))
-            row_cells[1].text = str(row.get("Critère", ""))
-            row_cells[2].text = str(row.get("Cible / Standard attendu", ""))
-            row_cells[3].text = str(row.get("Échelle d'évaluation (1-5)", ""))
-            row_cells[4].text = str(row.get("Évaluateur", ""))
+    # Section 4: Matrice KSA
+    doc.add_heading("4. Matrice KSA", level=1)
+    ksa_matrix = brief_data.get("ksa_matrix")
+    if isinstance(ksa_matrix, pd.DataFrame) and not ksa_matrix.empty:
+        for _, row in ksa_matrix.iterrows():
+            doc.add_paragraph(f"- {row.get('Rubrique', '')}: {row.get('Critère', '')} (Question: {row.get('Question pour l\'entretien', '')}, Éval: {row.get('Évaluation (1-5)', '')})")
     else:
         doc.add_paragraph("Aucune donnée KSA disponible.")
-    doc.add_paragraph()
 
-    # --- SECTION 5: Stratégie Recrutement
-    doc.add_heading("5. Stratégie Recrutement", level=2)
-    strategy_fields = ["canaux_prioritaires", "criteres_exclusion", "processus_evaluation"]
-    for field in strategy_fields:
-        if field in st.session_state and st.session_state[field]:
-            value = ", ".join(st.session_state[field]) if field == "canaux_prioritaires" else st.session_state[field]
-            doc.add_paragraph(f"{field.replace('_', ' ').title()}: {value}")
-    doc.add_paragraph()
+    # Section 5: Stratégie Recrutement
+    doc.add_heading("5. Stratégie Recrutement", level=1)
+    doc.add_paragraph(f"Canaux: {brief_data.get('canaux_profil', '')}")
+    doc.add_paragraph(f"Critères d'exclusion: {brief_data.get('criteres_exclusion', '')}")
 
-    # --- SECTION 6: Notes du Manager
-    doc.add_heading("6. Notes du Manager", level=2)
-    if st.session_state.get("manager_notes"):
-        doc.add_paragraph(f"Notes Générales: {st.session_state.manager_notes}")
-    for i in range(1, 21):
-        comment_key = f"manager_comment_{i}"
-        if comment_key in st.session_state.get("manager_comments", {}) and st.session_state.manager_comments[comment_key]:
-            doc.add_paragraph(f"Commentaire {i}: {st.session_state.manager_comments[comment_key]}")
+    # Section 6: Notes du Manager
+    doc.add_heading("6. Notes du Manager", level=1)
+    doc.add_paragraph(brief_data.get("manager_notes", ""))
 
     buffer = io.BytesIO()
     doc.save(buffer)
     buffer.seek(0)
-    return buffer
+    return buffer.getvalue()
 
 # -------------------- Gestion de la Bibliothèque de fiches de poste --------------------
 LIBRARY_FILE = "job_library.json"
@@ -716,7 +676,7 @@ def get_example_for_field(section_title, field_title):
     examples = {
         "Contexte du poste": {
             "Raison de l'ouverture": "Remplacement d’un départ en retraite sur un chantier majeur",
-            "Mission globale": "Assurer la gestion des projets BTP stratégiques de l’entreprise",
+            "Impact stratégique": "Assurer la gestion des projets BTP stratégiques de l’entreprise",
             "Tâches principales": "Gestion de chantier complexe, coordination d’équipe sur site, suivi des normes de sécurité BTP",
         },
         "Must-have (Indispensables)": {
@@ -730,10 +690,23 @@ def get_example_for_field(section_title, field_title):
             "Diplômes / Certifications valorisantes": "Certification LEED pour le BTP durable",
             "Compétences complémentaires": "Connaissance en BIM pour modélisation de chantiers",
         },
+        "Conditions et contraintes": {
+            "Localisation": "Chantier principal à Paris avec 20% de télétravail",
+            "Budget recrutement": "Salaire entre 40k et 50k€ + primes",
+        },
         "Sourcing et marché": {
             "Entreprises où trouver ce profil": "Vinci, Bouygues, Eiffage",
             "Synonymes / intitulés proches": "Conducteur de Travaux, Ingénieur Chantier",
             "Canaux à utiliser": "LinkedIn pour profils BTP, jobboards comme Batiweb",
+        },
+        "Profils pertinents": {
+            "Lien profil 1": "https://linkedin.com/in/exemple-btp",
+            "Lien profil 2": "https://linkedin.com/in/exemple-btp-2",
+            "Lien profil 3": "https://linkedin.com/in/exemple-btp-3",
+        },
+        "Notes libres": {
+            "Points à discuter ou à clarifier avec le manager": "Clarifier les délais du projet",
+            "Case libre": "Note sur les priorités du chantier",
         }
     }
     return examples.get(section_title, {}).get(field_title, "Exemple non disponible")
@@ -759,12 +732,11 @@ def generate_automatic_brief_name():
     
     return brief_name
 
-# Ajoutez ceci dans la section des fonctions utilitaires, par exemple
+# -------------------- Conversion de colonne --------------------
 def col_to_letter(col_index):
     """Convertit l'index de colonne (base 1) en lettre Excel (e.g., 1 -> A, 27 -> AA)"""
     letter = ''
     while col_index > 0:
-        # divmod(a, b) retourne (a // b, a % b)
         col_index, remainder = divmod(col_index - 1, 26)
         letter = chr(65 + remainder) + letter
     return letter
