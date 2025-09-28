@@ -299,4 +299,4 @@ else:
             else:
                 st.info("Aucune fonctionnalité à supprimer.")
 
-    st.caption("TG-Hire IA - Roadmap Fonctionnelle v2.2")
+    st.caption("TG-Hire IA - Roadmap Fonctionnelle v1.0")
