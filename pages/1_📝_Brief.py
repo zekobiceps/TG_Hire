@@ -247,6 +247,48 @@ def delete_current_brief():
             st.session_state.brief_phase = "📁 Gestion"
             st.rerun()
 
+# --- NOUVELLE FONCTION (CALLBACK) POUR CORRIGER LE BUG ---
+def load_brief_for_editing(brief_name):
+    """
+    Callback pour charger les données d'un brief dans session_state AVANT le redessinage de la page.
+    """
+    st.session_state.current_brief_name = brief_name
+    brief_data = st.session_state.saved_briefs.get(brief_name, {})
+
+    keys_to_load = [
+        "poste_intitule", "manager_nom", "recruteur", "affectation_type", "affectation_nom",
+        "raison_ouverture", "impact_strategique", "rattachement", "taches_principales",
+        "must_have_experience", "must_have_diplomes", "must_have_competences", "must_have_softskills",
+        "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences",
+        "entreprises_profil", "synonymes_poste", "canaux_profil", "budget", "commentaires",
+        "notes_libres", "profil_link_1", "profil_link_2", "profil_link_3",
+        "canaux_prioritaires", "criteres_exclusion", "processus_evaluation", "manager_notes"
+    ]
+
+    for key in keys_to_load:
+        value = brief_data.get(key)
+        if key == "canaux_prioritaires":
+            st.session_state[key] = value if isinstance(value, list) else []
+        else:
+            st.session_state[key] = "" if pd.isna(value) else value
+
+    # Gérer la date séparément
+    try:
+        date_str = brief_data.get("date_brief")
+        st.session_state.date_brief = datetime.strptime(str(date_str), '%Y-%m-%d').date()
+    except (ValueError, TypeError):
+        st.session_state.date_brief = datetime.today().date()
+
+    # Gérer la matrice KSA séparément
+    try:
+        ksa_json_str = brief_data.get("KSA_MATRIX_JSON", "")
+        if ksa_json_str and isinstance(ksa_json_str, str) and ksa_json_str.strip() not in ('', '[]'):
+            st.session_state.ksa_matrix = pd.read_json(io.StringIO(ksa_json_str))
+        else:
+            st.session_state.ksa_matrix = pd.DataFrame()
+    except Exception:
+        st.session_state.ksa_matrix = pd.DataFrame()            
+
 # ---------------- INIT ----------------
 init_session_state()
 st.set_page_config(
@@ -369,6 +411,22 @@ with tabs[0]:
     
     with col_info:
         st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Informations de base</h3>', unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.text_input("Poste à recruter", key="poste_intitule")
+        with col2:
+            st.text_input("Manager", key="manager_nom")
+        with col3:
+            st.selectbox("Recruteur", ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"], key="recruteur")
+        
+        col4, col5, col6 = st.columns(3)
+        with col4:
+            st.selectbox("Type d'affectation", ["Chantier", "Siège", "Dépôt"], key="affectation_type")
+        with col5:
+            st.text_input("Nom affectation", key="affectation_nom")
+        with col6:
+            st.date_input("Date du brief", key="date_brief")
         
         # Load brief data if editing
         brief_data = {}
@@ -503,57 +561,21 @@ with tabs[0]:
         else:
             briefs_to_show = st.session_state.saved_briefs
 
-if briefs_to_show:
-    for name, data in briefs_to_show.items():
-        col_brief1, col_brief2, col_brief3, col_brief4 = st.columns([3, 1, 1, 1])
-        with col_brief1:
-            st.write(f"**{name}** - Manager: {data.get('manager_nom', 'N/A')} - Affectation: {data.get('affectation_nom', 'N/A')}")
-        with col_brief2:
-            if st.button("📝 Éditer", key=f"edit_{name}"):
-                st.session_state.current_brief_name = name
-                brief_data = st.session_state.saved_briefs.get(name, {})
+    if briefs_to_show:
+        for name, data in briefs_to_show.items():
+            col_brief1, col_brief2, col_brief3, col_brief4 = st.columns([3, 1, 1, 1])
+            with col_brief1:
+                st.write(f"**{name}** - Manager: {data.get('manager_nom', 'N/A')} - Affectation: {data.get('affectation_nom', 'N/A')}")
+            
+            with col_brief2:
+                # --- MODIFICATION DU BOUTON "ÉDITER" ---
+                st.button(
+                    "📝 Éditer", 
+                    key=f"edit_{name}", 
+                    on_click=load_brief_for_editing, 
+                    args=(name,)
+                )
 
-                # --- BLOC DE DIAGNOSTIC ---
-                st.info("Mode diagnostic activé pour trouver la clé problématique...")
-
-                keys_to_load = [
-                    "poste_intitule", "manager_nom", "recruteur", "affectation_type", "affectation_nom",
-                    "raison_ouverture", "impact_strategique", "rattachement", "taches_principales",
-                    "must_have_experience", "must_have_diplomes", "must_have_competences", "must_have_softskills",
-                    "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences",
-                    "entreprises_profil", "synonymes_poste", "canaux_profil", "budget", "commentaires",
-                    "notes_libres", "profil_link_1", "profil_link_2", "profil_link_3",
-                    "canaux_prioritaires", "criteres_exclusion", "processus_evaluation", "manager_notes"
-                ]
-
-                # On va essayer d'assigner les valeurs une par une
-                for key in keys_to_load:
-                    value = brief_data.get(key)
-                    
-                    # Nettoyage de la valeur
-                    clean_value = [] if key == "canaux_prioritaires" and pd.isna(value) else ("" if pd.isna(value) else value)
-                    
-                    try:
-                        st.session_state[key] = clean_value
-                    except Exception as e:
-                        # Si ça échoue, on affiche toutes les informations nécessaires
-                        st.error(f"🚨 L'APPLICATION A ÉCHOUÉ SUR LA CLÉ SUIVANTE :")
-                        st.code(f"Clé = \"{key}\"", language="text")
-                        
-                        st.error("TYPE DE LA VALEUR PROBLÉMATIQUE :")
-                        st.code(f"{type(clean_value)}", language="text")
-                        
-                        st.error("VALEUR (tronquée à 500 caractères) :")
-                        st.code(str(clean_value)[:500], language="text")
-                        
-                        st.exception(e) # Affiche le traceback complet
-                        st.stop() # Arrête l'application pour que le message reste visible
-
-                # Si la boucle se termine sans erreur, on gère les cas complexes
-                # ... (code pour la date et la matrice KSA) ...
-                
-                st.success("Diagnostic terminé sans erreur. Rechargement...")
-                st.rerun()
         with col_brief3:
             if st.button("🗑️ Supprimer", key=f"delete_{name}"):
                 st.session_state.saved_briefs.pop(name, None)
@@ -583,8 +605,8 @@ if briefs_to_show:
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                             key=f"download_word_{name}"
                         )
-else:
-    st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
+    else:
+        st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
 
 # ---------------- AVANT-BRIEF ----------------
 with tabs[1]:
