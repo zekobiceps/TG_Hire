@@ -495,23 +495,44 @@ with tabs[0]:
         
         if st.session_state.show_filtered_results:
             st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
-            briefs_to_show = st.session_state.saved_briefs  # Pour afficher tous les briefs
-
-st.write("DEBUG - Briefs à afficher :", briefs_to_show)
+            # ...onglet Gestion...
+briefs_to_show = st.session_state.saved_briefs
 
 if briefs_to_show and len(briefs_to_show) > 0:
+    # Mapping MAJUSCULES <-> minuscules
+    key_mapping = {
+        "RAISON_OUVERTURE": "raison_ouverture",
+        "IMPACT_STRATEGIQUE": "impact_strategique",
+        "TACHES_PRINCIPALES": "taches_principales",
+        "MUST_HAVE_EXP": "must_have_experience",
+        "MUST_HAVE_DIP": "must_have_diplomes",
+        "MUST_HAVE_COMPETENCES": "must_have_competences",
+        "MUST_HAVE_SOFTSKILLS": "must_have_softskills",
+        "NICE_TO_HAVE_EXP": "nice_to_have_experience",
+        "NICE_TO_HAVE_DIP": "nice_to_have_diplomes",
+        "NICE_TO_HAVE_COMPETENCES": "nice_to_have_competences",
+        "RATTACHEMENT": "rattachement",
+        "BUDGET": "budget",
+        "ENTREPRISES_PROFIL": "entreprises_profil",
+        "SYNONYMES_POSTE": "synonymes_poste",
+        "CANAUX_PROFIL": "canaux_profil",
+        "LIEN_PROFIL_1": "profil_link_1",
+        "LIEN_PROFIL_2": "profil_link_2",
+        "LIEN_PROFIL_3": "profil_link_3",
+        "COMMENTAIRES": "commentaires",
+        "NOTES_LIBRES": "notes_libres"
+    }
+
     for name, brief in briefs_to_show.items():
         col_brief1, col_brief2 = st.columns([6, 1])
         with col_brief1:
             st.markdown(f"**{name}**")
         with col_brief2:
             if st.button("📝 Éditer", key=f"edit_{name}"):
-                # Récupère les données du brief sélectionné
-                brief_data_gsheet = st.session_state.saved_briefs.get(name, {})
-                # Met à jour les clés simples
-                for key, value in brief_data_gsheet.items():
-                    st.session_state[key] = value
-                # Met à jour les clés uniques du formulaire Avant-brief
+                # Remplit les champs du formulaire avec les bonnes clés
+                for maj_key, min_key in key_mapping.items():
+                    st.session_state[min_key] = brief.get(maj_key, "")
+                # Remplit aussi les clés uniques du formulaire Avant-brief
                 sections = [
                     {"title": "Contexte du poste", "fields": [
                         ("Raison de l'ouverture", "raison_ouverture", ""),
@@ -544,7 +565,7 @@ if briefs_to_show and len(briefs_to_show) > 0:
                 for section in sections:
                     for title, field_key, _ in section["fields"]:
                         unique_key = f"{section['title'].replace(' ', '_')}_{field_key}"
-                        st.session_state[unique_key] = brief_data_gsheet.get(field_key, "")
+                        st.session_state[unique_key] = brief.get(key_mapping.get(field_key.upper(), field_key), "")
                 st.session_state.current_brief_name = name
                 st.session_state.avant_brief_completed = True
                 st.session_state.reunion_completed = True
