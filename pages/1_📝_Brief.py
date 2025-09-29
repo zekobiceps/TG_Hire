@@ -412,7 +412,8 @@ with tabs[0]:
 with col_info:
         st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Informations de base</h3>', unsafe_allow_html=True)
         
-        # Ce bloc de champs est maintenant unique et lit ses valeurs depuis st.session_state.
+        # Ce bloc de champs est maintenant unique et lit ses valeurs
+        # directement depuis st.session_state grâce à la fonction callback "load_brief_for_editing".
         col1, col2, col3 = st.columns(3)
         with col1:
             st.text_input("Poste à recruter", key="poste_intitule")
@@ -441,7 +442,7 @@ with col_info:
                     brief_name = generate_automatic_brief_name()
                     st.session_state.current_brief_name = brief_name
 
-                # Logique de sauvegarde complète
+                # Votre logique de sauvegarde complète
                 brief_data = {
                     "BRIEF_NAME": brief_name,
                     "poste_intitule": st.session_state.poste_intitule,
@@ -487,7 +488,7 @@ with col_info:
 
         with col_cancel:
             if st.button("➕ Nouveau / Annuler", use_container_width=True, key="cancel_brief"):
-                # --- Logique d'annulation complète ---
+                # Logique d'annulation complète
                 keys_to_reset = [
                     "poste_intitule", "manager_nom", "affectation_nom", "raison_ouverture", 
                     "impact_strategique", "rattachement", "taches_principales", "must_have_experience", 
@@ -495,8 +496,7 @@ with col_info:
                     "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences", 
                     "entreprises_profil", "synonymes_poste", "canaux_profil", "budget", 
                     "commentaires", "notes_libres", "profil_link_1", "profil_link_2", 
-                    "profil_link_3", "criteres_exclusion", 
-                    "processus_evaluation", "manager_notes"
+                    "profil_link_3", "criteres_exclusion", "processus_evaluation", "manager_notes"
                 ]
                 for key in keys_to_reset:
                     st.session_state[key] = ""
