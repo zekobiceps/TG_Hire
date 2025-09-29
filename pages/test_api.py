@@ -135,7 +135,7 @@ def render_ksa_matrix():
                 rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique",
                                       index=["Knowledge", "Skills", "Abilities"].index(st.session_state.get("new_rubrique", "Knowledge"))
                                       if st.session_state.get("new_rubrique") in ["Knowledge", "Skills", "Abilities"] else 0)
-                st.markdown("</div>", unsafe_allowhtml=True)
+                st.markdown("</div>", unsafe_allow_html=True)  # correction ici (unsafe_allow_html)
             with col2:
                 st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
                 critere = st.text_input("Critère", placeholder="", key="new_critere", value=st.session_state.get("new_critere", ""))
@@ -460,7 +460,7 @@ with tabs[0]:
         with col5:
             st.text_input("Nom affectation", key="affectation_nom", value=brief_data.get("affectation_nom", ""))
         with col6:
-            date_brief_raw = brief_data.get("date_brief", st.session_state.get)
+            date_brief_raw = brief_data.get("date_brief", st.session_state.get("date_brief", date.today()))  # correction : valeur par défaut correcte
 
             # Correction : on force la valeur dans session_state à être du bon type
             if "date_brief" in st.session_state and not isinstance(st.session_state["date_brief"], date):
@@ -723,17 +723,27 @@ with tabs[3]:
         st.subheader(f"📝 Synthèse - {st.session_state.current_brief_name}")
         
         brief_data = load_briefs().get(st.session_state.current_brief_name, {})
+        # Fallback MAJUSCULE -> minuscules -> session_state
+        poste = brief_data.get('POSTE_INTITULE') or brief_data.get('poste_intitule') or st.session_state.get('poste_intitule', 'N/A')
+        manager = brief_data.get('MANAGER_NOM') or brief_data.get('manager_nom') or st.session_state.get('manager_nom', 'N/A')
+        affect_nom = brief_data.get('AFFECTATION_NOM') or brief_data.get('affectation_nom') or st.session_state.get('affectation_nom', 'N/A')
+        affect_type = brief_data.get('AFFECTATION_TYPE') or brief_data.get('affectation_type') or st.session_state.get('affectation_type', 'N/A')
+        date_brief_disp = brief_data.get('DATE_BRIEF') or brief_data.get('date_brief') or str(st.session_state.get('date_brief', 'N/A'))
+
         st.write("### Informations générales")
-        st.write(f"- **Poste :** {brief_data.get('POSTE_INTITULE', 'N/A')}")
-        st.write(f"- **Manager :** {brief_data.get('MANAGER_NOM', 'N/A')}")
-        st.write(f"- **Affectation :** {brief_data.get('AFFECTATION_NOM', 'N/A')} ({brief_data.get('AFFECTATION_TYPE', 'N/A')})")
-        st.write(f"- **Date :** {brief_data.get('DATE_BRIEF', 'N/A')}")
+        st.write(f"- **Poste :** {poste}")
+        st.write(f"- **Manager :** {manager}")
+        st.write(f"- **Affectation :** {affect_nom} ({affect_type})")
+        st.write(f"- **Date :** {date_brief_disp}")
         
         st.write("### Détails du brief")
         for section in sections:
             with st.expander(f"📋 {section['title']}"):
                 for title, key, _ in section["fields"]:
-                    value = brief_data.get(key, st.session_state.get(key, ""))
+                    # Fallback clé upper / lower / session
+                    value = (brief_data.get(key.upper()) or
+                             brief_data.get(key) or
+                             st.session_state.get(key, ""))
                     if value:
                         st.write(f"- **{title} :** {value}")
         
