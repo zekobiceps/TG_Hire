@@ -775,6 +775,8 @@ with tabs[2]:
                 if st.button("Suivant ➡️", use_container_width=True):
                     st.session_state.reunion_step += 1
                     st.rerun()
+
+                    st.write(f"DEBUG: reunion_step = {st.session_state.get('reunion_step', 'NON DEFINI')}")
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
     if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Synthèse"):
