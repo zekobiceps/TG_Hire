@@ -710,7 +710,7 @@ for section in sections:
     if section["title"] == "Profils pertinents":
         continue
     for title, key, _ in section["fields"]:
-        sheet_key = key.upper()  # Cherche la clé MAJUSCULE
+        sheet_key = key.upper()
         info_value = brief_data.get(sheet_key, "")
         comment_value = manager_comments.get(key, "")
         table_data.append({
@@ -720,54 +720,54 @@ for section in sections:
             "Commentaires du manager": comment_value,
             "_key": key
         })
-            
-        if not table_data:
-            st.warning("Veuillez d'abord remplir l'onglet 'Avant-brief'.")
-        else:
-            df = pd.DataFrame(table_data)
-            edited_df = st.data_editor(
-                df,
-                column_config={
-                    "Section": st.column_config.TextColumn(disabled=True),
-                    "Détails": st.column_config.TextColumn(disabled=True),
-                    "Informations": st.column_config.TextColumn(disabled=True, width="large"),
-                    "Commentaires du manager": st.column_config.TextColumn(width="large"),
-                    "_key": None,
-                },
-                use_container_width=True, hide_index=True, key="manager_comments_editor"
-            )
 
-            if st.button("💾 Enregistrer les commentaires", type="primary"):
-                comments_to_save = {row["_key"]: row["Commentaires du manager"] for _, row in edited_df.iterrows() if row["Commentaires du manager"]}
-                st.session_state.saved_briefs[st.session_state.current_brief_name]["manager_comments"] = comments_to_save
-                save_briefs()
+if not table_data:
+    st.warning("Veuillez d'abord remplir l'onglet 'Avant-brief'.")
+else:
+    df = pd.DataFrame(table_data)
+    edited_df = st.data_editor(
+        df,
+        column_config={
+            "Section": st.column_config.TextColumn(disabled=True),
+            "Détails": st.column_config.TextColumn(disabled=True),
+            "Informations": st.column_config.TextColumn(disabled=True, width="large"),
+            "Commentaires du manager": st.column_config.TextColumn(width="large"),
+            "_key": None,
+        },
+        use_container_width=True, hide_index=True, key="manager_comments_editor"
+    )
 
-                payload_for_gsheet = st.session_state.saved_briefs[st.session_state.current_brief_name].copy()
-                payload_for_gsheet['MANAGER_COMMENTS_JSON'] = json.dumps(comments_to_save, indent=4, ensure_ascii=False)
-                
-                mapping = {
-                    "poste_intitule": "POSTE_INTITULE", "manager_nom": "MANAGER_NOM", "recruteur": "RECRUTEUR",
-                    "affectation_type": "AFFECTATION_TYPE", "affectation_nom": "AFFECTATION_NOM", "date_brief": "DATE_BRIEF",
-                    "raison_ouverture": "RAISON_OUVERTURE", "impact_strategique": "IMPACT_STRATEGIQUE",
-                    "rattachement": "RATTACHEMENT", "taches_principales": "TACHES_PRINCIPALES",
-                    "must_have_experience": "MUST_HAVE_EXP", "must_have_diplomes": "MUST_HAVE_DIP",
-                    "must_have_competences": "MUST_HAVE_COMPETENCES", "must_have_softskills": "MUST_HAVE_SOFTSKILLS",
-                    "nice_to_have_experience": "NICE_TO_HAVE_EXP", "nice_to_have_diplomes": "NICE_TO_HAVE_DIP",
-                    "nice_to_have_competences": "NICE_TO_HAVE_COMPETENCES",
-                    "entreprises_profil": "ENTREPRISES_PROFIL", "synonymes_poste": "SYNONYMES_POSTE",
-                    "canaux_profil": "CANAUX_PROFIL", "budget": "BUDGET", "commentaires": "COMMENTAIRES",
-                    "notes_libres": "NOTES_LIBRES"
-                }
-                for session_key, gsheet_key in mapping.items():
-                    if session_key in payload_for_gsheet:
-                        payload_for_gsheet[gsheet_key] = payload_for_gsheet[session_key]
+    if st.button("💾 Enregistrer les commentaires", type="primary"):
+        comments_to_save = {row["_key"]: row["Commentaires du manager"] for _, row in edited_df.iterrows() if row["Commentaires du manager"]}
+        st.session_state.saved_briefs[st.session_state.current_brief_name]["manager_comments"] = comments_to_save
+        save_briefs()
 
-                if "ksa_matrix" in payload_for_gsheet and isinstance(payload_for_gsheet["ksa_matrix"], pd.DataFrame) and not payload_for_gsheet["ksa_matrix"].empty:
-                    payload_for_gsheet['KSA_MATRIX_JSON'] = payload_for_gsheet["ksa_matrix"].to_csv(index=False, sep=";", encoding="utf-8")
-                
-                save_brief_to_gsheet(st.session_state.current_brief_name, payload_for_gsheet)
-                st.success("✅ Commentaires sauvegardés et synchronisés avec Google Sheets !")
-                st.rerun()
+        payload_for_gsheet = st.session_state.saved_briefs[st.session_state.current_brief_name].copy()
+        payload_for_gsheet['MANAGER_COMMENTS_JSON'] = json.dumps(comments_to_save, indent=4, ensure_ascii=False)
+        
+        mapping = {
+            "poste_intitule": "POSTE_INTITULE", "manager_nom": "MANAGER_NOM", "recruteur": "RECRUTEUR",
+            "affectation_type": "AFFECTATION_TYPE", "affectation_nom": "AFFECTATION_NOM", "date_brief": "DATE_BRIEF",
+            "raison_ouverture": "RAISON_OUVERTURE", "impact_strategique": "IMPACT_STRATEGIQUE",
+            "rattachement": "RATTACHEMENT", "taches_principales": "TACHES_PRINCIPALES",
+            "must_have_experience": "MUST_HAVE_EXP", "must_have_diplomes": "MUST_HAVE_DIP",
+            "must_have_competences": "MUST_HAVE_COMPETENCES", "must_have_softskills": "MUST_HAVE_SOFTSKILLS",
+            "nice_to_have_experience": "NICE_TO_HAVE_EXP", "nice_to_have_diplomes": "NICE_TO_HAVE_DIP",
+            "nice_to_have_competences": "NICE_TO_HAVE_COMPETENCES",
+            "entreprises_profil": "ENTREPRISES_PROFIL", "synonymes_poste": "SYNONYMES_POSTE",
+            "canaux_profil": "CANAUX_PROFIL", "budget": "BUDGET", "commentaires": "COMMENTAIRES",
+            "notes_libres": "NOTES_LIBRES"
+        }
+        for session_key, gsheet_key in mapping.items():
+            if session_key in payload_for_gsheet:
+                payload_for_gsheet[gsheet_key] = payload_for_gsheet[session_key]
+
+        if "ksa_matrix" in payload_for_gsheet and isinstance(payload_for_gsheet["ksa_matrix"], pd.DataFrame) and not payload_for_gsheet["ksa_matrix"].empty:
+            payload_for_gsheet['KSA_MATRIX_JSON'] = payload_for_gsheet["ksa_matrix"].to_csv(index=False, sep=";", encoding="utf-8")
+        
+        save_brief_to_gsheet(st.session_state.current_brief_name, payload_for_gsheet)
+        st.success("✅ Commentaires sauvegardés et synchronisés avec Google Sheets !")
+        st.rerun()
 
     if step == 2:
         with st.expander("📊 Matrice KSA - Validation manager", expanded=True):
