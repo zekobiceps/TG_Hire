@@ -490,45 +490,51 @@ with tabs[0]:
             st.date_input("Date du brief", key="date_brief", value=date_brief_value)
 
         if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
-            # Vérification des champs requis
             required_fields = ["poste_intitule", "manager_nom", "affectation_nom", "date_brief"]
             missing_fields = [field for field in required_fields if not st.session_state.get(field)]
-            
             if missing_fields:
                 st.error(f"Veuillez remplir les champs suivants : {', '.join(missing_fields)}")
             else:
-                # Création du brief
-                new_brief_name = generate_automatic_brief_name(st.session_state.poste_intitule, st.session_state.manager_nom)
+                # Nom automatique (ajout date si signature attend 3 params)
+                try:
+                    new_brief_name = generate_automatic_brief_name(
+                        st.session_state.poste_intitule,
+                        st.session_state.manager_nom,
+                        st.session_state.date_brief
+                    )
+                except TypeError:
+                    new_brief_name = generate_automatic_brief_name(
+                        st.session_state.poste_intitule,
+                        st.session_state.manager_nom
+                    )
                 st.session_state.current_brief_name = new_brief_name
-                
-                # Initialiser le brief avec les valeurs des champs
-                new_brief_data = {key: st.session_state.get(key) for key in all_field_keys}
-                st.session_state.saved_briefs[new_brief_name] = new_brief_data
-                
-                # Sauvegarder dans le fichier JSON
-                save_briefs()
-                
-                # Sauvegarder dans Google Sheets
-                payload_for_gsheet = new_brief_data.copy()
-                mapping = {
-                    "poste_intitule": "POSTE_INTITULE", "manager_nom": "MANAGER_NOM", "recruteur": "RECRUTEUR",
-                    "affectation_type": "AFFECTATION_TYPE", "affectation_nom": "AFFECTATION_NOM", "date_brief": "DATE_BRIEF",
-                    "raison_ouverture": "RAISON_OUVERTURE", "impact_strategique": "IMPACT_STRATEGIQUE",
-                    "rattachement": "RATTACHEMENT", "taches_principales": "TACHES_PRINCIPALES",
-                    "must_have_experience": "MUST_HAVE_EXP", "must_have_diplomes": "MUST_HAVE_DIP",
-                    "must_have_competences": "MUST_HAVE_COMPETENCES", "must_have_softskills": "MUST_HAVE_SOFTSKILLS",
-                    "nice_to_have_experience": "NICE_TO_HAVE_EXP", "nice_to_have_diplomes": "NICE_TO_HAVE_DIP",
-                    "nice_to_have_competences": "NICE_TO_HAVE_COMPETENCES",
-                    "entreprises_profil": "ENTREPRISES_PROFIL", "synonymes_poste": "SYNONYMES_POSTE",
-                    "canaux_profil": "CANAUX_PROFIL", "budget": "BUDGET", "commentaires": "COMMENTAIRES",
-                    "notes_libres": "NOTES_LIBRES"
+
+                new_brief_data = {}
+                # Champs de base (lower + upper)
+                base_pairs = {
+                    "poste_intitule": "POSTE_INTITULE",
+                    "manager_nom": "MANAGER_NOM",
+                    "recruteur": "RECRUTEUR",
+                    "affectation_type": "AFFECTATION_TYPE",
+                    "affectation_nom": "AFFECTATION_NOM",
+                    "date_brief": "DATE_BRIEF"
                 }
-                for session_key, gsheet_key in mapping.items():
-                    if session_key in payload_for_gsheet:
-                        payload_for_gsheet[gsheet_key] = payload_for_gsheet[session_key]
-                
-                save_brief_to_gsheet(new_brief_name, payload_for_gsheet)
-                
+                for low, up in base_pairs.items():
+                    v = st.session_state.get(low, "")
+                    new_brief_data[low] = v
+                    new_brief_data[up] = v
+                # Champs Avant-brief
+                for k in all_field_keys:
+                    v = st.session_state.get(k, "")
+                    new_brief_data[k] = v
+                    new_brief_data[k.upper()] = v
+
+                st.session_state.saved_briefs[new_brief_name] = new_brief_data
+                save_briefs()
+
+                # Payload Google Sheets (upper déjà prêts)
+                save_brief_to_gsheet(new_brief_name, new_brief_data)
+
                 st.success(f"✅ Brief '{new_brief_name}' créé avec succès !")
                 st.rerun()
 
@@ -612,11 +618,23 @@ with tabs[1]:
             if st.form_submit_button("💾 Enregistrer modifications", type="primary", use_container_width=True):
                 if st.session_state.current_brief_name:
                     current_brief_name = st.session_state.current_brief_name
-                    brief_to_update = st.session_state.saved_briefs[current_brief_name]
+                    brief_to_update = st.session_state.saved_briefs.get(current_brief_name, {})
                     for section in sections:
                         for _, key, _ in section["fields"]:
-                            brief_to_update[key] = st.session_state.get(key, "")
+                            val = st.session_state.get(key, "")
+                            # version lower + upper
+                            brief_to_update[key] = val
+                            brief_to_update[key.upper()] = val
+                    # Champs de base si modifiés
+                    for low in ["poste_intitule", "manager_nom", "recruteur",
+                                "affectation_type", "affectation_nom", "date_brief"]:
+                        if low in st.session_state:
+                            v = st.session_state.get(low, "")
+                            brief_to_update[low] = v
+                            brief_to_update[low.upper()] = v
+                    st.session_state.saved_briefs[current_brief_name] = brief_to_update
                     save_briefs()
+                    save_brief_to_gsheet(current_brief_name, brief_to_update)
                     st.success("✅ Modifications sauvegardées avec succès.")
                     st.rerun()
 
@@ -639,7 +657,8 @@ with tabs[2]:
             continue
         for title, key, _ in section["fields"]:
             sheet_key = key.upper()
-            info_value = brief_data.get(sheet_key, "")
+            info_value = brief_data.get(sheet_key) or brief_data.get(key, "")
+            # Charger JSON manager (déjà fait plus haut)
             comment_value = manager_comments.get(key, "")
             table_data.append({
                 "Section": section["title"],
@@ -648,6 +667,7 @@ with tabs[2]:
                 "Commentaires du manager": comment_value,
                 "_key": key
             })
+
     if table_data:
         df = pd.DataFrame(table_data)
         edited_df = st.data_editor(
@@ -662,13 +682,20 @@ with tabs[2]:
             use_container_width=True, hide_index=True, key="manager_comments_editor"
         )
         if st.button("💾 Enregistrer les commentaires", type="primary"):
-            comments_to_save = {row["_key"]: row["Commentaires du manager"] for _, row in edited_df.iterrows() if row["Commentaires du manager"]}
-            st.session_state.saved_briefs[st.session_state.current_brief_name]["manager_comments"] = comments_to_save
+            comments_to_save = {
+                row["_key"]: row["Commentaires du manager"]
+                for _, row in edited_df.iterrows()
+                if row["Commentaires du manager"]
+            }
+            # Sauvegarde cohérente en JSON (clé upper)
+            brief_ref = st.session_state.saved_briefs[st.session_state.current_brief_name]
+            brief_ref["MANAGER_COMMENTS_JSON"] = json.dumps(comments_to_save, ensure_ascii=False, indent=2)
+            # Optionnel : garder aussi version dict directe
+            brief_ref["manager_comments"] = comments_to_save
+            st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_ref
             save_briefs()
-            payload_for_gsheet = st.session_state.saved_briefs[st.session_state.current_brief_name].copy()
-            payload_for_gsheet['MANAGER_COMMENTS_JSON'] = json.dumps(comments_to_save, indent=4, ensure_ascii=False)
-            save_brief_to_gsheet(st.session_state.current_brief_name, payload_for_gsheet)
-            st.success("✅ Commentaires sauvegardés et synchronisés avec Google Sheets !")
+            save_brief_to_gsheet(st.session_state.current_brief_name, brief_ref)
+            st.success("✅ Commentaires sauvegardés et synchronisés.")
             st.rerun()
     else:
         st.warning("Veuillez d'abord remplir l'onglet 'Avant-brief'.")
@@ -688,13 +715,21 @@ with tabs[2]:
         with col_save:
             if st.form_submit_button("💾 Enregistrer la réunion", type="primary", use_container_width=True):
                 current_brief_name = st.session_state.current_brief_name
-                brief_to_update = st.session_state.saved_briefs[current_brief_name]
-                brief_to_update["strategie_sourcing"] = st.session_state.get("strategie_sourcing", "")
-                brief_to_update["processus_evaluation"] = st.session_state.get("processus_evaluation", "")
-                brief_to_update["criteres_exclusion"] = st.session_state.get("criteres_exclusion", "")
-                brief_to_update["manager_notes"] = st.session_state.get("manager_notes", "")
+                brief_to_update = st.session_state.saved_briefs.get(current_brief_name, {})
+                mapping_step3 = {
+                    "strategie_sourcing": "STRATEGIE_SOURCING",
+                    "processus_evaluation": "PROCESSUS_EVALUATION",
+                    "criteres_exclusion": "CRITERES_EXCLUSION",
+                    "manager_notes": "MANAGER_NOTES"
+                }
+                for low, up in mapping_step3.items():
+                    v = st.session_state.get(low, "")
+                    brief_to_update[low] = v
+                    brief_to_update[up] = v
+                st.session_state.saved_briefs[current_brief_name] = brief_to_update
                 st.session_state.reunion_completed = True
                 save_briefs()
+                save_brief_to_gsheet(current_brief_name, brief_to_update)
                 st.success("✅ Réunion de brief finalisée et sauvegardée.")
                 st.rerun()
 
