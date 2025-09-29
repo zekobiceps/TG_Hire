@@ -696,6 +696,8 @@ with tabs[2]:
             st.session_state.brief_to_import = None
             st.rerun()
         
+        brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
+
         manager_comments = brief_data.get("manager_comments", {})
 
         table_data = []
@@ -703,9 +705,15 @@ with tabs[2]:
             if section["title"] == "Profils pertinents":
                 continue
             for title, key, _ in section["fields"]:
+                # On récupère la valeur du brief sauvegardé (même que Avant-brief)
+                info_value = brief_data.get(key, "")
+                comment_value = manager_comments.get(key, "")
                 table_data.append({
-                    "Section": section["title"], "Détails": title, "Informations": brief_data.get(key, ""),
-                    "Commentaires du manager": manager_comments.get(key, ""), "_key": key
+                    "Section": section["title"],
+                    "Détails": title,
+                    "Informations": info_value,
+                    "Commentaires du manager": comment_value,
+                    "_key": key
                 })
             
         if not table_data:
