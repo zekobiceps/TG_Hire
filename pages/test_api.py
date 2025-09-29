@@ -495,44 +495,49 @@ with tabs[0]:
         
         if st.session_state.show_filtered_results:
             st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
-            # ...onglet Gestion...
+            # ...dans l'onglet Gestion...
 briefs_to_show = st.session_state.saved_briefs
 
-if briefs_to_show and len(briefs_to_show) > 0:
-    # Mapping MAJUSCULES <-> minuscules
-    key_mapping = {
-        "RAISON_OUVERTURE": "raison_ouverture",
-        "IMPACT_STRATEGIQUE": "impact_strategique",
-        "TACHES_PRINCIPALES": "taches_principales",
-        "MUST_HAVE_EXP": "must_have_experience",
-        "MUST_HAVE_DIP": "must_have_diplomes",
-        "MUST_HAVE_COMPETENCES": "must_have_competences",
-        "MUST_HAVE_SOFTSKILLS": "must_have_softskills",
-        "NICE_TO_HAVE_EXP": "nice_to_have_experience",
-        "NICE_TO_HAVE_DIP": "nice_to_have_diplomes",
-        "NICE_TO_HAVE_COMPETENCES": "nice_to_have_competences",
-        "RATTACHEMENT": "rattachement",
-        "BUDGET": "budget",
-        "ENTREPRISES_PROFIL": "entreprises_profil",
-        "SYNONYMES_POSTE": "synonymes_poste",
-        "CANAUX_PROFIL": "canaux_profil",
-        "LIEN_PROFIL_1": "profil_link_1",
-        "LIEN_PROFIL_2": "profil_link_2",
-        "LIEN_PROFIL_3": "profil_link_3",
-        "COMMENTAIRES": "commentaires",
-        "NOTES_LIBRES": "notes_libres"
-    }
+key_mapping = {
+    "POSTE_INTITULE": "poste_intitule",
+    "MANAGER_NOM": "manager_nom",
+    "RECRUTEUR": "recruteur",
+    "AFFECTATION_TYPE": "affectation_type",
+    "AFFECTATION_NOM": "affectation_nom",
+    "DATE_BRIEF": "date_brief",
+    "RAISON_OUVERTURE": "raison_ouverture",
+    "IMPACT_STRATEGIQUE": "impact_strategique",
+    "TACHES_PRINCIPALES": "taches_principales",
+    "MUST_HAVE_EXP": "must_have_experience",
+    "MUST_HAVE_DIP": "must_have_diplomes",
+    "MUST_HAVE_COMPETENCES": "must_have_competences",
+    "MUST_HAVE_SOFTSKILLS": "must_have_softskills",
+    "NICE_TO_HAVE_EXP": "nice_to_have_experience",
+    "NICE_TO_HAVE_DIP": "nice_to_have_diplomes",
+    "NICE_TO_HAVE_COMPETENCES": "nice_to_have_competences",
+    "RATTACHEMENT": "rattachement",
+    "BUDGET": "budget",
+    "ENTREPRISES_PROFIL": "entreprises_profil",
+    "SYNONYMES_POSTE": "synonymes_poste",
+    "CANAUX_PROFIL": "canaux_profil",
+    "LIEN_PROFIL_1": "profil_link_1",
+    "LIEN_PROFIL_2": "profil_link_2",
+    "LIEN_PROFIL_3": "profil_link_3",
+    "COMMENTAIRES": "commentaires",
+    "NOTES_LIBRES": "notes_libres"
+}
 
+if briefs_to_show and len(briefs_to_show) > 0:
     for name, brief in briefs_to_show.items():
         col_brief1, col_brief2 = st.columns([6, 1])
         with col_brief1:
             st.markdown(f"**{name}**")
         with col_brief2:
             if st.button("📝 Éditer", key=f"edit_{name}"):
-                # Remplit les champs du formulaire avec les bonnes clés
-                for maj_key, min_key in key_mapping.items():
-                    st.session_state[min_key] = brief.get(maj_key, "")
-                # Remplit aussi les clés uniques du formulaire Avant-brief
+                # Synchronise toutes les clés générales et champs du brief
+                for sheet_key, session_key in key_mapping.items():
+                    st.session_state[session_key] = brief.get(sheet_key, "")
+                # Synchronise aussi les clés uniques pour le formulaire Avant-brief
                 sections = [
                     {"title": "Contexte du poste", "fields": [
                         ("Raison de l'ouverture", "raison_ouverture", ""),
