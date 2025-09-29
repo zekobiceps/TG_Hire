@@ -449,7 +449,7 @@ with tabs[0]:
         with col1:
             st.text_input("Poste à recruter", key="poste_intitule", value=brief_data.get("poste_intitule", ""))
         with col2:
-            st.text_input("Manager", key="manager_nom",
+            st.text_input("Manager", key="manager_nom", value=brief_data.get("manager_nom", ""))
         with col3:
             st.selectbox("Recruteur", ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"], key="recruteur",
                 index=["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"].index(brief_data.get("recruteur", "Zakaria")) if brief_data.get("recruteur", "Zakaria") in ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"] else 0)
@@ -460,7 +460,7 @@ with tabs[0]:
         with col5:
             st.text_input("Nom affectation", key="affectation_nom", value=brief_data.get("affectation_nom", ""))
         with col6:
-            date_brief_raw = brief_data.get("date_brief", st.session_state.get
+            date_brief_raw = brief_data.get("date_brief", st.session_state.get)
 
             # Correction : on force la valeur dans session_state à être du bon type
             if "date_brief" in st.session_state and not isinstance(st.session_state["date_brief"], date):
@@ -606,7 +606,7 @@ with tabs[1]:
                     )
                     if st.session_state.get(f"advice_{key}", ""):
                         st.info(f"**Conseil IA :**\n{st.session_state[f'advice_{key}']}")
-        # ... boutons de sauvegarde ...
+        # ...boutons de sauvegarde...
 
 # ---------------- REUNION BRIEF ----------------
 with tabs[2]:
@@ -728,13 +728,14 @@ with tabs[2]:
         # ... formulaire d'ajout de critère KSA ...
 
     elif step == 3:
-        # PAS de tableau ici
-        # ... stratégie, processus, critères ...
-
+        # ...étape 3...
+        pass
     elif step == 4:
         # PAS de tableau ici
         # ... finalisation, notes, etc. ...
-
+        # (Ajoutez ici le code de finalisation ou laissez ce commentaire si rien n'est à faire)
+        pass
+    
     col1, col2, col3 = st.columns([1, 6, 1])
     with col1:
         if step > 1:
@@ -777,8 +778,8 @@ with tabs[3]:
                         st.write(f"- **{title} :** {value}")
         
         if "ksa_matrix" in st.session_state and not st.session_state.ksa_matrix.empty:
-        st.subheader("📊 Matrice KSA")
-        st.dataframe(st.session_state.ksa_matrix, use_container_width=True, hide_index=True)
+            st.subheader("📊 Matrice KSA")
+            st.dataframe(st.session_state.ksa_matrix, use_container_width=True, hide_index=True)
         
         st.write("### Actions")
         col_save, col_cancel = st.columns([1, 1])
