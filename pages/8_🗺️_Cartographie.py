@@ -297,8 +297,8 @@ with tab1:
         st.download_button("Télécharger CSV", data=csv_data, file_name="cartographie_talents.csv", mime="text/csv", key="export_csv")
 
 with tab2:
+    # On calcule le total des profils au début
     total_profils = sum(len(v) for v in st.session_state.cartographie_data.values())
-    st.subheader(f"📊 Vue globale de la cartographie ({total_profils} profils)")
     
     try:
         import plotly.express as px
@@ -308,17 +308,14 @@ with tab2:
             df_counts = pd.DataFrame(list(counts.items()), columns=['Quadrant', 'Nombre'])
             df_counts = df_counts[df_counts['Nombre'] > 0]
             
-            # --- MODIFICATION 1 : Le titre est maintenant ici ---
-            st.subheader("Répartition des candidats par quadrant")
+            # --- MODIFICATION ICI ---
+            # Le titre du graphique inclut maintenant le nombre total de profils
+            st.subheader(f"Répartition des candidats par quadrant ({total_profils} profils)")
 
-            # --- MODIFICATION 2 : On retire l'argument 'title' de cette ligne ---
             fig = px.pie(df_counts, names='Quadrant', values='Nombre',
                          color_discrete_sequence=["#636EFA", "#EF553B", "#00CC96", "#AB63FA"])
             
             fig.update_traces(hovertemplate='<b>%{label}</b><br>Nombre: %{value}<br>Pourcentage: %{percent}<extra></extra>')
-            
-            # --- MODIFICATION 3 : On ajoute cette ligne pour agrandir la légende ---
-            # Vous pouvez changer la valeur 16 pour ajuster la taille comme vous le souhaitez.
             fig.update_layout(legend_font_size=16)
             
             st.plotly_chart(fig, use_container_width=True)
