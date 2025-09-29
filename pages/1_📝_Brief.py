@@ -413,7 +413,6 @@ with col_info:
         st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Informations de base</h3>', unsafe_allow_html=True)
         
         # Ce bloc de champs est maintenant unique et lit ses valeurs depuis st.session_state.
-        # La fonction "Éditer" (avec on_click) remplit ces clés en arrière-plan.
         col1, col2, col3 = st.columns(3)
         with col1:
             st.text_input("Poste à recruter", key="poste_intitule")
@@ -433,7 +432,7 @@ with col_info:
         # Logique pour les boutons "Créer / Mettre à jour" et "Annuler"
         col_create, col_cancel = st.columns(2)
         with col_create:
-            button_label = "💾 Mettre à jour le brief" if st.session_state.current_brief_name else "💾 Créer un nouveau brief"
+            button_label = "💾 Mettre à jour le brief" if st.session_state.get("current_brief_name") else "💾 Créer un nouveau brief"
             if st.button(button_label, type="primary", use_container_width=True, key="create_update_brief"):
                 
                 if st.session_state.current_brief_name:
@@ -442,7 +441,7 @@ with col_info:
                     brief_name = generate_automatic_brief_name()
                     st.session_state.current_brief_name = brief_name
 
-                # --- Voici la logique de sauvegarde complète ---
+                # Logique de sauvegarde complète
                 brief_data = {
                     "BRIEF_NAME": brief_name,
                     "poste_intitule": st.session_state.poste_intitule,
@@ -451,7 +450,6 @@ with col_info:
                     "affectation_type": st.session_state.affectation_type,
                     "affectation_nom": st.session_state.affectation_nom,
                     "date_brief": str(st.session_state.date_brief),
-                    # On récupère toutes les autres données depuis st.session_state
                     "raison_ouverture": st.session_state.get("raison_ouverture", ""),
                     "impact_strategique": st.session_state.get("impact_strategique", ""),
                     "rattachement": st.session_state.get("rattachement", ""),
@@ -477,8 +475,7 @@ with col_info:
                     "manager_comments": st.session_state.get("manager_comments", {}),
                 }
                 
-                # Conversion de la matrice KSA en JSON pour la sauvegarde
-                if isinstance(brief_data["ksa_matrix"], pd.DataFrame):
+                if isinstance(brief_data.get("ksa_matrix"), pd.DataFrame):
                     brief_data["KSA_MATRIX_JSON"] = brief_data["ksa_matrix"].to_json(orient='split', date_format='iso')
 
                 st.session_state.saved_briefs[brief_name] = brief_data
@@ -490,7 +487,7 @@ with col_info:
 
         with col_cancel:
             if st.button("➕ Nouveau / Annuler", use_container_width=True, key="cancel_brief"):
-                # Logique pour vider les champs et déselectionner le brief actuel
+                # --- Logique d'annulation complète ---
                 keys_to_reset = [
                     "poste_intitule", "manager_nom", "affectation_nom", "raison_ouverture", 
                     "impact_strategique", "rattachement", "taches_principales", "must_have_experience", 
@@ -498,20 +495,20 @@ with col_info:
                     "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences", 
                     "entreprises_profil", "synonymes_poste", "canaux_profil", "budget", 
                     "commentaires", "notes_libres", "profil_link_1", "profil_link_2", 
-                    "profil_link_3", "canaux_prioritaires", "criteres_exclusion", 
+                    "profil_link_3", "criteres_exclusion", 
                     "processus_evaluation", "manager_notes"
                 ]
                 for key in keys_to_reset:
-                    # Gère le cas des listes (multiselect) et des chaînes de caractères
-                    st.session_state[key] = [] if key == "canaux_prioritaires" else ""
+                    st.session_state[key] = ""
                 
-                # Réinitialiser les selectbox et date_input à une valeur par défaut
+                # Réinitialiser les listes et les valeurs par défaut
+                st.session_state.canaux_prioritaires = []
                 st.session_state.recruteur = "Zakaria"
                 st.session_state.affectation_type = "Chantier"
                 st.session_state.date_brief = datetime.today().date()
                 st.session_state.ksa_matrix = pd.DataFrame()
                 
-                # Très important : on déselectionne le brief en cours
+                # Très important : on déselectionne le brief en cours pour commencer un nouveau
                 st.session_state.current_brief_name = "" 
                 st.rerun()
     
