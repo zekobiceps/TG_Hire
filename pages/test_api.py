@@ -462,6 +462,18 @@ with tabs[0]:
         with col6:
             # Bloc date corrigé ci-dessus
             date_brief_raw = brief_data.get("date_brief", st.session_state.get("date_brief", date.today()))
+
+            # Nettoyage de la clé session_state si elle n'est pas du bon type
+            if "date_brief" in st.session_state and not isinstance(st.session_state["date_brief"], date):
+                try:
+                    st.session_state["date_brief"] = datetime.strptime(str(st.session_state["date_brief"]), "%Y-%m-%d").date()
+                except Exception:
+                    try:
+                        st.session_state["date_brief"] = datetime.strptime(str(st.session_state["date_brief"]), "%d/%m/%Y").date()
+                    except Exception:
+                        st.session_state["date_brief"] = date.today()
+
+            # Conversion de la valeur à afficher
             if isinstance(date_brief_raw, str):
                 try:
                     date_brief_value = datetime.strptime(date_brief_raw, "%Y-%m-%d").date()
@@ -476,6 +488,7 @@ with tabs[0]:
                 date_brief_value = date_brief_raw
             else:
                 date_brief_value = date.today()
+
             st.date_input("Date du brief", key="date_brief", value=date_brief_value)
 
     # Boutons sous les champs
@@ -751,8 +764,7 @@ with tabs[2]:
                         "nice_to_have_competences": "NICE_TO_HAVE_COMPETENCES",
                         "entreprises_profil": "ENTREPRISES_PROFIL", "synonymes_poste": "SYNONYMES_POSTE",
                         "canaux_profil": "CANAUX_PROFIL", "budget": "BUDGET", "commentaires": "COMMENTAIRES",
-                        "notes_libres": "NOTES_LIBRES",
-                        "profil_link_1": "LIEN_PROFIL_1", "profil_link_2": "LIEN_PROFIL_2", "profil_link_3": "LIEN_PROFIL_3"
+                        "notes_libres": "NOTES_LIBRES"
                     }
                     for session_key, gsheet_key in mapping.items():
                         if session_key in payload_for_gsheet:
