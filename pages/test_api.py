@@ -696,26 +696,30 @@ with tabs[2]:
             st.session_state.brief_to_import = None
             st.rerun()
         
-        brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
-        st.write("DEBUG brief_data :", brief_data)  # <-- Ajoute cette ligne temporairement
+        import json
 
-        manager_comments = brief_data.get("manager_comments", {})
+brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
+manager_comments_json = brief_data.get("MANAGER_COMMENTS_JSON", "{}")
+try:
+    manager_comments = json.loads(manager_comments_json)
+except Exception:
+    manager_comments = {}
 
-        table_data = []
-        for section in sections:
-            if section["title"] == "Profils pertinents":
-                continue
-            for title, key, _ in section["fields"]:
-                # On récupère la valeur du brief sauvegardé (même que Avant-brief)
-                info_value = brief_data.get(key, "")
-                comment_value = manager_comments.get(key, "")
-                table_data.append({
-                    "Section": section["title"],
-                    "Détails": title,
-                    "Informations": info_value,
-                    "Commentaires du manager": comment_value,
-                    "_key": key
-                })
+table_data = []
+for section in sections:
+    if section["title"] == "Profils pertinents":
+        continue
+    for title, key, _ in section["fields"]:
+        sheet_key = key.upper()  # Cherche la clé MAJUSCULE
+        info_value = brief_data.get(sheet_key, "")
+        comment_value = manager_comments.get(key, "")
+        table_data.append({
+            "Section": section["title"],
+            "Détails": title,
+            "Informations": info_value,
+            "Commentaires du manager": comment_value,
+            "_key": key
+        })
             
         if not table_data:
             st.warning("Veuillez d'abord remplir l'onglet 'Avant-brief'.")
