@@ -509,12 +509,12 @@ if briefs_to_show:
         with col_brief1:
             st.write(f"**{name}** - Manager: {data.get('manager_nom', 'N/A')} - Affectation: {data.get('affectation_nom', 'N/A')}")
         with col_brief2:
-            # --- CORRECTION 2 : Logique de chargement des données ---
             if st.button("📝 Éditer", key=f"edit_{name}"):
                 st.session_state.current_brief_name = name
                 brief_data = st.session_state.saved_briefs.get(name, {})
 
-                # Liste complète des clés à charger
+                # --- CORRECTION : Préparer les données dans un dictionnaire temporaire ---
+                data_to_load = {}
                 keys_to_load = [
                     "poste_intitule", "manager_nom", "recruteur", "affectation_type", 
                     "affectation_nom", "raison_ouverture", "impact_strategique", 
@@ -527,27 +527,26 @@ if briefs_to_show:
                     "processus_evaluation", "manager_notes"
                 ]
 
-                # Charge les données du brief dans st.session_state en nettoyant les valeurs
+                # Remplir le dictionnaire en nettoyant les valeurs
                 for key in keys_to_load:
                     value = brief_data.get(key)
-                    if pd.isna(value):
-                        st.session_state[key] = "" # Remplace les NaN par une chaîne vide
-                    else:
-                        st.session_state[key] = value
+                    data_to_load[key] = "" if pd.isna(value) else value
 
-                # Gestion spécifique pour la date
+                # Gérer les cas spéciaux
                 date_str = brief_data.get("date_brief")
-                if date_str:
-                    try: st.session_state.date_brief = datetime.strptime(str(date_str), '%Y-%m-%d').date()
-                    except (ValueError, TypeError): st.session_state.date_brief = datetime.today()
-                else: st.session_state.date_brief = datetime.today()
+                try:
+                    data_to_load['date_brief'] = datetime.strptime(str(date_str), '%Y-%m-%d').date()
+                except (ValueError, TypeError):
+                    data_to_load['date_brief'] = datetime.today()
 
-                # Gestion spécifique pour la matrice KSA
                 ksa_json_str = brief_data.get("KSA_MATRIX_JSON", "")
-                if ksa_json_str and isinstance(ksa_json_str, str) and ksa_json_str.strip():
-                    try: st.session_state.ksa_matrix = pd.read_json(io.StringIO(ksa_json_str))
-                    except Exception: st.session_state.ksa_matrix = pd.DataFrame()
-                else: st.session_state.ksa_matrix = pd.DataFrame()
+                try:
+                    data_to_load['ksa_matrix'] = pd.read_json(io.StringIO(ksa_json_str)) if ksa_json_str else pd.DataFrame()
+                except Exception:
+                    data_to_load['ksa_matrix'] = pd.DataFrame()
+
+                # --- Mettre à jour st.session_state en une seule fois ---
+                st.session_state.update(data_to_load)
                 
                 st.rerun()
         with col_brief3:
