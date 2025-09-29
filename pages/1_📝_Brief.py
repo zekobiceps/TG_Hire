@@ -496,92 +496,91 @@ with tabs[0]:
         
         if st.session_state.show_filtered_results:
             st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
+
+# On détermine quels briefs afficher : ceux filtrés, ou tous par défaut.
+        if st.session_state.get('show_filtered_results', False) and 'filtered_briefs' in st.session_state:
             briefs_to_show = st.session_state.filtered_briefs
-            
-        if briefs_to_show:
-            for name, data in briefs_to_show.items():
-                col_brief1, col_brief2, col_brief3, col_brief4 = st.columns([3, 1, 1, 1])
-                with col_brief1:
-                    st.write(f"**{name}** - Manager: {data.get('manager_nom', 'N/A')} - Affectation: {data.get('affectation_nom', 'N/A')}")
+        else:
+            briefs_to_show = st.session_state.saved_briefs
+
+if briefs_to_show:
+    for name, data in briefs_to_show.items():
+        col_brief1, col_brief2, col_brief3, col_brief4 = st.columns([3, 1, 1, 1])
+        with col_brief1:
+            st.write(f"**{name}** - Manager: {data.get('manager_nom', 'N/A')} - Affectation: {data.get('affectation_nom', 'N/A')}")
+        with col_brief2:
+            # --- CORRECTION 2 : Logique de chargement des données ---
+            if st.button("📝 Éditer", key=f"edit_{name}"):
+                st.session_state.current_brief_name = name
+                brief_data = st.session_state.saved_briefs.get(name, {})
+
+                # Liste complète des clés à charger
+                keys_to_load = [
+                    "poste_intitule", "manager_nom", "recruteur", "affectation_type", 
+                    "affectation_nom", "raison_ouverture", "impact_strategique", 
+                    "rattachement", "taches_principales", "must_have_experience", 
+                    "must_have_diplomes", "must_have_competences", "must_have_softskills", 
+                    "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences", 
+                    "entreprises_profil", "synonymes_poste", "canaux_profil", "budget", 
+                    "commentaires", "notes_libres", "profil_link_1", "profil_link_2", 
+                    "profil_link_3", "canaux_prioritaires", "criteres_exclusion", 
+                    "processus_evaluation", "manager_notes"
+                ]
+
+                # Charge les données du brief dans st.session_state en nettoyant les valeurs
+                for key in keys_to_load:
+                    value = brief_data.get(key)
+                    if pd.isna(value):
+                        st.session_state[key] = "" # Remplace les NaN par une chaîne vide
+                    else:
+                        st.session_state[key] = value
+
+                # Gestion spécifique pour la date
+                date_str = brief_data.get("date_brief")
+                if date_str:
+                    try: st.session_state.date_brief = datetime.strptime(str(date_str), '%Y-%m-%d').date()
+                    except (ValueError, TypeError): st.session_state.date_brief = datetime.today()
+                else: st.session_state.date_brief = datetime.today()
+
+                # Gestion spécifique pour la matrice KSA
+                ksa_json_str = brief_data.get("KSA_MATRIX_JSON", "")
+                if ksa_json_str and isinstance(ksa_json_str, str) and ksa_json_str.strip():
+                    try: st.session_state.ksa_matrix = pd.read_json(io.StringIO(ksa_json_str))
+                    except Exception: st.session_state.ksa_matrix = pd.DataFrame()
+                else: st.session_state.ksa_matrix = pd.DataFrame()
                 
-                with col_brief2:
-                    # --- CORRECTION APPLIQUÉE ICI ---
-                    if st.button("📝 Éditer", key=f"edit_{name}"):
-                        st.session_state.current_brief_name = name
-                        brief_data = st.session_state.saved_briefs.get(name, {})
-
-                        # --- NOUVELLE LOGIQUE DE CHARGEMENT ---
-                        # Liste complète des clés à charger
-                        keys_to_load = [
-                            "poste_intitule", "manager_nom", "recruteur", "affectation_type", 
-                            "affectation_nom", "raison_ouverture", "impact_strategique", 
-                            "rattachement", "taches_principales", "must_have_experience", 
-                            "must_have_diplomes", "must_have_competences", "must_have_softskills", 
-                            "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences", 
-                            "entreprises_profil", "synonymes_poste", "canaux_profil", "budget", 
-                            "commentaires", "notes_libres", "profil_link_1", "profil_link_2", 
-                            "profil_link_3", "canaux_prioritaires", "criteres_exclusion", 
-                            "processus_evaluation", "manager_notes"
-                        ]
-
-                        # Charge les données du brief dans st.session_state
-                        for key in keys_to_load:
-                            st.session_state[key] = brief_data.get(key, "")
-
-                        # Gestion spécifique pour la date
-                        date_str = brief_data.get("date_brief")
-                        if date_str:
-                            try:
-                                st.session_state.date_brief = datetime.strptime(date_str, '%Y-%m-%d').date()
-                            except (ValueError, TypeError): st.session_state.date_brief = datetime.today()
-                        else:
-                            st.session_state.date_brief = datetime.today()
-
-                        # Gestion spécifique pour la matrice KSA (suppose un format JSON)
-                        ksa_json_str = brief_data.get("KSA_MATRIX_JSON", "")
-                        if ksa_json_str and isinstance(ksa_json_str, str) and ksa_json_str.strip():
-                            try:
-                                st.session_state.ksa_matrix = pd.read_json(io.StringIO(ksa_json_str))
-                            except Exception:
-                                st.session_state.ksa_matrix = pd.DataFrame() # Fallback
-                        else:
-                            st.session_state.ksa_matrix = pd.DataFrame()
-
-                        st.rerun()
-
-                # Les autres boutons restent inchangés
-                with col_brief3:
-                    if st.button("🗑️ Supprimer", key=f"delete_{name}"):
-                        st.session_state.saved_briefs.pop(name, None)
-                        save_briefs()
-                        st.success(f"Brief '{name}' supprimé.")
-                        st.rerun()
-
-                    with col_brief4:
-                        if st.button("📄 Exporter", key=f"export_{name}"):
-                            st.session_state.current_brief_name = name
-                            if PDF_AVAILABLE:
-                                pdf_buf = export_brief_pdf()
-                                if pdf_buf:
-                                    st.download_button(
-                                        "⬇️ Télécharger PDF",
-                                        data=pdf_buf,
-                                        file_name=f"{name}.pdf",
-                                        mime="application/pdf",
-                                        key=f"download_pdf_{name}"
-                                    )
-                            if WORD_AVAILABLE:
-                                word_buf = export_brief_word()
-                                if word_buf:
-                                    st.download_button(
-                                        "⬇️ Télécharger Word",
-                                        data=word_buf,
-                                        file_name=f"{name}.docx",
-                                        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                        key=f"download_word_{name}"
-                                    )
-            else:
-                st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
+                st.rerun()
+        with col_brief3:
+            if st.button("🗑️ Supprimer", key=f"delete_{name}"):
+                st.session_state.saved_briefs.pop(name, None)
+                save_briefs()
+                st.success(f"Brief '{name}' supprimé.")
+                st.rerun()
+        with col_brief4:
+            if st.button("📄 Exporter", key=f"export_{name}"):
+                st.session_state.current_brief_name = name
+                if PDF_AVAILABLE:
+                    pdf_buf = export_brief_pdf()
+                    if pdf_buf:
+                        st.download_button(
+                            "⬇️ Télécharger PDF",
+                            data=pdf_buf,
+                            file_name=f"{name}.pdf",
+                            mime="application/pdf",
+                            key=f"download_pdf_{name}"
+                        )
+                if WORD_AVAILABLE:
+                    word_buf = export_brief_word()
+                    if word_buf:
+                        st.download_button(
+                            "⬇️ Télécharger Word",
+                            data=word_buf,
+                            file_name=f"{name}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            key=f"download_word_{name}"
+                        )
+else:
+    st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
 
 # ---------------- AVANT-BRIEF ----------------
 with tabs[1]:
