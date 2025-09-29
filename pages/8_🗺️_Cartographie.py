@@ -306,15 +306,23 @@ with tab2:
         
         if sum(counts.values()) > 0:
             df_counts = pd.DataFrame(list(counts.items()), columns=['Quadrant', 'Nombre'])
-            
-            # --- MODIFICATION ICI ---
-            # On filtre le DataFrame pour ne garder que les lignes où le nombre est supérieur à 0
             df_counts = df_counts[df_counts['Nombre'] > 0]
             
-            fig = px.pie(df_counts, names='Quadrant', values='Nombre', title="Répartition des candidats par quadrant",
+            # --- MODIFICATION 1 : Le titre est maintenant ici ---
+            st.subheader("Répartition des candidats par quadrant")
+
+            # --- MODIFICATION 2 : On retire l'argument 'title' de cette ligne ---
+            fig = px.pie(df_counts, names='Quadrant', values='Nombre',
                          color_discrete_sequence=["#636EFA", "#EF553B", "#00CC96", "#AB63FA"])
+            
             fig.update_traces(hovertemplate='<b>%{label}</b><br>Nombre: %{value}<br>Pourcentage: %{percent}<extra></extra>')
+            
+            # --- MODIFICATION 3 : On ajoute cette ligne pour agrandir la légende ---
+            # Vous pouvez changer la valeur 16 pour ajuster la taille comme vous le souhaitez.
+            fig.update_layout(legend_font_size=16)
+            
             st.plotly_chart(fig, use_container_width=True)
+            
         else:
             st.info("Aucun candidat dans la cartographie pour l'instant.")
             
