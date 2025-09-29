@@ -475,19 +475,32 @@ with col5:
     st.text_input("Nom affectation", key="affectation_nom", value=brief_data.get("affectation_nom", st.session_state.get("affectation_nom", "")))
 with col6:
     date_brief_raw = brief_data.get("date_brief", st.session_state.get("date_brief", datetime.today()))
+    date_brief_value = None
+
     if isinstance(date_brief_raw, str):
         try:
             date_brief_value = datetime.strptime(date_brief_raw, "%Y-%m-%d").date()
         except Exception:
-            date_brief_value = datetime.today().date()
+            try:
+                date_brief_value = datetime.strptime(date_brief_raw, "%d/%m/%Y").date()
+            except Exception:
+                date_brief_value = datetime.today().date()
     elif isinstance(date_brief_raw, datetime):
         date_brief_value = date_brief_raw.date()
-    elif isinstance(date_brief_raw, pd.Timestamp):
+    elif hasattr(date_brief_raw, "date"):  # Pour pd.Timestamp
         date_brief_value = date_brief_raw.date()
+    elif isinstance(date_brief_raw, (list, tuple)):
+        # Si c'est une liste, prends le premier élément si possible
+        try:
+            date_brief_value = datetime.strptime(str(date_brief_raw[0]), "%Y-%m-%d").date()
+        except Exception:
+            date_brief_value = datetime.today().date()
     else:
-        date_brief_value = date_brief_raw
+        # Si rien ne marche, prends la date du jour
+        date_brief_value = datetime.today().date()
 
     st.date_input("Date du brief", key="date_brief", value=date_brief_value)
+
 
 col_create, col_cancel = st.columns(2)
 with col_create:
