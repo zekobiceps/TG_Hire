@@ -495,67 +495,27 @@ with tabs[0]:
         
         if st.session_state.show_filtered_results:
             st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
-            briefs_to_show = st.session_state.filtered_briefs
-            
-    if briefs_to_show:
-        for name, brief in briefs_to_show.items():
-            col_brief1, col_brief2, col_brief3, col_brief4 = st.columns([6, 1, 1, 2])
-            with col_brief1:
-                st.markdown(f"**{name}**")
-            with col_brief2:
-                if st.button("📝 Éditer", key=f"edit_{name}"):
-                    # Charge les données du brief depuis Google Sheets
-                    brief_data_gsheet = st.session_state.saved_briefs.get(name, {})
-                    # Met à jour les champs du formulaire avec les données Google Sheets
-                    for key, value in brief_data_gsheet.items():
-                        st.session_state[key] = value
-                    st.session_state.current_brief_name = name
-                    st.session_state.avant_brief_completed = True
-                    st.session_state.reunion_completed = True
-                    st.session_state.reunion_step = 1
-                    st.rerun()
-            with col_brief3:
-                if st.button("🗑️ Supprimer", key=f"delete_{name}"):
-                    st.session_state.saved_briefs.pop(name, None)
-                    save_briefs()
-                    st.session_state.saved_briefs = load_briefs()
-                    st.session_state.filtered_briefs = filter_briefs(
-                        st.session_state.saved_briefs,
-                        st.session_state.filter_date.strftime("%m") if st.session_state.filter_date else "",
-                        st.session_state.filter_recruteur,
-                        st.session_state.filter_brief_type,
-                        st.session_state.filter_manager,
-                        st.session_state.filter_affectation,
-                        st.session_state.filter_nom_affectation
-                    )
-                    st.session_state.save_message = f"✅ Brief '{name}' supprimé avec succès"
-                    st.session_state.save_message_tab = "Gestion"
-                    st.rerun()
-            with col_brief4:
-                if st.button("📄 Exporter", key=f"export_{name}"):
-                    st.session_state.current_brief_name = name
-                    if PDF_AVAILABLE:
-                        pdf_buf = export_brief_pdf()
-                        if pdf_buf:
-                            st.download_button(
-                                "⬇️ Télécharger PDF",
-                                data=pdf_buf,
-                                file_name=f"{name}.pdf",
-                                mime="application/pdf",
-                                key=f"download_pdf_{name}"
-                            )
-                    if WORD_AVAILABLE:
-                        word_buf = export_brief_word()
-                        if word_buf:
-                            st.download_button(
-                                "⬇️ Télécharger Word",
-                                data=word_buf,
-                                file_name=f"{name}.docx",
-                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                                key=f"download_word_{name}"
-                            )
-    else:
-        st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
+            briefs_to_show = st.session_state.saved_briefs  # Pour tester sans filtre
+
+st.write("DEBUG - Briefs à afficher :", briefs_to_show)
+
+if briefs_to_show and len(briefs_to_show) > 0:
+    for name, brief in briefs_to_show.items():
+        col_brief1, col_brief2 = st.columns([6, 1])
+        with col_brief1:
+            st.markdown(f"**{name}**")
+        with col_brief2:
+            if st.button("📝 Éditer", key=f"edit_{name}"):
+                brief_data_gsheet = st.session_state.saved_briefs.get(name, {})
+                for key, value in brief_data_gsheet.items():
+                    st.session_state[key] = value
+                st.session_state.current_brief_name = name
+                st.session_state.avant_brief_completed = True
+                st.session_state.reunion_completed = True
+                st.session_state.reunion_step = 1
+                st.rerun()
+else:
+    st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
 
 # ---------------- AVANT-BRIEF ----------------
 with tabs[1]:
