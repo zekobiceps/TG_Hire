@@ -152,6 +152,7 @@ def save_brief_to_gsheet(brief_name, brief_data):
         st.error(f"❌ ÉCHEC CRITIQUE: La sauvegarde Google Sheets a échoué pour '{brief_name}'. API Error: {e}")
         return False
 
+
 # -------------------- Directory for Briefs --------------------
 BRIEFS_DIR = "briefs"
 
