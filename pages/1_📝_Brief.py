@@ -509,46 +509,54 @@ if briefs_to_show:
         with col_brief1:
             st.write(f"**{name}** - Manager: {data.get('manager_nom', 'N/A')} - Affectation: {data.get('affectation_nom', 'N/A')}")
         with col_brief2:
-            if st.button("📝 Éditer", key=f"edit_{name}"):
-                st.session_state.current_brief_name = name
-                brief_data = st.session_state.saved_briefs.get(name, {})
+                if st.button("📝 Éditer", key=f"edit_{name}"):
+                    st.session_state.current_brief_name = name
+                    brief_data = st.session_state.saved_briefs.get(name, {})
 
-                # --- CORRECTION : Préparer les données dans un dictionnaire temporaire ---
-                data_to_load = {}
-                keys_to_load = [
-                    "poste_intitule", "manager_nom", "recruteur", "affectation_type", 
-                    "affectation_nom", "raison_ouverture", "impact_strategique", 
-                    "rattachement", "taches_principales", "must_have_experience", 
-                    "must_have_diplomes", "must_have_competences", "must_have_softskills", 
-                    "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences", 
-                    "entreprises_profil", "synonymes_poste", "canaux_profil", "budget", 
-                    "commentaires", "notes_libres", "profil_link_1", "profil_link_2", 
-                    "profil_link_3", "canaux_prioritaires", "criteres_exclusion", 
-                    "processus_evaluation", "manager_notes"
-                ]
+                    # --- NOUVELLE CORRECTION : Séparation des types de données ---
 
-                # Remplir le dictionnaire en nettoyant les valeurs
-                for key in keys_to_load:
-                    value = brief_data.get(key)
-                    data_to_load[key] = "" if pd.isna(value) else value
+                    # 1. Préparer un dictionnaire UNIQUEMENT pour les données simples (texte, etc.)
+                    simple_data_to_load = {}
+                    keys_to_load = [
+                        "poste_intitule", "manager_nom", "recruteur", "affectation_type", 
+                        "affectation_nom", "raison_ouverture", "impact_strategique", 
+                        "rattachement", "taches_principales", "must_have_experience", 
+                        "must_have_diplomes", "must_have_competences", "must_have_softskills", 
+                        "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences", 
+                        "entreprises_profil", "synonymes_poste", "canaux_profil", "budget", 
+                        "commentaires", "notes_libres", "profil_link_1", "profil_link_2", 
+                        "profil_link_3", "canaux_prioritaires", "criteres_exclusion", 
+                        "processus_evaluation", "manager_notes"
+                    ]
 
-                # Gérer les cas spéciaux
-                date_str = brief_data.get("date_brief")
-                try:
-                    data_to_load['date_brief'] = datetime.strptime(str(date_str), '%Y-%m-%d').date()
-                except (ValueError, TypeError):
-                    data_to_load['date_brief'] = datetime.today()
+                    for key in keys_to_load:
+                        value = brief_data.get(key)
+                        # On s'assure que tout est bien un type simple ou une liste
+                        if pd.isna(value):
+                            simple_data_to_load[key] = [] if key == "canaux_prioritaires" else ""
+                        else:
+                            simple_data_to_load[key] = value
 
-                ksa_json_str = brief_data.get("KSA_MATRIX_JSON", "")
-                try:
-                    data_to_load['ksa_matrix'] = pd.read_json(io.StringIO(ksa_json_str)) if ksa_json_str else pd.DataFrame()
-                except Exception:
-                    data_to_load['ksa_matrix'] = pd.DataFrame()
+                    # 2. Mettre à jour la session avec les données simples
+                    st.session_state.update(simple_data_to_load)
 
-                # --- Mettre à jour st.session_state en une seule fois ---
-                st.session_state.update(data_to_load)
-                
-                st.rerun()
+                    # 3. Gérer les types complexes (date, DataFrame) SÉPARÉMENT
+                    try:
+                        date_str = brief_data.get("date_brief")
+                        st.session_state.date_brief = datetime.strptime(str(date_str), '%Y-%m-%d').date()
+                    except (ValueError, TypeError, AttributeError):
+                        st.session_state.date_brief = datetime.today().date()
+                    
+                    try:
+                        ksa_json_str = brief_data.get("KSA_MATRIX_JSON", "")
+                        if ksa_json_str and isinstance(ksa_json_str, str) and ksa_json_str.strip() != '[]':
+                            st.session_state.ksa_matrix = pd.read_json(io.StringIO(ksa_json_str))
+                        else:
+                            st.session_state.ksa_matrix = pd.DataFrame()
+                    except Exception:
+                        st.session_state.ksa_matrix = pd.DataFrame()
+
+                    st.rerun()
         with col_brief3:
             if st.button("🗑️ Supprimer", key=f"delete_{name}"):
                 st.session_state.saved_briefs.pop(name, None)
