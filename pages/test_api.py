@@ -536,15 +536,6 @@ with tabs[0]:
                 
                 st.success(f"✅ Brief '{new_brief_name}' créé avec succès !")
                 st.rerun()
-    with col_cancel:
-        if st.button("🗑️ Annuler", type="secondary", use_container_width=True, key="cancel_brief"):
-            # Réinitialiser les champs
-            for key in all_field_keys:
-                if key in st.session_state:
-                    del st.session_state[key]
-            st.session_state.current_brief_name = ""
-            st.success("Création de brief annulée.")
-            st.rerun()
 
     with col_right:
         st.markdown('<h3 style="margin-bottom: 0.3rem;">🔍 Filtrer les briefs</h3>', unsafe_allow_html=True)
@@ -700,7 +691,12 @@ with tabs[2]:
     if step == 1:
         st.subheader("Étape 1 : Validation du brief et commentaires du manager")
         with st.expander("📝 Portrait robot du candidat - Validation", expanded=True):
-            brief_data.get(key, st.session_state.get(key, ""))
+            if st.session_state.current_brief_name:
+                brief_data = load_briefs().get(st.session_state.current_brief_name, {})
+                for section in sections:
+                    for title, key, _ in section["fields"]:
+                        st.session_state[key] = brief_data.get(key, "")
+            
             manager_comments = brief_data.get("manager_comments", {})
 
             table_data = []
