@@ -278,6 +278,86 @@ if "save_message" not in st.session_state:
 if "save_message_tab" not in st.session_state:
     st.session_state.save_message_tab = None
 
+if "import_brief_flag" not in st.session_state:
+    st.session_state.import_brief_flag = False
+if "brief_to_import" not in st.session_state:
+    st.session_state.brief_to_import = None
+
+key_mapping = {
+    "POSTE_INTITULE": "poste_intitule",
+    "MANAGER_NOM": "manager_nom",
+    "RECRUTEUR": "recruteur",
+    "AFFECTATION_TYPE": "affectation_type",
+    "AFFECTATION_NOM": "affectation_nom",
+    "DATE_BRIEF": "date_brief",
+    "RAISON_OUVERTURE": "raison_ouverture",
+    "IMPACT_STRATEGIQUE": "impact_strategique",
+    "TACHES_PRINCIPALES": "taches_principales",
+    "MUST_HAVE_EXP": "must_have_experience",
+    "MUST_HAVE_DIP": "must_have_diplomes",
+    "MUST_HAVE_COMPETENCES": "must_have_competences",
+    "MUST_HAVE_SOFTSKILLS": "must_have_softskills",
+    "NICE_TO_HAVE_EXP": "nice_to_have_experience",
+    "NICE_TO_HAVE_DIP": "nice_to_have_diplomes",
+    "NICE_TO_HAVE_COMPETENCES": "nice_to_have_competences",
+    "RATTACHEMENT": "rattachement",
+    "BUDGET": "budget",
+    "ENTREPRISES_PROFIL": "entreprises_profil",
+    "SYNONYMES_POSTE": "synonymes_poste",
+    "CANAUX_PROFIL": "canaux_profil",
+    "LIEN_PROFIL_1": "profil_link_1",
+    "LIEN_PROFIL_2": "profil_link_2",
+    "LIEN_PROFIL_3": "profil_link_3",
+    "COMMENTAIRES": "commentaires",
+    "NOTES_LIBRES": "notes_libres"
+}
+
+sections = [
+    {"title": "Contexte du poste", "fields": [
+        ("Raison de l'ouverture", "raison_ouverture", ""),
+        ("Impact stratégique", "impact_strategique", ""),
+        ("Tâches principales", "taches_principales", "")]},
+    {"title": "Must-have (Indispensables)", "fields": [
+        ("Expérience", "must_have_experience", ""),
+        ("Connaissances / Diplômes / Certifications", "must_have_diplomes", ""),
+        ("Compétences / Outils", "must_have_competences", ""),
+        ("Soft skills / aptitudes comportementales", "must_have_softskills", "")]},
+    {"title": "Nice-to-have (Atouts)", "fields": [
+        ("Expérience additionnelle", "nice_to_have_experience", ""),
+        ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", ""),
+        ("Compétences complémentaires", "nice_to_have_competences", "")]},
+    {"title": "Conditions et contraintes", "fields": [
+        ("Localisation", "rattachement", ""),
+        ("Budget recrutement", "budget", "")]},
+    {"title": "Sourcing et marché", "fields": [
+        ("Entreprises où trouver ce profil", "entreprises_profil", ""),
+        ("Synonymes / intitulés proches", "synonymes_poste", ""),
+        ("Canaux à utiliser", "canaux_profil", "")]},
+    {"title": "Profils pertinents", "fields": [
+        ("Lien profil 1", "profil_link_1", ""),
+        ("Lien profil 2", "profil_link_2", ""),
+        ("Lien profil 3", "profil_link_3", "")]},
+    {"title": "Notes libres", "fields": [
+        ("Points à discuter ou à clarifier avec le manager", "commentaires", ""),
+        ("Case libre", "notes_libres", "")]},
+]
+
+# --- Bloc d'import automatique ---
+if st.session_state.import_brief_flag and st.session_state.brief_to_import:
+    brief = load_briefs().get(st.session_state.brief_to_import, {})
+    for sheet_key, session_key in key_mapping.items():
+        st.session_state[session_key] = brief.get(sheet_key, "")
+    for section in sections:
+        for title, field_key, _ in section["fields"]:
+            unique_key = f"{section['title'].replace(' ', '_')}_{field_key}"
+            st.session_state[unique_key] = brief.get(key_mapping.get(field_key.upper(), field_key), "")
+    st.session_state.current_brief_name = st.session_state.brief_to_import
+    st.session_state.avant_brief_completed = True
+    st.session_state.reunion_completed = True
+    st.session_state.reunion_step = 1
+    st.session_state.import_brief_flag = False
+    st.session_state.brief_to_import = None
+    st.rerun()
 # -------------------- Sidebar --------------------
 with st.sidebar:
     st.title("📊 Statistiques Brief")
@@ -534,47 +614,8 @@ if briefs_to_show and len(briefs_to_show) > 0:
             st.markdown(f"**{name}**")
         with col_brief2:
             if st.button("📝 Éditer", key=f"edit_{name}"):
-                # Synchronise toutes les clés générales et champs du brief
-                for sheet_key, session_key in key_mapping.items():
-                    st.session_state[session_key] = brief.get(sheet_key, "")
-                # Synchronise aussi les clés uniques pour le formulaire Avant-brief
-                sections = [
-                    {"title": "Contexte du poste", "fields": [
-                        ("Raison de l'ouverture", "raison_ouverture", ""),
-                        ("Impact stratégique", "impact_strategique", ""),
-                        ("Tâches principales", "taches_principales", "")]},
-                    {"title": "Must-have (Indispensables)", "fields": [
-                        ("Expérience", "must_have_experience", ""),
-                        ("Connaissances / Diplômes / Certifications", "must_have_diplomes", ""),
-                        ("Compétences / Outils", "must_have_competences", ""),
-                        ("Soft skills / aptitudes comportementales", "must_have_softskills", "")]},
-                    {"title": "Nice-to-have (Atouts)", "fields": [
-                        ("Expérience additionnelle", "nice_to_have_experience", ""),
-                        ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", ""),
-                        ("Compétences complémentaires", "nice_to_have_competences", "")]},
-                    {"title": "Conditions et contraintes", "fields": [
-                        ("Localisation", "rattachement", ""),
-                        ("Budget recrutement", "budget", "")]},
-                    {"title": "Sourcing et marché", "fields": [
-                        ("Entreprises où trouver ce profil", "entreprises_profil", ""),
-                        ("Synonymes / intitulés proches", "synonymes_poste", ""),
-                        ("Canaux à utiliser", "canaux_profil", "")]},
-                    {"title": "Profils pertinents", "fields": [
-                        ("Lien profil 1", "profil_link_1", ""),
-                        ("Lien profil 2", "profil_link_2", ""),
-                        ("Lien profil 3", "profil_link_3", "")]},
-                    {"title": "Notes libres", "fields": [
-                        ("Points à discuter ou à clarifier avec le manager", "commentaires", ""),
-                        ("Case libre", "notes_libres", "")]},
-                ]
-                for section in sections:
-                    for title, field_key, _ in section["fields"]:
-                        unique_key = f"{section['title'].replace(' ', '_')}_{field_key}"
-                        st.session_state[unique_key] = brief.get(key_mapping.get(field_key.upper(), field_key), "")
-                st.session_state.current_brief_name = name
-                st.session_state.avant_brief_completed = True
-                st.session_state.reunion_completed = True
-                st.session_state.reunion_step = 1
+                st.session_state.import_brief_flag = True
+                st.session_state.brief_to_import = name
                 st.rerun()
 else:
     st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
