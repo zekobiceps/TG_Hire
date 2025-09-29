@@ -719,7 +719,7 @@ with tabs[1]:
             with st.expander(f"📋 {section['title']}", expanded=False):
                 for title, key, placeholder in section["fields"]:
                     unique_key = f"{section['title'].replace(' ', '_')}_{key}"
-                    current_value = st.session_state.get(key, brief_data.get(key, ""))
+                    current_value = st.session_state.get(unique_key, brief_data.get(key, ""))
                     st.text_area(title, value=current_value, key=unique_key, placeholder=placeholder, height=150)
                     if st.session_state.get(f"advice_{key}", ""):
                         st.info(f"**Conseil IA :**\n{st.session_state[f'advice_{key}']}")
