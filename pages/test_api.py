@@ -4,6 +4,7 @@ from datetime import datetime
 import json
 import pandas as pd
 from datetime import date
+import random
 
 # ✅ permet d'accéder à utils.py à la racine
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -481,18 +482,22 @@ with tabs[0]:
             if missing_fields:
                 st.error(f"Veuillez remplir les champs suivants : {', '.join(missing_fields)}")
             else:
-                # Nom automatique (ajout date si signature attend 3 params)
-                try:
-                    new_brief_name = generate_automatic_brief_name(
-                        st.session_state.poste_intitule,
-                        st.session_state.manager_nom,
-                        st.session_state.date_brief
-                    )
-                except TypeError:
-                    new_brief_name = generate_automatic_brief_name(
-                        st.session_state.poste_intitule,
-                        st.session_state.manager_nom
-                    )
+                # Normalisation date puis génération (toujours 3 paramètres)
+                date_arg = st.session_state.date_brief
+                if isinstance(date_arg, str):
+                    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+                        try:
+                            date_arg = datetime.strptime(date_arg, fmt).date()
+                            break
+                        except Exception:
+                            continue
+                if isinstance(date_arg, datetime):
+                    date_arg = date_arg.date()
+                new_brief_name = generate_automatic_brief_name(
+                    st.session_state.poste_intitule,
+                    st.session_state.manager_nom,
+                    date_arg
+                )
                 st.session_state.current_brief_name = new_brief_name
 
                 new_brief_data = {}
@@ -760,16 +765,9 @@ with tabs[2]:
                     st.session_state.ksa_matrix = df[expected]
                     st.success("Matrice KSA importée depuis Google Sheet.")
                 except Exception as e:
-                    st.error(f"Erreur lors de l'import JSON : {e}")
+                    st.error(f"Erreur import KSA JSON : {e}")
 
-            import_col1, import_col2 = st.columns([1, 3])
-            with import_col1:
-                if st.button("↻ Importer matrice (Google Sheet)", key="reload_ksa"):
-                    _import_ksa_from_json()
-            with import_col2:
-                st.caption("Si vous avez déjà une matrice KSA sauvegardée côté Google Sheet (colonne KSA_MATRIX_JSON), cliquez pour l'importer.")
-
-            # Auto-import si vide et JSON présent
+            # Auto-import silencieux si vide
             if st.session_state.ksa_matrix.empty and brief_data.get("KSA_MATRIX_JSON"):
                 _import_ksa_from_json()
 
@@ -810,12 +808,43 @@ with tabs[2]:
                                                   ) if st.session_state.get("step2_new_evaluateur","Recruteur") in
                                                   ["Recruteur","Manager","Les deux"] else 0)
 
+                    # Exemples aléatoires (affichés comme placeholder)
+                    question_examples = [
+                        "Ex: Décrivez une situation où vous avez résolu un conflit d'équipe.",
+                        "Ex: Comment priorisez-vous vos tâches sur un chantier en retard ?",
+                        "Ex: Donnez un exemple d'amélioration de processus que vous avez menée.",
+                        "Ex: Racontez une décision difficile prise avec impact time-to-hire.",
+                        "Ex: Comment gérez-vous la pression quand plusieurs urgences surviennent ?",
+                        "Ex: Décrivez une collaboration réussie avec un manager exigeant.",
+                        "Ex: Comment vérifiez-vous la fiabilité d'un candidat technique ?",
+                        "Ex: Donnez un exemple de question que vous utilisez pour tester l'autonomie.",
+                        "Ex: Expliquez une situation où vous avez anticipé un risque projet.",
+                        "Ex: Comment adaptez-vous votre approche selon le niveau du candidat ?"
+                    ]
+                    prompt_examples = [
+                        "Ex: Génère une question comportementale sur la gestion de conflit.",
+                        "Ex: Propose une question situationnelle sur la priorisation.",
+                        "Ex: Donne une question technique sur la maîtrise d'AutoCAD.",
+                        "Ex: Produit une question pour mesurer la résilience.",
+                        "Ex: Génère une question pour tester la capacité d'analyse.",
+                        "Ex: Crée une question sur l'amélioration continue.",
+                        "Ex: Donne une question pour évaluer le leadership terrain.",
+                        "Ex: Génère une question situationnelle sur un retard critique.",
+                        "Ex: Donne une question pour tester la communication inter-équipe.",
+                        "Ex: Génère une question sur la résolution de problème complexe."
+                    ]
+                    rand_question_ph = random.choice(question_examples)
+                    rand_prompt_ph = random.choice(prompt_examples)
+
                     col_q, col_eval = st.columns([3,1])
                     with col_q:
-                        question = st.text_area("Question pour l'entretien",
-                                                key="step2_new_question",
-                                                value=st.session_state.get("step2_new_question",""),
-                                                height=90)
+                        question = st.text_area(
+                            "Question pour l'entretien",
+                            key="step2_new_question",
+                            value=st.session_state.get("step2_new_question",""),
+                            placeholder=rand_question_ph,
+                            height=60
+                        )
                     with col_eval:
                         evaluation = st.slider("Évaluation (1-5)", 1, 5,
                                                value=st.session_state.get("step2_new_evaluation",3),
@@ -824,11 +853,14 @@ with tabs[2]:
                     st.markdown("---")
                     ai_col1, ai_col2 = st.columns([2,1])
                     with ai_col1:
-                        ai_prompt = st.text_input("Prompt IA (génération de question)",
-                                                  key="step2_ai_prompt",
-                                                  value=st.session_state.get("step2_ai_prompt",""))
+                        ai_prompt = st.text_input(
+                            "Prompt IA (génération de question)",
+                            key="step2_ai_prompt",
+                            value=st.session_state.get("step2_ai_prompt",""),
+                            placeholder=rand_prompt_ph
+                        )
                     with ai_col2:
-                        concise_mode = st.checkbox("Réponse courte", key="step2_concise_mode")
+                        concise_mode = st.checkbox("⚡ Mode rapide (réponse concise)", key="step2_concise_mode")
 
                     gen_col, add_col = st.columns([1,1])
                     with gen_col:
