@@ -697,6 +697,7 @@ with tabs[2]:
             st.rerun()
         
         brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
+        st.write("DEBUG brief_data :", brief_data)  # <-- Ajoute cette ligne temporairement
 
         manager_comments = brief_data.get("manager_comments", {})
 
