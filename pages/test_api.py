@@ -465,76 +465,89 @@ with tabs[0]:
                             brief_data.get("recruteur", st.session_state.get("recruteur", "Zakaria"))
                         ) if brief_data.get("recruteur", st.session_state.get("recruteur", "Zakaria")) in ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"] else 0)
         
-        col4, col5, col6 = st.columns(3)
-        with col4:
-            st.selectbox("Type d'affectation", ["Chantier", "Siège", "Dépôt"], key="affectation_type",
-                        index=["Chantier", "Siège", "Dépôt"].index(
-                            brief_data.get("affectation_type", st.session_state.get("affectation_type", "Chantier"))
-                        ) if brief_data.get("affectation_type", st.session_state.get("affectation_type", "Chantier")) in ["Chantier", "Siège", "Dépôt"] else 0)
-        with col5:
-            st.text_input("Nom affectation", key="affectation_nom", value=brief_data.get("affectation_nom", st.session_state.get("affectation_nom", "")))
-        with col6:
-            st.date_input("Date du brief", key="date_brief", value=brief_data.get("date_brief", st.session_state.get("date_brief", datetime.today())))
+col4, col5, col6 = st.columns(3)
+with col4:
+    st.selectbox("Type d'affectation", ["Chantier", "Siège", "Dépôt"], key="affectation_type",
+                index=["Chantier", "Siège", "Dépôt"].index(
+                    brief_data.get("affectation_type", st.session_state.get("affectation_type", "Chantier"))
+                ) if brief_data.get("affectation_type", st.session_state.get("affectation_type", "Chantier")) in ["Chantier", "Siège", "Dépôt"] else 0)
+with col5:
+    st.text_input("Nom affectation", key="affectation_nom", value=brief_data.get("affectation_nom", st.session_state.get("affectation_nom", "")))
+with col6:
+    date_brief_raw = brief_data.get("date_brief", st.session_state.get("date_brief", datetime.today()))
+    if isinstance(date_brief_raw, str):
+        try:
+            date_brief_value = datetime.strptime(date_brief_raw, "%Y-%m-%d").date()
+        except Exception:
+            date_brief_value = datetime.today().date()
+    elif isinstance(date_brief_raw, datetime):
+        date_brief_value = date_brief_raw.date()
+    elif isinstance(date_brief_raw, pd.Timestamp):
+        date_brief_value = date_brief_raw.date()
+    else:
+        date_brief_value = date_brief_raw
+
+    st.date_input("Date du brief", key="date_brief", value=date_brief_value)
+
+col_create, col_cancel = st.columns(2)
+with col_create:
+    if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
+        brief_name = generate_automatic_brief_name()
+        st.session_state.current_brief_name = brief_name
         
-        col_create, col_cancel = st.columns(2)
-        with col_create:
-            if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
-                brief_name = generate_automatic_brief_name()
-                st.session_state.current_brief_name = brief_name
-                
-                brief_data = {
-                    "BRIEF_NAME": brief_name,
-                    "poste_intitule": st.session_state.poste_intitule,
-                    "manager_nom": st.session_state.manager_nom,
-                    "POSTE_INTITULE": st.session_state.poste_intitule,
-                    "MANAGER_NOM": st.session_state.manager_nom,
-                    "RECRUTEUR": st.session_state.recruteur,
-                    "AFFECTATION_TYPE": st.session_state.affectation_type,
-                    "AFFECTATION_NOM": st.session_state.affectation_nom,
-                    "DATE_BRIEF": str(st.session_state.date_brief),
-                    "RAISON_OUVERTURE": st.session_state.get("raison_ouverture", ""),
-                    "IMPACT_STRATEGIQUE": st.session_state.get("impact_strategique", ""),
-                    "RATTACHEMENT": st.session_state.get("rattachement", ""),
-                    "TACHES_PRINCIPALES": st.session_state.get("taches_principales", ""),
-                    "MUST_HAVE_EXP": st.session_state.get("must_have_experience", ""),
-                    "MUST_HAVE_DIP": st.session_state.get("must_have_diplomes", ""),
-                    "MUST_HAVE_COMPETENCES": st.session_state.get("must_have_competences", ""),
-                    "MUST_HAVE_SOFTSKILLS": st.session_state.get("must_have_softskills", ""),
-                    "NICE_TO_HAVE_EXP": st.session_state.get("nice_to_have_experience", ""),
-                    "NICE_TO_HAVE_DIP": st.session_state.get("nice_to_have_diplomes", ""),
-                    "NICE_TO_HAVE_COMPETENCES": st.session_state.get("nice_to_have_competences", ""),
-                    "ENTREPRISES_PROFIL": st.session_state.get("entreprises_profil", ""),
-                    "SYNONYMES_POSTE": st.session_state.get("synonymes_poste", ""),
-                    "CANAUX_PROFIL": st.session_state.get("canaux_profil", ""),
-                    "BUDGET": st.session_state.get("budget", ""),
-                    "COMMENTAIRES": st.session_state.get("commentaires", ""),
-                    "NOTES_LIBRES": st.session_state.get("notes_libres", ""),
-                    "CRITERES_EXCLUSION": st.session_state.get("criteres_exclusion", ""),
-                    "PROCESSUS_EVALUATION": st.session_state.get("processus_evaluation", ""),
-                    "MANAGER_NOTES": st.session_state.get("manager_notes", ""),
-                    "KSA_MATRIX_JSON": st.session_state.get("KSA_MATRIX_JSON", ""),
-                    "brief_type": "Standard",
-                    "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()),
-                    "manager_comments": st.session_state.get("manager_comments", {}),
-                }
-                
-                st.session_state.saved_briefs[brief_name] = brief_data
-                save_briefs()
-                save_brief_to_gsheet(brief_name, brief_data)
-                
-                st.session_state.saved_briefs = load_briefs()
-                st.session_state.save_message = f"✅ Brief '{brief_name}' créé avec succès"
-                st.session_state.save_message_tab = "Gestion"
-                st.rerun()
-        with col_cancel:
-            if st.button("🗑️ Annuler", type="secondary", use_container_width=True, key="cancel_brief"):
-                st.session_state.poste_intitule = ""
-                st.session_state.manager_nom = ""
-                st.session_state.recruteur = ""
-                st.session_state.affectation_type = ""
-                st.session_state.affectation_nom = ""
-                st.session_state.date_brief = datetime.today()
-                st.rerun()
+        brief_data = {
+            "BRIEF_NAME": brief_name,
+            "poste_intitule": st.session_state.poste_intitule,
+            "manager_nom": st.session_state.manager_nom,
+            "POSTE_INTITULE": st.session_state.poste_intitule,
+            "MANAGER_NOM": st.session_state.manager_nom,
+            "RECRUTEUR": st.session_state.recruteur,
+            "AFFECTATION_TYPE": st.session_state.affectation_type,
+            "AFFECTATION_NOM": st.session_state.affectation_nom,
+            "DATE_BRIEF": str(st.session_state.date_brief),
+            "RAISON_OUVERTURE": st.session_state.get("raison_ouverture", ""),
+            "IMPACT_STRATEGIQUE": st.session_state.get("impact_strategique", ""),
+            "RATTACHEMENT": st.session_state.get("rattachement", ""),
+            "TACHES_PRINCIPALES": st.session_state.get("taches_principales", ""),
+            "MUST_HAVE_EXP": st.session_state.get("must_have_experience", ""),
+            "MUST_HAVE_DIP": st.session_state.get("must_have_diplomes", ""),
+            "MUST_HAVE_COMPETENCES": st.session_state.get("must_have_competences", ""),
+            "MUST_HAVE_SOFTSKILLS": st.session_state.get("must_have_softskills", ""),
+            "NICE_TO_HAVE_EXP": st.session_state.get("nice_to_have_experience", ""),
+            "NICE_TO_HAVE_DIP": st.session_state.get("nice_to_have_diplomes", ""),
+            "NICE_TO_HAVE_COMPETENCES": st.session_state.get("nice_to_have_competences", ""),
+            "ENTREPRISES_PROFIL": st.session_state.get("entreprises_profil", ""),
+            "SYNONYMES_POSTE": st.session_state.get("synonymes_poste", ""),
+            "CANAUX_PROFIL": st.session_state.get("canaux_profil", ""),
+            "BUDGET": st.session_state.get("budget", ""),
+            "COMMENTAIRES": st.session_state.get("commentaires", ""),
+            "NOTES_LIBRES": st.session_state.get("notes_libres", ""),
+            "CRITERES_EXCLUSION": st.session_state.get("criteres_exclusion", ""),
+            "PROCESSUS_EVALUATION": st.session_state.get("processus_evaluation", ""),
+            "MANAGER_NOTES": st.session_state.get("manager_notes", ""),
+            "KSA_MATRIX_JSON": st.session_state.get("KSA_MATRIX_JSON", ""),
+            "brief_type": "Standard",
+            "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()),
+            "manager_comments": st.session_state.get("manager_comments", {}),
+        }
+        
+        st.session_state.saved_briefs[brief_name] = brief_data
+        save_briefs()
+        save_brief_to_gsheet(brief_name, brief_data)
+        
+        st.session_state.saved_briefs = load_briefs()
+        st.session_state.save_message = f"✅ Brief '{brief_name}' créé avec succès"
+        st.session_state.save_message_tab = "Gestion"
+        st.rerun()
+with col_cancel:
+    if st.button("🗑️ Annuler", type="secondary", use_container_width=True, key="cancel_brief"):
+        st.session_state.poste_intitule = ""
+        st.session_state.manager_nom = ""
+        st.session_state.recruteur = ""
+        st.session_state.affectation_type = ""
+        st.session_state.affectation_nom = ""
+        st.session_state.date_brief = datetime.today()
+        st.rerun()
     
     with col_filter:
         st.markdown('<h3 style="margin-bottom: 0.3rem;">🔍 Filtrer les briefs</h3>', unsafe_allow_html=True)
