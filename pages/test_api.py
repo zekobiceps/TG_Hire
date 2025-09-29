@@ -602,36 +602,23 @@ with tabs[0]:
 # ---------------- AVANT-BRIEF ----------------
 # Dans l'onglet Avant-brief (tabs[1])
 with tabs[1]:
-    # ...existing code...
-    brief_data = load_briefs().get(st.session_state.current_brief_name, {})
+    brief_data = load_briefs().get(st.session_state.current_brief_name, {}) if st.session_state.current_brief_name else {}
 
     with st.form(key="avant_brief_form"):
         for section in sections:
             with st.expander(f"📋 {section['title']}", expanded=False):
                 for title, key, placeholder in section["fields"]:
-                    # Créer la clé unique comme dans le mapping
-                    unique_key = f"{section['title'].replace(' ', '_')}_{key}"
-                    
-                    # Récupérer la valeur depuis:
-                    # 1. session_state avec la clé unique
-                    # 2. brief_data avec la clé en MAJUSCULES (format Google Sheets)
-                    # 3. une chaîne vide par défaut
-                    sheet_key = key.upper()  # Par exemple "RAISON_OUVERTURE"
-                    current_value = st.session_state.get(
-                        unique_key,  # Par exemple "Contexte_du_poste_raison_ouverture"
-                        brief_data.get(sheet_key, "")  # Cherche "RAISON_OUVERTURE" dans les données
-                    )
-                    
-                    # Afficher le champ avec la valeur récupérée
+                    # On utilise la clé simple pour stocker et afficher la donnée
+                    sheet_key = key.upper()
+                    # On cherche la valeur dans l'ordre : session_state, brief_data, vide
+                    value = st.session_state.get(key, brief_data.get(sheet_key, ""))
                     st.text_area(
-                        title, 
-                        value=current_value,
-                        key=unique_key,
+                        title,
+                        value=value,
+                        key=key,
                         placeholder=placeholder,
                         height=150
                     )
-                    
-                    # Afficher le conseil IA si disponible
                     if st.session_state.get(f"advice_{key}", ""):
                         st.info(f"**Conseil IA :**\n{st.session_state[f'advice_{key}']}")
 
@@ -641,12 +628,10 @@ with tabs[1]:
                 if st.session_state.current_brief_name:
                     current_brief_name = st.session_state.current_brief_name
                     brief_to_update = st.session_state.saved_briefs[current_brief_name]
-                    
-                    all_field_keys = [field[1] for section in sections for field in section['fields']]
-                    for key in all_field_keys:
-                        unique_key = f"{next(s['title'].replace(' ', '_') for s in sections if key in [f[1] for f in s['fields']])}_{key}"
-                        brief_to_update[key] = st.session_state.get(unique_key, "")
-                    
+                    # On sauvegarde toutes les valeurs des champs
+                    for section in sections:
+                        for _, key, _ in section["fields"]:
+                            brief_to_update[key] = st.session_state.get(key, "")
                     save_briefs()
                     
                     payload_for_gsheet = brief_to_update.copy()
@@ -670,7 +655,6 @@ with tabs[1]:
                     save_brief_to_gsheet(current_brief_name, payload_for_gsheet)
                     st.success("✅ Modifications sauvegardées avec succès sur Google Sheets.")
                     st.rerun()
-
         with col_cancel:
             if st.form_submit_button("Annuler", use_container_width=True):
                 st.rerun()
@@ -716,7 +700,7 @@ with tabs[2]:
     if step == 1:
         st.subheader("Étape 1 : Validation du brief et commentaires du manager")
         with st.expander("📝 Portrait robot du candidat - Validation", expanded=True):
-            brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
+            brief_data.get(key, st.session_state.get(key, ""))
             manager_comments = brief_data.get("manager_comments", {})
 
             table_data = []
