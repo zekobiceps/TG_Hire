@@ -787,6 +787,16 @@ with tabs[2]:
             save_briefs()
             st.success("✅ Réunion de brief finalisée et sauvegardée.")
             st.rerun()
+
+    col_prev, col_next = st.columns([1, 1])
+    with col_prev:
+        if step > 1 and st.button("⬅️ Précédent", key=f"prev_{step}"):
+            st.session_state.reunion_step -= 1
+            st.rerun()
+    with col_next:
+        if step < 4 and st.button("Suivant ➡️", key=f"next_{step}"):
+            st.session_state.reunion_step += 1
+            st.rerun()
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
     if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Synthèse"):
@@ -803,10 +813,10 @@ with tabs[3]:
         
         brief_data = load_briefs().get(st.session_state.current_brief_name, {})
         st.write("### Informations générales")
-        st.write(f"- **Poste :** {brief_data.get('poste_intitule', 'N/A')}")
-        st.write(f"- **Manager :** {brief_data.get('manager_nom', 'N/A')}")
-        st.write(f"- **Affectation :** {brief_data.get('affectation_nom', 'N/A')} ({brief_data.get('affectation_type', 'N/A')})")
-        st.write(f"- **Date :** {brief_data.get('date_brief', 'N/A')}")
+        st.write(f"- **Poste :** {brief_data.get('POSTE_INTITULE', 'N/A')}")
+        st.write(f"- **Manager :** {brief_data.get('MANAGER_NOM', 'N/A')}")
+        st.write(f"- **Affectation :** {brief_data.get('AFFECTATION_NOM', 'N/A')} ({brief_data.get('AFFECTATION_TYPE', 'N/A')})")
+        st.write(f"- **Date :** {brief_data.get('DATE_BRIEF', 'N/A')}")
         
         st.write("### Détails du brief")
         for section in sections:
