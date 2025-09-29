@@ -409,188 +409,202 @@ with tabs[0]:
 
     col_info, col_filter = st.columns(2)
     
-    with col_info:
+with col_info:
         st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Informations de base</h3>', unsafe_allow_html=True)
         
-        # Load brief data if editing
-        brief_data = {}
-        if st.session_state.current_brief_name:
-            brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
-        
+        # Ce bloc de champs est maintenant unique et lit ses valeurs depuis st.session_state.
+        # La fonction "Éditer" (avec on_click) remplit ces clés en arrière-plan.
         col1, col2, col3 = st.columns(3)
         with col1:
-            st.text_input("Poste à recruter", key="poste_intitule", value=brief_data.get("poste_intitule", st.session_state.get("poste_intitule", "")))
+            st.text_input("Poste à recruter", key="poste_intitule")
         with col2:
-            st.text_input("Manager", key="manager_nom", value=brief_data.get("manager_nom", st.session_state.get("manager_nom", "")))
+            st.text_input("Manager", key="manager_nom")
         with col3:
-            st.selectbox("Recruteur", ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"], key="recruteur",
-                        index=["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"].index(
-                            brief_data.get("recruteur", st.session_state.get("recruteur", "Zakaria"))
-                        ) if brief_data.get("recruteur", st.session_state.get("recruteur", "Zakaria")) in ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"] else 0)
+            st.selectbox("Recruteur", ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"], key="recruteur")
         
         col4, col5, col6 = st.columns(3)
         with col4:
-            st.selectbox("Type d'affectation", ["Chantier", "Siège", "Dépôt"], key="affectation_type",
-                        index=["Chantier", "Siège", "Dépôt"].index(
-                            brief_data.get("affectation_type", st.session_state.get("affectation_type", "Chantier"))
-                        ) if brief_data.get("affectation_type", st.session_state.get("affectation_type", "Chantier")) in ["Chantier", "Siège", "Dépôt"] else 0)
+            st.selectbox("Type d'affectation", ["Chantier", "Siège", "Dépôt"], key="affectation_type")
         with col5:
-            st.text_input("Nom affectation", key="affectation_nom", value=brief_data.get("affectation_nom", st.session_state.get("affectation_nom", "")))
+            st.text_input("Nom affectation", key="affectation_nom")
         with col6:
-            st.date_input("Date du brief", key="date_brief", value=brief_data.get("date_brief", st.session_state.get("date_brief", datetime.today())))
+            st.date_input("Date du brief", key="date_brief")
         
+        # Logique pour les boutons "Créer / Mettre à jour" et "Annuler"
         col_create, col_cancel = st.columns(2)
         with col_create:
-            if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
-                brief_name = generate_automatic_brief_name()
-                st.session_state.current_brief_name = brief_name
+            button_label = "💾 Mettre à jour le brief" if st.session_state.current_brief_name else "💾 Créer un nouveau brief"
+            if st.button(button_label, type="primary", use_container_width=True, key="create_update_brief"):
                 
+                if st.session_state.current_brief_name:
+                    brief_name = st.session_state.current_brief_name
+                else:
+                    brief_name = generate_automatic_brief_name()
+                    st.session_state.current_brief_name = brief_name
+
+                # --- Voici la logique de sauvegarde complète ---
                 brief_data = {
                     "BRIEF_NAME": brief_name,
                     "poste_intitule": st.session_state.poste_intitule,
                     "manager_nom": st.session_state.manager_nom,
-                    "POSTE_INTITULE": st.session_state.poste_intitule,
-                    "MANAGER_NOM": st.session_state.manager_nom,
-                    "RECRUTEUR": st.session_state.recruteur,
-                    "AFFECTATION_TYPE": st.session_state.affectation_type,
-                    "AFFECTATION_NOM": st.session_state.affectation_nom,
-                    "DATE_BRIEF": str(st.session_state.date_brief),
-                    "RAISON_OUVERTURE": st.session_state.get("raison_ouverture", ""),
-                    "IMPACT_STRATEGIQUE": st.session_state.get("impact_strategique", ""),
-                    "RATTACHEMENT": st.session_state.get("rattachement", ""),
-                    "TACHES_PRINCIPALES": st.session_state.get("taches_principales", ""),
-                    "MUST_HAVE_EXP": st.session_state.get("must_have_experience", ""),
-                    "MUST_HAVE_DIP": st.session_state.get("must_have_diplomes", ""),
-                    "MUST_HAVE_COMPETENCES": st.session_state.get("must_have_competences", ""),
-                    "MUST_HAVE_SOFTSKILLS": st.session_state.get("must_have_softskills", ""),
-                    "NICE_TO_HAVE_EXP": st.session_state.get("nice_to_have_experience", ""),
-                    "NICE_TO_HAVE_DIP": st.session_state.get("nice_to_have_diplomes", ""),
-                    "NICE_TO_HAVE_COMPETENCES": st.session_state.get("nice_to_have_competences", ""),
-                    "ENTREPRISES_PROFIL": st.session_state.get("entreprises_profil", ""),
-                    "SYNONYMES_POSTE": st.session_state.get("synonymes_poste", ""),
-                    "CANAUX_PROFIL": st.session_state.get("canaux_profil", ""),
-                    "BUDGET": st.session_state.get("budget", ""),
-                    "COMMENTAIRES": st.session_state.get("commentaires", ""),
-                    "NOTES_LIBRES": st.session_state.get("notes_libres", ""),
-                    "CRITERES_EXCLUSION": st.session_state.get("criteres_exclusion", ""),
-                    "PROCESSUS_EVALUATION": st.session_state.get("processus_evaluation", ""),
-                    "MANAGER_NOTES": st.session_state.get("manager_notes", ""),
-                    "KSA_MATRIX_JSON": st.session_state.get("KSA_MATRIX_JSON", ""),
-                    "brief_type": "Standard",
+                    "recruteur": st.session_state.recruteur,
+                    "affectation_type": st.session_state.affectation_type,
+                    "affectation_nom": st.session_state.affectation_nom,
+                    "date_brief": str(st.session_state.date_brief),
+                    # On récupère toutes les autres données depuis st.session_state
+                    "raison_ouverture": st.session_state.get("raison_ouverture", ""),
+                    "impact_strategique": st.session_state.get("impact_strategique", ""),
+                    "rattachement": st.session_state.get("rattachement", ""),
+                    "taches_principales": st.session_state.get("taches_principales", ""),
+                    "must_have_experience": st.session_state.get("must_have_experience", ""),
+                    "must_have_diplomes": st.session_state.get("must_have_diplomes", ""),
+                    "must_have_competences": st.session_state.get("must_have_competences", ""),
+                    "must_have_softskills": st.session_state.get("must_have_softskills", ""),
+                    "nice_to_have_experience": st.session_state.get("nice_to_have_experience", ""),
+                    "nice_to_have_diplomes": st.session_state.get("nice_to_have_diplomes", ""),
+                    "nice_to_have_competences": st.session_state.get("nice_to_have_competences", ""),
+                    "entreprises_profil": st.session_state.get("entreprises_profil", ""),
+                    "synonymes_poste": st.session_state.get("synonymes_poste", ""),
+                    "canaux_profil": st.session_state.get("canaux_profil", ""),
+                    "budget": st.session_state.get("budget", ""),
+                    "commentaires": st.session_state.get("commentaires", ""),
+                    "notes_libres": st.session_state.get("notes_libres", ""),
+                    "canaux_prioritaires": st.session_state.get("canaux_prioritaires", []),
+                    "criteres_exclusion": st.session_state.get("criteres_exclusion", ""),
+                    "processus_evaluation": st.session_state.get("processus_evaluation", ""),
+                    "manager_notes": st.session_state.get("manager_notes", ""),
                     "ksa_matrix": st.session_state.get("ksa_matrix", pd.DataFrame()),
                     "manager_comments": st.session_state.get("manager_comments", {}),
                 }
                 
+                # Conversion de la matrice KSA en JSON pour la sauvegarde
+                if isinstance(brief_data["ksa_matrix"], pd.DataFrame):
+                    brief_data["KSA_MATRIX_JSON"] = brief_data["ksa_matrix"].to_json(orient='split', date_format='iso')
+
                 st.session_state.saved_briefs[brief_name] = brief_data
                 save_briefs()
                 save_brief_to_gsheet(brief_name, brief_data)
                 
-                st.session_state.saved_briefs = load_briefs()
-                st.session_state.save_message = f"✅ Brief '{brief_name}' créé avec succès"
-                st.session_state.save_message_tab = "Gestion"
+                st.success(f"✅ Brief '{brief_name}' sauvegardé avec succès")
                 st.rerun()
+
         with col_cancel:
-            if st.button("🗑️ Annuler", type="secondary", use_container_width=True, key="cancel_brief"):
-                st.session_state.poste_intitule = ""
-                st.session_state.manager_nom = ""
-                st.session_state.recruteur = ""
-                st.session_state.affectation_type = ""
-                st.session_state.affectation_nom = ""
-                st.session_state.date_brief = datetime.today()
+            if st.button("➕ Nouveau / Annuler", use_container_width=True, key="cancel_brief"):
+                # Logique pour vider les champs et déselectionner le brief actuel
+                keys_to_reset = [
+                    "poste_intitule", "manager_nom", "affectation_nom", "raison_ouverture", 
+                    "impact_strategique", "rattachement", "taches_principales", "must_have_experience", 
+                    "must_have_diplomes", "must_have_competences", "must_have_softskills", 
+                    "nice_to_have_experience", "nice_to_have_diplomes", "nice_to_have_competences", 
+                    "entreprises_profil", "synonymes_poste", "canaux_profil", "budget", 
+                    "commentaires", "notes_libres", "profil_link_1", "profil_link_2", 
+                    "profil_link_3", "canaux_prioritaires", "criteres_exclusion", 
+                    "processus_evaluation", "manager_notes"
+                ]
+                for key in keys_to_reset:
+                    # Gère le cas des listes (multiselect) et des chaînes de caractères
+                    st.session_state[key] = [] if key == "canaux_prioritaires" else ""
+                
+                # Réinitialiser les selectbox et date_input à une valeur par défaut
+                st.session_state.recruteur = "Zakaria"
+                st.session_state.affectation_type = "Chantier"
+                st.session_state.date_brief = datetime.today().date()
+                st.session_state.ksa_matrix = pd.DataFrame()
+                
+                # Très important : on déselectionne le brief en cours
+                st.session_state.current_brief_name = "" 
                 st.rerun()
     
-        with col_filter:
-            st.markdown('<h3 style="margin-bottom: 0.3rem;">🔍 Filtrer les briefs</h3>', unsafe_allow_html=True)
-        
-        col_filter1, col_filter2, col_filter3 = st.columns(3)
-        with col_filter1:
-            st.date_input("Date", key="filter_date", value=None)
-        with col_filter2:
-            st.text_input("Recruteur", key="filter_recruteur", value=st.session_state.get("filter_recruteur", ""))
-        with col_filter3:
-            st.text_input("Manager", key="filter_manager", value=st.session_state.get("filter_manager", ""))
-        
-        col_filter4, col_filter5, col_filter6 = st.columns(3)
-        with col_filter4:
-            st.selectbox("Affectation", ["", "Chantier", "Siège", "Dépôt"], key="filter_affectation",
-                        index=["", "Chantier", "Siège", "Dépôt"].index(st.session_state.get("filter_affectation", ""))
-                        if st.session_state.get("filter_affectation") in ["", "Chantier", "Siège", "Dépôt"] else 0)
-        with col_filter5:
-            st.text_input("Nom affectation", key="filter_nom_affectation", value=st.session_state.get("filter_nom_affectation", ""))
-        with col_filter6:
-            st.selectbox("Type de brief", ["", "Standard", "Urgent", "Stratégique"], key="filter_brief_type",
-                        index=["", "Standard", "Urgent", "Stratégique"].index(st.session_state.get("filter_brief_type", ""))
-                        if st.session_state.get("filter_brief_type") in ["", "Standard", "Urgent", "Stratégique"] else 0)
-        
-        if st.button("🔎 Filtrer", use_container_width=True, key="apply_filter"):
-            filter_month = st.session_state.filter_date.strftime("%m") if st.session_state.filter_date else ""
-            st.session_state.filtered_briefs = filter_briefs(
-                st.session_state.saved_briefs,
-                filter_month,
-                st.session_state.filter_recruteur,
-                st.session_state.filter_brief_type,
-                st.session_state.filter_manager,
-                st.session_state.filter_affectation,
-                st.session_state.filter_nom_affectation
-            )
-            st.session_state.show_filtered_results = True
-            st.rerun()
-        
-        if st.session_state.show_filtered_results:
-            st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
+with col_filter:
+    st.markdown('<h3 style="margin-bottom: 0.3rem;">🔍 Filtrer les briefs</h3>', unsafe_allow_html=True)
+    
+    col_filter1, col_filter2, col_filter3 = st.columns(3)
+    with col_filter1:
+        st.date_input("Date", key="filter_date", value=None)
+    with col_filter2:
+        st.text_input("Recruteur", key="filter_recruteur", value=st.session_state.get("filter_recruteur", ""))
+    with col_filter3:
+        st.text_input("Manager", key="filter_manager", value=st.session_state.get("filter_manager", ""))
+    
+    col_filter4, col_filter5, col_filter6 = st.columns(3)
+    with col_filter4:
+        st.selectbox("Affectation", ["", "Chantier", "Siège", "Dépôt"], key="filter_affectation",
+                    index=["", "Chantier", "Siège", "Dépôt"].index(st.session_state.get("filter_affectation", ""))
+                    if st.session_state.get("filter_affectation") in ["", "Chantier", "Siège", "Dépôt"] else 0)
+    with col_filter5:
+        st.text_input("Nom affectation", key="filter_nom_affectation", value=st.session_state.get("filter_nom_affectation", ""))
+    with col_filter6:
+        st.selectbox("Type de brief", ["", "Standard", "Urgent", "Stratégique"], key="filter_brief_type",
+                    index=["", "Standard", "Urgent", "Stratégique"].index(st.session_state.get("filter_brief_type", ""))
+                    if st.session_state.get("filter_brief_type") in ["", "Standard", "Urgent", "Stratégique"] else 0)
+    
+    if st.button("🔎 Filtrer", use_container_width=True, key="apply_filter"):
+        filter_month = st.session_state.filter_date.strftime("%m") if st.session_state.filter_date else ""
+        st.session_state.filtered_briefs = filter_briefs(
+            st.session_state.saved_briefs,
+            filter_month,
+            st.session_state.filter_recruteur,
+            st.session_state.filter_brief_type,
+            st.session_state.filter_manager,
+            st.session_state.filter_affectation,
+            st.session_state.filter_nom_affectation
+        )
+        st.session_state.show_filtered_results = True
+        st.rerun()
+    
+    if st.session_state.show_filtered_results:
+        st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
 
-# On détermine quels briefs afficher : ceux filtrés, ou tous par défaut.
+        # On détermine quels briefs afficher : ceux filtrés, ou tous par défaut.
         if st.session_state.get('show_filtered_results', False) and 'filtered_briefs' in st.session_state:
             briefs_to_show = st.session_state.filtered_briefs
         else:
             briefs_to_show = st.session_state.saved_briefs
 
-    if briefs_to_show:
-        for name, data in briefs_to_show.items():
-            col_brief1, col_brief2, col_brief3, col_brief4 = st.columns([3, 1, 1, 1])
-            with col_brief1:
-                st.write(f"**{name}** - Manager: {data.get('manager_nom', 'N/A')} - Affectation: {data.get('affectation_nom', 'N/A')}")
-            
-            with col_brief2:
-                # --- MODIFICATION DU BOUTON "ÉDITER" ---
-                st.button(
-                    "📝 Éditer", 
-                    key=f"edit_{name}", 
-                    on_click=load_brief_for_editing, 
-                    args=(name,)
-                )
-
-        with col_brief3:
-            if st.button("🗑️ Supprimer", key=f"delete_{name}"):
-                st.session_state.saved_briefs.pop(name, None)
-                save_briefs()
-                st.success(f"Brief '{name}' supprimé.")
-                st.rerun()
-        with col_brief4:
-            if st.button("📄 Exporter", key=f"export_{name}"):
-                st.session_state.current_brief_name = name
-                if PDF_AVAILABLE:
-                    pdf_buf = export_brief_pdf()
-                    if pdf_buf:
-                        st.download_button(
-                            "⬇️ Télécharger PDF",
-                            data=pdf_buf,
-                            file_name=f"{name}.pdf",
-                            mime="application/pdf",
-                            key=f"download_pdf_{name}"
-                        )
-                if WORD_AVAILABLE:
-                    word_buf = export_brief_word()
-                    if word_buf:
-                        st.download_button(
-                            "⬇️ Télécharger Word",
-                            data=word_buf,
-                            file_name=f"{name}.docx",
-                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                            key=f"download_word_{name}"
-                        )
-    else:
-        st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
+        if briefs_to_show:
+            for name, data in briefs_to_show.items():
+                col_brief1, col_brief2, col_brief3, col_brief4 = st.columns([3, 1, 1, 1])
+                with col_brief1:
+                    st.write(f"**{name}** - Manager: {data.get('manager_nom', 'N/A')} - Affectation: {data.get('affectation_nom', 'N/A')}")
+                with col_brief2:
+                    # --- MODIFICATION DU BOUTON "ÉDITER" ---
+                    st.button(
+                        "📝 Éditer", 
+                        key=f"edit_{name}", 
+                        on_click=load_brief_for_editing, 
+                        args=(name,)
+                    )
+                with col_brief3:
+                    if st.button("🗑️ Supprimer", key=f"delete_{name}"):
+                        st.session_state.saved_briefs.pop(name, None)
+                        save_briefs()
+                        st.success(f"Brief '{name}' supprimé.")
+                        st.rerun()
+                with col_brief4:
+                    if st.button("📄 Exporter", key=f"export_{name}"):
+                        st.session_state.current_brief_name = name
+                        if PDF_AVAILABLE:
+                            pdf_buf = export_brief_pdf()
+                            if pdf_buf:
+                                st.download_button(
+                                    "⬇️ Télécharger PDF",
+                                    data=pdf_buf,
+                                    file_name=f"{name}.pdf",
+                                    mime="application/pdf",
+                                    key=f"download_pdf_{name}"
+                                )
+                        if WORD_AVAILABLE:
+                            word_buf = export_brief_word()
+                            if word_buf:
+                                st.download_button(
+                                    "⬇️ Télécharger Word",
+                                    data=word_buf,
+                                    file_name=f"{name}.docx",
+                                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                    key=f"download_word_{name}"
+                                )
+        else:
+            st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
 
 # ---------------- AVANT-BRIEF ----------------
 with tabs[1]:
