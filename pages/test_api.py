@@ -52,167 +52,153 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# --- DEBUG démarrage (ajouter juste après les imports existants) ---
+st.write("DEBUG: script démarré à", datetime.utcnow().isoformat())
+
 def render_ksa_matrix():
     """Affiche la matrice KSA sous forme de tableau et permet l'ajout de critères."""
-    with st.expander("ℹ️ Explications de la méthode KSA", expanded=False):
-        st.markdown("""
-### Méthode KSA (Knowledge, Skills, Abilities)
+    try:
+        with st.expander("ℹ️ Explications de la méthode KSA", expanded=False):
+            st.markdown("""### Méthode KSA (Knowledge, Skills, Abilities)
 - **Knowledge (Connaissances)** : Savoirs théoriques nécessaires. Ex: Connaissances en normes de sécurité BTP (ISO 45001).
 - **Skills (Compétences)** : Aptitudes pratiques acquises. Ex: Maîtrise d'AutoCAD pour dessiner des plans de chantier.
 - **Abilities (Aptitudes)** : Capacités innées ou développées. Ex: Capacité à gérer des crises sur chantier.
+            """)
+        if "ksa_matrix" not in st.session_state:
+            st.session_state.ksa_matrix = pd.DataFrame(columns=[
+                "Rubrique", "Critère", "Type de question", "Cible / Standard attendu",
+                "Échelle d'évaluation (1-5)", "Évaluateur"
+            ])
 
-### Types de questions :
-- **Comportementale** : Basée sur des expériences passées (méthode STAR). Ex: "Décrivez une situation où vous avez résolu un conflit d'équipe."
-- **Situationnelle** : Hypothétique, pour évaluer la réaction future. Ex: "Que feriez-vous si un délai de chantier était menacé ?"
-- **Technique** : Évalue les connaissances spécifiques. Ex: "Expliquez comment vous utilisez AutoCAD pour la modélisation BTP."
-- **Générale** : Questions ouvertes sur l'expérience globale. Ex: "Parlez-moi de votre parcours en BTP."
-        """)
-    
-    if "ksa_matrix" not in st.session_state:
-        st.session_state.ksa_matrix = pd.DataFrame(columns=[
-            "Rubrique", "Critère", "Type de question", "Cible / Standard attendu", 
-            "Échelle d'évaluation (1-5)", "Évaluateur"
-        ])
-    
-    placeholder_dict = {
-        "Comportementale": "Ex: Décrivez une situation où vous avez géré une équipe sous pression (méthode STAR).",
-        "Situationnelle": "Ex: Que feriez-vous si un délai de chantier était menacé par un retard de livraison ?",
-        "Technique": "Ex: Expliquez comment vous utilisez AutoCAD pour la modélisation de structures BTP.",
-        "Générale": "Ex: Parlez-moi de votre expérience globale dans le secteur BTP."
-    }
-    
-    with st.expander("➕ Ajouter un critère", expanded=True):
-        st.markdown("""
-        <style>
-            .stTextInput, .stSelectbox, .stSlider, .stTextArea {
-                margin-bottom: 5px;
-                padding: 5px;
-                border-radius: 8px;
-                background-color: #2a2a2a;
-                color: #ffffff;
-            }
-            .stTextInput > div > input, .stTextArea > div > textarea {
-                background-color: #2a2a2a;
-                color: #ffffff;
-                border: 1px solid #555555;
-                border-radius: 8px;
-            }
-            .stSelectbox > div > select {
-                background-color: #2a2a2a;
-                color: #ffffff;
-                border: 1px solid #555555;
-                border-radius: 8px;
-            }
-            .stButton > button {
-                background-color: #FF0000;
-                color: white;
-                border-radius: 8px;
-                padding: 5px 10px;
-                margin-top: 5px;
-            }
-            .stButton > button:hover {
-                background-color: #FF3333;
-            }
-            .st-expander {
-                border: 1px solid #555555;
-                border-radius: 8px;
-                background-color: #1e1e1e;
-                padding: 5px;
-            }
-        </style>
-        """, unsafe_allow_html=True)
-        
-        with st.form(key="add_ksa_criterion_form"):
-            st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
-            cible = st.text_area("Cible / Standard attendu", 
-                               placeholder="Définissez la cible ou le standard attendu pour ce critère.", 
-                               key="new_cible", height=100, value=st.session_state.get("new_cible", ""))
-            st.markdown("</div>", unsafe_allow_html=True)
-            
-            col1, col2, col3 = st.columns([1, 1, 1.5])
-            with col1:
+        placeholder_dict = {
+            "Comportementale": "Ex: Décrivez une situation où vous avez géré une équipe sous pression (méthode STAR).",
+            "Situationnelle": "Ex: Que feriez-vous si un délai de chantier était menacé par un retard de livraison ?",
+            "Technique": "Ex: Expliquez comment vous utilisez AutoCAD pour la modélisation de structures BTP.",
+            "Générale": "Ex: Parlez-moi de votre expérience globale dans le secteur BTP."
+        }
+
+        with st.expander("➕ Ajouter un critère", expanded=True):
+            # (bloc inchangé sauf que toutes les occurrences unsafe_allow_html sont confirmées)
+            with st.form(key="add_ksa_criterion_form"):
                 st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
-                rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique",
-                                      index=["Knowledge", "Skills", "Abilities"].index(st.session_state.get("new_rubrique", "Knowledge"))
-                                      if st.session_state.get("new_rubrique") in ["Knowledge", "Skills", "Abilities"] else 0)
-                st.markdown("</div>", unsafe_allow_html=True)  # correction ici (unsafe_allow_html)
-            with col2:
-                st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
-                critere = st.text_input("Critère", placeholder="", key="new_critere", value=st.session_state.get("new_critere", ""))
-                type_question = st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], 
-                                           key="new_type_question",
-                                           index=["Comportementale", "Situationnelle", "Technique", "Générale"].index(st.session_state.get("new_type_question", "Comportementale"))
-                                           if st.session_state.get("new_type_question") in ["Comportementale", "Situationnelle", "Technique", "Générale"] else 0)
+                cible = st.text_area("Cible / Standard attendu",
+                                     placeholder="Définissez la cible ou le standard attendu pour ce critère.",
+                                     key="new_cible", height=100,
+                                     value=st.session_state.get("new_cible", ""))
                 st.markdown("</div>", unsafe_allow_html=True)
-            with col3:
-                st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
-                evaluation = st.slider("Échelle d'évaluation (1-5)", min_value=1, max_value=5, value=st.session_state.get("new_evaluation", 3), step=1, key="new_evaluation")
-                evaluateur = st.selectbox("Évaluateur", ["Manager", "Recruteur", "Les deux"], key="new_evaluateur",
-                                        index=["Manager", "Recruteur", "Les deux"].index(st.session_state.get("new_evaluateur", "Manager"))
-                                        if st.session_state.get("new_evaluateur") in ["Manager", "Recruteur", "Les deux"] else 0)
-                st.markdown("</div>", unsafe_allow_html=True)
-            
-            st.markdown("---")
-            st.markdown("**Demander une question à l'IA**")
-            ai_prompt = st.text_input("Décrivez ce que l'IA doit générer :", 
-                                    placeholder="Ex: une question générale pour évaluer la maîtrise des techniques de sourcing par un chargé de recrutement", 
-                                    key="ai_prompt", value=st.session_state.get("ai_prompt", ""))
-            st.checkbox("⚡ Mode rapide (réponse concise)", key="concise_checkbox")
-            
-            col_buttons = st.columns([1, 1])
-            with col_buttons[0]:
-                if st.form_submit_button("💡 Générer question IA", use_container_width=True):
-                    if ai_prompt:
-                        try:
-                            ai_response = generate_ai_question(ai_prompt, concise=st.session_state.concise_checkbox)
-                            st.session_state.ai_response = ai_response
-                        except Exception as e:
-                            st.error(f"Erreur lors de la génération de la question : {e}")
-                    else:
-                        st.error("Veuillez entrer un prompt pour l'IA")
-            
-            with col_buttons[1]:
-                if st.form_submit_button("➕ Ajouter le critère", use_container_width=True):
-                    if not critere or not cible:
-                        st.error("Veuillez remplir au moins le critère et la cible.")
-                    else:
-                        new_row = pd.DataFrame([{
-                            "Rubrique": rubrique,
-                            "Critère": critere,
-                            "Type de question": type_question,
-                            "Cible / Standard attendu": cible,
-                            "Échelle d'évaluation (1-5)": evaluation,
-                            "Évaluateur": evaluateur
-                        }])
-                        st.session_state.ksa_matrix = pd.concat([st.session_state.ksa_matrix, new_row], ignore_index=True)
-                        st.success("✅ Critère ajouté avec succès !")
-                        st.rerun()
 
-        if "ai_response" in st.session_state and st.session_state.ai_response:
-            st.success(f"**Question :** {st.session_state.ai_response}")
-            st.session_state.ai_response = ""
+                col1, col2, col3 = st.columns([1, 1, 1.5])
+                with col1:
+                    st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
+                    rubrique = st.selectbox(
+                        "Rubrique", ["Knowledge", "Skills", "Abilities"],
+                        key="new_rubrique",
+                        index=["Knowledge", "Skills", "Abilities"].index(
+                            st.session_state.get("new_rubrique", "Knowledge")
+                        ) if st.session_state.get("new_rubrique") in ["Knowledge", "Skills", "Abilities"] else 0
+                    )
+                    st.markdown("</div>", unsafe_allow_html=True)
+                with col2:
+                    st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
+                    critere = st.text_input("Critère", key="new_critere",
+                                            value=st.session_state.get("new_critere", ""))
+                    type_question = st.selectbox(
+                        "Type de question",
+                        ["Comportementale", "Situationnelle", "Technique", "Générale"],
+                        key="new_type_question",
+                        index=["Comportementale", "Situationnelle", "Technique", "Générale"].index(
+                            st.session_state.get("new_type_question", "Comportementale")
+                        ) if st.session_state.get("new_type_question") in
+                           ["Comportementale", "Situationnelle", "Technique", "Générale"] else 0
+                    )
+                    st.markdown("</div>", unsafe_allow_html=True)
+                with col3:
+                    st.markdown("<div style='padding: 5px;'>", unsafe_allow_html=True)
+                    evaluation = st.slider("Échelle d'évaluation (1-5)", 1, 5,
+                                           value=st.session_state.get("new_evaluation", 3),
+                                           step=1, key="new_evaluation")
+                    evaluateur = st.selectbox(
+                        "Évaluateur", ["Manager", "Recruteur", "Les deux"],
+                        key="new_evaluateur",
+                        index=["Manager", "Recruteur", "Les deux"].index(
+                            st.session_state.get("new_evaluateur", "Manager")
+                        ) if st.session_state.get("new_evaluateur") in
+                           ["Manager", "Recruteur", "Les deux"] else 0
+                    )
+                    st.markdown("</div>", unsafe_allow_html=True)
 
-    if not st.session_state.ksa_matrix.empty:
-        st.session_state.ksa_matrix = st.data_editor(
-            st.session_state.ksa_matrix,
-            hide_index=True,
-            column_config={
-                "Rubrique": st.column_config.SelectboxColumn(
-                    "Rubrique", options=["Knowledge", "Skills", "Abilities"], required=True),
-                "Critère": st.column_config.TextColumn("Critère", help="Critère spécifique à évaluer.", required=True),
-                "Type de question": st.column_config.SelectboxColumn(
-                    "Type de question", options=["Comportementale", "Situationnelle", "Technique", "Générale"], 
-                    help="Type de question pour l'entretien.", required=True),
-                "Cible / Standard attendu": st.column_config.TextColumn(
-                    "Cible / Standard attendu", help="Objectif ou standard à évaluer pour ce critère.", required=True),
-                "Échelle d'évaluation (1-5)": st.column_config.NumberColumn(
-                    "Échelle d'évaluation (1-5)", help="Notez la réponse du candidat de 1 à 5.", min_value=1, max_value=5, step=1, format="%d"),
-                "Évaluateur": st.column_config.SelectboxColumn(
-                    "Évaluateur", options=["Manager", "Recruteur", "Les deux"], help="Qui évalue ce critère.", required=True),
-            },
-            num_rows="dynamic",
-            use_container_width=True,
-        )
+                st.markdown("---")
+                st.markdown("**Demander une question à l'IA**")
+                ai_prompt = st.text_input(
+                    "Décrivez ce que l'IA doit générer :",
+                    placeholder="Ex: une question générale sur l'expérience en gestion de projet",
+                    key="ai_prompt", value=st.session_state.get("ai_prompt", "")
+                )
+                st.checkbox("⚡ Mode rapide (réponse concise)", key="concise_checkbox")
+
+                col_buttons = st.columns([1, 1])
+                with col_buttons[0]:
+                    if st.form_submit_button("💡 Générer question IA", use_container_width=True):
+                        if ai_prompt:
+                            try:
+                                ai_response = generate_ai_question(
+                                    ai_prompt,
+                                    concise=st.session_state.concise_checkbox
+                                )
+                                st.session_state.ai_response = ai_response
+                            except Exception as e:
+                                st.error(f"Erreur génération IA : {e}")
+                        else:
+                            st.error("Veuillez entrer un prompt pour l'IA")
+
+                with col_buttons[1]:
+                    if st.form_submit_button("➕ Ajouter le critère", use_container_width=True):
+                        if not critere or not cible:
+                            st.error("Veuillez remplir au moins le critère et la cible.")
+                        else:
+                            new_row = pd.DataFrame([{
+                                "Rubrique": rubrique,
+                                "Critère": critere,
+                                "Type de question": type_question,
+                                "Cible / Standard attendu": cible,
+                                "Échelle d'évaluation (1-5)": evaluation,
+                                "Évaluateur": evaluateur
+                            }])
+                            st.session_state.ksa_matrix = pd.concat(
+                                [st.session_state.ksa_matrix, new_row],
+                                ignore_index=True
+                            )
+                            st.success("✅ Critère ajouté.")
+                            st.rerun()
+
+            if "ai_response" in st.session_state and st.session_state.ai_response:
+                st.success(f"**Question :** {st.session_state.ai_response}")
+                st.session_state.ai_response = ""
+
+        if not st.session_state.ksa_matrix.empty:
+            st.session_state.ksa_matrix = st.data_editor(
+                st.session_state.ksa_matrix,
+                hide_index=True,
+                column_config={
+                    "Rubrique": st.column_config.SelectboxColumn(
+                        "Rubrique", options=["Knowledge", "Skills", "Abilities"], required=True),
+                    "Critère": st.column_config.TextColumn("Critère", required=True),
+                    "Type de question": st.column_config.SelectboxColumn(
+                        "Type de question",
+                        options=["Comportementale", "Situationnelle", "Technique", "Générale"],
+                        required=True),
+                    "Cible / Standard attendu": st.column_config.TextColumn(
+                        "Cible / Standard attendu", required=True),
+                    "Échelle d'évaluation (1-5)": st.column_config.NumberColumn(
+                        "Échelle d'évaluation (1-5)", min_value=1, max_value=5, step=1, format="%d"),
+                    "Évaluateur": st.column_config.SelectboxColumn(
+                        "Évaluateur", options=["Manager", "Recruteur", "Les deux"], required=True),
+                },
+                num_rows="dynamic",
+                use_container_width=True,
+            )
+    except Exception as e:
+        st.error(f"❌ Erreur dans render_ksa_matrix: {e}")
 
 def delete_current_brief():
     """Supprime le brief actuel et retourne à l'onglet Gestion"""
@@ -869,29 +855,3 @@ with tabs[3]:
                     st.info("ℹ️ Créez d'abord un brief pour l'exporter")
             else:
                 st.info("⚠️ Word non dispo (pip install python-docx)")
-
-# === AJOUT : fonction utilitaire de récupération ===
-def get_brief_value(brief_dict: dict, key: str, default: str = ""):
-    """
-    Récupère une valeur d'un brief avec robustesse :
-    - clé upper
-    - clé lower
-    - cas spéciaux (profil_link_x -> LIEN_PROFIL_X)
-    """
-    if not brief_dict:
-        return default
-    # Cas des liens profils
-    if key.startswith("profil_link_"):
-        suffix = key.split("_")[-1]
-        candidates = [
-            f"LIEN_PROFIL_{suffix}",
-            f"PROFIL_LINK_{suffix}".upper(),  # au cas où déjà stocké
-            key.upper(),
-            key
-        ]
-    else:
-        candidates = [key.upper(), key]
-    for c in candidates:
-        if c in brief_dict and brief_dict[c] not in (None, ""):
-            return brief_dict[c]
-    return default
