@@ -3,6 +3,7 @@ import sys, os
 from datetime import datetime
 import json
 import pandas as pd
+from datetime import date
 
 # ✅ permet d'accéder à utils.py à la racine
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
@@ -487,17 +488,21 @@ with col6:
                 date_brief_value = datetime.today().date()
     elif isinstance(date_brief_raw, datetime):
         date_brief_value = date_brief_raw.date()
+    elif isinstance(date_brief_raw, date):
+        date_brief_value = date_brief_raw
     elif hasattr(date_brief_raw, "date"):  # Pour pd.Timestamp
         date_brief_value = date_brief_raw.date()
     elif isinstance(date_brief_raw, (list, tuple)):
-        # Si c'est une liste, prends le premier élément si possible
         try:
             date_brief_value = datetime.strptime(str(date_brief_raw[0]), "%Y-%m-%d").date()
         except Exception:
             date_brief_value = datetime.today().date()
     else:
-        # Si rien ne marche, prends la date du jour
         date_brief_value = datetime.today().date()
+
+    # Correction : on force la valeur dans session_state à être du bon type
+    if "date_brief" in st.session_state and not isinstance(st.session_state["date_brief"], date):
+        del st.session_state["date_brief"]
 
     st.date_input("Date du brief", key="date_brief", value=date_brief_value)
 
