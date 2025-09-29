@@ -440,9 +440,9 @@ all_field_keys = [
 with tabs[0]:
     brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {}) if st.session_state.current_brief_name else {}
 
-    # Bloc principal : deux colonnes
     col_left, col_right = st.columns([2, 2])
 
+    # Bloc "Créer un brief"
     with col_left:
         st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Informations de base</h3>', unsafe_allow_html=True)
         col1, col2, col3 = st.columns(3)
@@ -460,40 +460,20 @@ with tabs[0]:
         with col5:
             st.text_input("Nom affectation", key="affectation_nom", value=brief_data.get("affectation_nom", ""))
         with col6:
-            # Bloc date corrigé ci-dessus
             date_brief_raw = brief_data.get("date_brief", st.session_state.get("date_brief", date.today()))
-
-            # Nettoyage de la clé session_state si elle n'est pas du bon type
-            if "date_brief" in st.session_state and not isinstance(st.session_state["date_brief"], date):
-                try:
-                    st.session_state["date_brief"] = datetime.strptime(str(st.session_state["date_brief"]), "%Y-%m-%d").date()
-                except Exception:
-                    try:
-                        st.session_state["date_brief"] = datetime.strptime(str(st.session_state["date_brief"]), "%d/%m/%Y").date()
-                    except Exception:
-                        st.session_state["date_brief"] = date.today()
-
-            # Conversion de la valeur à afficher
             if isinstance(date_brief_raw, str):
                 try:
                     date_brief_value = datetime.strptime(date_brief_raw, "%Y-%m-%d").date()
                 except Exception:
-                    try:
-                        date_brief_value = datetime.strptime(date_brief_raw, "%d/%m/%Y").date()
-                    except Exception:
-                        date_brief_value = date.today()
+                    date_brief_value = date.today()
             elif isinstance(date_brief_raw, datetime):
                 date_brief_value = date_brief_raw.date()
             elif isinstance(date_brief_raw, date):
                 date_brief_value = date_brief_raw
             else:
                 date_brief_value = date.today()
-
             st.date_input("Date du brief", key="date_brief", value=date_brief_value)
 
-    # Boutons sous les champs
-    col_create, col_cancel = st.columns([2, 2])
-    with col_create:
         if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
             # Vérification des champs requis
             required_fields = ["poste_intitule", "manager_nom", "affectation_nom", "date_brief"]
@@ -537,6 +517,7 @@ with tabs[0]:
                 st.success(f"✅ Brief '{new_brief_name}' créé avec succès !")
                 st.rerun()
 
+    # Bloc "Filtrer les briefs"
     with col_right:
         st.markdown('<h3 style="margin-bottom: 0.3rem;">🔍 Filtrer les briefs</h3>', unsafe_allow_html=True)
         col_filter1, col_filter2, col_filter3 = st.columns(3)
@@ -644,7 +625,7 @@ with tabs[1]:
                             payload_for_gsheet[gsheet_key] = payload_for_gsheet[session_key]
                     
                     save_brief_to_gsheet(current_brief_name, payload_for_gsheet)
-                    st.success("✅ Modifications sauvegardées avec succès sur Google Sheets.")
+                    st.success("✅ Modifications sauvegardées avec succès")
                     st.rerun()
         with col_cancel:
             if st.form_submit_button("Annuler", use_container_width=True):
@@ -690,74 +671,77 @@ with tabs[2]:
 
     if step == 1:
         st.subheader("Étape 1 : Validation du brief et commentaires du manager")
-        with st.expander("📝 Portrait robot du candidat - Validation", expanded=True):
-            if st.session_state.current_brief_name:
-                brief_data = load_briefs().get(st.session_state.current_brief_name, {})
-                for section in sections:
-                    for title, key, _ in section["fields"]:
-                        st.session_state[key] = brief_data.get(key, "")
-            
-            manager_comments = brief_data.get("manager_comments", {})
-
-            table_data = []
+    with st.expander("📝 Portrait robot du candidat - Validation", expanded=True):
+        if st.session_state.import_brief_flag and st.session_state.brief_to_import:
+            brief_data = load_briefs().get(st.session_state.brief_to_import, {})
             for section in sections:
-                if section["title"] == "Profils pertinents":
-                    continue
                 for title, key, _ in section["fields"]:
-                    table_data.append({
-                        "Section": section["title"], "Détails": title, "Informations": brief_data.get(key, ""),
-                        "Commentaires du manager": manager_comments.get(key, ""), "_key": key
-                    })
+                    st.session_state[key] = brief_data.get(key, "")
+            st.session_state.import_brief_flag = False
+            st.session_state.brief_to_import = None
+            st.rerun()
+        
+        manager_comments = brief_data.get("manager_comments", {})
+
+        table_data = []
+        for section in sections:
+            if section["title"] == "Profils pertinents":
+                continue
+            for title, key, _ in section["fields"]:
+                table_data.append({
+                    "Section": section["title"], "Détails": title, "Informations": brief_data.get(key, ""),
+                    "Commentaires du manager": manager_comments.get(key, ""), "_key": key
+                })
+            
+        if not table_data:
+            st.warning("Veuillez d'abord remplir l'onglet 'Avant-brief'.")
+        else:
+            df = pd.DataFrame(table_data)
+            edited_df = st.data_editor(
+                df,
+                column_config={
+                    "Section": st.column_config.TextColumn(disabled=True),
+                    "Détails": st.column_config.TextColumn(disabled=True),
+                    "Informations": st.column_config.TextColumn(disabled=True, width="large"),
+                    "Commentaires du manager": st.column_config.TextColumn(width="large"),
+                    "_key": None,
+                },
+                use_container_width=True, hide_index=True, key="manager_comments_editor"
+            )
+
+            if st.button("💾 Enregistrer les commentaires", type="primary"):
+                comments_to_save = {row["_key"]: row["Commentaires du manager"] for _, row in edited_df.iterrows() if row["Commentaires du manager"]}
+                st.session_state.saved_briefs[st.session_state.current_brief_name]["manager_comments"] = comments_to_save
+                save_briefs()
+
+                payload_for_gsheet = st.session_state.saved_briefs[st.session_state.current_brief_name].copy()
+                payload_for_gsheet['MANAGER_COMMENTS_JSON'] = json.dumps(comments_to_save, indent=4, ensure_ascii=False)
                 
-            if not table_data:
-                st.warning("Veuillez d'abord remplir l'onglet 'Avant-brief'.")
-            else:
-                df = pd.DataFrame(table_data)
-                edited_df = st.data_editor(
-                    df,
-                    column_config={
-                        "Section": st.column_config.TextColumn(disabled=True),
-                        "Détails": st.column_config.TextColumn(disabled=True),
-                        "Informations": st.column_config.TextColumn(disabled=True, width="large"),
-                        "Commentaires du manager": st.column_config.TextColumn(width="large"),
-                        "_key": None,
-                    },
-                    use_container_width=True, hide_index=True, key="manager_comments_editor"
-                )
+                mapping = {
+                    "poste_intitule": "POSTE_INTITULE", "manager_nom": "MANAGER_NOM", "recruteur": "RECRUTEUR",
+                    "affectation_type": "AFFECTATION_TYPE", "affectation_nom": "AFFECTATION_NOM", "date_brief": "DATE_BRIEF",
+                    "raison_ouverture": "RAISON_OUVERTURE", "impact_strategique": "IMPACT_STRATEGIQUE",
+                    "rattachement": "RATTACHEMENT", "taches_principales": "TACHES_PRINCIPALES",
+                    "must_have_experience": "MUST_HAVE_EXP", "must_have_diplomes": "MUST_HAVE_DIP",
+                    "must_have_competences": "MUST_HAVE_COMPETENCES", "must_have_softskills": "MUST_HAVE_SOFTSKILLS",
+                    "nice_to_have_experience": "NICE_TO_HAVE_EXP", "nice_to_have_diplomes": "NICE_TO_HAVE_DIP",
+                    "nice_to_have_competences": "NICE_TO_HAVE_COMPETENCES",
+                    "entreprises_profil": "ENTREPRISES_PROFIL", "synonymes_poste": "SYNONYMES_POSTE",
+                    "canaux_profil": "CANAUX_PROFIL", "budget": "BUDGET", "commentaires": "COMMENTAIRES",
+                    "notes_libres": "NOTES_LIBRES"
+                }
+                for session_key, gsheet_key in mapping.items():
+                    if session_key in payload_for_gsheet:
+                        payload_for_gsheet[gsheet_key] = payload_for_gsheet[session_key]
 
-                if st.button("💾 Enregistrer les commentaires", type="primary"):
-                    comments_to_save = {row["_key"]: row["Commentaires du manager"] for _, row in edited_df.iterrows() if row["Commentaires du manager"]}
-                    st.session_state.saved_briefs[st.session_state.current_brief_name]["manager_comments"] = comments_to_save
-                    save_briefs()
+                if "ksa_matrix" in payload_for_gsheet and isinstance(payload_for_gsheet["ksa_matrix"], pd.DataFrame) and not payload_for_gsheet["ksa_matrix"].empty:
+                    payload_for_gsheet['KSA_MATRIX_JSON'] = payload_for_gsheet["ksa_matrix"].to_csv(index=False, sep=";", encoding="utf-8")
+                
+                save_brief_to_gsheet(st.session_state.current_brief_name, payload_for_gsheet)
+                st.success("✅ Commentaires sauvegardés et synchronisés avec Google Sheets !")
+                st.rerun()
 
-                    payload_for_gsheet = st.session_state.saved_briefs[st.session_state.current_brief_name].copy()
-                    payload_for_gsheet['MANAGER_COMMENTS_JSON'] = json.dumps(comments_to_save, indent=4, ensure_ascii=False)
-                    
-                    mapping = {
-                        "poste_intitule": "POSTE_INTITULE", "manager_nom": "MANAGER_NOM", "recruteur": "RECRUTEUR",
-                        "affectation_type": "AFFECTATION_TYPE", "affectation_nom": "AFFECTATION_NOM", "date_brief": "DATE_BRIEF",
-                        "raison_ouverture": "RAISON_OUVERTURE", "impact_strategique": "IMPACT_STRATEGIQUE",
-                        "rattachement": "RATTACHEMENT", "taches_principales": "TACHES_PRINCIPALES",
-                        "must_have_experience": "MUST_HAVE_EXP", "must_have_diplomes": "MUST_HAVE_DIP",
-                        "must_have_competences": "MUST_HAVE_COMPETENCES", "must_have_softskills": "MUST_HAVE_SOFTSKILLS",
-                        "nice_to_have_experience": "NICE_TO_HAVE_EXP", "nice_to_have_diplomes": "NICE_TO_HAVE_DIP",
-                        "nice_to_have_competences": "NICE_TO_HAVE_COMPETENCES",
-                        "entreprises_profil": "ENTREPRISES_PROFIL", "synonymes_poste": "SYNONYMES_POSTE",
-                        "canaux_profil": "CANAUX_PROFIL", "budget": "BUDGET", "commentaires": "COMMENTAIRES",
-                        "notes_libres": "NOTES_LIBRES"
-                    }
-                    for session_key, gsheet_key in mapping.items():
-                        if session_key in payload_for_gsheet:
-                            payload_for_gsheet[gsheet_key] = payload_for_gsheet[session_key]
-
-                    if "ksa_matrix" in payload_for_gsheet and isinstance(payload_for_gsheet["ksa_matrix"], pd.DataFrame) and not payload_for_gsheet["ksa_matrix"].empty:
-                        payload_for_gsheet['KSA_MATRIX_JSON'] = payload_for_gsheet["ksa_matrix"].to_csv(index=False, sep=";", encoding="utf-8")
-                    
-                    save_brief_to_gsheet(st.session_state.current_brief_name, payload_for_gsheet)
-                    st.success("✅ Commentaires sauvegardés et synchronisés avec Google Sheets !")
-                    st.rerun()
-
-    elif step == 2:
+    if step == 2:
         with st.expander("📊 Matrice KSA - Validation manager", expanded=True):
             with st.expander("ℹ️ Explications de la méthode KSA", expanded=False):
                 st.markdown("""
