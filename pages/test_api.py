@@ -532,50 +532,54 @@ if briefs_to_show and len(briefs_to_show) > 0:
         col_brief1, col_brief2 = st.columns([6, 1])
         with col_brief1:
             st.markdown(f"**{name}**")
-        with col_brief2:
-            if st.button("📝 Éditer", key=f"edit_{name}"):
-                # Synchronise toutes les clés générales et champs du brief
-                for sheet_key, session_key in key_mapping.items():
-                    st.session_state[session_key] = brief.get(sheet_key, "")
-                # Synchronise aussi les clés uniques pour le formulaire Avant-brief
-                sections = [
-                    {"title": "Contexte du poste", "fields": [
-                        ("Raison de l'ouverture", "raison_ouverture", ""),
-                        ("Impact stratégique", "impact_strategique", ""),
-                        ("Tâches principales", "taches_principales", "")]},
-                    {"title": "Must-have (Indispensables)", "fields": [
-                        ("Expérience", "must_have_experience", ""),
-                        ("Connaissances / Diplômes / Certifications", "must_have_diplomes", ""),
-                        ("Compétences / Outils", "must_have_competences", ""),
-                        ("Soft skills / aptitudes comportementales", "must_have_softskills", "")]},
-                    {"title": "Nice-to-have (Atouts)", "fields": [
-                        ("Expérience additionnelle", "nice_to_have_experience", ""),
-                        ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", ""),
-                        ("Compétences complémentaires", "nice_to_have_competences", "")]},
-                    {"title": "Conditions et contraintes", "fields": [
-                        ("Localisation", "rattachement", ""),
-                        ("Budget recrutement", "budget", "")]},
-                    {"title": "Sourcing et marché", "fields": [
-                        ("Entreprises où trouver ce profil", "entreprises_profil", ""),
-                        ("Synonymes / intitulés proches", "synonymes_poste", ""),
-                        ("Canaux à utiliser", "canaux_profil", "")]},
-                    {"title": "Profils pertinents", "fields": [
-                        ("Lien profil 1", "profil_link_1", ""),
-                        ("Lien profil 2", "profil_link_2", ""),
-                        ("Lien profil 3", "profil_link_3", "")]},
-                    {"title": "Notes libres", "fields": [
-                        ("Points à discuter ou à clarifier avec le manager", "commentaires", ""),
-                        ("Case libre", "notes_libres", "")]},
-                ]
-                for section in sections:
-                    for title, field_key, _ in section["fields"]:
-                        unique_key = f"{section['title'].replace(' ', '_')}_{field_key}"
-                        st.session_state[unique_key] = brief.get(key_mapping.get(field_key.upper(), field_key), "")
-                st.session_state.current_brief_name = name
-                st.session_state.avant_brief_completed = True
-                st.session_state.reunion_completed = True
-                st.session_state.reunion_step = 1
-                st.rerun()
+            with col_brief2:
+                if st.button("📝 Éditer", key=f"edit_{name}"):
+                    # Synchronise toutes les clés générales et champs du brief
+                    for sheet_key, session_key in key_mapping.items():
+                        # On évite d'écraser les clés déjà contrôlées par un widget
+                        if session_key not in st.session_state or not hasattr(st.session_state, session_key):
+                            st.session_state[session_key] = brief.get(sheet_key, "")
+                    # Synchronise aussi les clés uniques pour le formulaire Avant-brief
+                    sections = [
+                        {"title": "Contexte du poste", "fields": [
+                            ("Raison de l'ouverture", "raison_ouverture", ""),
+                            ("Impact stratégique", "impact_strategique", ""),
+                            ("Tâches principales", "taches_principales", "")]},
+                        {"title": "Must-have (Indispensables)", "fields": [
+                            ("Expérience", "must_have_experience", ""),
+                            ("Connaissances / Diplômes / Certifications", "must_have_diplomes", ""),
+                            ("Compétences / Outils", "must_have_competences", ""),
+                            ("Soft skills / aptitudes comportementales", "must_have_softskills", "")]},
+                        {"title": "Nice-to-have (Atouts)", "fields": [
+                            ("Expérience additionnelle", "nice_to_have_experience", ""),
+                            ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", ""),
+                            ("Compétences complémentaires", "nice_to_have_competences", "")]},
+                        {"title": "Conditions et contraintes", "fields": [
+                            ("Localisation", "rattachement", ""),
+                            ("Budget recrutement", "budget", "")]},
+                        {"title": "Sourcing et marché", "fields": [
+                            ("Entreprises où trouver ce profil", "entreprises_profil", ""),
+                            ("Synonymes / intitulés proches", "synonymes_poste", ""),
+                            ("Canaux à utiliser", "canaux_profil", "")]},
+                        {"title": "Profils pertinents", "fields": [
+                            ("Lien profil 1", "profil_link_1", ""),
+                            ("Lien profil 2", "profil_link_2", ""),
+                            ("Lien profil 3", "profil_link_3", "")]},
+                        {"title": "Notes libres", "fields": [
+                            ("Points à discuter ou à clarifier avec le manager", "commentaires", ""),
+                            ("Case libre", "notes_libres", "")]},
+                    ]
+                    for section in sections:
+                        for title, field_key, _ in section["fields"]:
+                            unique_key = f"{section['title'].replace(' ', '_')}_{field_key}"
+                            # On évite d'écraser les clés déjà contrôlées par un widget
+                            if unique_key not in st.session_state or not hasattr(st.session_state, unique_key):
+                                st.session_state[unique_key] = brief.get(key_mapping.get(field_key.upper(), field_key), "")
+                    st.session_state.current_brief_name = name
+                    st.session_state.avant_brief_completed = True
+                    st.session_state.reunion_completed = True
+                    st.session_state.reunion_step = 1
+                    st.rerun()
 else:
     st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
 
