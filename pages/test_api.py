@@ -461,13 +461,77 @@ with tabs[0]:
             st.text_input("Nom affectation", key="affectation_nom", value=brief_data.get("affectation_nom", ""))
         with col6:
             # Bloc date corrigé ci-dessus
-            date_brief_value = brief_data.get("date_brief", date.today())
-            if isinstance(date_brief_value, str):
+            date_brief_raw = brief_data.get("date_brief", st.session_state.get("date_brief", date.today()))
+            if isinstance(date_brief_raw, str):
                 try:
-                    date_brief_value = datetime.strptime(date_brief_value, "%Y-%m-%d").date()
+                    date_brief_value = datetime.strptime(date_brief_raw, "%Y-%m-%d").date()
                 except Exception:
-                    date_brief_value = date.today()
+                    try:
+                        date_brief_value = datetime.strptime(date_brief_raw, "%d/%m/%Y").date()
+                    except Exception:
+                        date_brief_value = date.today()
+            elif isinstance(date_brief_raw, datetime):
+                date_brief_value = date_brief_raw.date()
+            elif isinstance(date_brief_raw, date):
+                date_brief_value = date_brief_raw
+            else:
+                date_brief_value = date.today()
             st.date_input("Date du brief", key="date_brief", value=date_brief_value)
+
+    # Boutons sous les champs
+    col_create, col_cancel = st.columns([2, 2])
+    with col_create:
+        if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
+            # Vérification des champs requis
+            required_fields = ["poste_intitule", "manager_nom", "affectation_nom", "date_brief"]
+            missing_fields = [field for field in required_fields if not st.session_state.get(field)]
+            
+            if missing_fields:
+                st.error(f"Veuillez remplir les champs suivants : {', '.join(missing_fields)}")
+            else:
+                # Création du brief
+                new_brief_name = generate_automatic_brief_name(st.session_state.poste_intitule, st.session_state.manager_nom)
+                st.session_state.current_brief_name = new_brief_name
+                
+                # Initialiser le brief avec les valeurs des champs
+                new_brief_data = {key: st.session_state.get(key) for key in all_field_keys}
+                st.session_state.saved_briefs[new_brief_name] = new_brief_data
+                
+                # Sauvegarder dans le fichier JSON
+                save_briefs()
+                
+                # Sauvegarder dans Google Sheets
+                payload_for_gsheet = new_brief_data.copy()
+                mapping = {
+                    "poste_intitule": "POSTE_INTITULE", "manager_nom": "MANAGER_NOM", "recruteur": "RECRUTEUR",
+                    "affectation_type": "AFFECTATION_TYPE", "affectation_nom": "AFFECTATION_NOM", "date_brief": "DATE_BRIEF",
+                    "raison_ouverture": "RAISON_OUVERTURE", "impact_strategique": "IMPACT_STRATEGIQUE",
+                    "rattachement": "RATTACHEMENT", "taches_principales": "TACHES_PRINCIPALES",
+                    "must_have_experience": "MUST_HAVE_EXP", "must_have_diplomes": "MUST_HAVE_DIP",
+                    "must_have_competences": "MUST_HAVE_COMPETENCES", "must_have_softskills": "MUST_HAVE_SOFTSKILLS",
+                    "nice_to_have_experience": "NICE_TO_HAVE_EXP", "nice_to_have_diplomes": "NICE_TO_HAVE_DIP",
+                    "nice_to_have_competences": "NICE_TO_HAVE_COMPETENCES",
+                    "entreprises_profil": "ENTREPRISES_PROFIL", "synonymes_poste": "SYNONYMES_POSTE",
+                    "canaux_profil": "CANAUX_PROFIL", "budget": "BUDGET", "commentaires": "COMMENTAIRES",
+                    "notes_libres": "NOTES_LIBRES"
+                }
+                for session_key, gsheet_key in mapping.items():
+                    if session_key in payload_for_gsheet:
+                        payload_for_gsheet[gsheet_key] = payload_for_gsheet[session_key]
+                
+                save_brief_to_gsheet(new_brief_name, payload_for_gsheet)
+                
+                st.success(f"✅ Brief '{new_brief_name}' créé avec succès !")
+                st.rerun()
+    with col_cancel:
+        if st.button("🗑️ Annuler", type="secondary", use_container_width=True, key="cancel_brief"):
+            # Réinitialiser les champs
+            for key in all_field_keys:
+                if key in st.session_state:
+                    del st.session_state[key]
+            st.session_state.current_brief_name = ""
+            st.success("Création de brief annulée.")
+            st.rerun()
 
     with col_right:
         st.markdown('<h3 style="margin-bottom: 0.3rem;">🔍 Filtrer les briefs</h3>', unsafe_allow_html=True)
