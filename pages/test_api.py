@@ -652,7 +652,45 @@ else:
     st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
 
 # ---------------- AVANT-BRIEF ----------------
+# Dans l'onglet Avant-brief (tabs[1])
 with tabs[1]:
+    # ...existing code...
+    brief_data = load_briefs().get(st.session_state.current_brief_name, {})
+
+    with st.form(key="avant_brief_form"):
+        for section in sections:
+            with st.expander(f"📋 {section['title']}", expanded=False):
+                for title, key, placeholder in section["fields"]:
+                    # Construction de la clé unique
+                    unique_key = f"{section['title'].replace(' ', '_')}_{key}"
+                    
+                    # Récupération de la valeur avec priorité
+                    current_value = ""
+                    
+                    # 1. Essaie depuis session_state avec la clé unique
+                    if unique_key in st.session_state:
+                        current_value = st.session_state[unique_key]
+                    # 2. Essaie depuis brief_data avec la clé en MAJUSCULES
+                    elif key.upper() in brief_data:
+                        current_value = brief_data[key.upper()]
+                    # 3. Essaie depuis session_state avec la clé simple
+                    elif key in st.session_state:
+                        current_value = st.session_state[key]
+                    
+                    # Affiche le champ avec la valeur récupérée
+                    st.text_area(
+                        title,
+                        value=current_value,
+                        key=unique_key,
+                        placeholder=placeholder,
+                        height=150
+                    )
+                    
+                    # Affiche le conseil IA si disponible
+                    if st.session_state.get(f"advice_{key}", ""):
+                        st.info(f"**Conseil IA :**\n{st.session_state[f'advice_{key}']}")
+        
+        # ...reste du code du formulaire...
     if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Avant-brief"):
         st.success(st.session_state.save_message)
         st.session_state.save_message = None
