@@ -641,6 +641,7 @@ with tabs[2]:
     # Sécurisation de la variable d'étape
     if "reunion_step" not in st.session_state or not isinstance(st.session_state.reunion_step, int):
         st.session_state.reunion_step = 1
+    
     total_steps = 4
     step = st.session_state.reunion_step
 
@@ -654,85 +655,85 @@ with tabs[2]:
         except Exception:
             manager_comments = {}
 
-        # Utilitaire robuste
-        def get_brief_value(brief_dict: dict, key: str, default: str = ""):
-            if not brief_dict:
-                return default
-            if key.startswith("profil_link_"):
-                suf = key.split("_")[-1]
-                cand = [f"LIEN_PROFIL_{suf}", key.upper(), key]
-            else:
-                cand = [key.upper(), key]
-            for c in cand:
-                val = brief_dict.get(c, "")
-                if val not in ("", None):
-                    return val
-            return default
+        # Barre de progression
+        st.progress(int(step / total_steps * 100), text=f"**Étape {step} sur {total_steps}**")
 
-        st.progress(int(step / total_steps * 100), text=f"Étape {step} sur {total_steps}")
-
-        # ---------------- ÉTAPE 1 ----------------
+        # ============================================================
+        # ÉTAPE 1 : Portrait robot & Commentaires manager
+        # ============================================================
         if step == 1:
             st.markdown("### 📝 Étape 1 : Portrait robot & Commentaires manager")
-            table_data = []
-            for section in sections:
-                if section["title"] == "Profils pertinents":
-                    continue
-                for title, key, _ in section["fields"]:
-                    table_data.append({
-                        "Section": section["title"],
-                        "Détails": title,
-                        "Informations": get_brief_value(brief_data, key, ""),
-                        "Commentaires du manager": manager_comments.get(key, ""),
-                        "_key": key
-                    })
-            if not table_data:
-                st.warning("Veuillez d'abord remplir l'onglet Avant-brief.")
-            else:
-                df = pd.DataFrame(table_data)
-                edited_df = st.data_editor(
-                    df,
-                    column_config={
-                        "Section": st.column_config.TextColumn(disabled=True),
-                        "Détails": st.column_config.TextColumn(disabled=True),
-                        "Informations": st.column_config.TextColumn(disabled=True, width="large"),
-                        "Commentaires du manager": st.column_config.TextColumn(width="large"),
-                        "_key": None
-                    },
-                    hide_index=True,
-                    use_container_width=True,
-                    key="manager_comments_editor"
-                )
-                if st.button("💾 Enregistrer commentaires", type="primary"):
-                    new_comments = {
-                        row["_key"]: row["Commentaires du manager"]
-                        for _, row in edited_df.iterrows()
-                        if row["Commentaires du manager"]
-                    }
-                    brief_data["MANAGER_COMMENTS_JSON"] = json.dumps(new_comments, ensure_ascii=False, indent=2)
-                    brief_data["manager_comments"] = new_comments
-                    st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
-                    save_briefs()
-                    save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
-                    st.success("Commentaires sauvegardés.")
-                    st.rerun()
+            
+            with st.expander("📋 Portrait robot du candidat - Validation", expanded=True):
+                table_data = []
+                for section in sections:
+                    if section["title"] == "Profils pertinents":
+                        continue
+                    for title, key, _ in section["fields"]:
+                        # Récupération robuste des données
+                        info_value = brief_data.get(key.upper(), brief_data.get(key, ""))
+                        table_data.append({
+                            "Section": section["title"],
+                            "Détails": title,
+                            "Informations": info_value,
+                            "Commentaires du manager": manager_comments.get(key, ""),
+                            "_key": key
+                        })
+                
+                if not table_data:
+                    st.warning("Veuillez d'abord remplir l'onglet 'Avant-brief'.")
+                else:
+                    df = pd.DataFrame(table_data)
+                    edited_df = st.data_editor(
+                        df,
+                        column_config={
+                            "Section": st.column_config.TextColumn(disabled=True),
+                            "Détails": st.column_config.TextColumn(disabled=True),
+                            "Informations": st.column_config.TextColumn(disabled=True, width="large"),
+                            "Commentaires du manager": st.column_config.TextColumn(width="large"),
+                            "_key": None
+                        },
+                        hide_index=True,
+                        use_container_width=True,
+                        key="manager_comments_editor"
+                    )
+                    
+                    if st.button("💾 Enregistrer commentaires", type="primary"):
+                        new_comments = {
+                            row["_key"]: row["Commentaires du manager"]
+                            for _, row in edited_df.iterrows()
+                            if row["Commentaires du manager"]
+                        }
+                        brief_data["MANAGER_COMMENTS_JSON"] = json.dumps(new_comments, ensure_ascii=False, indent=2)
+                        brief_data["manager_comments"] = new_comments
+                        st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
+                        save_briefs()
+                        save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
+                        st.success("✅ Commentaires sauvegardés.")
+                        st.rerun()
 
-        # ---------------- ÉTAPE 2 ----------------
+        # ============================================================
+        # ÉTAPE 2 : Matrice KSA
+        # ============================================================
         elif step == 2:
             st.markdown("### 📊 Étape 2 : Matrice KSA")
             render_ksa_matrix()
-            # Sauvegarde rapide (optionnelle)
+            
+            # Bouton sauvegarde optionnel
             if st.button("💾 Sauvegarder matrice KSA", key="save_ksa_inline"):
                 if "ksa_matrix" in st.session_state and not st.session_state.ksa_matrix.empty:
                     brief_data["KSA_MATRIX_JSON"] = st.session_state.ksa_matrix.to_json(orient="records", force_ascii=False)
                     st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
                     save_briefs()
                     save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
-                    st.success("Matrice KSA sauvegardée.")
+                    st.success("✅ Matrice KSA sauvegardée.")
 
-        # ---------------- ÉTAPE 3 ----------------
+        # ============================================================
+        # ÉTAPE 3 : Stratégie & Processus
+        # ============================================================
         elif step == 3:
             st.markdown("### 🛠️ Étape 3 : Stratégie & Processus")
+            
             with st.form("reunion_step3_form"):
                 st.text_area("Stratégie de sourcing", key="strategie_sourcing",
                              value=brief_data.get("STRATEGIE_SOURCING", st.session_state.get("strategie_sourcing", "")))
@@ -740,6 +741,7 @@ with tabs[2]:
                              value=brief_data.get("PROCESSUS_EVALUATION", st.session_state.get("processus_evaluation", "")))
                 st.text_area("Critères d'exclusion", key="criteres_exclusion",
                              value=brief_data.get("CRITERES_EXCLUSION", st.session_state.get("criteres_exclusion", "")))
+                
                 if st.form_submit_button("💾 Sauvegarder l'étape 3", type="primary"):
                     for low, up in {
                         "strategie_sourcing": "STRATEGIE_SOURCING",
@@ -749,42 +751,56 @@ with tabs[2]:
                         val = st.session_state.get(low, "")
                         brief_data[low] = val
                         brief_data[up] = val
+                    
                     st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
                     save_briefs()
                     save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
-                    st.success("Étape 3 sauvegardée.")
+                    st.success("✅ Étape 3 sauvegardée.")
 
-        # ---------------- ÉTAPE 4 ----------------
+        # ============================================================
+        # ÉTAPE 4 : Finalisation
+        # ============================================================
         elif step == 4:
             st.markdown("### 🧾 Étape 4 : Notes du manager & Finalisation")
+            
             with st.form("reunion_step4_form"):
                 st.text_area("Notes du manager", key="manager_notes",
                              value=brief_data.get("MANAGER_NOTES", st.session_state.get("manager_notes", "")))
+                
                 submitted = st.form_submit_button("💾 Finaliser la réunion", type="primary")
                 if submitted:
                     v = st.session_state.get("manager_notes", "")
                     brief_data["manager_notes"] = v
                     brief_data["MANAGER_NOTES"] = v
-                    # Sauvegarde KSA si pas déjà faite
+                    
+                    # Sauvegarde KSA si présente
                     if "ksa_matrix" in st.session_state and not st.session_state.ksa_matrix.empty:
                         brief_data["KSA_MATRIX_JSON"] = st.session_state.ksa_matrix.to_json(orient="records", force_ascii=False)
+                    
                     st.session_state.reunion_completed = True
                     st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
                     save_briefs()
                     save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
-                    st.success("Réunion finalisée.")
+                    st.success("✅ Réunion finalisée.")
                     st.rerun()
 
-        # ---------------- NAVIGATION ----------------
-        nav_prev, nav_next = st.columns([1, 1])
-        with nav_prev:
-            if step > 1 and st.button("⬅️ Précédent", key=f"prev_{step}"):
-                st.session_state.reunion_step -= 1
-                st.rerun()
-        with nav_next:
-            if step < total_steps and st.button("Suivant ➡️", key=f"next_{step}"):
-                st.session_state.reunion_step += 1
-                st.rerun()
+        # ============================================================
+        # NAVIGATION : Boutons Précédent / Suivant
+        # ============================================================
+        st.markdown("---")
+        col_prev, col_next = st.columns([1, 1])
+        
+        with col_prev:
+            if step > 1:
+                if st.button("⬅️ Précédent", key=f"prev_{step}", use_container_width=True):
+                    st.session_state.reunion_step -= 1
+                    st.rerun()
+        
+        with col_next:
+            if step < total_steps:
+                if st.button("Suivant ➡️", key=f"next_{step}", use_container_width=True):
+                    st.session_state.reunion_step += 1
+                    st.rerun()
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
     if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Synthèse"):
