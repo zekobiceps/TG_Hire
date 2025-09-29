@@ -526,8 +526,15 @@ with tabs[0]:
                 # Champs Avant-brief
                 for k in all_field_keys:
                     v = st.session_state.get(k, "")
+                    # Stockage lower
                     new_brief_data[k] = v
-                    new_brief_data[k.upper()] = v
+                    # Stockage upper normal
+                    if k.startswith("profil_link_"):
+                        # Mapper vers LIEN_PROFIL_X
+                        suffix = k.split("_")[-1]
+                        new_brief_data[f"LIEN_PROFIL_{suffix}"] = v
+                    else:
+                        new_brief_data[k.upper()] = v
 
                 st.session_state.saved_briefs[new_brief_name] = new_brief_data
                 save_briefs()
@@ -622,9 +629,12 @@ with tabs[1]:
                     for section in sections:
                         for _, key, _ in section["fields"]:
                             val = st.session_state.get(key, "")
-                            # version lower + upper
                             brief_to_update[key] = val
-                            brief_to_update[key.upper()] = val
+                            if key.startswith("profil_link_"):
+                                suffix = key.split("_")[-1]
+                                brief_to_update[f"LIEN_PROFIL_{suffix}"] = val
+                            else:
+                                brief_to_update[key.upper()] = val
                     # Champs de base si modifiés
                     for low in ["poste_intitule", "manager_nom", "recruteur",
                                 "affectation_type", "affectation_nom", "date_brief"]:
@@ -649,6 +659,32 @@ with tabs[2]:
     except Exception:
         manager_comments = {}
 
+    # === AJOUT : fonction utilitaire de récupération ===
+    def get_brief_value(brief_dict: dict, key: str, default: str = ""):
+        """
+        Récupère une valeur d'un brief avec robustesse :
+        - clé upper
+        - clé lower
+        - cas spéciaux (profil_link_x -> LIEN_PROFIL_X)
+        """
+        if not brief_dict:
+            return default
+        # Cas des liens profils
+        if key.startswith("profil_link_"):
+            suffix = key.split("_")[-1]
+            candidates = [
+                f"LIEN_PROFIL_{suffix}",
+                f"PROFIL_LINK_{suffix}".upper(),  # au cas où déjà stocké
+                key.upper(),
+                key
+            ]
+        else:
+            candidates = [key.upper(), key]
+        for c in candidates:
+            if c in brief_dict and brief_dict[c] not in (None, ""):
+                return brief_dict[c]
+        return default
+
     # 1. Tableau "Portrait robot du candidat"
     st.markdown("### 📝 Portrait robot du candidat")
     table_data = []
@@ -656,9 +692,7 @@ with tabs[2]:
         if section["title"] == "Profils pertinents":
             continue
         for title, key, _ in section["fields"]:
-            sheet_key = key.upper()
-            info_value = brief_data.get(sheet_key) or brief_data.get(key, "")
-            # Charger JSON manager (déjà fait plus haut)
+            info_value = get_brief_value(brief_data, key, "")
             comment_value = manager_comments.get(key, "")
             table_data.append({
                 "Section": section["title"],
@@ -687,18 +721,14 @@ with tabs[2]:
                 for _, row in edited_df.iterrows()
                 if row["Commentaires du manager"]
             }
-            # Sauvegarde cohérente en JSON (clé upper)
             brief_ref = st.session_state.saved_briefs[st.session_state.current_brief_name]
             brief_ref["MANAGER_COMMENTS_JSON"] = json.dumps(comments_to_save, ensure_ascii=False, indent=2)
-            # Optionnel : garder aussi version dict directe
             brief_ref["manager_comments"] = comments_to_save
             st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_ref
             save_briefs()
             save_brief_to_gsheet(st.session_state.current_brief_name, brief_ref)
             st.success("✅ Commentaires sauvegardés et synchronisés.")
             st.rerun()
-    else:
-        st.warning("Veuillez d'abord remplir l'onglet 'Avant-brief'.")
 
     # 2. Matrice KSA
     st.markdown("### 📊 Matrice KSA")
@@ -726,6 +756,9 @@ with tabs[2]:
                     v = st.session_state.get(low, "")
                     brief_to_update[low] = v
                     brief_to_update[up] = v
+                # Sauvegarder la matrice KSA si présente
+                if "ksa_matrix" in st.session_state and not st.session_state.ksa_matrix.empty:
+                    brief_to_update["KSA_MATRIX_JSON"] = st.session_state.ksa_matrix.to_json(orient="records", force_ascii=False)
                 st.session_state.saved_briefs[current_brief_name] = brief_to_update
                 st.session_state.reunion_completed = True
                 save_briefs()
@@ -836,3 +869,29 @@ with tabs[3]:
                     st.info("ℹ️ Créez d'abord un brief pour l'exporter")
             else:
                 st.info("⚠️ Word non dispo (pip install python-docx)")
+
+# === AJOUT : fonction utilitaire de récupération ===
+def get_brief_value(brief_dict: dict, key: str, default: str = ""):
+    """
+    Récupère une valeur d'un brief avec robustesse :
+    - clé upper
+    - clé lower
+    - cas spéciaux (profil_link_x -> LIEN_PROFIL_X)
+    """
+    if not brief_dict:
+        return default
+    # Cas des liens profils
+    if key.startswith("profil_link_"):
+        suffix = key.split("_")[-1]
+        candidates = [
+            f"LIEN_PROFIL_{suffix}",
+            f"PROFIL_LINK_{suffix}".upper(),  # au cas où déjà stocké
+            key.upper(),
+            key
+        ]
+    else:
+        candidates = [key.upper(), key]
+    for c in candidates:
+        if c in brief_dict and brief_dict[c] not in (None, ""):
+            return brief_dict[c]
+    return default
