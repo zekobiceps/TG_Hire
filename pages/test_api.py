@@ -461,11 +461,26 @@ with tabs[0]:
             st.text_input("Nom affectation", key="affectation_nom", value=brief_data.get("affectation_nom", ""))
         with col6:
             date_brief_raw = brief_data.get("date_brief", st.session_state.get("date_brief", date.today()))
+
+            # Correction : on force la valeur dans session_state à être du bon type
+            if "date_brief" in st.session_state and not isinstance(st.session_state["date_brief"], date):
+                try:
+                    st.session_state["date_brief"] = datetime.strptime(str(st.session_state["date_brief"]), "%Y-%m-%d").date()
+                except Exception:
+                    try:
+                        st.session_state["date_brief"] = datetime.strptime(str(st.session_state["date_brief"]), "%d/%m/%Y").date()
+                    except Exception:
+                        st.session_state["date_brief"] = date.today()
+
+            # Conversion de la valeur à afficher
             if isinstance(date_brief_raw, str):
                 try:
                     date_brief_value = datetime.strptime(date_brief_raw, "%Y-%m-%d").date()
                 except Exception:
-                    date_brief_value = date.today()
+                    try:
+                        date_brief_value = datetime.strptime(date_brief_raw, "%d/%m/%Y").date()
+                    except Exception:
+                        date_brief_value = date.today()
             elif isinstance(date_brief_raw, datetime):
                 date_brief_value = date_brief_raw.date()
             elif isinstance(date_brief_raw, date):
