@@ -720,39 +720,251 @@ with tabs[2]:
         # ---------------- ÉTAPE 2 ----------------
         elif step == 2:
             st.markdown("### 📊 Étape 2 : Matrice KSA")
-            render_ksa_matrix()
-            # Sauvegarde rapide (optionnelle)
-            if st.button("💾 Sauvegarder matrice KSA", key="save_ksa_inline"):
-                if "ksa_matrix" in st.session_state and not st.session_state.ksa_matrix.empty:
-                    brief_data["KSA_MATRIX_JSON"] = st.session_state.ksa_matrix.to_json(orient="records", force_ascii=False)
-                    st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
-                    save_briefs()
-                    save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
-                    st.success("Matrice KSA sauvegardée.")
+
+            def _import_ksa_from_json():
+                json_str = (brief_data.get("KSA_MATRIX_JSON") or "").strip()
+                if not json_str:
+                    st.warning("Aucune donnée KSA_MATRIX_JSON disponible dans le brief.")
+                    return
+                try:
+                    data = json.loads(json_str)
+                    if not isinstance(data, list):
+                        st.error("Format inattendu (doit être une liste JSON).")
+                        return
+                    df = pd.DataFrame(data)
+                    # Normalisation des noms de colonnes
+                    rename_map = {}
+                    for col in df.columns:
+                        c = col.strip()
+                        if c.lower().startswith("question"):
+                            rename_map[col] = "Question pour l'entretien"
+                        elif "échelle" in c.lower() or "évaluation" in c.lower():
+                            rename_map[col] = "Évaluation (1-5)"
+                        elif c.lower() == "critère" or "crit" in c.lower():
+                            rename_map[col] = "Critère"
+                        elif c.lower() == "rubrique":
+                            rename_map[col] = "Rubrique"
+                        elif "évaluateur" in c.lower():
+                            rename_map[col] = "Évaluateur"
+                        elif "type de question" in c.lower():
+                            rename_map[col] = "Type de question"
+                    if rename_map:
+                        df = df.rename(columns=rename_map)
+
+                    # Ajout des colonnes manquantes si besoin
+                    expected = ["Rubrique","Critère","Type de question","Question pour l'entretien","Évaluation (1-5)","Évaluateur"]
+                    for c in expected:
+                        if c not in df.columns:
+                            df[c] = ""
+
+                    st.session_state.ksa_matrix = df[expected]
+                    st.success("Matrice KSA importée depuis Google Sheet.")
+                except Exception as e:
+                    st.error(f"Erreur lors de l'import JSON : {e}")
+
+            import_col1, import_col2 = st.columns([1, 3])
+            with import_col1:
+                if st.button("↻ Importer matrice (Google Sheet)", key="reload_ksa"):
+                    _import_ksa_from_json()
+            with import_col2:
+                st.caption("Si vous avez déjà une matrice KSA sauvegardée côté Google Sheet (colonne KSA_MATRIX_JSON), cliquez pour l'importer.")
+
+            # Auto-import si vide et JSON présent
+            if st.session_state.ksa_matrix.empty and brief_data.get("KSA_MATRIX_JSON"):
+                _import_ksa_from_json()
+
+            # Explications (compact)
+            with st.expander("ℹ️ Rappel méthode KSA", expanded=False):
+                st.markdown("""
+- Knowledge = Connaissances
+- Skills = Compétences opérationnelles
+- Abilities = Aptitudes (capacités)
+""")
+
+            # Formulaire ajout critère (layout proche Brief.py original)
+            with st.expander("➕ Ajouter un critère", expanded=True):
+                with st.form(key="add_criteria_form_step2"):
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        rubrique = st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="step2_new_rubrique",
+                                                index=["Knowledge","Skills","Abilities"].index(
+                                                    st.session_state.get("step2_new_rubrique","Knowledge")
+                                                ) if st.session_state.get("step2_new_rubrique","Knowledge") in ["Knowledge","Skills","Abilities"] else 0)
+                    with col2:
+                        critere = st.text_input("Critère", key="step2_new_critere",
+                                                value=st.session_state.get("step2_new_critere",""))
+                    with col3:
+                        type_question = st.selectbox("Type de question",
+                                                     ["Comportementale","Situationnelle","Technique","Générale"],
+                                                     key="step2_new_type_question",
+                                                     index=["Comportementale","Situationnelle","Technique","Générale"].index(
+                                                         st.session_state.get("step2_new_type_question","Comportementale")
+                                                     ) if st.session_state.get("step2_new_type_question","Comportementale") in
+                                                     ["Comportementale","Situationnelle","Technique","Générale"] else 0)
+                    with col4:
+                        evaluateur = st.selectbox("Évaluateur",
+                                                  ["Recruteur","Manager","Les deux"],
+                                                  key="step2_new_evaluateur",
+                                                  index=["Recruteur","Manager","Les deux"].index(
+                                                      st.session_state.get("step2_new_evaluateur","Recruteur")
+                                                  ) if st.session_state.get("step2_new_evaluateur","Recruteur") in
+                                                  ["Recruteur","Manager","Les deux"] else 0)
+
+                    col_q, col_eval = st.columns([3,1])
+                    with col_q:
+                        question = st.text_area("Question pour l'entretien",
+                                                key="step2_new_question",
+                                                value=st.session_state.get("step2_new_question",""),
+                                                height=90)
+                    with col_eval:
+                        evaluation = st.slider("Évaluation (1-5)", 1, 5,
+                                               value=st.session_state.get("step2_new_evaluation",3),
+                                               key="step2_new_evaluation")
+
+                    st.markdown("---")
+                    ai_col1, ai_col2 = st.columns([2,1])
+                    with ai_col1:
+                        ai_prompt = st.text_input("Prompt IA (génération de question)",
+                                                  key="step2_ai_prompt",
+                                                  value=st.session_state.get("step2_ai_prompt",""))
+                    with ai_col2:
+                        concise_mode = st.checkbox("Réponse courte", key="step2_concise_mode")
+
+                    gen_col, add_col = st.columns([1,1])
+                    with gen_col:
+                        if st.form_submit_button("💡 Générer question IA"):
+                            if ai_prompt:
+                                try:
+                                    ai_resp = generate_ai_question(ai_prompt, concise=concise_mode)
+                                    if ai_resp.lower().startswith("question:"):
+                                        ai_resp = ai_resp.split(":",1)[1].strip()
+                                    st.session_state.step2_new_question = ai_resp
+                                    st.success("Question générée.")
+                                except Exception as e:
+                                    st.error(f"Erreur IA : {e}")
+                            else:
+                                st.warning("Entrez un prompt.")
+                    with add_col:
+                        if st.form_submit_button("➕ Ajouter le critère"):
+                            if not critere or not question:
+                                st.error("Critère et question requis.")
+                            else:
+                                new_row = pd.DataFrame([{
+                                    "Rubrique": rubrique,
+                                    "Critère": critere,
+                                    "Type de question": type_question,
+                                    "Question pour l'entretien": question,
+                                    "Évaluation (1-5)": evaluation,
+                                    "Évaluateur": evaluateur
+                                }])
+                                if "ksa_matrix" not in st.session_state or st.session_state.ksa_matrix.empty:
+                                    st.session_state.ksa_matrix = new_row
+                                else:
+                                    st.session_state.ksa_matrix = pd.concat(
+                                        [st.session_state.ksa_matrix, new_row],
+                                        ignore_index=True
+                                    )
+                                st.success("Critère ajouté.")
+                                st.rerun()
+
+            if st.session_state.ksa_matrix.empty:
+                st.info("Aucun critère KSA pour le moment.")
+            else:
+                # Édition inline
+                st.session_state.ksa_matrix = st.data_editor(
+                    st.session_state.ksa_matrix,
+                    hide_index=True,
+                    use_container_width=True,
+                    key="ksa_editor_step2",
+                    num_rows="dynamic",
+                    column_config={
+                        "Rubrique": st.column_config.SelectboxColumn("Rubrique", options=["Knowledge","Skills","Abilities"]),
+                        "Critère": st.column_config.TextColumn("Critère"),
+                        "Type de question": st.column_config.SelectboxColumn(
+                            "Type de question",
+                            options=["Comportementale","Situationnelle","Technique","Générale"]),
+                        "Question pour l'entretien": st.column_config.TextColumn("Question pour l'entretien", width="large"),
+                        "Évaluation (1-5)": st.column_config.NumberColumn("Évaluation (1-5)", min_value=1, max_value=5, step=1),
+                        "Évaluateur": st.column_config.SelectboxColumn("Évaluateur",
+                                                                      options=["Recruteur","Manager","Les deux"])
+                    }
+                )
+
+                save_cols = st.columns([1,1,3])
+                with save_cols[0]:
+                    if st.button("💾 Sauvegarder matrice", key="save_ksa_step2"):
+                        brief_data["KSA_MATRIX_JSON"] = st.session_state.ksa_matrix.to_json(orient="records", force_ascii=False)
+                        st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
+                        save_briefs()
+                        save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
+                        st.success("Matrice sauvegardée.")
+                with save_cols[1]:
+                    if st.button("🗑️ Vider", key="clear_ksa_step2"):
+                        st.session_state.ksa_matrix = pd.DataFrame(columns=[
+                            "Rubrique","Critère","Type de question","Question pour l'entretien","Évaluation (1-5)","Évaluateur"
+                        ])
+                        st.info("Matrice vidée (non encore sauvegardée).")
+            st.markdown("---")
+            st.caption("Passez à l'étape suivante une fois la matrice validée.")
 
         # ---------------- ÉTAPE 3 ----------------
         elif step == 3:
             st.markdown("### 🛠️ Étape 3 : Stratégie & Processus")
-            with st.form("reunion_step3_form"):
-                st.text_area("Stratégie de sourcing", key="strategie_sourcing",
-                             value=brief_data.get("STRATEGIE_SOURCING", st.session_state.get("strategie_sourcing", "")))
-                st.text_area("Processus d'évaluation", key="processus_evaluation",
-                             value=brief_data.get("PROCESSUS_EVALUATION", st.session_state.get("processus_evaluation", "")))
-                st.text_area("Critères d'exclusion", key="criteres_exclusion",
-                             value=brief_data.get("CRITERES_EXCLUSION", st.session_state.get("criteres_exclusion", "")))
-                if st.form_submit_button("💾 Sauvegarder l'étape 3", type="primary"):
-                    for low, up in {
-                        "strategie_sourcing": "STRATEGIE_SOURCING",
-                        "processus_evaluation": "PROCESSUS_EVALUATION",
-                        "criteres_exclusion": "CRITERES_EXCLUSION"
-                    }.items():
-                        val = st.session_state.get(low, "")
-                        brief_data[low] = val
-                        brief_data[up] = val
-                    st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
-                    save_briefs()
-                    save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
-                    st.success("Étape 3 sauvegardée.")
+
+            # Sélection ergonomique des canaux
+            st.markdown("#### 🎯 Canaux prioritaire de sourcing")
+            all_channels = ["LinkedIn","Jobboards","Cooptation","Réseaux sociaux","Chasse de tête","Annonces","CVthèques"]
+            if "canaux_prioritaires" not in st.session_state or not isinstance(st.session_state.canaux_prioritaires, list):
+                st.session_state.canaux_prioritaires = []
+
+            # Boutons toggle
+            ch_cols = st.columns(len(all_channels))
+            for i, ch in enumerate(all_channels):
+                active = ch in st.session_state.canaux_prioritaires
+                btn_label = f"{'✅' if active else '➕'} {ch}"
+                if ch_cols[i].button(btn_label, key=f"chbtn_{ch}"):
+                    if active:
+                        st.session_state.canaux_prioritaires.remove(ch)
+                    else:
+                        st.session_state.canaux_prioritaires.append(ch)
+                    st.experimental_rerun()
+
+            # Multiselect secondaire (édition directe)
+            st.multiselect("Modifier les canaux (multiselect)",
+                           all_channels,
+                           key="canaux_prioritaires",
+                           default=st.session_state.canaux_prioritaires)
+
+            st.markdown("---")
+            st.subheader("Critères d'exclusion & Processus")
+            colA, colB = st.columns(2)
+            with colA:
+                st.text_area("🚫 Critères d'exclusion",
+                             key="criteres_exclusion",
+                             height=180,
+                             value=brief_data.get("CRITERES_EXCLUSION",
+                                                  st.session_state.get("criteres_exclusion","")))
+            with colB:
+                st.text_area("✅ Processus d'évaluation",
+                             key="processus_evaluation",
+                             height=180,
+                             value=brief_data.get("PROCESSUS_EVALUATION",
+                                                  st.session_state.get("processus_evaluation","")))
+
+            if st.button("💾 Sauvegarder Étape 3", type="primary", key="save_step3"):
+                brief_data["canaux_prioritaires"] = st.session_state.get("canaux_prioritaires", [])
+                brief_data["CANAUX_PRIORITAIRES"] = json.dumps(brief_data["canaux_prioritaires"], ensure_ascii=False)
+                for low, up in {
+                    "criteres_exclusion":"CRITERES_EXCLUSION",
+                    "processus_evaluation":"PROCESSUS_EVALUATION"
+                }.items():
+                    val = st.session_state.get(low,"")
+                    brief_data[low] = val
+                    brief_data[up] = val
+                st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
+                save_briefs()
+                save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
+                st.success("Étape 3 sauvegardée.")
 
         # ---------------- ÉTAPE 4 ----------------
         elif step == 4:
