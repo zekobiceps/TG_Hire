@@ -438,67 +438,36 @@ all_field_keys = [
 
 # ---------------- ONGLET GESTION ----------------
 with tabs[0]:
-    if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Gestion"):
-        st.success(st.session_state.save_message)
-        st.session_state.save_message = None
-        st.session_state.save_message_tab = None
+    st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Informations de base</h3>', unsafe_allow_html=True)
+    brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {}) if st.session_state.current_brief_name else {}
 
-    st.session_state.saved_briefs = load_briefs()
-
-    col_info, col_filter = st.columns(2)
-    
-    with col_info:
-        st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Informations de base</h3>', unsafe_allow_html=True)
-        
-        # Load brief data if editing
-        brief_data = {}
-        if st.session_state.current_brief_name:
-            brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
-        
-        col1, col2, col3, col4, col5, col6 = st.columns(6)
-        with col1:
-            st.text_input("Poste à recruter", key="poste_intitule", value=brief_data.get("poste_intitule", st.session_state.get("poste_intitule", "")))
-        with col2:
-            st.text_input("Manager", key="manager_nom", value=brief_data.get("manager_nom", st.session_state.get("manager_nom", "")))
-        with col3:
-            st.selectbox("Recruteur", ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"], key="recruteur",
-                index=["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"].index(
-                    brief_data.get("recruteur", st.session_state.get("recruteur", "Zakaria"))
-                ) if brief_data.get("recruteur", st.session_state.get("recruteur", "Zakaria")) in ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"] else 0)
-        with col4:
-            st.selectbox("Type d'affectation", ["Chantier", "Siège", "Dépôt"], key="affectation_type",
-                index=["Chantier", "Siège", "Dépôt"].index(
-                    brief_data.get("affectation_type", st.session_state.get("affectation_type", "Chantier"))
-                ) if brief_data.get("affectation_type", st.session_state.get("affectation_type", "Chantier")) in ["Chantier", "Siège", "Dépôt"] else 0)
-        with col5:
-            st.text_input("Nom affectation", key="affectation_nom", value=brief_data.get("affectation_nom", st.session_state.get("affectation_nom", "")))
-        with col6:
-            date_brief_raw = brief_data.get("date_brief", st.session_state.get("date_brief", datetime.today()))
-            date_brief_value = None
-            if isinstance(date_brief_raw, str):
-                try:
-                    date_brief_value = datetime.strptime(date_brief_raw, "%Y-%m-%d").date()
-                except Exception:
-                    try:
-                        date_brief_value = datetime.strptime(date_brief_raw, "%d/%m/%Y").date()
-                    except Exception:
-                        date_brief_value = datetime.today().date()
-            elif isinstance(date_brief_raw, datetime):
-                date_brief_value = date_brief_raw.date()
-            elif isinstance(date_brief_raw, date):
-                date_brief_value = date_brief_raw
-            elif hasattr(date_brief_raw, "date"):
-                date_brief_value = date_brief_raw.date()
-            elif isinstance(date_brief_raw, (list, tuple)):
-                try:
-                    date_brief_value = datetime.strptime(str(date_brief_raw[0]), "%Y-%m-%d").date()
-                except Exception:
-                    date_brief_value = datetime.today().date()
-            else:
+    col1, col2, col3, col4, col5, col6 = st.columns(6)
+    with col1:
+        st.text_input("Poste à recruter", key="poste_intitule", value=brief_data.get("poste_intitule", ""))
+    with col2:
+        st.text_input("Manager", key="manager_nom", value=brief_data.get("manager_nom", ""))
+    with col3:
+        st.selectbox("Recruteur", ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"], key="recruteur",
+            index=["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"].index(brief_data.get("recruteur", "Zakaria")) if brief_data.get("recruteur", "Zakaria") in ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"] else 0)
+    with col4:
+        st.selectbox("Type d'affectation", ["Chantier", "Siège", "Dépôt"], key="affectation_type",
+            index=["Chantier", "Siège", "Dépôt"].index(brief_data.get("affectation_type", "Chantier")) if brief_data.get("affectation_type", "Chantier") in ["Chantier", "Siège", "Dépôt"] else 0)
+    with col5:
+        st.text_input("Nom affectation", key="affectation_nom", value=brief_data.get("affectation_nom", ""))
+    with col6:
+        date_brief_raw = brief_data.get("date_brief", datetime.today())
+        if isinstance(date_brief_raw, str):
+            try:
+                date_brief_value = datetime.strptime(date_brief_raw, "%Y-%m-%d").date()
+            except Exception:
                 date_brief_value = datetime.today().date()
-            if "date_brief" in st.session_state and not isinstance(st.session_state["date_brief"], date):
-                del st.session_state["date_brief"]
-            st.date_input("Date du brief", key="date_brief", value=date_brief_value)
+        elif isinstance(date_brief_raw, datetime):
+            date_brief_value = date_brief_raw.date()
+        elif isinstance(date_brief_raw, date):
+            date_brief_value = date_brief_raw
+        else:
+            date_brief_value = datetime.today().date()
+        st.date_input("Date du brief", key="date_brief", value=date_brief_value)
     
     col_create, col_cancel = st.columns(2)
     with col_create:
@@ -560,6 +529,8 @@ with tabs[0]:
             st.session_state.date_brief = datetime.today()
             st.rerun()
     
+    # Define col_filter before using it
+    col_filter, = st.columns(1)
     with col_filter:
         st.markdown('<h3 style="margin-bottom: 0.3rem;">🔍 Filtrer les briefs</h3>', unsafe_allow_html=True)
         
