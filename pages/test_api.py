@@ -495,7 +495,7 @@ with tabs[0]:
         
         if st.session_state.show_filtered_results:
             st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
-            briefs_to_show = st.session_state.saved_briefs  # Pour tester sans filtre
+            briefs_to_show = st.session_state.saved_briefs  # Pour afficher tous les briefs
 
 st.write("DEBUG - Briefs à afficher :", briefs_to_show)
 
@@ -506,9 +506,45 @@ if briefs_to_show and len(briefs_to_show) > 0:
             st.markdown(f"**{name}**")
         with col_brief2:
             if st.button("📝 Éditer", key=f"edit_{name}"):
+                # Récupère les données du brief sélectionné
                 brief_data_gsheet = st.session_state.saved_briefs.get(name, {})
+                # Met à jour les clés simples
                 for key, value in brief_data_gsheet.items():
                     st.session_state[key] = value
+                # Met à jour les clés uniques du formulaire Avant-brief
+                sections = [
+                    {"title": "Contexte du poste", "fields": [
+                        ("Raison de l'ouverture", "raison_ouverture", ""),
+                        ("Impact stratégique", "impact_strategique", ""),
+                        ("Tâches principales", "taches_principales", "")]},
+                    {"title": "Must-have (Indispensables)", "fields": [
+                        ("Expérience", "must_have_experience", ""),
+                        ("Connaissances / Diplômes / Certifications", "must_have_diplomes", ""),
+                        ("Compétences / Outils", "must_have_competences", ""),
+                        ("Soft skills / aptitudes comportementales", "must_have_softskills", "")]},
+                    {"title": "Nice-to-have (Atouts)", "fields": [
+                        ("Expérience additionnelle", "nice_to_have_experience", ""),
+                        ("Diplômes / Certifications valorisantes", "nice_to_have_diplomes", ""),
+                        ("Compétences complémentaires", "nice_to_have_competences", "")]},
+                    {"title": "Conditions et contraintes", "fields": [
+                        ("Localisation", "rattachement", ""),
+                        ("Budget recrutement", "budget", "")]},
+                    {"title": "Sourcing et marché", "fields": [
+                        ("Entreprises où trouver ce profil", "entreprises_profil", ""),
+                        ("Synonymes / intitulés proches", "synonymes_poste", ""),
+                        ("Canaux à utiliser", "canaux_profil", "")]},
+                    {"title": "Profils pertinents", "fields": [
+                        ("Lien profil 1", "profil_link_1", ""),
+                        ("Lien profil 2", "profil_link_2", ""),
+                        ("Lien profil 3", "profil_link_3", "")]},
+                    {"title": "Notes libres", "fields": [
+                        ("Points à discuter ou à clarifier avec le manager", "commentaires", ""),
+                        ("Case libre", "notes_libres", "")]},
+                ]
+                for section in sections:
+                    for title, field_key, _ in section["fields"]:
+                        unique_key = f"{section['title'].replace(' ', '_')}_{field_key}"
+                        st.session_state[unique_key] = brief_data_gsheet.get(field_key, "")
                 st.session_state.current_brief_name = name
                 st.session_state.avant_brief_completed = True
                 st.session_state.reunion_completed = True
