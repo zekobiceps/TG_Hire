@@ -606,7 +606,19 @@ with tabs[1]:
                     )
                     if st.session_state.get(f"advice_{key}", ""):
                         st.info(f"**Conseil IA :**\n{st.session_state[f'advice_{key}']}")
-        # ...boutons de sauvegarde...
+        # Ajout du bouton de soumission
+        col_save = st.columns(1)[0]
+        with col_save:
+            if st.form_submit_button("💾 Enregistrer modifications", type="primary", use_container_width=True):
+                if st.session_state.current_brief_name:
+                    current_brief_name = st.session_state.current_brief_name
+                    brief_to_update = st.session_state.saved_briefs[current_brief_name]
+                    for section in sections:
+                        for _, key, _ in section["fields"]:
+                            brief_to_update[key] = st.session_state.get(key, "")
+                    save_briefs()
+                    st.success("✅ Modifications sauvegardées avec succès.")
+                    st.rerun()
 
 # ---------------- REUNION BRIEF ----------------
 with tabs[2]:
@@ -721,33 +733,60 @@ with tabs[2]:
                     st.rerun()
 
     elif step == 2:
-        # Matrice KSA uniquement ici
         st.subheader("Étape 2 : Matrice KSA")
+        # Affichage de la matrice KSA
         if "ksa_matrix" in st.session_state and not st.session_state.ksa_matrix.empty:
             st.dataframe(st.session_state.ksa_matrix, use_container_width=True, hide_index=True)
-        # ... formulaire d'ajout de critère KSA ...
+        # Formulaire d'ajout de critère KSA
+        with st.form(key="add_ksa_criterion_form"):
+            st.text_input("Critère", key="new_critere")
+            st.text_area("Cible / Standard attendu", key="new_cible")
+            st.selectbox("Rubrique", ["Knowledge", "Skills", "Abilities"], key="new_rubrique")
+            st.selectbox("Type de question", ["Comportementale", "Situationnelle", "Technique", "Générale"], key="new_type_question")
+            st.slider("Échelle d'évaluation (1-5)", min_value=1, max_value=5, value=3, key="new_evaluation")
+            st.selectbox("Évaluateur", ["Manager", "Recruteur", "Les deux"], key="new_evaluateur")
+            if st.form_submit_button("➕ Ajouter le critère"):
+                # Ajout du critère à la matrice KSA
+                new_row = pd.DataFrame([{
+                    "Rubrique": st.session_state.new_rubrique,
+                    "Critère": st.session_state.new_critere,
+                    "Type de question": st.session_state.new_type_question,
+                    "Cible / Standard attendu": st.session_state.new_cible,
+                    "Échelle d'évaluation (1-5)": st.session_state.new_evaluation,
+                    "Évaluateur": st.session_state.new_evaluateur
+                }])
+                st.session_state.ksa_matrix = pd.concat([st.session_state.ksa_matrix, new_row], ignore_index=True)
+                st.success("✅ Critère ajouté avec succès !")
+                st.rerun()
 
     elif step == 3:
-        # ...étape 3...
-        pass
-    elif step == 4:
-        # PAS de tableau ici
-        # ... finalisation, notes, etc. ...
-        # (Ajoutez ici le code de finalisation ou laissez ce commentaire si rien n'est à faire)
-        pass
-    
-    col1, col2, col3 = st.columns([1, 6, 1])
-    with col1:
-        if step > 1:
-            if st.button("⬅️ Précédent", key="prev_step"):
-                st.session_state.reunion_step -= 1
-                st.rerun()
-    with col3:
-        if step < total_steps:
-            if st.button("Suivant ➡️", key="next_step"):
-                st.session_state.reunion_step += 1
-                st.rerun()
+        st.subheader("Étape 3 : Stratégie et Processus")
+        # Ajoute ici tes widgets pour la stratégie, processus, critères, etc.
+        st.text_area("Stratégie de sourcing", key="strategie_sourcing")
+        st.text_area("Processus d'évaluation", key="processus_evaluation")
+        st.text_area("Critères d'exclusion", key="criteres_exclusion")
+        st.text_area("Notes du manager", key="manager_notes")
+        if st.button("💾 Enregistrer cette étape", type="primary"):
+            # Sauvegarde des données de l'étape 3
+            current_brief_name = st.session_state.current_brief_name
+            brief_to_update = st.session_state.saved_briefs[current_brief_name]
+            brief_to_update["strategie_sourcing"] = st.session_state.get("strategie_sourcing", "")
+            brief_to_update["processus_evaluation"] = st.session_state.get("processus_evaluation", "")
+            brief_to_update["criteres_exclusion"] = st.session_state.get("criteres_exclusion", "")
+            brief_to_update["manager_notes"] = st.session_state.get("manager_notes", "")
+            save_briefs()
+            st.success("✅ Étape 3 sauvegardée.")
+            st.rerun()
 
+    elif step == 4:
+        st.subheader("Étape 4 : Finalisation")
+        st.info("Finalisez le brief, vérifiez les informations et sauvegardez.")
+        # Ajoute ici tes widgets de finalisation si besoin
+        if st.button("💾 Enregistrer la réunion", type="primary"):
+            st.session_state.reunion_completed = True
+            save_briefs()
+            st.success("✅ Réunion de brief finalisée et sauvegardée.")
+            st.rerun()
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
     if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Synthèse"):
