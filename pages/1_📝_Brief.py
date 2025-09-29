@@ -412,22 +412,6 @@ with tabs[0]:
     with col_info:
         st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Informations de base</h3>', unsafe_allow_html=True)
         
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.text_input("Poste à recruter", key="poste_intitule")
-        with col2:
-            st.text_input("Manager", key="manager_nom")
-        with col3:
-            st.selectbox("Recruteur", ["Zakaria", "Jalal", "Sara", "Ghita", "Bouchra"], key="recruteur")
-        
-        col4, col5, col6 = st.columns(3)
-        with col4:
-            st.selectbox("Type d'affectation", ["Chantier", "Siège", "Dépôt"], key="affectation_type")
-        with col5:
-            st.text_input("Nom affectation", key="affectation_nom")
-        with col6:
-            st.date_input("Date du brief", key="date_brief")
-        
         # Load brief data if editing
         brief_data = {}
         if st.session_state.current_brief_name:
@@ -515,8 +499,8 @@ with tabs[0]:
                 st.session_state.date_brief = datetime.today()
                 st.rerun()
     
-    with col_filter:
-        st.markdown('<h3 style="margin-bottom: 0.3rem;">🔍 Filtrer les briefs</h3>', unsafe_allow_html=True)
+        with col_filter:
+            st.markdown('<h3 style="margin-bottom: 0.3rem;">🔍 Filtrer les briefs</h3>', unsafe_allow_html=True)
         
         col_filter1, col_filter2, col_filter3 = st.columns(3)
         with col_filter1:
