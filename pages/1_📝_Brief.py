@@ -412,8 +412,6 @@ with tabs[0]:
 with col_info:
         st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Informations de base</h3>', unsafe_allow_html=True)
         
-        # Ce bloc de champs est maintenant unique et lit ses valeurs
-        # directement depuis st.session_state grâce à la fonction callback "load_brief_for_editing".
         col1, col2, col3 = st.columns(3)
         with col1:
             st.text_input("Poste à recruter", key="poste_intitule")
@@ -429,6 +427,7 @@ with col_info:
             st.text_input("Nom affectation", key="affectation_nom")
         with col6:
             st.date_input("Date du brief", key="date_brief")
+        
         
         # Logique pour les boutons "Créer / Mettre à jour" et "Annuler"
         col_create, col_cancel = st.columns(2)
@@ -670,9 +669,13 @@ with tabs[1]:
         for section in sections:
             with st.expander(f"📋 {section['title']}", expanded=False):
                 for title, key, placeholder in section["fields"]:
+                    # La clé unique est utilisée pour la sauvegarde, mais la valeur vient de st.session_state
                     unique_key = f"{section['title'].replace(' ', '_')}_{key}"
-                    current_value = st.session_state.get(key, brief_data.get(key, ""))
-                    st.text_area(title, value=current_value, key=unique_key, placeholder=placeholder, height=150)
+                    
+                    # --- CORRECTION ICI ---
+                    # On retire le paramètre "value=". La valeur est maintenant gérée par la clé.
+                    st.text_area(title, key=key, placeholder=placeholder, height=150)
+                    
                     if st.session_state.get(f"advice_{key}", ""):
                         st.info(f"**Conseil IA :**\n{st.session_state[f'advice_{key}']}")
 
@@ -928,12 +931,10 @@ with tabs[2]:
             col1, col2 = st.columns(2)
             with col1:
                 st.text_area("🚫 Critères d'exclusion", key="criteres_exclusion", height=150, 
-                            placeholder="Ex: ne pas avoir d'expérience dans le secteur public...",
-                            value=st.session_state.get("criteres_exclusion", ""))
+                      placeholder="Ex: ne pas avoir d'expérience dans le secteur public...")
             with col2:
                 st.text_area("✅ Processus d'évaluation (détails)", key="processus_evaluation", height=150, 
-                            placeholder="Ex: Entretien RH (30min), Test technique, Entretien manager (60min)...",
-                            value=st.session_state.get("processus_evaluation", ""))
+                      placeholder="Ex: Entretien RH (30min), Test technique, Entretien manager (60min)...")
         
         _, col_cancel = st.columns([3, 1])
         with col_cancel:
@@ -945,14 +946,11 @@ with tabs[2]:
         
         with st.form(key="reunion_final_form"):
             with st.expander("📝 Notes générales du manager", expanded=True):
-                st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=250,
-                            value=st.session_state.get("manager_notes", ""))
+                st.text_area("Notes et commentaires généraux du manager", key="manager_notes", height=250)
                 st.text_area("🚫 Critères d'exclusion", key="criteres_exclusion", height=150, 
-                            placeholder="Ex: ne pas avoir d'expérience dans le secteur public...",
-                            value=st.session_state.get("criteres_exclusion", ""))
+                      placeholder="Ex: ne pas avoir d'expérience dans le secteur public...")
                 st.text_area("✅ Processus d'évaluation (détails)", key="processus_evaluation", height=150, 
-                            placeholder="Ex: Entretien RH (30min), Test technique, Entretien manager (60min)...",
-                            value=st.session_state.get("processus_evaluation", ""))
+                      placeholder="Ex: Entretien RH (30min), Test technique, Entretien manager (60min)...")
 
             st.markdown("---")
             
