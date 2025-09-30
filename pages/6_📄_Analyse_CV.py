@@ -501,14 +501,17 @@ with tab1:
         uploaded_files_ranking = st.file_uploader("Importer des CVs", type=["pdf"], accept_multiple_files=True, key="ranking_uploader")
     with col3:
         st.markdown("#### 📄 Fiche de Poste (optionnelle)")
-        fiche_poste_file = st.file_uploader("Importer une fiche de poste (PDF)", type=["pdf"], key="fiche_poste_uploader")
+        fiche_poste_options = ["Aucune", "Importer une fiche de poste (PDF)"]
+        fiche_poste_choice = st.selectbox("Choisissez la source de la fiche de poste", fiche_poste_options, index=0)
         fiche_poste_text = ""
-        if fiche_poste_file:
-            fiche_poste_text = extract_text_from_pdf(fiche_poste_file)
-            if fiche_poste_text and not fiche_poste_text.startswith("Erreur"):
-                st.success("Fiche de poste importée !")
-            else:
-                st.error("Erreur lors de la lecture de la fiche de poste.")
+        if fiche_poste_choice == "Importer une fiche de poste (PDF)":
+            fiche_poste_file = st.file_uploader("Fiche de poste (PDF)", type=["pdf"], key="fiche_poste_uploader")
+            if fiche_poste_file:
+                fiche_poste_text = extract_text_from_pdf(fiche_poste_file)
+                if fiche_poste_text and not fiche_poste_text.startswith("Erreur"):
+                    st.success("Fiche de poste importée !")
+                else:
+                    st.error("Erreur lors de la lecture de la fiche de poste.")
     
     st.markdown("---")
     
@@ -608,7 +611,8 @@ with tab1:
                         file_names.append(file.name)
             
             # Analyse selon la méthode choisie
-            with st.spinner(f"Analyse des CVs en cours avec {analysis_method}..."):
+            loading_text = f"Analyse des CVs en cours par IA..." if analysis_method == "Analyse par IA (DeepSeek)" else f"Analyse des CVs en cours avec {analysis_method}..."
+            with st.spinner(loading_text):
                 results, explanations, logic = {}, None, None
                 
                 if analysis_method == "Analyse par IA (DeepSeek)":
@@ -691,24 +695,30 @@ with tab1:
                     score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", explanation, re.IGNORECASE)
                     score_text = f"Score : {score_match.group(1)}%" if score_match else "Score : N/A"
                     st.markdown(f"**{score_text}**")
+                    # Nouvelle troncature : coupe à la fin d'une phrase ou paragraphe
+                    def truncate_explanation(text, max_len=600):
+                        if len(text) <= max_len:
+                            return text
+                        # Coupe à la fin d'une phrase
+                        sentences = re.split(r'(\.|\!|\?)', text)
+                        out = ''
+                        for i in range(0, len(sentences)-1, 2):
+                            if len(out) + len(sentences[i]) + len(sentences[i+1]) > max_len:
+                                break
+                            out += sentences[i] + sentences[i+1]
+                        return out.strip() + '...'
                     strong_match = re.search(r"Points? Forts?\s*(.*?)\n\s*Points? Faibles?", explanation, re.DOTALL|re.IGNORECASE)
                     weak_match = re.search(r"Points? Faibles?\s*(.*)", explanation, re.DOTALL|re.IGNORECASE)
                     if strong_match:
                         strong_text = strong_match.group(1).strip()
-                        if len(strong_text) > 300:
-                            strong_text = strong_text[:300] + "..."
                         st.markdown("**Points Forts**")
-                        st.markdown(strong_text)
+                        st.markdown(truncate_explanation(strong_text))
                     if weak_match:
                         weak_text = weak_match.group(1).strip()
-                        if len(weak_text) > 300:
-                            weak_text = weak_text[:300] + "..."
                         st.markdown("**Points Faibles**")
-                        st.markdown(weak_text)
+                        st.markdown(truncate_explanation(weak_text))
                     if not strong_match and not weak_match:
-                        if explanation and len(explanation) > 300:
-                            explanation = explanation[:300] + "..."
-                        st.markdown(explanation)
+                        st.markdown(truncate_explanation(explanation))
         
         # Système de feedback par CV avec formulaires pour éviter les rechargements
         st.markdown("---")
