@@ -375,29 +375,34 @@ with col_save2:
                 "date_creation": datetime.now().strftime("%Y-%m-%d")
             }
             
-            # Sauvegarder dans Google Sheets
-            if utils.save_annonce_to_gsheet(annonce_data):
+            # Sauvegarder dans Google Sheets (obligatoire)
+            success = utils.save_annonce_to_gsheet(annonce_data)
+            if success:
                 st.success("✅ Annonce sauvegardée dans Google Sheets avec succès !")
+                # Recharger la liste des annonces depuis Google Sheets pour affichage
+                try:
+                    records = utils.load_annonces_from_gsheet()
+                    # Convertir les records (dicts) vers le format local attendu pour l'affichage
+                    st.session_state.annonces = []
+                    for r in records:
+                        st.session_state.annonces.append({
+                            "date": r.get("timestamp", ""),
+                            "poste": r.get("poste", ""),
+                            "entreprise": r.get("entreprise", ""),
+                            "localisation": r.get("localisation", ""),
+                            "contenu": r.get("contenu", ""),
+                            "plateforme": r.get("plateforme", r.get("format_type", ""))
+                        })
+                except Exception as e:
+                    st.warning(f"⚠️ Annonce sauvegardée mais impossible de recharger la liste depuis Sheets: {e}")
+
+                # Reset pour nouvelle saisie (protection contre erreurs Streamlit API)
+                try:
+                    st.session_state["annonce_contenu"] = ""
+                except Exception:
+                    pass
             else:
-                st.warning("⚠️ Erreur lors de la sauvegarde dans Google Sheets, sauvegarde locale uniquement.")
-            
-            # Sauvegarder aussi localement
-            annonce = {
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "poste": poste_final,
-                "entreprise": entreprise,
-                "localisation": localisation_finale,
-                "contenu": contenu,
-                "plateforme": plateforme,
-            }
-            st.session_state.annonces.append(annonce)
-            
-            # Reset pour nouvelle saisie (protection contre erreurs Streamlit API)
-            try:
-                st.session_state["annonce_contenu"] = ""
-            except Exception:
-                # Si Streamlit refuse la modification (ex: contexte restreint), on ignore pour éviter le plantage
-                pass
+                st.error("❌ Erreur lors de la sauvegarde dans Google Sheets — l'annonce n'a PAS été enregistrée.")
         else:
             st.warning("⚠️ Merci de remplir tous les champs obligatoires")
 
