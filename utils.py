@@ -7,6 +7,7 @@ import pandas as pd
 from datetime import datetime
 import io
 import random
+from io import BytesIO
 
 # --- IMPORTS CONDITIONNELS (CORRIGÉS) ---
 # Importations standard
@@ -17,16 +18,18 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 # PDF (ReportLab)
 try:
     from reportlab.lib.pagesizes import A4
-    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.lib import colors
-    PDF_AVAILABLE = True
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.units import mm
+    PDF_PRETTY_AVAILABLE = True
 except ImportError:
-    PDF_AVAILABLE = False
-    class Dummy: # Classes factices pour éviter les erreurs Pylance/NameError si Reportlab manque
+    PDF_PRETTY_AVAILABLE = False
+    class Dummy:
         def __init__(self, *args, **kwargs): pass
     SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, getSampleStyleSheet, colors = [Dummy] * 7
     A4 = None
+
+# === AJOUT COMPATIBILITÉ ANCIEN NOM ===
+PDF_AVAILABLE = PDF_PRETTY_AVAILABLE   # pour les fonctions existantes (export_brief_pdf)
 
 # Word (Python-docx)
 try:
@@ -699,24 +702,46 @@ def get_example_for_field(section_title, field_title):
     return examples.get(section_title, {}).get(field_title, "Exemple non disponible")
 
 # -------------------- Génération de nom de brief automatique --------------------
-def generate_automatic_brief_name():
+def generate_automatic_brief_name(poste: str = None, manager: str = None, date_obj=None):
     """
-    Generate a unique brief name based on the position title, manager name, and date.
-    Uses session_state values if available, otherwise defaults to a generic name.
+    Génère un nom unique de brief: POSTE_MANAGER_YYYYMMDD[_n].
+    Paramètres optionnels (fallback sur st.session_state pour compatibilité).
     """
-    poste = st.session_state.get("poste_intitule", "Poste")
-    manager = st.session_state.get("manager_nom", "Manager")
-    date_str = st.session_state.get("date_brief", datetime.today()).strftime("%Y%m%d")
-    
-    base_name = f"{poste}_{manager}_{date_str}"
-    
+    from datetime import datetime, date
+    # Fallback session_state
+    if poste is None:
+        poste = st.session_state.get("poste_intitule", "Poste")
+    if manager is None:
+        manager = st.session_state.get("manager_nom", "Manager")
+    if date_obj is None:
+        date_obj = st.session_state.get("date_brief", datetime.today())
+    # Normalisation date
+    if isinstance(date_obj, str):
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+            try:
+                date_obj = datetime.strptime(date_obj, fmt).date()
+                break
+            except Exception:
+                continue
+    if isinstance(date_obj, datetime):
+        date_obj = date_obj.date()
+    if not isinstance(date_obj, date):
+        date_obj = datetime.today().date()
+    date_str = date_obj.strftime("%Y%m%d")
+
+    # Nettoyage simple
+    def slugify(val):
+        return "".join(c for c in val.strip().replace(" ", "_") if c.isalnum() or c in ("_", "-"))[:40] or "X"
+    poste_slug = slugify(poste)
+    manager_slug = slugify(manager)
+
+    base_name = f"{poste_slug}_{manager_slug}_{date_str}"
     saved_briefs = st.session_state.get("saved_briefs", {})
-    counter = 1
     brief_name = base_name
+    i = 1
     while brief_name in saved_briefs:
-        brief_name = f"{base_name}_{counter}"
-        counter += 1
-    
+        brief_name = f"{base_name}_{i}"
+        i += 1
     return brief_name
 
 # -------------------- Conversion de colonne --------------------
@@ -727,3 +752,99 @@ def col_to_letter(col_index):
         col_index, remainder = divmod(col_index - 1, 26)
         letter = chr(65 + remainder) + letter
     return letter
+
+def export_brief_pdf_pretty(brief_name: str, brief_data: dict, ksa_df):
+    """
+    Génère un PDF structuré et lisible (brief + stratégie + matrice KSA).
+    Retourne un buffer BytesIO ou None si lib absente.
+    """
+    if not PDF_PRETTY_AVAILABLE:
+        return None
+    buf = BytesIO()
+    c = canvas.Canvas(buf, pagesize=A4)
+    W, H = A4
+    margin_x = 20 * mm
+    y = H - 25 * mm
+
+    def line(txt, size=9, leading=12, bold=False, max_len=150):
+        nonlocal y
+        if y < 30 * mm:
+            c.showPage()
+            y = H - 25 * mm
+        font = "Helvetica-Bold" if bold else "Helvetica"
+        c.setFont(font, size)
+        for seg in str(txt).split("\n"):
+            c.drawString(margin_x, y, seg[:max_len])
+            y -= leading
+
+    line(f"Brief: {brief_name}", size=14, leading=18, bold=True)
+    line(f"Poste: {brief_data.get('POSTE_INTITULE', brief_data.get('poste_intitule',''))}", bold=True)
+    line(f"Manager: {brief_data.get('MANAGER_NOM', brief_data.get('manager_nom',''))}")
+    line(f"Affectation: {brief_data.get('AFFECTATION_NOM','')} ({brief_data.get('AFFECTATION_TYPE','')})")
+    line(f"Date: {brief_data.get('DATE_BRIEF', brief_data.get('date_brief',''))}")
+    line("")
+
+    line("1. Contexte & Exigences", bold=True)
+    ordered_keys = [
+        ("Raison de l'ouverture","RAISON_OUVERTURE"),
+        ("Impact stratégique","IMPACT_STRATEGIQUE"),
+        ("Tâches principales","TACHES_PRINCIPALES"),
+        ("Must Have - Expérience","MUST_HAVE_EXPERIENCE"),
+        ("Must Have - Diplômes","MUST_HAVE_DIPLOMES"),
+        ("Must Have - Compétences","MUST_HAVE_COMPETENCES"),
+        ("Must Have - Soft skills","MUST_HAVE_SOFTSKILLS"),
+        ("Nice to Have - Expérience","NICE_TO_HAVE_EXPERIENCE"),
+        ("Nice to Have - Diplômes","NICE_TO_HAVE_DIPLOMES"),
+        ("Nice to Have - Compétences","NICE_TO_HAVE_COMPETENCES"),
+        ("Localisation","RATTACHEMENT"),
+        ("Budget","BUDGET"),
+        ("Entreprises cibles","ENTREPRISES_PROFIL"),
+        ("Synonymes","SYNONYMES_POSTE"),
+        ("Canaux suggérés","CANAUX_PROFIL"),
+        ("Lien profil 1","LIEN_PROFIL_1"),
+        ("Lien profil 2","LIEN_PROFIL_2"),
+        ("Lien profil 3","LIEN_PROFIL_3"),
+        ("Notes libres","NOTES_LIBRES")
+    ]
+    for label, key in ordered_keys:
+        val = brief_data.get(key, "")
+        if val:
+            line(f"- {label}: {val}")
+
+    line("")
+    line("2. Stratégie & Processus", bold=True)
+    for label, key in [
+        ("Stratégie de sourcing","STRATEGIE_SOURCING"),
+        ("Critères d'exclusion","CRITERES_EXCLUSION"),
+        ("Processus d'évaluation","PROCESSUS_EVALUATION"),
+        ("Notes manager","MANAGER_NOTES")
+    ]:
+        v = brief_data.get(key, "")
+        if v:
+            line(f"- {label}: {v}")
+
+    if ksa_df is not None and hasattr(ksa_df, "empty") and not ksa_df.empty:
+        line("")
+        line("3. Matrice KSA (Résumé)", bold=True)
+        for _, row in ksa_df.iterrows():
+            rub = row.get("Rubrique","")
+            crit = row.get("Critère","")
+            tq = row.get("Type de question","")
+            q = row.get("Question pour l'entretien", row.get("Cible / Standard attendu",""))
+            ev = row.get("Évaluation (1-5)", row.get("Évaluation (1-5)",""))
+            line(f"[{rub}/{tq}] {crit} (Cible: {ev}/5)")
+            if q:
+                line(f"    Q: {str(q)[:110]}")
+        if "Évaluation (1-5)" in ksa_df.columns:
+            try:
+                vals = ksa_df["Évaluation (1-5)"].dropna().astype(float)
+                if len(vals) > 0:
+                    avg = round(vals.mean(), 2)
+                    line(f"Score cible moyen: {avg}/5", bold=True)
+            except:
+                pass
+
+    c.showPage()
+    c.save()
+    buf.seek(0)
+    return buf
