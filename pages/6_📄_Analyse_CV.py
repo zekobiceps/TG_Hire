@@ -631,31 +631,70 @@ with tab1:
                 
                 # Sauvegarder les résultats pour le feedback
                 st.session_state.last_analysis_result = results_df
-                st.session_state.cv_analysis_feedback = False
+                st.session_state.last_analysis_method = analysis_method
+                st.session_state.last_job_title = job_title
+                st.session_state.last_job_description = job_description
+                st.session_state.last_file_names = file_names
                 
-                # Demander un feedback à l'utilisateur
+                # Système de feedback par CV
+                for i, (file_name, score) in enumerate(ranked_resumes):
+                    with st.expander(f"💬 Feedback pour : {file_name}"):
+                        feedback_key_prefix = f"cv_{i}_"
+                        feedback_col1, feedback_col2 = st.columns([3, 1])
+                        with feedback_col1:
+                            cv_feedback_score = st.slider("Note", 1, 5, 3, key=f"{feedback_key_prefix}score")
+                            cv_feedback_text = st.text_area("Commentaires spécifiques", key=f"{feedback_key_prefix}text", 
+                                                   placeholder="Points forts/faibles de ce classement...")
+                        
+                        with feedback_col2:
+                            if st.button("Envoyer feedback", key=f"{feedback_key_prefix}submit"):
+                                save_feedback(
+                                    analysis_method=f"{analysis_method} (CV individuel)",
+                                    job_title=job_title,
+                                    job_description_snippet=job_description[:200],
+                                    cv_count=1,
+                                    feedback_score=cv_feedback_score,
+                                    feedback_text=f"Feedback pour {file_name}: {cv_feedback_text}"
+                                )
+                                st.success(f"Merci pour votre feedback sur {file_name} ! 🙏")
+                
+                # Feedback global persistant (utilise session_state pour persister entre les interactions)
+                if "cv_analysis_feedback_submitted" not in st.session_state:
+                    st.session_state.cv_analysis_feedback_submitted = False
+                    
                 st.markdown("---")
-                st.markdown("### 🌟 Donnez-nous votre feedback")
-                st.markdown("Comment évaluez-vous la qualité des résultats fournis par cette analyse ?")
+                st.markdown("### 🌟 Feedback global sur l'analyse")
+                st.markdown("Comment évaluez-vous la qualité globale des résultats fournis par cette analyse ?")
                 
                 feedback_col1, feedback_col2 = st.columns([3, 1])
                 with feedback_col1:
-                    feedback_score = st.slider("Note", 1, 5, 3, key="feedback_slider")
-                    feedback_text = st.text_area("Commentaires (optionnel)", key="feedback_text", 
+                    if "global_feedback_score" not in st.session_state:
+                        st.session_state.global_feedback_score = 3
+                    if "global_feedback_text" not in st.session_state:
+                        st.session_state.global_feedback_text = ""
+                        
+                    global_feedback_score = st.slider("Note globale", 1, 5, st.session_state.global_feedback_score, key="global_feedback_slider")
+                    global_feedback_text = st.text_area("Commentaires sur l'ensemble de l'analyse", 
+                                               value=st.session_state.global_feedback_text,
+                                               key="global_feedback_text", 
                                                placeholder="Qu'avez-vous apprécié ? Que pourrait-on améliorer ?")
+                    
+                    # Mettre à jour les valeurs en session
+                    st.session_state.global_feedback_score = global_feedback_score
+                    st.session_state.global_feedback_text = global_feedback_text
                 
                 with feedback_col2:
-                    if st.button("Envoyer feedback", key="send_feedback"):
+                    if st.button("Envoyer feedback global", key="send_global_feedback") or st.session_state.cv_analysis_feedback_submitted:
                         save_feedback(
                             analysis_method=analysis_method,
                             job_title=job_title,
                             job_description_snippet=job_description[:200],
                             cv_count=len(file_names),
-                            feedback_score=feedback_score,
-                            feedback_text=feedback_text
+                            feedback_score=global_feedback_score,
+                            feedback_text=global_feedback_text
                         )
-                        st.session_state.cv_analysis_feedback = True
-                        st.success("Merci pour votre feedback ! 🙏")
+                        st.session_state.cv_analysis_feedback_submitted = True
+                        st.success("Merci pour votre feedback global ! 🙏")
             else:
                 st.error("L'analyse n'a retourné aucun score.")
 
