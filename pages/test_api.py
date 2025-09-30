@@ -6,6 +6,12 @@ import pandas as pd
 from datetime import date
 import random
 from io import BytesIO
+from textwrap import wrap
+try:
+    from docx import Document
+    WORD_LIB_CUSTOM = True
+except Exception:
+    WORD_LIB_CUSTOM = False
 try:
     from reportlab.lib.pagesizes import A4
     from reportlab.pdfgen import canvas
@@ -42,28 +48,111 @@ from utils import (
 # --- CSS pour augmenter la taille du texte des onglets ---
 st.markdown("""
     <style>
-    .stTabs [data-baseweb="tab"] {
-        height: auto !important;
-        padding: 10px 16px !important;
-    }
-    .stButton > button {
-        border-radius: 4px;
-        padding: 0.5rem 1rem;
-        font-weight: 500;
-    }
-    .streamlit-expanderHeader {
-        font-weight: 600;
-    }
-    .stDataFrame {
-        width: 100%;
-    }
-    .stTextArea textarea {
-        min-height: 100px;
-        resize: vertical;
-        white-space: pre-wrap !important;
-    }
+    .stTabs [data-baseweb="tab"]{height:auto!important;padding:10px 16px!important;}
+    .stButton > button{border-radius:4px;padding:0.5rem 1rem;font-weight:500;}
+    .streamlit-expanderHeader{font-weight:600;}
+    .stDataFrame{width:100%;}
+    .stTextArea textarea{min-height:100px;resize:vertical;white-space:pre-wrap!important;}
+    .ai-red-btn button{background:#C40000!important;color:#fff!important;border:1px solid #960000!important;font-weight:600!important;}
+    .ai-red-btn button:hover{background:#E00000!important;}
+    .ai-suggestion-box{background:linear-gradient(135deg,#e6ffed,#f4fff7);border-left:5px solid #23C552;padding:0.6rem 0.8rem;margin:0.3rem 0 0.8rem;border-radius:6px;font-size:.9rem;}
+    .score-cible{font-size:28px!important;font-weight:700;color:#C40000;margin-top:.5rem;}
+    .brief-row{margin-bottom:0.2rem;}
+    .brief-row .stButton>button{padding:0.25rem 0.5rem;font-size:0.70rem;}
+    .brief-name{padding-top:0.35rem;font-size:0.85rem;}
     </style>
 """, unsafe_allow_html=True)
+
+def generate_custom_pdf(brief_name:str, data:dict, ksa:pd.DataFrame|None)->BytesIO|None:
+    if not PDF_LIB_OK:
+        return None
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfgen import canvas
+        buffer = BytesIO()
+        c = canvas.Canvas(buffer, pagesize=A4)
+        w,h = A4
+        y = h-40
+        logo_path = os.path.join(os.path.dirname(__file__), '..', 'tgcc.png')
+        if os.path.exists(logo_path):
+            try: c.drawImage(logo_path,40,y-30,width=120,preserveAspectRatio=True,mask='auto')
+            except Exception: pass
+        c.setFont('Helvetica-Bold',18); c.drawString(180,y-10,f"Brief - {brief_name}")
+        meta = [
+            f"Poste : {data.get('POSTE_INTITULE') or data.get('poste_intitule','')}",
+            f"Manager : {data.get('MANAGER_NOM') or data.get('manager_nom','')}",
+            f"Recruteur : {data.get('RECRUTEUR') or data.get('recruteur','')}",
+            f"Affectation : {data.get('AFFECTATION_NOM') or data.get('affectation_nom','')} ({data.get('AFFECTATION_TYPE') or data.get('affectation_type','')})",
+            f"Date : {data.get('DATE_BRIEF') or data.get('date_brief','')}"
+        ]
+        y-=55; c.setFont('Helvetica',10)
+        for line in meta:
+            c.drawString(40,y,line); y-=14
+        sections_pdf=[
+            ("Contexte",["RAISON_OUVERTURE","IMPACT_STRATEGIQUE","TACHES_PRINCIPALES"]),
+            ("Must-have",["MUST_HAVE_EXP","MUST_HAVE_DIP","MUST_HAVE_COMPETENCES","MUST_HAVE_SOFTSKILLS"]),
+            ("Nice-to-have",["NICE_TO_HAVE_EXP","NICE_TO_HAVE_DIP","NICE_TO_HAVE_COMPETENCES"]),
+            ("Conditions",["RATTACHEMENT","BUDGET"]),
+            ("Sourcing",["ENTREPRISES_PROFIL","SYNONYMES_POSTE","CANAUX_PROFIL"]),
+            ("Notes",["COMMENTAIRES","NOTES_LIBRES"])
+        ]
+        for title,keys in sections_pdf:
+            c.setFont('Helvetica-Bold',12); c.drawString(40,y-4,title); y-=18; c.setFont('Helvetica',9)
+            for k in keys:
+                val=data.get(k,'');
+                if not val: continue
+                wrapped=wrap(f"- {k.title().replace('_',' ')} : {val}",110)
+                for wline in wrapped:
+                    if y<60: c.showPage(); y=h-60; c.setFont('Helvetica',9)
+                    c.drawString(50,y,wline); y-=12
+            y-=4
+        if ksa is not None and isinstance(ksa,pd.DataFrame) and not ksa.empty:
+            if y<100: c.showPage(); y=h-60
+            c.setFont('Helvetica-Bold',12); c.drawString(40,y,'Matrice KSA'); y-=16; c.setFont('Helvetica',8)
+            cols=["Rubrique","Critère","Type de question","Évaluation (1-5)"]
+            for _,row in ksa.iterrows():
+                line=' | '.join(str(row.get(cn,''))[:40] for cn in cols)
+                for wline in wrap(line,115):
+                    if y<40: c.showPage(); y=h-60; c.setFont('Helvetica',8)
+                    c.drawString(40,y,wline); y-=10
+        c.showPage(); c.save(); buffer.seek(0); return buffer
+    except Exception:
+        return None
+
+def generate_custom_word(brief_name:str,data:dict,ksa:pd.DataFrame|None)->BytesIO|None:
+    if not WORD_LIB_CUSTOM:
+        return None
+    try:
+        doc=Document(); doc.add_heading(f"Brief - {brief_name}",0)
+        for label,key in [("Poste","POSTE_INTITULE"),("Manager","MANAGER_NOM"),("Recruteur","RECRUTEUR"),("Affectation","AFFECTATION_NOM"),("Date","DATE_BRIEF")]:
+            p=doc.add_paragraph(); p.add_run(f"{label} : ").bold=True; p.add_run(str(data.get(key) or data.get(key.lower(),'') or ''))
+        mapping=[
+            ("Contexte",["RAISON_OUVERTURE","IMPACT_STRATEGIQUE","TACHES_PRINCIPALES"]),
+            ("Must-have",["MUST_HAVE_EXP","MUST_HAVE_DIP","MUST_HAVE_COMPETENCES","MUST_HAVE_SOFTSKILLS"]),
+            ("Nice-to-have",["NICE_TO_HAVE_EXP","NICE_TO_HAVE_DIP","NICE_TO_HAVE_COMPETENCES"]),
+            ("Conditions",["RATTACHEMENT","BUDGET"]),
+            ("Sourcing",["ENTREPRISES_PROFIL","SYNONYMES_POSTE","CANAUX_PROFIL"]),
+            ("Notes",["COMMENTAIRES","NOTES_LIBRES"])
+        ]
+        for title,keys in mapping:
+            doc.add_heading(title,2)
+            for k in keys:
+                val=data.get(k,'')
+                if val:
+                    doc.add_paragraph(f"{k.title().replace('_',' ')} : {val}",style='List Bullet')
+        if ksa is not None and isinstance(ksa,pd.DataFrame) and not ksa.empty:
+            doc.add_heading('Matrice KSA',2)
+            table=doc.add_table(rows=1,cols=4)
+            for i,hdr in enumerate(["Rubrique","Critère","Type","Éval"]): table.rows[0].cells[i].text=hdr
+            for _,row in ksa.iterrows():
+                r=table.add_row().cells
+                r[0].text=str(row.get('Rubrique',''))
+                r[1].text=str(row.get('Critère',''))
+                r[2].text=str(row.get('Type de question',''))
+                r[3].text=str(row.get('Évaluation (1-5)',''))
+        bio=BytesIO(); doc.save(bio); bio.seek(0); return bio
+    except Exception:
+        return None
 
 def render_ksa_matrix():
     """Affiche la matrice KSA sous forme de tableau et permet l'ajout de critères."""
@@ -595,14 +684,15 @@ with tabs[0]:
             st.markdown('<h3 style="margin-top: 1rem; margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
             if briefs_to_show:
                 for name, brief in briefs_to_show.items():
-                    col_brief1, col_brief2 = st.columns([6, 1])
-                    with col_brief1:
-                        st.markdown(f"**{name}**")
-                    with col_brief2:
-                        if st.button("📝 Éditer", key=f"edit_{name}"):
-                            st.session_state.import_brief_flag = True
-                            st.session_state.brief_to_import = name
-                            st.rerun()
+                    c1,c2,c3 = st.columns([5,1,1])
+                    with c1:
+                        st.markdown(f"<div class='brief-name'><strong>{name}</strong></div>", unsafe_allow_html=True)
+                    with c2:
+                        if st.button("📝", key=f"edit_{name}"):
+                            st.session_state.import_brief_flag=True; st.session_state.brief_to_import=name; st.rerun()
+                    with c3:
+                        if st.button("🗑️", key=f"del_{name}"):
+                            st.session_state.saved_briefs.pop(name,None); save_briefs(); st.session_state.filtered_briefs.pop(name,None); st.success("Supprimé"); st.rerun()
             else:
                 st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
 
@@ -742,24 +832,22 @@ with tabs[2]:
         # ----- Étape 2 -----
         elif step == 2:
             st.markdown("### 📊 Étape 2 : Matrice KSA")
-            with st.expander("ℹ️ Méthode KSA (exemples & bonnes pratiques)", expanded=False):
-                st.markdown("""
-**KSA = Knowledge / Skills / Abilities**  
-- Knowledge : savoirs structurés (réglementation, normes, méthodologies)  
-- Skills : compétences pratico-opérationnelles (méthodes, outils, exécution)  
-- Abilities : aptitudes transverses (leadership, adaptation, jugement, communication)
+            with st.expander("ℹ️ Matrice KSA : Les Critères d'Évaluation", expanded=False):
+                st.markdown("""**Matrice KSA : Les Critères d'Évaluation 🛠️🧠🤝**
+La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation du candidat en trois piliers :
 
-Types de questions :  
-- Comportementale (passé réel – utiliser STAR)  
-- Situationnelle (projection)  
-- Technique (validation expertise)  
-- Générale (vision / structuration)
+**Knowledge (K) 📚 :** Connaissances théoriques.
+**Skills (S) 🔧 :** Compétences pratiques / opérationnelles.
+**Abilities (A) 🧭 :** Aptitudes comportementales (méthode STAR pour évaluer une situation réelle passée).
 
-Bonnes pratiques :  
-1. 4 à 7 critères suffisent pour un premier passage  
-2. Une question = un critère mesurable  
-3. Spécifier l’évaluateur clarifie le déroulé d’entretien  
-4. Ajouter une cible standard (ex: structure, profondeur, démarche, indicateurs)
+**Choix du type de question :**
+• Comportementale (STAR) → surtout Abilities (A).  
+• Technique → Knowledge (K) & Skills (S).  
+• Situationnelle → Abilities (A) + Skills (S) sur un scénario hypothétique.  
+• Générale → Vision / motivation / structuration.  
+
+**Échelle 1-5 – Cible Standard :** 1=Insuffisant, 3=Acceptable (autonome moyen terme), 5=Expert (peut former).  
+**Bonnes pratiques :** 4–7 critères, une question = un critère, évaluateur défini, cible claire.
 """)
 
             # Charger JSON existant si DataFrame vide
@@ -876,7 +964,7 @@ Bonnes pratiques :
                 # Score
                 try:
                     avg = round(st.session_state.ksa_matrix["Évaluation (1-5)"].astype(float).mean(),2)
-                    st.markdown(f"**🎯 Score cible moyen : {avg} / 5**")
+                    st.markdown(f"<div class='score-cible'>🎯 Score cible : {avg} / 5</div>", unsafe_allow_html=True)
                 except Exception:
                     pass
             else:
@@ -891,12 +979,17 @@ Bonnes pratiques :
             st.multiselect("Canaux prioritaires", channels,
                            key="canaux_prioritaires",
                            default=st.session_state.canaux_prioritaires)
-            st.text_area("🚫 Critères d'exclusion", key="criteres_exclusion",
-                         height=160,
-                         value=brief_data.get("CRITERES_EXCLUSION", st.session_state.get("criteres_exclusion","")))
-            st.text_area("✅ Processus d'évaluation", key="processus_evaluation",
-                         height=160,
-                         value=brief_data.get("PROCESSUS_EVALUATION", st.session_state.get("processus_evaluation","")))
+            default_steps = ("1-Sourcing & Qualification (Recruteur):\nLe Recruteur trie, vérifie les critères éliminatoires (Budget, Mobilité) et qualifie les connaissances de base (Knowledge). Il envoie la shortlist qualifiée au Manager sous 5 jours.\n\n"
+                             "2-Entretien Manager (Knowledge & Skills):\nLe Manager évalue la maîtrise technique et les compétences pratiques (Skills) du candidat, qui est convoqué à partir de la shortlist.\n\n"
+                             "3-Entretien Recruteur (Aptitudes/Abilities):\nLe Recruteur se concentre sur l'évaluation des aptitudes comportementales (Abilities) et de l'adéquation à la culture d'entreprise (fit).\n\n"
+                             "4-Clôture et Validation DRH:\nLe dossier complet du candidat retenu (avec l'avis KSA de chacun) est soumis à la DRH pour validation finale.")
+            if not st.session_state.get("processus_evaluation") and not brief_data.get("PROCESSUS_EVALUATION"):
+                st.session_state.processus_evaluation = default_steps
+            c_excl, c_proc = st.columns(2)
+            with c_excl:
+                st.text_area("🚫 Critères d'exclusion", key="criteres_exclusion", height=250, value=brief_data.get("CRITERES_EXCLUSION", st.session_state.get("criteres_exclusion","")))
+            with c_proc:
+                st.text_area("✅ Etapes suivantes", key="processus_evaluation", height=250, value=st.session_state.get("processus_evaluation", brief_data.get("PROCESSUS_EVALUATION","")))
             if st.button("💾 Sauvegarder Étape 3", key="save_step3", type="primary"):
                 brief_data["canaux_prioritaires"] = st.session_state.get("canaux_prioritaires", [])
                 brief_data["CANAUX_PRIORITAIRES"] = json.dumps(brief_data["canaux_prioritaires"], ensure_ascii=False)
@@ -992,7 +1085,7 @@ with tabs[3]:
             try:
                 if "Évaluation (1-5)" in show_df.columns:
                     avg2 = round(show_df["Évaluation (1-5)"].astype(float).mean(),2)
-                    st.markdown(f"**🎯 Score cible moyen : {avg2} / 5**")
+                    st.markdown(f"<div class='score-cible'>🎯 Score cible : {avg2} / 5</div>", unsafe_allow_html=True)
             except Exception:
                 pass
         else:
@@ -1018,26 +1111,16 @@ with tabs[3]:
             st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("### Export")
-        ex1, ex2 = st.columns(2)
+        ex1, ex2, _esp = st.columns([0.4,0.4,2.2])
         with ex1:
-            if PDF_AVAILABLE:
-                pdf_buf = export_brief_pdf_pretty(
-                    st.session_state.current_brief_name,
-                    bd,
-                    st.session_state.ksa_matrix if "ksa_matrix" in st.session_state else None
-                )
-                if pdf_buf:
-                    st.download_button("⬇️ PDF", data=pdf_buf,
-                                       file_name=f"{st.session_state.current_brief_name}.pdf",
-                                       mime="application/pdf")
+            pdf_buf = generate_custom_pdf(st.session_state.current_brief_name, bd, st.session_state.ksa_matrix if "ksa_matrix" in st.session_state else None)
+            if pdf_buf:
+                st.download_button("⬇️ PDF", data=pdf_buf, file_name=f"{st.session_state.current_brief_name}.pdf", mime="application/pdf")
             else:
                 st.info("PDF indisponible.")
         with ex2:
-            if WORD_AVAILABLE:
-                word_buf = export_brief_word()
-                if word_buf:
-                    st.download_button("⬇️ Word", data=word_buf,
-                                       file_name=f"{st.session_state.current_brief_name}.docx",
-                                       mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+            word_buf = generate_custom_word(st.session_state.current_brief_name, bd, st.session_state.ksa_matrix if "ksa_matrix" in st.session_state else None)
+            if word_buf:
+                st.download_button("⬇️ Word", data=word_buf, file_name=f"{st.session_state.current_brief_name}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
             else:
                 st.info("Word indisponible.")
