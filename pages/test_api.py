@@ -453,24 +453,35 @@ with tabs[0]:
         with col5:
             st.text_input("Nom affectation", key="affectation_nom", value=brief_data.get("affectation_nom", ""))
         with col6:
-            # Lecture source
-            date_brief_raw = brief_data.get("date_brief", st.session_state.get("date_brief", date.today()))
-            # Parsing sans écrire dans session_state avant le widget
-            def parse_date(val):
-                if isinstance(val, date):
-                    return val
-                if isinstance(val, datetime):
-                    return val.date()
-                if isinstance(val, str):
-                    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+            # --- Normalisation robuste de la date avant le widget ---
+            def _parse_date_any(v):
+                if isinstance(v, date):
+                    return v
+                if isinstance(v, datetime):
+                    return v.date()
+                if isinstance(v, str):
+                    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d"):
                         try:
-                            return datetime.strptime(val, fmt).date()
+                            return datetime.strptime(v, fmt).date()
                         except:
                             continue
                 return date.today()
-            date_brief_value = parse_date(date_brief_raw)
-            # Widget (aucune mutation préalable -> pas d'avertissement)
-            chosen_date = st.date_input("Date du brief", value=date_brief_value, key="date_brief")
+
+            # Valeur prioritaire : session_state si déjà existante
+            if "date_brief" in st.session_state:
+                if not isinstance(st.session_state.date_brief, (date, datetime)):
+                    st.session_state.date_brief = _parse_date_any(st.session_state.date_brief)
+                elif isinstance(st.session_state.date_brief, datetime):
+                    st.session_state.date_brief = st.session_state.date_brief.date()
+                date_brief_value = st.session_state.date_brief
+            else:
+                # Sinon brief_data -> parse
+                raw = brief_data.get("date_brief", brief_data.get("DATE_BRIEF", date.today()))
+                date_brief_value = _parse_date_any(raw)
+
+            chosen_date = st.date_input("Date du brief",
+                                        value=date_brief_value,
+                                        key="date_brief")
 
         if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
             required_fields = ["poste_intitule", "manager_nom", "affectation_nom", "date_brief"]
@@ -1170,5 +1181,16 @@ with tabs[3]:
                 st.rerun()
         with nav_next:
             if step < total_steps and st.button("Suivant ➡️", key=f"wizard_next_{step}", use_container_width=True):
+                st.session_state.reunion_step += 1
+                st.rerun()
+
+        # --- Navigation Wizard (toujours visible dans l’onglet Réunion) ---
+        nav_prev, nav_next = st.columns([1, 1])
+        with nav_prev:
+            if step > 1 and st.button("⬅️ Précédent", key=f"reunion_prev_{step}", use_container_width=True):
+                st.session_state.reunion_step -= 1
+                st.rerun()
+        with nav_next:
+            if step < total_steps and st.button("Suivant ➡️", key=f"reunion_next_{step}", use_container_width=True):
                 st.session_state.reunion_step += 1
                 st.rerun()
