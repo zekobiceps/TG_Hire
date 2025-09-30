@@ -410,13 +410,13 @@ def rank_resumes_with_rules(job_description, resumes, file_names):
         if resume_entities["Niveau d'études"] >= jd_entities["Niveau d'études"]:
             score_from_edu = EDUCATION_WEIGHT
             current_score += score_from_edu
-        logic['Niveau d\'études'] = f"Candidat: Bac+{resume_entities['Niveau d\'études']} vs Requis: Bac+{jd_entities['Niveau d\'études']} (+{score_from_edu} pts)"
+        logic['Niveau d\'études'] = "Candidat: Bac+{} vs Requis: Bac+{} (+{} pts)".format(resume_entities["Niveau d'études"], jd_entities["Niveau d'études"], score_from_edu)
         
         score_from_exp = 0
         if resume_entities["Années d'expérience"] >= jd_entities["Années d'expérience"]:
             score_from_exp = EXPERIENCE_WEIGHT
             current_score += score_from_exp
-        logic['Expérience'] = f"Candidat: {resume_entities['Années d\'expérience']} ans vs Requis: {jd_entities['Années d\'expérience']} ans (+{score_from_exp} pts)"
+        logic['Expérience'] = "Candidat: {} ans vs Requis: {} ans (+{} pts)".format(resume_entities["Années d'expérience"], jd_entities["Années d'expérience"], score_from_exp)
         
         results.append({"file_name": file_names[i], "score": current_score, "logic": logic})
 
@@ -965,7 +965,8 @@ with tab4:
 
         with col4:
             most_used = feedback_stats.loc[feedback_stats["Nombre d'évaluations"].idxmax()]
-            st.metric("Plus Utilisée", most_used["Méthode"].split(" (")[0], help=f"{most_used['Nombre d'évaluations']} évaluations")
+            evaluations_count = most_used["Nombre d'évaluations"]
+            st.metric("Plus Utilisée", most_used["Méthode"].split(" (")[0], help=f"{evaluations_count} évaluations")
 
         st.markdown("---")
 
@@ -1083,14 +1084,14 @@ with tab4:
             score_class = get_score_class(row["Score moyen"])
             reliability = "Très fiable" if row["Nombre d'évaluations"] >= 10 else "À confirmer" if row["Nombre d'évaluations"] >= 5 else "Données limitées"
 
-            table_html += f"""
+            table_html += """
                 <tr>
-                    <td>{row["Méthode"]}</td>
-                    <td><span class="{score_class}">{row["Score moyen"]:.2f}/5</span></td>
-                    <td>{row["Nombre d'évaluations"]}</td>
-                    <td>{reliability}</td>
+                    <td>{}</td>
+                    <td><span class="{}">{:.2f}/5</span></td>
+                    <td>{}</td>
+                    <td>{}</td>
                 </tr>
-            """
+            """.format(row["Méthode"], score_class, row["Score moyen"], row["Nombre d'évaluations"], reliability)
 
         table_html += "</tbody></table>"
         st.markdown(table_html, unsafe_allow_html=True)
