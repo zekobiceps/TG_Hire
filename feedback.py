@@ -16,7 +16,11 @@ except ImportError:
 # Chemin vers le fichier de données de feedback
 FEEDBACK_DATA_PATH = "feedback_data.json"
 FEEDBACK_GSHEET_NAME = "TG_Hire_Feedback_Analytics"
-FEEDBACK_GSHEET_URL = "https://docs.google.com/spreadsheets/d/1FBeN0s7ESjZ6BPoG4iB4VQ6w-MfRL1GWBGEkbqPR0gI/edit"
+
+# URL de la feuille Google Sheets pour le feedback
+# Utilisons d'abord l'URL de la feuille Cartographie qui fonctionne déjà
+CARTOGRAPHIE_GSHEET_URL = "https://docs.google.com/spreadsheets/d/1QLC_LzwQU5eKLRcaDglLd6csejLZSs1aauYFwzFk0ac/edit"
+FEEDBACK_GSHEET_URL = CARTOGRAPHIE_GSHEET_URL
 
 def save_feedback(analysis_method, job_title, job_description_snippet, cv_count, feedback_score, feedback_text=""):
     """
@@ -87,22 +91,32 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
                     "client_x509_cert_url": st.secrets.get("GCP_CLIENT_CERT_URL", "")
                 }
                 
-                # Créer les identifiants avec les scopes nécessaires
+                # Créer les identifiants avec les scopes nécessaires (comme dans Cartographie.py)
                 creds = service_account.Credentials.from_service_account_info(
                     service_account_info,
-                    scopes=["https://www.googleapis.com/auth/spreadsheets"]
+                    scopes=[
+                        "https://www.googleapis.com/auth/spreadsheets",
+                        "https://www.googleapis.com/auth/drive"
+                    ]
                 )
                 
                 # Connecter à Google Sheets
                 gc = gspread.authorize(creds)
                 
                 # Ouvrir la feuille de feedback spécifique
+                st.info(f"Tentative de connexion au Google Sheet: {FEEDBACK_GSHEET_URL}")
                 spreadsheet = gc.open_by_url(FEEDBACK_GSHEET_URL)
+                st.success(f"✅ Connexion établie avec Google Sheet")
                 
                 # Vérifier si la feuille Feedback existe déjà, sinon la créer
                 try:
+                    # Essayer de trouver la feuille existante
+                    st.info(f"Recherche de la feuille {FEEDBACK_GSHEET_NAME}")
                     worksheet = spreadsheet.worksheet(FEEDBACK_GSHEET_NAME)
+                    st.success(f"Feuille {FEEDBACK_GSHEET_NAME} trouvée")
                 except gspread.exceptions.WorksheetNotFound:
+                    # Si la feuille n'existe pas, on la crée
+                    st.info(f"Création d'une nouvelle feuille: {FEEDBACK_GSHEET_NAME}")
                     worksheet = spreadsheet.add_worksheet(title=FEEDBACK_GSHEET_NAME, rows=1000, cols=8)
                     
                     # Ajouter les en-têtes
@@ -111,6 +125,7 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
                         "cv_count", "feedback_score", "feedback_text", "version_app"
                     ]
                     worksheet.update('A1:H1', [headers])
+                    st.success(f"Nouvelle feuille créée avec en-têtes: {FEEDBACK_GSHEET_NAME}")
                 
                 # Convertir l'entrée de feedback en ligne
                 row = [
@@ -125,6 +140,7 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
                 ]
                 
                 # Ajouter la ligne (comme dans 8_🗺️_Cartographie.py)
+                st.info(f"Tentative d'envoi des données à la feuille: {FEEDBACK_GSHEET_NAME}")
                 worksheet.append_row(row)
                 st.success(f"✅ Feedback enregistré dans Google Sheets avec succès!")
             except Exception as e:
