@@ -731,7 +731,7 @@ with tabs[0]:
                 for name, brief in briefs_to_show.items():
                     coln, cola = st.columns([5,4])
                     with coln:
-                        st.markdown(f"<div class='brief-name' style='font-size:2rem;font-weight:700;'>{name}</div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='brief-name' style='font-size:1rem;font-weight:700;'>{name}</div>", unsafe_allow_html=True)
                     with cola:
                         c_edit, c_del = st.columns([1,1])
                         with c_edit:
@@ -751,7 +751,7 @@ with tabs[0]:
                 min-width: 50px !important;
                 height: 28px !important;
             }
-            .brief-name { font-size: 2rem !important; font-weight: 700 !important; }
+            .brief-name { font-size: 1rem !important; font-weight: 700 !important; }
             </style>
             """, unsafe_allow_html=True)
 
