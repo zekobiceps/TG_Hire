@@ -731,7 +731,7 @@ with tabs[0]:
                 for name, brief in briefs_to_show.items():
                     coln, cola = st.columns([5,4])
                     with coln:
-                        st.markdown(f"<div class='brief-name'><strong>{name}</strong></div>", unsafe_allow_html=True)
+                        st.markdown(f"<div class='brief-name' style='font-size:2rem;font-weight:700;'>{name}</div>", unsafe_allow_html=True)
                     with cola:
                         c_edit, c_del = st.columns([1,1])
                         with c_edit:
@@ -742,6 +742,18 @@ with tabs[0]:
                                 st.session_state.saved_briefs.pop(name,None); save_briefs(); st.session_state.filtered_briefs.pop(name,None); st.success("Supprimé"); st.rerun()
             else:
                 st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
+            # CSS pour réduire la taille des boutons éditer/supprimer
+            st.markdown("""
+            <style>
+            [data-testid='stButton'] button {
+                font-size: 13px !important;
+                padding: 2px 10px !important;
+                min-width: 50px !important;
+                height: 28px !important;
+            }
+            .brief-name { font-size: 2rem !important; font-weight: 700 !important; }
+            </style>
+            """, unsafe_allow_html=True)
 
 # ---------------- AVANT-BRIEF ----------------
 # Dans l'onglet Avant-brief (tabs[1])
@@ -964,10 +976,12 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                         try:
                             with st.spinner("⏳ Génération en cours par l'IA..."):
                                 resp = generate_ai_question(ai_prompt, concise=concise)
+                            # Nettoyage : retire les '**' et le préfixe "Question:" ou "Réponse:"
+                            resp = resp.replace('**', '')
                             if isinstance(resp, str) and resp.lower().startswith("question:"):
                                 resp = resp.split(":",1)[1].strip()
-                            # Stocke résultat pour injection et affichage
-                            st.session_state.ks_question_new = resp
+                            elif isinstance(resp, str) and resp.lower().startswith("réponse:"):
+                                resp = resp.split(":",1)[1].strip()
                             st.session_state.ks_generated_question = resp
                             st.success("Question générée.")
                             st.rerun()
@@ -1003,7 +1017,7 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                 # Affichage de la question générée (si existe) sous les boutons
                 if st.session_state.get('ks_generated_question'):
                     q_disp = st.session_state.ks_generated_question.replace('\n','<br>')
-                    st.markdown(f"<div class='ai-suggestion-box'><strong>Question générée :</strong><br>{q_disp}</div>", unsafe_allow_html=True)
+                    st.markdown(f"<div class='ai-suggestion-box' style='color:#228B22;font-size:16px;'>Question générée :<br>{q_disp}</div>", unsafe_allow_html=True)
 
             if not st.session_state.ksa_matrix.empty:
                 cols_order = ["Rubrique","Critère","Type de question","Question pour l'entretien","Évaluation (1-5)","Évaluateur"]
@@ -1154,7 +1168,7 @@ with tabs[3]:
         else:
             st.info("Pas de matrice KSA.")
 
-        st.markdown("### Actions & Export")
+    # Suppression du titre "Actions & Export"
         col_act, col_exp = st.columns(2)
         with col_act:
             st.markdown("#### Actions")
