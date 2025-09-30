@@ -77,10 +77,10 @@ ANNONCES_WORKSHEET_NAME = "Annonces"
 
 # Entêtes de colonnes pour les annonces (doivent correspondre EXACTEMENT à la Ligne 1 de votre Google Sheet)
 ANNONCES_HEADERS = [
-    "timestamp", "poste", "entreprise", "localisation", "plateforme", 
-    "contenu", "fiche_text", "type_contrat", "niveau_experience", 
-    "formation_requise", "affectation", "competences_techniques", 
-    "missions_principales", "soft_skills", "date_creation"
+    "timestamp", "poste", "entreprise", "localisation", "plateforme", "format_type",
+    "contenu", "fiche_text", "type_contrat", "niveau_experience",
+    "formation_requise", "affectation", "competences_techniques",
+    "missions_principales", "soft_skills", "date_creation", "fields_present"
 ]
 
 # -------------------- FONCTIONS DE GESTION GOOGLE SHEETS (CORRIGÉES POUR SECRETS GCP_) --------------------
@@ -1530,12 +1530,21 @@ def save_annonce_to_gsheet(annonce_data):
         worksheet = sheet.worksheet(ANNONCES_WORKSHEET_NAME)
         
         # Préparer les données dans l'ordre des colonnes
+        # Calculer fields_present (True/False pour chaque champ utile)
+        keys_to_check = [
+            "poste", "entreprise", "localisation", "plateforme", "contenu", "fiche_text",
+            "type_contrat", "niveau_experience", "formation_requise", "affectation",
+            "competences_techniques", "missions_principales", "soft_skills"
+        ]
+        fields_present = {k: bool(annonce_data.get(k)) for k in keys_to_check}
+
         row_data = [
             annonce_data.get("timestamp", ""),
             annonce_data.get("poste", ""),
             annonce_data.get("entreprise", "TGCC"),
             annonce_data.get("localisation", ""),
             annonce_data.get("plateforme", ""),
+            annonce_data.get("format_type", annonce_data.get("plateforme", "")),
             annonce_data.get("contenu", ""),
             annonce_data.get("fiche_text", ""),
             annonce_data.get("type_contrat", ""),
@@ -1545,7 +1554,7 @@ def save_annonce_to_gsheet(annonce_data):
             annonce_data.get("competences_techniques", ""),
             annonce_data.get("missions_principales", ""),
             annonce_data.get("soft_skills", ""),
-            annonce_data.get("date_creation", "")
+            json.dumps(fields_present, ensure_ascii=False)
         ]
         
         # Ajouter la ligne

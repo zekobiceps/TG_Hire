@@ -362,6 +362,7 @@ with col_save2:
                 "entreprise": entreprise,
                 "localisation": localisation_finale,
                 "plateforme": plateforme,
+                "format_type": plateforme,
                 "contenu": contenu,
                 "fiche_text": fiche_text if fiche_text else "",
                 "type_contrat": locals().get('type_contrat', '') if input_mode == "Saisie manuelle" else "",
