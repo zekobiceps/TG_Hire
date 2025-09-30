@@ -391,123 +391,6 @@ def merge_local_with_session():
     st.session_state.saved_briefs = merged
     return merged
 
-# -------------------- Directory for Briefs --------------------
-BRIEFS_DIR = "briefs"
-
-def ensure_briefs_directory():
-    """Ensure the briefs directory exists."""
-    if not os.path.exists(BRIEFS_DIR):
-        os.makedirs(BRIEFS_DIR)
-
-# -------------------- Persistance (JSON locale - la version active) --------------------
-def save_briefs():
-    """
-    Sauvegarde locale des briefs en JSON.
-    - Convertit dates -> YYYY-MM-DD
-    - Convertit DataFrame -> JSON (records)
-    - Assure présence de KSA_MATRIX_JSON si ksa_matrix présent
-    """
-    import json, os
-    from datetime import date, datetime
-    import pandas as pd
-
-    briefs = st.session_state.get("saved_briefs", {}) or {}
-
-    def convert(obj):
-        if isinstance(obj, (date, datetime)):
-            return obj.strftime("%Y-%m-%d")
-        if isinstance(obj, pd.DataFrame):
-            # on ne garde pas la DataFrame brute
-            return obj.to_json(orient="records", force_ascii=False)
-        if isinstance(obj, dict):
-            return {k: convert(v) for k, v in obj.items()}
-        if isinstance(obj, list):
-            return [convert(x) for x in obj]
-        return obj
-
-    safe = {}
-    for name, data in briefs.items():
-        # si une clé ksa_matrix (DataFrame) existe, la transformer en KSA_MATRIX_JSON
-        if "ksa_matrix" in data and isinstance(data["ksa_matrix"], pd.DataFrame):
-            try:
-                data["KSA_MATRIX_JSON"] = data["ksa_matrix"].to_json(orient="records", force_ascii=False)
-            except Exception:
-                pass
-            # on ne sauvegarde pas la DataFrame brute
-            data.pop("ksa_matrix", None)
-        safe[name] = convert(data)
-
-    os.makedirs("briefs", exist_ok=True)
-    try:
-        with open("briefs/briefs.json", "w", encoding="utf-8") as f:
-            json.dump(safe, f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        st.error(f"Erreur lors de la sauvegarde locale des briefs: {e}")
-
-def load_briefs():
-    """Charge tous les briefs depuis Google Sheets."""
-    try:
-        briefs = {}
-        worksheet = get_briefs_gsheet_client()
-        if worksheet:
-            records = worksheet.get_all_records()
-            for record in records:
-                brief_name = record.get("BRIEF_NAME")
-                if brief_name:
-                    briefs[brief_name] = record
-                    if record.get("KSA_MATRIX_JSON"):
-                        try:
-                            record["ksa_matrix"] = pd.DataFrame.from_records(json.loads(record["KSA_MATRIX_JSON"]))
-                        except Exception:
-                            record["ksa_matrix"] = pd.DataFrame()
-        return briefs
-    except Exception as e:
-        st.warning(f"Erreur lors du chargement des briefs depuis Google Sheets : {e}")
-        return {}
-
-def refresh_saved_briefs():
-    """
-    Recharge depuis Google Sheets et stocke dans session_state.saved_briefs.
-    """
-    briefs = load_briefs()
-    st.session_state.saved_briefs = briefs
-    return briefs
-
-# === AJOUT : chargement local (manquait) ===
-@st.cache_data(ttl=120)
-def load_all_local_briefs():
-    """
-    Charge les briefs locaux (briefs/briefs.json + fichiers individuels).
-    N'interroge PAS Google Sheets.
-    """
-    folder = "briefs"
-    collected = {}
-    global_path = os.path.join(folder, "briefs.json")
-    try:
-        if os.path.exists(global_path):
-            with open(global_path, "r", encoding="utf-8") as f:
-                collected = json.load(f)
-        else:
-            if os.path.isdir(folder):
-                for fn in os.listdir(folder):
-                    if fn.endswith(".json") and fn != "briefs.json":
-                        try:
-                            with open(os.path.join(folder, fn), "r", encoding="utf-8") as f:
-                                collected[fn[:-5]] = json.load(f)
-                        except:
-                            continue
-    except Exception:
-        pass
-    return collected
-
-# (Optionnel : fusion locale + mémoire)
-def merge_local_with_session():
-    local = load_all_local_briefs()
-    mem = st.session_state.get("saved_briefs", {}) or {}
-    merged = {**local, **mem}
-    st.session_state.saved_briefs = merged
-    return merged
-
 # -------------------- Initialisation Session --------------------
 def init_session_state():
     """Initialise l'état de la session Streamlit avec des valeurs par défaut."""
@@ -1130,9 +1013,6 @@ import streamlit as st
 import json
 
 def get_brief_value(brief_dict: dict, key: str, default: str = ""):
-    """
-    Retourne la valeur d'un champ en testant plusieurs variantes (minuscule, MAJUSCULE, alias LIEN_PROFIL_X).
-    """
     if not isinstance(brief_dict, dict):
         return default
     if key.startswith("profil_link_"):
@@ -1141,35 +1021,26 @@ def get_brief_value(brief_dict: dict, key: str, default: str = ""):
     else:
         candidates = [key, key.upper()]
     for c in candidates:
-        val = brief_dict.get(c)
-        if val not in (None, ""):
-            return val
+        v = brief_dict.get(c)
+        if v not in ("", None):
+            return v
     return default
 
 def save_ksa_matrix_to_current_brief():
-    """
-    Sauvegarde st.session_state.ksa_matrix (DataFrame) -> KSA_MATRIX_JSON dans le brief courant.
-    N'insère pas la DataFrame brute dans saved_briefs (compat JSON).
-    """
     bname = st.session_state.get("current_brief_name")
     if not bname:
         return
-    if "ksa_matrix" not in st.session_state:
-        return
-    df = st.session_state.ksa_matrix
+    df = st.session_state.get("ksa_matrix")
     if not isinstance(df, pd.DataFrame) or df.empty:
         return
-    needed = ["Rubrique","Critère","Type de question","Question pour l'entretien","Évaluation (1-5)","Évaluateur"]
-    for c in needed:
+    cols = ["Rubrique","Critère","Type de question","Question pour l'entretien","Évaluation (1-5)","Évaluateur"]
+    for c in cols:
         if c not in df.columns:
             df[c] = ""
-    df = df[needed]
-    try:
-        brief_dict = st.session_state.saved_briefs.get(bname, {})
-        brief_dict["KSA_MATRIX_JSON"] = df.to_json(orient="records", force_ascii=False)
-        brief_dict.pop("ksa_matrix", None)
-        st.session_state.saved_briefs[bname] = brief_dict
-        save_briefs()
-        save_brief_to_gsheet(bname, brief_dict)
-    except Exception as e:
-        st.warning(f"Erreur sauvegarde KSA: {e}")
+    df = df[cols]
+    brief = st.session_state.saved_briefs.get(bname, {})
+    brief["KSA_MATRIX_JSON"] = df.to_json(orient="records", force_ascii=False)
+    brief.pop("ksa_matrix", None)
+    st.session_state.saved_briefs[bname] = brief
+    save_briefs()
+    save_brief_to_gsheet(bname, brief)

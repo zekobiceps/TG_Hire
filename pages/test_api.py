@@ -318,28 +318,21 @@ with tabs[2]:
                 edited_df = st.data_editor(
                     display_df,
                     hide_index=True,
-                    column_config={
-                        "Section": st.column_config.TextColumn(disabled=True),
-                        "Item": st.column_config.TextColumn(disabled=True),
-                        "Infos": st.column_config.TextColumn(disabled=True),
-                        "Commentaire manager": st.column_config.TextColumn()
-                    },
-                    key="rb_step1_editor",
-                    use_container_width=True
+                    key="reunion_step1_editor",
                 )
-                if st.button("💾 Sauvegarder commentaires", key="btn_save_comments"):
+                if st.button("Enregistrer commentaires", key="save_mgr_comments"):
                     new_comments = {}
                     for idx, row in edited_df.iterrows():
-                        val = row["Commentaire manager"]
-                        orig_key = base_df.loc[idx, "_key"]
-                        if val:
+                        val = row.get("Commentaire manager")
+                        if val and idx in base_df.index:
+                            orig_key = base_df.loc[idx, "_key"]  # corrigé (df -> base_df)
                             new_comments[orig_key] = val
                     brief_data["manager_comments"] = new_comments
                     brief_data["MANAGER_COMMENTS_JSON"] = json.dumps(new_comments, ensure_ascii=False)
-                    st.session_state.saved_briefs[brief_name] = brief_data
+                    st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
                     save_briefs()
-                    save_brief_to_gsheet(brief_name, brief_data)
-                    st.success("Commentaires enregistrés.")
+                    save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
+                    st.success("Commentaires sauvegardés.")
                     st.rerun()
 
         # ---- Étape 2 : KSA ----
@@ -441,6 +434,7 @@ div[data-testid="stForm"] button:has(span:contains('Générer IA')) {
                                 [st.session_state.ksa_matrix, pd.DataFrame([new_row])],
                                 ignore_index=True
                             )
+                        # Après avoir fait st.session_state.ksa_matrix = pd.concat(...)
                         save_ksa_matrix_to_current_brief()
                         st.success("Critère ajouté.")
                         st.rerun()
@@ -463,7 +457,8 @@ div[data-testid="stForm"] button:has(span:contains('Générer IA')) {
                         "Évaluateur": st.column_config.SelectboxColumn("Évaluateur", options=["Recruteur","Manager","Les deux"])
                     }
                 )
-                if not edited.equals(st.session_state.ksa_matrix[cols_order]):
+                # Après edited = st.data_editor(...)
+                if not edited.equals(st.session_state.ksa_matrix):
                     st.session_state.ksa_matrix = edited
                     save_ksa_matrix_to_current_brief()
                 try:
@@ -509,22 +504,21 @@ div[data-testid="stForm"] button:has(span:contains('Générer IA')) {
         # Navigation
         nav_prev, nav_next = st.columns([1,1])
         with nav_prev:
-            if step > 1 and st.button("⬅️ Précédent", key=f"prev_{step}"):
+            if st.session_state.reunion_step > 1 and st.button("⬅️ Précédent"):
                 st.session_state.reunion_step -= 1
                 st.rerun()
         with nav_next:
-            if step < total_steps and st.button("Suivant ➡️", key=f"next_{step}"):
-                if step in (1,2,3):
-                    # Auto-save léger
-                    bd = st.session_state.saved_briefs.get(brief_name, {})
+            if st.session_state.reunion_step < 4 and st.button("Suivant ➡️"):
+                # Auto-save léger
+                if st.session_state.reunion_step in (1,2,3) and st.session_state.current_brief_name:
+                    bd = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
                     bd["CRITERES_EXCLUSION"] = st.session_state.get("criteres_exclusion","")
                     bd["PROCESSUS_EVALUATION"] = st.session_state.get("processus_evaluation","")
                     bd["MANAGER_NOTES"] = st.session_state.get("manager_notes","")
-                    if "ksa_matrix" in st.session_state:
-                        save_ksa_matrix_to_current_brief()
-                    st.session_state.saved_briefs[brief_name] = bd
+                    save_ksa_matrix_to_current_brief()
+                    st.session_state.saved_briefs[st.session_state.current_brief_name] = bd
                     save_briefs()
-                    save_brief_to_gsheet(brief_name, bd)
+                    save_brief_to_gsheet(st.session_state.current_brief_name, bd)
                 st.session_state.reunion_step += 1
                 st.rerun()
 
@@ -552,6 +546,7 @@ with tabs[3]:
                     st.session_state.ksa_matrix = pd.DataFrame(json.loads(kjson))
                 except:
                     st.session_state.ksa_matrix = pd.DataFrame()
+
         if "ksa_matrix" in st.session_state and isinstance(st.session_state.ksa_matrix, pd.DataFrame) and not st.session_state.ksa_matrix.empty:
             df_show = st.session_state.ksa_matrix.copy()
             needed = ["Rubrique","Critère","Type de question","Question pour l'entretien","Évaluation (1-5)","Évaluateur"]
