@@ -17,8 +17,8 @@ from sentence_transformers import SentenceTransformer, util
 import torch
 
 # Import des fonctions avancées d'analyse
-from utils import rank_resumes_with_ensemble, batch_process_resumes
-from feedback import save_feedback, get_average_feedback_score, get_feedback_summary
+from utils import (rank_resumes_with_ensemble, batch_process_resumes, 
+                 save_feedback, get_average_feedback_score, get_feedback_summary)
 
 # -------------------- Configuration de la clé API DeepSeek --------------------
 # --- CORRECTION : Déplacé à l'intérieur des fonctions pour éviter l'erreur au démarrage ---
@@ -627,24 +627,7 @@ with tab1:
                 results_df["Rang"] = range(1, len(results_df) + 1)
                 results_df["Score"] = results_df["Score brut"].apply(lambda x: f"{x*100:.1f}%")
                 
-                st.markdown("### 🏆 Résultats du Classement")
-                st.dataframe(results_df[["Rang", "Nom du CV", "Score"]], width="stretch", hide_index=True)
-                
-                if logic:
-                    st.markdown("### 🧠 Logique de Scoring")
-                    for _, row in results_df.iterrows():
-                        file_name = row["Nom du CV"]
-                        with st.expander(f"Détail du score pour : **{file_name}**"):
-                            st.json(logic.get(file_name, {}))
-
-                if explanations:
-                    st.markdown("### 📝 Analyse détaillée par l'IA")
-                    for _, row in results_df.iterrows():
-                        file_name = row["Nom du CV"]
-                        with st.expander(f"Analyse pour : **{file_name}**"):
-                            st.markdown(explanations.get(file_name, "N/A"))
-                
-                # Sauvegarder les résultats pour le feedback
+                # Sauvegarder les résultats dans la session pour maintenir l'affichage
                 st.session_state.last_analysis_result = results_df
                 st.session_state.last_analysis_method = analysis_method
                 st.session_state.ranked_resumes = ranked_resumes
@@ -656,141 +639,177 @@ with tab1:
                 st.session_state.last_job_title = job_title
                 st.session_state.last_job_description = job_description
                 st.session_state.last_file_names = file_names
+                st.session_state.explanations = explanations
                 
-                # Système de feedback par CV avec formulaires pour éviter les rechargements
-                for i, (file_name, score) in enumerate(ranked_resumes):
-                    with st.expander(f"💬 Feedback pour : {file_name}"):
-                        feedback_key = f"feedback_form_{i}"
-                        submitted_key = f"submitted_{i}"
-                        
-                        # Vérifier si le feedback pour ce CV a déjà été soumis
-                        if submitted_key not in st.session_state:
-                            st.session_state[submitted_key] = False
-                        
-                        # Si déjà soumis, afficher un message de confirmation
-                        if st.session_state[submitted_key]:
-                            st.success(f"✅ Merci pour votre feedback sur {file_name} !")
-                        else:
-                            # Créer un formulaire pour chaque CV pour éviter les rechargements
-                            with st.form(key=feedback_key):
-                                st.markdown(f"#### Évaluez ce CV : {file_name}")
-                                
-                                # Options de notation avec des étoiles
-                                cv_feedback_options = [
-                                    "⭐ - Très insatisfaisant",
-                                    "⭐⭐ - Insatisfaisant",
-                                    "⭐⭐⭐ - Acceptable",
-                                    "⭐⭐⭐⭐ - Satisfaisant",
-                                    "⭐⭐⭐⭐⭐ - Très satisfaisant"
-                                ]
-                                selected_cv_option = st.radio(
-                                    "Note",
-                                    options=cv_feedback_options,
-                                    index=2,  # Par défaut sur 3 étoiles
-                                    horizontal=True,
-                                    key=f"cv_rating_{i}"
-                                )
-                                
-                                # Extraire la valeur numérique (1-5)
-                                cv_feedback_score = cv_feedback_options.index(selected_cv_option) + 1
-                                
-                                cv_feedback_text = st.text_area(
-                                    "Commentaires spécifiques (optionnel)",
-                                    placeholder="Points forts/faibles de ce classement...",
-                                    key=f"cv_comment_{i}"
-                                )
-                                
-                                # Bouton de soumission dans le formulaire
-                                cv_submit_button = st.form_submit_button(label=f"Évaluer {file_name}")
-                                
-                                if cv_submit_button:
-                                    result = save_feedback(
-                                        analysis_method=f"{analysis_method} (CV individuel)",
-                                        job_title=job_title,
-                                        job_description_snippet=job_description[:200],
-                                        cv_count=1,
-                                        feedback_score=cv_feedback_score,
-                                        feedback_text=f"Feedback pour {file_name}: {cv_feedback_text}"
-                                    )
-                                    st.session_state[submitted_key] = True
-                                    if result:
-                                        st.success(f"✅ Merci pour votre feedback sur {file_name} !")
-                                    else:
-                                        st.error("❌ Échec de l'enregistrement du feedback.")
+            else:
+                st.error("L'analyse n'a retourné aucun score.")
+
+    # Affichage des résultats (toujours visible, même après feedback)
+    if hasattr(st.session_state, 'last_analysis_result') and st.session_state.last_analysis_result is not None:
+        results_df = st.session_state.last_analysis_result
+        ranked_resumes = st.session_state.ranked_resumes
+        logic = getattr(st.session_state, 'logic', None)
+        explanations = getattr(st.session_state, 'explanations', None)
+        
+        st.markdown("### 🏆 Résultats du Classement")
+        st.dataframe(results_df[["Rang", "Nom du CV", "Score"]], width="stretch", hide_index=True)
+        
+        if logic:
+            st.markdown("### 🧠 Logique de Scoring")
+            for _, row in results_df.iterrows():
+                file_name = row["Nom du CV"]
+                with st.expander(f"Détail du score pour : **{file_name}**"):
+                    st.json(logic.get(file_name, {}))
+
+        if explanations:
+            st.markdown("### 📝 Analyse détaillée par l'IA")
+            for _, row in results_df.iterrows():
+                file_name = row["Nom du CV"]
+                with st.expander(f"Analyse pour : **{file_name}**"):
+                    st.markdown(explanations.get(file_name, "N/A"))
+        
+        # Système de feedback par CV avec formulaires pour éviter les rechargements
+        st.markdown("---")
+        st.markdown("### 💬 Feedback sur les résultats")
+        
+        for i, (file_name, score) in enumerate(ranked_resumes):
+            with st.expander(f"💬 Évaluer le classement de : {file_name}"):
+                feedback_key = f"feedback_form_{i}"
+                submitted_key = f"submitted_{i}"
                 
-                # Activer le formulaire de feedback global
-                st.session_state.show_feedback_form = True
+                # Vérifier si le feedback pour ce CV a déjà été soumis
+                if submitted_key not in st.session_state:
+                    st.session_state[submitted_key] = False
                 
-                # Feedback global en deux étapes pour éviter les problèmes de rechargement
-                st.markdown("---")
-                st.markdown("### 🌟 Feedback global sur l'analyse")
-                
-                # Étape 1: Afficher un bouton pour accéder au formulaire de feedback
-                if not st.session_state.feedback_submitted:
-                    feedback_button_col1, feedback_button_col2 = st.columns([3, 1])
-                    with feedback_button_col2:
-                        # Bouton pour afficher le feedback avec instructions
-                        st.button("📝 Donner mon feedback", 
-                              help="Cliquez ici pour évaluer les résultats de l'analyse", 
-                              key="show_feedback_button",
-                              on_click=lambda: setattr(st.session_state, 'show_feedback_form', True))
-                    
-                    with feedback_button_col1:
-                        st.markdown("Comment évaluez-vous la qualité globale des résultats fournis par cette analyse ?")
-                
-                # Étape 2: Formulaire séparé pour le feedback
-                if st.session_state.show_feedback_form and not st.session_state.feedback_submitted:
-                    with st.form(key='feedback_form'):
-                        st.markdown("### Évaluez la qualité de l'analyse")
+                # Si déjà soumis, afficher un message de confirmation
+                if st.session_state[submitted_key]:
+                    st.success(f"✅ Merci pour votre feedback sur {file_name} !")
+                else:
+                    # Créer un formulaire pour chaque CV pour éviter les rechargements
+                    with st.form(key=feedback_key):
+                        st.markdown(f"#### Évaluez le classement de : {file_name}")
                         
                         # Options de notation avec des étoiles
-                        global_feedback_options = [
+                        cv_feedback_options = [
                             "⭐ - Très insatisfaisant",
                             "⭐⭐ - Insatisfaisant",
                             "⭐⭐⭐ - Acceptable",
                             "⭐⭐⭐⭐ - Satisfaisant",
                             "⭐⭐⭐⭐⭐ - Très satisfaisant"
                         ]
-                        selected_option = st.radio(
-                            "Note globale",
-                            options=global_feedback_options,
+                        selected_cv_option = st.radio(
+                            "Note",
+                            options=cv_feedback_options,
                             index=2,  # Par défaut sur 3 étoiles
-                            horizontal=True
+                            horizontal=True,
+                            key=f"cv_rating_{i}"
                         )
                         
                         # Extraire la valeur numérique (1-5)
-                        global_feedback_score = global_feedback_options.index(selected_option) + 1
+                        cv_feedback_score = cv_feedback_options.index(selected_cv_option) + 1
                         
-                        # Champ pour les commentaires
-                        global_feedback_text = st.text_area(
-                            "Commentaires sur l'analyse (optionnel)",
-                            placeholder="Qu'avez-vous apprécié ? Que pourrait-on améliorer ?",
-                            height=100
+                        cv_feedback_text = st.text_area(
+                            "Commentaires spécifiques (optionnel)",
+                            placeholder="Points forts/faibles de ce classement...",
+                            key=f"cv_comment_{i}"
                         )
                         
-                        # Bouton de soumission dans le formulaire (ne recharge pas la page)
-                        submit_button = st.form_submit_button(label="Envoyer mon feedback")
+                        # Bouton de soumission dans le formulaire
+                        cv_submit_button = st.form_submit_button(label=f"Évaluer {file_name}")
                         
-                        if submit_button:
+                        if cv_submit_button:
+                            job_title = getattr(st.session_state, 'job_title', '')
+                            job_description = getattr(st.session_state, 'job_description', '')
+                            analysis_method = getattr(st.session_state, 'last_analysis_method', '')
+                            
                             result = save_feedback(
-                                analysis_method=analysis_method,
+                                analysis_method=f"{analysis_method} (CV individuel)",
                                 job_title=job_title,
                                 job_description_snippet=job_description[:200],
-                                cv_count=len(file_names),
-                                feedback_score=global_feedback_score,
-                                feedback_text=global_feedback_text
+                                cv_count=1,
+                                feedback_score=cv_feedback_score,
+                                feedback_text=f"Feedback pour {file_name}: {cv_feedback_text}"
                             )
-                            st.session_state.feedback_submitted = True
+                            st.session_state[submitted_key] = True
                             if result:
-                                st.success("✅ Merci pour votre feedback ! Il nous aidera à améliorer notre système.")
+                                st.success(f"✅ Merci pour votre feedback sur {file_name} !")
+                                st.rerun()
                             else:
                                 st.error("❌ Échec de l'enregistrement du feedback.")
+        
+        # Feedback global sur l'analyse
+        st.markdown("---")
+        st.markdown("### 🌟 Feedback global sur l'analyse")
+        
+        # Étape 1: Afficher un bouton pour accéder au formulaire de feedback
+        if not getattr(st.session_state, 'feedback_submitted', False):
+            feedback_button_col1, feedback_button_col2 = st.columns([3, 1])
+            with feedback_button_col1:
+                st.markdown("Comment évaluez-vous la qualité globale des résultats fournis par cette analyse ?")
+            with feedback_button_col2:
+                # Bouton pour afficher le feedback avec instructions
+                if st.button("📝 Donner mon feedback", 
+                          help="Cliquez ici pour évaluer les résultats de l'analyse", 
+                          key="show_feedback_button"):
+                    st.session_state.show_feedback_form = True
+        
+        # Étape 2: Formulaire séparé pour le feedback
+        if getattr(st.session_state, 'show_feedback_form', False) and not getattr(st.session_state, 'feedback_submitted', False):
+            with st.form(key='feedback_form'):
+                st.markdown("### Évaluez la qualité de l'analyse")
                 
-                # Message si le feedback a déjà été soumis
-                elif st.session_state.feedback_submitted:
-                    st.success("✅ Merci pour votre feedback ! Il nous aidera à améliorer notre système.")
-            else:
-                st.error("L'analyse n'a retourné aucun score.")
+                # Options de notation avec des étoiles
+                global_feedback_options = [
+                    "⭐ - Très insatisfaisant",
+                    "⭐⭐ - Insatisfaisant",
+                    "⭐⭐⭐ - Acceptable",
+                    "⭐⭐⭐⭐ - Satisfaisant",
+                    "⭐⭐⭐⭐⭐ - Très satisfaisant"
+                ]
+                selected_option = st.radio(
+                    "Note globale",
+                    options=global_feedback_options,
+                    index=2,  # Par défaut sur 3 étoiles
+                    horizontal=True
+                )
+                
+                # Extraire la valeur numérique (1-5)
+                global_feedback_score = global_feedback_options.index(selected_option) + 1
+                
+                # Champ pour les commentaires
+                global_feedback_text = st.text_area(
+                    "Commentaires sur l'analyse (optionnel)",
+                    placeholder="Qu'avez-vous apprécié ? Que pourrait-on améliorer ?",
+                    height=100
+                )
+                
+                # Bouton de soumission dans le formulaire (ne recharge pas la page)
+                submit_button = st.form_submit_button(label="Envoyer mon feedback")
+                
+                if submit_button:
+                    job_title = getattr(st.session_state, 'job_title', '')
+                    job_description = getattr(st.session_state, 'job_description', '')
+                    analysis_method = getattr(st.session_state, 'last_analysis_method', '')
+                    file_names = getattr(st.session_state, 'file_names', [])
+                    
+                    result = save_feedback(
+                        analysis_method=analysis_method,
+                        job_title=job_title,
+                        job_description_snippet=job_description[:200],
+                        cv_count=len(file_names),
+                        feedback_score=global_feedback_score,
+                        feedback_text=global_feedback_text
+                    )
+                    st.session_state.feedback_submitted = True
+                    if result:
+                        st.success("✅ Merci pour votre feedback ! Il nous aidera à améliorer notre système.")
+                        st.rerun()
+                    else:
+                        st.error("❌ Échec de l'enregistrement du feedback.")
+        
+        # Message si le feedback a déjà été soumis
+        elif getattr(st.session_state, 'feedback_submitted', False):
+            st.success("✅ Merci pour votre feedback ! Il nous aidera à améliorer notre système.")
 
 with tab2:
     st.markdown("### 📂 Importer un ou plusieurs CVs")
