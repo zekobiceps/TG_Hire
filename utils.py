@@ -46,6 +46,42 @@ try:
 except ImportError:
     GSPREAD_AVAILABLE = False
 
+def _build_service_account_info_from_st_secrets():
+    """Build a service account dict from st.secrets supporting a couple of key-name variants.
+
+    This helps when secrets were added under slightly different names (with or without _X509).
+    Returns a dict suitable for gspread.service_account_from_dict or raises KeyError.
+    """
+    # Required keys
+    required = [
+        "GCP_TYPE", "GCP_PROJECT_ID", "GCP_PRIVATE_KEY_ID",
+        "GCP_PRIVATE_KEY", "GCP_CLIENT_EMAIL", "GCP_CLIENT_ID"
+    ]
+    missing = [k for k in required if not st.secrets.get(k)]
+    if missing:
+        # Raise KeyError so callers can show a single informative message
+        raise KeyError(
+            ", ".join(missing)
+        )
+
+    # Build info using .get to avoid KeyError for optional fields
+    private_key_raw = st.secrets.get("GCP_PRIVATE_KEY", "") or ""
+    info = {
+        "type": st.secrets.get("GCP_TYPE"),
+        "project_id": st.secrets.get("GCP_PROJECT_ID"),
+        "private_key_id": st.secrets.get("GCP_PRIVATE_KEY_ID"),
+        "private_key": private_key_raw.replace("\\n", "\n") if private_key_raw else "",
+        "client_email": st.secrets.get("GCP_CLIENT_EMAIL"),
+        "client_id": st.secrets.get("GCP_CLIENT_ID"),
+        "auth_uri": st.secrets.get("GCP_AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
+        "token_uri": st.secrets.get("GCP_TOKEN_URI", "https://oauth2.googleapis.com/token"),
+        # optional cert URLs with sensible defaults
+        "auth_provider_x509_cert_url": st.secrets.get("GCP_AUTH_PROVIDER_X509_CERT_URL") or st.secrets.get("GCP_AUTH_PROVIDER_CERT_URL") or "https://www.googleapis.com/oauth2/v1/certs",
+        "client_x509_cert_url": st.secrets.get("GCP_CLIENT_X509_CERT_URL") or st.secrets.get("GCP_CLIENT_CERT_URL") or "",
+    }
+
+    return info
+
 try:
     from openai import OpenAI
     OPENAI_CLIENT_AVAILABLE = True
@@ -91,19 +127,7 @@ def get_briefs_gsheet_client():
     if not GSPREAD_AVAILABLE:
         return None
     try:
-        service_account_info = {
-            "type": st.secrets["GCP_TYPE"],
-            "project_id": st.secrets["GCP_PROJECT_ID"],
-            "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
-            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n').strip(), 
-            "client_email": st.secrets["GCP_CLIENT_EMAIL"],
-            "client_id": st.secrets["GCP_CLIENT_ID"],
-            "auth_uri": st.secrets["GCP_AUTH_URI"],
-            "token_uri": st.secrets["GCP_TOKEN_URI"],
-            "auth_provider_x509_cert_url": st.secrets["GCP_AUTH_PROVIDER_CERT_URL"],
-            "client_x509_cert_url": st.secrets["GCP_CLIENT_CERT_URL"]
-        }
-        
+        service_account_info = _build_service_account_info_from_st_secrets()
         gc = gspread.service_account_from_dict(service_account_info)
         spreadsheet = gc.open_by_url(BRIEFS_SHEET_URL)
         worksheet = spreadsheet.worksheet(BRIEFS_WORKSHEET_NAME)
@@ -1498,18 +1522,7 @@ def get_annonces_gsheet_client():
     if not GSPREAD_AVAILABLE:
         return None
     try:
-        service_account_info = {
-            "type": st.secrets["GCP_TYPE"],
-            "project_id": st.secrets["GCP_PROJECT_ID"],
-            "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
-            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace("\\n", "\n"),
-            "client_email": st.secrets["GCP_CLIENT_EMAIL"],
-            "client_id": st.secrets["GCP_CLIENT_ID"],
-            "auth_uri": st.secrets["GCP_AUTH_URI"],
-            "token_uri": st.secrets["GCP_TOKEN_URI"],
-            "auth_provider_x509_cert_url": st.secrets["GCP_AUTH_PROVIDER_X509_CERT_URL"],
-            "client_x509_cert_url": st.secrets["GCP_CLIENT_X509_CERT_URL"]
-        }
+        service_account_info = _build_service_account_info_from_st_secrets()
         gc = gspread.service_account_from_dict(service_account_info)
         return gc
     except KeyError as e:

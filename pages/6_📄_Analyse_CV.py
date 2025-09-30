@@ -513,7 +513,7 @@ with tab1:
             if fiche_poste_file:
                 fiche_poste_text = extract_text_from_pdf(fiche_poste_file)
                 if fiche_poste_text and not fiche_poste_text.startswith("Erreur"):
-                    st.success("Fiche de poste importée !")
+                    # Use the fiche content silently (no success toast)
                     job_description = fiche_poste_text  # Utiliser le contenu de la fiche comme description
                 else:
                     st.error("Erreur lors de la lecture de la fiche de poste.")

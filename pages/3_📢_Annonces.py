@@ -47,7 +47,7 @@ except Exception:
     debug_mode = False
 if not debug_mode:
     # allow quick URL override: ?debug=true
-    params = st.experimental_get_query_params()
+    params = st.query_params
     if params.get("debug", ["false"])[0].lower() == "true":
         debug_mode = True
 
@@ -118,7 +118,7 @@ if input_mode == "Upload PDF fiche de poste":
             fiche_text = ""
             for page in pdf_reader.pages:
                 fiche_text += page.extract_text() + "\n"
-            st.success("PDF extrait avec succès !")
+            # note: removed success toast to reduce noisy messages
         except Exception as e:
             st.error(f"Erreur lors de l'extraction du PDF : {e}")
 else:
@@ -374,13 +374,10 @@ if generate_button:
         st.warning("⚠️ Merci de remplir tous les champs obligatoires (marqués d'un *)")
 
 # Textarea pour le contenu
-if "annonce_contenu" not in st.session_state:
-    st.session_state["annonce_contenu"] = ""
-
+st.session_state.setdefault("annonce_contenu", "")
 contenu = st.text_area("Contenu de l'annonce (généré ou manuel)", 
                        key="annonce_contenu", 
                        height=300, 
-                       value=st.session_state.get("annonce_contenu", ""),
                        help="Contenu de l'annonce généré par l'IA ou saisi manuellement")
 
 # Bouton de sauvegarde
