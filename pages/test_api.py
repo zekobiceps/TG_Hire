@@ -612,13 +612,13 @@ with tabs[0]:
                     st.session_state.current_brief_name = bname
                     st.session_state.reunion_step = 1
                     st.session_state.reunion_completed = False
-                    st.experimental_rerun()
+                    st.rerun()
             with c3:
                 if st.button("🗑️", key=f"del_{bname}", help="Supprimer"):
                     st.session_state.saved_briefs.pop(bname, None)
                     save_briefs()
                     st.success("Supprimé.")
-                    st.experimental_rerun()
+                    st.rerun()
 
 # ---------------- AVANT-BRIEF ----------------
 # Dans l'onglet Avant-brief (tabs[1])
@@ -1089,7 +1089,7 @@ button[kind="secondary"] {
     with nav_left:
         if step > 1 and st.button("⬅️ Précédent", key=f"prev_{step}", help="Retour étape précédente"):
             st.session_state.reunion_step -= 1
-            st.experimental_rerun()
+            st.rerun()
     with nav_right:
         if step < total_steps and st.button("Suivant ➡️", key=f"next_{step}", help="Étape suivante"):
             # Auto-save (étapes 1–3)
@@ -1116,7 +1116,7 @@ button[kind="secondary"] {
                 save_brief_to_gsheet(bname, bdata)
 
             st.session_state.reunion_step += 1
-            st.experimental_rerun()
+            st.rerun()
 
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
