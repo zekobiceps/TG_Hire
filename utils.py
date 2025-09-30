@@ -1393,8 +1393,9 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
                     feedback_entry["version_app"]
                 ]
                 
-                # Ajouter la ligne
-                worksheet.append_row(row_data)
+                # Ajouter la ligne en forçant l'insertion à la première colonne d'une nouvelle ligne
+                last_row = len(worksheet.get_all_values()) + 1
+                worksheet.insert_row(row_data, index=last_row)
                 st.success("✅ Feedback envoyé avec succès à Google Sheets")
                 return True
                 
