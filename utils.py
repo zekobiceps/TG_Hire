@@ -1081,27 +1081,16 @@ def rank_resumes_with_ensemble(job_description, resumes, file_names,
         cosinus_weight: Poids de la méthode cosinus (0 à 1)
         semantic_weight: Poids de la méthode sémantique (0 à 1)
         rules_weight: Poids de la méthode par règles (0 à 1)
-        cosine_func: Fonction d'analyse cosinus (optionnel, pour l'injection de dépendance)
-        semantic_func: Fonction d'analyse sémantique (optionnel)
-        rules_func: Fonction d'analyse par règles (optionnel)
+        cosine_func: Fonction d'analyse cosinus (obligatoire)
+        semantic_func: Fonction d'analyse sémantique (obligatoire)
+        rules_func: Fonction d'analyse par règles (obligatoire)
         
     Returns:
         Dict contenant les scores combinés et les explications détaillées
     """
-    # Import les fonctions nécessaires depuis le module d'analyse CV
-    import importlib
-    analyse_cv = importlib.import_module("pages.6_📄_Analyse_CV")
-    rank_resumes_with_cosine = analyse_cv.rank_resumes_with_cosine
-    rank_resumes_with_embeddings = analyse_cv.rank_resumes_with_embeddings
-    rank_resumes_with_rules = analyse_cv.rank_resumes_with_rules
-    
-    # Utilise les fonctions par défaut si non fournies
-    if cosine_func is None:
-        cosine_func = rank_resumes_with_cosine
-    if semantic_func is None:
-        semantic_func = rank_resumes_with_embeddings
-    if rules_func is None:
-        rules_func = rank_resumes_with_rules
+    # Vérification des fonctions nécessaires
+    if cosine_func is None or semantic_func is None or rules_func is None:
+        raise ValueError("Les fonctions d'analyse doivent être fournies pour éviter les références circulaires")
     
     # Calcul des poids normalisés
     total_weight = cosinus_weight + semantic_weight + rules_weight
@@ -1174,7 +1163,8 @@ def rank_resumes_with_ensemble(job_description, resumes, file_names,
     return {"scores": combined_scores, "logic": combined_logic}
 
 def batch_process_resumes(job_description, file_list, analysis_method, 
-                          batch_size=10, progress_callback=None):
+                          batch_size=10, progress_callback=None, 
+                          extract_text_from_pdf_func=None, rank_resumes_funcs=None):
     """
     Traite un grand nombre de CVs par lots pour éviter les problèmes de mémoire.
     
@@ -1184,18 +1174,16 @@ def batch_process_resumes(job_description, file_list, analysis_method,
         analysis_method: Méthode d'analyse à utiliser
         batch_size: Taille des lots pour le traitement
         progress_callback: Fonction appelée pour mettre à jour la progression
+        extract_text_from_pdf_func: Fonction pour extraire le texte des PDFs (obligatoire)
+        rank_resumes_funcs: Dictionnaire des fonctions d'analyse (obligatoire)
+            {'cosine': func, 'embeddings': func, 'rules': func, 'ai': func, 'ensemble': func}
         
     Returns:
         Dict contenant les résultats combinés de tous les lots
     """
-    # Import les fonctions nécessaires depuis le module d'analyse CV
-    import importlib
-    analyse_cv = importlib.import_module("pages.6_📄_Analyse_CV")
-    extract_text_from_pdf = analyse_cv.extract_text_from_pdf
-    rank_resumes_with_cosine = analyse_cv.rank_resumes_with_cosine
-    rank_resumes_with_embeddings = analyse_cv.rank_resumes_with_embeddings
-    rank_resumes_with_rules = analyse_cv.rank_resumes_with_rules
-    rank_resumes_with_ai = analyse_cv.rank_resumes_with_ai
+    # Vérification des fonctions nécessaires
+    if extract_text_from_pdf_func is None or rank_resumes_funcs is None:
+        raise ValueError("Les fonctions d'analyse et d'extraction doivent être fournies pour éviter les références circulaires")
     
     # Initialisation des résultats
     all_scores = []
@@ -1205,15 +1193,15 @@ def batch_process_resumes(job_description, file_list, analysis_method,
     
     # Déterminer la fonction d'analyse appropriée
     if analysis_method == "Analyse par IA (DeepSeek)":
-        analysis_func = rank_resumes_with_ai
+        analysis_func = rank_resumes_funcs.get('ai')
     elif analysis_method == "Scoring par Règles (Regex)":
-        analysis_func = lambda jd, res, fnames: rank_resumes_with_rules(jd, res, fnames)
+        analysis_func = lambda jd, res, fnames: rank_resumes_funcs.get('rules')(jd, res, fnames)
     elif analysis_method == "Méthode Sémantique (Embeddings)":
-        analysis_func = rank_resumes_with_embeddings
+        analysis_func = rank_resumes_funcs.get('embeddings')
     elif analysis_method == "Analyse combinée (Ensemble)":
-        analysis_func = rank_resumes_with_ensemble
+        analysis_func = rank_resumes_funcs.get('ensemble')
     else:  # Par défaut, méthode cosinus
-        analysis_func = rank_resumes_with_cosine
+        analysis_func = rank_resumes_funcs.get('cosine')
     
     # Traitement par lots
     num_batches = (len(file_list) + batch_size - 1) // batch_size
@@ -1228,7 +1216,7 @@ def batch_process_resumes(job_description, file_list, analysis_method,
         batch_file_names = []
         
         for file in batch_files:
-            text = extract_text_from_pdf(file)
+            text = extract_text_from_pdf_func(file)
             if "Erreur" not in text:
                 batch_resumes.append(text)
                 batch_file_names.append(file.name)

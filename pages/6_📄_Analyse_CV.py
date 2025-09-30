@@ -392,7 +392,21 @@ with tab1:
                 file_list=uploaded_files_ranking,
                 analysis_method=analysis_method,
                 batch_size=batch_size,
-                progress_callback=update_progress
+                progress_callback=update_progress,
+                extract_text_from_pdf_func=extract_text_from_pdf,
+                rank_resumes_funcs={
+                    'cosine': rank_resumes_with_cosine,
+                    'embeddings': rank_resumes_with_embeddings,
+                    'rules': rank_resumes_with_rules,
+                    'ai': rank_resumes_with_ai,
+                    'ensemble': lambda jd, res, fnames, **kwargs: rank_resumes_with_ensemble(
+                        jd, res, fnames,
+                        cosine_func=rank_resumes_with_cosine,
+                        semantic_func=rank_resumes_with_embeddings,
+                        rules_func=rank_resumes_with_rules,
+                        **kwargs
+                    )
+                }
             )
             
             explanations = results.get("explanations")
@@ -434,7 +448,10 @@ with tab1:
                         job_description, resumes, file_names,
                         cosinus_weight=cosinus_weight,
                         semantic_weight=semantic_weight,
-                        rules_weight=rules_weight
+                        rules_weight=rules_weight,
+                        cosine_func=rank_resumes_with_cosine,
+                        semantic_func=rank_resumes_with_embeddings,
+                        rules_func=rank_resumes_with_rules
                     )
                     logic = results.get("logic")
                 
