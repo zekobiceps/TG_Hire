@@ -358,7 +358,7 @@ with st.sidebar:
     
     # Cette ligne appelle la fonction pour charger toutes les données de la feuille, 
     # puis len() compte le nombre total de briefs.
-    total_briefs = len(load_briefs())
+    total_briefs = len(st.session_state.get("saved_briefs", {}))  # plutôt que len(load_briefs())
     
     # Cette ligne affiche le total que vous avez calculé.
     st.metric("📋 Briefs créés", total_briefs)
@@ -469,19 +469,17 @@ with tabs[0]:
 
             # Valeur prioritaire : session_state si déjà existante
             if "date_brief" in st.session_state:
+                # Sécurise le type avant d'appeler le widget (sinon warning)
                 if not isinstance(st.session_state.date_brief, (date, datetime)):
                     st.session_state.date_brief = _parse_date_any(st.session_state.date_brief)
                 elif isinstance(st.session_state.date_brief, datetime):
                     st.session_state.date_brief = st.session_state.date_brief.date()
-                date_brief_value = st.session_state.date_brief
+                # IMPORTANT : ne pas passer 'value=' si key déjà présent (évite le warning jaune)
+                chosen_date = st.date_input("Date du brief", key="date_brief")
             else:
-                # Sinon brief_data -> parse
                 raw = brief_data.get("date_brief", brief_data.get("DATE_BRIEF", date.today()))
                 date_brief_value = _parse_date_any(raw)
-
-            chosen_date = st.date_input("Date du brief",
-                                        value=date_brief_value,
-                                        key="date_brief")
+                chosen_date = st.date_input("Date du brief", value=date_brief_value, key="date_brief")
 
         if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
             required_fields = ["poste_intitule", "manager_nom", "affectation_nom", "date_brief"]
@@ -537,6 +535,9 @@ with tabs[0]:
                         new_brief_data[k.upper()] = v
 
                 st.session_state.saved_briefs[new_brief_name] = new_brief_data
+                st.session_state.current_brief_name = new_brief_name
+                st.session_state.reunion_step = 1
+                st.session_state.reunion_completed = False  # on force le passage par le wizard
                 save_briefs()
                 save_brief_to_gsheet(new_brief_name, new_brief_data)
                 st.success(f"✅ Brief '{new_brief_name}' créé avec succès !")
@@ -1172,25 +1173,3 @@ with tabs[3]:
                     st.info("ℹ️ Créez d'abord un brief pour l'exporter")
             else:
                 st.info("⚠️ Word non dispo (pip install python-docx)")
-
-        # Navigation (affichée en dehors des formulaires)
-        nav_prev, nav_next = st.columns([1,1])
-        with nav_prev:
-            if step > 1 and st.button("⬅️ Précédent", key=f"wizard_prev_{step}", use_container_width=True):
-                st.session_state.reunion_step -= 1
-                st.rerun()
-        with nav_next:
-            if step < total_steps and st.button("Suivant ➡️", key=f"wizard_next_{step}", use_container_width=True):
-                st.session_state.reunion_step += 1
-                st.rerun()
-
-        # --- Navigation Wizard (toujours visible dans l’onglet Réunion) ---
-        nav_prev, nav_next = st.columns([1, 1])
-        with nav_prev:
-            if step > 1 and st.button("⬅️ Précédent", key=f"reunion_prev_{step}", use_container_width=True):
-                st.session_state.reunion_step -= 1
-                st.rerun()
-        with nav_next:
-            if step < total_steps and st.button("Suivant ➡️", key=f"reunion_next_{step}", use_container_width=True):
-                st.session_state.reunion_step += 1
-                st.rerun()
