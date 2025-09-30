@@ -58,17 +58,17 @@ BRIEFS_WORKSHEET_NAME = "Briefs"
 
 # Entêtes de colonnes (doivent correspondre EXACTEMENT à la Ligne 1 de votre Google Sheet)
 BRIEFS_HEADERS = [
-    "BRIEF_NAME", "POSTE_INTITULE", "MANAGER_NOM", "RECRUTEUR", "AFFECTATION_TYPE", 
-    "AFFECTATION_NOM", "DATE_BRIEF", "RAISON_OUVERTURE", "IMPACT_STRATEGIQUE", 
-    "TACHES_PRINCIPALES", "MUST_HAVE_EXP", "MUST_HAVE_DIP", 
-    "MUST_HAVE_COMPETENCES", "MUST_HAVE_SOFTSKILLS", "NICE_TO_HAVE_EXP", 
-    "NICE_TO_HAVE_DIP", "NICE_TO_HAVE_COMPETENCES", "RATTACHEMENT", "BUDGET", 
-    "ENTREPRISES_PROFIL", "SYNONYMES_POSTE", "CANAUX_PROFIL", 
+    "BRIEF_NAME", "POSTE_INTITULE", "MANAGER_NOM", "RECRUTEUR",
+    "AFFECTATION_TYPE", "AFFECTATION_NOM", "DATE_BRIEF",
+    "RAISON_OUVERTURE", "IMPACT_STRATEGIQUE", "TACHES_PRINCIPALES",
+    "MUST_HAVE_EXPERIENCE", "MUST_HAVE_DIPLOMES", "MUST_HAVE_COMPETENCES",
+    "MUST_HAVE_SOFTSKILLS", "NICE_TO_HAVE_EXPERIENCE", "NICE_TO_HAVE_DIPLOMES",
+    "NICE_TO_HAVE_COMPETENCES", "RATTACHEMENT", "BUDGET",
+    "ENTREPRISES_PROFIL", "SYNONYMES_POSTE", "CANAUX_PROFIL",
     "LIEN_PROFIL_1", "LIEN_PROFIL_2", "LIEN_PROFIL_3",
-    "COMMENTAIRES", "NOTES_LIBRES", "CRITERES_EXCLUSION", 
-    "PROCESSUS_EVALUATION", "MANAGER_NOTES", 
-    "MANAGER_COMMENTS_JSON",
-    "KSA_MATRIX_JSON", "DATE_MAJ"
+    "COMMENTAIRES", "NOTES_LIBRES",
+    "CRITERES_EXCLUSION", "PROCESSUS_EVALUATION", "MANAGER_NOTES",
+    "MANAGER_COMMENTS_JSON", "KSA_MATRIX_JSON", "DATE_MAJ"
 ]
 
 # -------------------- FONCTIONS DE GESTION GOOGLE SHEETS (CORRIGÉES POUR SECRETS GCP_) --------------------
@@ -104,56 +104,62 @@ def get_briefs_gsheet_client():
         return None
 
 def save_brief_to_gsheet(brief_name, brief_data):
-    """Sauvegarde un brief dans Google Sheets (met à jour si existe, insère si nouveau)."""
+    """Sauvegarde (création / update) du brief dans Google Sheets avec normalisation champs."""
     worksheet = get_briefs_gsheet_client()
     if worksheet is None:
         return False
-    
-    try:
-        # Garantit BRIEF_NAME présent
-        if not brief_data.get("BRIEF_NAME"):
-            brief_data["BRIEF_NAME"] = brief_name
 
-        row_data = []
-        ksa_df = brief_data.get("ksa_matrix")
+    # Normalisation clés courtes -> longues (compat anciennes données)
+    upgrade_map = {
+        "MUST_HAVE_EXP": "MUST_HAVE_EXPERIENCE",
+        "MUST_HAVE_DIP": "MUST_HAVE_DIPLOMES",
+        "NICE_TO_HAVE_EXP": "NICE_TO_HAVE_EXPERIENCE",
+        "NICE_TO_HAVE_DIP": "NICE_TO_HAVE_DIPLOMES"
+    }
+    for old, new in upgrade_map.items():
+        if old in brief_data and new not in brief_data:
+            brief_data[new] = brief_data[old]
 
-        for header in BRIEFS_HEADERS:
-            value = brief_data.get(header, "")
-            if header == "KSA_MATRIX_JSON":
-                if isinstance(ksa_df, pd.DataFrame):
-                    value = ksa_df.to_json(orient='records')
-                else:
-                    value = ""
-            elif header == "DATE_MAJ":
-                value = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            elif isinstance(value, list):
-                value = ", ".join(map(str, value))
-            elif isinstance(value, datetime):
-                value = value.strftime("%Y-%m-%d")
-            else:
-                value = str(value)
-            row_data.append(value)
+    # Normalisation KSA si DataFrame présente
+    ksa_df = brief_data.get("ksa_matrix")
+    if isinstance(ksa_df, pd.DataFrame) and not ksa_df.empty:
+        ksa_df = ksa_df.copy()
+        # Harmonise colonnes possibles
+        if "Cible / Standard attendu" in ksa_df.columns and "Question pour l'entretien" not in ksa_df.columns:
+            ksa_df["Question pour l'entretien"] = ksa_df["Cible / Standard attendu"]
+        if "Échelle d'évaluation (1-5)" in ksa_df.columns and "Évaluation (1-5)" not in ksa_df.columns:
+            ksa_df["Évaluation (1-5)"] = ksa_df["Échelle d'évaluation (1-5)"]
+        need = ["Rubrique","Critère","Type de question","Question pour l'entretien","Évaluation (1-5)","Évaluateur"]
+        for c in need:
+            if c not in ksa_df.columns:
+                ksa_df[c] = ""
+        brief_data["KSA_MATRIX_JSON"] = ksa_df[need].to_json(orient="records", force_ascii=False)
 
-        # Force première colonne
-        if row_data:
-            row_data[0] = brief_name
-
-        cell = worksheet.find(brief_name, in_column=1, case_sensitive=True)
-        
-        LAST_COL_LETTER = col_to_letter(len(BRIEFS_HEADERS))
-        
-        if cell:
-            range_to_update = f'A{cell.row}:{LAST_COL_LETTER}{cell.row}' 
-            worksheet.update(range_to_update, [row_data])
-            st.toast(f"✅ Brief '{brief_name}' mis à jour dans Google Sheets.", icon='☁️')
+    # Construit la ligne dans l’ordre des headers
+    row = []
+    for header in BRIEFS_HEADERS:
+        if header == "KSA_MATRIX_JSON":
+            val = brief_data.get("KSA_MATRIX_JSON", "")
+        elif header == "DATE_MAJ":
+            val = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         else:
-            worksheet.append_row(row_data)
-            st.toast(f"✅ Brief '{brief_name}' enregistré dans Google Sheets.", icon='☁️')
-            
-        return True
+            val = brief_data.get(header, "")
+        row.append("" if val is None else str(val))
 
+    # Force le nom
+    row[0] = brief_name
+    try:
+        cell = worksheet.find(brief_name, in_column=1, case_sensitive=True)
+        last_col = col_to_letter(len(BRIEFS_HEADERS))
+        if cell:
+            worksheet.update(f"A{cell.row}:{last_col}{cell.row}", [row])
+            st.toast(f"✅ Brief mis à jour (Sheets)", icon="☁️")
+        else:
+            worksheet.append_row(row)
+            st.toast(f"✅ Brief ajouté (Sheets)", icon="☁️")
+        return True
     except Exception as e:
-        st.error(f"❌ ÉCHEC CRITIQUE: La sauvegarde Google Sheets a échoué pour '{brief_name}'. API Error: {e}")
+        st.error(f"❌ Erreur sauvegarde Google Sheets: {e}")
         return False
 
 
@@ -1027,17 +1033,24 @@ def get_brief_value(brief_dict: dict, key: str, default: str = ""):
     return default
 
 def save_ksa_matrix_to_current_brief():
+    """Sauvegarde robuste de la KSA en JSON (accepte anciens noms de colonnes)."""
     bname = st.session_state.get("current_brief_name")
     if not bname:
         return
     df = st.session_state.get("ksa_matrix")
     if not isinstance(df, pd.DataFrame) or df.empty:
         return
-    cols = ["Rubrique","Critère","Type de question","Question pour l'entretien","Évaluation (1-5)","Évaluateur"]
-    for c in cols:
+    df = df.copy()
+    # Harmonisation colonnes
+    if "Cible / Standard attendu" in df.columns and "Question pour l'entretien" not in df.columns:
+        df["Question pour l'entretien"] = df["Cible / Standard attendu"]
+    if "Échelle d'évaluation (1-5)" in df.columns and "Évaluation (1-5)" not in df.columns:
+        df["Évaluation (1-5)"] = df["Échelle d'évaluation (1-5)"]
+    needed = ["Rubrique","Critère","Type de question","Question pour l'entretien","Évaluation (1-5)","Évaluateur"]
+    for c in needed:
         if c not in df.columns:
             df[c] = ""
-    df = df[cols]
+    df = df[needed]
     brief = st.session_state.saved_briefs.get(bname, {})
     brief["KSA_MATRIX_JSON"] = df.to_json(orient="records", force_ascii=False)
     brief.pop("ksa_matrix", None)
