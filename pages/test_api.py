@@ -457,22 +457,29 @@ with tabs[0]:
         with col5:
             st.text_input("Nom affectation", key="affectation_nom", value=brief_data.get("affectation_nom", ""))
         with col6:
-            from datetime import date, datetime
+            from datetime import date as _Date, datetime as _DateTime
+
             def _parse_date_any(v):
-                if isinstance(v, date):
+                if isinstance(v, _Date) and not isinstance(v, _DateTime):
                     return v
-                if isinstance(v, datetime):
+                if isinstance(v, _DateTime):
                     return v.date()
                 if isinstance(v, str):
-                    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+                    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d"):
                         try:
-                            return datetime.strptime(v, fmt).date()
+                            return _DateTime.strptime(v, fmt).date()
                         except:
                             continue
-                return date.today()
-            if "date_brief" not in st.session_state:
-                raw = brief_data.get("DATE_BRIEF") or brief_data.get("date_brief") or date.today()
-                st.session_state.date_brief = _parse_date_any(raw)
+                return _Date.today()
+
+            # Toujours re-normaliser (même si déjà présent)
+            raw_val = st.session_state.get("date_brief")
+            if raw_val is None:
+                raw_val = brief_data.get("DATE_BRIEF") or brief_data.get("date_brief") or _Date.today()
+            norm = _parse_date_any(raw_val)
+            st.session_state.date_brief = norm  # on force un objet date
+
+            # IMPORTANT: ne pas passer 'value=' puisque key déjà défini
             st.date_input("Date du brief", key="date_brief")
 
         if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
