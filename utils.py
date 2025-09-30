@@ -214,48 +214,250 @@ def load_briefs():
         st.warning(f"Erreur lors du chargement des briefs depuis Google Sheets : {e}")
         return {}
 
-# === AJOUT : fonction manquante empêchant l'import dans test_api.py ===
 def refresh_saved_briefs():
     """
-    Recharge les briefs depuis Google Sheets et met à jour st.session_state.saved_briefs.
-    Retourne le dict fraîchement chargé.
+    Recharge depuis Google Sheets et stocke dans session_state.saved_briefs.
     """
     briefs = load_briefs()
     st.session_state.saved_briefs = briefs
     return briefs
 
-# (Si besoin d’un cache temporaire : décommenter)
-# @st.cache_data(ttl=60)
-# def cached_briefs():
-#     return load_briefs()
-
-def count_briefs_from_gsheet():
-    """Count the number of briefs in Google Sheets as a fallback."""
-    worksheet = get_briefs_gsheet_client()
-    if worksheet:
-        try:
-            return len(worksheet.get_all_records())
-            st.write("Records from Google Sheets:", records)  # Juste après records = worksheet.get_all_records()
-        except Exception as e:
-            st.error(f"Erreur lors du comptage des briefs dans Google Sheets : {e}")
-            
-    return 0
-
-def save_job_descriptions():
-    """Sauvegarde les fiches de poste dans job_descriptions.json."""
+# === AJOUT : chargement local (manquait) ===
+@st.cache_data(ttl=120)
+def load_all_local_briefs():
+    """
+    Charge les briefs locaux (briefs/briefs.json + fichiers individuels).
+    N'interroge PAS Google Sheets.
+    """
+    folder = "briefs"
+    collected = {}
+    global_path = os.path.join(folder, "briefs.json")
     try:
-        with open("job_descriptions.json", "w", encoding="utf-8") as f:
-            json.dump(st.session_state.saved_job_descriptions, f, indent=4, ensure_ascii=False)
+        if os.path.exists(global_path):
+            with open(global_path, "r", encoding="utf-8") as f:
+                collected = json.load(f)
+        else:
+            if os.path.isdir(folder):
+                for fn in os.listdir(folder):
+                    if fn.endswith(".json") and fn != "briefs.json":
+                        try:
+                            with open(os.path.join(folder, fn), "r", encoding="utf-8") as f:
+                                collected[fn[:-5]] = json.load(f)
+                        except:
+                            continue
+    except Exception:
+        pass
+    return collected
+
+# (Optionnel : fusion locale + mémoire)
+def merge_local_with_session():
+    local = load_all_local_briefs()
+    mem = st.session_state.get("saved_briefs", {}) or {}
+    merged = {**local, **mem}
+    st.session_state.saved_briefs = merged
+    return merged
+
+# -------------------- Directory for Briefs --------------------
+BRIEFS_DIR = "briefs"
+
+def ensure_briefs_directory():
+    """Ensure the briefs directory exists."""
+    if not os.path.exists(BRIEFS_DIR):
+        os.makedirs(BRIEFS_DIR)
+
+# -------------------- Persistance (JSON locale - la version active) --------------------
+def save_briefs():
+    """
+    Sauvegarde locale des briefs (conversion sécurisée des dates -> str).
+    """
+    import json, os
+    briefs = st.session_state.get("saved_briefs", {})
+    safe_briefs = {}
+
+    def convert(obj):
+        from datetime import date, datetime
+        if isinstance(obj, (date, datetime)):
+            return obj.strftime("%Y-%m-%d")
+        if isinstance(obj, dict):
+            return {k: convert(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [convert(x) for x in obj]
+        return obj
+
+    for k, v in briefs.items():
+        safe_briefs[k] = convert(v)
+
+    os.makedirs("briefs", exist_ok=True)
+    try:
+        with open(os.path.join("briefs", "briefs.json"), "w", encoding="utf-8") as f:
+            json.dump(safe_briefs, f, ensure_ascii=False, indent=2)
     except Exception as e:
-        st.error(f"Erreur lors de la sauvegarde des fiches de poste: {e}")
+        st.error(f"Erreur lors de la sauvegarde locale des briefs: {e}")
 
-def load_job_descriptions():
-    """Charge les fiches de poste depuis job_descriptions.json."""
+def load_briefs():
+    """Charge tous les briefs depuis Google Sheets."""
     try:
-        with open("job_descriptions.json", "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
+        briefs = {}
+        worksheet = get_briefs_gsheet_client()
+        if worksheet:
+            records = worksheet.get_all_records()
+            for record in records:
+                brief_name = record.get("BRIEF_NAME")
+                if brief_name:
+                    briefs[brief_name] = record
+                    if record.get("KSA_MATRIX_JSON"):
+                        try:
+                            record["ksa_matrix"] = pd.DataFrame.from_records(json.loads(record["KSA_MATRIX_JSON"]))
+                        except Exception:
+                            record["ksa_matrix"] = pd.DataFrame()
+        return briefs
+    except Exception as e:
+        st.warning(f"Erreur lors du chargement des briefs depuis Google Sheets : {e}")
         return {}
+
+def refresh_saved_briefs():
+    """
+    Recharge depuis Google Sheets et stocke dans session_state.saved_briefs.
+    """
+    briefs = load_briefs()
+    st.session_state.saved_briefs = briefs
+    return briefs
+
+# === AJOUT : chargement local (manquait) ===
+@st.cache_data(ttl=120)
+def load_all_local_briefs():
+    """
+    Charge les briefs locaux (briefs/briefs.json + fichiers individuels).
+    N'interroge PAS Google Sheets.
+    """
+    folder = "briefs"
+    collected = {}
+    global_path = os.path.join(folder, "briefs.json")
+    try:
+        if os.path.exists(global_path):
+            with open(global_path, "r", encoding="utf-8") as f:
+                collected = json.load(f)
+        else:
+            if os.path.isdir(folder):
+                for fn in os.listdir(folder):
+                    if fn.endswith(".json") and fn != "briefs.json":
+                        try:
+                            with open(os.path.join(folder, fn), "r", encoding="utf-8") as f:
+                                collected[fn[:-5]] = json.load(f)
+                        except:
+                            continue
+    except Exception:
+        pass
+    return collected
+
+# (Optionnel : fusion locale + mémoire)
+def merge_local_with_session():
+    local = load_all_local_briefs()
+    mem = st.session_state.get("saved_briefs", {}) or {}
+    merged = {**local, **mem}
+    st.session_state.saved_briefs = merged
+    return merged
+
+# -------------------- Directory for Briefs --------------------
+BRIEFS_DIR = "briefs"
+
+def ensure_briefs_directory():
+    """Ensure the briefs directory exists."""
+    if not os.path.exists(BRIEFS_DIR):
+        os.makedirs(BRIEFS_DIR)
+
+# -------------------- Persistance (JSON locale - la version active) --------------------
+def save_briefs():
+    """
+    Sauvegarde locale des briefs (conversion sécurisée des dates -> str).
+    """
+    import json, os
+    briefs = st.session_state.get("saved_briefs", {})
+    safe_briefs = {}
+
+    def convert(obj):
+        from datetime import date, datetime
+        if isinstance(obj, (date, datetime)):
+            return obj.strftime("%Y-%m-%d")
+        if isinstance(obj, dict):
+            return {k: convert(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [convert(x) for x in obj]
+        return obj
+
+    for k, v in briefs.items():
+        safe_briefs[k] = convert(v)
+
+    os.makedirs("briefs", exist_ok=True)
+    try:
+        with open(os.path.join("briefs", "briefs.json"), "w", encoding="utf-8") as f:
+            json.dump(safe_briefs, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        st.error(f"Erreur lors de la sauvegarde locale des briefs: {e}")
+
+def load_briefs():
+    """Charge tous les briefs depuis Google Sheets."""
+    try:
+        briefs = {}
+        worksheet = get_briefs_gsheet_client()
+        if worksheet:
+            records = worksheet.get_all_records()
+            for record in records:
+                brief_name = record.get("BRIEF_NAME")
+                if brief_name:
+                    briefs[brief_name] = record
+                    if record.get("KSA_MATRIX_JSON"):
+                        try:
+                            record["ksa_matrix"] = pd.DataFrame.from_records(json.loads(record["KSA_MATRIX_JSON"]))
+                        except Exception:
+                            record["ksa_matrix"] = pd.DataFrame()
+        return briefs
+    except Exception as e:
+        st.warning(f"Erreur lors du chargement des briefs depuis Google Sheets : {e}")
+        return {}
+
+def refresh_saved_briefs():
+    """
+    Recharge depuis Google Sheets et stocke dans session_state.saved_briefs.
+    """
+    briefs = load_briefs()
+    st.session_state.saved_briefs = briefs
+    return briefs
+
+# === AJOUT : chargement local (manquait) ===
+@st.cache_data(ttl=120)
+def load_all_local_briefs():
+    """
+    Charge les briefs locaux (briefs/briefs.json + fichiers individuels).
+    N'interroge PAS Google Sheets.
+    """
+    folder = "briefs"
+    collected = {}
+    global_path = os.path.join(folder, "briefs.json")
+    try:
+        if os.path.exists(global_path):
+            with open(global_path, "r", encoding="utf-8") as f:
+                collected = json.load(f)
+        else:
+            if os.path.isdir(folder):
+                for fn in os.listdir(folder):
+                    if fn.endswith(".json") and fn != "briefs.json":
+                        try:
+                            with open(os.path.join(folder, fn), "r", encoding="utf-8") as f:
+                                collected[fn[:-5]] = json.load(f)
+                        except:
+                            continue
+    except Exception:
+        pass
+    return collected
+
+# (Optionnel : fusion locale + mémoire)
+def merge_local_with_session():
+    local = load_all_local_briefs()
+    mem = st.session_state.get("saved_briefs", {}) or {}
+    merged = {**local, **mem}
+    st.session_state.saved_briefs = merged
+    return merged
 
 # -------------------- Initialisation Session --------------------
 def init_session_state():
