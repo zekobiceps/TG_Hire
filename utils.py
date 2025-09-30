@@ -166,20 +166,30 @@ def ensure_briefs_directory():
 
 # -------------------- Persistance (JSON locale - la version active) --------------------
 def save_briefs():
-    """Save each brief in session_state.saved_briefs to a separate JSON file."""
+    """
+    Sauvegarde locale des briefs (conversion sécurisée des dates -> str).
+    """
+    import json, os
+    briefs = st.session_state.get("saved_briefs", {})
+    safe_briefs = {}
+
+    def convert(obj):
+        from datetime import date, datetime
+        if isinstance(obj, (date, datetime)):
+            return obj.strftime("%Y-%m-%d")
+        if isinstance(obj, dict):
+            return {k: convert(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [convert(x) for x in obj]
+        return obj
+
+    for k, v in briefs.items():
+        safe_briefs[k] = convert(v)
+
+    os.makedirs("briefs", exist_ok=True)
     try:
-        ensure_briefs_directory()
-        serializable_briefs = {
-            name: {
-                key: value.to_dict() if isinstance(value, pd.DataFrame) else value
-                for key, value in data.items()
-            }
-            for name, data in st.session_state.saved_briefs.items()
-        }
-        for brief_name, brief_data in serializable_briefs.items():
-            file_path = os.path.join(BRIEFS_DIR, f"{brief_name}.json")
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(brief_data, f, indent=4, ensure_ascii=False)
+        with open(os.path.join("briefs", "briefs.json"), "w", encoding="utf-8") as f:
+            json.dump(safe_briefs, f, ensure_ascii=False, indent=2)
     except Exception as e:
         st.error(f"Erreur lors de la sauvegarde locale des briefs: {e}")
 

@@ -453,34 +453,24 @@ with tabs[0]:
         with col5:
             st.text_input("Nom affectation", key="affectation_nom", value=brief_data.get("affectation_nom", ""))
         with col6:
-            date_brief_raw = brief_data.get("date_brief", st.session_state.get("date_brief", date.today()))  # correction : valeur par défaut correcte
-
-            # Correction : on force la valeur dans session_state à être du bon type
-            if "date_brief" in st.session_state and not isinstance(st.session_state["date_brief"], date):
-                try:
-                    st.session_state["date_brief"] = datetime.strptime(str(st.session_state["date_brief"]), "%Y-%m-%d").date()
-                except Exception:
-                    try:
-                        st.session_state["date_brief"] = datetime.strptime(str(st.session_state["date_brief"]), "%d/%m/%Y").date()
-                    except Exception:
-                        st.session_state["date_brief"] = date.today()
-
-            # Conversion de la valeur à afficher
-            if isinstance(date_brief_raw, str):
-                try:
-                    date_brief_value = datetime.strptime(date_brief_raw, "%Y-%m-%d").date()
-                except Exception:
-                    try:
-                        date_brief_value = datetime.strptime(date_brief_raw, "%d/%m/%Y").date()
-                    except Exception:
-                        date_brief_value = date.today()
-            elif isinstance(date_brief_raw, datetime):
-                date_brief_value = date_brief_raw.date()
-            elif isinstance(date_brief_raw, date):
-                date_brief_value = date_brief_raw
-            else:
-                date_brief_value = date.today()
-            st.date_input("Date du brief", key="date_brief", value=date_brief_value)
+            # Lecture source
+            date_brief_raw = brief_data.get("date_brief", st.session_state.get("date_brief", date.today()))
+            # Parsing sans écrire dans session_state avant le widget
+            def parse_date(val):
+                if isinstance(val, date):
+                    return val
+                if isinstance(val, datetime):
+                    return val.date()
+                if isinstance(val, str):
+                    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+                        try:
+                            return datetime.strptime(val, fmt).date()
+                        except:
+                            continue
+                return date.today()
+            date_brief_value = parse_date(date_brief_raw)
+            # Widget (aucune mutation préalable -> pas d'avertissement)
+            chosen_date = st.date_input("Date du brief", value=date_brief_value, key="date_brief")
 
         if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
             required_fields = ["poste_intitule", "manager_nom", "affectation_nom", "date_brief"]
@@ -506,8 +496,10 @@ with tabs[0]:
                     date_arg
                 )
 
+                # Conversion date en chaîne ISO pour éviter erreur JSON
+                date_str = date_arg.strftime("%Y-%m-%d") if isinstance(date_arg, date) else str(date_arg)
+
                 new_brief_data = {}
-                # Champs de base (lower + upper)
                 base_pairs = {
                     "poste_intitule": "POSTE_INTITULE",
                     "manager_nom": "MANAGER_NOM",
@@ -517,17 +509,17 @@ with tabs[0]:
                     "date_brief": "DATE_BRIEF"
                 }
                 for low, up in base_pairs.items():
-                    v = st.session_state.get(low, "")
+                    if low == "date_brief":
+                        v = date_str
+                    else:
+                        v = st.session_state.get(low, "")
                     new_brief_data[low] = v
                     new_brief_data[up] = v
-                # Champs Avant-brief
+
                 for k in all_field_keys:
                     v = st.session_state.get(k, "")
-                    # Stockage lower
                     new_brief_data[k] = v
-                    # Stockage upper normal
                     if k.startswith("profil_link_"):
-                        # Mapper vers LIEN_PROFIL_X
                         suffix = k.split("_")[-1]
                         new_brief_data[f"LIEN_PROFIL_{suffix}"] = v
                     else:
@@ -535,10 +527,7 @@ with tabs[0]:
 
                 st.session_state.saved_briefs[new_brief_name] = new_brief_data
                 save_briefs()
-
-                # Payload Google Sheets (upper déjà prêts)
                 save_brief_to_gsheet(new_brief_name, new_brief_data)
-
                 st.success(f"✅ Brief '{new_brief_name}' créé avec succès !")
                 st.rerun()
 
@@ -791,7 +780,7 @@ with tabs[2]:
                     ],
                     "Technique": [
                         "Citez les éléments essentiels d'une veille efficace.",
-                        "Expliquez la différence entre deux cadres réglementaires.",
+                        "Explique la différence entre deux cadres réglementaires.",
                         "Décrivez le processus de mise à jour documentaire."
                     ],
                     "Générale": [
@@ -1172,3 +1161,14 @@ with tabs[3]:
                     st.info("ℹ️ Créez d'abord un brief pour l'exporter")
             else:
                 st.info("⚠️ Word non dispo (pip install python-docx)")
+
+        # Navigation (affichée en dehors des formulaires)
+        nav_prev, nav_next = st.columns([1,1])
+        with nav_prev:
+            if step > 1 and st.button("⬅️ Précédent", key=f"wizard_prev_{step}", use_container_width=True):
+                st.session_state.reunion_step -= 1
+                st.rerun()
+        with nav_next:
+            if step < total_steps and st.button("Suivant ➡️", key=f"wizard_next_{step}", use_container_width=True):
+                st.session_state.reunion_step += 1
+                st.rerun()
