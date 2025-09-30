@@ -492,13 +492,23 @@ tab1, tab2, tab3, tab4 = st.tabs(["📊 Classement de CVs", "🎯 Analyse de Pro
 
 with tab1:
     st.markdown("### 📄 Informations du Poste")
-    col1, col2 = st.columns([2, 1])
+    col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
         job_title = st.text_input("Intitulé du poste", placeholder="Ex: Archiviste Junior")
         job_description = st.text_area("Description du poste", height=200, key="jd_ranking", placeholder="Collez la description...")
     with col2:
         st.markdown("#### 📤 Importer des CVs")
         uploaded_files_ranking = st.file_uploader("Importer des CVs", type=["pdf"], accept_multiple_files=True, key="ranking_uploader")
+    with col3:
+        st.markdown("#### 📄 Fiche de Poste (optionnelle)")
+        fiche_poste_file = st.file_uploader("Importer une fiche de poste (PDF)", type=["pdf"], key="fiche_poste_uploader")
+        fiche_poste_text = ""
+        if fiche_poste_file:
+            fiche_poste_text = extract_text_from_pdf(fiche_poste_file)
+            if fiche_poste_text and not fiche_poste_text.startswith("Erreur"):
+                st.success("Fiche de poste importée !")
+            else:
+                st.error("Erreur lors de la lecture de la fiche de poste.")
     
     st.markdown("---")
     
@@ -676,8 +686,26 @@ with tab1:
             for _, row in results_df.iterrows():
                 file_name = row["Nom du CV"]
                 with st.expander(f"Analyse pour : **{file_name}**"):
-                        explanation = explanations.get(file_name, "N/A")
-                        # Tronquer à 300 caractères pour concision
+                    explanation = explanations.get(file_name, "N/A")
+                    import re
+                    score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", explanation, re.IGNORECASE)
+                    score_text = f"Score : {score_match.group(1)}%" if score_match else "Score : N/A"
+                    st.markdown(f"**{score_text}**")
+                    strong_match = re.search(r"Points? Forts?\s*(.*?)\n\s*Points? Faibles?", explanation, re.DOTALL|re.IGNORECASE)
+                    weak_match = re.search(r"Points? Faibles?\s*(.*)", explanation, re.DOTALL|re.IGNORECASE)
+                    if strong_match:
+                        strong_text = strong_match.group(1).strip()
+                        if len(strong_text) > 300:
+                            strong_text = strong_text[:300] + "..."
+                        st.markdown("**Points Forts**")
+                        st.markdown(strong_text)
+                    if weak_match:
+                        weak_text = weak_match.group(1).strip()
+                        if len(weak_text) > 300:
+                            weak_text = weak_text[:300] + "..."
+                        st.markdown("**Points Faibles**")
+                        st.markdown(weak_text)
+                    if not strong_match and not weak_match:
                         if explanation and len(explanation) > 300:
                             explanation = explanation[:300] + "..."
                         st.markdown(explanation)
