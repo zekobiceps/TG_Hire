@@ -16,8 +16,9 @@ except ImportError:
 
 # Chemin vers le fichier de données de feedback
 FEEDBACK_DATA_PATH = "feedback_data.json"
-FEEDBACK_GSHEET_NAME = "Feedback"  # Nom de l'onglet dans Google Sheets
+FEEDBACK_GSHEET_NAME = "Feedback"  # Nom de l'onglet dans Google Sheets (Feuil4 est l'onglet 4)
 FEEDBACK_GSHEET_URL = "https://docs.google.com/spreadsheets/d/1QLC_LzwQU5eKLRcaDglLd6csejLZSs1aauYFwzFk0ac/edit"
+FEEDBACK_SHEET_INDEX = 3  # L'index 0 est la première feuille, 3 serait la 4ème feuille (Feuil4)
 
 # -------------------- FONCTIONS D'AUTHENTIFICATION GOOGLE SHEETS --------------------
 def get_feedback_google_credentials():
@@ -112,19 +113,43 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
             def save_feedback_to_google_sheet():
                 """Sauvegarde un feedback dans Google Sheets."""
                 try:
+                    # Afficher un message de debug pour voir si cette fonction est appelée
+                    print("Tentative d'envoi du feedback vers Google Sheets...")
+                    
+                    # Obtenir le client Google Sheets
                     gc = get_feedback_gsheet_client()
                     if not gc:
-                        st.error("❌ Impossible d'obtenir le client Google Sheets")
+                        print("❌ Impossible d'obtenir le client Google Sheets")
                         return False
+                        
+                    print(f"✅ Client Google Sheets obtenu, tentative d'ouverture de {FEEDBACK_GSHEET_URL}")
                         
                     # Ouvrir la feuille Google Sheets par URL
                     sh = gc.open_by_url(FEEDBACK_GSHEET_URL)
+                    print(f"✅ Feuille Google Sheets ouverte avec succès")
                     
                     # Vérifier si la feuille/onglet existe déjà, sinon la créer
                     try:
-                        worksheet = sh.worksheet(FEEDBACK_GSHEET_NAME)
-                    except gspread.exceptions.WorksheetNotFound:
+                        # Essayer d'abord par nom
+                        try:
+                            worksheet = sh.worksheet(FEEDBACK_GSHEET_NAME)
+                            print(f"✅ Onglet '{FEEDBACK_GSHEET_NAME}' trouvé par nom")
+                        except gspread.exceptions.WorksheetNotFound:
+                            # Essayer par index (Feuil4 serait index 3)
+                            try:
+                                worksheet = sh.get_worksheet(FEEDBACK_SHEET_INDEX)
+                                print(f"✅ Onglet trouvé par index {FEEDBACK_SHEET_INDEX}")
+                                if worksheet is None:
+                                    raise Exception("Worksheet est None")
+                            except Exception as e:
+                                print(f"❌ Erreur lors de l'accès par index: {e}")
+                                # Créer l'onglet avec des en-têtes
+                                print(f"Création d'un nouvel onglet '{FEEDBACK_GSHEET_NAME}'")
+                                worksheet = sh.add_worksheet(title=FEEDBACK_GSHEET_NAME, rows=1000, cols=8)
+                    except Exception as e:
+                        print(f"❌ Erreur lors de l'accès à l'onglet: {e}")
                         # Créer l'onglet avec des en-têtes
+                        print(f"Création d'un nouvel onglet '{FEEDBACK_GSHEET_NAME}'")
                         worksheet = sh.add_worksheet(title=FEEDBACK_GSHEET_NAME, rows=1000, cols=8)
                         
                         # Ajouter les en-têtes exacts tels qu'ils sont dans la feuille existante
@@ -133,6 +158,7 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
                             "cv_count", "feedback_score", "feedback_text", "version_app"
                         ]
                         worksheet.update('A1:H1', [headers])
+                        print(f"✅ Nouvel onglet créé avec en-têtes")
                     
                     # Préparer les données à ajouter
                     row_data = [
@@ -146,12 +172,19 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
                         feedback_entry["version_app"]
                     ]
                     
+                    # Afficher les données qui seront envoyées
+                    print(f"Données à envoyer: {row_data}")
+                    
                     # Ajouter la ligne (exactement comme dans Cartographie.py)
                     worksheet.append_row(row_data)
+                    print(f"✅ Données envoyées avec succès à Google Sheets")
                     st.success(f"✅ Feedback enregistré dans Google Sheets!")
                     return True
                     
                 except Exception as e:
+                    print(f"❌ ERREUR : {e}")
+                    import traceback
+                    print(traceback.format_exc())
                     st.error(f"❌ Erreur lors de la sauvegarde du feedback dans Google Sheets : {e}")
                     return False
             

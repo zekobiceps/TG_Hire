@@ -53,6 +53,14 @@ if "feedback_submitted" not in st.session_state:
     st.session_state.feedback_submitted = False
 if "global_feedback_score" not in st.session_state:
     st.session_state.global_feedback_score = 3
+    
+# Variables pour conserver les résultats de l'analyse même après feedback
+if "ranked_resumes" not in st.session_state:
+    st.session_state.ranked_resumes = []
+if "file_names" not in st.session_state:
+    st.session_state.file_names = []
+if "scores" not in st.session_state:
+    st.session_state.scores = []
 
 # -------------------- CSS --------------------
 st.markdown("""
@@ -640,6 +648,12 @@ with tab1:
                 # Sauvegarder les résultats pour le feedback
                 st.session_state.last_analysis_result = results_df
                 st.session_state.last_analysis_method = analysis_method
+                st.session_state.ranked_resumes = ranked_resumes
+                st.session_state.file_names = file_names
+                st.session_state.scores = scores
+                st.session_state.logic = logic
+                st.session_state.job_title = job_title
+                st.session_state.job_description = job_description
                 st.session_state.last_job_title = job_title
                 st.session_state.last_job_description = job_description
                 st.session_state.last_file_names = file_names
