@@ -9,10 +9,17 @@ from sklearn.metrics.pairwise import cosine_similarity
 import time
 import re
 from datetime import datetime
+import plotly.graph_objects as go
+import plotly.express as px
 
 # Imports pour la méthode sémantique
 from sentence_transformers import SentenceTransformer, util
 import torch
+
+# Import des fonctions avancées d'analyse
+from utils import (rank_resumes_with_ensemble, batch_process_resumes, 
+                 save_feedback, get_average_feedback_score, 
+                 get_feedback_summary)
 
 # -------------------- Configuration de la clé API DeepSeek --------------------
 # --- CORRECTION : Déplacé à l'intérieur des fonctions pour éviter l'erreur au démarrage ---
@@ -25,6 +32,20 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Initialisation des variables de session
+if "cv_analysis_feedback" not in st.session_state:
+    st.session_state.cv_analysis_feedback = False
+if "last_analysis_method" not in st.session_state:
+    st.session_state.last_analysis_method = None
+if "last_analysis_result" not in st.session_state:
+    st.session_state.last_analysis_result = None
+if "last_job_title" not in st.session_state:
+    st.session_state.last_job_title = ""
+if "last_job_description" not in st.session_state:
+    st.session_state.last_job_description = ""
+if "last_cv_count" not in st.session_state:
+    st.session_state.last_cv_count = 0
+
 # -------------------- CSS --------------------
 st.markdown("""
 <style>
@@ -33,6 +54,36 @@ div[data-testid="stTabs"] button p {
 }
 .stTextArea textarea {
     white-space: pre-wrap !important;
+}
+.feedback-box {
+    padding: 1rem;
+    border-radius: 0.5rem;
+    background-color: #f0f8ff;
+    margin-bottom: 1rem;
+}
+.feedback-title {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+.method-stats {
+    padding: 0.5rem;
+    border-radius: 0.3rem;
+    background-color: #f5f5f5;
+    margin: 0.2rem 0;
+}
+.progress-bar-container {
+    width: 100%;
+    height: 10px;
+    background-color: #f0f0f0;
+    border-radius: 5px;
+    margin: 10px 0;
+    overflow: hidden;
+}
+.progress-bar {
+    height: 100%;
+    background-color: #4CAF50;
+    border-radius: 5px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -266,7 +317,7 @@ def get_deepseek_analysis(text):
 
 # -------------------- Interface Utilisateur --------------------
 st.title("📄 Analyseur de CVs Intelligent")
-tab1, tab2, tab3 = st.tabs(["📊 Classement de CVs", "🎯 Analyse de Profil", "📖 Guide des Méthodes"])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Classement de CVs", "🎯 Analyse de Profil", "📖 Guide des Méthodes", "📈 Statistiques de Feedback"])
 
 with tab1:
     st.markdown("### 📄 Informations du Poste")
@@ -282,34 +333,114 @@ with tab1:
     
     analysis_method = st.radio(
         "✨ Choisissez votre méthode de classement",
-        ["Méthode Cosinus (Mots-clés)", "Méthode Sémantique (Embeddings)", "Scoring par Règles (Regex)", "Analyse par IA (DeepSeek)"],
+        ["Méthode Cosinus (Mots-clés)", "Méthode Sémantique (Embeddings)", "Scoring par Règles (Regex)", 
+         "Analyse par IA (DeepSeek)", "Analyse combinée (Ensemble)"],
         index=0, help="Consultez l'onglet 'Guide des Méthodes'."
     )
+    
+    # Options supplémentaires pour l'analyse combinée
+    if analysis_method == "Analyse combinée (Ensemble)":
+        st.markdown("### 🔢 Paramètres de combinaison")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            cosinus_weight = st.slider("Poids Cosinus", 0.0, 1.0, 0.2, 0.1, key="slider_cosinus")
+        with col2:
+            semantic_weight = st.slider("Poids Sémantique", 0.0, 1.0, 0.4, 0.1, key="slider_semantic")
+        with col3:
+            rules_weight = st.slider("Poids Règles", 0.0, 1.0, 0.4, 0.1, key="slider_rules")
+            
+        # Normalisation des poids
+        total_weight = cosinus_weight + semantic_weight + rules_weight
+        if total_weight > 0:
+            norm_cosinus = cosinus_weight / total_weight
+            norm_semantic = semantic_weight / total_weight
+            norm_rules = rules_weight / total_weight
+            st.info(f"Poids normalisés : Cosinus {norm_cosinus:.2f}, Sémantique {norm_semantic:.2f}, Règles {norm_rules:.2f}")
+        else:
+            st.warning("Veuillez attribuer un poids non nul à au moins une méthode.")
+    
+    # Options pour le traitement par lots
+    use_batch_processing = False
+    if len(uploaded_files_ranking or []) > 20:
+        use_batch_processing = st.checkbox("Activer le traitement par lots (recommandé pour plus de 20 CVs)", 
+                                         value=True, 
+                                         help="Traite les CVs par petits groupes pour éviter les problèmes de mémoire")
+        if use_batch_processing:
+            batch_size = st.slider("Taille du lot", min_value=5, max_value=50, value=10, 
+                                  help="Nombre de CVs traités simultanément")
 
     if st.button("🔍 Analyser et Classer", type="primary", width="stretch", disabled=not (uploaded_files_ranking and job_description)):
-        resumes, file_names = [], []
-        with st.spinner("Lecture des fichiers PDF..."):
-            for file in uploaded_files_ranking:
-                text = extract_text_from_pdf(file)
-                if not "Erreur" in text:
-                    resumes.append(text)
-                    file_names.append(file.name)
+        # Sauvegarder les informations pour le feedback
+        st.session_state.last_analysis_method = analysis_method
+        st.session_state.last_job_title = job_title
+        st.session_state.last_job_description = job_description
+        st.session_state.last_cv_count = len(uploaded_files_ranking)
         
-        with st.spinner("Analyse des CVs en cours..."):
-            results, explanations, logic = {}, None, None
-            if analysis_method == "Analyse par IA (DeepSeek)":
-                results = rank_resumes_with_ai(job_description, resumes, file_names)
-                explanations = results.get("explanations")
-            elif analysis_method == "Scoring par Règles (Regex)":
-                rule_results = rank_resumes_with_rules(job_description, resumes, file_names)
-                results = {"scores": [r["score"] for r in rule_results]}
-                logic = {r["file_name"]: r["logic"] for r in rule_results}
-            elif analysis_method == "Méthode Sémantique (Embeddings)":
-                results = rank_resumes_with_embeddings(job_description, resumes, file_names)
-                logic = results.get("logic")
-            else: # Cosinus
-                results = rank_resumes_with_cosine(job_description, resumes, file_names)
-                logic = results.get("logic")
+        # Traitement standard ou par lots selon le nombre de CVs
+        if use_batch_processing:
+            # Créer une barre de progression
+            progress_placeholder = st.empty()
+            progress_bar = st.progress(0)
+            
+            def update_progress(progress):
+                progress_placeholder.text(f"Traitement en cours... {int(progress * 100)}%")
+                progress_bar.progress(progress)
+            
+            # Traitement par lots
+            results, file_names = batch_process_resumes(
+                job_description=job_description,
+                file_list=uploaded_files_ranking,
+                analysis_method=analysis_method,
+                batch_size=batch_size,
+                progress_callback=update_progress
+            )
+            
+            explanations = results.get("explanations")
+            logic = results.get("logic")
+            
+            # Nettoyer la barre de progression
+            progress_placeholder.empty()
+            progress_bar.empty()
+            
+        else:
+            # Lecture des fichiers PDF
+            resumes, file_names = [], []
+            with st.spinner("Lecture des fichiers PDF..."):
+                for file in uploaded_files_ranking:
+                    text = extract_text_from_pdf(file)
+                    if not "Erreur" in text:
+                        resumes.append(text)
+                        file_names.append(file.name)
+            
+            # Analyse selon la méthode choisie
+            with st.spinner(f"Analyse des CVs en cours avec {analysis_method}..."):
+                results, explanations, logic = {}, None, None
+                
+                if analysis_method == "Analyse par IA (DeepSeek)":
+                    results = rank_resumes_with_ai(job_description, resumes, file_names)
+                    explanations = results.get("explanations")
+                
+                elif analysis_method == "Scoring par Règles (Regex)":
+                    rule_results = rank_resumes_with_rules(job_description, resumes, file_names)
+                    results = {"scores": [r["score"] for r in rule_results]}
+                    logic = {r["file_name"]: r["logic"] for r in rule_results}
+                
+                elif analysis_method == "Méthode Sémantique (Embeddings)":
+                    results = rank_resumes_with_embeddings(job_description, resumes, file_names)
+                    logic = results.get("logic")
+                
+                elif analysis_method == "Analyse combinée (Ensemble)":
+                    results = rank_resumes_with_ensemble(
+                        job_description, resumes, file_names,
+                        cosinus_weight=cosinus_weight,
+                        semantic_weight=semantic_weight,
+                        rules_weight=rules_weight
+                    )
+                    logic = results.get("logic")
+                
+                else:  # Méthode Cosinus par défaut
+                    results = rank_resumes_with_cosine(job_description, resumes, file_names)
+                    logic = results.get("logic")
 
             scores = results.get("scores", [])
             if scores is not None and len(scores) > 0:
@@ -334,6 +465,34 @@ with tab1:
                         file_name = row["Nom du CV"]
                         with st.expander(f"Analyse pour : **{file_name}**"):
                             st.markdown(explanations.get(file_name, "N/A"))
+                
+                # Sauvegarder les résultats pour le feedback
+                st.session_state.last_analysis_result = results_df
+                st.session_state.cv_analysis_feedback = False
+                
+                # Demander un feedback à l'utilisateur
+                st.markdown("---")
+                st.markdown("### 🌟 Donnez-nous votre feedback")
+                st.markdown("Comment évaluez-vous la qualité des résultats fournis par cette analyse ?")
+                
+                feedback_col1, feedback_col2 = st.columns([3, 1])
+                with feedback_col1:
+                    feedback_score = st.slider("Note", 1, 5, 3, key="feedback_slider")
+                    feedback_text = st.text_area("Commentaires (optionnel)", key="feedback_text", 
+                                               placeholder="Qu'avez-vous apprécié ? Que pourrait-on améliorer ?")
+                
+                with feedback_col2:
+                    if st.button("Envoyer feedback", key="send_feedback"):
+                        save_feedback(
+                            analysis_method=analysis_method,
+                            job_title=job_title,
+                            job_description_snippet=job_description[:200],
+                            cv_count=len(file_names),
+                            feedback_score=feedback_score,
+                            feedback_text=feedback_text
+                        )
+                        st.session_state.cv_analysis_feedback = True
+                        st.success("Merci pour votre feedback ! 🙏")
             else:
                 st.error("L'analyse n'a retourné aucun score.")
 
@@ -424,6 +583,94 @@ with tab3:
     - **Avantages** : ✅ La plus précise et la plus "humaine". Comprend les nuances et fournit des explications de haute qualité.
     - **Limites** : ❌ La plus lente, et chaque analyse **consomme vos tokens !**
     """)
+    
+    st.subheader("5. Analyse combinée (Ensemble)")
+    st.markdown("""
+    - **Principe** : Combine plusieurs méthodes d'analyse (Cosinus, Sémantique, Règles) en un seul score pondéré.
+    - **Comment ça marche ?** Chaque CV est analysé selon les trois méthodes, puis les scores sont multipliés par les poids attribués à chaque méthode et additionnés.
+    - **Idéal pour** : Obtenir un classement plus équilibré qui tire parti des forces de chaque méthode. Réduire les faux positifs et les faux négatifs.
+    - **Avantages** : ✅ Plus robuste face aux biais de chaque méthode individuelle. Hautement personnalisable via les poids attribués. Fournit des explications détaillées.
+    - **Limites** : ❌ Plus lent que les méthodes individuelles (mais plus rapide que l'analyse par IA). Complexité accrue.
+    
+    ##### Comment ajuster les poids ?
+    - **Augmentez le poids Cosinus** lorsque les mots-clés exacts sont très importants (termes techniques spécifiques).
+    - **Augmentez le poids Sémantique** pour les postes créatifs ou les compétences transversales, où la compréhension du contexte est cruciale.
+    - **Augmentez le poids Règles** pour les postes avec des exigences formelles strictes en termes d'expérience ou de diplômes.
+    """)
+
+with tab4:
+    st.header("📈 Statistiques de Feedback Utilisateur")
+    
+    # Récupération des statistiques
+    feedback_stats = get_feedback_summary()
+    
+    if len(feedback_stats) > 0:
+        # Affichage des scores moyens par méthode
+        st.subheader("🌟 Satisfaction moyenne par méthode d'analyse")
+        
+        # Convertir les colonnes numériques en type numérique
+        feedback_stats["Score moyen"] = pd.to_numeric(feedback_stats["Score moyen"])
+        feedback_stats["Nombre d'évaluations"] = pd.to_numeric(feedback_stats["Nombre d'évaluations"])
+        
+        # Filtrer uniquement les méthodes avec des évaluations
+        feedback_with_evals = feedback_stats[feedback_stats["Nombre d'évaluations"] > 0]
+        
+        if not feedback_with_evals.empty:
+            # Graphique des scores moyens
+            fig_scores = go.Figure()
+            fig_scores.add_trace(go.Bar(
+                x=feedback_with_evals["Score moyen"],
+                y=feedback_with_evals["Méthode"],
+                orientation='h',
+                marker_color=["#0068c9", "#83c9ff", "#29b09d", "#7defa1", "#ff2b2b"][:len(feedback_with_evals)]
+            ))
+            fig_scores.update_layout(
+                title="Score moyen par méthode (sur 5)",
+                height=300,
+                margin={"l": 150, "r": 10, "t": 30, "b": 30},
+                xaxis={"range": [0, 5]},
+            )
+            
+            st.plotly_chart(fig_scores, use_container_width=True)
+            
+            # Graphique du nombre d'évaluations
+            fig_evals = go.Figure(data=[go.Pie(
+                labels=feedback_with_evals["Méthode"],
+                values=feedback_with_evals["Nombre d'évaluations"],
+                marker_colors=["#0068c9", "#83c9ff", "#29b09d", "#7defa1", "#ff2b2b"][:len(feedback_with_evals)]
+            )])
+            fig_evals.update_layout(
+                title="Distribution des évaluations",
+                height=300,
+            )
+            
+            st.plotly_chart(fig_evals, use_container_width=True)
+            
+            # Affichage du tableau de statistiques
+            st.subheader("📊 Détails des statistiques")
+            st.dataframe(feedback_stats, width="stretch", height=200)
+            
+            # Méthode la mieux notée
+            if len(feedback_with_evals) > 1:
+                best_method = feedback_with_evals.loc[feedback_with_evals["Score moyen"].idxmax()]
+                st.success(f"🏆 La méthode la mieux notée est : **{best_method['Méthode']}** avec un score de **{best_method['Score moyen']:.2f}/5** sur {best_method['Nombre d\'évaluations']} évaluations.")
+        else:
+            st.info("Aucune méthode n'a encore reçu d'évaluations.")
+    else:
+        st.info("Aucun feedback n'a encore été enregistré. Les statistiques apparaîtront ici une fois que des utilisateurs auront évalué les analyses de CV.")
+        
+        # Exemple de feedback
+        with st.expander("Comment les feedbacks sont-ils collectés ?"):
+            st.markdown("""
+            Après chaque analyse de CV, un formulaire de feedback apparaît en bas de la page pour demander à l'utilisateur d'évaluer la qualité des résultats.
+            
+            Les utilisateurs peuvent :
+            1. Attribuer une note de 1 à 5 étoiles
+            2. Laisser un commentaire optionnel
+            3. Envoyer leur feedback pour améliorer la précision de l'analyse
+            
+            Ces données sont ensuite agrégées pour identifier les méthodes les plus pertinentes selon les utilisateurs.
+            """)
 
 with st.sidebar:
     st.markdown("### 🔧 Configuration")

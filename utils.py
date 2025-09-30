@@ -1057,3 +1057,326 @@ def save_ksa_matrix_to_current_brief():
     st.session_state.saved_briefs[bname] = brief
     save_briefs()
     save_brief_to_gsheet(bname, brief)
+
+
+# ======================== ANALYSE CV AVANCÉE ========================
+# Fonctions pour l'analyse combinée, le traitement par lots et le feedback utilisateur
+# Ces fonctions étaient précédemment dans utils_cv_analyzer.py
+
+# -------------------- Configuration --------------------
+# Chemin pour stocker les données de feedback
+FEEDBACK_DATA_PATH = "feedback_data.json"
+
+# -------------------- Fonctions pour l'analyse combinée et le feedback --------------------
+def rank_resumes_with_ensemble(job_description, resumes, file_names, 
+                              cosinus_weight=0.2, semantic_weight=0.4, rules_weight=0.4,
+                              cosine_func=None, semantic_func=None, rules_func=None):
+    """
+    Combine les résultats de plusieurs méthodes d'analyse pour obtenir un score global pondéré.
+    
+    Args:
+        job_description: Description du poste à pourvoir
+        resumes: Liste des textes de CV à analyser
+        file_names: Liste des noms de fichiers correspondants
+        cosinus_weight: Poids de la méthode cosinus (0 à 1)
+        semantic_weight: Poids de la méthode sémantique (0 à 1)
+        rules_weight: Poids de la méthode par règles (0 à 1)
+        cosine_func: Fonction d'analyse cosinus (optionnel, pour l'injection de dépendance)
+        semantic_func: Fonction d'analyse sémantique (optionnel)
+        rules_func: Fonction d'analyse par règles (optionnel)
+        
+    Returns:
+        Dict contenant les scores combinés et les explications détaillées
+    """
+    # Import les fonctions nécessaires depuis le module d'analyse CV
+    import importlib
+    analyse_cv = importlib.import_module("pages.6_📄_Analyse_CV")
+    rank_resumes_with_cosine = analyse_cv.rank_resumes_with_cosine
+    rank_resumes_with_embeddings = analyse_cv.rank_resumes_with_embeddings
+    rank_resumes_with_rules = analyse_cv.rank_resumes_with_rules
+    
+    # Utilise les fonctions par défaut si non fournies
+    if cosine_func is None:
+        cosine_func = rank_resumes_with_cosine
+    if semantic_func is None:
+        semantic_func = rank_resumes_with_embeddings
+    if rules_func is None:
+        rules_func = rank_resumes_with_rules
+    
+    # Calcul des poids normalisés
+    total_weight = cosinus_weight + semantic_weight + rules_weight
+    if total_weight == 0:
+        cosinus_weight, semantic_weight, rules_weight = 0.33, 0.33, 0.34
+    else:
+        cosinus_weight /= total_weight
+        semantic_weight /= total_weight
+        rules_weight /= total_weight
+    
+    # Analyse avec chaque méthode
+    with st.spinner("Analyse par méthode cosinus..."):
+        cosine_results = cosine_func(job_description, resumes, file_names)
+        cosine_scores = cosine_results.get("scores", [0] * len(file_names))
+        cosine_logic = cosine_results.get("logic", {})
+    
+    with st.spinner("Analyse par méthode sémantique..."):
+        semantic_results = semantic_func(job_description, resumes, file_names)
+        semantic_scores = semantic_results.get("scores", [0] * len(file_names))
+        semantic_logic = semantic_results.get("logic", {})
+    
+    with st.spinner("Analyse par règles..."):
+        rule_results = rules_func(job_description, resumes, file_names)
+        rule_scores = [r["score"] for r in rule_results]
+        rule_logic = {r["file_name"]: r["logic"] for r in rule_results}
+    
+    # Combinaison des scores
+    combined_scores = []
+    for i in range(len(file_names)):
+        cosine_score = cosine_scores[i] if i < len(cosine_scores) else 0
+        semantic_score = semantic_scores[i] if i < len(semantic_scores) else 0
+        rule_score = rule_scores[i] if i < len(rule_scores) else 0
+        
+        weighted_score = (
+            cosine_score * cosinus_weight +
+            semantic_score * semantic_weight +
+            rule_score * rules_weight
+        )
+        combined_scores.append(weighted_score)
+    
+    # Construction d'une logique combinée
+    combined_logic = {}
+    for i, file_name in enumerate(file_names):
+        cosine_score = cosine_scores[i] if i < len(cosine_scores) else 0
+        semantic_score = semantic_scores[i] if i < len(semantic_scores) else 0
+        rule_score = rule_scores[i] if i < len(rule_scores) else 0
+        
+        combined_logic[file_name] = {
+            "Méthode Cosinus": {
+                "Score": f"{cosine_score*100:.1f}%",
+                "Poids": f"{cosinus_weight:.2f}",
+                "Contribution": f"{cosine_score*cosinus_weight*100:.1f}%",
+                "Détails": cosine_logic.get(file_name, {})
+            },
+            "Méthode Sémantique": {
+                "Score": f"{semantic_score*100:.1f}%",
+                "Poids": f"{semantic_weight:.2f}",
+                "Contribution": f"{semantic_score*semantic_weight*100:.1f}%",
+                "Détails": semantic_logic.get(file_name, {})
+            },
+            "Méthode Règles": {
+                "Score": f"{rule_score*100:.1f}%",
+                "Poids": f"{rules_weight:.2f}",
+                "Contribution": f"{rule_score*rules_weight*100:.1f}%",
+                "Détails": rule_logic.get(file_name, {})
+            },
+            "Score Final": f"{combined_scores[i]*100:.1f}%"
+        }
+    
+    return {"scores": combined_scores, "logic": combined_logic}
+
+def batch_process_resumes(job_description, file_list, analysis_method, 
+                          batch_size=10, progress_callback=None):
+    """
+    Traite un grand nombre de CVs par lots pour éviter les problèmes de mémoire.
+    
+    Args:
+        job_description: Description du poste
+        file_list: Liste de fichiers CV (objets UploadedFile de Streamlit)
+        analysis_method: Méthode d'analyse à utiliser
+        batch_size: Taille des lots pour le traitement
+        progress_callback: Fonction appelée pour mettre à jour la progression
+        
+    Returns:
+        Dict contenant les résultats combinés de tous les lots
+    """
+    # Import les fonctions nécessaires depuis le module d'analyse CV
+    import importlib
+    analyse_cv = importlib.import_module("pages.6_📄_Analyse_CV")
+    extract_text_from_pdf = analyse_cv.extract_text_from_pdf
+    rank_resumes_with_cosine = analyse_cv.rank_resumes_with_cosine
+    rank_resumes_with_embeddings = analyse_cv.rank_resumes_with_embeddings
+    rank_resumes_with_rules = analyse_cv.rank_resumes_with_rules
+    rank_resumes_with_ai = analyse_cv.rank_resumes_with_ai
+    
+    # Initialisation des résultats
+    all_scores = []
+    all_file_names = []
+    all_logic = {}
+    all_explanations = {}
+    
+    # Déterminer la fonction d'analyse appropriée
+    if analysis_method == "Analyse par IA (DeepSeek)":
+        analysis_func = rank_resumes_with_ai
+    elif analysis_method == "Scoring par Règles (Regex)":
+        analysis_func = lambda jd, res, fnames: rank_resumes_with_rules(jd, res, fnames)
+    elif analysis_method == "Méthode Sémantique (Embeddings)":
+        analysis_func = rank_resumes_with_embeddings
+    elif analysis_method == "Analyse combinée (Ensemble)":
+        analysis_func = rank_resumes_with_ensemble
+    else:  # Par défaut, méthode cosinus
+        analysis_func = rank_resumes_with_cosine
+    
+    # Traitement par lots
+    num_batches = (len(file_list) + batch_size - 1) // batch_size
+    
+    for batch_idx in range(num_batches):
+        start_idx = batch_idx * batch_size
+        end_idx = min((batch_idx + 1) * batch_size, len(file_list))
+        batch_files = file_list[start_idx:end_idx]
+        
+        # Extraction du texte des CVs
+        batch_resumes = []
+        batch_file_names = []
+        
+        for file in batch_files:
+            text = extract_text_from_pdf(file)
+            if "Erreur" not in text:
+                batch_resumes.append(text)
+                batch_file_names.append(file.name)
+        
+        # Analyse du lot
+        if batch_resumes:
+            if analysis_method == "Analyse par IA (DeepSeek)":
+                results = analysis_func(job_description, batch_resumes, batch_file_names)
+                batch_scores = results.get("scores", [])
+                batch_explanations = results.get("explanations", {})
+                all_explanations.update(batch_explanations)
+            elif analysis_method == "Scoring par Règles (Regex)":
+                rule_results = analysis_func(job_description, batch_resumes, batch_file_names)
+                batch_scores = [r["score"] for r in rule_results]
+                batch_logic = {r["file_name"]: r["logic"] for r in rule_results}
+                all_logic.update(batch_logic)
+            elif analysis_method == "Analyse combinée (Ensemble)":
+                results = analysis_func(job_description, batch_resumes, batch_file_names)
+                batch_scores = results.get("scores", [])
+                batch_logic = results.get("logic", {})
+                all_logic.update(batch_logic)
+            else:
+                results = analysis_func(job_description, batch_resumes, batch_file_names)
+                batch_scores = results.get("scores", [])
+                batch_logic = results.get("logic", {})
+                all_logic.update(batch_logic)
+            
+            all_scores.extend(batch_scores)
+            all_file_names.extend(batch_file_names)
+        
+        # Mise à jour de la progression
+        if progress_callback:
+            progress_callback((batch_idx + 1) / num_batches)
+    
+    # Construction des résultats finaux
+    final_results = {
+        "scores": all_scores,
+        "logic": all_logic
+    }
+    
+    if all_explanations:
+        final_results["explanations"] = all_explanations
+    
+    return final_results, all_file_names
+
+def save_feedback(analysis_method, job_title, job_description_snippet, cv_count, feedback_score, feedback_text):
+    """
+    Sauvegarde le feedback de l'utilisateur sur les résultats d'analyse.
+    
+    Args:
+        analysis_method: Méthode d'analyse utilisée
+        job_title: Intitulé du poste
+        job_description_snippet: Extrait de la description du poste
+        cv_count: Nombre de CVs analysés
+        feedback_score: Score de satisfaction (1-5)
+        feedback_text: Commentaires textuels
+    """
+    feedback_data = []
+    
+    # Chargement des données existantes
+    if os.path.exists(FEEDBACK_DATA_PATH):
+        try:
+            with open(FEEDBACK_DATA_PATH, 'r', encoding='utf-8') as f:
+                feedback_data = json.load(f)
+        except:
+            pass
+    
+    # Ajout du nouveau feedback
+    feedback_entry = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "analysis_method": analysis_method,
+        "job_title": job_title,
+        "job_description_snippet": job_description_snippet[:200] + "..." if len(job_description_snippet) > 200 else job_description_snippet,
+        "cv_count": cv_count,
+        "feedback_score": feedback_score,
+        "feedback_text": feedback_text
+    }
+    
+    feedback_data.append(feedback_entry)
+    
+    # Sauvegarde des données
+    with open(FEEDBACK_DATA_PATH, 'w', encoding='utf-8') as f:
+        json.dump(feedback_data, f, ensure_ascii=False, indent=2)
+    
+    return True
+
+def get_average_feedback_score(analysis_method=None):
+    """
+    Récupère le score moyen de feedback pour une méthode donnée ou pour toutes les méthodes.
+    
+    Args:
+        analysis_method: Méthode d'analyse spécifique (ou None pour toutes les méthodes)
+        
+    Returns:
+        Score moyen et nombre d'évaluations
+    """
+    if not os.path.exists(FEEDBACK_DATA_PATH):
+        return 0, 0
+    
+    try:
+        with open(FEEDBACK_DATA_PATH, 'r', encoding='utf-8') as f:
+            feedback_data = json.load(f)
+        
+        if analysis_method:
+            relevant_feedback = [f for f in feedback_data if f["analysis_method"] == analysis_method]
+        else:
+            relevant_feedback = feedback_data
+        
+        if not relevant_feedback:
+            return 0, 0
+        
+        total_score = sum(f["feedback_score"] for f in relevant_feedback)
+        return total_score / len(relevant_feedback), len(relevant_feedback)
+    
+    except:
+        return 0, 0
+
+def get_feedback_summary():
+    """
+    Génère un résumé des feedbacks reçus pour chaque méthode d'analyse.
+    
+    Returns:
+        DataFrame contenant les statistiques de feedback
+    """
+    methods = [
+        "Méthode Cosinus (Mots-clés)",
+        "Méthode Sémantique (Embeddings)",
+        "Scoring par Règles (Regex)",
+        "Analyse par IA (DeepSeek)",
+        "Analyse combinée (Ensemble)"
+    ]
+    
+    summary_data = []
+    
+    for method in methods:
+        avg_score, count = get_average_feedback_score(method)
+        summary_data.append({
+            "Méthode": method,
+            "Score moyen": round(avg_score, 2),
+            "Nombre d'évaluations": count
+        })
+    
+    # Ajouter le score global
+    overall_avg, overall_count = get_average_feedback_score()
+    summary_data.append({
+        "Méthode": "Toutes méthodes confondues",
+        "Score moyen": round(overall_avg, 2),
+        "Nombre d'évaluations": overall_count
+    })
+    
+    return pd.DataFrame(summary_data)
