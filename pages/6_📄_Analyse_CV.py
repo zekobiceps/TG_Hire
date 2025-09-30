@@ -642,7 +642,22 @@ with tab1:
                         feedback_key_prefix = f"cv_{i}_"
                         feedback_col1, feedback_col2 = st.columns([3, 1])
                         with feedback_col1:
-                            cv_feedback_score = st.slider("Note", 1, 5, 3, key=f"{feedback_key_prefix}score")
+                            # Remplacer le slider par des boutons radio pour plus de stabilité
+                            cv_feedback_score_options = {
+                                "⭐": 1,
+                                "⭐⭐": 2,
+                                "⭐⭐⭐": 3,
+                                "⭐⭐⭐⭐": 4,
+                                "⭐⭐⭐⭐⭐": 5
+                            }
+                            cv_feedback_score_display = st.radio(
+                                "Note", 
+                                options=list(cv_feedback_score_options.keys()),
+                                horizontal=True,
+                                key=f"{feedback_key_prefix}score_radio"
+                            )
+                            cv_feedback_score = cv_feedback_score_options[cv_feedback_score_display]
+                            
                             cv_feedback_text = st.text_area("Commentaires spécifiques", key=f"{feedback_key_prefix}text", 
                                                    placeholder="Points forts/faibles de ce classement...")
                         
@@ -658,15 +673,29 @@ with tab1:
                                 )
                                 st.success(f"Merci pour votre feedback sur {file_name} ! 🙏")
                 
-                # Feedback global - version simplifiée sans état persistant
+                # Feedback global avec boutons radio au lieu de slider
                 st.markdown("---")
                 st.markdown("### 🌟 Feedback global sur l'analyse")
                 st.markdown("Comment évaluez-vous la qualité globale des résultats fournis par cette analyse ?")
                 
                 feedback_col1, feedback_col2 = st.columns([3, 1])
                 with feedback_col1:
-                    # Version simplifiée sans persistance d'état qui causait l'erreur
-                    global_feedback_score = st.slider("Note globale", 1, 5, 3, key="global_feedback_slider")
+                    # Utilisation de boutons radio pour éviter les problèmes de rechargement
+                    global_feedback_score_options = {
+                        "⭐": 1,
+                        "⭐⭐": 2,
+                        "⭐⭐⭐": 3,
+                        "⭐⭐⭐⭐": 4,
+                        "⭐⭐⭐⭐⭐": 5
+                    }
+                    global_feedback_score_display = st.radio(
+                        "Note globale", 
+                        options=list(global_feedback_score_options.keys()),
+                        horizontal=True,
+                        key="global_feedback_score_radio"
+                    )
+                    global_feedback_score = global_feedback_score_options[global_feedback_score_display]
+                    
                     global_feedback_text = st.text_area("Commentaires sur l'ensemble de l'analyse", 
                                                key="global_feedback_text", 
                                                placeholder="Qu'avez-vous apprécié ? Que pourrait-on améliorer ?")
