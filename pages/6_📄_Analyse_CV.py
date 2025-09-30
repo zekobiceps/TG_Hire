@@ -100,6 +100,16 @@ div[data-testid="stTabs"] button p {
     background-color: #4CAF50;
     border-radius: 5px;
 }
+/* Réduire la taille du texte des métriques */
+[data-testid="metric-container"] {
+    font-size: 0.8em !important;
+}
+[data-testid="metric-container"] > div:first-child {
+    font-size: 0.75em !important;
+}
+[data-testid="metric-container"] > div:last-child {
+    font-size: 0.7em !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -709,8 +719,6 @@ with tab1:
                             4: "⭐⭐⭐⭐ Satisfaisant",
                             5: "⭐⭐⭐⭐⭐ Excellent"
                         }
-                        st.caption(f"**Votre note :** {score_labels[cv_feedback_score]}")
-
                         cv_feedback_text = st.text_area(
                             "Commentaires spécifiques (optionnel)",
                             placeholder=f"Points forts/faibles du classement de {file_name}...",
@@ -754,50 +762,44 @@ with tab1:
         if not getattr(st.session_state, 'feedback_submitted', False):
             with st.form(key='feedback_form'):
                 st.markdown("**Comment évaluez-vous la qualité globale des résultats de cette analyse ?**")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Slider pour la notation (1-5)
+                    global_feedback_score = st.slider(
+                        "Note globale (1 = Très insatisfaisant, 5 = Excellent)",
+                        min_value=1,
+                        max_value=5,
+                        value=3,
+                        step=1,
+                        help="Glissez pour donner votre note"
+                    )
 
-                # Slider pour la notation (1-5)
-                global_feedback_score = st.slider(
-                    "Note globale (1 = Très insatisfaisant, 5 = Excellent)",
-                    min_value=1,
-                    max_value=5,
-                    value=3,
-                    step=1,
-                    help="Glissez pour donner votre note"
-                )
-
-                # Affichage visuel de la note
-                score_labels = {
-                    1: "⭐ Très insatisfaisant",
-                    2: "⭐⭐ Insatisfaisant",
-                    3: "⭐⭐⭐ Acceptable",
-                    4: "⭐⭐⭐⭐ Satisfaisant",
-                    5: "⭐⭐⭐⭐⭐ Excellent"
-                }
-                st.caption(f"**Votre note :** {score_labels[global_feedback_score]}")
-
-                # Critères d'évaluation spécifiques
-                st.markdown("**Quels critères avez-vous particulièrement appréciés ou critiqués ?**")
-                user_criteria = st.multiselect(
-                    "Sélectionnez les critères évalués :",
-                    options=[
-                        "Pertinence du classement",
-                        "Clarté de la logique d'analyse",
-                        "Rapidité d'exécution",
-                        "Facilité d'utilisation",
-                        "Précision des scores",
-                        "Qualité des explications",
-                        "Autre"
-                    ],
-                    default=[],
-                    help="Sélectionnez tous les critères qui s'appliquent"
-                )
-
-                # Champ pour les commentaires
-                global_feedback_text = st.text_area(
-                    "Commentaires et suggestions d'amélioration (optionnel)",
-                    placeholder="Qu'avez-vous apprécié ? Que pourrait-on améliorer ? Quelles fonctionnalités ajouter ?",
-                    height=120
-                )
+                    # Critères d'évaluation spécifiques
+                    st.markdown("**Critères évalués :**")
+                    user_criteria = st.multiselect(
+                        "Sélectionnez les critères :",
+                        options=[
+                            "Pertinence du classement",
+                            "Clarté de la logique d'analyse",
+                            "Rapidité d'exécution",
+                            "Facilité d'utilisation",
+                            "Précision des scores",
+                            "Qualité des explications",
+                            "Autre"
+                        ],
+                        default=[],
+                        help="Tous les critères qui s'appliquent"
+                    )
+                    
+                with col2:
+                    # Champ pour les commentaires
+                    global_feedback_text = st.text_area(
+                        "Commentaires et suggestions d'amélioration (optionnel)",
+                        placeholder="Qu'avez-vous apprécié ? Que pourrait-on améliorer ? Quelles fonctionnalités ajouter ?",
+                        height=200
+                    )
 
                 # Bouton de soumission avec style amélioré
                 col1, col2, col3 = st.columns([1, 2, 1])
@@ -844,18 +846,20 @@ with tab2:
     
     analysis_type_single = st.selectbox(
         "Type d'analyse souhaité",
-        ("Analyse par IA (DeepSeek)", "Analyse par Regex (Extraction d'entités)", "Analyse par la Méthode Sémantique", "Analyse par la Méthode Cosinus")
+        ("Analyse par IA (DeepSeek)", "Analyse par Regex (Extraction d'entités)", "Analyse par la Méthode Sémantique", 
+         "Analyse par la Méthode Cosinus", "Analyse Combinée (Ensemble)")
     )
     captions = {
         "Analyse par IA (DeepSeek)": "Analyse qualitative (points forts/faibles). Consomme vos tokens !",
         "Analyse par Regex (Extraction d'entités)": "Extrait des informations structurées (compétences, diplômes, etc.).",
         "Analyse par la Méthode Sémantique": "Calcule un score de pertinence basé sur le sens (nécessite une description de poste).",
-        "Analyse par la Méthode Cosinus": "Calcule un score de pertinence basé sur les mots-clés (nécessite une description de poste)."
+        "Analyse par la Méthode Cosinus": "Calcule un score de pertinence basé sur les mots-clés (nécessite une description de poste).",
+        "Analyse Combinée (Ensemble)": "Combine plusieurs méthodes d'analyse pour un score plus robuste (nécessite une description de poste)."
     }
     st.caption(captions.get(analysis_type_single))
 
     job_desc_single = ""
-    if "Analyse par la Méthode" in analysis_type_single:
+    if "Analyse par la Méthode" in analysis_type_single or "Analyse Combinée" in analysis_type_single:
         job_desc_single = st.text_area("Description de poste pour le calcul du score", height=150, key="jd_single")
 
     if uploaded_files_analysis and st.button("🚀 Lancer l'analyse", type="primary", width="stretch", key="btn_single_analysis"):
@@ -882,6 +886,25 @@ with tab2:
                                 result = rank_resumes_with_cosine(job_desc_single, [text], [uploaded_file.name])
                                 score = result["scores"][0]
                                 st.metric("Score de Pertinence Cosinus", f"{score*100:.1f}%")
+                        elif "Analyse Combinée" in analysis_type_single:
+                            if not job_desc_single: st.warning("Veuillez fournir une description de poste.")
+                            else:
+                                result = rank_resumes_with_ensemble(
+                                    job_desc_single, [text], [uploaded_file.name],
+                                    cosinus_weight=0.2, semantic_weight=0.4, rules_weight=0.4,
+                                    cosine_func=rank_resumes_with_cosine,
+                                    semantic_func=rank_resumes_with_embeddings,
+                                    rules_func=rank_resumes_with_rules
+                                )
+                                score = result["scores"][0]
+                                st.metric("Score de Pertinence Combinée", f"{score*100:.1f}%")
+                                
+                                # Affichage de la logique si disponible
+                                if "logic" in result:
+                                    logic = result["logic"].get(uploaded_file.name, {})
+                                    if logic:
+                                        st.markdown("**Détail de l'analyse combinée :**")
+                                        st.json(logic)
                         else: # Analyse IA
                             analysis_result = get_deepseek_analysis(text)
                             st.markdown(analysis_result)
@@ -941,7 +964,7 @@ with tab3:
     """)
 
 with tab4:
-    st.header("� Dashboard de Feedback & Amélioration")
+    st.header("📊 Statistiques de Feedback")
 
     # Récupération des statistiques
     feedback_stats = get_feedback_summary()
@@ -966,7 +989,7 @@ with tab4:
         with col4:
             most_used = feedback_stats.loc[feedback_stats["Nombre d'évaluations"].idxmax()]
             evaluations_count = most_used["Nombre d'évaluations"]
-            st.metric("Plus Utilisée", most_used["Méthode"].split(" (")[0], help=f"{evaluations_count} évaluations")
+            st.metric("Top", most_used["Méthode"].split(" (")[0], help=f"{evaluations_count} évaluations")
 
         st.markdown("---")
 
@@ -1019,6 +1042,8 @@ with tab4:
                     title="Répartition des feedbacks par méthode",
                     height=400,
                     margin={"l": 20, "r": 20, "t": 40, "b": 20},
+                    font=dict(size=14),
+                    legend=dict(font=dict(size=16))
                 )
 
                 st.plotly_chart(fig_evals, use_container_width=True)
