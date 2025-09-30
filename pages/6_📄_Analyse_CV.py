@@ -17,9 +17,8 @@ from sentence_transformers import SentenceTransformer, util
 import torch
 
 # Import des fonctions avancées d'analyse
-from utils import (rank_resumes_with_ensemble, batch_process_resumes, 
-                 save_feedback, get_average_feedback_score, 
-                 get_feedback_summary)
+from utils import rank_resumes_with_ensemble, batch_process_resumes
+from feedback import save_feedback, get_average_feedback_score, get_feedback_summary
 
 # -------------------- Configuration de la clé API DeepSeek --------------------
 # --- CORRECTION : Déplacé à l'intérieur des fonctions pour éviter l'erreur au démarrage ---
@@ -705,7 +704,7 @@ with tab1:
                                 cv_submit_button = st.form_submit_button(label=f"Évaluer {file_name}")
                                 
                                 if cv_submit_button:
-                                    save_feedback(
+                                    result = save_feedback(
                                         analysis_method=f"{analysis_method} (CV individuel)",
                                         job_title=job_title,
                                         job_description_snippet=job_description[:200],
@@ -714,7 +713,10 @@ with tab1:
                                         feedback_text=f"Feedback pour {file_name}: {cv_feedback_text}"
                                     )
                                     st.session_state[submitted_key] = True
-                                    st.success(f"✅ Merci pour votre feedback sur {file_name} !")
+                                    if result:
+                                        st.success(f"✅ Merci pour votre feedback sur {file_name} !")
+                                    else:
+                                        st.error("❌ Échec de l'enregistrement du feedback.")
                 
                 # Activer le formulaire de feedback global
                 st.session_state.show_feedback_form = True
@@ -770,7 +772,7 @@ with tab1:
                         submit_button = st.form_submit_button(label="Envoyer mon feedback")
                         
                         if submit_button:
-                            save_feedback(
+                            result = save_feedback(
                                 analysis_method=analysis_method,
                                 job_title=job_title,
                                 job_description_snippet=job_description[:200],
@@ -779,7 +781,10 @@ with tab1:
                                 feedback_text=global_feedback_text
                             )
                             st.session_state.feedback_submitted = True
-                            st.success("✅ Merci pour votre feedback ! Il nous aidera à améliorer notre système.")
+                            if result:
+                                st.success("✅ Merci pour votre feedback ! Il nous aidera à améliorer notre système.")
+                            else:
+                                st.error("❌ Échec de l'enregistrement du feedback.")
                 
                 # Message si le feedback a déjà été soumis
                 elif st.session_state.feedback_submitted:
