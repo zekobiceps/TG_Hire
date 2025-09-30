@@ -1377,7 +1377,7 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
                         "cv_count", "feedback_score", "feedback_text", "user_criteria",
                         "improvement_suggestions", "version_app"
                     ]
-                    worksheet.update('A1:H1', [headers])
+                    worksheet.update('A1:J1', [headers])
                 
                 # Préparer les données à ajouter
                 row_data = [
@@ -1388,18 +1388,18 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
                     str(feedback_entry["cv_count"]),
                     str(feedback_entry["feedback_score"]),
                     feedback_entry["feedback_text"],
-                    feedback_entry["user_criteria"],
-                    feedback_entry["improvement_suggestions"],
+                    ", ".join(feedback_entry["user_criteria"]) if isinstance(feedback_entry["user_criteria"], list) else str(feedback_entry["user_criteria"]),
+                    ", ".join(feedback_entry["improvement_suggestions"]) if isinstance(feedback_entry["improvement_suggestions"], list) else str(feedback_entry["improvement_suggestions"]),
                     feedback_entry["version_app"]
                 ]
                 
                 # Ajouter la ligne
                 worksheet.append_row(row_data)
-                print(f"✅ Feedback envoyé avec succès à Google Sheets")
+                st.success("✅ Feedback envoyé avec succès à Google Sheets")
                 return True
                 
     except Exception as e:
-        print(f"❌ Erreur lors de la sauvegarde du feedback dans Google Sheets : {e}")
+    st.error(f"❌ Erreur lors de la sauvegarde du feedback dans Google Sheets : {e}")
         # Ne pas faire échouer si Google Sheets n'est pas disponible
         return True
     
