@@ -168,29 +168,45 @@ def ensure_briefs_directory():
 # -------------------- Persistance (JSON locale - la version active) --------------------
 def save_briefs():
     """
-    Sauvegarde locale des briefs (conversion sécurisée des dates -> str).
+    Sauvegarde locale des briefs en JSON.
+    - Convertit dates -> YYYY-MM-DD
+    - Convertit DataFrame -> JSON (records)
+    - Assure présence de KSA_MATRIX_JSON si ksa_matrix présent
     """
     import json, os
-    briefs = st.session_state.get("saved_briefs", {})
-    safe_briefs = {}
+    from datetime import date, datetime
+    import pandas as pd
+
+    briefs = st.session_state.get("saved_briefs", {}) or {}
 
     def convert(obj):
-        from datetime import date, datetime
         if isinstance(obj, (date, datetime)):
             return obj.strftime("%Y-%m-%d")
+        if isinstance(obj, pd.DataFrame):
+            # on ne garde pas la DataFrame brute
+            return obj.to_json(orient="records", force_ascii=False)
         if isinstance(obj, dict):
             return {k: convert(v) for k, v in obj.items()}
         if isinstance(obj, list):
             return [convert(x) for x in obj]
         return obj
 
-    for k, v in briefs.items():
-        safe_briefs[k] = convert(v)
+    safe = {}
+    for name, data in briefs.items():
+        # si une clé ksa_matrix (DataFrame) existe, la transformer en KSA_MATRIX_JSON
+        if "ksa_matrix" in data and isinstance(data["ksa_matrix"], pd.DataFrame):
+            try:
+                data["KSA_MATRIX_JSON"] = data["ksa_matrix"].to_json(orient="records", force_ascii=False)
+            except Exception:
+                pass
+            # on ne sauvegarde pas la DataFrame brute
+            data.pop("ksa_matrix", None)
+        safe[name] = convert(data)
 
     os.makedirs("briefs", exist_ok=True)
     try:
-        with open(os.path.join("briefs", "briefs.json"), "w", encoding="utf-8") as f:
-            json.dump(safe_briefs, f, ensure_ascii=False, indent=2)
+        with open("briefs/briefs.json", "w", encoding="utf-8") as f:
+            json.dump(safe, f, ensure_ascii=False, indent=2)
     except Exception as e:
         st.error(f"Erreur lors de la sauvegarde locale des briefs: {e}")
 
@@ -269,29 +285,45 @@ def ensure_briefs_directory():
 # -------------------- Persistance (JSON locale - la version active) --------------------
 def save_briefs():
     """
-    Sauvegarde locale des briefs (conversion sécurisée des dates -> str).
+    Sauvegarde locale des briefs en JSON.
+    - Convertit dates -> YYYY-MM-DD
+    - Convertit DataFrame -> JSON (records)
+    - Assure présence de KSA_MATRIX_JSON si ksa_matrix présent
     """
     import json, os
-    briefs = st.session_state.get("saved_briefs", {})
-    safe_briefs = {}
+    from datetime import date, datetime
+    import pandas as pd
+
+    briefs = st.session_state.get("saved_briefs", {}) or {}
 
     def convert(obj):
-        from datetime import date, datetime
         if isinstance(obj, (date, datetime)):
             return obj.strftime("%Y-%m-%d")
+        if isinstance(obj, pd.DataFrame):
+            # on ne garde pas la DataFrame brute
+            return obj.to_json(orient="records", force_ascii=False)
         if isinstance(obj, dict):
             return {k: convert(v) for k, v in obj.items()}
         if isinstance(obj, list):
             return [convert(x) for x in obj]
         return obj
 
-    for k, v in briefs.items():
-        safe_briefs[k] = convert(v)
+    safe = {}
+    for name, data in briefs.items():
+        # si une clé ksa_matrix (DataFrame) existe, la transformer en KSA_MATRIX_JSON
+        if "ksa_matrix" in data and isinstance(data["ksa_matrix"], pd.DataFrame):
+            try:
+                data["KSA_MATRIX_JSON"] = data["ksa_matrix"].to_json(orient="records", force_ascii=False)
+            except Exception:
+                pass
+            # on ne sauvegarde pas la DataFrame brute
+            data.pop("ksa_matrix", None)
+        safe[name] = convert(data)
 
     os.makedirs("briefs", exist_ok=True)
     try:
-        with open(os.path.join("briefs", "briefs.json"), "w", encoding="utf-8") as f:
-            json.dump(safe_briefs, f, ensure_ascii=False, indent=2)
+        with open("briefs/briefs.json", "w", encoding="utf-8") as f:
+            json.dump(safe, f, ensure_ascii=False, indent=2)
     except Exception as e:
         st.error(f"Erreur lors de la sauvegarde locale des briefs: {e}")
 
@@ -370,29 +402,45 @@ def ensure_briefs_directory():
 # -------------------- Persistance (JSON locale - la version active) --------------------
 def save_briefs():
     """
-    Sauvegarde locale des briefs (conversion sécurisée des dates -> str).
+    Sauvegarde locale des briefs en JSON.
+    - Convertit dates -> YYYY-MM-DD
+    - Convertit DataFrame -> JSON (records)
+    - Assure présence de KSA_MATRIX_JSON si ksa_matrix présent
     """
     import json, os
-    briefs = st.session_state.get("saved_briefs", {})
-    safe_briefs = {}
+    from datetime import date, datetime
+    import pandas as pd
+
+    briefs = st.session_state.get("saved_briefs", {}) or {}
 
     def convert(obj):
-        from datetime import date, datetime
         if isinstance(obj, (date, datetime)):
             return obj.strftime("%Y-%m-%d")
+        if isinstance(obj, pd.DataFrame):
+            # on ne garde pas la DataFrame brute
+            return obj.to_json(orient="records", force_ascii=False)
         if isinstance(obj, dict):
             return {k: convert(v) for k, v in obj.items()}
         if isinstance(obj, list):
             return [convert(x) for x in obj]
         return obj
 
-    for k, v in briefs.items():
-        safe_briefs[k] = convert(v)
+    safe = {}
+    for name, data in briefs.items():
+        # si une clé ksa_matrix (DataFrame) existe, la transformer en KSA_MATRIX_JSON
+        if "ksa_matrix" in data and isinstance(data["ksa_matrix"], pd.DataFrame):
+            try:
+                data["KSA_MATRIX_JSON"] = data["ksa_matrix"].to_json(orient="records", force_ascii=False)
+            except Exception:
+                pass
+            # on ne sauvegarde pas la DataFrame brute
+            data.pop("ksa_matrix", None)
+        safe[name] = convert(data)
 
     os.makedirs("briefs", exist_ok=True)
     try:
-        with open(os.path.join("briefs", "briefs.json"), "w", encoding="utf-8") as f:
-            json.dump(safe_briefs, f, ensure_ascii=False, indent=2)
+        with open("briefs/briefs.json", "w", encoding="utf-8") as f:
+            json.dump(safe, f, ensure_ascii=False, indent=2)
     except Exception as e:
         st.error(f"Erreur lors de la sauvegarde locale des briefs: {e}")
 

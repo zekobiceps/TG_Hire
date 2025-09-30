@@ -697,8 +697,6 @@ with tabs[2]:
                     return val
             return default
 
-        st.progress(int(step / total_steps * 100), text=f"Étape {step} sur {total_steps}")
-
         # ---------------- ÉTAPE 1 ----------------
         if step == 1:
             st.markdown("### 📝 Étape 1 : Portrait robot & Commentaires manager")
@@ -1087,18 +1085,29 @@ button[kind="secondary"] {
             st.experimental_rerun()
     with nav_right:
         if step < total_steps and st.button("Suivant ➡️", key=f"next_{step}", help="Étape suivante"):
-            # (auto-save inséré ici – voir patch 7)
+            # Auto-save (étapes 1–3)
             if step in (1,2,3) and st.session_state.current_brief_name:
                 bname = st.session_state.current_brief_name
                 bdata = st.session_state.saved_briefs.get(bname, {})
+
+                # Champs texte
                 bdata["CRITERES_EXCLUSION"] = st.session_state.get("criteres_exclusion","")
                 bdata["PROCESSUS_EVALUATION"] = st.session_state.get("processus_evaluation","")
                 bdata["MANAGER_NOTES"] = st.session_state.get("manager_notes","")
-                if "ksa_matrix" in st.session_state and not st.session_state.ksa_matrix.empty:
-                    bdata["KSA_MATRIX_JSON"] = st.session_state.ksa_matrix.to_json(orient="records", force_ascii=False)
+
+                # KSA → JSON uniquement
+                if "ksa_matrix" in st.session_state and hasattr(st.session_state.ksa_matrix, "empty") and not st.session_state.ksa_matrix.empty:
+                    try:
+                        bdata["KSA_MATRIX_JSON"] = st.session_state.ksa_matrix.to_json(orient="records", force_ascii=False)
+                    except Exception:
+                        pass
+                # Ne jamais stocker la DataFrame brute
+                bdata.pop("ksa_matrix", None)
+
                 st.session_state.saved_briefs[bname] = bdata
                 save_briefs()
                 save_brief_to_gsheet(bname, bdata)
+
             st.session_state.reunion_step += 1
             st.experimental_rerun()
 
