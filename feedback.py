@@ -127,10 +127,10 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
                         # Créer l'onglet avec des en-têtes
                         worksheet = sh.add_worksheet(title=FEEDBACK_GSHEET_NAME, rows=1000, cols=8)
                         
-                        # Ajouter les en-têtes
+                        # Ajouter les en-têtes exacts tels qu'ils sont dans la feuille existante
                         headers = [
-                            "Timestamp", "Méthode d'analyse", "Poste", "Description",
-                            "Nombre de CVs", "Score", "Commentaires", "Version"
+                            "timestamp", "analysis_method", "job_title", "job_description_snippet",
+                            "cv_count", "feedback_score", "feedback_text", "version_app"
                         ]
                         worksheet.update('A1:H1', [headers])
                     
