@@ -480,7 +480,7 @@ with tab1:
     analysis_method = st.radio(
         "✨ Choisissez votre méthode de classement",
         ["Méthode Cosinus (Mots-clés)", "Méthode Sémantique (Embeddings)", "Scoring par Règles (Regex)", 
-         "Analyse par IA (DeepSeek)", "Analyse combinée (Ensemble)"],
+         "Analyse combinée (Ensemble)", "Analyse par IA (DeepSeek)"],
         index=0, help="Consultez l'onglet 'Guide des Méthodes'."
     )
     

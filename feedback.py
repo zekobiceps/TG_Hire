@@ -7,6 +7,7 @@ from datetime import datetime
 # Chemin vers le fichier de données de feedback
 FEEDBACK_DATA_PATH = "feedback_data.json"
 FEEDBACK_GSHEET_NAME = "TG_Hire_Feedback_Analytics"
+FEEDBACK_GSHEET_URL = "https://docs.google.com/spreadsheets/d/1FBeN0s7ESjZ6BPoG4iB4VQ6w-MfRL1GWBGEkbqPR0gI/edit"
 
 def save_feedback(analysis_method, job_title, job_description_snippet, cv_count, feedback_score, feedback_text=""):
     """
@@ -61,17 +62,28 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
     # Sauvegarde dans Google Sheets si disponible
     try:
         from utils import GSPREAD_AVAILABLE, get_briefs_gsheet_client
+        import streamlit as st
         
         if GSPREAD_AVAILABLE:
             # Obtenir le client Google Sheets
             gc = get_briefs_gsheet_client()
             if gc:
                 try:
+                    # Utiliser le client existant pour accéder à la nouvelle feuille
+                    parent_spreadsheet = gc.parent
+                    
+                    # Ouvrir la feuille de feedback spécifique
+                    try:
+                        spreadsheet = parent_spreadsheet.open_by_url(FEEDBACK_GSHEET_URL)
+                    except:
+                        # Si on ne peut pas ouvrir par URL, continuer avec la feuille actuelle
+                        spreadsheet = parent_spreadsheet
+                    
                     # Vérifier si la feuille Feedback existe déjà, sinon la créer
                     try:
-                        worksheet = gc.parent.worksheet(FEEDBACK_GSHEET_NAME)
+                        worksheet = spreadsheet.worksheet(FEEDBACK_GSHEET_NAME)
                     except:
-                        worksheet = gc.parent.add_worksheet(title=FEEDBACK_GSHEET_NAME, rows=1000, cols=8)
+                        worksheet = spreadsheet.add_worksheet(title=FEEDBACK_GSHEET_NAME, rows=1000, cols=8)
                         
                         # Ajouter les en-têtes
                         headers = [
@@ -145,8 +157,8 @@ def get_feedback_summary():
         "Méthode Cosinus (Mots-clés)",
         "Méthode Sémantique (Embeddings)",
         "Scoring par Règles (Regex)",
-        "Analyse par IA (DeepSeek)",
-        "Analyse combinée (Ensemble)"
+        "Analyse combinée (Ensemble)",
+        "Analyse par IA (DeepSeek)"
     ]
     
     summary_data = []
