@@ -1381,17 +1381,20 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
                 
                 # Préparer les données à ajouter
                 row_data = [
-                    feedback_entry["timestamp"],
-                    feedback_entry["analysis_method"],
-                    feedback_entry["job_title"],
-                    feedback_entry["job_description_snippet"],
+                    str(feedback_entry["timestamp"]),
+                    str(feedback_entry["analysis_method"]),
+                    str(feedback_entry["job_title"]),
+                    str(feedback_entry["job_description_snippet"]),
                     str(feedback_entry["cv_count"]),
                     str(feedback_entry["feedback_score"]),
-                    feedback_entry["feedback_text"],
-                    ", ".join(feedback_entry["user_criteria"]) if isinstance(feedback_entry["user_criteria"], list) else str(feedback_entry["user_criteria"]),
-                    ", ".join(feedback_entry["improvement_suggestions"]) if isinstance(feedback_entry["improvement_suggestions"], list) else str(feedback_entry["improvement_suggestions"]),
-                    feedback_entry["version_app"]
+                    str(feedback_entry["feedback_text"]),
+                    str(", ".join(feedback_entry["user_criteria"]) if isinstance(feedback_entry["user_criteria"], list) else feedback_entry["user_criteria"]),
+                    str(", ".join(feedback_entry["improvement_suggestions"]) if isinstance(feedback_entry["improvement_suggestions"], list) else feedback_entry["improvement_suggestions"]),
+                    str(feedback_entry["version_app"])
                 ]
+                # Forcer la taille à 10 colonnes (ajouter des cellules vides si besoin)
+                while len(row_data) < 10:
+                    row_data.append("")
                 
                 # Ajouter la ligne en forçant l'insertion à la première colonne d'une nouvelle ligne
                 last_row = len(worksheet.get_all_values()) + 1
