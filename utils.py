@@ -71,6 +71,18 @@ BRIEFS_HEADERS = [
     "MANAGER_COMMENTS_JSON", "KSA_MATRIX_JSON", "DATE_MAJ"
 ]
 
+# -------------------- CONFIGURATION GOOGLE SHEETS pour les Annonces --------------------
+ANNONCES_SHEET_URL = "https://docs.google.com/spreadsheets/d/1yibT8jcQ35a9VWAKpcdczKAHdnIOLi2UHnQvsfulH_s/edit"
+ANNONCES_WORKSHEET_NAME = "Annonces"
+
+# Entêtes de colonnes pour les annonces (doivent correspondre EXACTEMENT à la Ligne 1 de votre Google Sheet)
+ANNONCES_HEADERS = [
+    "timestamp", "poste", "entreprise", "localisation", "plateforme", 
+    "contenu", "fiche_text", "type_contrat", "niveau_experience", 
+    "formation_requise", "affectation", "competences_techniques", 
+    "missions_principales", "soft_skills", "date_creation"
+]
+
 # -------------------- FONCTIONS DE GESTION GOOGLE SHEETS (CORRIGÉES POUR SECRETS GCP_) --------------------
 
 @st.cache_resource
@@ -1477,3 +1489,87 @@ def get_feedback_summary():
     })
     
     return pd.DataFrame(summary_data)
+
+# -------------------- FONCTIONS GOOGLE SHEETS pour les Annonces --------------------
+
+@st.cache_resource
+def get_annonces_gsheet_client():
+    """Initialise et retourne le client gspread pour les annonces."""
+    if not GSPREAD_AVAILABLE:
+        return None
+    try:
+        service_account_info = {
+            "type": st.secrets["GCP_TYPE"],
+            "project_id": st.secrets["GCP_PROJECT_ID"],
+            "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
+            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace("\\n", "\n"),
+            "client_email": st.secrets["GCP_CLIENT_EMAIL"],
+            "client_id": st.secrets["GCP_CLIENT_ID"],
+            "auth_uri": st.secrets["GCP_AUTH_URI"],
+            "token_uri": st.secrets["GCP_TOKEN_URI"],
+            "auth_provider_x509_cert_url": st.secrets["GCP_AUTH_PROVIDER_X509_CERT_URL"],
+            "client_x509_cert_url": st.secrets["GCP_CLIENT_X509_CERT_URL"]
+        }
+        gc = gspread.service_account_from_dict(service_account_info)
+        return gc
+    except KeyError as e:
+        st.error(f"❌ Clé de secret manquante pour Google Sheets: {e}. Vérifiez la configuration des secrets GCP_...")
+        return None
+    except Exception as e:
+        st.error(f"❌ Erreur de connexion/ouverture de Google Sheets: {e}")
+        return None
+
+def save_annonce_to_gsheet(annonce_data):
+    """Sauvegarde une annonce dans Google Sheets."""
+    try:
+        gc = get_annonces_gsheet_client()
+        if not gc:
+            return False
+        
+        sheet = gc.open_by_url(ANNONCES_SHEET_URL)
+        worksheet = sheet.worksheet(ANNONCES_WORKSHEET_NAME)
+        
+        # Préparer les données dans l'ordre des colonnes
+        row_data = [
+            annonce_data.get("timestamp", ""),
+            annonce_data.get("poste", ""),
+            annonce_data.get("entreprise", "TGCC"),
+            annonce_data.get("localisation", ""),
+            annonce_data.get("plateforme", ""),
+            annonce_data.get("contenu", ""),
+            annonce_data.get("fiche_text", ""),
+            annonce_data.get("type_contrat", ""),
+            annonce_data.get("niveau_experience", ""),
+            annonce_data.get("formation_requise", ""),
+            annonce_data.get("affectation", ""),
+            annonce_data.get("competences_techniques", ""),
+            annonce_data.get("missions_principales", ""),
+            annonce_data.get("soft_skills", ""),
+            annonce_data.get("date_creation", "")
+        ]
+        
+        # Ajouter la ligne
+        worksheet.append_row(row_data)
+        return True
+        
+    except Exception as e:
+        st.error(f"❌ Erreur sauvegarde annonce Google Sheets: {e}")
+        return False
+
+def load_annonces_from_gsheet():
+    """Charge toutes les annonces depuis Google Sheets."""
+    try:
+        gc = get_annonces_gsheet_client()
+        if not gc:
+            return []
+        
+        sheet = gc.open_by_url(ANNONCES_SHEET_URL)
+        worksheet = sheet.worksheet(ANNONCES_WORKSHEET_NAME)
+        
+        # Récupérer toutes les données
+        records = worksheet.get_all_records()
+        return records
+        
+    except Exception as e:
+        st.warning(f"Erreur lors du chargement des annonces depuis Google Sheets : {e}")
+        return []

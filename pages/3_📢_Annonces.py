@@ -168,14 +168,18 @@ with col_info1:
     poste_final = st.text_input("Poste*", help="Ex: Directeur des Projets BTP")
 with col_info2:
     localisation_finale = st.text_input("Localisation*", help="Ex: Casablanca, Rabat, Tanger")
-    entreprise = st.text_input("Entreprise*", value="TGCC", disabled=True)
+
+# Entreprise par défaut (TGCC)
+entreprise = "TGCC"
 
 # Bouton pour générer via IA
 col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
 with col_btn2:
+    st.markdown('<div class="red-generate-button">', unsafe_allow_html=True)
     generate_button = st.button("💡 Générer l'annonce via IA", 
                               width="stretch",
                               key="btn_generer_annonce")
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # Génération IA avec spinner
 if generate_button:
@@ -351,6 +355,32 @@ col_save1, col_save2, col_save3 = st.columns([1, 2, 1])
 with col_save2:
     if st.button("💾 Sauvegarder l'annonce", type="primary", width="stretch", key="btn_sauvegarder_annonce"):
         if poste_final and entreprise and contenu and localisation_finale:
+            # Préparer les données pour Google Sheets
+            annonce_data = {
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "poste": poste_final,
+                "entreprise": entreprise,
+                "localisation": localisation_finale,
+                "plateforme": plateforme,
+                "contenu": contenu,
+                "fiche_text": fiche_text if fiche_text else "",
+                "type_contrat": locals().get('type_contrat', '') if input_mode == "Saisie manuelle" else "",
+                "niveau_experience": locals().get('niveau_experience', '') if input_mode == "Saisie manuelle" else "",
+                "formation_requise": locals().get('formation_requise', '') if input_mode == "Saisie manuelle" else "",
+                "affectation": locals().get('affectation', '') if input_mode == "Saisie manuelle" else "",
+                "competences_techniques": locals().get('competences_techniques', '') if input_mode == "Saisie manuelle" else "",
+                "missions_principales": locals().get('missions_principales', '') if input_mode == "Saisie manuelle" else "",
+                "soft_skills": locals().get('soft_skills', '') if input_mode == "Saisie manuelle" else "",
+                "date_creation": datetime.now().strftime("%Y-%m-%d")
+            }
+            
+            # Sauvegarder dans Google Sheets
+            if utils.save_annonce_to_gsheet(annonce_data):
+                st.success("✅ Annonce sauvegardée dans Google Sheets avec succès !")
+            else:
+                st.warning("⚠️ Erreur lors de la sauvegarde dans Google Sheets, sauvegarde locale uniquement.")
+            
+            # Sauvegarder aussi localement
             annonce = {
                 "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
                 "poste": poste_final,
@@ -360,7 +390,7 @@ with col_save2:
                 "plateforme": plateforme,
             }
             st.session_state.annonces.append(annonce)
-            st.success("✅ Annonce sauvegardée avec succès !")
+            
             # Reset pour nouvelle saisie
             st.session_state["annonce_contenu"] = ""
         else:
