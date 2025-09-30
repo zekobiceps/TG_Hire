@@ -3,6 +3,15 @@ import json
 import os
 import pandas as pd
 from datetime import datetime
+import streamlit as st
+
+# Imports pour Google Sheets
+try:
+    import gspread
+    from google.oauth2 import service_account
+    GSPREAD_AVAILABLE = True
+except ImportError:
+    GSPREAD_AVAILABLE = False
 
 # Chemin vers le fichier de données de feedback
 FEEDBACK_DATA_PATH = "feedback_data.json"
@@ -61,53 +70,70 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
     
     # Sauvegarde dans Google Sheets si disponible
     try:
-        from utils import GSPREAD_AVAILABLE, get_briefs_gsheet_client
-        import streamlit as st
-        
         if GSPREAD_AVAILABLE:
-            # Obtenir le client Google Sheets
-            gc = get_briefs_gsheet_client()
-            if gc:
+            # Créer les identifiants pour Google Sheets directement ici, comme dans 8_🗺️_Cartographie.py
+            try:
+                service_account_info = {
+                    "type": st.secrets["GCP_TYPE"],
+                    "project_id": st.secrets["GCP_PROJECT_ID"],
+                    "private_key_id": st.secrets.get("GCP_PRIVATE_KEY_ID", ""),
+                    "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n'),
+                    "client_email": st.secrets["GCP_CLIENT_EMAIL"],
+                    "client_id": st.secrets.get("GCP_CLIENT_ID", ""),
+                    "auth_uri": st.secrets.get("GCP_AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
+                    "token_uri": st.secrets["GCP_TOKEN_URI"],
+                    "auth_provider_x509_cert_url": st.secrets.get("GCP_AUTH_PROVIDER_CERT_URL", "https://www.googleapis.com/oauth2/v1/certs"),
+                    "client_x509_cert_url": st.secrets.get("GCP_CLIENT_CERT_URL", "")
+                }
+                
+                # Créer les identifiants avec les scopes nécessaires
+                creds = service_account.Credentials.from_service_account_info(
+                    service_account_info,
+                    scopes=["https://www.googleapis.com/auth/spreadsheets"]
+                )
+                
+                # Connecter à Google Sheets
+                gc = gspread.authorize(creds)
+                
+                # Ouvrir la feuille de feedback spécifique
                 try:
-                    # Utiliser le client existant pour accéder à la nouvelle feuille
-                    parent_spreadsheet = gc.parent
+                    spreadsheet = gc.open_by_url(FEEDBACK_GSHEET_URL)
+                except:
+                    st.warning("⚠️ URL de la feuille de feedback introuvable, impossible de sauvegarder en ligne.")
                     
-                    # Ouvrir la feuille de feedback spécifique
-                    try:
-                        spreadsheet = parent_spreadsheet.open_by_url(FEEDBACK_GSHEET_URL)
-                    except:
-                        # Si on ne peut pas ouvrir par URL, continuer avec la feuille actuelle
-                        spreadsheet = parent_spreadsheet
-                    
-                    # Vérifier si la feuille Feedback existe déjà, sinon la créer
-                    try:
-                        worksheet = spreadsheet.worksheet(FEEDBACK_GSHEET_NAME)
-                    except:
-                        worksheet = spreadsheet.add_worksheet(title=FEEDBACK_GSHEET_NAME, rows=1000, cols=8)
-                        
-                        # Ajouter les en-têtes
-                        headers = [
-                            "timestamp", "analysis_method", "job_title", "job_description_snippet",
-                            "cv_count", "feedback_score", "feedback_text", "version_app"
-                        ]
-                        worksheet.update('A1:H1', [headers])
-                    
-                    # Convertir l'entrée de feedback en ligne
-                    row = [
-                        feedback_entry["timestamp"],
-                        feedback_entry["analysis_method"],
-                        feedback_entry["job_title"],
-                        feedback_entry["job_description_snippet"],
-                        str(feedback_entry["cv_count"]),
-                        str(feedback_entry["feedback_score"]),
-                        feedback_entry["feedback_text"],
-                        feedback_entry["version_app"]
-                    ]
-                    
-                    # Ajouter la ligne
-                    worksheet.append_row(row)
-                except Exception as e:
-                    print(f"Erreur lors de la sauvegarde du feedback dans Google Sheets: {e}")
+                    if spreadsheet:
+                        try:
+                            # Vérifier si la feuille Feedback existe déjà, sinon la créer
+                            try:
+                                worksheet = spreadsheet.worksheet(FEEDBACK_GSHEET_NAME)
+                            except gspread.exceptions.WorksheetNotFound:
+                                worksheet = spreadsheet.add_worksheet(title=FEEDBACK_GSHEET_NAME, rows=1000, cols=8)
+                                
+                                # Ajouter les en-têtes
+                                headers = [
+                                    "timestamp", "analysis_method", "job_title", "job_description_snippet",
+                                    "cv_count", "feedback_score", "feedback_text", "version_app"
+                                ]
+                                worksheet.update('A1:H1', [headers])
+                            
+                            # Convertir l'entrée de feedback en ligne
+                            row = [
+                                feedback_entry["timestamp"],
+                                feedback_entry["analysis_method"],
+                                feedback_entry["job_title"],
+                                feedback_entry["job_description_snippet"],
+                                str(feedback_entry["cv_count"]),
+                                str(feedback_entry["feedback_score"]),
+                                feedback_entry["feedback_text"],
+                                feedback_entry["version_app"]
+                            ]
+                            
+                            # Ajouter la ligne (comme dans 8_🗺️_Cartographie.py)
+                            worksheet.append_row(row)
+                            st.success(f"✅ Feedback enregistré dans Google Sheets avec succès!")
+                        except Exception as e:
+                            st.error(f"❌ Erreur lors de la sauvegarde du feedback dans Google Sheets: {e}")
+                            st.info("Le feedback a été sauvegardé localement, mais pas dans Google Sheets.")
     except ImportError:
         # GSpread n'est pas disponible, on continue sans erreur
         pass
