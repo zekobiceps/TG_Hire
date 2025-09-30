@@ -676,7 +676,11 @@ with tab1:
             for _, row in results_df.iterrows():
                 file_name = row["Nom du CV"]
                 with st.expander(f"Analyse pour : **{file_name}**"):
-                    st.markdown(explanations.get(file_name, "N/A"))
+                        explanation = explanations.get(file_name, "N/A")
+                        # Tronquer à 300 caractères pour concision
+                        if explanation and len(explanation) > 300:
+                            explanation = explanation[:300] + "..."
+                        st.markdown(explanation)
         
         # Système de feedback par CV avec formulaires pour éviter les rechargements
         st.markdown("---")

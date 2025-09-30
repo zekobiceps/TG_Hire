@@ -1380,19 +1380,22 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
                     worksheet.update('A1:J1', [headers])
                 
                 # Préparer les données à ajouter
+                # Construction explicite pour garantir version_app en colonne J (index 9)
                 row_data = [
-                    str(feedback_entry["timestamp"]),
-                    str(feedback_entry["analysis_method"]),
-                    str(feedback_entry["job_title"]),
-                    str(feedback_entry["job_description_snippet"]),
-                    str(feedback_entry["cv_count"]),
-                    str(feedback_entry["feedback_score"]),
-                    str(feedback_entry["feedback_text"]),
-                    str(", ".join(feedback_entry["user_criteria"]) if isinstance(feedback_entry["user_criteria"], list) else feedback_entry["user_criteria"]),
-                    str(", ".join(feedback_entry["improvement_suggestions"]) if isinstance(feedback_entry["improvement_suggestions"], list) else feedback_entry["improvement_suggestions"]),
-                    str(feedback_entry["version_app"])
+                    str(feedback_entry.get("timestamp", "")),
+                    str(feedback_entry.get("analysis_method", "")),
+                    str(feedback_entry.get("job_title", "")),
+                    str(feedback_entry.get("job_description_snippet", "")),
+                    str(feedback_entry.get("cv_count", "")),
+                    str(feedback_entry.get("feedback_score", "")),
+                    str(feedback_entry.get("feedback_text", "")),
+                    str(", ".join(feedback_entry.get("user_criteria", [])) if isinstance(feedback_entry.get("user_criteria", []), list) else feedback_entry.get("user_criteria", "")),
+                    str(", ".join(feedback_entry.get("improvement_suggestions", [])) if isinstance(feedback_entry.get("improvement_suggestions", []), list) else feedback_entry.get("improvement_suggestions", "")),
+                    str(feedback_entry.get("version_app", ""))
                 ]
-                # Forcer la taille à 10 colonnes (ajouter des cellules vides si besoin)
+                # Tronquer à 10 colonnes si jamais il y a plus
+                row_data = row_data[:10]
+                # Compléter si moins de 10 colonnes
                 while len(row_data) < 10:
                     row_data.append("")
                 
