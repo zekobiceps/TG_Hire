@@ -492,26 +492,35 @@ tab1, tab2, tab3, tab4 = st.tabs(["📊 Classement de CVs", "🎯 Analyse de Pro
 
 with tab1:
     st.markdown("### 📄 Informations du Poste")
-    col1, col2, col3 = st.columns([2, 1, 1])
+    col1, col2 = st.columns([2, 1])
     with col1:
-        job_title = st.text_input("Intitulé du poste", placeholder="Ex: Archiviste Junior")
-        job_description = st.text_area("Description du poste", height=200, key="jd_ranking", placeholder="Collez la description...")
-    with col2:
-        st.markdown("#### 📤 Importer des CVs")
-        uploaded_files_ranking = st.file_uploader("Importer des CVs", type=["pdf"], accept_multiple_files=True, key="ranking_uploader")
-    with col3:
-        st.markdown("#### 📄 Fiche de Poste (optionnelle)")
-        fiche_poste_options = ["Aucune", "Importer une fiche de poste (PDF)"]
-        fiche_poste_choice = st.selectbox("Choisissez la source de la fiche de poste", fiche_poste_options, index=0)
+        # Menu déroulant pour choisir entre annonce et fiche de poste
+        job_source = st.selectbox(
+            "Source des informations du poste",
+            ["Annonce (saisie manuelle)", "Fiche de poste (PDF)"],
+            index=0
+        )
+        
+        job_title = ""
+        job_description = ""
         fiche_poste_text = ""
-        if fiche_poste_choice == "Importer une fiche de poste (PDF)":
-            fiche_poste_file = st.file_uploader("Fiche de poste (PDF)", type=["pdf"], key="fiche_poste_uploader")
+        
+        if job_source == "Annonce (saisie manuelle)":
+            job_title = st.text_input("Intitulé du poste", placeholder="Ex: Archiviste Junior")
+            job_description = st.text_area("Description du poste", height=200, key="jd_ranking", placeholder="Collez la description...")
+        else:  # Fiche de poste (PDF)
+            fiche_poste_file = st.file_uploader("Importer une fiche de poste (PDF)", type=["pdf"], key="fiche_poste_uploader")
             if fiche_poste_file:
                 fiche_poste_text = extract_text_from_pdf(fiche_poste_file)
                 if fiche_poste_text and not fiche_poste_text.startswith("Erreur"):
                     st.success("Fiche de poste importée !")
+                    job_description = fiche_poste_text  # Utiliser le contenu de la fiche comme description
                 else:
                     st.error("Erreur lors de la lecture de la fiche de poste.")
+                    
+    with col2:
+        st.markdown("#### 📤 Importer des CVs")
+        uploaded_files_ranking = st.file_uploader("Importer des CVs", type=["pdf"], accept_multiple_files=True, key="ranking_uploader")
     
     st.markdown("---")
     
@@ -692,33 +701,30 @@ with tab1:
                 with st.expander(f"Analyse pour : **{file_name}**"):
                     explanation = explanations.get(file_name, "N/A")
                     import re
+                    
+                    # Extraction et affichage du score
                     score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", explanation, re.IGNORECASE)
-                    score_text = f"Score : {score_match.group(1)}%" if score_match else "Score : N/A"
-                    st.markdown(f"**{score_text}**")
-                    # Nouvelle troncature : coupe à la fin d'une phrase ou paragraphe
-                    def truncate_explanation(text, max_len=600):
-                        if len(text) <= max_len:
+                    if score_match:
+                        st.markdown(f"**Score : {score_match.group(1)}%**")
+                    
+                    # Nouvelle approche : affichage complet avec troncature intelligente
+                    def smart_truncate(text, max_length=1000):
+                        """Tronque intelligemment le texte en gardant le sens"""
+                        if len(text) <= max_length:
                             return text
-                        # Coupe à la fin d'une phrase
-                        sentences = re.split(r'(\.|\!|\?)', text)
-                        out = ''
-                        for i in range(0, len(sentences)-1, 2):
-                            if len(out) + len(sentences[i]) + len(sentences[i+1]) > max_len:
+                        
+                        # Cherche le dernier point, point d'exclamation ou d'interrogation avant la limite
+                        truncate_pos = max_length
+                        for i in range(max_length, max(0, max_length-200), -1):
+                            if text[i] in '.!?':
+                                truncate_pos = i + 1
                                 break
-                            out += sentences[i] + sentences[i+1]
-                        return out.strip() + '...'
-                    strong_match = re.search(r"Points? Forts?\s*(.*?)\n\s*Points? Faibles?", explanation, re.DOTALL|re.IGNORECASE)
-                    weak_match = re.search(r"Points? Faibles?\s*(.*)", explanation, re.DOTALL|re.IGNORECASE)
-                    if strong_match:
-                        strong_text = strong_match.group(1).strip()
-                        st.markdown("**Points Forts**")
-                        st.markdown(truncate_explanation(strong_text))
-                    if weak_match:
-                        weak_text = weak_match.group(1).strip()
-                        st.markdown("**Points Faibles**")
-                        st.markdown(truncate_explanation(weak_text))
-                    if not strong_match and not weak_match:
-                        st.markdown(truncate_explanation(explanation))
+                        
+                        return text[:truncate_pos].strip() + "..."
+                    
+                    # Afficher l'explication complète avec troncature intelligente
+                    cleaned_explanation = explanation.replace("Score:", "").replace(f"{score_match.group(1)}%" if score_match else "", "").strip()
+                    st.markdown(smart_truncate(cleaned_explanation))
         
         # Système de feedback par CV avec formulaires pour éviter les rechargements
         st.markdown("---")
