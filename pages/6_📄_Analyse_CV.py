@@ -177,46 +177,192 @@ def regex_analysis(text):
     
     # --- CALCUL D'EXPÉRIENCE BASÉ SUR LES DATES ---
     total_experience_months = 0
-    date_patterns = re.findall(r'(\d{1,2}/\d{4})\s*-\s*(\d{1,2}/\d{4}|aujourd\'hui|jour)|([a-zA-Z]+\.?\s+\d{4})\s*-\s*([a-zA-Z]+\.?\s+\d{4}|aujourd\'hui|jour)', text, re.IGNORECASE)
     
-    month_map = {"janvier": 1, "février": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6, "juillet": 7, "août": 8, "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12, "jan": 1, "fév": 2, "mar": 3, "avr": 4, "may": 5, "jun": 6, "juil": 7, "aoû": 8, "sep": 9, "oct": 10, "nov": 11, "déc": 12}
+    # Patterns pour différents formats de dates
+    # 1. Format MM/YYYY - MM/YYYY
+    # 2. Format Mois YYYY - Mois YYYY
+    # 3. Format YYYY - YYYY
+    # 4. Format période (X ans et Y mois)
+    date_patterns = [
+        # Format MM/YYYY - MM/YYYY ou Mois YYYY - Mois YYYY
+        re.findall(r'(\d{1,2}/\d{4})\s*-\s*(\d{1,2}/\d{4}|aujourd\'hui|présent|jour|current)|([a-zéèêëàâäôöùûüïîç]+\.?\s+\d{4})\s*-\s*([a-zéèêëàâäôöùûüïîç]+\.?\s+\d{4}|aujourd\'hui|présent|jour|current)', text, re.IGNORECASE),
+        # Format YYYY - YYYY
+        re.findall(r'(?<!\d)(\d{4})\s*-\s*(\d{4}|aujourd\'hui|présent|jour|current)(?!\d)', text, re.IGNORECASE),
+        # Format "X ans et Y mois" ou "X années d'expérience"
+        re.findall(r'(\d+)\s+ans?\s+(?:et\s+(\d+)\s+mois)?|(\d+)\s+années?\s+d[e\']expérience', text, re.IGNORECASE)
+    ]
+    
+    month_map = {
+        # Français
+        "janvier": 1, "février": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6, 
+        "juillet": 7, "août": 8, "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12,
+        "jan": 1, "fév": 2, "mar": 3, "avr": 4, "mai": 5, "juin": 6, 
+        "juil": 7, "août": 8, "sept": 9, "oct": 10, "nov": 11, "déc": 12,
+        # Anglais
+        "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
+        "july": 7, "august": 8, "september": 9, "october": 10, "november": 11, "december": 12,
+        "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+        "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12
+    }
     
     def parse_date(date_str):
+        if not date_str:
+            return None
+            
         date_str = date_str.lower().strip().replace('.','').replace('û','u')
-        for month_fr, month_num in month_map.items():
-            if month_fr in date_str:
-                date_str = date_str.replace(month_fr, str(month_num))
-                return datetime.strptime(re.sub(r'[^\d/]', '', date_str).strip(), '%m/%Y')
-        return datetime.strptime(date_str, '%m/%Y')
+        
+        # Traitement des mentions "aujourd'hui", "présent", etc.
+        if any(current_term in date_str for current_term in ["aujourd'hui", "présent", "current", "jour"]):
+            return datetime.now()
+            
+        # Pour le format année seule (YYYY)
+        if re.match(r'^\d{4}$', date_str):
+            return datetime(int(date_str), 1, 1)
+            
+        # Pour les formats avec mois en lettres
+        for month_name, month_num in month_map.items():
+            if month_name in date_str:
+                year_match = re.search(r'\d{4}', date_str)
+                if year_match:
+                    year = int(year_match.group())
+                    return datetime(year, month_num, 1)
+                    
+        # Format MM/YYYY par défaut
+        try:
+            return datetime.strptime(date_str, '%m/%Y')
+        except ValueError:
+            # En cas d'échec, on essaie de nettoyer davantage
+            cleaned = re.sub(r'[^\d/]', '', date_str).strip()
+            if re.match(r'^\d{1,2}/\d{4}$', cleaned):
+                return datetime.strptime(cleaned, '%m/%Y')
+                
+        return None
 
-    for match in date_patterns:
+    # Traitement du format MM/YYYY - MM/YYYY ou Mois YYYY - Mois YYYY
+    for match in date_patterns[0]:
         try:
             start_str, end_str = match[0] or match[2], match[1] or match[3]
             
             start_date = parse_date(start_str)
-            end_date = datetime.now() if "aujourd'hui" in end_str.lower() or "jour" in end_str.lower() else parse_date(end_str)
-
-            duration = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
-            total_experience_months += duration if duration > 0 else 0
+            end_date = datetime.now() if any(current_term in end_str.lower() for current_term in ["aujourd'hui", "présent", "current", "jour"]) else parse_date(end_str)
+            
+            if start_date and end_date:
+                duration = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
+                total_experience_months += max(0, duration)
         except Exception:
             continue
-
+    
+    # Traitement du format YYYY - YYYY
+    for match in date_patterns[1]:
+        try:
+            start_year, end_year = match
+            
+            if any(current_term in end_year.lower() for current_term in ["aujourd'hui", "présent", "current", "jour"]):
+                end_date = datetime.now()
+                start_date = datetime(int(start_year), 1, 1)
+            else:
+                start_date = datetime(int(start_year), 1, 1)
+                end_date = datetime(int(end_year), 12, 31)
+                
+            duration = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
+            total_experience_months += max(0, duration)
+        except Exception:
+            continue
+    
+    # Traitement des mentions explicites d'années d'expérience
+    for match in date_patterns[2]:
+        try:
+            years = int(match[0] or match[2] or 0)  # Années
+            months = int(match[1] or 0)             # Mois (optionnel)
+            
+            total_experience_months += years * 12 + months
+        except Exception:
+            continue
+    
+    # Si aucune expérience détectée mais "X ans d'expérience" est mentionné directement
+    if total_experience_months == 0:
+        # Recherche de mentions d'expérience directes en français et en anglais
+        direct_exp_patterns = [
+            r'(\d+)\s*(?:an(?:s|né(?:e|es))?)\s+d[\'e]\s*(?:expérience|exp\.)',  # X ans d'expérience
+            r'expérience\s+(?:de|d[\'e])\s+(\d+)\s*(?:an(?:s|né(?:e|es))?)',      # expérience de X ans
+            r'(\d+)\s*(?:year(?:s)?)\s+(?:of)?\s*experience',                    # X years experience (EN)
+            r'experience\s+(?:of)?\s+(\d+)\s*(?:year(?:s)?)',                    # experience of X years (EN)
+        ]
+        
+        for pattern in direct_exp_patterns:
+            direct_exp_match = re.search(pattern, text_lower)
+            if direct_exp_match:
+                try:
+                    years = int(direct_exp_match.group(1))
+                    total_experience_months = years * 12
+                    break
+                except:
+                    continue
+    
+    # Arrondi à l'année la plus proche
     total_experience_years = round(total_experience_months / 12)
 
     education_level = 0
-    edu_patterns = {5: r'bac\s*\+\s*5|master|ingénieur', 3: r'bac\s*\+\s*3|licence', 2: r'bac\s*\+\s*2|bts|dut', 0: r'baccalauréat'}
-    for level, pattern in edu_patterns.items():
+    # Patterns d'éducation améliorés avec équivalents internationaux
+    edu_patterns = {
+        8: r'doctorat|phd|ph\.d|docteur|doctorate',
+        5: r'bac\s*\+\s*5|master|m\.?sc\.?|ingénieur|mba|diplôme\s+d[\'e]ingénieur',
+        3: r'bac\s*\+\s*3|licence|bachelor|b\.?sc\.?|diplôme\s+universitaire\s+de\s+technologie|d\.?u\.?t',
+        2: r'bac\s*\+\s*2|bts|dut|deug',
+        0: r'baccalauréat|bac|high\s+school|secondary\s+education'
+    }
+    
+    # On commence par rechercher le diplôme le plus élevé
+    levels = sorted(edu_patterns.keys(), reverse=True)
+    for level in levels:
+        pattern = edu_patterns[level]
         if re.search(pattern, text_lower):
             education_level = level
             break
             
     skills = []
-    profile_section_match = re.search(r"profil recherché\s*:(.*?)(?:\n\n|\Z)", text_lower, re.DOTALL | re.IGNORECASE)
-    if profile_section_match:
-        profile_section = profile_section_match.group(1)
-        words = re.findall(r'\b[a-zA-ZÀ-ÿ-]{4,}\b', profile_section)
-        stop_words = ["profil", "recherché", "maîtrise", "bonne", "expérience", "esprit", "basé", "casablanca", "missions", "principales", "confirmée", "idéalement", "selon"]
-        skills = [word for word in words if word not in stop_words]
+    
+    # Recherche de sections spécifiques où les compétences peuvent se trouver
+    skill_sections = [
+        r"(?:compétences|skills|competences)\s*(?:techniques|technical)?\s*[:;](.*?)(?:\n\n|\Z)",
+        r"(?:profil|profile)\s+(?:recherché|sought|technique|technical)\s*[:;](.*?)(?:\n\n|\Z)",
+        r"(?:technologies|outils|tools|langages|languages)\s*[:;](.*?)(?:\n\n|\Z)",
+        r"(?:expertise|savoir-faire)\s*[:;](.*?)(?:\n\n|\Z)"
+    ]
+    
+    # Stop words plus complets (FR/EN)
+    stop_words = [
+        # Français
+        "profil", "recherché", "maîtrise", "bonne", "expérience", "esprit", "basé", "casablanca", 
+        "missions", "principales", "confirmée", "idéalement", "selon", "avoir", "être", "connaissance",
+        "capable", "capacité", "aptitude", "compétence", "technique", "solide", "avancée",
+        # Anglais
+        "profile", "required", "mastery", "good", "experience", "spirit", "based", "mission", "main",
+        "confirmed", "ideally", "according", "have", "being", "knowledge", "able", "ability", "skill",
+        "technical", "solid", "advanced"
+    ]
+    
+    # Recherche dans les différentes sections
+    for pattern in skill_sections:
+        section_match = re.search(pattern, text_lower, re.DOTALL | re.IGNORECASE)
+        if section_match:
+            section_text = section_match.group(1)
+            # Extraction des mots pertinents (mots de 4 lettres minimum, incluant caractères spéciaux techniques)
+            words = re.findall(r'\b[a-zA-ZÀ-ÿ\+\#\.]{4,}\b', section_text)
+            skills.extend([word for word in words if word.lower() not in stop_words])
+    
+    # Si aucune section trouvée, chercher dans tout le texte
+    if not skills:
+        # Recherche de termes techniques communs
+        tech_patterns = [
+            r'\b(?:python|java(?:script)?|typescript|c\+\+|ruby|php|html5?|css3?|sql|nosql|mongodb|mysql|postgresql|oracle|azure|aws|gcp|react(?:js)?|angular(?:js)?|vue(?:js)?|node(?:js)?|express(?:js)?|django|flask|spring|hibernate|docker|kubernetes|jenkins|git|jira|confluence|agile|scrum|kanban)\b',
+            r'\b(?:excel|word|powerpoint|outlook|office|sharepoint|teams|visio|project|access|onedrive|dynamics|power\s*bi|tableau|qlik(?:view)?|looker|microstrategy)\b',
+            r'\b(?:sap|oracle|salesforce|workday|netsuite|peoplesoft|microsoft\s*dynamics|jd\s*edwards|sage|quickbooks)\b'
+        ]
+        
+        for pattern in tech_patterns:
+            tech_matches = re.findall(pattern, text_lower, re.IGNORECASE)
+            skills.extend(tech_matches)
 
     return {
         "Niveau d'études": education_level,

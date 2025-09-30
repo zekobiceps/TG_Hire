@@ -1064,8 +1064,13 @@ def save_ksa_matrix_to_current_brief():
 # Ces fonctions étaient précédemment dans utils_cv_analyzer.py
 
 # -------------------- Configuration --------------------
-# Chemin pour stocker les données de feedback
-FEEDBACK_DATA_PATH = "feedback_data.json"
+# Import des fonctions de gestion du feedback
+from feedback import (
+    save_feedback,
+    get_average_feedback_score,
+    get_feedback_summary,
+    FEEDBACK_DATA_PATH
+)
 
 # -------------------- Fonctions pour l'analyse combinée et le feedback --------------------
 def rank_resumes_with_ensemble(job_description, resumes, file_names, 
@@ -1262,109 +1267,4 @@ def batch_process_resumes(job_description, file_list, analysis_method,
     
     return final_results, all_file_names
 
-def save_feedback(analysis_method, job_title, job_description_snippet, cv_count, feedback_score, feedback_text):
-    """
-    Sauvegarde le feedback de l'utilisateur sur les résultats d'analyse.
-    
-    Args:
-        analysis_method: Méthode d'analyse utilisée
-        job_title: Intitulé du poste
-        job_description_snippet: Extrait de la description du poste
-        cv_count: Nombre de CVs analysés
-        feedback_score: Score de satisfaction (1-5)
-        feedback_text: Commentaires textuels
-    """
-    feedback_data = []
-    
-    # Chargement des données existantes
-    if os.path.exists(FEEDBACK_DATA_PATH):
-        try:
-            with open(FEEDBACK_DATA_PATH, 'r', encoding='utf-8') as f:
-                feedback_data = json.load(f)
-        except:
-            pass
-    
-    # Ajout du nouveau feedback
-    feedback_entry = {
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "analysis_method": analysis_method,
-        "job_title": job_title,
-        "job_description_snippet": job_description_snippet[:200] + "..." if len(job_description_snippet) > 200 else job_description_snippet,
-        "cv_count": cv_count,
-        "feedback_score": feedback_score,
-        "feedback_text": feedback_text
-    }
-    
-    feedback_data.append(feedback_entry)
-    
-    # Sauvegarde des données
-    with open(FEEDBACK_DATA_PATH, 'w', encoding='utf-8') as f:
-        json.dump(feedback_data, f, ensure_ascii=False, indent=2)
-    
-    return True
-
-def get_average_feedback_score(analysis_method=None):
-    """
-    Récupère le score moyen de feedback pour une méthode donnée ou pour toutes les méthodes.
-    
-    Args:
-        analysis_method: Méthode d'analyse spécifique (ou None pour toutes les méthodes)
-        
-    Returns:
-        Score moyen et nombre d'évaluations
-    """
-    if not os.path.exists(FEEDBACK_DATA_PATH):
-        return 0, 0
-    
-    try:
-        with open(FEEDBACK_DATA_PATH, 'r', encoding='utf-8') as f:
-            feedback_data = json.load(f)
-        
-        if analysis_method:
-            relevant_feedback = [f for f in feedback_data if f["analysis_method"] == analysis_method]
-        else:
-            relevant_feedback = feedback_data
-        
-        if not relevant_feedback:
-            return 0, 0
-        
-        total_score = sum(f["feedback_score"] for f in relevant_feedback)
-        return total_score / len(relevant_feedback), len(relevant_feedback)
-    
-    except:
-        return 0, 0
-
-def get_feedback_summary():
-    """
-    Génère un résumé des feedbacks reçus pour chaque méthode d'analyse.
-    
-    Returns:
-        DataFrame contenant les statistiques de feedback
-    """
-    methods = [
-        "Méthode Cosinus (Mots-clés)",
-        "Méthode Sémantique (Embeddings)",
-        "Scoring par Règles (Regex)",
-        "Analyse par IA (DeepSeek)",
-        "Analyse combinée (Ensemble)"
-    ]
-    
-    summary_data = []
-    
-    for method in methods:
-        avg_score, count = get_average_feedback_score(method)
-        summary_data.append({
-            "Méthode": method,
-            "Score moyen": round(avg_score, 2),
-            "Nombre d'évaluations": count
-        })
-    
-    # Ajouter le score global
-    overall_avg, overall_count = get_average_feedback_score()
-    summary_data.append({
-        "Méthode": "Toutes méthodes confondues",
-        "Score moyen": round(overall_avg, 2),
-        "Nombre d'évaluations": overall_count
-    })
-    
-    return pd.DataFrame(summary_data)
+# Les fonctions de gestion du feedback ont été déplacées vers feedback.py
