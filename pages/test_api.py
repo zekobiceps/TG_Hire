@@ -1080,6 +1080,17 @@ button[kind="secondary"] {
                 save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
                 st.success("Étape 3 sauvegardée.")
 
+    # === AJOUT / RÉTABLISSEMENT NAVIGATION WIZARD (placer à la toute fin du else: avant la fin de with tabs[2]) ===
+    nav_prev, nav_next = st.columns([1,1])
+    with nav_prev:
+        if step > 1 and st.button("⬅️ Précédent", key=f"reunion_prev_{step}", use_container_width=True):
+            st.session_state.reunion_step -= 1
+            st.rerun()
+    with nav_next:
+        if step < total_steps and st.button("Suivant ➡️", key=f"reunion_next_{step}", use_container_width=True):
+            st.session_state.reunion_step += 1
+            st.rerun()
+
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
     if ("save_message" in st.session_state and st.session_state.save_message) and ("save_message_tab" in st.session_state and st.session_state.save_message_tab == "Synthèse"):
@@ -1175,78 +1186,4 @@ with tabs[3]:
             else:
                 st.info("⚠️ Word non dispo (pip install python-docx)")
 
-def save_briefs():
-    """
-    Sauvegarde locale :
-    - briefs/briefs.json (global)
-    - briefs/<nom>.json (un fichier par brief pour compatibilité ancienne logique)
-    Conversion sûre des dates / datetime en chaînes ISO.
-    """
-    import json, os
-    from datetime import date, datetime
-    briefs = st.session_state.get("saved_briefs", {}) or {}
-
-    def convert(obj):
-        if isinstance(obj, (date, datetime)):
-            return obj.strftime("%Y-%m-%d")
-        if isinstance(obj, dict):
-            return {k: convert(v) for k, v in obj.items()}
-        if isinstance(obj, list):
-            return [convert(x) for x in obj]
-        return obj
-
-    os.makedirs("briefs", exist_ok=True)
-    safe_global = {}
-    for name, data in briefs.items():
-        safe_data = convert(data)
-        safe_global[name] = safe_data
-        # fichier individuel
-        try:
-            with open(os.path.join("briefs", f"{name}.json"), "w", encoding="utf-8") as f_ind:
-                json.dump(safe_data, f_ind, ensure_ascii=False, indent=2)
-        except Exception as e:
-            st.warning(f"⚠️ Impossible d'écrire le fichier individuel '{name}.json': {e}")
-
-    try:
-        with open(os.path.join("briefs", "briefs.json"), "w", encoding="utf-8") as f_all:
-            json.dump(safe_global, f_all, ensure_ascii=False, indent=2)
-    except Exception as e:
-        st.error(f"Erreur lors de la sauvegarde locale des briefs: {e}")
-
-@st.cache_data(ttl=120)
-def load_all_local_briefs():
-    """
-    Charge tous les briefs depuis briefs.json (fallback : fichiers individuels).
-    """
-    import json, os
-    folder = "briefs"
-    collected = {}
-    try:
-        path_global = os.path.join(folder, "briefs.json")
-        if os.path.exists(path_global):
-            with open(path_global, "r", encoding="utf-8") as f:
-                collected = json.load(f)
-        else:
-            if os.path.isdir(folder):
-                for fn in os.listdir(folder):
-                    if fn.endswith(".json") and fn != "briefs.json":
-                        try:
-                            with open(os.path.join(folder, fn), "r", encoding="utf-8") as f:
-                                data = json.load(f)
-                                name = fn[:-5]
-                                collected[name] = data
-                        except:
-                            continue
-    except Exception:
-        pass
-    return collected
-
-def refresh_saved_briefs():
-    """
-    Fusion (sans écraser les briefs déjà en session avec modifications récentes).
-    """
-    local = load_all_local_briefs()
-    sess = st.session_state.get("saved_briefs", {})
-    merged = {**local, **sess}  # priorité aux données en session
-    st.session_state.saved_briefs = merged
-    return merged
+# --- Fin du fichier (fonctions utilitaires centralisées dans utils.py) ---
