@@ -1374,10 +1374,10 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
                     # Ajouter les en-têtes
                     headers = [
                         "timestamp", "analysis_method", "job_title", "job_description_snippet",
-                        "cv_count", "feedback_score", "feedback_text", "user_criteria",
-                        "improvement_suggestions", "version_app"
+                        "cv_count", "feedback_score", "feedback_text", "Critères évalués :",
+                        "version_app"
                     ]
-                    worksheet.update('A1:J1', [headers])
+                    worksheet.update('A1:I1', [headers])
                 
                 # Préparer les données à ajouter
                 # Construction explicite pour garantir version_app en colonne J (index 9)
@@ -1390,13 +1390,12 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
                     str(feedback_entry.get("feedback_score", "")),
                     str(feedback_entry.get("feedback_text", "")),
                     str(", ".join(feedback_entry.get("user_criteria", [])) if isinstance(feedback_entry.get("user_criteria", []), list) else feedback_entry.get("user_criteria", "")),
-                    str(", ".join(feedback_entry.get("improvement_suggestions", [])) if isinstance(feedback_entry.get("improvement_suggestions", []), list) else feedback_entry.get("improvement_suggestions", "")),
                     str(feedback_entry.get("version_app", ""))
                 ]
-                # Tronquer à 10 colonnes si jamais il y a plus
-                row_data = row_data[:10]
-                # Compléter si moins de 10 colonnes
-                while len(row_data) < 10:
+                # Tronquer à 9 colonnes si jamais il y a plus
+                row_data = row_data[:9]
+                # Compléter si moins de 9 colonnes
+                while len(row_data) < 9:
                     row_data.append("")
                 
                 # Ajouter la ligne en forçant l'insertion à la première colonne d'une nouvelle ligne
