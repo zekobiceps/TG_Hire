@@ -57,7 +57,7 @@ st.markdown("""
     .ai-red-btn button:hover{background:#E00000!important;}
     .ai-suggestion-box{background:linear-gradient(135deg,#e6ffed,#f4fff7);border-left:5px solid #23C552;padding:0.6rem 0.8rem;margin:0.3rem 0 0.8rem;border-radius:6px;font-size:.9rem;}
     .score-cible{font-size:24px!important;font-weight:700;color:#0057B7;margin-top:.5rem;}
-    .brief-name{padding-top:0.15rem;font-size:0.80rem;display:flex;align-items:center;}
+    .brief-name{padding-top:0.10rem;font-size:0.95rem;font-weight:600;display:flex;align-items:center;}
     .filtered-brief-line{display:flex;align-items:center;gap:0.4rem;margin-bottom:0.15rem;}
     .filtered-brief-line .actions{display:flex;gap:0.3rem;}
     .filtered-brief-line button{padding:0.25rem 0.6rem !important;font-size:0.70rem !important;}
@@ -729,16 +729,16 @@ with tabs[0]:
             st.markdown('<h3 style="margin-top: 1rem; margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
             if briefs_to_show:
                 for name, brief in briefs_to_show.items():
-                    coln, cola = st.columns([6,2])
+                    coln, cola = st.columns([5,3])
                     with coln:
                         st.markdown(f"<div class='brief-name'><strong>{name}</strong></div>", unsafe_allow_html=True)
                     with cola:
                         c_edit, c_del = st.columns([1,1])
                         with c_edit:
-                            if st.button("📝 Éditer", key=f"edit_{name}"):
+                            if st.button("📝 Éditer", key=f"edit_{name}", use_container_width=True):
                                 st.session_state.import_brief_flag=True; st.session_state.brief_to_import=name; st.rerun()
                         with c_del:
-                            if st.button("🗑️ Supprimer", key=f"del_{name}"):
+                            if st.button("🗑️ Supprimer", key=f"del_{name}", use_container_width=True):
                                 st.session_state.saved_briefs.pop(name,None); save_briefs(); st.session_state.filtered_briefs.pop(name,None); st.success("Supprimé"); st.rerun()
             else:
                 st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
@@ -916,6 +916,12 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                         "Rubrique","Critère","Type de question","Question pour l'entretien","Évaluation (1-5)","Évaluateur"
                     ])
 
+            # Injection différée d'une question IA générée (évite conflit de state après widget)
+            if 'ks_question_new' in st.session_state:
+                st.session_state.ks_question = st.session_state.ks_question_new
+                del st.session_state.ks_question_new
+                st.rerun()
+
             with st.form("add_ksa_form_step2"):
                 c1,c2,c3,c4 = st.columns(4)
                 with c1:
@@ -941,26 +947,26 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                                           placeholder="Ex: question comportementale sur gestion de conflit priorisation")
                 concise = st.checkbox("⚡ Mode rapide (réponse concise)", key="ks_concise")
 
-                colb1, colb2 = st.columns(2)
-                with colb1:
+                bcol1, bcol2 = st.columns([1,1])
+                with bcol1:
                     st.markdown("<div class='ai-red-btn'>", unsafe_allow_html=True)
                     gen_btn = st.form_submit_button("💡 Générer question IA", use_container_width=True)
                     st.markdown("</div>", unsafe_allow_html=True)
-                with colb2:
+                with bcol2:
                     add_btn = st.form_submit_button("➕ Ajouter", use_container_width=True)
-                # (ancien style spécifique supprimé, remplacé par la classe globale ai-red-btn)
 
                 if gen_btn:
                     if not ai_prompt:
                         st.warning("Indique un prompt.")
                     else:
                         try:
-                            resp = generate_ai_question(ai_prompt, concise=concise)
-                            if resp.lower().startswith("question:"):
+                            with st.spinner("⏳ Génération en cours par l'IA..."):
+                                resp = generate_ai_question(ai_prompt, concise=concise)
+                            if isinstance(resp, str) and resp.lower().startswith("question:"):
                                 resp = resp.split(":",1)[1].strip()
-                            st.session_state.ks_question = resp
+                            # Stocke dans variable temporaire pour réinjection au prochain rerun
+                            st.session_state.ks_question_new = resp
                             st.success("Question générée.")
-                            st.experimental_rerun() if hasattr(st, "experimental_rerun") else st.rerun()
                         except Exception as e:
                             st.error(f"Erreur IA: {e}")
 
@@ -1036,7 +1042,7 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
             with c_excl:
                 st.text_area("🚫 Critères d'exclusion", key="criteres_exclusion", height=260, value=brief_data.get("CRITERES_EXCLUSION", st.session_state.get("criteres_exclusion","")), placeholder="Ex: Moins de 3 ans d'expérience / Refus mobilité / Salaire hors budget")
             with c_proc:
-                st.text_area("✅ Etapes suivantes", key="processus_evaluation", height=320, value=st.session_state.get("processus_evaluation", brief_data.get("PROCESSUS_EVALUATION","")))
+                st.text_area("✅ Etapes suivantes", key="processus_evaluation", height=420, value=st.session_state.get("processus_evaluation", brief_data.get("PROCESSUS_EVALUATION","")))
             # Sauvegarde auto (pas de bouton)
             brief_data["canaux_prioritaires"] = st.session_state.get("canaux_prioritaires", [])
             brief_data["CANAUX_PRIORITAIRES"] = json.dumps(brief_data["canaux_prioritaires"], ensure_ascii=False)
