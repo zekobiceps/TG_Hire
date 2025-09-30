@@ -110,33 +110,34 @@ def save_brief_to_gsheet(brief_name, brief_data):
         return False
     
     try:
+        # Garantit BRIEF_NAME présent
+        if not brief_data.get("BRIEF_NAME"):
+            brief_data["BRIEF_NAME"] = brief_name
+
         row_data = []
         ksa_df = brief_data.get("ksa_matrix")
-        
+
         for header in BRIEFS_HEADERS:
             value = brief_data.get(header, "")
-            
             if header == "KSA_MATRIX_JSON":
                 if isinstance(ksa_df, pd.DataFrame):
                     value = ksa_df.to_json(orient='records')
                 else:
                     value = ""
-            
             elif header == "DATE_MAJ":
                 value = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            elif header in brief_data:
-                if isinstance(value, list):
-                    value = ", ".join(map(str, value))
-                elif isinstance(value, datetime):
-                    value = value.strftime("%Y-%m-%d")
-                else:
-                    value = str(value)
+            elif isinstance(value, list):
+                value = ", ".join(map(str, value))
+            elif isinstance(value, datetime):
+                value = value.strftime("%Y-%m-%d")
             else:
-                value = ""
-                
+                value = str(value)
             row_data.append(value)
-        
+
+        # Force première colonne
+        if row_data:
+            row_data[0] = brief_name
+
         cell = worksheet.find(brief_name, in_column=1, case_sensitive=True)
         
         LAST_COL_LETTER = col_to_letter(len(BRIEFS_HEADERS))

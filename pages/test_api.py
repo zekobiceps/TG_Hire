@@ -457,33 +457,23 @@ with tabs[0]:
         with col5:
             st.text_input("Nom affectation", key="affectation_nom", value=brief_data.get("affectation_nom", ""))
         with col6:
-            # --- Normalisation robuste de la date avant le widget ---
+            from datetime import date, datetime
             def _parse_date_any(v):
                 if isinstance(v, date):
                     return v
                 if isinstance(v, datetime):
                     return v.date()
                 if isinstance(v, str):
-                    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y/%m/%d"):
+                    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
                         try:
                             return datetime.strptime(v, fmt).date()
                         except:
                             continue
                 return date.today()
-
-            # Valeur prioritaire : session_state si déjà existante
-            if "date_brief" in st.session_state:
-                # Sécurise le type avant d'appeler le widget (sinon warning)
-                if not isinstance(st.session_state.date_brief, (date, datetime)):
-                    st.session_state.date_brief = _parse_date_any(st.session_state.date_brief)
-                elif isinstance(st.session_state.date_brief, datetime):
-                    st.session_state.date_brief = st.session_state.date_brief.date()
-                # IMPORTANT : ne pas passer 'value=' si key déjà présent (évite le warning jaune)
-                chosen_date = st.date_input("Date du brief", key="date_brief")
-            else:
-                raw = brief_data.get("date_brief", brief_data.get("DATE_BRIEF", date.today()))
-                date_brief_value = _parse_date_any(raw)
-                chosen_date = st.date_input("Date du brief", value=date_brief_value, key="date_brief")
+            if "date_brief" not in st.session_state:
+                raw = brief_data.get("DATE_BRIEF") or brief_data.get("date_brief") or date.today()
+                st.session_state.date_brief = _parse_date_any(raw)
+            st.date_input("Date du brief", key="date_brief")
 
         if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
             required_fields = ["poste_intitule", "manager_nom", "affectation_nom", "date_brief"]
@@ -531,6 +521,8 @@ with tabs[0]:
                         new_brief_data[f"LIEN_PROFIL_{suffix}"] = v
                     else:
                         new_brief_data[k.upper()] = v
+
+                new_brief_data["BRIEF_NAME"] = new_brief_name
 
                 # Mise à jour session + sauvegarde
                 st.session_state.saved_briefs[new_brief_name] = new_brief_data
@@ -597,6 +589,29 @@ with tabs[0]:
                     st.rerun()
     else:
         st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
+
+    # --- AJOUT BARRE DE RECHERCHE ---
+    if st.checkbox("🔍 Chercher un brief", key="toggle_search_briefs"):
+        search = st.text_input("Rechercher (nom contient...)", key="search_brief_query")
+        briefs = st.session_state.get("saved_briefs", {})
+        if search:
+            briefs = {k:v for k,v in briefs.items() if search.lower() in k.lower()}
+        for bname in sorted(briefs.keys()):
+            c1, c2, c3 = st.columns([5,1,1])
+            with c1:
+                st.write(f"• {bname}")
+            with c2:
+                if st.button("✏️", key=f"edit_{bname}", help="Éditer"):
+                    st.session_state.current_brief_name = bname
+                    st.session_state.reunion_step = 1
+                    st.session_state.reunion_completed = False
+                    st.experimental_rerun()
+            with c3:
+                if st.button("🗑️", key=f"del_{bname}", help="Supprimer"):
+                    st.session_state.saved_briefs.pop(bname, None)
+                    save_briefs()
+                    st.success("Supprimé.")
+                    st.experimental_rerun()
 
 # ---------------- AVANT-BRIEF ----------------
 # Dans l'onglet Avant-brief (tabs[1])
@@ -1037,8 +1052,7 @@ button[kind="secondary"] {
                 except Exception:
                     pass
             else:
-                st.info("Aucun critère KSA pour le moment.")
-
+                st.info("Aucun critère KSA pour l’instant.")
 # ================== PATCH ÉTAPE 3 (remplacer le bloc elif step == 3:) ==================
         elif step == 3:
             st.markdown("### 🛠️ Étape 3 : Stratégie & Processus")
@@ -1054,42 +1068,39 @@ button[kind="secondary"] {
             st.text_area(
                 "🚫 Critères d'exclusion",
                 key="criteres_exclusion",
-                height=160,
-                value=brief_data.get("CRITERES_EXCLUSION", st.session_state.get("criteres_exclusion","")),
-                placeholder="Ex: Moins de 3 ans d'expérience / Pas de mobilité / Pas de certification X / Manque de maîtrise d'outil Y..."
+                height=180,
+                placeholder="Ex: Moins de 3 ans en gestion de chantier / Pas d'expérience multi-sites..."
             )
             st.text_area(
-                "✅ Processus d'évaluation",
+                "🛠️ Processus d'évaluation",
                 key="processus_evaluation",
-                height=160,
-                value=brief_data.get("PROCESSUS_EVALUATION", st.session_state.get("processus_evaluation","")),
-                placeholder="Ex: 1) Entretien téléphonique 2) Entretien technique 3) Étude de cas 4) Entretien final..."
+                height=180,
+                placeholder="Ex: 1. Screening / 2. Entretien Manager / 3. Visite chantier / 4. Décision."
             )
-            if st.button("💾 Sauvegarder Étape 3", type="primary", key="save_step3"):
-                brief_data["canaux_prioritaires"] = st.session_state.get("canaux_prioritaires", [])
-                brief_data["CANAUX_PRIORITAIRES"] = json.dumps(brief_data["canaux_prioritaires"], ensure_ascii=False)
-                for low, up in {
-                    "criteres_exclusion":"CRITERES_EXCLUSION",
-                    "processus_evaluation":"PROCESSUS_EVALUATION"
-                }.items():
-                    val = st.session_state.get(low,"")
-                    brief_data[low] = val
-                    brief_data[up] = val
-                st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
-                save_briefs()
-                save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
-                st.success("Étape 3 sauvegardée.")
+            # Retirer bouton sauvegarde ici (l’étape Suivant fera la sauvegarde)
 
     # === AJOUT / RÉTABLISSEMENT NAVIGATION WIZARD (placer à la toute fin du else: avant la fin de with tabs[2]) ===
-    nav_prev, nav_next = st.columns([1,1])
-    with nav_prev:
-        if step > 1 and st.button("⬅️ Précédent", key=f"reunion_prev_{step}", use_container_width=True):
+    nav_left, nav_right = st.columns([1,1])
+    with nav_left:
+        if step > 1 and st.button("⬅️ Précédent", key=f"prev_{step}", help="Retour étape précédente"):
             st.session_state.reunion_step -= 1
-            st.rerun()
-    with nav_next:
-        if step < total_steps and st.button("Suivant ➡️", key=f"reunion_next_{step}", use_container_width=True):
+            st.experimental_rerun()
+    with nav_right:
+        if step < total_steps and st.button("Suivant ➡️", key=f"next_{step}", help="Étape suivante"):
+            # (auto-save inséré ici – voir patch 7)
+            if step in (1,2,3) and st.session_state.current_brief_name:
+                bname = st.session_state.current_brief_name
+                bdata = st.session_state.saved_briefs.get(bname, {})
+                bdata["CRITERES_EXCLUSION"] = st.session_state.get("criteres_exclusion","")
+                bdata["PROCESSUS_EVALUATION"] = st.session_state.get("processus_evaluation","")
+                bdata["MANAGER_NOTES"] = st.session_state.get("manager_notes","")
+                if "ksa_matrix" in st.session_state and not st.session_state.ksa_matrix.empty:
+                    bdata["KSA_MATRIX_JSON"] = st.session_state.ksa_matrix.to_json(orient="records", force_ascii=False)
+                st.session_state.saved_briefs[bname] = bdata
+                save_briefs()
+                save_brief_to_gsheet(bname, bdata)
             st.session_state.reunion_step += 1
-            st.rerun()
+            st.experimental_rerun()
 
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
