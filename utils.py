@@ -1399,7 +1399,7 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
                 return True
                 
     except Exception as e:
-    st.error(f"❌ Erreur lors de la sauvegarde du feedback dans Google Sheets : {e}")
+        st.error(f"❌ Erreur lors de la sauvegarde du feedback dans Google Sheets : {e}")
         # Ne pas faire échouer si Google Sheets n'est pas disponible
         return True
     
