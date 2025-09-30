@@ -128,12 +128,12 @@ if not st.session_state.logged_in:
     st.set_page_config(page_title="TG-Hire IA - Connexion", layout="centered")
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.image("tgcc.png", use_container_width=True)
+        st.image("tgcc.png", width="stretch")
         with st.form("login_form"):
             st.subheader("Connexion")
             email = st.text_input("Adresse Email").lower().strip()
             password = st.text_input("Mot de Passe", type="password")
-            if st.form_submit_button("Se Connecter", use_container_width=True):
+            if st.form_submit_button("Se Connecter", width="stretch"):
                 if email in st.session_state.users and st.session_state.users[email]["password"] == password:
                     st.session_state.logged_in = True
                     st.session_state.current_user = st.session_state.users[email]["name"]
@@ -153,7 +153,7 @@ else:
 
     # --- BARRE LATÉRALE (MODIFIÉE) ---
     with st.sidebar:
-        st.image("tgcc.png", use_container_width=True)
+        st.image("tgcc.png", width="stretch")
         st.markdown("---")
         # MODIFICATION : Utilisation du nouveau style CSS pour le message de bienvenue
         st.markdown(
@@ -164,7 +164,7 @@ else:
             unsafe_allow_html=True
         )
         st.markdown("---")
-        if st.button("🚪 Déconnexion", use_container_width=True):
+        if st.button("🚪 Déconnexion", width="stretch"):
             st.session_state.logged_in = False
             st.session_state.current_user = ""
             st.session_state.data_loaded = False
@@ -290,7 +290,7 @@ else:
                 delete_feature_id = st.selectbox("Sélectionner une fonctionnalité à supprimer", options=[f[0] for f in all_features], format_func=lambda x: next((f[1] for f in all_features if f[0] == x), ""))
                 
                 if delete_feature_id:
-                    if st.button("🗑️ Supprimer", type="primary", use_container_width=True):
+                    if st.button("🗑️ Supprimer", type="primary", width="stretch"):
                         for status in st.session_state.features:
                             st.session_state.features[status] = [f for f in st.session_state.features[status] if f["id"] != delete_feature_id]
                         save_features_to_gsheet()

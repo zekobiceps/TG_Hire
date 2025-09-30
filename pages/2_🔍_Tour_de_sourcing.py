@@ -155,7 +155,7 @@ with tab1:
         localisation = st.text_input("Localisation:", key="boolean_loc", placeholder="Ex: Casablanca")
         employeur = st.text_input("Employeur:", key="boolean_employeur", placeholder="Ex: TGCC")
 
-    if st.button("🪄 Générer la requête Boolean", type="primary", use_container_width=True, key="boolean_generate"):
+    if st.button("🪄 Générer la requête Boolean", type="primary", width="stretch", key="boolean_generate"):
         with st.spinner("⏳ Génération en cours..."):
             start_time = time.time()
             st.session_state["boolean_query"] = generate_boolean_query(
@@ -172,7 +172,7 @@ with tab1:
         
         col1, col2 = st.columns([1, 2])
         with col1:
-            if st.button("💾 Sauvegarder", key="boolean_save", use_container_width=True):
+            if st.button("💾 Sauvegarder", key="boolean_save", width="stretch"):
                 entry = {
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M"), 
                     "type": "Boolean", 
@@ -184,7 +184,7 @@ with tab1:
                 st.success("✅ Sauvegardé")
         with col2:
             url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
-            st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, use_container_width=True)
+            st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, width="stretch")
 
 # -------------------- Tab 2: X-Ray --------------------
 with tab2:
@@ -198,7 +198,7 @@ with tab2:
         localisation_xray = st.text_input("Localisation:", key="xray_loc", placeholder="Ex: Casablanca")
         exclusions_xray = st.text_input("Mots à exclure:", key="xray_exclusions", placeholder="Ex: Stage, Junior")
 
-    if st.button("🔍 Construire X-Ray", type="primary", use_container_width=True, key="xray_build"):
+    if st.button("🔍 Construire X-Ray", type="primary", width="stretch", key="xray_build"):
         with st.spinner("⏳ Génération en cours..."):
             start_time = time.time()
             st.session_state["xray_query"] = generate_xray_query(site_cible, poste_xray, mots_cles, localisation_xray)
@@ -212,7 +212,7 @@ with tab2:
         url = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
         col1, col2, col3 = st.columns([1, 2, 2])
         with col1:
-            if st.button("💾 Sauvegarder", key="xray_save", use_container_width=True):
+            if st.button("💾 Sauvegarder", key="xray_save", width="stretch"):
                 entry = {
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M"), 
                     "type": "X-Ray",
@@ -223,9 +223,9 @@ with tab2:
                 save_library_entries()
                 st.success("✅ Sauvegardé")
         with col2:
-            st.link_button("🌐 Ouvrir sur Google", url, use_container_width=True)
+            st.link_button("🌐 Ouvrir sur Google", url, width="stretch")
         with col3:
-            st.link_button("🔎 Recherche avancée", f"https://www.google.com/advanced_search?q={quote(st.session_state['xray_query'])}", use_container_width=True)
+            st.link_button("🔎 Recherche avancée", f"https://www.google.com/advanced_search?q={quote(st.session_state['xray_query'])}", width="stretch")
 
 # -------------------- Tab 3: CSE --------------------
 with tab3:
@@ -238,7 +238,7 @@ with tab3:
         localisation_cse = st.text_input("Localisation:", key="cse_loc", placeholder="Ex: Casablanca")
         entreprise_cse = st.text_input("Entreprise:", key="cse_ent", placeholder="Ex: TGCC")
 
-    if st.button("🔍 Lancer recherche CSE", type="primary", use_container_width=True, key="cse_search"):
+    if st.button("🔍 Lancer recherche CSE", type="primary", width="stretch", key="cse_search"):
         with st.spinner("⏳ Construction de la requête..."):
             start_time = time.time()
             query_parts = []
@@ -254,7 +254,7 @@ with tab3:
         st.text_area("Requête CSE:", value=st.session_state["cse_query"], height=100, key="cse_area")
         col1, col2 = st.columns([1, 2])
         with col1:
-            if st.button("💾 Sauvegarder", key="cse_save", use_container_width=True):
+            if st.button("💾 Sauvegarder", key="cse_save", width="stretch"):
                 entry = {
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M"), 
                     "type": "CSE", 
@@ -266,13 +266,13 @@ with tab3:
                 st.success("✅ Sauvegardé")
         with col2:
             cse_url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
-            st.link_button("🌐 Ouvrir sur CSE", cse_url, use_container_width=True)
+            st.link_button("🌐 Ouvrir sur CSE", cse_url, width="stretch")
 
 # -------------------- Tab 4: Dogpile --------------------
 with tab4:
     st.header("🐶 Dogpile Search")
     query = st.text_input("Requête Dogpile:", key="dogpile_query_input", placeholder="Ex: Python developer Casablanca")
-    if st.button("🔍 Rechercher", key="dogpile_search_btn", type="primary", use_container_width=True):
+    if st.button("🔍 Rechercher", key="dogpile_search_btn", type="primary", width="stretch"):
         if query:
             st.session_state["dogpile_query"] = query
             st.success("✅ Requête enregistrée")
@@ -280,7 +280,7 @@ with tab4:
         st.text_area("Requête Dogpile:", value=st.session_state["dogpile_query"], height=80, key="dogpile_area")
         col1, col2 = st.columns([1, 2])
         with col1:
-            if st.button("💾 Sauvegarder", key="dogpile_save_btn", use_container_width=True):
+            if st.button("💾 Sauvegarder", key="dogpile_save_btn", width="stretch"):
                 entry = {
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M"), 
                     "type": "Dogpile", 
@@ -292,7 +292,7 @@ with tab4:
                 st.success("✅ Sauvegardé")
         with col2:
             dogpile_url = f"http://www.dogpile.com/serp?q={quote(st.session_state['dogpile_query'])}"
-            st.link_button("🌐 Ouvrir sur Dogpile", dogpile_url, use_container_width=True)
+            st.link_button("🌐 Ouvrir sur Dogpile", dogpile_url, width="stretch")
 
 # -------------------- Tab 5: Web Scraper - Analyse Concurrentielle --------------------
 # -------------------- Tab 5: Web Scraper - Analyse Concurrentielle --------------------
@@ -326,7 +326,7 @@ with tab5:
             default=["Compétences recherchées", "Niveaux d'expérience", "Avantages proposés"]
         )
     
-    if st.button("🚀 Lancer l'analyse concurrentielle", use_container_width=True, key="scraper_btn"):
+    if st.button("🚀 Lancer l'analyse concurrentielle", width="stretch", key="scraper_btn"):
         if concurrents:
             concurrents_list = [url.strip() for url in concurrents.split('\n') if url.strip()]
             mots_cles_list = [mot.strip().lower() for mot in mots_cles.split(',')] if mots_cles else []
@@ -564,7 +564,7 @@ with tab5:
                 # Création d'un DataFrame pour une meilleure visualisation
                 try:
                     df_results = pd.DataFrame(results)
-                    st.dataframe(df_results, use_container_width=True)
+                    st.dataframe(df_results, width="stretch")
                     
                     # Afficher un résumé par entreprise
                     st.subheader("📊 Résumé par entreprise")
@@ -617,7 +617,7 @@ with tab5:
                         data=csv_data,
                         file_name="analyse_concurrentielle_emplois.csv",
                         mime="text/csv",
-                        use_container_width=True
+                        width="stretch"
                     )
                 except NameError:
                     st.warning("Impossible de générer le fichier CSV car pandas n'est pas disponible.")
@@ -794,7 +794,7 @@ démontrent un potentiel fort pour le poste de {poste} au sein de notre {terme_o
             st.success("✅ Infos candidat mises à jour")
 
     # --------- GÉNÉRATION ---------
-    if st.button("✨ Générer", type="primary", use_container_width=True, key="btn_generate_inmail"):
+    if st.button("✨ Générer", type="primary", width="stretch", key="btn_generate_inmail"):
         donnees_profil = st.session_state.get("inmail_profil_data", profil_data)
         msg, objet_auto = generate_inmail(donnees_profil, poste_accroche, entreprise, ton_message, longueur_message, cta_option, genre_profil)
         st.session_state["inmail_message"] = msg
@@ -862,7 +862,7 @@ with tab7:
 
     mode_rapide_magicien = st.checkbox("⚡ Mode rapide (réponse concise)", key="magicien_fast")
 
-    if st.button("✨ Poser la question", type="primary", key="ask_magicien", use_container_width=True):
+    if st.button("✨ Poser la question", type="primary", key="ask_magicien", width="stretch"):
         if question:
             with st.spinner("⏳ Génération en cours..."):
                 start_time = time.time()
@@ -897,7 +897,7 @@ with tab7:
                     st.session_state.magicien_history.remove(item)
                     st.rerun()
         
-        if st.button("🧹 Supprimer tout", key="clear_magicien_all", use_container_width=True):
+        if st.button("🧹 Supprimer tout", key="clear_magicien_all", width="stretch"):
             st.session_state.magicien_history.clear()
             st.success("✅ Historique vidé")
             st.rerun()
@@ -914,7 +914,7 @@ with tab8:
         entreprise = st.text_input("Entreprise:", key="perm_entreprise", placeholder="TGCC")
         source = st.radio("Source de détection :", ["Site officiel", "Charika.ma"], key="perm_source", horizontal=True)
 
-    if st.button("🔮 Générer permutations", use_container_width=True):
+    if st.button("🔮 Générer permutations", width="stretch"):
         if prenom and nom and entreprise:
             with st.spinner("⏳ Génération des permutations..."):
                 start_time = time.time()

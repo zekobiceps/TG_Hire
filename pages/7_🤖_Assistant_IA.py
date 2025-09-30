@@ -175,9 +175,9 @@ user_input = st.text_area(
 
 col1, col2 = st.columns([3, 1])
 with col1:
-    send_button = st.button("💡 Générer par l'IA", type="primary", use_container_width=True)
+    send_button = st.button("💡 Générer par l'IA", type="primary", width="stretch")
 with col2:
-    reset_button = st.button("🧹 Effacer", use_container_width=True)
+    reset_button = st.button("🧹 Effacer", width="stretch")
 
 if reset_button:
     st.session_state.conversation_history = []

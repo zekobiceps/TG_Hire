@@ -226,7 +226,7 @@ with tab1:
     notes = st.text_area("Notes / Observations", key="carto_notes", height=100)
     cv_file = st.file_uploader("Télécharger CV (PDF ou DOCX)", type=["pdf", "docx"], key="carto_cv")
 
-    if st.button("💾 Ajouter à la cartographie", type="primary", use_container_width=True, key="btn_add_carto"):
+    if st.button("💾 Ajouter à la cartographie", type="primary", width="stretch", key="btn_add_carto"):
         if nom and poste:
             cv_link = None
             if cv_file:
@@ -318,7 +318,7 @@ with tab2:
             fig.update_traces(hovertemplate='<b>%{label}</b><br>Nombre: %{value}<br>Pourcentage: %{percent}<extra></extra>')
             fig.update_layout(legend_font_size=16)
             
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width="stretch")
             
         else:
             st.info("Aucun candidat dans la cartographie pour l'instant.")

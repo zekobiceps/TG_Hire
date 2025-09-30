@@ -286,7 +286,7 @@ with tab1:
         index=0, help="Consultez l'onglet 'Guide des Méthodes'."
     )
 
-    if st.button("🔍 Analyser et Classer", type="primary", use_container_width=True, disabled=not (uploaded_files_ranking and job_description)):
+    if st.button("🔍 Analyser et Classer", type="primary", width="stretch", disabled=not (uploaded_files_ranking and job_description)):
         resumes, file_names = [], []
         with st.spinner("Lecture des fichiers PDF..."):
             for file in uploaded_files_ranking:
@@ -319,7 +319,7 @@ with tab1:
                 results_df["Score"] = results_df["Score brut"].apply(lambda x: f"{x*100:.1f}%")
                 
                 st.markdown("### 🏆 Résultats du Classement")
-                st.dataframe(results_df[["Rang", "Nom du CV", "Score"]], use_container_width=True, hide_index=True)
+                st.dataframe(results_df[["Rang", "Nom du CV", "Score"]], width="stretch", hide_index=True)
                 
                 if logic:
                     st.markdown("### 🧠 Logique de Scoring")
@@ -357,7 +357,7 @@ with tab2:
     if "Analyse par la Méthode" in analysis_type_single:
         job_desc_single = st.text_area("Description de poste pour le calcul du score", height=150, key="jd_single")
 
-    if uploaded_files_analysis and st.button("🚀 Lancer l'analyse", type="primary", use_container_width=True, key="btn_single_analysis"):
+    if uploaded_files_analysis and st.button("🚀 Lancer l'analyse", type="primary", width="stretch", key="btn_single_analysis"):
         for uploaded_file in uploaded_files_analysis:
             with st.expander(f"Résultat pour : **{uploaded_file.name}**", expanded=True):
                 with st.spinner("Analyse en cours..."):

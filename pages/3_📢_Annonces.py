@@ -174,7 +174,7 @@ with col_info2:
 col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
 with col_btn2:
     generate_button = st.button("💡 Générer l'annonce via IA", 
-                              use_container_width=True,
+                              width="stretch",
                               key="btn_generer_annonce")
 
 # Génération IA avec spinner
@@ -349,7 +349,7 @@ contenu = st.text_area("Contenu de l'annonce (généré ou manuel)",
 # Bouton de sauvegarde
 col_save1, col_save2, col_save3 = st.columns([1, 2, 1])
 with col_save2:
-    if st.button("💾 Sauvegarder l'annonce", type="primary", use_container_width=True, key="btn_sauvegarder_annonce"):
+    if st.button("💾 Sauvegarder l'annonce", type="primary", width="stretch", key="btn_sauvegarder_annonce"):
         if poste_final and entreprise and contenu and localisation_finale:
             annonce = {
                 "date": datetime.now().strftime("%Y-%m-%d %H:%M"),

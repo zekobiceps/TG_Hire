@@ -289,10 +289,10 @@ Limiter à 4–7 critères forts. Une question = un critère avec cible claire.
                 col_buttons = st.columns([1,1])
                 with col_buttons[0]:
                     st.markdown("<div class='ai-red-btn'>", unsafe_allow_html=True)
-                    gen_click = st.form_submit_button("💡 Générer question IA", use_container_width=True)
+                    gen_click = st.form_submit_button("💡 Générer question IA", width="stretch")
                     st.markdown("</div>", unsafe_allow_html=True)
                 with col_buttons[1]:
-                    add_click = st.form_submit_button("➕ Ajouter le critère", use_container_width=True)
+                    add_click = st.form_submit_button("➕ Ajouter le critère", width="stretch")
                 if gen_click:
                     if ai_prompt:
                         try:
@@ -345,7 +345,7 @@ Limiter à 4–7 critères forts. Une question = un critère avec cible claire.
                         "Évaluateur", options=["Manager", "Recruteur", "Les deux"], required=True),
                 },
                 num_rows="dynamic",
-                use_container_width=True,
+                width="stretch",
             )
     except Exception as e:
         st.error(f"❌ Erreur dans render_ksa_matrix: {e}")
@@ -625,7 +625,7 @@ with tabs[0]:
                 date_brief_value = _parse_date_any(raw)
                 chosen_date = st.date_input("Date du brief", value=date_brief_value, key="date_brief")
 
-        if st.button("💾 Créer brief", type="primary", use_container_width=True, key="create_brief"):
+        if st.button("💾 Créer brief", type="primary", width="stretch", key="create_brief"):
             required_fields = ["poste_intitule", "manager_nom", "affectation_nom", "date_brief"]
             missing_fields = [field for field in required_fields if not st.session_state.get(field)]
             if missing_fields:
@@ -709,7 +709,7 @@ with tabs[0]:
                         index=["", "Standard", "Urgent", "Stratégique"].index(st.session_state.get("filter_brief_type", ""))
                         if st.session_state.get("filter_brief_type") in ["", "Standard", "Urgent", "Stratégique"] else 0)
 
-        if st.button("🔎 Filtrer", use_container_width=True, key="apply_filter"):
+        if st.button("🔎 Filtrer", width="stretch", key="apply_filter"):
             filter_month = st.session_state.filter_date.strftime("%m") if st.session_state.filter_date else ""
             st.session_state.filtered_briefs = filter_briefs(
                 st.session_state.saved_briefs,
@@ -735,10 +735,10 @@ with tabs[0]:
                     with cola:
                         c_edit, c_del = st.columns([1,1])
                         with c_edit:
-                            if st.button("📝 Éditer", key=f"edit_{name}", use_container_width=True):
+                            if st.button("📝 Éditer", key=f"edit_{name}", width="stretch"):
                                 st.session_state.import_brief_flag=True; st.session_state.brief_to_import=name; st.rerun()
                         with c_del:
-                            if st.button("🗑️ Supprimer", key=f"del_{name}", use_container_width=True):
+                            if st.button("🗑️ Supprimer", key=f"del_{name}", width="stretch"):
                                 st.session_state.saved_briefs.pop(name,None); save_briefs(); st.session_state.filtered_briefs.pop(name,None); st.success("Supprimé"); st.rerun()
             else:
                 st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
@@ -871,7 +871,7 @@ with tabs[2]:
                         "Commentaire manager": st.column_config.TextColumn()
                     },
                     key="etape1_editor",
-                    use_container_width=True
+                    width="stretch"
                 )
                 if st.button("💾 Enregistrer commentaires", key="save_mgr_step1"):
                     new_com = {}
@@ -962,11 +962,11 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                 bcol1, bcol2 = st.columns([1,1])
                 with bcol1:
                     st.markdown("<div class='ai-red-btn' style='margin-top:0.4rem;'>", unsafe_allow_html=True)
-                    gen_btn = st.form_submit_button("💡 Générer question IA", use_container_width=True)
+                    gen_btn = st.form_submit_button("💡 Générer question IA", width="stretch")
                     st.markdown("</div>", unsafe_allow_html=True)
                 with bcol2:
                     st.markdown("<div class='add-crit-btn' style='margin-top:0.4rem;'>", unsafe_allow_html=True)
-                    add_btn = st.form_submit_button("➕ Ajouter", use_container_width=True)
+                    add_btn = st.form_submit_button("➕ Ajouter", width="stretch")
                     st.markdown("</div>", unsafe_allow_html=True)
 
                 if gen_btn:
@@ -1027,7 +1027,7 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                 edited = st.data_editor(
                     st.session_state.ksa_matrix[cols_order],
                     hide_index=True,
-                    use_container_width=True,
+                    width="stretch",
                     key="ksa_editor_step2",
                     column_config={
                         "Rubrique": st.column_config.SelectboxColumn("Rubrique", options=["Knowledge","Skills","Abilities"]),
@@ -1101,13 +1101,13 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
         nav_prev, nav_next = st.columns([1,1])
         with nav_prev:
             st.markdown("<div class='nav-small'>", unsafe_allow_html=True)
-            if step > 1 and st.button("⬅️ Précédent", key=f"rb_prev_{step}", use_container_width=True):
+            if step > 1 and st.button("⬅️ Précédent", key=f"rb_prev_{step}", width="stretch"):
                 st.session_state.reunion_step -= 1
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
         with nav_next:
             st.markdown("<div class='nav-small'>", unsafe_allow_html=True)
-            if step < total_steps and st.button("Suivant ➡️", key=f"rb_next_{step}", use_container_width=True):
+            if step < total_steps and st.button("Suivant ➡️", key=f"rb_next_{step}", width="stretch"):
                 # Auto-save léger
                 if step in (1,2,3):
                     brief_data["CRITERES_EXCLUSION"] = st.session_state.get("criteres_exclusion","")
@@ -1158,7 +1158,7 @@ with tabs[3]:
         if "ksa_matrix" in st.session_state and isinstance(st.session_state.ksa_matrix, pd.DataFrame) and not st.session_state.ksa_matrix.empty:
             st.subheader("📊 Matrice KSA")
             show_df = st.session_state.ksa_matrix.copy()
-            st.dataframe(show_df, hide_index=True, use_container_width=True)
+            st.dataframe(show_df, hide_index=True, width="stretch")
             try:
                 if "Évaluation (1-5)" in show_df.columns:
                     avg2 = round(show_df["Évaluation (1-5)"].astype(float).mean(),2)
