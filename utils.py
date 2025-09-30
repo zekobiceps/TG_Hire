@@ -194,7 +194,7 @@ def save_briefs():
         st.error(f"Erreur lors de la sauvegarde locale des briefs: {e}")
 
 def load_briefs():
-    """Load all briefs exclusively from Google Sheets."""
+    """Charge tous les briefs depuis Google Sheets."""
     try:
         briefs = {}
         worksheet = get_briefs_gsheet_client()
@@ -204,15 +204,30 @@ def load_briefs():
                 brief_name = record.get("BRIEF_NAME")
                 if brief_name:
                     briefs[brief_name] = record
-                    if "KSA_MATRIX_JSON" in record and record["KSA_MATRIX_JSON"]:
+                    if record.get("KSA_MATRIX_JSON"):
                         try:
                             record["ksa_matrix"] = pd.DataFrame.from_records(json.loads(record["KSA_MATRIX_JSON"]))
-                        except json.JSONDecodeError:
-                            record["ksa_matrix"] = pd.DataFrame()  # Fallback si JSON invalide
+                        except Exception:
+                            record["ksa_matrix"] = pd.DataFrame()
         return briefs
     except Exception as e:
         st.warning(f"Erreur lors du chargement des briefs depuis Google Sheets : {e}")
         return {}
+
+# === AJOUT : fonction manquante empêchant l'import dans test_api.py ===
+def refresh_saved_briefs():
+    """
+    Recharge les briefs depuis Google Sheets et met à jour st.session_state.saved_briefs.
+    Retourne le dict fraîchement chargé.
+    """
+    briefs = load_briefs()
+    st.session_state.saved_briefs = briefs
+    return briefs
+
+# (Si besoin d’un cache temporaire : décommenter)
+# @st.cache_data(ttl=60)
+# def cached_briefs():
+#     return load_briefs()
 
 def count_briefs_from_gsheet():
     """Count the number of briefs in Google Sheets as a fallback."""
