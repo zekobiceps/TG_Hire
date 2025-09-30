@@ -49,7 +49,7 @@ from utils import (
 st.markdown("""
     <style>
     .stTabs [data-baseweb="tab"]{height:auto!important;padding:10px 16px!important;}
-    .stButton > button{border-radius:4px;padding:0.5rem 1rem;font-weight:500;}
+    .stButton > button{border-radius:4px;padding:0.5rem 1rem;font-weight:500;white-space:nowrap;}
     .streamlit-expanderHeader{font-weight:600;}
     .stDataFrame{width:100%;}
     .stTextArea textarea{min-height:100px;resize:vertical;white-space:pre-wrap!important;}
@@ -57,7 +57,7 @@ st.markdown("""
     .ai-red-btn button:hover{background:#E00000!important;}
     .ai-suggestion-box{background:linear-gradient(135deg,#e6ffed,#f4fff7);border-left:5px solid #23C552;padding:0.6rem 0.8rem;margin:0.3rem 0 0.8rem;border-radius:6px;font-size:.9rem;}
     .score-cible{font-size:24px!important;font-weight:700;color:#0057B7;margin-top:.5rem;}
-    .brief-name{padding-top:0.10rem;font-size:0.95rem;font-weight:600;display:flex;align-items:center;}
+    .brief-name{padding-top:0.05rem;font-size:1.05rem;font-weight:650;display:flex;align-items:center;}
     .filtered-brief-line{display:flex;align-items:center;gap:0.4rem;margin-bottom:0.15rem;}
     .filtered-brief-line .actions{display:flex;gap:0.3rem;}
     .filtered-brief-line button{padding:0.25rem 0.6rem !important;font-size:0.70rem !important;}
@@ -729,7 +729,7 @@ with tabs[0]:
             st.markdown('<h3 style="margin-top: 1rem; margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
             if briefs_to_show:
                 for name, brief in briefs_to_show.items():
-                    coln, cola = st.columns([5,3])
+                    coln, cola = st.columns([5,4])
                     with coln:
                         st.markdown(f"<div class='brief-name'><strong>{name}</strong></div>", unsafe_allow_html=True)
                     with cola:
@@ -949,11 +949,13 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
 
                 bcol1, bcol2 = st.columns([1,1])
                 with bcol1:
-                    st.markdown("<div class='ai-red-btn'>", unsafe_allow_html=True)
+                    st.markdown("<div class='ai-red-btn' style='margin-top:0.4rem;'>", unsafe_allow_html=True)
                     gen_btn = st.form_submit_button("💡 Générer question IA", use_container_width=True)
                     st.markdown("</div>", unsafe_allow_html=True)
                 with bcol2:
+                    st.markdown("<div class='add-crit-btn' style='margin-top:0.4rem;'>", unsafe_allow_html=True)
                     add_btn = st.form_submit_button("➕ Ajouter", use_container_width=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
 
                 if gen_btn:
                     if not ai_prompt:
@@ -964,9 +966,11 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                                 resp = generate_ai_question(ai_prompt, concise=concise)
                             if isinstance(resp, str) and resp.lower().startswith("question:"):
                                 resp = resp.split(":",1)[1].strip()
-                            # Stocke dans variable temporaire pour réinjection au prochain rerun
+                            # Stocke résultat pour injection et affichage
                             st.session_state.ks_question_new = resp
+                            st.session_state.ks_generated_question = resp
                             st.success("Question générée.")
+                            st.rerun()
                         except Exception as e:
                             st.error(f"Erreur IA: {e}")
 
@@ -991,7 +995,15 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                             )
                         save_ksa_matrix_to_current_brief()
                         st.success("Critère ajouté.")
+                        # Nettoie l'affichage suggestion pour prochaine entrée
+                        if 'ks_generated_question' in st.session_state:
+                            del st.session_state.ks_generated_question
                         st.rerun()
+
+                # Affichage de la question générée (si existe) sous les boutons
+                if st.session_state.get('ks_generated_question'):
+                    q_disp = st.session_state.ks_generated_question.replace('\n','<br>')
+                    st.markdown(f"<div class='ai-suggestion-box'><strong>Question générée :</strong><br>{q_disp}</div>", unsafe_allow_html=True)
 
             if not st.session_state.ksa_matrix.empty:
                 cols_order = ["Rubrique","Critère","Type de question","Question pour l'entretien","Évaluation (1-5)","Évaluateur"]
