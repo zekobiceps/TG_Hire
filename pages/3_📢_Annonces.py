@@ -39,6 +39,39 @@ st.set_page_config(
 
 st.title("📢  Gestion des annonces")
 
+# --- Debug: test de connexion Google Sheets (visible si st.secrets['DEBUG']==True ou param ?debug=true)
+debug_mode = False
+try:
+    debug_mode = bool(st.secrets.get("DEBUG", False))
+except Exception:
+    debug_mode = False
+if not debug_mode:
+    # allow quick URL override: ?debug=true
+    params = st.experimental_get_query_params()
+    if params.get("debug", ["false"])[0].lower() == "true":
+        debug_mode = True
+
+if debug_mode:
+    st.warning("DEBUG MODE: Bouton de test Google Sheets activé")
+    cold1, cold2 = st.columns([1, 3])
+    with cold2:
+        if st.button("🔎 Tester connexion Annonces → Google Sheets", key="debug_test_sheets"):
+            try:
+                gc = utils.get_annonces_gsheet_client()
+                if not gc:
+                    st.error("Client gspread non initialisé (vérifiez GSPREAD_AVAILABLE et st.secrets)")
+                else:
+                    st.success("Client gspread initialisé")
+                    try:
+                        records = utils.load_annonces_from_gsheet()
+                        st.success(f"Chargé {len(records)} enregistrements depuis la feuille Annonces")
+                        if len(records) > 0:
+                            st.json(records[0])
+                    except Exception as e:
+                        st.error(f"Erreur lors du chargement des annonces: {e}")
+            except Exception as e:
+                st.error(f"Erreur lors du test Google Sheets: {e}")
+
 # -------------------- Styles CSS --------------------
 st.markdown("""
     <style>
