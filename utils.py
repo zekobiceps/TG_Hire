@@ -1124,3 +1124,52 @@ def export_brief_pdf_pretty(brief_name: str, brief_data: dict, ksa_df):
     c.save()
     buf.seek(0)
     return buf
+
+import pandas as pd
+import streamlit as st
+import json
+
+def get_brief_value(brief_dict: dict, key: str, default: str = ""):
+    """
+    Retourne la valeur d'un champ en testant plusieurs variantes (minuscule, MAJUSCULE, alias LIEN_PROFIL_X).
+    """
+    if not isinstance(brief_dict, dict):
+        return default
+    if key.startswith("profil_link_"):
+        suf = key.split("_")[-1]
+        candidates = [f"LIEN_PROFIL_{suf}", key.upper(), key]
+    else:
+        candidates = [key, key.upper()]
+    for c in candidates:
+        val = brief_dict.get(c)
+        if val not in (None, ""):
+            return val
+    return default
+
+def save_ksa_matrix_to_current_brief():
+    """
+    Sauvegarde st.session_state.ksa_matrix (DataFrame) -> KSA_MATRIX_JSON dans le brief courant.
+    N'insère pas la DataFrame brute dans saved_briefs (compat JSON).
+    """
+    bname = st.session_state.get("current_brief_name")
+    if not bname:
+        return
+    if "ksa_matrix" not in st.session_state:
+        return
+    df = st.session_state.ksa_matrix
+    if not isinstance(df, pd.DataFrame) or df.empty:
+        return
+    needed = ["Rubrique","Critère","Type de question","Question pour l'entretien","Évaluation (1-5)","Évaluateur"]
+    for c in needed:
+        if c not in df.columns:
+            df[c] = ""
+    df = df[needed]
+    try:
+        brief_dict = st.session_state.saved_briefs.get(bname, {})
+        brief_dict["KSA_MATRIX_JSON"] = df.to_json(orient="records", force_ascii=False)
+        brief_dict.pop("ksa_matrix", None)
+        st.session_state.saved_briefs[bname] = brief_dict
+        save_briefs()
+        save_brief_to_gsheet(bname, brief_dict)
+    except Exception as e:
+        st.warning(f"Erreur sauvegarde KSA: {e}")
