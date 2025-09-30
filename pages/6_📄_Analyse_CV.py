@@ -1053,73 +1053,25 @@ with tab4:
         # Tableau détaillé avec style amélioré
         st.subheader("📋 Détails des Statistiques")
 
-        # Style CSS pour le tableau
-        st.markdown("""
-        <style>
-        .feedback-table {
-            border-collapse: collapse;
-            width: 100%;
-            margin: 20px 0;
-        }
-        .feedback-table th, .feedback-table td {
-            border: 1px solid #ddd;
-            padding: 12px;
-            text-align: left;
-        }
-        .feedback-table th {
-            background-color: #f8f9fa;
-            font-weight: bold;
-        }
-        .feedback-table tr:nth-child(even) {
-            background-color: #f8f9fa;
-        }
-        .feedback-table tr:hover {
-            background-color: #e3f2fd;
-        }
-        .score-high { color: #2e7d32; font-weight: bold; }
-        .score-medium { color: #f57c00; font-weight: bold; }
-        .score-low { color: #d32f2f; font-weight: bold; }
-        </style>
-        """, unsafe_allow_html=True)
-
-        # Convertir en HTML avec classes de couleur
-        def get_score_class(score):
-            if score >= 4.0:
-                return "score-high"
-            elif score >= 3.0:
-                return "score-medium"
-            else:
-                return "score-low"
-
-        # Créer le tableau HTML
-        table_html = """
-        <table class="feedback-table">
-            <thead>
-                <tr>
-                    <th>Méthode d'Analyse</th>
-                    <th>Score Moyen</th>
-                    <th>Nombre d'Évaluations</th>
-                    <th>Fiabilité</th>
-                </tr>
-            </thead>
-            <tbody>
-        """
-
-        for _, row in feedback_stats.iterrows():
-            score_class = get_score_class(row["Score moyen"])
-            reliability = "Très fiable" if row["Nombre d'évaluations"] >= 10 else "À confirmer" if row["Nombre d'évaluations"] >= 5 else "Données limitées"
-
-            table_html += """
-                <tr>
-                    <td>{}</td>
-                    <td><span class="{}">{:.2f}/5</span></td>
-                    <td>{}</td>
-                    <td>{}</td>
-                </tr>
-            """.format(row["Méthode"], score_class, row["Score moyen"], row["Nombre d'évaluations"], reliability)
-
-        table_html += "</tbody></table>"
-        st.markdown(table_html, unsafe_allow_html=True)
+        # Préparer les données pour l'affichage
+        display_stats = feedback_stats.copy()
+        display_stats["Score Formaté"] = display_stats.apply(lambda row: 
+            f"{row['Score moyen']:.2f}/5 {'🟢' if row['Score moyen'] >= 4.0 else '🟡' if row['Score moyen'] >= 3.0 else '🔴'}", axis=1)
+        display_stats["Fiabilité"] = display_stats["Nombre d'évaluations"].apply(
+            lambda x: "Très fiable 🎯" if x >= 10 else "À confirmer ⚠️" if x >= 5 else "Données limitées 📊")
+        
+        # Afficher le tableau avec colonnes formatées
+        st.dataframe(
+            display_stats[["Méthode", "Score Formaté", "Nombre d'évaluations", "Fiabilité"]],
+            column_config={
+                "Méthode": st.column_config.TextColumn("Méthode d'Analyse", width="medium"),
+                "Score Formaté": st.column_config.TextColumn("Score Moyen", width="small"),
+                "Nombre d'évaluations": st.column_config.NumberColumn("Évaluations", width="small"),
+                "Fiabilité": st.column_config.TextColumn("Fiabilité", width="medium")
+            },
+            hide_index=True,
+            use_container_width=True
+        )
 
         # Insights et recommandations
         st.markdown("---")

@@ -564,7 +564,8 @@ def export_brief_pdf():
     ksa_matrix = brief_data.get("ksa_matrix")
     if isinstance(ksa_matrix, pd.DataFrame) and not ksa_matrix.empty:
         for _, row in ksa_matrix.iterrows():
-            ksa_text = f"- {row.get('Rubrique', '')}: {row.get('Critère', '')} (Question: {row.get('Question pour l\'entretien', '')}, Éval: {row.get('Évaluation (1-5)', '')})"
+            question = row.get('Question pour l\'entretien', '')
+            ksa_text = f"- {row.get('Rubrique', '')}: {row.get('Critère', '')} (Question: {question}, Éval: {row.get('Évaluation (1-5)', '')})"
             story.append(Paragraph(ksa_text, styles['Normal']))
     else:
         story.append(Paragraph("Aucune donnée KSA disponible.", styles['Normal']))
@@ -620,7 +621,8 @@ def export_brief_word():
     ksa_matrix = brief_data.get("ksa_matrix")
     if isinstance(ksa_matrix, pd.DataFrame) and not ksa_matrix.empty:
         for _, row in ksa_matrix.iterrows():
-            doc.add_paragraph(f"- {row.get('Rubrique', '')}: {row.get('Critère', '')} (Question: {row.get('Question pour l\'entretien', '')}, Éval: {row.get('Évaluation (1-5)', '')})")
+            question_text = row.get('Question pour l\'entretien', '')
+            doc.add_paragraph(f"- {row.get('Rubrique', '')}: {row.get('Critère', '')} (Question: {question_text}, Éval: {row.get('Évaluation (1-5)', '')})")
     else:
         doc.add_paragraph("Aucune donnée KSA disponible.")
 
