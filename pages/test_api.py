@@ -56,10 +56,14 @@ st.markdown("""
     .ai-red-btn button{background:#C40000!important;color:#fff!important;border:1px solid #960000!important;font-weight:600!important;}
     .ai-red-btn button:hover{background:#E00000!important;}
     .ai-suggestion-box{background:linear-gradient(135deg,#e6ffed,#f4fff7);border-left:5px solid #23C552;padding:0.6rem 0.8rem;margin:0.3rem 0 0.8rem;border-radius:6px;font-size:.9rem;}
-    .score-cible{font-size:28px!important;font-weight:700;color:#C40000;margin-top:.5rem;}
-    .brief-row{margin-bottom:0.2rem;}
-    .brief-row .stButton>button{padding:0.25rem 0.5rem;font-size:0.70rem;}
-    .brief-name{padding-top:0.35rem;font-size:0.85rem;}
+    .score-cible{font-size:24px!important;font-weight:700;color:#0057B7;margin-top:.5rem;}
+    .brief-name{padding-top:0.15rem;font-size:0.80rem;display:flex;align-items:center;}
+    .filtered-brief-line{display:flex;align-items:center;gap:0.4rem;margin-bottom:0.15rem;}
+    .filtered-brief-line .actions{display:flex;gap:0.3rem;}
+    .filtered-brief-line button{padding:0.25rem 0.6rem !important;font-size:0.70rem !important;}
+    .synthese-two-cols{display:flex;gap:2rem;}
+    .synthese-col{flex:1;min-width:200px;}
+    .synthese-col h4{margin-bottom:0.4rem;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -75,9 +79,11 @@ def generate_custom_pdf(brief_name:str, data:dict, ksa:pd.DataFrame|None)->Bytes
         y = h-40
         logo_path = os.path.join(os.path.dirname(__file__), '..', 'tgcc.png')
         if os.path.exists(logo_path):
-            try: c.drawImage(logo_path,40,y-30,width=120,preserveAspectRatio=True,mask='auto')
-            except Exception: pass
-        c.setFont('Helvetica-Bold',18); c.drawString(180,y-10,f"Brief - {brief_name}")
+            try:
+                c.drawImage(logo_path,40,y-30,width=140,preserveAspectRatio=True,mask='auto')
+            except Exception:
+                pass
+        c.setFont('Helvetica-Bold',18); c.drawString(210,y-10,f"Brief - {brief_name}")
         meta = [
             f"Poste : {data.get('POSTE_INTITULE') or data.get('poste_intitule','')}",
             f"Manager : {data.get('MANAGER_NOM') or data.get('manager_nom','')}",
@@ -107,14 +113,38 @@ def generate_custom_pdf(brief_name:str, data:dict, ksa:pd.DataFrame|None)->Bytes
                     c.drawString(50,y,wline); y-=12
             y-=4
         if ksa is not None and isinstance(ksa,pd.DataFrame) and not ksa.empty:
-            if y<100: c.showPage(); y=h-60
-            c.setFont('Helvetica-Bold',12); c.drawString(40,y,'Matrice KSA'); y-=16; c.setFont('Helvetica',8)
+            if y<140: c.showPage(); y=h-60
+            c.setFont('Helvetica-Bold',12); c.drawString(40,y,'Matrice KSA'); y-=20
             cols=["Rubrique","Critère","Type de question","Évaluation (1-5)"]
+            col_widths=[70,200,130,80]
+            x0=40
+            header_y=y
+            c.setFont('Helvetica-Bold',9)
+            for i,col in enumerate(cols):
+                c.drawString(x0+sum(col_widths[:i]), header_y, col)
+            y=header_y-14
+            c.setFont('Helvetica',8)
             for _,row in ksa.iterrows():
-                line=' | '.join(str(row.get(cn,''))[:40] for cn in cols)
-                for wline in wrap(line,115):
-                    if y<40: c.showPage(); y=h-60; c.setFont('Helvetica',8)
-                    c.drawString(40,y,wline); y-=10
+                crit=str(row.get('Critère',''))
+                crit_lines=wrap(crit,45) or ['']
+                rub=str(row.get('Rubrique',''))
+                tq=str(row.get('Type de question',''))
+                evalv=str(row.get('Évaluation (1-5)',''))
+                for li,txt in enumerate(crit_lines):
+                    if y<60:
+                        c.showPage(); y=h-60; header_y=y; c.setFont('Helvetica-Bold',9)
+                        for i,col in enumerate(cols):
+                            c.drawString(x0+sum(col_widths[:i]), header_y, col)
+                        y=header_y-14; c.setFont('Helvetica',8)
+                    if li==0:
+                        c.drawString(x0, y, rub)
+                        c.drawString(x0+col_widths[0], y, txt)
+                        c.drawString(x0+col_widths[0]+col_widths[1], y, tq)
+                        c.drawString(x0+col_widths[0]+col_widths[1]+col_widths[2], y, evalv)
+                    else:
+                        c.drawString(x0+col_widths[0], y, txt)
+                    y-=10
+                y-=2
         c.showPage(); c.save(); buffer.seek(0); return buffer
     except Exception:
         return None
@@ -123,7 +153,15 @@ def generate_custom_word(brief_name:str,data:dict,ksa:pd.DataFrame|None)->BytesI
     if not WORD_LIB_CUSTOM:
         return None
     try:
-        doc=Document(); doc.add_heading(f"Brief - {brief_name}",0)
+        doc=Document()
+        logo_path = os.path.join(os.path.dirname(__file__), '..', 'tgcc.png')
+        if os.path.exists(logo_path):
+            try:
+                from docx.shared import Inches
+                doc.add_picture(logo_path, width=Inches(2.2))
+            except Exception:
+                pass
+        doc.add_heading(f"Brief - {brief_name}",0)
         for label,key in [("Poste","POSTE_INTITULE"),("Manager","MANAGER_NOM"),("Recruteur","RECRUTEUR"),("Affectation","AFFECTATION_NOM"),("Date","DATE_BRIEF")]:
             p=doc.add_paragraph(); p.add_run(f"{label} : ").bold=True; p.add_run(str(data.get(key) or data.get(key.lower(),'') or ''))
         mapping=[
@@ -143,13 +181,14 @@ def generate_custom_word(brief_name:str,data:dict,ksa:pd.DataFrame|None)->BytesI
         if ksa is not None and isinstance(ksa,pd.DataFrame) and not ksa.empty:
             doc.add_heading('Matrice KSA',2)
             table=doc.add_table(rows=1,cols=4)
-            for i,hdr in enumerate(["Rubrique","Critère","Type","Éval"]): table.rows[0].cells[i].text=hdr
+            hdrs=["Rubrique","Critère","Type","Éval"]
+            for i,h in enumerate(hdrs): table.rows[0].cells[i].text=h
             for _,row in ksa.iterrows():
-                r=table.add_row().cells
-                r[0].text=str(row.get('Rubrique',''))
-                r[1].text=str(row.get('Critère',''))
-                r[2].text=str(row.get('Type de question',''))
-                r[3].text=str(row.get('Évaluation (1-5)',''))
+                cells=table.add_row().cells
+                cells[0].text=str(row.get('Rubrique',''))
+                cells[1].text=str(row.get('Critère',''))
+                cells[2].text=str(row.get('Type de question',''))
+                cells[3].text=str(row.get('Évaluation (1-5)',''))
         bio=BytesIO(); doc.save(bio); bio.seek(0); return bio
     except Exception:
         return None
@@ -159,10 +198,22 @@ def render_ksa_matrix():
     try:
         with st.expander("ℹ️ Explications de la méthode KSA", expanded=False):
             st.markdown("""### Méthode KSA (Knowledge, Skills, Abilities)
-- **Knowledge (Connaissances)** : Savoirs théoriques nécessaires. Ex: Connaissances en normes de sécurité BTP (ISO 45001).
-- **Skills (Compétences)** : Aptitudes pratiques acquises. Ex: Maîtrise d'AutoCAD pour dessiner des plans de chantier.
-- **Abilities (Aptitudes)** : Capacités innées ou développées. Ex: Capacité à gérer des crises sur chantier.
-            """)
+La matrice KSA permet d'évaluer un candidat sur trois dimensions complémentaires :
+
+**Knowledge (Connaissances)** – Savoirs théoriques / réglementaires.  
+**Skills (Compétences)** – Savoirs-faire techniques & opérationnels.  
+**Abilities (Aptitudes)** – Capacités comportementales / cognitives dans l'action.
+
+| Type de question | Objectif | Cible K/S/A |
+|------------------|----------|-------------|
+| Comportementale (STAR) | Situation réelle passée | Abilities (principal) + Skills |
+| Technique | Vérifier la maîtrise concrète | Knowledge & Skills |
+| Situationnelle | Réaction hypothétique | Abilities + Skills |
+| Générale | Motivation / structuration | Mix selon formulation |
+
+Échelle (1–5) : 1=Insuffisant | 3=Autonome attendu | 5=Référent.  
+Limiter à 4–7 critères forts. Une question = un critère avec cible claire.
+""")
         if "ksa_matrix" not in st.session_state:
             st.session_state.ksa_matrix = pd.DataFrame(columns=[
                 "Rubrique", "Critère", "Type de question", "Cible / Standard attendu",
@@ -235,25 +286,23 @@ def render_ksa_matrix():
                 )
                 st.checkbox("⚡ Mode rapide (réponse concise)", key="concise_checkbox")
 
-                col_buttons = st.columns([1, 1])
+                col_buttons = st.columns([1,1])
                 with col_buttons[0]:
                     st.markdown("<div class='ai-red-btn'>", unsafe_allow_html=True)
-                    if st.form_submit_button("💡 Générer question IA", use_container_width=True):
-                        if ai_prompt:
-                            try:
-                                ai_response = generate_ai_question(
-                                    ai_prompt,
-                                    concise=st.session_state.concise_checkbox
-                                )
-                                st.session_state.ai_response = ai_response
-                            except Exception as e:
-                                st.error(f"Erreur génération IA : {e}")
-                        else:
-                            st.error("Veuillez entrer un prompt pour l'IA")
+                    gen_click = st.form_submit_button("💡 Générer question IA", use_container_width=True)
                     st.markdown("</div>", unsafe_allow_html=True)
-
                 with col_buttons[1]:
-                    if st.form_submit_button("➕ Ajouter le critère", use_container_width=True):
+                    add_click = st.form_submit_button("➕ Ajouter le critère", use_container_width=True)
+                if gen_click:
+                    if ai_prompt:
+                        try:
+                            ai_response = generate_ai_question(ai_prompt, concise=st.session_state.concise_checkbox)
+                            st.session_state.ai_response = ai_response
+                        except Exception as e:
+                            st.error(f"Erreur génération IA : {e}")
+                    else:
+                        st.error("Veuillez entrer un prompt pour l'IA")
+                if add_click:
                         if not critere or not cible:
                             st.error("Veuillez remplir au moins le critère et la cible.")
                         else:
@@ -337,7 +386,7 @@ def delete_current_brief():
 # ---------------- INIT ----------------
 init_session_state()
 st.set_page_config(
-    page_title="TG-Hire IA - Brief",
+    page_title="Brief de Calibration",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -458,16 +507,12 @@ with st.sidebar:
     total_briefs = len(merged)
     st.metric("📋 Briefs créés", total_briefs)
 
-    if st.button("🔁 Recharger locaux", key="reload_local_briefs"):
-        refresh_saved_briefs()
-        st.rerun()
-
     st.divider()
     if st.button("Tester Connexion IA", key="test_deepseek"):
         test_deepseek_connection()
 
 # ---------------- NAVIGATION PRINCIPALE ----------------
-st.title("🤖 TG-Hire IA - Brief")
+st.title("🤖 Brief de Calibration")
 
 # Define tabs before using them
 tabs = st.tabs([
@@ -684,15 +729,17 @@ with tabs[0]:
             st.markdown('<h3 style="margin-top: 1rem; margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
             if briefs_to_show:
                 for name, brief in briefs_to_show.items():
-                    c1,c2,c3 = st.columns([5,1,1])
-                    with c1:
+                    coln, cola = st.columns([6,2])
+                    with coln:
                         st.markdown(f"<div class='brief-name'><strong>{name}</strong></div>", unsafe_allow_html=True)
-                    with c2:
-                        if st.button("📝", key=f"edit_{name}"):
-                            st.session_state.import_brief_flag=True; st.session_state.brief_to_import=name; st.rerun()
-                    with c3:
-                        if st.button("🗑️", key=f"del_{name}"):
-                            st.session_state.saved_briefs.pop(name,None); save_briefs(); st.session_state.filtered_briefs.pop(name,None); st.success("Supprimé"); st.rerun()
+                    with cola:
+                        c_edit, c_del = st.columns([1,1])
+                        with c_edit:
+                            if st.button("📝 Éditer", key=f"edit_{name}"):
+                                st.session_state.import_brief_flag=True; st.session_state.brief_to_import=name; st.rerun()
+                        with c_del:
+                            if st.button("🗑️ Supprimer", key=f"del_{name}"):
+                                st.session_state.saved_briefs.pop(name,None); save_briefs(); st.session_state.filtered_briefs.pop(name,None); st.success("Supprimé"); st.rerun()
             else:
                 st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
 
@@ -985,22 +1032,20 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                              "4-Clôture et Validation DRH:\nLe dossier complet du candidat retenu (avec l'avis KSA de chacun) est soumis à la DRH pour validation finale.")
             if not st.session_state.get("processus_evaluation") and not brief_data.get("PROCESSUS_EVALUATION"):
                 st.session_state.processus_evaluation = default_steps
-            c_excl, c_proc = st.columns(2)
+            c_excl, c_proc = st.columns([1,1.2])
             with c_excl:
-                st.text_area("🚫 Critères d'exclusion", key="criteres_exclusion", height=250, value=brief_data.get("CRITERES_EXCLUSION", st.session_state.get("criteres_exclusion","")))
+                st.text_area("🚫 Critères d'exclusion", key="criteres_exclusion", height=260, value=brief_data.get("CRITERES_EXCLUSION", st.session_state.get("criteres_exclusion","")), placeholder="Ex: Moins de 3 ans d'expérience / Refus mobilité / Salaire hors budget")
             with c_proc:
-                st.text_area("✅ Etapes suivantes", key="processus_evaluation", height=250, value=st.session_state.get("processus_evaluation", brief_data.get("PROCESSUS_EVALUATION","")))
-            if st.button("💾 Sauvegarder Étape 3", key="save_step3", type="primary"):
-                brief_data["canaux_prioritaires"] = st.session_state.get("canaux_prioritaires", [])
-                brief_data["CANAUX_PRIORITAIRES"] = json.dumps(brief_data["canaux_prioritaires"], ensure_ascii=False)
-                for low, up in {"criteres_exclusion":"CRITERES_EXCLUSION","processus_evaluation":"PROCESSUS_EVALUATION"}.items():
-                    val = st.session_state.get(low,"")
-                    brief_data[low] = val
-                    brief_data[up] = val
-                st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
-                save_briefs()
-                save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
-                st.success("Étape 3 sauvegardée.")
+                st.text_area("✅ Etapes suivantes", key="processus_evaluation", height=320, value=st.session_state.get("processus_evaluation", brief_data.get("PROCESSUS_EVALUATION","")))
+            # Sauvegarde auto (pas de bouton)
+            brief_data["canaux_prioritaires"] = st.session_state.get("canaux_prioritaires", [])
+            brief_data["CANAUX_PRIORITAIRES"] = json.dumps(brief_data["canaux_prioritaires"], ensure_ascii=False)
+            for low, up in {"criteres_exclusion":"CRITERES_EXCLUSION","processus_evaluation":"PROCESSUS_EVALUATION"}.items():
+                val = st.session_state.get(low,"")
+                brief_data[low] = val
+                brief_data[up] = val
+            st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
+            save_briefs(); save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
 
         # ----- Étape 4 (NOUVELLE) -----
         elif step == 4:
@@ -1091,34 +1136,21 @@ with tabs[3]:
         else:
             st.info("Pas de matrice KSA.")
 
-        st.markdown("### Actions")
-        act1, act2, _sp = st.columns([0.4,0.4,2.2])
-        with act1:
-            st.markdown("<div class='synthese-actions'>", unsafe_allow_html=True)
+        st.markdown("### Actions & Export")
+        col_act, col_exp = st.columns(2)
+        with col_act:
+            st.markdown("#### Actions")
             if st.button("💾 Sauvegarder synthèse", type="primary", key="btn_save_synthese"):
-                save_briefs()
-                save_brief_to_gsheet(st.session_state.current_brief_name, bd)
-                st.success("Synthèse sauvegardée.")
-            st.markdown("</div>", unsafe_allow_html=True)
-        with act2:
-            st.markdown("<div class='synthese-actions'>", unsafe_allow_html=True)
+                save_briefs(); save_brief_to_gsheet(st.session_state.current_brief_name, bd); st.success("Synthèse sauvegardée.")
             if st.button("🗑️ Supprimer le brief", key="btn_delete_synthese"):
-                st.session_state.saved_briefs.pop(st.session_state.current_brief_name, None)
-                save_briefs()
-                st.session_state.current_brief_name = ""
-                st.success("Brief supprimé.")
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        st.markdown("### Export")
-        ex1, ex2, _esp = st.columns([0.4,0.4,2.2])
-        with ex1:
+                st.session_state.saved_briefs.pop(st.session_state.current_brief_name, None); save_briefs(); st.session_state.current_brief_name = ""; st.success("Brief supprimé."); st.rerun()
+        with col_exp:
+            st.markdown("#### Export")
             pdf_buf = generate_custom_pdf(st.session_state.current_brief_name, bd, st.session_state.ksa_matrix if "ksa_matrix" in st.session_state else None)
             if pdf_buf:
                 st.download_button("⬇️ PDF", data=pdf_buf, file_name=f"{st.session_state.current_brief_name}.pdf", mime="application/pdf")
             else:
                 st.info("PDF indisponible.")
-        with ex2:
             word_buf = generate_custom_word(st.session_state.current_brief_name, bd, st.session_state.ksa_matrix if "ksa_matrix" in st.session_state else None)
             if word_buf:
                 st.download_button("⬇️ Word", data=word_buf, file_name=f"{st.session_state.current_brief_name}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
