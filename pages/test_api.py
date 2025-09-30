@@ -148,6 +148,7 @@ def render_ksa_matrix():
 
                 col_buttons = st.columns([1, 1])
                 with col_buttons[0]:
+                    st.markdown("<div class='ai-red-btn'>", unsafe_allow_html=True)
                     if st.form_submit_button("💡 Générer question IA", use_container_width=True):
                         if ai_prompt:
                             try:
@@ -160,6 +161,7 @@ def render_ksa_matrix():
                                 st.error(f"Erreur génération IA : {e}")
                         else:
                             st.error("Veuillez entrer un prompt pour l'IA")
+                    st.markdown("</div>", unsafe_allow_html=True)
 
                 with col_buttons[1]:
                     if st.form_submit_button("➕ Ajouter le critère", use_container_width=True):
@@ -260,6 +262,9 @@ if "reunion_step" not in st.session_state:
 
 if "filtered_briefs" not in st.session_state:
     st.session_state.filtered_briefs = {}
+if "show_filtered_results" not in st.session_state:
+    # Contrôle d'affichage des briefs filtrés (par défaut caché tant qu'on n'a pas cliqué sur Filtrer)
+    st.session_state.show_filtered_results = False
 
 if "avant_brief_completed" not in st.session_state:
     st.session_state.avant_brief_completed = True
@@ -584,22 +589,22 @@ with tabs[0]:
             st.session_state.show_filtered_results = True
             st.rerun()
 
-    # Affichage des briefs sauvegardés
-    briefs_to_show = st.session_state.saved_briefs if not st.session_state.get("show_filtered_results", False) else st.session_state.filtered_briefs
-
-    if briefs_to_show and len(briefs_to_show) > 0:
-        st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
-        for name, brief in briefs_to_show.items():
-            col_brief1, col_brief2 = st.columns([6, 1])
-            with col_brief1:
-                st.markdown(f"**{name}**")
-            with col_brief2:
-                if st.button("📝 Éditer", key=f"edit_{name}"):
-                    st.session_state.import_brief_flag = True
-                    st.session_state.brief_to_import = name
-                    st.rerun()
-    else:
-        st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
+        # Résultats filtrés (uniquement après clic sur Filtrer)
+        if st.session_state.get("show_filtered_results", False):
+            briefs_to_show = st.session_state.filtered_briefs
+            st.markdown('<h3 style="margin-top: 1rem; margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
+            if briefs_to_show:
+                for name, brief in briefs_to_show.items():
+                    col_brief1, col_brief2 = st.columns([6, 1])
+                    with col_brief1:
+                        st.markdown(f"**{name}**")
+                    with col_brief2:
+                        if st.button("📝 Éditer", key=f"edit_{name}"):
+                            st.session_state.import_brief_flag = True
+                            st.session_state.brief_to_import = name
+                            st.rerun()
+            else:
+                st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
 
 # ---------------- AVANT-BRIEF ----------------
 # Dans l'onglet Avant-brief (tabs[1])
@@ -615,6 +620,7 @@ with tabs[1]:
             ai_field_options = [f"{s['title']} ➜ {title}" for s in sections for title,_,_ in s["fields"]]
             ai_selected = st.selectbox("Champ à enrichir", ai_field_options, key="ab_ai_field")
         with c_ai2:
+            st.markdown("<div class='ai-red-btn'>", unsafe_allow_html=True)
             if st.button("💡 Générer suggestion IA", key="btn_ai_suggestion"):
                 sec, fld = ai_selected.split(" ➜ ",1)
                 for s in sections:
@@ -624,8 +630,8 @@ with tabs[1]:
                                 adv = generate_checklist_advice(s["title"], title)
                                 ex = get_example_for_field(s["title"], title)
                                 st.session_state[f"advice_{key}"] = adv + ("\nExemple:\n" + ex if ex else "")
-                                st.success("Suggestion générée (voir sous le champ).")
                                 break
+            st.markdown("</div>", unsafe_allow_html=True)
 
         with st.form(key="avant_brief_form"):
             for section in sections:
@@ -641,7 +647,8 @@ with tabs[1]:
                             height=140
                         )
                         if st.session_state.get(f"advice_{key}", ""):
-                            st.info(f"**Suggestion IA :**\n{st.session_state[f'advice_{key}']}")
+                            suggestion_html = st.session_state[f"advice_{key}"].replace('\n', '<br>')
+                            st.markdown(f"<div class='ai-suggestion-box'><strong>Suggestion IA :</strong><br>{suggestion_html}</div>", unsafe_allow_html=True)
             if st.form_submit_button("💾 Enregistrer modifications", type="primary"):
                 if st.session_state.current_brief_name:
                     current = st.session_state.current_brief_name
@@ -801,19 +808,12 @@ Bonnes pratiques :
 
                 colb1, colb2 = st.columns(2)
                 with colb1:
+                    st.markdown("<div class='ai-red-btn'>", unsafe_allow_html=True)
                     gen_btn = st.form_submit_button("💡 Générer question IA", use_container_width=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
                 with colb2:
                     add_btn = st.form_submit_button("➕ Ajouter", use_container_width=True)
-
-                st.markdown("""
-<style>
-button[kind="secondary"]:has(span:contains("Générer question IA")) {
-    background:#c40000 !important;
-    color:#fff !important;
-    font-weight:600;
-}
-</style>
-""", unsafe_allow_html=True)
+                # (ancien style spécifique supprimé, remplacé par la classe globale ai-red-btn)
 
                 if gen_btn:
                     if not ai_prompt:
@@ -930,10 +930,13 @@ button[kind="secondary"]:has(span:contains("Générer question IA")) {
         # ----- Navigation -----
         nav_prev, nav_next = st.columns([1,1])
         with nav_prev:
+            st.markdown("<div class='nav-small'>", unsafe_allow_html=True)
             if step > 1 and st.button("⬅️ Précédent", key=f"rb_prev_{step}", use_container_width=True):
                 st.session_state.reunion_step -= 1
                 st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
         with nav_next:
+            st.markdown("<div class='nav-small'>", unsafe_allow_html=True)
             if step < total_steps and st.button("Suivant ➡️", key=f"rb_next_{step}", use_container_width=True):
                 # Auto-save léger
                 if step in (1,2,3):
@@ -947,6 +950,7 @@ button[kind="secondary"]:has(span:contains("Générer question IA")) {
                     save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
                 st.session_state.reunion_step += 1
                 st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
 # ================== SYNTHÈSE (AJOUT Score moyen) ==================
 with tabs[3]:
@@ -995,19 +999,23 @@ with tabs[3]:
             st.info("Pas de matrice KSA.")
 
         st.markdown("### Actions")
-        a1,a2 = st.columns(2)
-        with a1:
-            if st.button("💾 Sauvegarder synthèse", type="primary"):
+        act1, act2, _sp = st.columns([0.4,0.4,2.2])
+        with act1:
+            st.markdown("<div class='synthese-actions'>", unsafe_allow_html=True)
+            if st.button("💾 Sauvegarder synthèse", type="primary", key="btn_save_synthese"):
                 save_briefs()
                 save_brief_to_gsheet(st.session_state.current_brief_name, bd)
                 st.success("Synthèse sauvegardée.")
-        with a2:
-            if st.button("🗑️ Supprimer le brief"):
+            st.markdown("</div>", unsafe_allow_html=True)
+        with act2:
+            st.markdown("<div class='synthese-actions'>", unsafe_allow_html=True)
+            if st.button("🗑️ Supprimer le brief", key="btn_delete_synthese"):
                 st.session_state.saved_briefs.pop(st.session_state.current_brief_name, None)
                 save_briefs()
                 st.session_state.current_brief_name = ""
                 st.success("Brief supprimé.")
                 st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("### Export")
         ex1, ex2 = st.columns(2)
