@@ -392,8 +392,12 @@ with col_save2:
             }
             st.session_state.annonces.append(annonce)
             
-            # Reset pour nouvelle saisie
-            st.session_state["annonce_contenu"] = ""
+            # Reset pour nouvelle saisie (protection contre erreurs Streamlit API)
+            try:
+                st.session_state["annonce_contenu"] = ""
+            except Exception:
+                # Si Streamlit refuse la modification (ex: contexte restreint), on ignore pour éviter le plantage
+                pass
         else:
             st.warning("⚠️ Merci de remplir tous les champs obligatoires")
 
