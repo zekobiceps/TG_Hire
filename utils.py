@@ -473,7 +473,7 @@ def init_session_state():
         "notes_libres": "", "profil_links": ["", "", ""], "ksa_data": {}, "ksa_matrix": pd.DataFrame(),
         "saved_briefs": load_briefs(), "current_brief_name": None, "filtered_briefs": {},
         "show_filtered_results": False, "brief_data": {}, "comment_libre": "", "brief_phase": "Gestion",
-        "saved_job_descriptions": load_job_descriptions(), "temp_extracted_data": None, "temp_job_title": "",
+        "saved_job_descriptions": [], "temp_extracted_data": None, "temp_job_title": "",
         "canaux_prioritaires": [], "criteres_exclusion": "", "processus_evaluation": "",
         "manager_comments": {}, "manager_notes": "", "job_library": load_library(),
     }
