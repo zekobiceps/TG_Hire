@@ -580,45 +580,36 @@ with tabs[0]:
             st.session_state.show_filtered_results = True
             st.rerun()
 
-    # Affichage des briefs sauvegardés
-    briefs_to_show = st.session_state.saved_briefs if not st.session_state.get("show_filtered_results", False) else st.session_state.filtered_briefs
+    # Affichage des briefs : seulement après Filtrer OU après activation recherche
+    briefs_to_show = {}
+    if st.session_state.get("show_filtered_results"):
+        briefs_to_show = st.session_state.filtered_briefs
+    # Recherche (masque sinon)
+    if st.checkbox("🔍 Chercher un brief", key="toggle_search_briefs"):
+        search = st.text_input("Rechercher (nom contient...)", key="search_brief_query")
+        briefs_to_show = st.session_state.get("saved_briefs", {})
+        if search:
+            briefs_to_show = {k: v for k, v in briefs_to_show.items() if search.lower() in k.lower()}
 
-    if briefs_to_show and len(briefs_to_show) > 0:
+    if briefs_to_show:
         st.markdown('<h3 style="margin-bottom: 0.3rem;">📋 Briefs sauvegardés</h3>', unsafe_allow_html=True)
-        for name, brief in briefs_to_show.items():
-            col_brief1, col_brief2 = st.columns([6, 1])
-            with col_brief1:
-                st.markdown(f"**{name}**")
-            with col_brief2:
-                if st.button("📝 Éditer", key=f"edit_{name}"):
+        for name in sorted(briefs_to_show.keys()):
+            c1, c2, c3 = st.columns([6, 1, 1])
+            with c1:
+                st.write(f"• {name}")
+            with c2:
+                if st.button("✏️", key=f"edit_{name}", help="Éditer"):
                     st.session_state.import_brief_flag = True
                     st.session_state.brief_to_import = name
                     st.rerun()
-    else:
-        st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
-
-    # --- AJOUT BARRE DE RECHERCHE ---
-    if st.checkbox("🔍 Chercher un brief", key="toggle_search_briefs"):
-        search = st.text_input("Rechercher (nom contient...)", key="search_brief_query")
-        briefs = st.session_state.get("saved_briefs", {})
-        if search:
-            briefs = {k:v for k,v in briefs.items() if search.lower() in k.lower()}
-        for bname in sorted(briefs.keys()):
-            c1, c2, c3 = st.columns([5,1,1])
-            with c1:
-                st.write(f"• {bname}")
-            with c2:
-                if st.button("✏️", key=f"edit_{bname}", help="Éditer"):
-                    st.session_state.current_brief_name = bname
-                    st.session_state.reunion_step = 1
-                    st.session_state.reunion_completed = False
-                    st.rerun()
             with c3:
-                if st.button("🗑️", key=f"del_{bname}", help="Supprimer"):
-                    st.session_state.saved_briefs.pop(bname, None)
+                if st.button("🗑️", key=f"del_{name}", help="Supprimer"):
+                    st.session_state.saved_briefs.pop(name, None)
                     save_briefs()
                     st.success("Supprimé.")
                     st.rerun()
+    else:
+        st.info("Aucun brief affiché (utilisez Filtrer ou Chercher).")
 
 # ---------------- AVANT-BRIEF ----------------
 # Dans l'onglet Avant-brief (tabs[1])
@@ -673,40 +664,58 @@ with tabs[1]:
 with tabs[2]:
     st.subheader("✅ Réunion de brief")
 
-    # Sécurisation de la variable d'étape
+    # Barre de progression étapes (toujours visible)
+    total_steps = 4
     if "reunion_step" not in st.session_state or not isinstance(st.session_state.reunion_step, int):
         st.session_state.reunion_step = 1
-    total_steps = 4
     step = st.session_state.reunion_step
+    pct = int(((step - 1) / (total_steps - 1)) * 100)
+    st.progress(pct, text=f"Étape {step}/{total_steps}")
 
     if not st.session_state.current_brief_name:
         st.info("Sélectionnez ou créez d'abord un brief dans l'onglet Gestion.")
     else:
         brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
-        manager_comments_json = brief_data.get("MANAGER_COMMENTS_JSON", "{}")
-        try:
-            manager_comments = json.loads(manager_comments_json) if manager_comments_json else {}
-        except Exception:
-            manager_comments = {}
 
-        # Utilitaire robuste
+        # --- Import KSA si vide & JSON dispo ---
+        if ("ksa_matrix" not in st.session_state or st.session_state.ksa_matrix is None or getattr(st.session_state.ksa_matrix, "empty", True)) and brief_data.get("KSA_MATRIX_JSON"):
+            try:
+                raw = json.loads(brief_data["KSA_MATRIX_JSON"])
+                if isinstance(raw, list) and raw:
+                    df_imp = pd.DataFrame(raw)
+                    rename_map = {
+                        "Échelle d'évaluation (1-5)": "Évaluation (1-5)",
+                        "Echelle d'évaluation (1-5)": "Évaluation (1-5)",
+                        "Evaluation (1-5)": "Évaluation (1-5)",
+                        "Question": "Question pour l'entretien",
+                        "Question entretien": "Question pour l'entretien"
+                    }
+                    for k, v in list(rename_map.items()):
+                        if k in df_imp.columns and v not in df_imp.columns:
+                            df_imp = df_imp.rename(columns={k: v})
+                    needed = ["Rubrique","Critère","Type de question","Question pour l'entretien","Évaluation (1-5)","Évaluateur"]
+                    for c in needed:
+                        if c not in df_imp.columns:
+                            df_imp[c] = ""
+                    st.session_state.ksa_matrix = df_imp[needed]
+            except Exception:
+                st.session_state.ksa_matrix = pd.DataFrame(columns=["Rubrique","Critère","Type de question","Question pour l'entretien","Évaluation (1-5)","Évaluateur"])
+
+        # Utilitaire pour valeurs
         def get_brief_value(brief_dict: dict, key: str, default: str = ""):
-            if not brief_dict:
-                return default
             if key.startswith("profil_link_"):
                 suf = key.split("_")[-1]
                 cand = [f"LIEN_PROFIL_{suf}", key.upper(), key]
             else:
                 cand = [key.upper(), key]
             for c in cand:
-                val = brief_dict.get(c, "")
-                if val not in ("", None):
-                    return val
+                if c in brief_dict and brief_dict[c] not in ("", None):
+                    return brief_dict[c]
             return default
 
         # ---------------- ÉTAPE 1 ----------------
         if step == 1:
-            st.markdown("### 📝 Étape 1 : Portrait robot & Commentaires manager")
+            st.markdown("### 📝 Étape 1 : Vue consolidée & commentaires manager")
             table_data = []
             for section in sections:
                 if section["title"] == "Profils pertinents":
@@ -714,351 +723,204 @@ with tabs[2]:
                 for title, key, _ in section["fields"]:
                     table_data.append({
                         "Section": section["title"],
-                        "Détails": title,
-                        "Informations": get_brief_value(brief_data, key, ""),
-                        "Commentaires du manager": manager_comments.get(key, ""),
+                        "Item": title,
+                        "Infos": get_brief_value(brief_data, key, ""),
+                        "Commentaire manager": brief_data.get("manager_comments", {}).get(key, ""),
                         "_key": key
                     })
             if not table_data:
-                st.warning("Veuillez d'abord remplir l'onglet Avant-brief.")
+                st.warning("Veuillez remplir l’Avant-brief d’abord.")
             else:
                 df = pd.DataFrame(table_data)
-                edited_df = st.data_editor(
+                edited = st.data_editor(
                     df,
+                    hide_index=True,
                     column_config={
                         "Section": st.column_config.TextColumn(disabled=True),
-                        "Détails": st.column_config.TextColumn(disabled=True),
-                        "Informations": st.column_config.TextColumn(disabled=True, width="large"),
-                        "Commentaires du manager": st.column_config.TextColumn(width="large"),
-                        "_key": None
+                        "Item": st.column_config.TextColumn(disabled=True),
+                        "Infos": st.column_config.TextColumn(disabled=True),
+                        "Commentaire manager": st.column_config.TextColumn()
                     },
-                    hide_index=True,
-                    use_container_width=True,
-                    key="manager_comments_editor"
+                    key="manager_comments_editor_rb"
                 )
-                if st.button("💾 Enregistrer commentaires", type="primary"):
+                if st.button("💾 Enregistrer commentaires", key="save_mgr_comments"):
                     new_comments = {
-                        row["_key"]: row["Commentaires du manager"]
-                        for _, row in edited_df.iterrows()
-                        if row["Commentaires du manager"]
+                        row["_key"]: row["Commentaire manager"]
+                        for _, row in edited.iterrows() if row["Commentaire manager"]
                     }
-                    brief_data["MANAGER_COMMENTS_JSON"] = json.dumps(new_comments, ensure_ascii=False, indent=2)
                     brief_data["manager_comments"] = new_comments
+                    brief_data["MANAGER_COMMENTS_JSON"] = json.dumps(new_comments, ensure_ascii=False)
                     st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
                     save_briefs()
                     save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
                     st.success("Commentaires sauvegardés.")
                     st.rerun()
 
-        # ---------------- ÉTAPE 2 ----------------
+        # ---------------- ÉTAPE 2 (KSA) ----------------
         elif step == 2:
             st.markdown("### 📊 Étape 2 : Matrice KSA")
+            with st.expander("ℹ️ Méthode KSA", expanded=False):
+                st.markdown("""
+**KSA = Knowledge / Skills / Abilities**  
+Exemples rapides :
+- Skills / Situationnelle → "Si un livrable critique est bloqué, que faites-vous ?"
+- Knowledge / Technique → "Explique la différence entre deux méthodes d'analyse."
+- Abilities / Comportementale → "Raconte une situation où ton leadership a débloqué un problème."
+🎯 Objectif : Structurer l’entretien & réduire les biais.
+""")
 
-            # Import silencieux
-            def _import_ksa_from_json():
-                json_str = (brief_data.get("KSA_MATRIX_JSON") or "").strip()
-                if not json_str:
-                    return
-                try:
-                    data = json.loads(json_str)
-                    if not isinstance(data, list):
-                        return
-                    df = pd.DataFrame(data)
-                    rename_map = {}
-                    for col in df.columns:
-                        c = col.strip()
-                        lc = c.lower()
-                        if lc.startswith("question"):
-                            rename_map[col] = "Question pour l'entretien"
-                        elif "échelle" in lc or "évaluation" in lc:
-                            rename_map[col] = "Évaluation (1-5)"
-                        elif "crit" in lc:
-                            rename_map[col] = "Critère"
-                        elif "rubrique" in lc:
-                            rename_map[col] = "Rubrique"
-                        elif "évaluateur" in lc:
-                            rename_map[col] = "Évaluateur"
-                        elif "type de question" in lc:
-                            rename_map[col] = "Type de question"
-                    if rename_map:
-                        df = df.rename(columns=rename_map)
-                    expected = ["Rubrique","Critère","Type de question","Question pour l'entretien","Évaluation (1-5)","Évaluateur"]
-                    for ccol in expected:
-                        if ccol not in df.columns:
-                            df[ccol] = ""
-                    st.session_state.ksa_matrix = df[expected]
-                except Exception:
-                    pass
-
-            if ("ksa_matrix" not in st.session_state) or st.session_state.ksa_matrix.empty:
-                if brief_data.get("KSA_MATRIX_JSON"):
-                    _import_ksa_from_json()
-                else:
-                    st.session_state.ksa_matrix = pd.DataFrame(columns=[
-                        "Rubrique","Critère","Type de question","Question pour l'entretien","Évaluation (1-5)","Évaluateur"
-                    ])
-
-            # Exemples dynamiques (3 par combinaison Rubrique / Type)
-            ksa_examples = {
-                "Knowledge": {
-                    "Comportementale": [
-                        "Décrivez une norme clé que vous avez dû apprendre récemment.",
-                        "Expliquez comment vous suivez les évolutions réglementaires.",
-                        "Parlez d'une base de connaissances que vous avez structurée."
-                    ],
-                    "Situationnelle": [
-                        "Si une nouvelle norme arrive la veille d'un audit, que faites-vous ?",
-                        "Comment réagir si l'équipe ignore une procédure critique ?",
-                        "Que faites-vous si la doc technique est obsolète ?"
-                    ],
-                    "Technique": [
-                        "Citez les éléments essentiels d'une veille efficace.",
-                        "Explique la différence entre deux cadres réglementaires.",
-                        "Décrivez le processus de mise à jour documentaire."
-                    ],
-                    "Générale": [
-                        "Comment évaluez-vous votre niveau de connaissances métier ?",
-                        "Quelles sources vous utilisez pour apprendre rapidement ?",
-                        "Comment structurez-vous vos apprentissages ?"
-                    ]
-                },
-                "Skills": {
-                    "Comportementale": [
-                        "Décrivez une situation où vous avez optimisé un processus.",
-                        "Parlez d'une action concrète ayant amélioré la qualité.",
-                        "Décrivez une mission critique livrée sous pression."
-                    ],
-                    "Situationnelle": [
-                        "Si une tâche prioritaire entre en conflit avec un blocage équipe ?",
-                        "Que faites-vous si un livrable majeur est en retard ?",
-                        "Comment adaptez-vous votre méthode si la charge double soudainement ?"
-                    ],
-                    "Technique": [
-                        "Expliquez comment vous utilisez un outil clé du poste.",
-                        "Décrivez votre méthode de diagnostic d'une panne complexe.",
-                        "Comment automatisez-vous une tâche répétitive ?"
-                    ],
-                    "Générale": [
-                        "Quelle compétence vous distingue le plus ?",
-                        "Comment maintenez-vous vos compétences techniques ?",
-                        "Donnez un exemple de montée en compétence rapide."
-                    ]
-                },
-                "Abilities": {
-                    "Comportementale": [
-                        "Racontez une situation où votre résilience a été déterminante.",
-                        "Expliquez un moment où votre leadership a redressé une équipe.",
-                        "Parlez d'une situation nécessitant adaptabilité."
-                    ],
-                    "Situationnelle": [
-                        "Que faites-vous si une décision rapide est requise avec peu d'infos ?",
-                        "Comment réagissez-vous si deux parties clés sont en conflit ?",
-                        "Si un imprévu majeur arrive en pleine phase critique ?"
-                    ],
-                    "Technique": [
-                        "Comment structurez-vous votre analyse dans un contexte flou ?",
-                        "Décrivez comment vous hiérarchisez des risques.",
-                        "Expliquez comment vous cadrez une problématique complexe."
-                    ],
-                    "Générale": [
-                        "Quelle est votre plus grande force transversale ?",
-                        "Comment cultivez-vous votre adaptabilité ?",
-                        "Qu'est-ce qui vous aide à rester concentré ?"
-                    ]
+            # Formulaire ajout critère
+            with st.form("add_ksa_form_rb"):
+                c1, c2, c3, c4 = st.columns([1,1,1,1])
+                with c1:
+                    rubrique = st.selectbox("Rubrique", ["Knowledge","Skills","Abilities"],
+                                            key="rb_new_rubrique",
+                                            index=["Knowledge","Skills","Abilities"].index(
+                                                st.session_state.get("rb_new_rubrique","Knowledge")
+                                            ) if st.session_state.get("rb_new_rubrique","Knowledge") in ["Knowledge","Skills","Abilities"] else 0)
+                with c2:
+                    type_q = st.selectbox("Type de question",
+                                          ["Comportementale","Situationnelle","Technique","Générale"],
+                                          key="rb_new_type_question",
+                                          index=["Comportementale","Situationnelle","Technique","Générale"].index(
+                                              st.session_state.get("rb_new_type_question","Comportementale")
+                                          ) if st.session_state.get("rb_new_type_question","Comportementale") in
+                                          ["Comportementale","Situationnelle","Technique","Générale"] else 0)
+                with c3:
+                    critere = st.text_input("Critère", key="rb_new_critere",
+                                            value=st.session_state.get("rb_new_critere",""))
+                with c4:
+                    evaluateur = st.selectbox("Évaluateur",
+                                              ["Recruteur","Manager","Les deux"],
+                                              key="rb_new_evaluateur",
+                                              index=["Recruteur","Manager","Les deux"].index(
+                                                  st.session_state.get("rb_new_evaluateur","Recruteur")
+                                              ) if st.session_state.get("rb_new_evaluateur","Recruteur") in
+                                              ["Recruteur","Manager","Les deux"] else 0)
+                # Placeholder question
+                placeholders = {
+                    ("Skills","Situationnelle"): "Ex: Si un site prend 2 semaines de retard...",
+                    ("Skills","Technique"): "Ex: Décris ta méthode de diagnostic...",
+                    ("Abilities","Comportementale"): "Ex: Raconte une situation de conflit géré...",
+                    ("Knowledge","Technique"): "Ex: Explique un concept clé récent...",
                 }
-            }
+                dyn_q = placeholders.get((rubrique, type_q), "Ex: Formule une question ciblée.")
+                qc, evalc = st.columns([3,1])
+                with qc:
+                    question = st.text_input("Question pour l'entretien",
+                                             key="rb_new_question",
+                                             value=st.session_state.get("rb_new_question",""),
+                                             placeholder=dyn_q)
+                with evalc:
+                    evaluation = st.slider("Évaluation (1-5)", 1,5,
+                                           key="rb_new_evaluation",
+                                           value=st.session_state.get("rb_new_evaluation",3))
+                pc1, pc2 = st.columns([2,2])
+                with pc1:
+                    ai_prompt = st.text_input("Prompt IA",
+                                              key="rb_ai_prompt",
+                                              value=st.session_state.get("rb_ai_prompt",""),
+                                              placeholder="Ex: question situationnelle priorisation")
+                with pc2:
+                    concise_mode = st.checkbox("⚡ Concis", key="rb_ai_concise")
 
-            prompt_examples = {
-                "Comportementale": [
-                    "Ex: Génère une question comportementale sur la gestion de conflit.",
-                    "Ex: Donne une question sur un échec transformé en réussite.",
-                    "Ex: Propose une question sur l'amélioration continue."
-                ],
-                "Situationnelle": [
-                    "Ex: Crée une question situationnelle sur un retard critique.",
-                    "Ex: Génère une question sur priorisation multi-projets.",
-                    "Ex: Donne une mise en situation sur gestion d'incident."
-                ],
-                "Technique": [
-                    "Ex: Génère une question technique sur analyse de risque.",
-                    "Ex: Donne une question sur optimisation d'un process.",
-                    "Ex: Crée une question sur diagnostic de panne."
-                ],
-                "Générale": [
-                    "Ex: Donne une question générale sur motivation.",
-                    "Ex: Génère une question pour explorer adaptabilité.",
-                    "Ex: Propose une question sur style de collaboration."
-                ]
-            }
+                btn_left, btn_right = st.columns([1,1])
+                with btn_left:
+                    gen_btn = st.form_submit_button("💡 Générer IA", use_container_width=True)
+                with btn_right:
+                    add_btn = st.form_submit_button("➕ Ajouter", use_container_width=True)
 
-            with st.expander("➕ Ajouter / Modifier un critère", expanded=True):
-                with st.form("add_ksa_step2_form"):
-                    col_top1, col_top2, col_top3, col_top4 = st.columns([1,1,1,1])
-                    with col_top1:
-                        rubrique = st.selectbox("Rubrique", ["Knowledge","Skills","Abilities"],
-                                                key="step2_new_rubrique",
-                                                index=["Knowledge","Skills","Abilities"].index(
-                                                    st.session_state.get("step2_new_rubrique","Knowledge")
-                                                ) if st.session_state.get("step2_new_rubrique","Knowledge") in ["Knowledge","Skills","Abilities"] else 0)
-                    with col_top2:
-                        type_question = st.selectbox("Type de question",
-                                                     ["Comportementale","Situationnelle","Technique","Générale"],
-                                                     key="step2_new_type_question",
-                                                     index=["Comportementale","Situationnelle","Technique","Générale"].index(
-                                                         st.session_state.get("step2_new_type_question","Comportementale")
-                                                     ) if st.session_state.get("step2_new_type_question","Comportementale") in
-                                                     ["Comportementale","Situationnelle","Technique","Générale"] else 0)
-                    with col_top3:
-                        critere = st.text_input("Critère", key="step2_new_critere",
-                                                value=st.session_state.get("step2_new_critere",""))
-                    with col_top4:
-                        evaluateur = st.selectbox("Évaluateur",
-                                                  ["Recruteur","Manager","Les deux"],
-                                                  key="step2_new_evaluateur",
-                                                  index=["Recruteur","Manager","Les deux"].index(
-                                                      st.session_state.get("step2_new_evaluateur","Recruteur")
-                                                  ) if st.session_state.get("step2_new_evaluateur","Recruteur") in
-                                                  ["Recruteur","Manager","Les deux"] else 0)
-
-                    # Placeholder dynamique pour la question
-                    examples_list = ksa_examples.get(rubrique, {}).get(type_question, [])
-                    dyn_q_placeholder = random.choice(examples_list) if examples_list else "Ex: Décrivez une situation pertinente."
-                    prompt_list = prompt_examples.get(type_question, [])
-                    dyn_prompt_placeholder = random.choice(prompt_list) if prompt_list else "Ex: Génère une question adaptée."
-
-                    col_mid1, col_mid2 = st.columns([2,1])
-                    with col_mid1:
-                        question = st.text_area(
-                            "Question pour l'entretien",
-                            key="step2_new_question",
-                            value=st.session_state.get("step2_new_question",""),
-                            placeholder=dyn_q_placeholder,
-                            height=60
-                        )
-                    with col_mid2:
-                        evaluation = st.slider("Évaluation (1-5)", 1, 5,
-                                               value=st.session_state.get("step2_new_evaluation",3),
-                                               key="step2_new_evaluation")
-
-                    cible = st.text_area(
-                        "Cible / Standard attendu",
-                        key="step2_new_cible",
-                        value=st.session_state.get("step2_new_cible",""),
-                        placeholder="Ex: Réponse structurée (méthode STAR), mise en avant de la coopération, précision factuelle.",
-                        height=90
-                    )
-
-                    ai_prompt = st.text_input(
-                        "Prompt IA (génération de question)",
-                        key="step2_ai_prompt",
-                        value=st.session_state.get("step2_ai_prompt",""),
-                        placeholder=dyn_prompt_placeholder
-                    )
-                    concise_mode = st.checkbox("⚡ Mode rapide (réponse concise)", key="step2_concise_mode")
-
-                    st.markdown("""
+                st.markdown("""
 <style>
-div.full-btn-container button {
-    width:100% !important;
-    font-weight:600;
-    padding:0.8rem 1rem;
-    font-size:0.95rem;
-}
 button[kind="secondary"] {
-    background-color:#d30000 !important;
-    color:#ffffff !important;
+    background:#cc0000 !important;
+    color:#fff !important;
+    font-weight:600;
 }
 </style>
 """, unsafe_allow_html=True)
 
-                    gen_btn = st.form_submit_button("💡 Générer question IA", use_container_width=True)
-                    add_btn = st.form_submit_button("➕ Ajouter le critère", use_container_width=True)
-
-                    if gen_btn:
-                        if ai_prompt:
-                            try:
-                                ai_resp = generate_ai_question(ai_prompt, concise=concise_mode)
-                                if ai_resp.lower().startswith("question:"):
-                                    ai_resp = ai_resp.split(":",1)[1].strip()
-                                st.session_state.step2_new_question = ai_resp
-                                st.success("Question générée.")
-                            except Exception as e:
-                                st.error(f"Erreur IA : {e}")
-                        else:
-                            st.warning("Entrez un prompt.")
-                    if add_btn:
-                        if not critere or not question:
-                            st.error("Critère et question requis.")
-                        else:
-                            new_row = pd.DataFrame([{
-                                "Rubrique": rubrique,
-                                "Critère": critere,
-                                "Type de question": type_question,
-                                "Question pour l'entretien": question,
-                                "Évaluation (1-5)": evaluation,
-                                "Évaluateur": evaluateur
-                            }])
-                            if st.session_state.ksa_matrix.empty:
-                                st.session_state.ksa_matrix = new_row
-                            else:
-                                st.session_state.ksa_matrix = pd.concat(
-                                    [st.session_state.ksa_matrix, new_row],
-                                    ignore_index=True
-                                )
-                            # Auto-save après ajout
-                            try:
-                                brief_data["KSA_MATRIX_JSON"] = st.session_state.ksa_matrix.to_json(orient="records", force_ascii=False)
-                                st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
-                                save_briefs()
-                                save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
-                            except Exception:
-                                pass
-                            st.success("Critère ajouté.")
+                if gen_btn:
+                    if not ai_prompt:
+                        st.warning("Indique un prompt.")
+                    else:
+                        try:
+                            resp = generate_ai_question(ai_prompt, concise=concise_mode)
+                            if resp.lower().startswith("question:"):
+                                resp = resp.split(":",1)[1].strip()
+                            st.session_state.rb_new_question = resp
+                            st.success("Question générée.")
                             st.rerun()
+                        except Exception as e:
+                            st.error(f"Erreur IA: {e}")
 
-            # Edition + auto-save
-            if not st.session_state.ksa_matrix.empty:
+                if add_btn:
+                    if not critere or not question:
+                        st.error("Critère + question requis.")
+                    else:
+                        new_row = {
+                            "Rubrique": rubrique,
+                            "Critère": critere,
+                            "Type de question": type_q,
+                            "Question pour l'entretien": question,
+                            "Évaluation (1-5)": evaluation,
+                            "Évaluateur": evaluateur
+                        }
+                        if "ksa_matrix" not in st.session_state or st.session_state.ksa_matrix.empty:
+                            st.session_state.ksa_matrix = pd.DataFrame([new_row])
+                        else:
+                            st.session_state.ksa_matrix = pd.concat(
+                                [st.session_state.ksa_matrix, pd.DataFrame([new_row])],
+                                ignore_index=True
+                            )
+                        # Sauvegarde
+                        try:
+                            brief_data["KSA_MATRIX_JSON"] = st.session_state.ksa_matrix.to_json(orient="records", force_ascii=False)
+                            st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
+                            save_briefs()
+                            save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
+                        except Exception:
+                            pass
+                        st.success("Critère ajouté.")
+                        st.rerun()
+
+            # Éditeur
+            if "ksa_matrix" in st.session_state and not st.session_state.ksa_matrix.empty:
                 edited = st.data_editor(
                     st.session_state.ksa_matrix,
                     hide_index=True,
                     use_container_width=True,
-                    key="ksa_editor_step2",
-                    num_rows="dynamic",
+                    key="rb_ksa_editor",
                     column_config={
                         "Rubrique": st.column_config.SelectboxColumn("Rubrique", options=["Knowledge","Skills","Abilities"]),
                         "Critère": st.column_config.TextColumn("Critère"),
                         "Type de question": st.column_config.SelectboxColumn("Type de question",
                             options=["Comportementale","Situationnelle","Technique","Générale"]),
-                        "Question pour l'entretien": st.column_config.TextColumn("Question pour l'entretien", width="large"),
-                        "Évaluation (1-5)": st.column_config.NumberColumn("Évaluation (1-5)", min_value=1, max_value=5, step=1),
-                        "Évaluateur": st.column_config.SelectboxColumn("Évaluateur",
-                            options=["Recruteur","Manager","Les deux"])
+                        "Question pour l'entretien": st.column_config.TextColumn("Question pour l'entretien"),
+                        "Évaluation (1-5)": st.column_config.NumberColumn("Évaluation (1-5)", min_value=1, max_value=5),
+                        "Évaluateur": st.column_config.SelectboxColumn("Évaluateur", options=["Recruteur","Manager","Les deux"])
                     }
                 )
                 if not edited.equals(st.session_state.ksa_matrix):
                     st.session_state.ksa_matrix = edited
-                    # Auto-save silencieux
                     try:
-                        brief_data["KSA_MATRIX_JSON"] = st.session_state.ksa_matrix.to_json(orient="records", force_ascii=False)
+                        brief_data["KSA_MATRIX_JSON"] = edited.to_json(orient="records", force_ascii=False)
                         st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
                         save_briefs()
                         save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
                     except Exception:
                         pass
-
-                # Score cible (moyenne)
                 try:
-                    if "Évaluation (1-5)" in st.session_state.ksa_matrix.columns:
-                        avg_score = st.session_state.ksa_matrix["Évaluation (1-5)"].replace("", None).dropna().astype(float)
-                        if len(avg_score) > 0:
-                            score = round(avg_score.mean(), 2)
-                            st.markdown(f"**Score cible moyen : {score} / 5**")
-                            st.progress(min(1.0, score / 5))
-                except Exception:
+                    vals = edited["Évaluation (1-5)"].dropna().astype(float)
+                    if len(vals) > 0:
+                        avg = round(vals.mean(), 2)
+                        st.markdown(f"<h3 style='margin-top:6px;'>Score cible moyen : {avg} / 5 🎯</h3>", unsafe_allow_html=True)
+                except:
                     pass
             else:
                 st.info("Aucun critère KSA pour l’instant.")
-# ================== PATCH ÉTAPE 3 (remplacer le bloc elif step == 3:) ==================
+
+        # ---------------- ÉTAPE 3 ----------------
         elif step == 3:
             st.markdown("### 🛠️ Étape 3 : Stratégie & Processus")
             channels = ["LinkedIn","Jobboards","Jobzyn","Chasse de tête","Annonces","CVthèques"]
@@ -1070,53 +932,75 @@ button[kind="secondary"] {
                 key="canaux_prioritaires",
                 default=st.session_state.canaux_prioritaires
             )
-            st.text_area(
-                "🚫 Critères d'exclusion",
-                key="criteres_exclusion",
-                height=180,
-                placeholder="Ex: Moins de 3 ans en gestion de chantier / Pas d'expérience multi-sites..."
-            )
-            st.text_area(
-                "🛠️ Processus d'évaluation",
-                key="processus_evaluation",
-                height=180,
-                placeholder="Ex: 1. Screening / 2. Entretien Manager / 3. Visite chantier / 4. Décision."
-            )
-            # Retirer bouton sauvegarde ici (l’étape Suivant fera la sauvegarde)
+            left_c, right_c = st.columns(2)
+            with left_c:
+                st.text_area(
+                    "🚫 Critères d'exclusion",
+                    key="criteres_exclusion",
+                    height=200,
+                    placeholder="Ex: Moins de 3 ans sur poste similaire / Pas d'expérience multi-sites..."
+                )
+            with right_c:
+                st.text_area(
+                    "🛠️ Processus d'évaluation",
+                    key="processus_evaluation",
+                    height=200,
+                    placeholder="Ex: 1. Screening / 2. Manager / 3. Visite / 4. Décision."
+                )
 
-    # === AJOUT / RÉTABLISSEMENT NAVIGATION WIZARD (placer à la toute fin du else: avant la fin de with tabs[2]) ===
-    nav_left, nav_right = st.columns([1,1])
-    with nav_left:
-        if step > 1 and st.button("⬅️ Précédent", key=f"prev_{step}", help="Retour étape précédente"):
-            st.session_state.reunion_step -= 1
-            st.rerun()
-    with nav_right:
-        if step < total_steps and st.button("Suivant ➡️", key=f"next_{step}", help="Étape suivante"):
-            # Auto-save (étapes 1–3)
-            if step in (1,2,3) and st.session_state.current_brief_name:
+        # ---------------- ÉTAPE 4 ----------------
+        elif step == 4:
+            st.markdown("### ✅ Étape 4 : Validation finale")
+            st.text_area(
+                "🗒️ Notes / Commentaires finaux du manager",
+                key="manager_notes",
+                height=220,
+                placeholder="Ex: Sensibilité sécurité, posture terrain, autonomie attendue..."
+            )
+            st.info("Clique sur Sauvegarder & Finaliser pour activer la Synthèse.")
+            if st.button("💾 Sauvegarder & Finaliser", key="finalize_brief"):
                 bname = st.session_state.current_brief_name
                 bdata = st.session_state.saved_briefs.get(bname, {})
-
-                # Champs texte
-                bdata["CRITERES_EXCLUSION"] = st.session_state.get("criteres_exclusion","")
-                bdata["PROCESSUS_EVALUATION"] = st.session_state.get("processus_evaluation","")
                 bdata["MANAGER_NOTES"] = st.session_state.get("manager_notes","")
-
-                # KSA → JSON uniquement
-                if "ksa_matrix" in st.session_state and hasattr(st.session_state.ksa_matrix, "empty") and not st.session_state.ksa_matrix.empty:
+                # Ajouter KSA JSON si présent
+                if "ksa_matrix" in st.session_state and not st.session_state.ksa_matrix.empty:
                     try:
                         bdata["KSA_MATRIX_JSON"] = st.session_state.ksa_matrix.to_json(orient="records", force_ascii=False)
                     except Exception:
                         pass
-                # Ne jamais stocker la DataFrame brute
-                bdata.pop("ksa_matrix", None)
-
                 st.session_state.saved_briefs[bname] = bdata
                 save_briefs()
                 save_brief_to_gsheet(bname, bdata)
+                st.session_state.reunion_completed = True
+                st.success("Brief finalisé. Accédez à la Synthèse.")
+                st.rerun()
 
-            st.session_state.reunion_step += 1
-            st.rerun()
+        # --- Navigation Wizard (après contenu étape) ---
+        nav_left, nav_right = st.columns([1,1])
+        with nav_left:
+            if step > 1 and st.button("⬅️ Précédent", key=f"prev_{step}", help="Retour étape précédente"):
+                st.session_state.reunion_step -= 1
+                st.rerun()
+        with nav_right:
+            if step < total_steps and st.button("Suivant ➡️", key=f"next_{step}", help="Étape suivante"):
+                # Auto-save (étapes 1–3 seulement)
+                if step in (1,2,3) and st.session_state.current_brief_name:
+                    bname = st.session_state.current_brief_name
+                    bdata = st.session_state.saved_briefs.get(bname, {})
+                    bdata["CRITERES_EXCLUSION"] = st.session_state.get("criteres_exclusion","")
+                    bdata["PROCESSUS_EVALUATION"] = st.session_state.get("processus_evaluation","")
+                    bdata["MANAGER_NOTES"] = st.session_state.get("manager_notes","")
+                    if "ksa_matrix" in st.session_state and not st.session_state.ksa_matrix.empty:
+                        try:
+                            bdata["KSA_MATRIX_JSON"] = st.session_state.ksa_matrix.to_json(orient="records", force_ascii=False)
+                        except Exception:
+                            pass
+                    bdata.pop("ksa_matrix", None)
+                    st.session_state.saved_briefs[bname] = bdata
+                    save_briefs()
+                    save_brief_to_gsheet(bname, bdata)
+                st.session_state.reunion_step += 1
+                st.rerun()
 
 # ---------------- SYNTHÈSE ----------------
 with tabs[3]:
