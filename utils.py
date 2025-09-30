@@ -1302,10 +1302,11 @@ def get_feedback_gsheet_client():
         st.error(f"❌ Erreur d'authentification Google Sheets: {str(e)}")
     return None
 
-def save_feedback(analysis_method, job_title, job_description_snippet, cv_count, feedback_score, feedback_text=""):
+def save_feedback(analysis_method, job_title, job_description_snippet, cv_count, feedback_score, feedback_text="",
+                 user_criteria=None, improvement_suggestions=None):
     """
     Sauvegarde un feedback utilisateur localement et dans Google Sheets si disponible.
-    
+
     Args:
         analysis_method: Méthode d'analyse utilisée (Cosinus, Sémantique, Règles, IA, Ensemble)
         job_title: Intitulé du poste analysé
@@ -1313,22 +1314,26 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
         cv_count: Nombre de CV analysés dans cette session
         feedback_score: Note de satisfaction (1-5)
         feedback_text: Commentaires textuels de l'utilisateur (optionnel)
-        
+        user_criteria: Critères d'évaluation spécifiques mentionnés par l'utilisateur
+        improvement_suggestions: Suggestions d'amélioration
+
     Returns:
         Boolean indiquant si le feedback a été sauvegardé avec succès
     """
     # Préparation des données de feedback
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     app_version = "1.0.0"
-    
+
     feedback_entry = {
         "timestamp": timestamp,
         "analysis_method": analysis_method,
         "job_title": job_title,
-        "job_description_snippet": job_description_snippet[:200] if job_description_snippet else "",
+        "job_description_snippet": job_description_snippet[:500] if job_description_snippet else "",  # Étendu à 500 caractères
         "cv_count": cv_count,
         "feedback_score": feedback_score,
         "feedback_text": feedback_text,
+        "user_criteria": user_criteria or "",
+        "improvement_suggestions": improvement_suggestions or "",
         "version_app": app_version
     }
     
@@ -1362,12 +1367,13 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
                 try:
                     worksheet = sh.worksheet(FEEDBACK_GSHEET_NAME)
                 except gspread.exceptions.WorksheetNotFound:
-                    # Créer l'onglet s'il n'existe pas
-                    worksheet = sh.add_worksheet(title=FEEDBACK_GSHEET_NAME, rows=1000, cols=8)
+                # Créer l'onglet s'il n'existe pas
+                    worksheet = sh.add_worksheet(title=FEEDBACK_GSHEET_NAME, rows=1000, cols=10)
                     # Ajouter les en-têtes
                     headers = [
                         "timestamp", "analysis_method", "job_title", "job_description_snippet",
-                        "cv_count", "feedback_score", "feedback_text", "version_app"
+                        "cv_count", "feedback_score", "feedback_text", "user_criteria",
+                        "improvement_suggestions", "version_app"
                     ]
                     worksheet.update('A1:H1', [headers])
                 
@@ -1380,6 +1386,8 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
                     str(feedback_entry["cv_count"]),
                     str(feedback_entry["feedback_score"]),
                     feedback_entry["feedback_text"],
+                    feedback_entry["user_criteria"],
+                    feedback_entry["improvement_suggestions"],
                     feedback_entry["version_app"]
                 ]
                 

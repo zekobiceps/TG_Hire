@@ -687,35 +687,44 @@ with tab1:
                 else:
                     # Créer un formulaire pour chaque CV pour éviter les rechargements
                     with st.form(key=feedback_key):
-                        st.markdown(f"#### Évaluez le classement de : {file_name}")
-                        
-                        # Options de notation avec des étoiles
-                        cv_feedback_options = [
-                            "⭐ - Très insatisfaisant",
-                            "⭐⭐ - Insatisfaisant",
-                            "⭐⭐⭐ - Acceptable",
-                            "⭐⭐⭐⭐ - Satisfaisant",
-                            "⭐⭐⭐⭐⭐ - Très satisfaisant"
-                        ]
-                        selected_cv_option = st.radio(
-                            "Note",
-                            options=cv_feedback_options,
-                            index=2,  # Par défaut sur 3 étoiles
-                            horizontal=True,
-                            key=f"cv_rating_{i}"
+                        st.markdown(f"#### 📊 Évaluation du CV : {file_name}")
+                        st.caption(f"Score actuel : {score*100:.1f}%")
+
+                        # Slider pour la notation (1-5)
+                        cv_feedback_score = st.slider(
+                            f"Note pour {file_name} (1 = Très insatisfaisant, 5 = Excellent)",
+                            min_value=1,
+                            max_value=5,
+                            value=3,
+                            step=1,
+                            key=f"cv_rating_{i}",
+                            help="Glissez pour donner votre note"
                         )
-                        
-                        # Extraire la valeur numérique (1-5)
-                        cv_feedback_score = cv_feedback_options.index(selected_cv_option) + 1
-                        
+
+                        # Affichage visuel de la note
+                        score_labels = {
+                            1: "⭐ Très insatisfaisant",
+                            2: "⭐⭐ Insatisfaisant",
+                            3: "⭐⭐⭐ Acceptable",
+                            4: "⭐⭐⭐⭐ Satisfaisant",
+                            5: "⭐⭐⭐⭐⭐ Excellent"
+                        }
+                        st.caption(f"**Votre note :** {score_labels[cv_feedback_score]}")
+
                         cv_feedback_text = st.text_area(
                             "Commentaires spécifiques (optionnel)",
-                            placeholder="Points forts/faibles de ce classement...",
+                            placeholder=f"Points forts/faibles du classement de {file_name}...",
+                            height=80,
                             key=f"cv_comment_{i}"
                         )
-                        
-                        # Bouton de soumission dans le formulaire
-                        cv_submit_button = st.form_submit_button(label=f"Évaluer {file_name}")
+
+                        # Bouton de soumission avec style amélioré
+                        col1, col2 = st.columns([3, 1])
+                        with col2:
+                            cv_submit_button = st.form_submit_button(
+                                label=f"📤 Évaluer",
+                                type="secondary"
+                            )
                         
                         if cv_submit_button:
                             job_title = getattr(st.session_state, 'job_title', '')
@@ -740,73 +749,91 @@ with tab1:
         # Feedback global sur l'analyse
         st.markdown("---")
         st.markdown("### 🌟 Feedback global sur l'analyse")
-        
-        # Étape 1: Afficher un bouton pour accéder au formulaire de feedback
+
+        # Formulaire de feedback global directement visible
         if not getattr(st.session_state, 'feedback_submitted', False):
-            feedback_button_col1, feedback_button_col2 = st.columns([3, 1])
-            with feedback_button_col1:
-                st.markdown("Comment évaluez-vous la qualité globale des résultats fournis par cette analyse ?")
-            with feedback_button_col2:
-                # Bouton pour afficher le feedback avec instructions
-                if st.button("📝 Donner mon feedback", 
-                          help="Cliquez ici pour évaluer les résultats de l'analyse", 
-                          key="show_feedback_button"):
-                    st.session_state.show_feedback_form = True
-        
-        # Étape 2: Formulaire séparé pour le feedback
-        if getattr(st.session_state, 'show_feedback_form', False) and not getattr(st.session_state, 'feedback_submitted', False):
             with st.form(key='feedback_form'):
-                st.markdown("### Évaluez la qualité de l'analyse")
-                
-                # Options de notation avec des étoiles
-                global_feedback_options = [
-                    "⭐ - Très insatisfaisant",
-                    "⭐⭐ - Insatisfaisant",
-                    "⭐⭐⭐ - Acceptable",
-                    "⭐⭐⭐⭐ - Satisfaisant",
-                    "⭐⭐⭐⭐⭐ - Très satisfaisant"
-                ]
-                selected_option = st.radio(
-                    "Note globale",
-                    options=global_feedback_options,
-                    index=2,  # Par défaut sur 3 étoiles
-                    horizontal=True
+                st.markdown("**Comment évaluez-vous la qualité globale des résultats de cette analyse ?**")
+
+                # Slider pour la notation (1-5)
+                global_feedback_score = st.slider(
+                    "Note globale (1 = Très insatisfaisant, 5 = Excellent)",
+                    min_value=1,
+                    max_value=5,
+                    value=3,
+                    step=1,
+                    help="Glissez pour donner votre note"
                 )
-                
-                # Extraire la valeur numérique (1-5)
-                global_feedback_score = global_feedback_options.index(selected_option) + 1
-                
+
+                # Affichage visuel de la note
+                score_labels = {
+                    1: "⭐ Très insatisfaisant",
+                    2: "⭐⭐ Insatisfaisant",
+                    3: "⭐⭐⭐ Acceptable",
+                    4: "⭐⭐⭐⭐ Satisfaisant",
+                    5: "⭐⭐⭐⭐⭐ Excellent"
+                }
+                st.caption(f"**Votre note :** {score_labels[global_feedback_score]}")
+
+                # Critères d'évaluation spécifiques
+                st.markdown("**Quels critères avez-vous particulièrement appréciés ou critiqués ?**")
+                user_criteria = st.multiselect(
+                    "Sélectionnez les critères évalués :",
+                    options=[
+                        "Pertinence du classement",
+                        "Clarté de la logique d'analyse",
+                        "Rapidité d'exécution",
+                        "Facilité d'utilisation",
+                        "Précision des scores",
+                        "Qualité des explications",
+                        "Autre"
+                    ],
+                    default=[],
+                    help="Sélectionnez tous les critères qui s'appliquent"
+                )
+
                 # Champ pour les commentaires
                 global_feedback_text = st.text_area(
-                    "Commentaires sur l'analyse (optionnel)",
-                    placeholder="Qu'avez-vous apprécié ? Que pourrait-on améliorer ?",
-                    height=100
+                    "Commentaires et suggestions d'amélioration (optionnel)",
+                    placeholder="Qu'avez-vous apprécié ? Que pourrait-on améliorer ? Quelles fonctionnalités ajouter ?",
+                    height=120
                 )
-                
-                # Bouton de soumission dans le formulaire (ne recharge pas la page)
-                submit_button = st.form_submit_button(label="Envoyer mon feedback")
-                
+
+                # Bouton de soumission avec style amélioré
+                col1, col2, col3 = st.columns([1, 2, 1])
+                with col2:
+                    submit_button = st.form_submit_button(
+                        label="📤 Envoyer mon feedback",
+                        type="primary",
+                        use_container_width=True
+                    )
+
                 if submit_button:
                     job_title = getattr(st.session_state, 'job_title', '')
                     job_description = getattr(st.session_state, 'job_description', '')
                     analysis_method = getattr(st.session_state, 'last_analysis_method', '')
                     file_names = getattr(st.session_state, 'file_names', [])
-                    
+
+                    criteria_text = ", ".join(user_criteria) if user_criteria else ""
+
                     result = save_feedback(
                         analysis_method=analysis_method,
                         job_title=job_title,
-                        job_description_snippet=job_description[:200],
+                        job_description_snippet=job_description,
                         cv_count=len(file_names),
                         feedback_score=global_feedback_score,
-                        feedback_text=global_feedback_text
+                        feedback_text=global_feedback_text,
+                        user_criteria=criteria_text,
+                        improvement_suggestions=global_feedback_text
                     )
                     st.session_state.feedback_submitted = True
                     if result:
                         st.success("✅ Merci pour votre feedback ! Il nous aidera à améliorer notre système.")
+                        st.balloons()  # Animation festive
                         st.rerun()
                     else:
                         st.error("❌ Échec de l'enregistrement du feedback.")
-        
+
         # Message si le feedback a déjà été soumis
         elif getattr(st.session_state, 'feedback_submitted', False):
             st.success("✅ Merci pour votre feedback ! Il nous aidera à améliorer notre système.")
@@ -914,78 +941,218 @@ with tab3:
     """)
 
 with tab4:
-    st.header("📈 Statistiques de Feedback Utilisateur")
-    
+    st.header("� Dashboard de Feedback & Amélioration")
+
     # Récupération des statistiques
     feedback_stats = get_feedback_summary()
-    
+
     if len(feedback_stats) > 0:
-        # Affichage des scores moyens par méthode
-        st.subheader("🌟 Satisfaction moyenne par méthode d'analyse")
-        
-        # Convertir les colonnes numériques en type numérique
-        feedback_stats["Score moyen"] = pd.to_numeric(feedback_stats["Score moyen"])
-        feedback_stats["Nombre d'évaluations"] = pd.to_numeric(feedback_stats["Nombre d'évaluations"])
-        
-        # Filtrer uniquement les méthodes avec des évaluations
-        feedback_with_evals = feedback_stats[feedback_stats["Nombre d'évaluations"] > 0]
-        
-        if not feedback_with_evals.empty:
-            # Graphique des scores moyens
-            fig_scores = go.Figure()
-            fig_scores.add_trace(go.Bar(
-                x=feedback_with_evals["Score moyen"],
-                y=feedback_with_evals["Méthode"],
-                orientation='h',
-                marker_color=["#0068c9", "#83c9ff", "#29b09d", "#7defa1", "#ff2b2b"][:len(feedback_with_evals)]
-            ))
-            fig_scores.update_layout(
-                title="Score moyen par méthode (sur 5)",
-                height=300,
-                margin={"l": 150, "r": 10, "t": 30, "b": 30},
-                xaxis={"range": [0, 5]},
-            )
-            
-            st.plotly_chart(fig_scores, use_container_width=True)
-            
-            # Graphique du nombre d'évaluations
-            fig_evals = go.Figure(data=[go.Pie(
-                labels=feedback_with_evals["Méthode"],
-                values=feedback_with_evals["Nombre d'évaluations"],
-                marker_colors=["#0068c9", "#83c9ff", "#29b09d", "#7defa1", "#ff2b2b"][:len(feedback_with_evals)]
-            )])
-            fig_evals.update_layout(
-                title="Distribution des évaluations",
-                height=300,
-            )
-            
-            st.plotly_chart(fig_evals, use_container_width=True)
-            
-            # Affichage du tableau de statistiques
-            st.subheader("📊 Détails des statistiques")
-            st.dataframe(feedback_stats, width="stretch", height=200)
-            
-            # Méthode la mieux notée
-            if len(feedback_with_evals) > 1:
-                best_method = feedback_with_evals.loc[feedback_with_evals["Score moyen"].idxmax()]
-                st.success(f"🏆 La méthode la mieux notée est : **{best_method['Méthode']}** avec un score de **{best_method['Score moyen']:.2f}/5** sur {best_method['Nombre d\'évaluations']} évaluations.")
-        else:
-            st.info("Aucune méthode n'a encore reçu d'évaluations.")
+        # Métriques principales
+        st.subheader("📈 Métriques Clés")
+
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            total_feedbacks = feedback_stats["Nombre d'évaluations"].sum()
+            st.metric("Total Feedbacks", total_feedbacks, help="Nombre total d'évaluations reçues")
+
+        with col2:
+            avg_score = (feedback_stats["Score moyen"] * feedback_stats["Nombre d'évaluations"]).sum() / total_feedbacks
+            st.metric("Score Moyen Global", f"{avg_score:.2f}/5", help="Satisfaction moyenne globale")
+
+        with col3:
+            best_method = feedback_stats.loc[feedback_stats["Score moyen"].idxmax()]
+            st.metric("Meilleure Méthode", best_method["Méthode"].split(" (")[0], help=f"Score: {best_method['Score moyen']:.2f}/5")
+
+        with col4:
+            most_used = feedback_stats.loc[feedback_stats["Nombre d'évaluations"].idxmax()]
+            st.metric("Plus Utilisée", most_used["Méthode"].split(" (")[0], help=f"{most_used['Nombre d'évaluations']} évaluations")
+
+        st.markdown("---")
+
+        # Graphiques améliorés
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.subheader("🌟 Satisfaction par Méthode")
+            # Filtrer uniquement les méthodes avec des évaluations
+            feedback_with_evals = feedback_stats[feedback_stats["Nombre d'évaluations"] > 0]
+
+            if not feedback_with_evals.empty:
+                # Graphique en barres horizontales avec couleurs
+                fig_scores = go.Figure()
+                colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD']
+
+                for i, (_, row) in enumerate(feedback_with_evals.iterrows()):
+                    fig_scores.add_trace(go.Bar(
+                        x=[row["Score moyen"]],
+                        y=[row["Méthode"]],
+                        orientation='h',
+                        name=row["Méthode"],
+                        marker_color=colors[i % len(colors)],
+                        showlegend=False
+                    ))
+
+                fig_scores.update_layout(
+                    title="Score moyen par méthode (sur 5)",
+                    height=max(300, len(feedback_with_evals) * 40),
+                    margin={"l": 200, "r": 20, "t": 40, "b": 20},
+                    xaxis={"range": [0, 5], "title": "Score moyen"},
+                    yaxis={"title": ""},
+                )
+
+                st.plotly_chart(fig_scores, use_container_width=True)
+
+        with col2:
+            st.subheader("📊 Distribution des Évaluations")
+            if not feedback_with_evals.empty:
+                # Camembert avec pourcentages
+                fig_evals = go.Figure(data=[go.Pie(
+                    labels=feedback_with_evals["Méthode"],
+                    values=feedback_with_evals["Nombre d'évaluations"],
+                    marker_colors=['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD'],
+                    textinfo='label+percent',
+                    hovertemplate="<b>%{label}</b><br>%{value} évaluations (%{percent})<extra></extra>"
+                )])
+
+                fig_evals.update_layout(
+                    title="Répartition des feedbacks par méthode",
+                    height=400,
+                    margin={"l": 20, "r": 20, "t": 40, "b": 20},
+                )
+
+                st.plotly_chart(fig_evals, use_container_width=True)
+
+        st.markdown("---")
+
+        # Tableau détaillé avec style amélioré
+        st.subheader("📋 Détails des Statistiques")
+
+        # Style CSS pour le tableau
+        st.markdown("""
+        <style>
+        .feedback-table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 20px 0;
+        }
+        .feedback-table th, .feedback-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        .feedback-table th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+        .feedback-table tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        .feedback-table tr:hover {
+            background-color: #e3f2fd;
+        }
+        .score-high { color: #2e7d32; font-weight: bold; }
+        .score-medium { color: #f57c00; font-weight: bold; }
+        .score-low { color: #d32f2f; font-weight: bold; }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # Convertir en HTML avec classes de couleur
+        def get_score_class(score):
+            if score >= 4.0:
+                return "score-high"
+            elif score >= 3.0:
+                return "score-medium"
+            else:
+                return "score-low"
+
+        # Créer le tableau HTML
+        table_html = """
+        <table class="feedback-table">
+            <thead>
+                <tr>
+                    <th>Méthode d'Analyse</th>
+                    <th>Score Moyen</th>
+                    <th>Nombre d'Évaluations</th>
+                    <th>Fiabilité</th>
+                </tr>
+            </thead>
+            <tbody>
+        """
+
+        for _, row in feedback_stats.iterrows():
+            score_class = get_score_class(row["Score moyen"])
+            reliability = "Très fiable" if row["Nombre d'évaluations"] >= 10 else "À confirmer" if row["Nombre d'évaluations"] >= 5 else "Données limitées"
+
+            table_html += f"""
+                <tr>
+                    <td>{row["Méthode"]}</td>
+                    <td><span class="{score_class}">{row["Score moyen"]:.2f}/5</span></td>
+                    <td>{row["Nombre d'évaluations"]}</td>
+                    <td>{reliability}</td>
+                </tr>
+            """
+
+        table_html += "</tbody></table>"
+        st.markdown(table_html, unsafe_allow_html=True)
+
+        # Insights et recommandations
+        st.markdown("---")
+        st.subheader("💡 Insights & Recommandations")
+
+        if len(feedback_with_evals) > 1:
+            best_method = feedback_with_evals.loc[feedback_with_evals["Score moyen"].idxmax()]
+            worst_method = feedback_with_evals.loc[feedback_with_evals["Score moyen"].idxmin()]
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.success(f"🏆 **Meilleure méthode** : {best_method['Méthode']} avec un score de {best_method['Score moyen']:.2f}/5")
+                st.info("💭 **Recommandation** : Priorisez cette méthode pour vos analyses futures.")
+
+            with col2:
+                if best_method['Score moyen'] - worst_method['Score moyen'] > 0.5:
+                    st.warning(f"⚠️ **Méthode à améliorer** : {worst_method['Méthode']} (score: {worst_method['Score moyen']:.2f}/5)")
+                    st.info("💭 **Suggestion** : Collectez plus de feedbacks pour affiner cette méthode.")
+
+        # Évolution temporelle (si assez de données)
+        if total_feedbacks >= 10:
+            st.subheader("📈 Évolution de la Satisfaction")
+            st.info("📊 Avec plus de données, nous pourrons afficher des graphiques d'évolution temporelle de la satisfaction utilisateur.")
+
     else:
-        st.info("Aucun feedback n'a encore été enregistré. Les statistiques apparaîtront ici une fois que des utilisateurs auront évalué les analyses de CV.")
-        
-        # Exemple de feedback
-        with st.expander("Comment les feedbacks sont-ils collectés ?"):
+        # Interface vide avec call-to-action
+        st.info("📊 Aucun feedback n'a encore été enregistré.")
+
+        col1, col2 = st.columns([2, 1])
+        with col1:
             st.markdown("""
-            Après chaque analyse de CV, un formulaire de feedback apparaît en bas de la page pour demander à l'utilisateur d'évaluer la qualité des résultats.
-            
-            Les utilisateurs peuvent :
-            1. Attribuer une note de 1 à 5 étoiles
-            2. Laisser un commentaire optionnel
-            3. Envoyer leur feedback pour améliorer la précision de l'analyse
-            
-            Ces données sont ensuite agrégées pour identifier les méthodes les plus pertinentes selon les utilisateurs.
+            ### 🚀 Commencez à collecter des feedbacks !
+
+            Les données de feedback nous permettent de :
+
+            - **Analyser les performances** de chaque méthode d'analyse
+            - **Identifier les tendances** de satisfaction utilisateur
+            - **Améliorer continuellement** les algorithmes de classement
+            - **Fournir des insights** sur les préférences des recruteurs
+
+            **Comment ça marche :**
+            1. Effectuez des analyses de CV
+            2. Évaluez les résultats obtenus
+            3. Les statistiques s'affichent automatiquement ici
             """)
+
+        with col2:
+            st.markdown("""
+            ### 📈 Bénéfices Attendus
+
+            - **Précision accrue** des classements
+            - **Meilleure UX** pour les utilisateurs
+            - **Optimisation** des ressources IA
+            - **Insights métier** sur le recrutement
+            """)
+
+            if st.button("🎯 Effectuer une première analyse", type="primary"):
+                st.switch_page("pages/6_📄_Analyse_CV.py")
 
 with st.sidebar:
     st.markdown("### 🔧 Configuration")
