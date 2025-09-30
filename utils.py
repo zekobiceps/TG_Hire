@@ -1064,13 +1064,6 @@ def save_ksa_matrix_to_current_brief():
 # Ces fonctions étaient précédemment dans utils_cv_analyzer.py
 
 # -------------------- Configuration --------------------
-# Import des fonctions de gestion du feedback
-from feedback import (
-    save_feedback,
-    get_average_feedback_score,
-    get_feedback_summary,
-    FEEDBACK_DATA_PATH
-)
 
 # -------------------- Fonctions pour l'analyse combinée et le feedback --------------------
 def rank_resumes_with_ensemble(job_description, resumes, file_names, 
