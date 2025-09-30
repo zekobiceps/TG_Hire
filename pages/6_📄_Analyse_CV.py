@@ -964,9 +964,9 @@ with tab3:
     """)
 
 with tab4:
-    st.header("📊 Statistiques de Feedback")
 
-    # Récupération des statistiques
+
+    # Récupération des statistiques (pré-chargement à l'ouverture de l'onglet)
     feedback_stats = get_feedback_summary()
 
     if len(feedback_stats) > 0:
@@ -1099,38 +1099,15 @@ with tab4:
 
     else:
         # Interface vide avec call-to-action
-        st.info("📊 Aucun feedback n'a encore été enregistré.")
-
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            st.markdown("""
-            ### 🚀 Commencez à collecter des feedbacks !
-
-            Les données de feedback nous permettent de :
-
-            - **Analyser les performances** de chaque méthode d'analyse
-            - **Identifier les tendances** de satisfaction utilisateur
-            - **Améliorer continuellement** les algorithmes de classement
-            - **Fournir des insights** sur les préférences des recruteurs
-
-            **Comment ça marche :**
-            1. Effectuez des analyses de CV
-            2. Évaluez les résultats obtenus
-            3. Les statistiques s'affichent automatiquement ici
-            """)
-
-        with col2:
-            st.markdown("""
-            ### 📈 Bénéfices Attendus
-
-            - **Précision accrue** des classements
-            - **Meilleure UX** pour les utilisateurs
-            - **Optimisation** des ressources IA
-            - **Insights métier** sur le recrutement
-            """)
-
-            if st.button("🎯 Effectuer une première analyse", type="primary"):
-                st.switch_page("pages/6_📄_Analyse_CV.py")
+        st.info("Aucun feedback n'a encore été enregistré.")
+        st.markdown("""
+        <div style='margin-top:1em;'>
+        <b>Comment ça marche :</b><br>
+        1. Effectuez des analyses de CV<br>
+        2. Évaluez les résultats obtenus<br>
+        3. Les statistiques s'affichent automatiquement ici
+        </div>
+        """, unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("### 🔧 Configuration")
