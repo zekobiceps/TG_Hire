@@ -658,33 +658,21 @@ with tab1:
                                 )
                                 st.success(f"Merci pour votre feedback sur {file_name} ! 🙏")
                 
-                # Feedback global persistant (utilise session_state pour persister entre les interactions)
-                if "cv_analysis_feedback_submitted" not in st.session_state:
-                    st.session_state.cv_analysis_feedback_submitted = False
-                    
+                # Feedback global - version simplifiée sans état persistant
                 st.markdown("---")
                 st.markdown("### 🌟 Feedback global sur l'analyse")
                 st.markdown("Comment évaluez-vous la qualité globale des résultats fournis par cette analyse ?")
                 
                 feedback_col1, feedback_col2 = st.columns([3, 1])
                 with feedback_col1:
-                    if "global_feedback_score" not in st.session_state:
-                        st.session_state.global_feedback_score = 3
-                    if "global_feedback_text" not in st.session_state:
-                        st.session_state.global_feedback_text = ""
-                        
-                    global_feedback_score = st.slider("Note globale", 1, 5, st.session_state.global_feedback_score, key="global_feedback_slider")
+                    # Version simplifiée sans persistance d'état qui causait l'erreur
+                    global_feedback_score = st.slider("Note globale", 1, 5, 3, key="global_feedback_slider")
                     global_feedback_text = st.text_area("Commentaires sur l'ensemble de l'analyse", 
-                                               value=st.session_state.global_feedback_text,
                                                key="global_feedback_text", 
                                                placeholder="Qu'avez-vous apprécié ? Que pourrait-on améliorer ?")
-                    
-                    # Mettre à jour les valeurs en session
-                    st.session_state.global_feedback_score = global_feedback_score
-                    st.session_state.global_feedback_text = global_feedback_text
                 
                 with feedback_col2:
-                    if st.button("Envoyer feedback global", key="send_global_feedback") or st.session_state.cv_analysis_feedback_submitted:
+                    if st.button("Envoyer feedback global", key="send_global_feedback"):
                         save_feedback(
                             analysis_method=analysis_method,
                             job_title=job_title,
@@ -693,7 +681,6 @@ with tab1:
                             feedback_score=global_feedback_score,
                             feedback_text=global_feedback_text
                         )
-                        st.session_state.cv_analysis_feedback_submitted = True
                         st.success("Merci pour votre feedback global ! 🙏")
             else:
                 st.error("L'analyse n'a retourné aucun score.")
