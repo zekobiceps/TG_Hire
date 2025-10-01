@@ -45,6 +45,16 @@ st.set_page_config(
 
 st.title("📢  Gestion des annonces")
 
+# Bloc Informations générales déplacé ici pour être en haut
+with st.container():
+    st.subheader("Informations générales")
+    col_info1, col_info2 = st.columns(2)
+    with col_info1:
+        poste_final = st.text_input("Poste*", help="Ex: Directeur des Projets BTP")
+    with col_info2:
+        localisation_finale = st.text_input("Localisation*", help="Ex: Casablanca, Rabat, Tanger")
+    entreprise = "TGCC"  # constante
+
 # --- Debug: test de connexion Google Sheets (visible si st.secrets['DEBUG']==True ou param ?debug=true)
 debug_mode = False
 try:
@@ -200,22 +210,12 @@ else:
     Avantages: {avantages}
     """
 
-st.subheader("Informations générales")
-col_info1, col_info2 = st.columns(2)
-with col_info1:
-    poste_final = st.text_input("Poste*", help="Ex: Directeur des Projets BTP")
-with col_info2:
-    localisation_finale = st.text_input("Localisation*", help="Ex: Casablanca, Rabat, Tanger")
-
-# Entreprise par défaut (TGCC)
-entreprise = "TGCC"
+## (Section Informations générales déplacée en haut)
 
 # (Bloc formulaire principal dupliqué supprimé - on conserve la première instance définie plus haut)
 
-# Bouton pour générer via IA (même style que sauvegarder)
-col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
-with col_btn2:
-    generate_button = st.button("💡 Générer l'annonce via IA", type="primary", width="stretch", key="btn_generer_annonce")
+# Bouton pour générer via IA (pleine largeur)
+generate_button = st.button("💡 Générer l'annonce via IA", type="primary", use_container_width=True, key="btn_generer_annonce")
 
 # Génération IA avec spinner
 if generate_button:
@@ -383,10 +383,7 @@ contenu = st.text_area("Contenu de l'annonce (généré ou manuel)",
                        height=300, 
                        help="Contenu de l'annonce généré par l'IA ou saisi manuellement")
 
-# Bouton de sauvegarde
-col_save1, col_save2, col_save3 = st.columns([1, 2, 1])
-with col_save2:
-    if st.button("💾 Sauvegarder l'annonce", type="primary", width="stretch", key="btn_sauvegarder_annonce"):
+if st.button("💾 Sauvegarder l'annonce", type="primary", use_container_width=True, key="btn_sauvegarder_annonce"):
         if poste_final and entreprise and contenu and localisation_finale:
             # Préparer les données pour Google Sheets
             annonce_data = {
@@ -436,10 +433,9 @@ st.divider()
 
 # -------------------- Sidebar Statistiques --------------------
 with st.sidebar:
-    st.title("📊 Statistiques Annonces")
+    st.title("📊 Annonces créées")
     nb_annonces = len(st.session_state.annonces)
-    st.markdown("<span style='font-size:18px;'>� Annonces créées</span>", unsafe_allow_html=True)
-    st.markdown(f"<span style='font-size:32px;font-weight:700;color:#0057B7;'>{nb_annonces}</span>", unsafe_allow_html=True)
+    st.markdown(f"<span style='font-size:28px;font-weight:700;color:#0057B7;'>{nb_annonces}</span>", unsafe_allow_html=True)
     st.divider()
 
 # -------------------- Liste des annonces --------------------
