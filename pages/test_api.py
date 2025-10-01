@@ -1,4 +1,5 @@
 import streamlit as st
+from utils import save_sourcing_entry_to_gsheet, load_sourcing_entries_from_gsheet
 
 # Vérification de la connexion
 if not st.session_state.get("logged_in", False):
@@ -348,7 +349,7 @@ with tab1:
         localisation = st.text_input("Localisation:", key="boolean_loc", placeholder="Ex: Casablanca")
         employeur = st.text_input("Employeur:", key="boolean_employeur", placeholder="Ex: TGCC")
 
-    if st.button("🪄 Générer la requête Boolean", type="primary", width="stretch", key="boolean_generate"):
+    if st.button("💡🪄 Générer la requête Boolean", type="primary", width="stretch", key="boolean_generate"):
         with st.spinner("⏳ Génération en cours..."):
             start_time = time.time()
             st.session_state["boolean_query"] = generate_boolean_query(
@@ -372,7 +373,6 @@ with tab1:
             st.success(f"✅ Requête générée en {total_time:.1f}s")
 
     if st.session_state.get("boolean_query"):
-        # détection obsolescence
         snap = st.session_state.get("boolean_snapshot", {})
         current_changed = any([
             snap.get("poste") != poste,
@@ -387,28 +387,52 @@ with tab1:
         label_boolean = "Requête Boolean:" + (" 🔄 (obsolète - paramètres modifiés)" if current_changed else "")
         st.text_area(label_boolean, value=st.session_state["boolean_query"], height=120, key="boolean_area")
         st.markdown(f"<button style='margin-top:4px' data-copy=\"{st.session_state['boolean_query'].replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
+        cols_main = st.columns([1,1,1])
+        with cols_main[0]:
+            if st.button("💾 Sauvegarder", key="boolean_save", use_container_width=True):
+                entry = {
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "type": "Boolean",
+                    "poste": poste,
+                    "requete": st.session_state["boolean_query"],
+                    "utilisateur": st.session_state.get("user", ""),
+                    "source": "Boolean",
+                    "commentaire": ""
+                }
+                st.session_state.library_entries.append(entry)
+                save_library_entries()
+                save_sourcing_entry_to_gsheet(entry)
+                st.success("✅ Sauvegardé")
+        with cols_main[1]:
+            url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
+            st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, use_container_width=True)
         # Variantes
         variants = generate_boolean_variants(st.session_state["boolean_query"], synonymes, competences_optionnelles)
         if variants:
             st.caption("🔀 Variantes proposées")
             for idx, (title, vq) in enumerate(variants):
                 st.text_area(f"{title}", value=vq, height=80, key=f"bool_var_{idx}")
-                st.markdown(f"<button data-copy=\"{vq.replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            if st.button("💾 Sauvegarder", key="boolean_save", width="stretch"):
-                entry = {
-                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"), 
-                    "type": "Boolean", 
-                    "poste": poste, 
-                    "requete": st.session_state["boolean_query"]
-                }
-                st.session_state.library_entries.append(entry)
-                save_library_entries()
-                st.success("✅ Sauvegardé")
-        with col2:
-            url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
-            st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, width="stretch")
+                cols_var = st.columns([1,1,1])
+                with cols_var[0]:
+                    if st.button(f"💾 Sauvegarder {idx+1}", key=f"bool_save_{idx}", use_container_width=True):
+                        entry = {
+                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                            "type": "Boolean",
+                            "poste": poste,
+                            "requete": vq,
+                            "utilisateur": st.session_state.get("user", ""),
+                            "source": f"Boolean Variante {idx+1}",
+                            "commentaire": ""
+                        }
+                        st.session_state.library_entries.append(entry)
+                        save_library_entries()
+                        save_sourcing_entry_to_gsheet(entry)
+                        st.success(f"✅ Variante {idx+1} sauvegardée")
+                with cols_var[1]:
+                    url_var = f"https://www.linkedin.com/search/results/people/?keywords={quote(vq)}"
+                    st.link_button(f"🌐 LinkedIn {idx+1}", url_var, use_container_width=True)
+                with cols_var[2]:
+                    st.markdown(f"<button data-copy=\"{vq.replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
 
 # -------------------- Tab 2: X-Ray --------------------
 with tab2:
@@ -1222,49 +1246,58 @@ with tab8:
 # -------------------- Tab 9: Bibliothèque --------------------
 with tab9:
     st.header("📚 Bibliothèque des recherches")
-    
-    if st.session_state.library_entries:
-        col1, col2 = st.columns(2)
-        with col1:
-            search_term = st.text_input("🔎 Rechercher:", placeholder="Rechercher par poste ou requête")
-        with col2:
-            sort_by = st.selectbox("📌 Trier par:", ["Date récente", "Date ancienne", "Type", "Poste"], key="sort_by")
+    # Actualisation auto depuis Google Sheets
+    entries_local = st.session_state.library_entries if st.session_state.library_entries else []
+    entries_gsheet = load_sourcing_entries_from_gsheet()
+    # Fusion et déduplication (par requête + type + poste)
+    all_entries = entries_local.copy()
+    for e in entries_gsheet:
+        if not any((e.get("requete") == x.get("requete") and e.get("type") == x.get("type") and e.get("poste") == x.get("poste")) for x in all_entries):
+            all_entries.append(e)
+    col1, col2 = st.columns(2)
+    with col1:
+        search_term = st.text_input("🔎 Rechercher:", placeholder="Rechercher par poste ou requête")
+    with col2:
+        sort_by = st.selectbox("📌 Trier par:", ["Date récente", "Date ancienne", "Type", "Poste"], key="sort_by")
 
-        entries = st.session_state.library_entries
-        
-        if search_term:
-            entries = [e for e in entries if search_term.lower() in e["requete"].lower() or 
-                     search_term.lower() in e["poste"].lower() or search_term.lower() in e["type"].lower()]
+    entries = all_entries
+    if search_term:
+        entries = [e for e in entries if search_term.lower() in str(e.get("requete","")) .lower() or 
+                 search_term.lower() in str(e.get("poste","")) .lower() or search_term.lower() in str(e.get("type","")) .lower()]
 
-        if sort_by == "Type":
-            entries = sorted(entries, key=lambda x: x["type"])
-        elif sort_by == "Poste":
-            entries = sorted(entries, key=lambda x: x["poste"])
-        elif sort_by == "Date ancienne":
-            entries = sorted(entries, key=lambda x: x["date"])
-        else:
-            entries = sorted(entries, key=lambda x: x["date"], reverse=True)
+    # Utilise timestamp si présent, sinon date
+    def get_date(e):
+        return e.get("timestamp") or e.get("date") or ""
 
-        st.info(f"📊 {len(entries)} recherche(s) trouvée(s)")
-        
-        for i, entry in enumerate(entries):
-            with st.expander(f"{entry['date']} - {entry['type']} - {entry['poste']}"):
-                st.text_area("Requête:", value=entry['requete'], height=100, key=f"req_{i}")
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.button("🗑️ Supprimer", key=f"del_{i}"):
+    if sort_by == "Type":
+        entries = sorted(entries, key=lambda x: x.get("type",""))
+    elif sort_by == "Poste":
+        entries = sorted(entries, key=lambda x: x.get("poste",""))
+    elif sort_by == "Date ancienne":
+        entries = sorted(entries, key=get_date)
+    else:
+        entries = sorted(entries, key=get_date, reverse=True)
+
+    st.info(f"📊 {len(entries)} recherche(s) trouvée(s)")
+    for i, entry in enumerate(entries):
+        with st.expander(f"{get_date(entry)} - {entry.get('type','')} - {entry.get('poste','')}"):
+            st.text_area("Requête:", value=entry.get('requete',''), height=100, key=f"req_{i}")
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🗑️ Supprimer", key=f"del_{i}"):
+                    if entry in st.session_state.library_entries:
                         st.session_state.library_entries.remove(entry)
                         save_library_entries()
                         st.success("✅ Recherche supprimée")
                         st.rerun()
-                with col2:
-                    if entry['type'] == 'Boolean':
-                        url = f"https://www.linkedin.com/search/results/people/?keywords={quote(entry['requete'])}"
-                        st.link_button("🌐 Ouvrir", url)
-                    elif entry['type'] == 'X-Ray':
-                        url = f"https://www.google.com/search?q={quote(entry['requete'])}"
-                        st.link_button("🌐 Ouvrir", url)
-    else:
+            with col2:
+                if entry.get('type') == 'Boolean':
+                    url = f"https://www.linkedin.com/search/results/people/?keywords={quote(entry.get('requete',''))}"
+                    st.link_button("🌐 Ouvrir", url)
+                elif entry.get('type') == 'X-Ray':
+                    url = f"https://www.google.com/search?q={quote(entry.get('requete',''))}"
+                    st.link_button("🌐 Ouvrir", url)
+    if not entries:
         st.info("📝 Aucune recherche sauvegardée pour le moment")
 
 # -------------------- CSS pour masquer le prompt en bas --------------------

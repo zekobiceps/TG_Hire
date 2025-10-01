@@ -1,3 +1,47 @@
+# -------------------- CONFIGURATION GOOGLE SHEETS pour la Bibliothèque Sourcing --------------------
+SOURCING_SHEET_URL = "https://docs.google.com/spreadsheets/d/1Yw99SS4vU5v0DuD7S1AwaEispJCo-cwioxSsAYnzRkE/edit"
+SOURCING_WORKSHEET_NAME = "Sourcing DB"
+SOURCING_HEADERS = [
+    "timestamp", "type", "poste", "requete", "utilisateur", "source", "commentaire"
+]
+
+@st.cache_resource
+def get_sourcing_gsheet_client():
+    if not GSPREAD_AVAILABLE:
+        return None
+    try:
+        service_account_info = _build_service_account_info_from_st_secrets()
+        gc = gspread.service_account_from_dict(service_account_info)
+        spreadsheet = gc.open_by_url(SOURCING_SHEET_URL)
+        worksheet = spreadsheet.worksheet(SOURCING_WORKSHEET_NAME)
+        return worksheet
+    except Exception as e:
+        st.error(f"❌ Erreur Google Sheets Sourcing DB: {e}")
+        return None
+
+def save_sourcing_entry_to_gsheet(entry: dict):
+    worksheet = get_sourcing_gsheet_client()
+    if worksheet is None:
+        return False
+    row = [entry.get(h, "") for h in SOURCING_HEADERS]
+    try:
+        worksheet.append_row(row)
+        st.toast("✅ Requête sauvegardée dans Sourcing DB", icon="☁️")
+        return True
+    except Exception as e:
+        st.error(f"❌ Erreur sauvegarde Sourcing DB: {e}")
+        return False
+
+def load_sourcing_entries_from_gsheet():
+    worksheet = get_sourcing_gsheet_client()
+    if worksheet is None:
+        return []
+    try:
+        records = worksheet.get_all_records()
+        return records
+    except Exception as e:
+        st.warning(f"Erreur chargement Sourcing DB: {e}")
+        return []
 # utils.py
 # -*- coding: utf-8 -*-
 import streamlit as st
