@@ -349,48 +349,46 @@ with tab1:
         localisation = st.text_input("Localisation:", key="boolean_loc", placeholder="Ex: Casablanca")
         employeur = st.text_input("Employeur:", key="boolean_employeur", placeholder="Ex: TGCC")
 
-    col_gen1, col_gen2 = st.columns([2,1])
-    with col_gen1:
-        gen_mode = st.selectbox("Générer la requête Boolean par :", ["Algorithme", "Intelligence artificielle"], key="boolean_gen_mode")
-    with col_gen2:
-        if st.button("Générer la requête Boolean", type="primary", key="boolean_generate_main"):
-            if gen_mode == "Algorithme":
-                with st.spinner("⏳ Génération en cours..."):
-                    start_time = time.time()
-                    st.session_state["boolean_query"] = generate_boolean_query(
-                        poste, synonymes, competences_obligatoires,
-                        competences_optionnelles, exclusions, localisation, secteur
-                    )
-                    if employeur:
-                        st.session_state["boolean_query"] += f' AND ("{employeur}")'
-                    st.session_state["boolean_snapshot"] = {
-                        "poste": poste,
-                        "synonymes": synonymes,
-                        "comp_ob": competences_obligatoires,
-                        "comp_opt": competences_optionnelles,
-                        "exclusions": exclusions,
-                        "localisation": localisation,
-                        "secteur": secteur,
-                        "employeur": employeur or ""
-                    }
-                    total_time = time.time() - start_time
-                    st.success(f"✅ Requête générée en {total_time:.1f}s")
-            else:
-                with st.spinner("🤖 Génération Intelligence artificielle en cours..."):
-                    prompt = f"Génère une requête Boolean pour le sourcing avec les critères suivants:\nPoste: {poste}\nSynonymes: {synonymes}\nCompétences obligatoires: {competences_obligatoires}\nCompétences optionnelles: {competences_optionnelles}\nExclusions: {exclusions}\nLocalisation: {localisation}\nSecteur: {secteur}\nEmployeur: {employeur}"
-                    ia_result = ask_deepseek([{"role": "user", "content": prompt}], max_tokens=200)
-                    st.session_state["boolean_query"] = ia_result["content"].strip()
-                    st.session_state["boolean_snapshot"] = {
-                        "poste": poste,
-                        "synonymes": synonymes,
-                        "comp_ob": competences_obligatoires,
-                        "comp_opt": competences_optionnelles,
-                        "exclusions": exclusions,
-                        "localisation": localisation,
-                        "secteur": secteur,
-                        "employeur": employeur or ""
-                    }
-                    st.success("✅ Requête Boolean générée par Intelligence artificielle")
+    col_gen = st.columns([0.7,0.3])
+    gen_mode = col_gen[0].selectbox("Générer la requête Boolean par :", ["Algorithme", "Intelligence artificielle"], key="boolean_gen_mode")
+    if col_gen[1].button("Générer la requête Boolean", type="primary", key="boolean_generate_main"):
+        if gen_mode == "Algorithme":
+            with st.spinner("⏳ Génération en cours..."):
+                start_time = time.time()
+                st.session_state["boolean_query"] = generate_boolean_query(
+                    poste, synonymes, competences_obligatoires,
+                    competences_optionnelles, exclusions, localisation, secteur
+                )
+                if employeur:
+                    st.session_state["boolean_query"] += f' AND ("{employeur}")'
+                st.session_state["boolean_snapshot"] = {
+                    "poste": poste,
+                    "synonymes": synonymes,
+                    "comp_ob": competences_obligatoires,
+                    "comp_opt": competences_optionnelles,
+                    "exclusions": exclusions,
+                    "localisation": localisation,
+                    "secteur": secteur,
+                    "employeur": employeur or ""
+                }
+                total_time = time.time() - start_time
+                st.success(f"✅ Requête générée en {total_time:.1f}s")
+        else:
+            with st.spinner("🤖 Génération Intelligence artificielle en cours..."):
+                prompt = f"Génère une requête Boolean pour le sourcing avec les critères suivants:\nPoste: {poste}\nSynonymes: {synonymes}\nCompétences obligatoires: {competences_obligatoires}\nCompétences optionnelles: {competences_optionnelles}\nExclusions: {exclusions}\nLocalisation: {localisation}\nSecteur: {secteur}\nEmployeur: {employeur}"
+                ia_result = ask_deepseek([{"role": "user", "content": prompt}], max_tokens=200)
+                st.session_state["boolean_query"] = ia_result["content"].strip()
+                st.session_state["boolean_snapshot"] = {
+                    "poste": poste,
+                    "synonymes": synonymes,
+                    "comp_ob": competences_obligatoires,
+                    "comp_opt": competences_optionnelles,
+                    "exclusions": exclusions,
+                    "localisation": localisation,
+                    "secteur": secteur,
+                    "employeur": employeur or ""
+                }
+                st.success("✅ Requête Boolean générée par Intelligence artificielle")
 
     if st.session_state.get("boolean_query"):
         snap = st.session_state.get("boolean_snapshot", {})
@@ -408,9 +406,7 @@ with tab1:
         st.text_area(label_boolean, value=st.session_state["boolean_query"], height=120, key="boolean_area")
         # Zone commentaire
     boolean_commentaire = st.text_input("Commentaire (optionnel)", value=st.session_state.get("boolean_commentaire", ""), key="boolean_commentaire")
-    # On ne met à jour le session_state que si le widget a été affiché
-    if "boolean_commentaire" in st.session_state:
-        st.session_state["boolean_commentaire"] = boolean_commentaire
+    # Ne pas modifier st.session_state["boolean_commentaire"] après le widget : Streamlit gère la valeur automatiquement
     # Boutons sur la même ligne à droite
     cols_btn = st.columns([1,1,1])
     # Boutons sur la même ligne
