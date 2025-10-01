@@ -1409,7 +1409,7 @@ with tab6:
             return f"Je serai ravi{suffix} de convenir d’un rendez-vous afin d’échanger sur cette opportunité."
         return ""
 
-    def generate_inmail(donnees_profil, poste, entreprise, ton, max_words, cta_type, genre):
+    def generate_inmail(donnees_profil, poste, entreprise, ton, max_words, cta_type, genre, terme_organisation):
         accroche_prompt = f"""
         Tu es un recruteur marocain qui écrit des accroches pour InMail.
         Génère une accroche persuasive adaptée au ton "{ton}".
@@ -1447,7 +1447,7 @@ démontrent un potentiel fort pour le poste de {poste} au sein de notre {terme_o
             extend_result = ask_deepseek([{"role": "user", "content": extend_prompt}], max_tokens=max_words * 2)
             response = extend_result["content"]
 
-        return response.strip(), objet
+        return response.strip()
 
     # --------- IMPORTER UN MODÈLE ---------
     if st.session_state.library_entries:
@@ -1455,6 +1455,7 @@ démontrent un potentiel fort pour le poste de {poste} au sein de notre {terme_o
         selected_template = st.selectbox("📂 Importer un modèle sauvegardé :", [""] + templates, key="import_template_inmail")
         if selected_template:
             template_entry = next(e for e in st.session_state.library_entries if f"{e['poste']} - {e['date']}" == selected_template)
+           
             st.session_state["inmail_profil_data"] = {
                 "prenom": "Candidat",
                 "nom": "",
@@ -1536,9 +1537,9 @@ démontrent un potentiel fort pour le poste de {poste} au sein de notre {terme_o
     # --------- GÉNÉRATION ---------
     if st.button("✨ Générer", type="primary", width="stretch", key="btn_generate_inmail"):
         donnees_profil = st.session_state.get("inmail_profil_data", profil_data)
-        msg, objet_auto = generate_inmail(donnees_profil, poste_accroche, entreprise, ton_message, longueur_message, cta_option, genre_profil)
+        msg = generate_inmail(donnees_profil, poste_accroche, entreprise, ton_message, longueur_message, cta_option, genre_profil, "entreprise")
         st.session_state["inmail_message"] = msg
-        st.session_state["inmail_objet"] = objet_auto
+        st.session_state["inmail_objet"] = "Nouvelle opportunité: " + poste_accroche
         st.session_state["inmail_generated"] = True
 
     # --------- RÉSULTAT ---------
@@ -1553,9 +1554,9 @@ démontrent un potentiel fort pour le poste de {poste} au sein de notre {terme_o
         with col1:
             if st.button("🔄 Régénérer avec mêmes paramètres", key="btn_regen_inmail"):
                 donnees_profil = st.session_state.get("inmail_profil_data", profil_data)
-                msg, objet_auto = generate_inmail(donnees_profil, poste_accroche, entreprise, ton_message, longueur_message, cta_option, genre_profil)
+                msg = generate_inmail(donnees_profil, poste_accroche, entreprise, ton_message, longueur_message, cta_option, genre_profil, "entreprise")
                 st.session_state["inmail_message"] = msg
-                st.session_state["inmail_objet"] = objet_auto
+                st.session_state["inmail_objet"] = "Nouvelle opportunité: " + poste_accroche
                 st.rerun()
         with col2:
             if st.button("💾 Sauvegarder comme modèle", key="btn_save_inmail"):
