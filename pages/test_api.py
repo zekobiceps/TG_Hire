@@ -419,21 +419,21 @@ with tab1:
         current_changed = False
         label_boolean = "Requête Boolean:"
     # Correction : affichage toujours synchronisé avec la variable session_state
-    st.text_area(label_boolean, value=st.session_state.get("boolean_query", ""), height=120, key="boolean_area")
-        # Zone commentaire
+    boolean_query_value = st.session_state.get("boolean_query", "")
+    st.text_area(label_boolean, value=boolean_query_value, height=120, key="boolean_area")
+    # Zone commentaire
     boolean_commentaire = st.text_input("Commentaire (optionnel)", value=st.session_state.get("boolean_commentaire", ""), key="boolean_commentaire")
-    # Ne pas modifier st.session_state["boolean_commentaire"] après le widget : Streamlit gère la valeur automatiquement
     # Boutons sur la même ligne à droite
     cols_actions = st.columns([0.5,0.25,0.25])
     with cols_actions[0]:
-        st.markdown(f"<button data-copy=\"{st.session_state['boolean_query'].replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
+        st.markdown(f"<button data-copy=\"{boolean_query_value.replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
     with cols_actions[1]:
         if st.button("💾 Sauvegarder", key="boolean_save", use_container_width=True):
             entry = {
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                 "type": "Boolean",
                 "poste": poste,
-                "requete": st.session_state["boolean_query"],
+                "requete": boolean_query_value,
                 "utilisateur": st.session_state.get("user", ""),
                 "source": "Boolean",
                 "commentaire": st.session_state.get("boolean_commentaire", "")
@@ -443,11 +443,11 @@ with tab1:
             save_sourcing_entry_to_gsheet(entry)
             st.success("✅ Sauvegardé")
     with cols_actions[2]:
-        url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
+        url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(boolean_query_value)}"
         st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, use_container_width=True)
 
-    # Variantes
-    variants = generate_boolean_variants(st.session_state["boolean_query"], synonymes, competences_optionnelles)
+    # Variantes : toujours recalculées à partir de la requête actuelle
+    variants = generate_boolean_variants(boolean_query_value, synonymes, competences_optionnelles)
     if variants:
         st.caption("🔀 Variantes proposées")
         for idx, (title, vq) in enumerate(variants):
