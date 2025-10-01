@@ -491,11 +491,19 @@ with tab1:
 
     # Variantes (seulement si requête existe)
     if st.session_state.get("boolean_query"):
+        # Générer les variantes avec les valeurs ACTUELLES des champs
         variants = generate_boolean_variants(st.session_state["boolean_query"], synonymes, competences_optionnelles)
+        
+        # Debug temporaire pour les variantes
+        st.write(f"DEBUG VARIANTES - Synonymes actuels: '{synonymes}'")
+        st.write(f"DEBUG VARIANTES - Compétences opt actuelles: '{competences_optionnelles}'")
+        st.write(f"DEBUG VARIANTES - Nombre de variantes: {len(variants)}")
+        
         st.caption("🔀 Variantes proposées")
         if variants:
             for idx, (title, vq) in enumerate(variants):
-                st.text_area(f"{title}", value=vq, height=80, key=f"bool_var_{idx}")
+                # Supprimer la key pour permettre la mise à jour automatique
+                st.text_area(f"{title}", value=vq, height=80)
                 st.text_input(f"Commentaire variante {idx+1}", value=st.session_state.get(f"boolean_commentaire_var_{idx}", ""), key=f"boolean_commentaire_var_{idx}")
                 cols_var = st.columns([0.5,0.25,0.25])
                 with cols_var[0]:
