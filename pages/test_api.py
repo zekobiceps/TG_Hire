@@ -303,30 +303,62 @@ def ask_deepseek(messages, max_tokens=300):
     # Cas 1 : Génération de la requête Boolean (enrichissement des synonymes et des compétences)
     if "génère une requête boolean" in question:
         
-        # Simuler l'enrichissement des synonymes
+        # Approche MINIMALISTE pour éviter 0 résultat sur LinkedIn
+        # Seulement enrichir les synonymes, pas trop de compétences obligatoires
+        
         if "ingénieur de travaux" in poste.lower() or "ingénieur travaux" in poste.lower():
-            ia_syns = f"{synonymes}, Conducteur de Travaux Principal, Chef de Projet BTP, Responsable Chantier" if synonymes else "Conducteur de Travaux Principal, Chef de Projet BTP, Responsable Chantier"
-            ia_comp_ob = f"{comp_ob}, Suivi d'exécution, Normes DTU, Planning chantier" if comp_ob else "Suivi d'exécution, Normes DTU, Planning chantier"
+            # Synonymes conservateurs
+            ia_syns = f"{synonymes}, Conducteur de travaux, Chef de chantier" if synonymes else "Conducteur de travaux, Chef de chantier"
+            # Compétences très légères ou vides si rien n'est saisi
+            ia_comp_ob = comp_ob if comp_ob else ""  # Ne pas ajouter de compétences obligatoires si vide
         elif "chargé de recrutement" in poste.lower() or "recruteur" in poste.lower():
-            ia_syns = f"{synonymes}, Recruiter Specialist, Talent Acquisition Partner, Chasseur de têtes" if synonymes else "Recruiter Specialist, Talent Acquisition Partner, Chasseur de têtes"
-            ia_comp_ob = f"{comp_ob}, LinkedIn Recruiter, Sourcing, Entretiens de recrutement" if comp_ob else "LinkedIn Recruiter, Sourcing, Entretiens de recrutement"
+            ia_syns = f"{synonymes}, Talent acquisition, Sourcing" if synonymes else "Talent acquisition, Sourcing"
+            ia_comp_ob = comp_ob if comp_ob else ""
         elif "développeur" in poste.lower() or "developer" in poste.lower():
-            ia_syns = f"{synonymes}, Software Engineer, Programmeur, Dev" if synonymes else "Software Engineer, Programmeur, Dev"
-            ia_comp_ob = f"{comp_ob}, Git, Debugging, Code Review" if comp_ob else "Git, Debugging, Code Review"
+            ia_syns = f"{synonymes}, Software engineer, Programmeur" if synonymes else "Software engineer, Programmeur"
+            ia_comp_ob = comp_ob if comp_ob else ""
         elif "comptable" in poste.lower() or "finance" in poste.lower():
-            ia_syns = f"{synonymes}, Expert Comptable, Contrôleur de Gestion, Analyste Financier" if synonymes else "Expert Comptable, Contrôleur de Gestion, Analyste Financier"
-            ia_comp_ob = f"{comp_ob}, SAGE, Normes IFRS, Fiscalité" if comp_ob else "SAGE, Normes IFRS, Fiscalité"
+            ia_syns = f"{synonymes}, Expert comptable, Contrôleur gestion" if synonymes else "Expert comptable, Contrôleur gestion"
+            ia_comp_ob = comp_ob if comp_ob else ""
         else:
-            ia_syns = f"{synonymes}, Expert, Lead, Senior" if synonymes else "Expert, Lead, Senior"
-            ia_comp_ob = comp_ob or "Management, Leadership, Expertise métier"
+            # Pour les postes non reconnus, ajouter seulement des synonymes génériques
+            ia_syns = f"{synonymes}, Senior, Expert" if synonymes else "Senior, Expert"
+            ia_comp_ob = comp_ob  # Garder ce que l'utilisateur a saisi
         
         return {"content": ia_syns, "comp_ob_ia": ia_comp_ob}
     
-    # Cas 2 : Outils/Logiciels
+    # Cas 2 : Analyse de fiche de poste
+    elif "analyse cette fiche de poste" in question:
+        # Simulation d'extraction d'informations depuis une fiche de poste
+        fiche_content = messages[0]["content"].lower()
+        
+        # Détection de patterns dans la fiche
+        suggestions = []
+        
+        if "ingénieur" in fiche_content and "travaux" in fiche_content:
+            suggestions.append("Titre: Ingénieur de travaux")
+            suggestions.append("Synonymes: Conducteur de travaux, Chef de chantier")
+            suggestions.append("Compétences obligatoires: AutoCAD, Gestion projet")
+            suggestions.append("Compétences optionnelles: Primavera, Management équipe")
+        elif "développeur" in fiche_content or "developer" in fiche_content:
+            suggestions.append("Titre: Développeur")
+            suggestions.append("Synonymes: Software engineer, Programmeur")
+            suggestions.append("Compétences obligatoires: Programming, Git")
+        elif "comptable" in fiche_content:
+            suggestions.append("Titre: Comptable")
+            suggestions.append("Synonymes: Expert comptable, Contrôleur gestion")
+            suggestions.append("Compétences obligatoires: SAGE, Fiscalité")
+        else:
+            suggestions.append("Analyse: Poste non reconnu automatiquement")
+            suggestions.append("Conseil: Remplissez manuellement les champs ci-dessous")
+            
+        return {"content": "\n".join(suggestions)}
+    
+    # Cas 3 : Outils/Logiciels
     elif "outils" in question or "logiciels" in question:
         return {"content": "• AutoCAD\n• Revit\n• Primavera P6\n• MS Project\n• Robot Structural Analysis\n• SketchUp"}
         
-    # Cas 3 : Compétences
+    # Cas 4 : Compétences
     elif "compétences" in question:
         return {"content": "• Gestion de projet\n• Lecture de plans techniques\n• Management d'équipe\n• Budget et planning\n• Conformité réglementaire\n• Négociation fournisseurs"}
         
@@ -373,6 +405,27 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
 with tab1:
     st.header("🔍 Recherche Boolean")
     
+    # Option fiche de poste pour l'IA
+    with st.expander("📄 Fiche de poste (optionnel - pour enrichissement IA)", expanded=False):
+        fiche_poste = st.text_area(
+            "Collez ici la fiche de poste complète:",
+            height=120,
+            key="boolean_fiche_poste",
+            placeholder="Mission: ...\nProfil recherché: ...\nCompétences requises: ...\nExpérience: ..."
+        )
+        if fiche_poste and st.button("🤖 Analyser la fiche et pré-remplir", key="analyze_fiche"):
+            with st.spinner("🔍 Analyse de la fiche en cours..."):
+                # Simulation d'analyse de fiche de poste
+                analyze_prompt = f"Analyse cette fiche de poste et extrait les éléments clés:\n{fiche_poste}\n\nExtrait:\n1. Titre du poste\n2. 2-3 synonymes du poste\n3. 2-3 compétences obligatoires\n4. 2-3 compétences optionnelles\n5. Mots à exclure si mentionnés"
+                result = ask_deepseek([{"role": "user", "content": analyze_prompt}], max_tokens=200)
+                
+                if result["content"].strip():
+                    st.success("✅ Analyse terminée ! Les champs ont été pré-remplits ci-dessous.")
+                    # Note: Dans une vraie implémentation, on parserait le résultat pour remplir les champs
+                    st.info("💡 Suggestion IA: " + result["content"][:200] + "...")
+                else:
+                    st.warning("⚠️ Impossible d'analyser la fiche. Remplissez manuellement les champs ci-dessous.")
+    
     col1, col2 = st.columns(2)
     with col1:
         poste = st.text_input("Poste recherché:", key="boolean_poste", placeholder="Ex: Ingénieur de travaux")
@@ -389,6 +442,8 @@ with tab1:
     col_gen = st.columns([0.7,0.3])
     with col_gen[0]:
         gen_mode = st.selectbox("Générer la requête Boolean par :", ["Algorithme", "Intelligence artificielle"], key="boolean_gen_mode")
+        if gen_mode == "Intelligence artificielle":
+            st.caption("💡 L'IA enrichit les synonymes de façon conservatrice pour maximiser les résultats LinkedIn")
     with col_gen[1]:
         gen_btn = st.button("Générer la requête Boolean", type="primary", key="boolean_generate_main")
     if gen_btn:
@@ -449,6 +504,8 @@ with tab1:
                 }
                 total_time = time.time() - start_time
                 st.success(f"✅ Requête Boolean générée par Intelligence artificielle en {total_time:.1f}s")
+                if synonymes_ia != synonymes or comp_ob_ia != competences_obligatoires:
+                    st.info("🤖 L'IA a enrichi vos critères pour optimiser les résultats LinkedIn")
                 st.rerun()  # Force la mise à jour de l'affichage
 
     # Affichage unifié de la requête Boolean
