@@ -404,24 +404,23 @@ with tab1:
                 st.success("✅ Requête Boolean générée par Intelligence artificielle")
 
     # Affichage de la requête Boolean - toujours visible
-    if st.session_state.get("boolean_query"):
-        snap = st.session_state.get("boolean_snapshot", {})
-        current_changed = any([
-            snap.get("poste") != poste,
-            snap.get("synonymes") != synonymes,
-            snap.get("comp_ob") != competences_obligatoires,
-            snap.get("comp_opt") != competences_optionnelles,
-            snap.get("exclusions") != exclusions,
-            snap.get("localisation") != localisation,
-            snap.get("secteur") != secteur,
-            snap.get("employeur") != (employeur or "")
-        ]) if snap else False
-        label_boolean = "Requête Boolean:" + (" 🔄 (obsolète - paramètres modifiés)" if current_changed else "")
-        boolean_query_value = st.session_state.get("boolean_query", "")
-    else:
-        label_boolean = "Requête Boolean:"
-        boolean_query_value = ""
+    snap = st.session_state.get("boolean_snapshot", {})
+    current_changed = any([
+        snap.get("poste") != poste,
+        snap.get("synonymes") != synonymes,
+        snap.get("comp_ob") != competences_obligatoires,
+        snap.get("comp_opt") != competences_optionnelles,
+        snap.get("exclusions") != exclusions,
+        snap.get("localisation") != localisation,
+        snap.get("secteur") != secteur,
+        snap.get("employeur") != (employeur or "")
+    ]) if snap else False
     
+    # Récupération de la requête Boolean principale
+    boolean_query_value = st.session_state.get("boolean_query", "")
+    label_boolean = "Requête Boolean:" + (" 🔄 (obsolète - paramètres modifiés)" if current_changed and boolean_query_value else "")
+    
+    # Affichage forcé de la requête Boolean principale
     st.text_area(label_boolean, value=boolean_query_value, height=120, key="boolean_area")
     # Zone commentaire
     boolean_commentaire = st.text_input("Commentaire (optionnel)", value=st.session_state.get("boolean_commentaire", ""), key="boolean_commentaire")
@@ -448,8 +447,14 @@ with tab1:
         url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(boolean_query_value)}"
         st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, use_container_width=True)
 
-    # Variantes : toujours recalculées à partir de la requête actuelle, même si vide
-    variants = generate_boolean_variants(boolean_query_value, synonymes, competences_optionnelles)
+    # Variantes : utilise les valeurs du snapshot si disponible, sinon valeurs actuelles
+    if boolean_query_value and snap:
+        # Utilise les valeurs sauvegardées du snapshot pour les variantes
+        variants = generate_boolean_variants(boolean_query_value, snap.get("synonymes", ""), snap.get("comp_opt", ""))
+    else:
+        # Utilise les valeurs actuelles si pas de requête générée
+        variants = generate_boolean_variants(boolean_query_value, synonymes, competences_optionnelles)
+    
     st.caption("🔀 Variantes proposées")
     if variants:
         for idx, (title, vq) in enumerate(variants):
