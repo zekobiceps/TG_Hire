@@ -388,6 +388,7 @@ with tab1:
                 st.success(f"✅ Requête générée en {total_time:.1f}s")
                 # Debug temporaire
                 st.write(f"DEBUG - Requête stockée: '{st.session_state['boolean_query']}'")
+                st.rerun()  # Force la mise à jour de l'affichage
         else:
             with st.spinner("🤖 Génération Intelligence artificielle en cours..."):
                 start_time = time.time()
@@ -429,6 +430,7 @@ with tab1:
                 }
                 total_time = time.time() - start_time
                 st.success(f"✅ Requête Boolean générée par Intelligence artificielle en {total_time:.1f}s")
+                st.rerun()  # Force la mise à jour de l'affichage
 
     # Affichage unifié de la requête Boolean
     snap = st.session_state.get("boolean_snapshot", {})
@@ -456,9 +458,9 @@ with tab1:
     if params_changed:
         label += " ⚠️ (Requête obsolète - critères modifiés - Régénérez pour mettre à jour)"
     
-    # Widget unifié - toujours la même structure
+    # Widget unifié - SANS KEY pour permettre la mise à jour automatique
     placeholder_text = "Remplissez les critères ci-dessus puis cliquez sur 'Générer la requête Boolean'" if not query_value else ""
-    st.text_area(label, value=query_value, height=120, key="boolean_area", placeholder=placeholder_text)
+    st.text_area(label, value=query_value, height=120, placeholder=placeholder_text)
     
     # Boutons et actions (seulement si requête existe)
     if st.session_state.get("boolean_query"):
