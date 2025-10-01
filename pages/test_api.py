@@ -285,22 +285,53 @@ Seriez-vous ouvert à un échange pour discuter de cette opportunité ?
 Dans l'attente de votre retour,"""
 
 def ask_deepseek(messages, max_tokens=300):
-    """Simule l'appel à l'API DeepSeek"""
+    """Simule l'appel à l'API DeepSeek avec une logique d'enrichissement."""
     time.sleep(1)  # Simulation de délai
     question = messages[0]["content"].lower()
-    # Correction : si le champ Synonymes est présent et non vide dans le prompt, on le récupère
-    import re
-    match = re.search(r"synonymes:\s*(.*)", messages[0]["content"], re.IGNORECASE)
-    if match:
-        syns = match.group(1).strip()
-        if syns:
-            return {"content": syns}
-    if "outils" in question or "logiciels" in question:
+    
+    # 1. Extraction des critères de base
+    def extract_field(field_name, content):
+        match = re.search(f"{field_name}:\s*(.*?)(?:\n|$)", content, re.IGNORECASE)
+        return match.group(1).strip() if match else ""
+    
+    poste = extract_field("poste", messages[0]["content"])
+    synonymes = extract_field("synonymes", messages[0]["content"])
+    comp_ob = extract_field("compétences obligatoires", messages[0]["content"])
+    
+    # 2. Logique pour simuler l'enrichissement par l'IA
+    
+    # Cas 1 : Génération de la requête Boolean (enrichissement des synonymes et des compétences)
+    if "génère une requête boolean" in question:
+        
+        # Simuler l'enrichissement des synonymes
+        if "ingénieur de travaux" in poste.lower() or "ingénieur travaux" in poste.lower():
+            ia_syns = f"{synonymes}, Conducteur de Travaux Principal, Chef de Projet BTP, Responsable Chantier" if synonymes else "Conducteur de Travaux Principal, Chef de Projet BTP, Responsable Chantier"
+            ia_comp_ob = f"{comp_ob}, Suivi d'exécution, Normes DTU, Planning chantier" if comp_ob else "Suivi d'exécution, Normes DTU, Planning chantier"
+        elif "chargé de recrutement" in poste.lower() or "recruteur" in poste.lower():
+            ia_syns = f"{synonymes}, Recruiter Specialist, Talent Acquisition Partner, Chasseur de têtes" if synonymes else "Recruiter Specialist, Talent Acquisition Partner, Chasseur de têtes"
+            ia_comp_ob = f"{comp_ob}, LinkedIn Recruiter, Sourcing, Entretiens de recrutement" if comp_ob else "LinkedIn Recruiter, Sourcing, Entretiens de recrutement"
+        elif "développeur" in poste.lower() or "developer" in poste.lower():
+            ia_syns = f"{synonymes}, Software Engineer, Programmeur, Dev" if synonymes else "Software Engineer, Programmeur, Dev"
+            ia_comp_ob = f"{comp_ob}, Git, Debugging, Code Review" if comp_ob else "Git, Debugging, Code Review"
+        elif "comptable" in poste.lower() or "finance" in poste.lower():
+            ia_syns = f"{synonymes}, Expert Comptable, Contrôleur de Gestion, Analyste Financier" if synonymes else "Expert Comptable, Contrôleur de Gestion, Analyste Financier"
+            ia_comp_ob = f"{comp_ob}, SAGE, Normes IFRS, Fiscalité" if comp_ob else "SAGE, Normes IFRS, Fiscalité"
+        else:
+            ia_syns = f"{synonymes}, Expert, Lead, Senior" if synonymes else "Expert, Lead, Senior"
+            ia_comp_ob = comp_ob or "Management, Leadership, Expertise métier"
+        
+        return {"content": ia_syns, "comp_ob_ia": ia_comp_ob}
+    
+    # Cas 2 : Outils/Logiciels
+    elif "outils" in question or "logiciels" in question:
         return {"content": "• AutoCAD\n• Revit\n• Primavera P6\n• MS Project\n• Robot Structural Analysis\n• SketchUp"}
+        
+    # Cas 3 : Compétences
     elif "compétences" in question:
         return {"content": "• Gestion de projet\n• Lecture de plans techniques\n• Management d'équipe\n• Budget et planning\n• Conformité réglementaire\n• Négociation fournisseurs"}
-    else:
-        return {"content": ""}
+        
+    # Cas par défaut : Retourne un contenu vide
+    return {"content": ""}
 
 def get_email_from_charika(entreprise):
     """Simule la détection de format d'email depuis Charika"""
@@ -341,9 +372,6 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
 # -------------------- Tab 1: Boolean Search --------------------
 with tab1:
     st.header("🔍 Recherche Boolean")
-    
-    # DEBUG VISIBLE
-    st.error("🔴 DEBUG ACTIF - VERSION AVEC DEBUG")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -386,8 +414,6 @@ with tab1:
                 }
                 total_time = time.time() - start_time
                 st.success(f"✅ Requête générée en {total_time:.1f}s")
-                # Debug temporaire
-                st.write(f"DEBUG - Requête stockée: '{st.session_state['boolean_query']}'")
                 st.rerun()  # Force la mise à jour de l'affichage
         else:
             with st.spinner("🤖 Génération Intelligence artificielle en cours..."):
@@ -395,22 +421,15 @@ with tab1:
                 prompt = f"Génère une requête Boolean pour le sourcing avec les critères suivants:\nPoste: {poste}\nSynonymes: {synonymes}\nCompétences obligatoires: {competences_obligatoires}\nCompétences optionnelles: {competences_optionnelles}\nExclusions: {exclusions}\nLocalisation: {localisation}\nSecteur: {secteur}\nEmployeur: {employeur}"
                 ia_result = ask_deepseek([{"role": "user", "content": prompt}], max_tokens=200)
                 
-                # Amélioration : toujours générer une requête même si l'IA ne répond pas
-                if ia_result["content"].strip():
-                    # L'IA a donné une réponse, on l'utilise comme synonymes
-                    synonymes_ia = ia_result["content"].strip()
-                    st.session_state["boolean_query"] = generate_boolean_query(
-                        poste, synonymes_ia, competences_obligatoires,
-                        competences_optionnelles, exclusions, localisation, secteur, employeur
-                    )
-                    used_synonymes = synonymes_ia
-                else:
-                    # L'IA n'a pas répondu, on utilise les synonymes saisis
-                    st.session_state["boolean_query"] = generate_boolean_query(
-                        poste, synonymes, competences_obligatoires,
-                        competences_optionnelles, exclusions, localisation, secteur, employeur
-                    )
-                    used_synonymes = synonymes
+                # Récupère les synonymes enrichis, sinon ceux de l'utilisateur
+                synonymes_ia = ia_result.get("content", synonymes) if ia_result.get("content", "").strip() else synonymes
+                # Récupère les compétences obligatoires enrichies
+                comp_ob_ia = ia_result.get("comp_ob_ia", competences_obligatoires)
+                
+                st.session_state["boolean_query"] = generate_boolean_query(
+                    poste, synonymes_ia, comp_ob_ia,  # Utilisation de comp_ob_ia
+                    competences_optionnelles, exclusions, localisation, secteur, employeur
+                )
                 
                 # Ajouter l'employeur si spécifié
                 if employeur:
@@ -419,8 +438,8 @@ with tab1:
                 # Sauvegarder le snapshot avec les vraies valeurs utilisées
                 st.session_state["boolean_snapshot"] = {
                     "poste": poste,
-                    "synonymes": used_synonymes,
-                    "comp_ob": competences_obligatoires,
+                    "synonymes": synonymes_ia,  # Sauvegarde l'IA enrichie
+                    "comp_ob": comp_ob_ia,     # Sauvegarde l'IA enrichie
                     "comp_opt": competences_optionnelles,
                     "exclusions": exclusions,
                     "localisation": localisation,
@@ -435,10 +454,6 @@ with tab1:
     # Affichage unifié de la requête Boolean
     snap = st.session_state.get("boolean_snapshot", {})
     query_value = st.session_state.get("boolean_query", "")
-    
-    # Debug temporaire
-    st.write(f"DEBUG - Valeur à afficher: '{query_value}'")
-    st.write(f"DEBUG - Session state keys: {list(st.session_state.keys())}")
     
     # Vérifier si les paramètres ont changé pour l'indication visuelle
     params_changed = False
@@ -466,8 +481,8 @@ with tab1:
     if st.session_state.get("boolean_query"):
         # Zone commentaire
         boolean_commentaire = st.text_input("Commentaire (optionnel)", value=st.session_state.get("boolean_commentaire", ""), key="boolean_commentaire")
-        # Boutons sur la même ligne à droite
-        cols_actions = st.columns([0.5,0.25,0.25])
+        # Boutons organisés : Copier, Sauvegarder, LinkedIn
+        cols_actions = st.columns([0.2,0.4,0.4])
         with cols_actions[0]:
             st.markdown(f"<button data-copy=\"{st.session_state['boolean_query'].replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
         with cols_actions[1]:
@@ -494,18 +509,13 @@ with tab1:
         # Générer les variantes avec les valeurs ACTUELLES des champs
         variants = generate_boolean_variants(st.session_state["boolean_query"], synonymes, competences_optionnelles)
         
-        # Debug temporaire pour les variantes
-        st.write(f"DEBUG VARIANTES - Synonymes actuels: '{synonymes}'")
-        st.write(f"DEBUG VARIANTES - Compétences opt actuelles: '{competences_optionnelles}'")
-        st.write(f"DEBUG VARIANTES - Nombre de variantes: {len(variants)}")
-        
         st.caption("🔀 Variantes proposées")
         if variants:
             for idx, (title, vq) in enumerate(variants):
                 # Supprimer la key pour permettre la mise à jour automatique
                 st.text_area(f"{title}", value=vq, height=80)
                 st.text_input(f"Commentaire variante {idx+1}", value=st.session_state.get(f"boolean_commentaire_var_{idx}", ""), key=f"boolean_commentaire_var_{idx}")
-                cols_var = st.columns([0.5,0.25,0.25])
+                cols_var = st.columns([0.2,0.4,0.4])
                 with cols_var[0]:
                     st.markdown(f"<button data-copy=\"{vq.replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
                 with cols_var[1]:
