@@ -418,9 +418,14 @@ with tab1:
             snap.get("employeur") != (employeur or "")
         ]) if snap else False
         
-        # Affichage avec indication si les paramètres ont changé
-        label_text = "Requête Boolean:" + (" 🔄 (obsolète - paramètres modifiés)" if current_changed else "")
-        st.text_area(label_text, value=st.session_state["boolean_query"], height=120, key="boolean_area")
+        # Si les paramètres ont changé, effacer la requête obsolète
+        if current_changed:
+            st.session_state["boolean_query"] = ""
+            st.session_state["boolean_snapshot"] = {}
+            st.rerun()
+        else:
+            # Affichage normal si pas de changements
+            st.text_area("Requête Boolean:", value=st.session_state["boolean_query"], height=120, key="boolean_area")
         # Zone commentaire
         boolean_commentaire = st.text_input("Commentaire (optionnel)", value=st.session_state.get("boolean_commentaire", ""), key="boolean_commentaire")
         # Boutons sur la même ligne à droite
@@ -442,40 +447,40 @@ with tab1:
                 save_library_entries()
                 save_sourcing_entry_to_gsheet(entry)
                 st.success("✅ Sauvegardé")
-        with cols_actions[2]:
-            url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
-            st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, use_container_width=True)
+            with cols_actions[2]:
+                url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
+                st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, use_container_width=True)
 
-        # Variantes : génération basée sur la requête principale
-        variants = generate_boolean_variants(st.session_state["boolean_query"], synonymes, competences_optionnelles)
-        st.caption("🔀 Variantes proposées")
-        if variants:
-            for idx, (title, vq) in enumerate(variants):
-                st.text_area(f"{title}", value=vq, height=80, key=f"bool_var_{idx}")
-                st.text_input(f"Commentaire variante {idx+1}", value=st.session_state.get(f"boolean_commentaire_var_{idx}", ""), key=f"boolean_commentaire_var_{idx}")
-                cols_var = st.columns([0.5,0.25,0.25])
-                with cols_var[0]:
-                    st.markdown(f"<button data-copy=\"{vq.replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
-                with cols_var[1]:
-                    if st.button(f"💾 Sauvegarder {idx+1}", key=f"bool_save_{idx}", use_container_width=True):
-                        entry = {
-                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "type": "Boolean",
-                            "poste": poste,
-                            "requete": vq,
-                            "utilisateur": st.session_state.get("user", ""),
-                            "source": f"Boolean Variante {idx+1}",
-                            "commentaire": st.session_state.get(f"boolean_commentaire_var_{idx}", "")
-                        }
-                        st.session_state.library_entries.append(entry)
-                        save_library_entries()
-                        save_sourcing_entry_to_gsheet(entry)
-                        st.success(f"✅ Variante {idx+1} sauvegardée")
-                with cols_var[2]:
-                    url_var = f"https://www.linkedin.com/search/results/people/?keywords={quote(vq)}"
-                    st.link_button(f"🌐 LinkedIn {idx+1}", url_var, use_container_width=True)
-        else:
-            st.info("Aucune variante générée pour la requête actuelle.")
+            # Variantes : génération basée sur la requête principale
+            variants = generate_boolean_variants(st.session_state["boolean_query"], synonymes, competences_optionnelles)
+            st.caption("🔀 Variantes proposées")
+            if variants:
+                for idx, (title, vq) in enumerate(variants):
+                    st.text_area(f"{title}", value=vq, height=80, key=f"bool_var_{idx}")
+                    st.text_input(f"Commentaire variante {idx+1}", value=st.session_state.get(f"boolean_commentaire_var_{idx}", ""), key=f"boolean_commentaire_var_{idx}")
+                    cols_var = st.columns([0.5,0.25,0.25])
+                    with cols_var[0]:
+                        st.markdown(f"<button data-copy=\"{vq.replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
+                    with cols_var[1]:
+                        if st.button(f"💾 Sauvegarder {idx+1}", key=f"bool_save_{idx}", use_container_width=True):
+                            entry = {
+                                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                                "type": "Boolean",
+                                "poste": poste,
+                                "requete": vq,
+                                "utilisateur": st.session_state.get("user", ""),
+                                "source": f"Boolean Variante {idx+1}",
+                                "commentaire": st.session_state.get(f"boolean_commentaire_var_{idx}", "")
+                            }
+                            st.session_state.library_entries.append(entry)
+                            save_library_entries()
+                            save_sourcing_entry_to_gsheet(entry)
+                            st.success(f"✅ Variante {idx+1} sauvegardée")
+                    with cols_var[2]:
+                        url_var = f"https://www.linkedin.com/search/results/people/?keywords={quote(vq)}"
+                        st.link_button(f"🌐 LinkedIn {idx+1}", url_var, use_container_width=True)
+            else:
+                st.info("Aucune variante générée pour la requête actuelle.")
 
 # -------------------- Tab 2: X-Ray --------------------
 with tab2:
