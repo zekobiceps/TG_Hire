@@ -21,13 +21,22 @@ spec.loader.exec_module(utils)
 # -------------------- Init session --------------------
 utils.init_session_state()
 
-# Initialiser les variables manquantes
-defaults = {
-    "annonces": [],
-}
-for k, v in defaults.items():
-    if k not in st.session_state:
-        st.session_state[k] = v
+if "annonces" not in st.session_state or not st.session_state.annonces:
+    try:
+        records = utils.load_annonces_from_gsheet()
+        st.session_state.annonces = []
+        for r in records:
+            st.session_state.annonces.append({
+                "date": r.get("timestamp", ""),
+                "poste": r.get("poste", ""),
+                "entreprise": r.get("entreprise", ""),
+                "localisation": r.get("localisation", ""),
+                "contenu": r.get("contenu", ""),
+                "plateforme": r.get("plateforme", r.get("format_type", ""))
+            })
+    except Exception as e:
+        st.session_state.annonces = []
+        st.warning(f"Erreur lors du chargement initial des annonces : {e}")
 
 # -------------------- Page config --------------------
 st.set_page_config(
@@ -429,10 +438,17 @@ with col_save2:
 
 st.divider()
 
+
+# -------------------- Sidebar Statistiques --------------------
+with st.sidebar:
+    st.title("� Statistiques Annonces")
+    nb_annonces = len(st.session_state.annonces)
+    st.metric("📢 Annonces sauvegardées", nb_annonces)
+    st.divider()
+
 # -------------------- Liste des annonces --------------------
 st.subheader("📋 Annonces sauvegardées")
-nb_annonces = len(st.session_state.annonces)
-st.markdown(f"<span style='font-size:18px;color:#444;'>Il y a <b>{nb_annonces}</b> annonce(s) sauvegardée(s).</span>", unsafe_allow_html=True)
+
 
 # Barre de recherche
 search_term = st.text_input("🔎 Rechercher une annonce par poste, entreprise ou affectation", key="search_annonce")
