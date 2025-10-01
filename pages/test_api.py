@@ -1410,12 +1410,14 @@ with tab6:
         return ""
 
     def generate_inmail(donnees_profil, poste, entreprise, ton, max_words, cta_type, genre):
+        accroche_prompt = f"""
         Tu es un recruteur marocain qui écrit des accroches pour InMail.
         Génère une accroche persuasive adaptée au ton "{ton}".
         Infos candidat: {donnees_profil}.
         Poste à pourvoir: {poste}, Entreprise: {entreprise}.
         L'accroche doit être concise, unique et engageante.
         """
+
         accroche_result = ask_deepseek([{"role": "user", "content": accroche_prompt}], max_tokens=80)
         accroche = accroche_result["content"].strip()
 
