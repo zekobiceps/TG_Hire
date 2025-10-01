@@ -533,8 +533,11 @@ def extract_text_from_pdf(uploaded_file):
 
         # 4) Fallback OCR si installé (pdf2image + pytesseract)
         try:
-            from pdf2image import convert_from_bytes
-            import pytesseract
+            # Importer dynamiquement pour éviter que Pylance signale une erreur
+            import importlib
+            convert_mod = importlib.import_module('pdf2image')
+            pytesseract = importlib.import_module('pytesseract')
+            convert_from_bytes = getattr(convert_mod, 'convert_from_bytes')
             bio.seek(0)
             images = convert_from_bytes(bio.read(), dpi=200)
             ocr_text_parts = []

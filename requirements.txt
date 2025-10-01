@@ -1,10 +1,10 @@
-# --- Interface et Visualisation ---
+# Core dependencies for TG_Hire
 streamlit
 plotly
 altair
 pydeck
 
-# --- Manipulation de Données & Fichiers ---
+# Data & files
 pandas
 numpy
 python-docx
@@ -15,12 +15,12 @@ PyMuPDF
 json5
 lxml
 
-# --- Intelligence Artificielle & Machine Learning ---
+# ML / Embeddings
 scikit-learn
 sentence-transformers
 torch
 
-# --- APIs & Connecteurs ---
+# APIs & Connectors
 requests
 beautifulsoup4
 GitPython
@@ -31,7 +31,11 @@ google-auth-httplib2
 google-auth-oauthlib
 groq
 google-generativeai
-openai  # Added to support DeepSeek API
+openai
 
-# --- PDF Generation ---
-reportlab  # Added to support PDF export
+# PDF Generation
+reportlab
+
+# Optional OCR (install to enable OCR fallback)
+pdf2image
+pytesseract
