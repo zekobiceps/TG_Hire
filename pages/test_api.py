@@ -414,7 +414,10 @@ with tab1:
             snap.get("secteur") != secteur,
             snap.get("employeur") != (employeur or "")
         ]) if snap else False
-    label_boolean = "Requête Boolean:" + (" 🔄 (obsolète - paramètres modifiés)" if current_changed else "")
+        label_boolean = "Requête Boolean:" + (" 🔄 (obsolète - paramètres modifiés)" if current_changed else "")
+    else:
+        current_changed = False
+        label_boolean = "Requête Boolean:"
     # Correction : affichage toujours synchronisé avec la variable session_state
     st.text_area(label_boolean, value=st.session_state.get("boolean_query", ""), height=120, key="boolean_area")
         # Zone commentaire
