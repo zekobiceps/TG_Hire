@@ -1,9 +1,7 @@
 import streamlit as st
 from utils import save_sourcing_entry_to_gsheet, load_sourcing_entries_from_gsheet
 
-# Vérification de la connexion
-if not st.session_state.get("logged_in", False):
-    st.stop()
+
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
@@ -468,41 +466,96 @@ def extract_text_from_pdf(uploaded_file):
     try:
         if not PDF_AVAILABLE:
             return "Extraction PDF non disponible - Librairies PyPDF2 ou pdfplumber manquantes"
-        
-        # Réinitialiser le pointeur du fichier
-        uploaded_file.seek(0)
-        
-        # Essayer avec pdfplumber d'abord (meilleur pour la mise en forme)
+
+        # Lire les octets et travailler sur un BytesIO (plus fiable avec les librairies)
+        try:
+            import io
+            uploaded_file.seek(0)
+            data = uploaded_file.read()
+            bio = io.BytesIO(data)
+        except Exception:
+            # Si on ne peut pas lire le buffer, tenter d'utiliser le fichier tel quel
+            bio = uploaded_file
+
+        # 1) pdfplumber
         try:
             import pdfplumber
-            with pdfplumber.open(uploaded_file) as pdf:
-                text = ""
+            bio.seek(0)
+            with pdfplumber.open(bio) as pdf:
+                text_parts = []
                 for page in pdf.pages:
                     page_text = page.extract_text()
                     if page_text:
-                        text += page_text + "\n"
-                if text.strip():
-                    return text.strip()
+                        text_parts.append(page_text)
+                text = "\n".join(text_parts).strip()
+                if text:
+                    return text
         except Exception as e:
             print(f"Erreur pdfplumber: {e}")
-        
-        # Fallback sur PyPDF2
+
+        # 2) PyPDF2
         try:
             import PyPDF2
-            uploaded_file.seek(0)  # Remettre le pointeur au début
-            pdf_reader = PyPDF2.PdfReader(uploaded_file)
-            text = ""
-            for page in pdf_reader.pages:
-                page_text = page.extract_text()
+            bio.seek(0)
+            reader = PyPDF2.PdfReader(bio)
+            text_parts = []
+            for page in reader.pages:
+                try:
+                    page_text = page.extract_text()
+                except Exception:
+                    page_text = None
                 if page_text:
-                    text += page_text + "\n"
-            if text.strip():
-                return text.strip()
+                    text_parts.append(page_text)
+            text = "\n".join(text_parts).strip()
+            if text:
+                return text
         except Exception as e:
             print(f"Erreur PyPDF2: {e}")
-        
-        return "Erreur lors de l'extraction du texte du PDF - Vérifiez que le fichier n'est pas protégé par mot de passe"
-            
+
+        # 3) pypdf / pypdf.PdfReader (au cas où)
+        try:
+            from pypdf import PdfReader as PypdfReader
+            bio.seek(0)
+            reader = PypdfReader(bio)
+            text_parts = []
+            for page in reader.pages:
+                try:
+                    page_text = page.extract_text()
+                except Exception:
+                    page_text = None
+                if page_text:
+                    text_parts.append(page_text)
+            text = "\n".join(text_parts).strip()
+            if text:
+                return text
+        except Exception as e:
+            print(f"Erreur pypdf: {e}")
+
+        # 4) Fallback OCR si installé (pdf2image + pytesseract)
+        try:
+            from pdf2image import convert_from_bytes
+            import pytesseract
+            bio.seek(0)
+            images = convert_from_bytes(bio.read(), dpi=200)
+            ocr_text_parts = []
+            for img in images:
+                try:
+                    # petite réduction si très grande
+                    ocr_text = pytesseract.image_to_string(img, lang='fra+eng')
+                    if ocr_text:
+                        ocr_text_parts.append(ocr_text)
+                except Exception:
+                    continue
+            ocr_text = "\n".join(ocr_text_parts).strip()
+            if ocr_text:
+                return ocr_text
+        except Exception as e:
+            # Si pdf2image/pytesseract non installés ou erreur OCR, ignorer
+            print(f"OCR fallback unavailable or failed: {e}")
+
+        # Si on arrive ici, aucune librairie n'a extrait du texte
+        return "Aucun texte lisible trouvé. Le PDF est peut-être un scan (images) ou protégé par mot de passe."
+
     except Exception as e:
         return f"Erreur lors de l'extraction PDF: {str(e)}"
 
@@ -585,7 +638,7 @@ with tab1:
                             # Extraction réelle du PDF
                             extracted_text = extract_text_from_pdf(uploaded_file)
                             
-                            if extracted_text and "Erreur" not in extracted_text:
+                            if extracted_text and "Erreur" not in extracted_text and not extracted_text.strip().startswith("Aucun texte lisible trouvé"):
                                 fiche_content = extracted_text
                                 st.success("✅ Texte extrait avec succès!")
                                 
@@ -597,7 +650,11 @@ with tab1:
                                     help="Vous pouvez modifier le texte extrait si nécessaire"
                                 )
                             else:
-                                st.error(f"❌ {extracted_text}")
+                                # Afficher un message plus clair selon la raison
+                                if extracted_text and extracted_text.strip().startswith("Aucun texte lisible trouvé"):
+                                    st.error("❌ Aucun texte lisible trouvé dans le PDF. Il s'agit probablement d'un PDF scanné (images) ou protégé.\n💡 Collez manuellement le contenu dans l'onglet 'Coller le texte' ou utilisez un OCR externe.")
+                                else:
+                                    st.error(f"❌ {extracted_text}")
                                 # Fallback: permettre à l'utilisateur de coller le texte manuellement
                                 st.warning("💡 Collez manuellement le contenu dans l'onglet 'Coller le texte'")
                                 
@@ -742,7 +799,8 @@ with tab1:
         # Boutons organisés : Copier, Sauvegarder, LinkedIn
         cols_actions = st.columns([0.2,0.4,0.4])
         with cols_actions[0]:
-            st.markdown(f"<button data-copy=\"{st.session_state['boolean_query'].replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
+            safe_boolean = st.session_state.get('boolean_query', '').replace('"', '&quot;')
+            st.markdown(f'<button data-copy="{safe_boolean}">📋 Copier</button>', unsafe_allow_html=True)
         with cols_actions[1]:
             if st.button("💾 Sauvegarder", key="boolean_save", use_container_width=True):
                 entry = {
@@ -775,7 +833,8 @@ with tab1:
                 st.text_input(f"Commentaire variante {idx+1}", value=st.session_state.get(f"boolean_commentaire_var_{idx}", ""), key=f"boolean_commentaire_var_{idx}")
                 cols_var = st.columns([0.2,0.4,0.4])
                 with cols_var[0]:
-                    st.markdown(f"<button data-copy=\"{vq.replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
+                    safe_vq = vq.replace('"', '&quot;')
+                    st.markdown(f'<button data-copy="{safe_vq}">📋 Copier</button>', unsafe_allow_html=True)
                 with cols_var[1]:
                     if st.button(f"💾 Sauvegarder {idx+1}", key=f"bool_save_{idx}", use_container_width=True):
                         entry = {
@@ -858,27 +917,29 @@ with tab2:
         ]) if snapx else False
         label_x = "Requête X-Ray:" + (" 🔄 (obsolète - paramètres modifiés)" if changed_x else "")
         st.text_area(label_x, value=st.session_state["xray_query"], height=120, key="xray_area")
-        st.markdown(f"<button style='margin-top:4px' data-copy=\"{st.session_state['xray_query'].replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
-        # Variantes
-        x_vars = generate_xray_variants(st.session_state["xray_query"], poste_xray, mots_cles, localisation_xray)
-        if x_vars:
-            st.caption("🔀 Variantes proposées")
-            for i,(title, qv) in enumerate(x_vars):
-                st.text_area(title, value=qv, height=80, key=f"xray_var_{i}")
-                st.markdown(f"<button data-copy=\"{qv.replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
-        url = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
-        col1, col2, col3 = st.columns([1, 2, 2])
-        with col1:
-            if st.button("💾 Sauvegarder", key="xray_save", width="stretch"):
-                entry = {
-                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"), 
-                    "type": "X-Ray",
-                    "poste": poste_xray, 
-                    "requete": st.session_state["xray_query"]
-                }
-                st.session_state.library_entries.append(entry)
-                save_library_entries()
-                st.success("✅ Sauvegardé")
+    safe_xray = st.session_state.get('xray_query', '').replace('"', '&quot;')
+    st.markdown(f'<button style="margin-top:4px" data-copy="{safe_xray}">📋 Copier</button>', unsafe_allow_html=True)
+    # Variantes
+    x_vars = generate_xray_variants(st.session_state["xray_query"], poste_xray, mots_cles, localisation_xray)
+    if x_vars:
+        st.caption("🔀 Variantes proposées")
+        for i, (title, qv) in enumerate(x_vars):
+            st.text_area(title, value=qv, height=80, key=f"xray_var_{i}")
+            safe_qv = qv.replace('"', '&quot;')
+            st.markdown(f'<button data-copy="{safe_qv}">📋 Copier</button>', unsafe_allow_html=True)
+    url = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
+    col1, col2, col3 = st.columns([1, 2, 2])
+    with col1:
+        if st.button("💾 Sauvegarder", key="xray_save", width="stretch"):
+            entry = {
+                "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "type": "X-Ray",
+                "poste": poste_xray,
+                "requete": st.session_state["xray_query"],
+            }
+            st.session_state.library_entries.append(entry)
+            save_library_entries()
+            st.success("✅ Sauvegardé")
         with col2:
             st.link_button("🌐 Ouvrir sur Google", url, width="stretch")
         with col3:
@@ -909,22 +970,23 @@ with tab3:
 
     if st.session_state.get("cse_query"):
         st.text_area("Requête CSE:", value=st.session_state["cse_query"], height=100, key="cse_area")
-        st.markdown(f"<button style='margin-top:4px' data-copy=\"{st.session_state['cse_query'].replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            if st.button("💾 Sauvegarder", key="cse_save", width="stretch"):
-                entry = {
-                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"), 
-                    "type": "CSE", 
-                    "poste": poste_cse, 
-                    "requete": st.session_state["cse_query"]
-                }
-                st.session_state.library_entries.append(entry)
-                save_library_entries()
-                st.success("✅ Sauvegardé")
-        with col2:
-            cse_url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
-            st.link_button("🌐 Ouvrir sur CSE", cse_url, width="stretch")
+    safe_cse = st.session_state.get('cse_query', '').replace('"', '&quot;')
+    st.markdown(f'<button style="margin-top:4px" data-copy="{safe_cse}">📋 Copier</button>', unsafe_allow_html=True)
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        if st.button("💾 Sauvegarder", key="cse_save", width="stretch"):
+            entry = {
+                "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "type": "CSE",
+                "poste": poste_cse,
+                "requete": st.session_state["cse_query"],
+            }
+            st.session_state.library_entries.append(entry)
+            save_library_entries()
+            st.success("✅ Sauvegardé")
+    with col2:
+        cse_url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
+        st.link_button("🌐 Ouvrir sur CSE", cse_url, width="stretch")
 
 # -------------------- Tab 4: Dogpile --------------------
 with tab4:
@@ -936,22 +998,23 @@ with tab4:
             st.success("✅ Requête enregistrée")
     if st.session_state.get("dogpile_query"):
         st.text_area("Requête Dogpile:", value=st.session_state["dogpile_query"], height=80, key="dogpile_area")
-        st.markdown(f"<button style='margin-top:4px' data-copy=\"{st.session_state['dogpile_query'].replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            if st.button("💾 Sauvegarder", key="dogpile_save_btn", width="stretch"):
-                entry = {
-                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"), 
-                    "type": "Dogpile", 
-                    "poste": "Recherche Dogpile", 
-                    "requete": st.session_state["dogpile_query"]
-                }
-                st.session_state.library_entries.append(entry)
-                save_library_entries()
-                st.success("✅ Sauvegardé")
-        with col2:
-            dogpile_url = f"http://www.dogpile.com/serp?q={quote(st.session_state['dogpile_query'])}"
-            st.link_button("🌐 Ouvrir sur Dogpile", dogpile_url, width="stretch")
+    safe_dogpile = st.session_state.get('dogpile_query', '').replace('"', '&quot;')
+    st.markdown(f'<button style="margin-top:4px" data-copy="{safe_dogpile}">📋 Copier</button>', unsafe_allow_html=True)
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        if st.button("💾 Sauvegarder", key="dogpile_save_btn", width="stretch"):
+            entry = {
+                "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "type": "Dogpile",
+                "poste": "Recherche Dogpile",
+                "requete": st.session_state["dogpile_query"],
+            }
+            st.session_state.library_entries.append(entry)
+            save_library_entries()
+            st.success("✅ Sauvegardé")
+    with col2:
+        dogpile_url = f"http://www.dogpile.com/serp?q={quote(st.session_state['dogpile_query'])}"
+        st.link_button("🌐 Ouvrir sur Dogpile", dogpile_url, width="stretch")
 
 # -------------------- Tab 5: Web Scraper - Analyse Concurrentielle --------------------
 # -------------------- Tab 5: Web Scraper - Analyse Concurrentielle --------------------

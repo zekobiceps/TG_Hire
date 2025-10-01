@@ -136,9 +136,72 @@ def get_api_key():
 
 def extract_text_from_pdf(file):
     try:
-        pdf = PdfReader(file)
-        text = "".join(page.extract_text() for page in pdf.pages if page.extract_text())
-        return text.strip() if text else "Aucun texte lisible trouvé."
+        # Utiliser un buffer mémoire pour plus de compatibilité
+        import io
+        try:
+            file.seek(0)
+            data = file.read()
+            bio = io.BytesIO(data)
+        except Exception:
+            bio = file
+
+        # 1) pdfplumber (meilleur pour extraction de texte mise en page)
+        try:
+            import pdfplumber
+            bio.seek(0)
+            with pdfplumber.open(bio) as pdf:
+                parts = []
+                for page in pdf.pages:
+                    pt = page.extract_text()
+                    if pt:
+                        parts.append(pt)
+                text = "\n".join(parts).strip()
+                if text:
+                    return text
+        except Exception as e:
+            # Ignorer et essayer d'autres méthodes
+            print(f"pdfplumber error: {e}")
+
+        # 2) PyPDF2
+        try:
+            import PyPDF2
+            bio.seek(0)
+            reader = PyPDF2.PdfReader(bio)
+            parts = []
+            for page in reader.pages:
+                try:
+                    pt = page.extract_text()
+                except Exception:
+                    pt = None
+                if pt:
+                    parts.append(pt)
+            text = "\n".join(parts).strip()
+            if text:
+                return text
+        except Exception as e:
+            print(f"PyPDF2 error: {e}")
+
+        # 3) pypdf
+        try:
+            from pypdf import PdfReader as PypdfReader
+            bio.seek(0)
+            reader = PypdfReader(bio)
+            parts = []
+            for page in reader.pages:
+                try:
+                    pt = page.extract_text()
+                except Exception:
+                    pt = None
+                if pt:
+                    parts.append(pt)
+            text = "\n".join(parts).strip()
+            if text:
+                return text
+        except Exception as e:
+            print(f"pypdf error: {e}")
+
+        # Aucun texte extrait -> PDF probablement scanné (images) ou protégé
+        return "Aucun texte lisible trouvé. Le PDF est peut-être un scan (images) ou protégé par mot de passe."
     except Exception as e:
         return f"Erreur d'extraction du texte: {str(e)}"
 
@@ -915,8 +978,12 @@ with tab2:
             with st.expander(f"Résultat pour : **{uploaded_file.name}**", expanded=True):
                 with st.spinner("Analyse en cours..."):
                     text = extract_text_from_pdf(uploaded_file)
-                    if "Erreur" in text:
-                        st.error(f"❌ {text}")
+                    if "Erreur" in text or (text and text.strip().startswith("Aucun texte lisible trouvé")):
+                        # Message clair pour les PDFs scannés ou protégés
+                        if text and text.strip().startswith("Aucun texte lisible trouvé"):
+                            st.error("❌ Aucun texte lisible trouvé dans le PDF. Il s'agit probablement d'un PDF scanné (images) ou protégé.\n💡 Collez manuellement le contenu ou utilisez un OCR externe (ex: tesseract) pour convertir le PDF en texte.")
+                        else:
+                            st.error(f"❌ {text}")
                     else:
                         if analysis_type_single == "Analyse par Regex (Extraction d'entités)":
                             entities = regex_analysis(text)
