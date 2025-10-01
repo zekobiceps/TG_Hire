@@ -487,7 +487,7 @@ else:
 
 # -------------------- Nouvelle section : Création d'annonce --------------------
 st.divider()
-st.title("✏️ Créer une nouvelle annonce")
+
 
 # Choix de la plateforme
 plateforme = st.selectbox("Plateforme cible", ["JOBZYN", "TGCC", "LinkedIn"], key="annonce_plateforme_2")
@@ -598,10 +598,7 @@ entreprise = "TGCC"
 # Bouton pour générer via IA
 col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
 with col_btn2:
-    st.markdown('<style>.red-vif-btn button {background-color:#ff0000!important;color:#fff!important;border:1px solid #ff0000!important;font-weight:bold!important;}</style>', unsafe_allow_html=True)
-    st.markdown('<div class="red-vif-btn">', unsafe_allow_html=True)
-    generate_button = st.button("💡 Générer l'annonce via IA", key="btn_generer_annonce_2")
-    st.markdown('</div>', unsafe_allow_html=True)
+    generate_button = st.button("💡 Générer l'annonce via IA", type="primary", width="stretch", key="btn_generer_annonce")
 
 # Génération IA avec spinner
 if generate_button:
