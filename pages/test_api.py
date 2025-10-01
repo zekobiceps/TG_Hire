@@ -464,17 +464,14 @@ with tab1:
         with tab_text:
             fiche_poste = st.text_area(
                 "Collez ici la fiche de poste complète:",
-                height=120,
+                height=180,
                 key="boolean_fiche_poste",
-                placeholder="Mission: ...\nProfil recherché: ...\nCompétences requises: ...\nExpérience: ..."
+                placeholder="Mission: ...\nProfil recherché: ...\nCompétences requises: ...\nExpérience: ...\nFormation: ...\nAvantages: ..."
             )
             if fiche_poste:
                 fiche_content = fiche_poste
         
         with tab_pdf:
-            if not PDF_AVAILABLE:
-                st.warning("⚠️ Extraction PDF limitée - Installez PyPDF2 ou pdfplumber pour une meilleure extraction")
-            
             uploaded_file = st.file_uploader(
                 "Choisissez votre fichier PDF:",
                 type=['pdf'],
@@ -501,8 +498,8 @@ with tab1:
                                 # Aperçu du contenu avec possibilité d'édition
                                 fiche_content = st.text_area(
                                     "Aperçu et édition du contenu extrait:",
-                                    value=extracted_text[:2000] + ("..." if len(extracted_text) > 2000 else ""),
-                                    height=150,
+                                    value=extracted_text[:3000] + ("..." if len(extracted_text) > 3000 else ""),
+                                    height=200,
                                     help="Vous pouvez modifier le texte extrait si nécessaire"
                                 )
                             else:
