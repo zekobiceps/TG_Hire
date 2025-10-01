@@ -1,3 +1,4 @@
+import streamlit as st
 # -------------------- CONFIGURATION GOOGLE SHEETS pour la Bibliothèque Sourcing --------------------
 SOURCING_SHEET_URL = "https://docs.google.com/spreadsheets/d/1Yw99SS4vU5v0DuD7S1AwaEispJCo-cwioxSsAYnzRkE/edit"
 SOURCING_WORKSHEET_NAME = "Sourcing DB"
