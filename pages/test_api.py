@@ -420,14 +420,16 @@ with tab1:
         current_changed = False
         label_boolean = "Requête Boolean:"
     # Correction : affichage toujours synchronisé avec la variable session_state
+    # Correction : affichage toujours synchronisé avec la variable session_state
     boolean_query_value = st.session_state.get("boolean_query", "")
-    st.text_area(label_boolean, value=boolean_query_value, height=120, key="boolean_area")
+    # On force la mise à jour du champ à chaque génération, même si la requête est vide
+    st.text_area(label_boolean, value=boolean_query_value if boolean_query_value else "(aucune requête générée)", height=120, key="boolean_area")
     # Zone commentaire
     boolean_commentaire = st.text_input("Commentaire (optionnel)", value=st.session_state.get("boolean_commentaire", ""), key="boolean_commentaire")
     # Boutons sur la même ligne à droite
     cols_actions = st.columns([0.5,0.25,0.25])
     with cols_actions[0]:
-        st.markdown(f"<button data-copy=\"{boolean_query_value.replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
+        st.markdown(f"<button data-copy=\"{(boolean_query_value if boolean_query_value else '').replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
     with cols_actions[1]:
         if st.button("💾 Sauvegarder", key="boolean_save", use_container_width=True):
             entry = {
@@ -447,10 +449,10 @@ with tab1:
         url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(boolean_query_value)}"
         st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, use_container_width=True)
 
-    # Variantes : toujours recalculées à partir de la requête actuelle
+    # Variantes : toujours recalculées à partir de la requête actuelle, même si vide
     variants = generate_boolean_variants(boolean_query_value, synonymes, competences_optionnelles)
+    st.caption("🔀 Variantes proposées")
     if variants:
-        st.caption("🔀 Variantes proposées")
         for idx, (title, vq) in enumerate(variants):
             st.text_area(f"{title}", value=vq, height=80, key=f"bool_var_{idx}")
             st.text_input(f"Commentaire variante {idx+1}", value=st.session_state.get(f"boolean_commentaire_var_{idx}", ""), key=f"boolean_commentaire_var_{idx}")
@@ -475,6 +477,8 @@ with tab1:
             with cols_var[2]:
                 url_var = f"https://www.linkedin.com/search/results/people/?keywords={quote(vq)}"
                 st.link_button(f"🌐 LinkedIn {idx+1}", url_var, use_container_width=True)
+    else:
+        st.info("Aucune variante générée pour la requête actuelle.")
 
 # -------------------- Tab 2: X-Ray --------------------
 with tab2:
