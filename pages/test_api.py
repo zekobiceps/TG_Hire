@@ -322,6 +322,9 @@ def ask_deepseek(messages, max_tokens=300):
             ia_syns = f"{synonymes}, Conducteur de travaux, Chef de chantier" if synonymes else "Conducteur de travaux, Chef de chantier"
             # Compétences très légères ou vides si rien n'est saisi
             ia_comp_ob = comp_ob if comp_ob else ""  # Ne pas ajouter de compétences obligatoires si vide
+        elif "ged" in poste.lower() or "gestion électronique" in poste.lower() or "archivage" in poste.lower():
+            ia_syns = f"{synonymes}, Gestionnaire documentaire, Archiviste, Document manager" if synonymes else "Gestionnaire documentaire, Archiviste, Document manager"
+            ia_comp_ob = comp_ob if comp_ob else ""
         elif "chargé de recrutement" in poste.lower() or "recruteur" in poste.lower():
             ia_syns = f"{synonymes}, Talent acquisition, Sourcing" if synonymes else "Talent acquisition, Sourcing"
             ia_comp_ob = comp_ob if comp_ob else ""
@@ -330,6 +333,10 @@ def ask_deepseek(messages, max_tokens=300):
             ia_comp_ob = comp_ob if comp_ob else ""
         elif "comptable" in poste.lower() or "finance" in poste.lower():
             ia_syns = f"{synonymes}, Expert comptable, Contrôleur gestion" if synonymes else "Expert comptable, Contrôleur gestion"
+            ia_comp_ob = comp_ob if comp_ob else ""
+        elif "responsable" in poste.lower() or "manager" in poste.lower() or "directeur" in poste.lower():
+            # Synonymes pour postes de management/responsabilité
+            ia_syns = f"{synonymes}, Manager, Chef de service, Directeur" if synonymes else "Manager, Chef de service, Directeur"
             ia_comp_ob = comp_ob if comp_ob else ""
         else:
             # Pour les postes non reconnus, ajouter seulement des synonymes génériques
@@ -340,28 +347,88 @@ def ask_deepseek(messages, max_tokens=300):
     
     # Cas 2 : Analyse de fiche de poste
     elif "analyse cette fiche de poste" in question:
-        # Simulation d'extraction d'informations depuis une fiche de poste
-        fiche_content = messages[0]["content"].lower()
+        # Analyse intelligente de la fiche de poste
+        fiche_content = messages[0]["content"]
+        fiche_lower = fiche_content.lower()
         
-        # Détection de patterns dans la fiche
+        # Extraire le titre du poste (première ligne souvent)
+        lines = fiche_content.strip().split('\n')
+        titre_candidat = ""
+        
+        # Chercher le titre dans les premières lignes
+        for line in lines[:5]:  # Regarder les 5 premières lignes
+            line = line.strip()
+            if line and not line.startswith('opportunité') and not line.startswith('rejoignez') and not line.startswith('tgcc recrute'):
+                if len(line) < 100 and not line.lower().startswith('missions'):  # Probablement un titre
+                    titre_candidat = line
+                    break
+        
         suggestions = []
         
-        if "ingénieur" in fiche_content and "travaux" in fiche_content:
-            suggestions.append("Titre: Ingénieur de travaux")
+        # Cas spécifiques basés sur le contenu
+        if "ged" in fiche_lower or "gestion électronique" in fiche_lower or "archivage" in fiche_lower:
+            suggestions.append(f"Titre: {titre_candidat if titre_candidat else 'Responsable GED & Archivage'}")
+            suggestions.append("Synonymes: Gestionnaire documentaire, Archiviste, Document manager")
+            suggestions.append("Compétences obligatoires: GED, Archivage, Dématérialisation")
+            suggestions.append("Compétences optionnelles: Gouvernance documentaire, Normes ISO, Métadonnées")
+        elif "ingénieur" in fiche_lower and "travaux" in fiche_lower:
+            suggestions.append(f"Titre: {titre_candidat if titre_candidat else 'Ingénieur de travaux'}")
             suggestions.append("Synonymes: Conducteur de travaux, Chef de chantier")
             suggestions.append("Compétences obligatoires: AutoCAD, Gestion projet")
             suggestions.append("Compétences optionnelles: Primavera, Management équipe")
-        elif "développeur" in fiche_content or "developer" in fiche_content:
-            suggestions.append("Titre: Développeur")
+        elif "développeur" in fiche_lower or "developer" in fiche_lower:
+            suggestions.append(f"Titre: {titre_candidat if titre_candidat else 'Développeur'}")
             suggestions.append("Synonymes: Software engineer, Programmeur")
             suggestions.append("Compétences obligatoires: Programming, Git")
-        elif "comptable" in fiche_content:
-            suggestions.append("Titre: Comptable")
+            suggestions.append("Compétences optionnelles: Framework, Base de données")
+        elif "comptable" in fiche_lower or "finance" in fiche_lower:
+            suggestions.append(f"Titre: {titre_candidat if titre_candidat else 'Comptable'}")
             suggestions.append("Synonymes: Expert comptable, Contrôleur gestion")
             suggestions.append("Compétences obligatoires: SAGE, Fiscalité")
+            suggestions.append("Compétences optionnelles: Audit, Consolidation")
+        elif "responsable" in fiche_lower or "manager" in fiche_lower or "directeur" in fiche_lower:
+            suggestions.append(f"Titre: {titre_candidat if titre_candidat else 'Responsable'}")
+            suggestions.append("Synonymes: Manager, Chef de service, Directeur")
+            
+            # Extraire les compétences mentionnées dans la fiche
+            comp_obligatoires = []
+            comp_optionnelles = []
+            
+            if "leadership" in fiche_lower:
+                comp_obligatoires.append("Leadership")
+            if "management" in fiche_lower or "encadrer" in fiche_lower:
+                comp_obligatoires.append("Management")
+            if "gestion" in fiche_lower:
+                comp_obligatoires.append("Gestion")
+            if "pilotage" in fiche_lower or "piloter" in fiche_lower:
+                comp_optionnelles.append("Pilotage projet")
+            if "reporting" in fiche_lower:
+                comp_optionnelles.append("Reporting")
+            if "analyse" in fiche_lower:
+                comp_optionnelles.append("Esprit d'analyse")
+                
+            suggestions.append(f"Compétences obligatoires: {', '.join(comp_obligatoires) if comp_obligatoires else 'Management, Leadership'}")
+            suggestions.append(f"Compétences optionnelles: {', '.join(comp_optionnelles) if comp_optionnelles else 'Pilotage projet, Communication'}")
         else:
-            suggestions.append("Analyse: Poste non reconnu automatiquement")
-            suggestions.append("Conseil: Remplissez manuellement les champs ci-dessous")
+            # Essayer d'extraire quand même des informations génériques
+            if titre_candidat:
+                suggestions.append(f"Titre: {titre_candidat}")
+                suggestions.append("Synonymes: Expert, Spécialiste, Senior")
+            else:
+                suggestions.append("Analyse: Titre non détecté clairement")
+            
+            # Rechercher des compétences dans le texte
+            competences_trouvees = []
+            mots_competences = ["gestion", "management", "leadership", "pilotage", "analyse", "organisation", 
+                              "supervision", "coordination", "planification", "suivi", "contrôle"]
+            for mot in mots_competences:
+                if mot in fiche_lower:
+                    competences_trouvees.append(mot.capitalize())
+            
+            if competences_trouvees:
+                suggestions.append(f"Compétences détectées: {', '.join(competences_trouvees[:3])}")
+            else:
+                suggestions.append("Conseil: Remplissez manuellement les champs ci-dessous")
             
         return {"content": "\n".join(suggestions)}
     
@@ -394,20 +461,27 @@ def extract_text_from_pdf(uploaded_file):
                     page_text = page.extract_text()
                     if page_text:
                         text += page_text + "\n"
-                return text.strip()
-        except:
-            pass
+                if text.strip():
+                    return text.strip()
+        except Exception as e:
+            print(f"Erreur pdfplumber: {e}")
         
         # Fallback sur PyPDF2
         try:
             import PyPDF2
+            uploaded_file.seek(0)  # Remettre le pointeur au début
             pdf_reader = PyPDF2.PdfReader(uploaded_file)
             text = ""
             for page in pdf_reader.pages:
-                text += page.extract_text() + "\n"
-            return text.strip()
-        except:
-            return "Erreur lors de l'extraction du texte du PDF"
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+            if text.strip():
+                return text.strip()
+        except Exception as e:
+            print(f"Erreur PyPDF2: {e}")
+        
+        return "Erreur lors de l'extraction du texte du PDF - Vérifiez que le fichier n'est pas protégé par mot de passe"
             
     except Exception as e:
         return f"Erreur lors de l'extraction PDF: {str(e)}"
