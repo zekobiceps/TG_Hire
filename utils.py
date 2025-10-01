@@ -42,9 +42,9 @@ def load_sourcing_entries_from_gsheet():
     except Exception as e:
         st.warning(f"Erreur chargement Sourcing DB: {e}")
         return []
+import streamlit as st
 # utils.py
 # -*- coding: utf-8 -*-
-import streamlit as st
 import os
 import json
 import pandas as pd
