@@ -347,8 +347,28 @@ def ask_deepseek(messages, max_tokens=300):
     
     # Cas 2 : Analyse de fiche de poste
     elif "analyse cette fiche de poste" in question:
-        # Analyse intelligente de la fiche de poste
-        fiche_content = messages[0]["content"]
+        # Extraire seulement le contenu de la fiche de poste (après les deux points)
+        full_content = messages[0]["content"]
+        
+        # Trouver le début réel de la fiche de poste (après "clés:" ou similaire)
+        if ":" in full_content:
+            # Chercher après le dernier ":" qui marque la fin du prompt
+            parts = full_content.split('\n')
+            fiche_lines = []
+            found_content = False
+            
+            for line in parts:
+                if found_content or (not line.startswith('analyse') and not line.startswith('extrait') and ':' not in line):
+                    if line.strip():  # Ignorer les lignes vides au début
+                        found_content = True
+                        fiche_lines.append(line)
+                elif line.strip().endswith(':') or '5. Mots à exclure' in line:
+                    found_content = True  # Commencer à capturer après cette ligne
+            
+            fiche_content = '\n'.join(fiche_lines)
+        else:
+            fiche_content = full_content
+        
         fiche_lower = fiche_content.lower()
         
         # Extraire le titre du poste (première ligne souvent)
@@ -359,7 +379,7 @@ def ask_deepseek(messages, max_tokens=300):
         for line in lines[:5]:  # Regarder les 5 premières lignes
             line = line.strip()
             if line and not line.startswith('opportunité') and not line.startswith('rejoignez') and not line.startswith('tgcc recrute'):
-                if len(line) < 100 and not line.lower().startswith('missions'):  # Probablement un titre
+                if len(line) < 100 and not line.lower().startswith('missions') and not line.lower().startswith('analyse'):  # Probablement un titre
                     titre_candidat = line
                     break
         
