@@ -288,15 +288,19 @@ def ask_deepseek(messages, max_tokens=300):
     """Simule l'appel à l'API DeepSeek"""
     time.sleep(1)  # Simulation de délai
     question = messages[0]["content"].lower()
-    
-    if "synonymes" in question:
-        return {"content": "Ingénieur travaux, Chef de chantier, Conducteur de travaux, Responsable de projet BTP, Manager construction"}
-    elif "outils" in question or "logiciels" in question:
+    # Correction : si le champ Synonymes est présent et non vide dans le prompt, on le récupère
+    import re
+    match = re.search(r"synonymes:\s*(.*)", messages[0]["content"], re.IGNORECASE)
+    if match:
+        syns = match.group(1).strip()
+        if syns:
+            return {"content": syns}
+    if "outils" in question or "logiciels" in question:
         return {"content": "• AutoCAD\n• Revit\n• Primavera P6\n• MS Project\n• Robot Structural Analysis\n• SketchUp"}
     elif "compétences" in question:
         return {"content": "• Gestion de projet\n• Lecture de plans techniques\n• Management d'équipe\n• Budget et planning\n• Conformité réglementaire\n• Négociation fournisseurs"}
     else:
-        return {"content": "Voici des informations pertinentes concernant votre demande. N'hésitez pas à préciser votre question pour une réponse plus ciblée."}
+        return {"content": ""}
 
 def get_email_from_charika(entreprise):
     """Simule la détection de format d'email depuis Charika"""
@@ -349,9 +353,13 @@ with tab1:
         localisation = st.text_input("Localisation:", key="boolean_loc", placeholder="Ex: Casablanca")
         employeur = st.text_input("Employeur:", key="boolean_employeur", placeholder="Ex: TGCC")
 
-    col_gen = st.columns([0.8,0.2])
-    gen_mode = col_gen[0].selectbox("Générer la requête Boolean par :", ["Algorithme", "Intelligence artificielle"], key="boolean_gen_mode")
-    if col_gen[1].button("Générer la requête Boolean", type="primary", key="boolean_generate_main"):
+    # Amélioration de l'alignement du bouton Générer
+    col_gen = st.columns([0.7,0.3])
+    with col_gen[0]:
+        gen_mode = st.selectbox("Générer la requête Boolean par :", ["Algorithme", "Intelligence artificielle"], key="boolean_gen_mode")
+    with col_gen[1]:
+        gen_btn = st.button("Générer la requête Boolean", type="primary", key="boolean_generate_main")
+    if gen_btn:
         if gen_mode == "Algorithme":
             with st.spinner("⏳ Génération en cours..."):
                 start_time = time.time()
@@ -406,18 +414,17 @@ with tab1:
             snap.get("secteur") != secteur,
             snap.get("employeur") != (employeur or "")
         ]) if snap else False
-        label_boolean = "Requête Boolean:" + (" 🔄 (obsolète - paramètres modifiés)" if current_changed else "")
-        # Affichage de la requête Boolean sous forme de texte brut (non liste)
-        st.text_area(label_boolean, value=str(st.session_state["boolean_query"]), height=120, key="boolean_area")
+    label_boolean = "Requête Boolean:" + (" 🔄 (obsolète - paramètres modifiés)" if current_changed else "")
+    # Correction : affichage toujours synchronisé avec la variable session_state
+    st.text_area(label_boolean, value=st.session_state.get("boolean_query", ""), height=120, key="boolean_area")
         # Zone commentaire
     boolean_commentaire = st.text_input("Commentaire (optionnel)", value=st.session_state.get("boolean_commentaire", ""), key="boolean_commentaire")
     # Ne pas modifier st.session_state["boolean_commentaire"] après le widget : Streamlit gère la valeur automatiquement
     # Boutons sur la même ligne à droite
-    cols_btn = st.columns([1,1,1])
-    # Boutons sur la même ligne
-    with cols_btn[0]:
+    cols_actions = st.columns([0.5,0.25,0.25])
+    with cols_actions[0]:
         st.markdown(f"<button data-copy=\"{st.session_state['boolean_query'].replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
-    with cols_btn[1]:
+    with cols_actions[1]:
         if st.button("💾 Sauvegarder", key="boolean_save", use_container_width=True):
             entry = {
                 "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -432,37 +439,38 @@ with tab1:
             save_library_entries()
             save_sourcing_entry_to_gsheet(entry)
             st.success("✅ Sauvegardé")
-    with cols_btn[2]:
+    with cols_actions[2]:
         url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
         st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, use_container_width=True)
-        # Variantes
-        variants = generate_boolean_variants(st.session_state["boolean_query"], synonymes, competences_optionnelles)
-        if variants:
-            st.caption("🔀 Variantes proposées")
-            for idx, (title, vq) in enumerate(variants):
-                st.text_area(f"{title}", value=vq, height=80, key=f"bool_var_{idx}")
-                st.session_state[f"boolean_commentaire_var_{idx}"] = st.text_input(f"Commentaire variante {idx+1}", value=st.session_state.get(f"boolean_commentaire_var_{idx}", ""), key=f"boolean_commentaire_var_{idx}")
-                cols_var = st.columns([1,1,1])
-                with cols_var[0]:
-                    st.markdown(f"<button data-copy=\"{vq.replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
-                with cols_var[1]:
-                    if st.button(f"💾 Sauvegarder {idx+1}", key=f"bool_save_{idx}", use_container_width=True):
-                        entry = {
-                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                            "type": "Boolean",
-                            "poste": poste,
-                            "requete": vq,
-                            "utilisateur": st.session_state.get("user", ""),
-                            "source": f"Boolean Variante {idx+1}",
-                            "commentaire": st.session_state.get(f"boolean_commentaire_var_{idx}", "")
-                        }
-                        st.session_state.library_entries.append(entry)
-                        save_library_entries()
-                        save_sourcing_entry_to_gsheet(entry)
-                        st.success(f"✅ Variante {idx+1} sauvegardée")
-                with cols_var[2]:
-                    url_var = f"https://www.linkedin.com/search/results/people/?keywords={quote(vq)}"
-                    st.link_button(f"🌐 LinkedIn {idx+1}", url_var, use_container_width=True)
+
+    # Variantes
+    variants = generate_boolean_variants(st.session_state["boolean_query"], synonymes, competences_optionnelles)
+    if variants:
+        st.caption("🔀 Variantes proposées")
+        for idx, (title, vq) in enumerate(variants):
+            st.text_area(f"{title}", value=vq, height=80, key=f"bool_var_{idx}")
+            st.text_input(f"Commentaire variante {idx+1}", value=st.session_state.get(f"boolean_commentaire_var_{idx}", ""), key=f"boolean_commentaire_var_{idx}")
+            cols_var = st.columns([0.5,0.25,0.25])
+            with cols_var[0]:
+                st.markdown(f"<button data-copy=\"{vq.replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
+            with cols_var[1]:
+                if st.button(f"💾 Sauvegarder {idx+1}", key=f"bool_save_{idx}", use_container_width=True):
+                    entry = {
+                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "type": "Boolean",
+                        "poste": poste,
+                        "requete": vq,
+                        "utilisateur": st.session_state.get("user", ""),
+                        "source": f"Boolean Variante {idx+1}",
+                        "commentaire": st.session_state.get(f"boolean_commentaire_var_{idx}", "")
+                    }
+                    st.session_state.library_entries.append(entry)
+                    save_library_entries()
+                    save_sourcing_entry_to_gsheet(entry)
+                    st.success(f"✅ Variante {idx+1} sauvegardée")
+            with cols_var[2]:
+                url_var = f"https://www.linkedin.com/search/results/people/?keywords={quote(vq)}"
+                st.link_button(f"🌐 LinkedIn {idx+1}", url_var, use_container_width=True)
 
 # -------------------- Tab 2: X-Ray --------------------
 with tab2:
@@ -1331,13 +1339,3 @@ with tab9:
         st.info("📝 Aucune recherche sauvegardée pour le moment")
 
 # -------------------- CSS pour masquer le prompt en bas --------------------
-st.markdown("""
-    <style>
-    .stTextArea textarea[aria-label*='Modifiez la question'] {
-        display: none;
-    }
-    .stTextArea label[aria-label*='Modifiez la question'] {
-        display: none;
-    }
-    </style>
-""", unsafe_allow_html=True)
