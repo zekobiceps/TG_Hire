@@ -424,37 +424,43 @@ with tab1:
                 total_time = time.time() - start_time
                 st.success(f"✅ Requête Boolean générée par Intelligence artificielle en {total_time:.1f}s")
 
-    # Vérification continue des changements de paramètres (EXCLUANT le mode de génération)
+    # Calcul de la requête actuelle pour comparaison immédiate
+    current_query_params = {
+        "poste": poste,
+        "synonymes": synonymes,
+        "comp_ob": competences_obligatoires,
+        "comp_opt": competences_optionnelles,
+        "exclusions": exclusions,
+        "localisation": localisation,
+        "secteur": secteur,
+        "employeur": employeur or ""
+    }
+    
+    # Vérification si la requête stockée correspond aux paramètres actuels
     snap = st.session_state.get("boolean_snapshot", {})
-    if snap:  # Seulement si une requête a déjà été générée
-        current_changed = any([
-            snap.get("poste") != poste,
-            # Ne pas comparer les synonymes car l'IA peut les avoir modifiés
-            snap.get("comp_ob") != competences_obligatoires,
-            snap.get("comp_opt") != competences_optionnelles,
-            snap.get("exclusions") != exclusions,
-            snap.get("localisation") != localisation,
-            snap.get("secteur") != secteur,
-            snap.get("employeur") != (employeur or "")
-            # Ne pas inclure le mode de génération dans la comparaison
+    query_is_current = False
+    if snap and st.session_state.get("boolean_query"):
+        query_is_current = all([
+            snap.get("poste") == poste,
+            # Pour les synonymes, accepter soit les originaux soit ceux modifiés par l'IA
+            (snap.get("synonymes") == synonymes or snap.get("synonymes") != synonymes),  # Tolérer les modifications IA
+            snap.get("comp_ob") == competences_obligatoires,
+            snap.get("comp_opt") == competences_optionnelles,
+            snap.get("exclusions") == exclusions,
+            snap.get("localisation") == localisation,
+            snap.get("secteur") == secteur,
+            snap.get("employeur") == (employeur or "")
         ])
-        
-        # Si les paramètres ont changé, effacer immédiatement et recharger
-        if current_changed:
-            st.session_state["boolean_query"] = ""
-            st.session_state["boolean_snapshot"] = {}
-            # Ajouter un flag pour éviter les boucles infinies
-            if not st.session_state.get("clearing_boolean", False):
-                st.session_state["clearing_boolean"] = True
-                st.rerun()
     
-    # Reset du flag de nettoyage
-    if st.session_state.get("clearing_boolean", False):
-        st.session_state["clearing_boolean"] = False
-    
-    # Affichage de la requête Boolean
-    if st.session_state.get("boolean_query"):
+    # Affichage de la requête Boolean SEULEMENT si elle correspond aux paramètres actuels
+    if st.session_state.get("boolean_query") and query_is_current:
         st.text_area("Requête Boolean:", value=st.session_state["boolean_query"], height=120, key="boolean_area")
+    elif st.session_state.get("boolean_query") and not query_is_current:
+        # Effacer silencieusement si la requête ne correspond plus
+        st.session_state["boolean_query"] = ""
+        st.session_state["boolean_snapshot"] = {}
+        # Afficher un placeholder vide
+        st.text_area("Requête Boolean:", value="", height=120, key="boolean_area", placeholder="Modifiez les critères ci-dessus puis cliquez sur 'Générer la requête Boolean'")
         # Zone commentaire
         boolean_commentaire = st.text_input("Commentaire (optionnel)", value=st.session_state.get("boolean_commentaire", ""), key="boolean_commentaire")
         # Boutons sur la même ligne à droite
@@ -480,8 +486,7 @@ with tab1:
             url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
             st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, use_container_width=True)
 
-    # Variantes : génération basée sur la requête principale (remis à gauche)
-    if st.session_state.get("boolean_query"):
+        # Variantes : génération basée sur la requête principale (seulement si requête valide)
         variants = generate_boolean_variants(st.session_state["boolean_query"], synonymes, competences_optionnelles)
         st.caption("🔀 Variantes proposées")
         if variants:
@@ -511,6 +516,11 @@ with tab1:
                     st.link_button(f"🌐 LinkedIn {idx+1}", url_var, use_container_width=True)
         else:
             st.info("Aucune variante générée pour la requête actuelle.")
+    else:
+        # Pas de requête valide - affichage minimal
+        st.info("👆 Remplissez les critères ci-dessus et cliquez sur 'Générer la requête Boolean' pour voir les résultats.")
+
+
 
 # -------------------- Tab 2: X-Ray --------------------
 with tab2:
