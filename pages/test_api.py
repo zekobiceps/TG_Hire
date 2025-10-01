@@ -403,6 +403,7 @@ with tab1:
                 }
                 st.success("✅ Requête Boolean générée par Intelligence artificielle")
 
+    # Affichage de la requête Boolean - toujours visible
     if st.session_state.get("boolean_query"):
         snap = st.session_state.get("boolean_snapshot", {})
         current_changed = any([
@@ -416,13 +417,11 @@ with tab1:
             snap.get("employeur") != (employeur or "")
         ]) if snap else False
         label_boolean = "Requête Boolean:" + (" 🔄 (obsolète - paramètres modifiés)" if current_changed else "")
+        boolean_query_value = st.session_state.get("boolean_query", "")
     else:
-        current_changed = False
         label_boolean = "Requête Boolean:"
-    # Correction : affichage toujours synchronisé avec la variable session_state
-    # Correction : affichage toujours synchronisé avec la variable session_state
-    boolean_query_value = st.session_state.get("boolean_query", "")
-    # Affichage de la requête Boolean (vide si pas encore générée)
+        boolean_query_value = ""
+    
     st.text_area(label_boolean, value=boolean_query_value, height=120, key="boolean_area")
     # Zone commentaire
     boolean_commentaire = st.text_input("Commentaire (optionnel)", value=st.session_state.get("boolean_commentaire", ""), key="boolean_commentaire")
