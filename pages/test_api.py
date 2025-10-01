@@ -349,9 +349,9 @@ with tab1:
         localisation = st.text_input("Localisation:", key="boolean_loc", placeholder="Ex: Casablanca")
         employeur = st.text_input("Employeur:", key="boolean_employeur", placeholder="Ex: TGCC")
 
-    col_gen = st.columns([2,2])
-    with col_gen[0]:
-        if st.button("Générer la requête Boolean par l'algorithme", type="primary", key="boolean_generate_algo"):
+    gen_mode = st.selectbox("Générer la requête Boolean par :", ["Algorithme", "IA"], key="boolean_gen_mode")
+    if st.button("Générer la requête Boolean", type="primary", key="boolean_generate_main"):
+        if gen_mode == "Algorithme":
             with st.spinner("⏳ Génération en cours..."):
                 start_time = time.time()
                 st.session_state["boolean_query"] = generate_boolean_query(
@@ -360,7 +360,6 @@ with tab1:
                 )
                 if employeur:
                     st.session_state["boolean_query"] += f' AND ("{employeur}")'
-                # snapshot des paramètres pour détection obsolescence
                 st.session_state["boolean_snapshot"] = {
                     "poste": poste,
                     "synonymes": synonymes,
@@ -371,11 +370,9 @@ with tab1:
                     "secteur": secteur,
                     "employeur": employeur or ""
                 }
-                st.session_state["boolean_commentaire"] = st.session_state.get("boolean_commentaire", "")
                 total_time = time.time() - start_time
                 st.success(f"✅ Requête générée en {total_time:.1f}s")
-    with col_gen[1]:
-        if st.button("Générer la requête Boolean par l'IA", type="primary", key="boolean_generate_ia"):
+        else:
             with st.spinner("🤖 Génération IA en cours..."):
                 prompt = f"Génère une requête Boolean pour le sourcing avec les critères suivants:\nPoste: {poste}\nSynonymes: {synonymes}\nCompétences obligatoires: {competences_obligatoires}\nCompétences optionnelles: {competences_optionnelles}\nExclusions: {exclusions}\nLocalisation: {localisation}\nSecteur: {secteur}\nEmployeur: {employeur}"
                 ia_result = ask_deepseek([{"role": "user", "content": prompt}], max_tokens=200)
@@ -390,7 +387,6 @@ with tab1:
                     "secteur": secteur,
                     "employeur": employeur or ""
                 }
-                st.session_state["boolean_commentaire"] = st.session_state.get("boolean_commentaire", "")
                 st.success("✅ Requête Boolean générée par IA")
 
     if st.session_state.get("boolean_query"):
@@ -408,29 +404,31 @@ with tab1:
         label_boolean = "Requête Boolean:" + (" 🔄 (obsolète - paramètres modifiés)" if current_changed else "")
         st.text_area(label_boolean, value=st.session_state["boolean_query"], height=120, key="boolean_area")
         # Zone commentaire
-        st.session_state["boolean_commentaire"] = st.text_input("Commentaire (optionnel)", value=st.session_state.get("boolean_commentaire", ""), key="boolean_commentaire")
-        # Boutons sur la même ligne à droite
-        cols_btn = st.columns([1,1,1])
-        with cols_btn[0]:
-            st.markdown(f"<button data-copy=\"{st.session_state['boolean_query'].replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
-        with cols_btn[1]:
-            if st.button("💾 Sauvegarder", key="boolean_save", use_container_width=True):
-                entry = {
-                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                    "type": "Boolean",
-                    "poste": poste,
-                    "requete": st.session_state["boolean_query"],
-                    "utilisateur": st.session_state.get("user", ""),
-                    "source": "Boolean",
-                    "commentaire": st.session_state.get("boolean_commentaire", "")
-                }
-                st.session_state.library_entries.append(entry)
-                save_library_entries()
-                save_sourcing_entry_to_gsheet(entry)
-                st.success("✅ Sauvegardé")
-        with cols_btn[2]:
-            url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
-            st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, use_container_width=True)
+    boolean_commentaire = st.text_input("Commentaire (optionnel)", value=st.session_state.get("boolean_commentaire", ""), key="boolean_commentaire")
+    st.session_state["boolean_commentaire"] = boolean_commentaire
+    # Boutons sur la même ligne à droite
+    cols_btn = st.columns([1,1,1])
+    # Boutons sur la même ligne
+    with cols_btn[0]:
+        st.markdown(f"<button data-copy=\"{st.session_state['boolean_query'].replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
+    with cols_btn[1]:
+        if st.button("💾 Sauvegarder", key="boolean_save", use_container_width=True):
+            entry = {
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                "type": "Boolean",
+                "poste": poste,
+                "requete": st.session_state["boolean_query"],
+                "utilisateur": st.session_state.get("user", ""),
+                "source": "Boolean",
+                "commentaire": st.session_state.get("boolean_commentaire", "")
+            }
+            st.session_state.library_entries.append(entry)
+            save_library_entries()
+            save_sourcing_entry_to_gsheet(entry)
+            st.success("✅ Sauvegardé")
+    with cols_btn[2]:
+        url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
+        st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, use_container_width=True)
         # Variantes
         variants = generate_boolean_variants(st.session_state["boolean_query"], synonymes, competences_optionnelles)
         if variants:
