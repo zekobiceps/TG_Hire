@@ -422,8 +422,8 @@ with tab1:
     # Correction : affichage toujours synchronisé avec la variable session_state
     # Correction : affichage toujours synchronisé avec la variable session_state
     boolean_query_value = st.session_state.get("boolean_query", "")
-    # On force la mise à jour du champ à chaque génération, même si la requête est vide
-    st.text_area(label_boolean, value=boolean_query_value if boolean_query_value else "(aucune requête générée)", height=120, key="boolean_area")
+    # Affichage de la requête Boolean (vide si pas encore générée)
+    st.text_area(label_boolean, value=boolean_query_value, height=120, key="boolean_area")
     # Zone commentaire
     boolean_commentaire = st.text_input("Commentaire (optionnel)", value=st.session_state.get("boolean_commentaire", ""), key="boolean_commentaire")
     # Boutons sur la même ligne à droite
