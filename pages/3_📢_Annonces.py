@@ -210,70 +210,7 @@ with col_info2:
 # Entreprise par défaut (TGCC)
 entreprise = "TGCC"
 
-# -------------------- Formulaire principal --------------------
-plateforme = st.selectbox("Plateforme cible", ["JOBZYN", "TGCC", "LinkedIn"], key="annonce_plateforme")
-
-# Afficher la saisie manuelle uniquement pour TGCC
-if plateforme == "TGCC":
-    input_mode = st.radio("Mode d'entrée des infos du poste", ["Upload PDF fiche de poste", "Saisie manuelle"], key="input_mode")
-else:
-    input_mode = "Upload PDF fiche de poste"
-
-fiche_text = ""
-
-if input_mode == "Upload PDF fiche de poste":
-    uploaded_file = st.file_uploader("Téléchargez la fiche de poste (PDF)", type="pdf", key="pdf_upload")
-    if uploaded_file:
-        try:
-            pdf_reader = pypdf.PdfReader(BytesIO(uploaded_file.read()))
-            fiche_text = ""
-            for page in pdf_reader.pages:
-                fiche_text += page.extract_text() + "\n"
-            # note: removed success toast to reduce noisy messages
-        except Exception as e:
-            st.error(f"Erreur lors de l'extraction du PDF : {e}")
-else:
-    st.subheader("Informations du poste")
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        type_contrat = st.selectbox("Type de contrat*", ["CDI", "CDD", "Contrat de chantier", "Stage"], help="Sélectionnez le type de contrat")
-        niveau_experience = st.selectbox("Niveau d'expérience*", ["0-2 ans", "3-5 ans", "5-10 ans", "10+ ans"], help="Nombre d'années d'expérience requis")
-        formation_requise = st.selectbox("Formation requise*", ["Bac", "Bac+2", "Bac+3", "Bac+5"], help="Niveau de formation minimum")
-    with col2:
-        affectation = st.text_input("Affectation*", help="Ex: Chantier Mohammed VI, Direction Technique, Projet Autoroute")
-        date_demarrage = st.text_input("Date de démarrage", help="Ex: Dès que possible, Septembre 2024")
-        # Salaire indicatif supprimé
-    with col3:
-        competences_techniques = st.text_area("Compétences techniques*", help="Ex: Maîtrise d'AutoCAD, gestion de projet, normes BTP, lecture de plans")
-        langues = st.multiselect("Langues requises", ["Arabe", "Français", "Anglais", "Espagnol"], help="Langues nécessaires pour le poste")
-    with col4:
-        missions_principales = st.text_area("Missions principales*", help="Ex: Gestion de chantier, coordination d'équipe, suivi budget, contrôle qualité")
-        soft_skills = st.text_area("Soft skills*", help="Ex: Leadership, rigueur, autonomie, gestion du stress")
-        deplacement = st.selectbox("Déplacements requis", ["Non", "Occasionnels", "Fréquents", "Permanent"], help="Fréquence des déplacements")
-    st.subheader("Informations complémentaires")
-    col_ctx1, col_ctx2 = st.columns(2)
-    with col_ctx1:
-        contexte_recrutement = st.text_area("Contexte du recrutement*", help="Ex: Expansion de l'entreprise sur de nouveaux marchés, nouveau chantier")
-        description_equipe = st.text_area("Description de l'équipe", help="Ex: Équipe de 15 ingénieurs expérimentés")
-    with col_ctx2:
-        valeurs_entreprise = st.text_area("Valeurs de TGCC*", value="Qualité, Intégrité, Excellence, Ambition", help="Valeurs fondamentales de l'entreprise")
-        avantages = st.text_area("Avantages proposés", help="Ex: Mutuelle, transport, formation, évolution de carrière")
-    fiche_text = f"""
-    Type de contrat: {type_contrat}
-    Niveau d'expérience: {niveau_experience}
-    Formation requise: {formation_requise}
-    Affectation: {affectation}
-    Date de démarrage: {date_demarrage}
-    Compétences techniques: {competences_techniques}
-    Langues: {', '.join(langues)}
-    Missions principales: {missions_principales}
-    Soft skills: {soft_skills}
-    Déplacements: {deplacement}
-    Contexte du recrutement: {contexte_recrutement}
-    Description de l'équipe: {description_equipe}
-    Valeurs de TGCC: {valeurs_entreprise}
-    Avantages: {avantages}
-    """
+# (Bloc formulaire principal dupliqué supprimé - on conserve la première instance définie plus haut)
 
 # Bouton pour générer via IA (même style que sauvegarder)
 col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
