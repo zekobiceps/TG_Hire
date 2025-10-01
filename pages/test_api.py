@@ -17,6 +17,17 @@ import hashlib
 import pandas as pd
 from collections import Counter
 
+# Import optionnel pour l'extraction PDF
+try:
+    import PyPDF2
+    PDF_AVAILABLE = True
+except ImportError:
+    try:
+        import pdfplumber
+        PDF_AVAILABLE = True
+    except ImportError:
+        PDF_AVAILABLE = False
+
 # Fichier de persistance pour la bibliothèque
 LIB_FILE = "library_entries.json"
 
@@ -365,6 +376,42 @@ def ask_deepseek(messages, max_tokens=300):
     # Cas par défaut : Retourne un contenu vide
     return {"content": ""}
 
+def extract_text_from_pdf(uploaded_file):
+    """Extrait le texte d'un fichier PDF uploadé"""
+    try:
+        if not PDF_AVAILABLE:
+            return "Extraction PDF non disponible - Librairies PyPDF2 ou pdfplumber manquantes"
+        
+        # Réinitialiser le pointeur du fichier
+        uploaded_file.seek(0)
+        
+        # Essayer avec pdfplumber d'abord (meilleur pour la mise en forme)
+        try:
+            import pdfplumber
+            with pdfplumber.open(uploaded_file) as pdf:
+                text = ""
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
+                return text.strip()
+        except:
+            pass
+        
+        # Fallback sur PyPDF2
+        try:
+            import PyPDF2
+            pdf_reader = PyPDF2.PdfReader(uploaded_file)
+            text = ""
+            for page in pdf_reader.pages:
+                text += page.extract_text() + "\n"
+            return text.strip()
+        except:
+            return "Erreur lors de l'extraction du texte du PDF"
+            
+    except Exception as e:
+        return f"Erreur lors de l'extraction PDF: {str(e)}"
+
 def get_email_from_charika(entreprise):
     """Simule la détection de format d'email depuis Charika"""
     formats = [
@@ -407,22 +454,85 @@ with tab1:
     
     # Option fiche de poste pour l'IA
     with st.expander("📄 Fiche de poste (optionnel - pour enrichissement IA)", expanded=False):
-        fiche_poste = st.text_area(
-            "Collez ici la fiche de poste complète:",
-            height=120,
-            key="boolean_fiche_poste",
-            placeholder="Mission: ...\nProfil recherché: ...\nCompétences requises: ...\nExpérience: ..."
-        )
-        if fiche_poste and st.button("🤖 Analyser la fiche et pré-remplir", key="analyze_fiche"):
+        st.markdown("**Choisissez votre méthode d'import :**")
+        
+        # Onglets pour les deux méthodes
+        tab_text, tab_pdf = st.tabs(["📝 Coller le texte", "📄 Uploader PDF"])
+        
+        fiche_content = ""
+        
+        with tab_text:
+            fiche_poste = st.text_area(
+                "Collez ici la fiche de poste complète:",
+                height=120,
+                key="boolean_fiche_poste",
+                placeholder="Mission: ...\nProfil recherché: ...\nCompétences requises: ...\nExpérience: ..."
+            )
+            if fiche_poste:
+                fiche_content = fiche_poste
+        
+        with tab_pdf:
+            if not PDF_AVAILABLE:
+                st.warning("⚠️ Extraction PDF limitée - Installez PyPDF2 ou pdfplumber pour une meilleure extraction")
+            
+            uploaded_file = st.file_uploader(
+                "Choisissez votre fichier PDF:",
+                type=['pdf'],
+                key="boolean_pdf_uploader",
+                help="Formats acceptés: PDF (max 10MB)"
+            )
+            
+            if uploaded_file is not None:
+                try:
+                    # Vérification de la taille du fichier (max 10MB)
+                    if uploaded_file.size > 10 * 1024 * 1024:
+                        st.error("❌ Fichier trop volumineux (max 10MB)")
+                    else:
+                        st.success(f"✅ Fichier '{uploaded_file.name}' uploadé avec succès!")
+                        
+                        with st.spinner("📄 Extraction du texte en cours..."):
+                            # Extraction réelle du PDF
+                            extracted_text = extract_text_from_pdf(uploaded_file)
+                            
+                            if extracted_text and "Erreur" not in extracted_text:
+                                fiche_content = extracted_text
+                                st.success("✅ Texte extrait avec succès!")
+                                
+                                # Aperçu du contenu avec possibilité d'édition
+                                fiche_content = st.text_area(
+                                    "Aperçu et édition du contenu extrait:",
+                                    value=extracted_text[:2000] + ("..." if len(extracted_text) > 2000 else ""),
+                                    height=150,
+                                    help="Vous pouvez modifier le texte extrait si nécessaire"
+                                )
+                            else:
+                                st.error(f"❌ {extracted_text}")
+                                # Fallback: permettre à l'utilisateur de coller le texte manuellement
+                                st.warning("💡 Collez manuellement le contenu dans l'onglet 'Coller le texte'")
+                                
+                except Exception as e:
+                    st.error(f"❌ Erreur lors du traitement du PDF: {str(e)}")
+                    st.warning("💡 Collez manuellement le contenu dans l'onglet 'Coller le texte'")
+        
+        # Bouton d'analyse commun
+        if fiche_content and st.button("🤖 Analyser la fiche et pré-remplir", key="analyze_fiche", use_container_width=True):
             with st.spinner("🔍 Analyse de la fiche en cours..."):
                 # Simulation d'analyse de fiche de poste
-                analyze_prompt = f"Analyse cette fiche de poste et extrait les éléments clés:\n{fiche_poste}\n\nExtrait:\n1. Titre du poste\n2. 2-3 synonymes du poste\n3. 2-3 compétences obligatoires\n4. 2-3 compétences optionnelles\n5. Mots à exclure si mentionnés"
+                analyze_prompt = f"Analyse cette fiche de poste et extrait les éléments clés:\n{fiche_content}\n\nExtrait:\n1. Titre du poste\n2. 2-3 synonymes du poste\n3. 2-3 compétences obligatoires\n4. 2-3 compétences optionnelles\n5. Mots à exclure si mentionnés"
                 result = ask_deepseek([{"role": "user", "content": analyze_prompt}], max_tokens=200)
                 
                 if result["content"].strip():
-                    st.success("✅ Analyse terminée ! Les champs ont été pré-remplits ci-dessous.")
-                    # Note: Dans une vraie implémentation, on parserait le résultat pour remplir les champs
-                    st.info("💡 Suggestion IA: " + result["content"][:200] + "...")
+                    st.success("✅ Analyse terminée ! Utilisez les suggestions ci-dessous pour remplir les champs.")
+                    
+                    # Affichage des suggestions de manière plus structurée
+                    with st.container():
+                        st.markdown("### 💡 Suggestions de l'IA:")
+                        suggestions = result["content"].split('\n')
+                        for suggestion in suggestions:
+                            if suggestion.strip():
+                                st.markdown(f"• {suggestion.strip()}")
+                    
+                    st.info("� Copiez ces suggestions dans les champs correspondants ci-dessous")
                 else:
                     st.warning("⚠️ Impossible d'analyser la fiche. Remplissez manuellement les champs ci-dessous.")
     
