@@ -341,6 +341,10 @@ tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
 # -------------------- Tab 1: Boolean Search --------------------
 with tab1:
     st.header("🔍 Recherche Boolean")
+    
+    # DEBUG VISIBLE
+    st.error("🔴 DEBUG ACTIF - VERSION AVEC DEBUG")
+    
     col1, col2 = st.columns(2)
     with col1:
         poste = st.text_input("Poste recherché:", key="boolean_poste", placeholder="Ex: Ingénieur de travaux")
@@ -382,6 +386,8 @@ with tab1:
                 }
                 total_time = time.time() - start_time
                 st.success(f"✅ Requête générée en {total_time:.1f}s")
+                # Debug temporaire
+                st.write(f"DEBUG - Requête stockée: '{st.session_state['boolean_query']}'")
         else:
             with st.spinner("🤖 Génération Intelligence artificielle en cours..."):
                 start_time = time.time()
@@ -424,31 +430,35 @@ with tab1:
                 total_time = time.time() - start_time
                 st.success(f"✅ Requête Boolean générée par Intelligence artificielle en {total_time:.1f}s")
 
-    # Approche simple : affichage avec indication visuelle des changements
+    # Affichage unifié de la requête Boolean
     snap = st.session_state.get("boolean_snapshot", {})
-    if st.session_state.get("boolean_query"):
-        # Vérifier si les paramètres ont changé pour l'indication visuelle
-        params_changed = False
-        if snap:
-            params_changed = any([
-                snap.get("poste") != poste,
-                snap.get("comp_ob") != competences_obligatoires,
-                snap.get("comp_opt") != competences_optionnelles,
-                snap.get("exclusions") != exclusions,
-                snap.get("localisation") != localisation,
-                snap.get("secteur") != secteur,
-                snap.get("employeur") != (employeur or "")
-            ])
-        
-        # Affichage avec indication si obsolète
-        label = "Requête Boolean:"
-        if params_changed:
-            label += " ⚠️ (Requête obsolète - critères modifiés - Régénérez pour mettre à jour)"
-        
-        st.text_area(label, value=st.session_state["boolean_query"], height=120, key="boolean_area")
-    else:
-        # Aucune requête générée
-        st.text_area("Requête Boolean:", value="", height=120, key="boolean_area", placeholder="Remplissez les critères ci-dessus puis cliquez sur 'Générer la requête Boolean'")
+    query_value = st.session_state.get("boolean_query", "")
+    
+    # Debug temporaire
+    st.write(f"DEBUG - Valeur à afficher: '{query_value}'")
+    st.write(f"DEBUG - Session state keys: {list(st.session_state.keys())}")
+    
+    # Vérifier si les paramètres ont changé pour l'indication visuelle
+    params_changed = False
+    if snap and query_value:
+        params_changed = any([
+            snap.get("poste") != poste,
+            snap.get("comp_ob") != competences_obligatoires,
+            snap.get("comp_opt") != competences_optionnelles,
+            snap.get("exclusions") != exclusions,
+            snap.get("localisation") != localisation,
+            snap.get("secteur") != secteur,
+            snap.get("employeur") != (employeur or "")
+        ])
+    
+    # Label avec indication si obsolète
+    label = "Requête Boolean:"
+    if params_changed:
+        label += " ⚠️ (Requête obsolète - critères modifiés - Régénérez pour mettre à jour)"
+    
+    # Widget unifié - toujours la même structure
+    placeholder_text = "Remplissez les critères ci-dessus puis cliquez sur 'Générer la requête Boolean'" if not query_value else ""
+    st.text_area(label, value=query_value, height=120, key="boolean_area", placeholder=placeholder_text)
     
     # Boutons et actions (seulement si requête existe)
     if st.session_state.get("boolean_query"):
