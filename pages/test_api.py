@@ -377,44 +377,66 @@ with tab1:
                     "exclusions": exclusions,
                     "localisation": localisation,
                     "secteur": secteur,
-                    "employeur": employeur or ""
+                    "employeur": employeur or "",
+                    "mode": gen_mode
                 }
                 total_time = time.time() - start_time
                 st.success(f"✅ Requête générée en {total_time:.1f}s")
         else:
             with st.spinner("🤖 Génération Intelligence artificielle en cours..."):
+                start_time = time.time()
                 prompt = f"Génère une requête Boolean pour le sourcing avec les critères suivants:\nPoste: {poste}\nSynonymes: {synonymes}\nCompétences obligatoires: {competences_obligatoires}\nCompétences optionnelles: {competences_optionnelles}\nExclusions: {exclusions}\nLocalisation: {localisation}\nSecteur: {secteur}\nEmployeur: {employeur}"
                 ia_result = ask_deepseek([{"role": "user", "content": prompt}], max_tokens=200)
-                # Si la sortie IA est vide, on utilise le champ Synonymes saisi par l'utilisateur
-                synonymes_ia = ia_result["content"] if ia_result["content"].strip() else synonymes
-                st.session_state["boolean_query"] = generate_boolean_query(
-                    poste, synonymes_ia, competences_obligatoires,
-                    competences_optionnelles, exclusions, localisation, secteur, employeur
-                )
+                
+                # Amélioration : toujours générer une requête même si l'IA ne répond pas
+                if ia_result["content"].strip():
+                    # L'IA a donné une réponse, on l'utilise comme synonymes
+                    synonymes_ia = ia_result["content"].strip()
+                    st.session_state["boolean_query"] = generate_boolean_query(
+                        poste, synonymes_ia, competences_obligatoires,
+                        competences_optionnelles, exclusions, localisation, secteur, employeur
+                    )
+                    used_synonymes = synonymes_ia
+                else:
+                    # L'IA n'a pas répondu, on utilise les synonymes saisis
+                    st.session_state["boolean_query"] = generate_boolean_query(
+                        poste, synonymes, competences_obligatoires,
+                        competences_optionnelles, exclusions, localisation, secteur, employeur
+                    )
+                    used_synonymes = synonymes
+                
+                # Ajouter l'employeur si spécifié
+                if employeur:
+                    st.session_state["boolean_query"] += f' AND ("{employeur}")'
+                
+                # Sauvegarder le snapshot avec les vraies valeurs utilisées
                 st.session_state["boolean_snapshot"] = {
                     "poste": poste,
-                    "synonymes": synonymes_ia,
+                    "synonymes": used_synonymes,
                     "comp_ob": competences_obligatoires,
                     "comp_opt": competences_optionnelles,
                     "exclusions": exclusions,
                     "localisation": localisation,
                     "secteur": secteur,
-                    "employeur": employeur or ""
+                    "employeur": employeur or "",
+                    "mode": gen_mode
                 }
-                st.success("✅ Requête Boolean générée par Intelligence artificielle")
+                total_time = time.time() - start_time
+                st.success(f"✅ Requête Boolean générée par Intelligence artificielle en {total_time:.1f}s")
 
-    # Vérification continue des changements de paramètres
+    # Vérification continue des changements de paramètres (EXCLUANT le mode de génération)
     snap = st.session_state.get("boolean_snapshot", {})
     if snap:  # Seulement si une requête a déjà été générée
         current_changed = any([
             snap.get("poste") != poste,
-            snap.get("synonymes") != synonymes,
+            # Ne pas comparer les synonymes car l'IA peut les avoir modifiés
             snap.get("comp_ob") != competences_obligatoires,
             snap.get("comp_opt") != competences_optionnelles,
             snap.get("exclusions") != exclusions,
             snap.get("localisation") != localisation,
             snap.get("secteur") != secteur,
             snap.get("employeur") != (employeur or "")
+            # Ne pas inclure le mode de génération dans la comparaison
         ])
         
         # Si les paramètres ont changé, effacer immédiatement
