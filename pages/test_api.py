@@ -385,14 +385,15 @@ with tab1:
             with st.spinner("🤖 Génération Intelligence artificielle en cours..."):
                 prompt = f"Génère une requête Boolean pour le sourcing avec les critères suivants:\nPoste: {poste}\nSynonymes: {synonymes}\nCompétences obligatoires: {competences_obligatoires}\nCompétences optionnelles: {competences_optionnelles}\nExclusions: {exclusions}\nLocalisation: {localisation}\nSecteur: {secteur}\nEmployeur: {employeur}"
                 ia_result = ask_deepseek([{"role": "user", "content": prompt}], max_tokens=200)
-                # On passe la sortie IA dans le générateur pour garantir la structure Boolean
+                # Si la sortie IA est vide, on utilise le champ Synonymes saisi par l'utilisateur
+                synonymes_ia = ia_result["content"] if ia_result["content"].strip() else synonymes
                 st.session_state["boolean_query"] = generate_boolean_query(
-                    poste, ia_result["content"], competences_obligatoires,
+                    poste, synonymes_ia, competences_obligatoires,
                     competences_optionnelles, exclusions, localisation, secteur, employeur
                 )
                 st.session_state["boolean_snapshot"] = {
                     "poste": poste,
-                    "synonymes": ia_result["content"],
+                    "synonymes": synonymes_ia,
                     "comp_ob": competences_obligatoires,
                     "comp_opt": competences_optionnelles,
                     "exclusions": exclusions,
