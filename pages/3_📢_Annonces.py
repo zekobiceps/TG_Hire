@@ -433,12 +433,12 @@ st.divider()
 
 # -------------------- Sidebar Statistiques --------------------
 with st.sidebar:
-    # Titre réduit de ~20%
-    st.markdown("<h2 style='font-size:1.6rem;margin-bottom:0.4rem;'>📊 Annonces créées</h2>", unsafe_allow_html=True)
+    # Titre encore réduit (~1.3rem) et espace resserré
+    st.markdown("<div style='margin:0 0 0.15rem 0;'><span style='font-size:1.3rem;font-weight:600;'>📊 Annonces créées</span></div>", unsafe_allow_html=True)
     nb_annonces = len(st.session_state.annonces)
-    # Nombre centré en rouge vif
-    st.markdown(f"<div style='text-align:center;margin:0.3rem 0 0.6rem;'>" \
-                f"<span style='font-size:2.4rem;font-weight:800;color:#C40000;'>{nb_annonces}</span>" \
+    # Nombre centré en rouge vif, marges réduites
+    st.markdown(f"<div style='text-align:center;margin:0.05rem 0 0.4rem;'>" \
+                f"<span style='font-size:2.2rem;font-weight:800;color:#C40000;line-height:1;'>{nb_annonces}</span>" \
                 f"</div>", unsafe_allow_html=True)
     st.divider()
 
