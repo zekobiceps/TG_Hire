@@ -393,16 +393,7 @@ with col_save2:
                 "localisation": localisation_finale,
                 "plateforme": plateforme,
                 "format_type": plateforme,
-                "contenu": contenu,
-                "fiche_text": fiche_text if fiche_text else "",
-                "type_contrat": locals().get('type_contrat', '') if input_mode == "Saisie manuelle" else "",
-                "niveau_experience": locals().get('niveau_experience', '') if input_mode == "Saisie manuelle" else "",
-                "formation_requise": locals().get('formation_requise', '') if input_mode == "Saisie manuelle" else "",
-                "affectation": locals().get('affectation', '') if input_mode == "Saisie manuelle" else "",
-                "competences_techniques": locals().get('competences_techniques', '') if input_mode == "Saisie manuelle" else "",
-                "missions_principales": locals().get('missions_principales', '') if input_mode == "Saisie manuelle" else "",
-                "soft_skills": locals().get('soft_skills', '') if input_mode == "Saisie manuelle" else "",
-                "date_creation": datetime.now().strftime("%Y-%m-%d")
+                "contenu": contenu
             }
             
             # Sauvegarder dans Google Sheets (obligatoire)
@@ -440,27 +431,40 @@ st.divider()
 
 # -------------------- Liste des annonces --------------------
 st.subheader("📋 Annonces sauvegardées")
+nb_annonces = len(st.session_state.annonces)
+st.markdown(f"<span style='font-size:18px;color:#444;'>Il y a <b>{nb_annonces}</b> annonce(s) sauvegardée(s).</span>", unsafe_allow_html=True)
 
-if not st.session_state.annonces:
+# Barre de recherche
+search_term = st.text_input("🔎 Rechercher une annonce par poste, entreprise ou affectation", key="search_annonce")
+
+filtered_annonces = [a for a in st.session_state.annonces[::-1] if not search_term or search_term.lower() in a['poste'].lower() or search_term.lower() in a['entreprise'].lower() or search_term.lower() in a['localisation'].lower()]
+
+if not filtered_annonces:
     st.info("Aucune annonce sauvegardée pour le moment.")
 else:
-    for i, annonce in enumerate(st.session_state.annonces[::-1]):  # affichage dernière en premier
+    for i, annonce in enumerate(filtered_annonces):
         with st.expander(f"{annonce['date']} - {annonce['poste']} - {annonce['plateforme']}", expanded=False):
             st.write(f"**Entreprise :** {annonce['entreprise']}")
-            st.write(f"**Localisation :** {annonce['localisation'] or 'Non spécifiée'}")
+            st.write(f"**Affectation (Nom de la direction/chantier) :** {annonce['localisation'] or 'Non spécifiée'}")
             st.write("**Contenu :**")
             st.text_area("Contenu", annonce["contenu"], height=120, key=f"annonce_contenu_{i}", disabled=True)
 
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("🗑️ Supprimer", key=f"delete_annonce_{i}"):
-                    st.session_state.annonces.pop(len(st.session_state.annonces) - 1 - i)
-                    st.success("Annonce supprimée.")
+                    # Suppression réelle dans Google Sheets
+                    try:
+                        utils.delete_annonce_from_gsheet(annonce)
+                        st.success("Annonce supprimée de la base de données.")
+                    except Exception as e:
+                        st.error(f"Erreur lors de la suppression dans Google Sheets : {e}")
+                    # Suppression locale
+                    st.session_state.annonces.pop(len(filtered_annonces) - 1 - i)
                     st.rerun()
             with col2:
                 st.download_button(
                     "⬇️ Exporter",
-                    data=f"Poste: {annonce['poste']}\nEntreprise: {annonce['entreprise']}\nLocalisation: {annonce['localisation']}\nPlateforme: {annonce['plateforme']}\n\n{annonce['contenu']}",
+                    data=f"Poste: {annonce['poste']}\nEntreprise: {annonce['entreprise']}\nAffectation: {annonce['localisation']}\nPlateforme: {annonce['plateforme']}\n\n{annonce['contenu']}",
                     file_name=f"annonce_{annonce['poste']}_{i}.txt",
                     mime="text/plain",
                     key=f"download_annonce_{i}"
