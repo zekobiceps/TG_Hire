@@ -433,9 +433,13 @@ st.divider()
 
 # -------------------- Sidebar Statistiques --------------------
 with st.sidebar:
-    st.title("📊 Annonces créées")
+    # Titre réduit de ~20%
+    st.markdown("<h2 style='font-size:1.6rem;margin-bottom:0.4rem;'>📊 Annonces créées</h2>", unsafe_allow_html=True)
     nb_annonces = len(st.session_state.annonces)
-    st.markdown(f"<span style='font-size:28px;font-weight:700;color:#0057B7;'>{nb_annonces}</span>", unsafe_allow_html=True)
+    # Nombre centré en rouge vif
+    st.markdown(f"<div style='text-align:center;margin:0.3rem 0 0.6rem;'>" \
+                f"<span style='font-size:2.4rem;font-weight:800;color:#C40000;'>{nb_annonces}</span>" \
+                f"</div>", unsafe_allow_html=True)
     st.divider()
 
 # -------------------- Liste des annonces --------------------
