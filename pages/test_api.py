@@ -349,10 +349,9 @@ with tab1:
         localisation = st.text_input("Localisation:", key="boolean_loc", placeholder="Ex: Casablanca")
         employeur = st.text_input("Employeur:", key="boolean_employeur", placeholder="Ex: TGCC")
 
-    col_gen = st.columns([1,1])
+    col_gen = st.columns([0.8,0.2])
     gen_mode = col_gen[0].selectbox("Générer la requête Boolean par :", ["Algorithme", "Intelligence artificielle"], key="boolean_gen_mode")
-    generate_clicked = col_gen[1].button("Générer la requête Boolean", type="primary", key="boolean_generate_main")
-    if generate_clicked:
+    if col_gen[1].button("Générer la requête Boolean", type="primary", key="boolean_generate_main"):
         if gen_mode == "Algorithme":
             with st.spinner("⏳ Génération en cours..."):
                 start_time = time.time()
@@ -378,10 +377,14 @@ with tab1:
             with st.spinner("🤖 Génération Intelligence artificielle en cours..."):
                 prompt = f"Génère une requête Boolean pour le sourcing avec les critères suivants:\nPoste: {poste}\nSynonymes: {synonymes}\nCompétences obligatoires: {competences_obligatoires}\nCompétences optionnelles: {competences_optionnelles}\nExclusions: {exclusions}\nLocalisation: {localisation}\nSecteur: {secteur}\nEmployeur: {employeur}"
                 ia_result = ask_deepseek([{"role": "user", "content": prompt}], max_tokens=200)
-                st.session_state["boolean_query"] = ia_result["content"].strip()
+                # On passe la sortie IA dans le générateur pour garantir la structure Boolean
+                st.session_state["boolean_query"] = generate_boolean_query(
+                    poste, ia_result["content"], competences_obligatoires,
+                    competences_optionnelles, exclusions, localisation, secteur, employeur
+                )
                 st.session_state["boolean_snapshot"] = {
                     "poste": poste,
-                    "synonymes": synonymes,
+                    "synonymes": ia_result["content"],
                     "comp_ob": competences_obligatoires,
                     "comp_opt": competences_optionnelles,
                     "exclusions": exclusions,
@@ -405,9 +408,7 @@ with tab1:
         ]) if snap else False
         label_boolean = "Requête Boolean:" + (" 🔄 (obsolète - paramètres modifiés)" if current_changed else "")
         # Affichage de la requête Boolean sous forme de texte brut (non liste)
-        requete_boolean = str(st.session_state["boolean_query"])
-        st.text_area(label_boolean, value=requete_boolean, height=120, key="boolean_area")
-        # Vérification : le bouton LinkedIn utilise bien la même requête
+        st.text_area(label_boolean, value=str(st.session_state["boolean_query"]), height=120, key="boolean_area")
         # Zone commentaire
     boolean_commentaire = st.text_input("Commentaire (optionnel)", value=st.session_state.get("boolean_commentaire", ""), key="boolean_commentaire")
     # Ne pas modifier st.session_state["boolean_commentaire"] après le widget : Streamlit gère la valeur automatiquement
