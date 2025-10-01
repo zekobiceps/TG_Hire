@@ -439,11 +439,18 @@ with tab1:
             # Ne pas inclure le mode de génération dans la comparaison
         ])
         
-        # Si les paramètres ont changé, effacer immédiatement
+        # Si les paramètres ont changé, effacer immédiatement et recharger
         if current_changed:
             st.session_state["boolean_query"] = ""
             st.session_state["boolean_snapshot"] = {}
-            # Pas de st.rerun() pour éviter les boucles
+            # Ajouter un flag pour éviter les boucles infinies
+            if not st.session_state.get("clearing_boolean", False):
+                st.session_state["clearing_boolean"] = True
+                st.rerun()
+    
+    # Reset du flag de nettoyage
+    if st.session_state.get("clearing_boolean", False):
+        st.session_state["clearing_boolean"] = False
     
     # Affichage de la requête Boolean
     if st.session_state.get("boolean_query"):
