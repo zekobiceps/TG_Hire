@@ -16,6 +16,9 @@ import hashlib
 import pandas as pd
 from collections import Counter
 
+# Fichier de persistance pour la bibliothèque
+LIB_FILE = "library_entries.json"
+
 # --- CSS pour augmenter la taille du texte des onglets ---
 st.markdown("""
 <style>
@@ -23,17 +26,43 @@ div[data-testid="stTabs"] button p {
     font-size: 18px; 
 }
 </style>
+<script>
+function copyToClipboard(text){
+    navigator.clipboard.writeText(text).then(()=>{
+        const ev = new Event('clipboard-copied');
+        document.dispatchEvent(ev);
+    });
+}
+document.addEventListener('click', function(e){
+    if(e.target && e.target.dataset && e.target.dataset.copy){
+         copyToClipboard(e.target.dataset.copy);
+    }
+});
+</script>
 """, unsafe_allow_html=True)
 
 # -------------------- Configuration initiale --------------------
+def _load_library_entries():
+    if os.path.exists(LIB_FILE):
+        try:
+            with open(LIB_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                return data
+        except Exception:
+            return []
+    return []
+
 def init_session_state():
     """Initialise les variables de session"""
     defaults = {
         "api_usage": {"current_session_tokens": 0, "used_tokens": 0},
-        "library_entries": [],
+        "library_entries": _load_library_entries(),
         "magicien_history": [],
         "boolean_query": "",
+        "boolean_snapshot": {},
         "xray_query": "",
+        "xray_snapshot": {},
         "cse_query": "",
         "dogpile_query": "",
         "scraper_result": "",
@@ -49,8 +78,12 @@ def init_session_state():
             st.session_state[k] = v
 
 def save_library_entries():
-    """Sauvegarde les entrées de la bibliothèque (simulation)"""
-    pass
+    """Sauvegarde les entrées de la bibliothèque en JSON"""
+    try:
+        with open(LIB_FILE, 'w', encoding='utf-8') as f:
+            json.dump(st.session_state.library_entries, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        st.warning(f"⚠️ Échec de sauvegarde bibliothèque: {e}")
 
 def _split_terms(raw: str) -> list:
     if not raw:
@@ -114,6 +147,47 @@ def generate_boolean_query(poste: str, synonymes: str, competences_obligatoires:
         parts.append(f'("{employeur}")')
     return ' AND '.join(filter(None, parts))
 
+def generate_boolean_variants(base_query: str, synonymes: str, comp_opt: str) -> list:
+    """Génère quelques variantes simples:
+    - Variante 1: sans compétences optionnelles
+    - Variante 2: synonymes en fin
+    - Variante 3: suppression des guillemets sur poste/synonymes (si applicable)
+    """
+    variants = []
+    try:
+        if not base_query:
+            return []
+        # Variante 1: retirer groupe optionnel si présent
+        if comp_opt:
+            opt_terms = _split_terms(comp_opt)
+            if opt_terms:
+                opt_group = _or_group(opt_terms)
+                v1 = base_query.replace(f" AND {opt_group}", "")
+                variants.append(("Sans compétences optionnelles", v1))
+        # Variante 2: déplacer synonymes à la fin
+        if synonymes:
+            syn_terms = _split_terms(synonymes)
+            syn_group = _or_group(syn_terms)
+            if syn_group in base_query:
+                parts = base_query.split(" AND ")
+                reordered = [p for p in parts if p != syn_group] + [syn_group]
+                variants.append(("Synonymes en fin", ' AND '.join(reordered)))
+        # Variante 3: retirer guillemets des synonymes individuels si pas d'espaces
+        if synonymes:
+            syn_terms = _split_terms(synonymes)
+            if syn_terms and all(' ' not in t for t in syn_terms):
+                syn_group = _or_group(syn_terms)
+                no_quotes = '(' + ' OR '.join(syn_terms) + ')'
+                variants.append(("Synonymes sans guillemets", base_query.replace(syn_group, no_quotes)))
+    except Exception:
+        pass
+    # déduplication titres
+    seen = set(); final=[]
+    for title, q in variants:
+        if q not in seen:
+            seen.add(q); final.append((title, q))
+    return final[:3]
+
 def generate_xray_query(site_cible: str, poste: str, mots_cles: str, localisation: str) -> str:
     """Génère une requête X-Ray améliorée.
     - Support multi mots-clés / localisations
@@ -130,6 +204,71 @@ def generate_xray_query(site_cible: str, poste: str, mots_cles: str, localisatio
     locs = _split_terms(localisation)
     if locs:
         parts.append(_or_group(locs))
+    return ' '.join(parts)
+
+def generate_xray_variants(query: str, poste: str, mots_cles: str, localisation: str) -> list:
+    variants = []
+    try:
+        if not query:
+            return []
+        # intitle sur poste
+        if poste:
+            v1 = query.replace(f'"{poste}"', f'intitle:"{poste}"') if f'"{poste}"' in query else query + f' intitle:"{poste}"'
+            variants.append(("intitle: poste", v1))
+        # Séparer mots-clés en OR explicite si plusieurs
+        kws = _split_terms(mots_cles)
+        if kws and len(kws) > 1:
+            or_block = '(' + ' OR '.join(f'"{k}"' for k in kws) + ')'
+            base_no = re.sub(r'\([^)]*\)', '', query)  # tentative retrait ancien groupe
+            variants.append(("OR explicite mots-clés", f"{base_no} {or_block}".strip()))
+        # Localisations en OR avec pattern "(Casablanca OR Rabat)"
+        locs = _split_terms(localisation)
+        if locs and len(locs) > 1:
+            loc_block = '(' + ' OR '.join(f'"{l}"' for l in locs) + ')'
+            if any(l in query for l in locs):
+                variants.append(("Localisations OR", query + ' ' + loc_block))
+    except Exception:
+        pass
+    # dédup
+    seen=set(); final=[]
+    for t,q in variants:
+        if q not in seen:
+            seen.add(q); final.append((t,q))
+    return final[:3]
+
+def build_xray_linkedin(poste: str, mots_cles: list[str], localisations: list[str],
+                        langues: list[str], entreprises: list[str], ecoles: list[str],
+                        seniority: str | None) -> str:
+    """Construit une requête X-Ray LinkedIn plus riche.
+    seniority peut être: 'junior','senior','manager'
+    """
+    parts = ["site:linkedin.com/in"]
+    if poste:
+        parts.append(f'("{poste}" OR intitle:"{poste}")')
+    if mots_cles:
+        parts.append('(' + ' OR '.join(f'"{m}"' for m in mots_cles) + ')')
+    if localisations:
+        parts.append('(' + ' OR '.join(f'"{l}"' for l in localisations) + ')')
+    if langues:
+        # tente de cibler la langue via mots fréquents
+        for lg in langues:
+            if lg.lower().startswith('fr'):
+                parts.append('("Français" OR "French")')
+            elif lg.lower().startswith('en'):
+                parts.append('("Anglais" OR "English")')
+            elif lg.lower().startswith('ar'):
+                parts.append('("Arabe" OR "Arabic")')
+    if entreprises:
+        parts.append('("' + '" OR "'.join(entreprises) + '")')
+    if ecoles:
+        parts.append('("' + '" OR "'.join(ecoles) + '")')
+    if seniority:
+        if seniority == 'junior':
+            parts.append('("junior" OR "débutant" OR "1 an" OR "2 ans")')
+        elif seniority == 'senior':
+            parts.append('("senior" OR "expérimenté" OR "8 ans" OR "10 ans")')
+        elif seniority == 'manager':
+            parts.append('("manager" OR "lead" OR "chef" OR "head")')
     return ' '.join(parts)
 
 def generate_accroche_inmail(url_linkedin, poste_accroche):
@@ -218,12 +357,43 @@ with tab1:
             )
             if employeur:
                 st.session_state["boolean_query"] += f' AND ("{employeur}")'
+            # snapshot des paramètres pour détection obsolescence
+            st.session_state["boolean_snapshot"] = {
+                "poste": poste,
+                "synonymes": synonymes,
+                "comp_ob": competences_obligatoires,
+                "comp_opt": competences_optionnelles,
+                "exclusions": exclusions,
+                "localisation": localisation,
+                "secteur": secteur,
+                "employeur": employeur or ""
+            }
             total_time = time.time() - start_time
             st.success(f"✅ Requête générée en {total_time:.1f}s")
 
     if st.session_state.get("boolean_query"):
-        st.text_area("Requête Boolean:", value=st.session_state["boolean_query"], height=120, key="boolean_area")
-        
+        # détection obsolescence
+        snap = st.session_state.get("boolean_snapshot", {})
+        current_changed = any([
+            snap.get("poste") != poste,
+            snap.get("synonymes") != synonymes,
+            snap.get("comp_ob") != competences_obligatoires,
+            snap.get("comp_opt") != competences_optionnelles,
+            snap.get("exclusions") != exclusions,
+            snap.get("localisation") != localisation,
+            snap.get("secteur") != secteur,
+            snap.get("employeur") != (employeur or "")
+        ]) if snap else False
+        label_boolean = "Requête Boolean:" + (" 🔄 (obsolète - paramètres modifiés)" if current_changed else "")
+        st.text_area(label_boolean, value=st.session_state["boolean_query"], height=120, key="boolean_area")
+        st.markdown(f"<button style='margin-top:4px' data-copy=\"{st.session_state['boolean_query'].replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
+        # Variantes
+        variants = generate_boolean_variants(st.session_state["boolean_query"], synonymes, competences_optionnelles)
+        if variants:
+            st.caption("🔀 Variantes proposées")
+            for idx, (title, vq) in enumerate(variants):
+                st.text_area(f"{title}", value=vq, height=80, key=f"bool_var_{idx}")
+                st.markdown(f"<button data-copy=\"{vq.replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
         col1, col2 = st.columns([1, 2])
         with col1:
             if st.button("💾 Sauvegarder", key="boolean_save", width="stretch"):
@@ -252,17 +422,61 @@ with tab2:
         localisation_xray = st.text_input("Localisation:", key="xray_loc", placeholder="Ex: Casablanca")
         exclusions_xray = st.text_input("Mots à exclure:", key="xray_exclusions", placeholder="Ex: Stage, Junior")
 
+    with st.expander("⚙️ Mode avancé LinkedIn", expanded=False):
+        coladv1, coladv2, coladv3 = st.columns(3)
+        with coladv1:
+            seniority = st.selectbox("Séniorité", ["", "junior", "senior", "manager"], key="xray_senior")
+            langues_adv = st.text_input("Langues (fr,en,ar)", key="xray_langs", placeholder="fr,en")
+        with coladv2:
+            entreprises_adv = st.text_input("Entreprises cibles", key="xray_ent_adv", placeholder="OCP, TGCC")
+            ecoles_adv = st.text_input("Écoles / Universités", key="xray_ecoles", placeholder="EMI, ENSA")
+        with coladv3:
+            gen_avance = st.checkbox("Utiliser builder avancé", key="xray_use_adv")
+            hint = st.caption("Construit une requête enrichie multi-filtres")
+
     if st.button("🔍 Construire X-Ray", type="primary", width="stretch", key="xray_build"):
         with st.spinner("⏳ Génération en cours..."):
             start_time = time.time()
-            st.session_state["xray_query"] = generate_xray_query(site_cible, poste_xray, mots_cles, localisation_xray)
+            if st.session_state.get("xray_use_adv"):
+                mots_list = _split_terms(mots_cles)
+                loc_list = _split_terms(localisation_xray)
+                langs_list = [l.strip() for l in st.session_state.get("xray_langs", "").split(',') if l.strip()]
+                ent_list = [e.strip() for e in st.session_state.get("xray_ent_adv", "").split(',') if e.strip()]
+                ecol_list = [e.strip() for e in st.session_state.get("xray_ecoles", "").split(',') if e.strip()]
+                st.session_state["xray_query"] = build_xray_linkedin(poste_xray, mots_list, loc_list, langs_list, ent_list, ecol_list, st.session_state.get("xray_senior") or None)
+            else:
+                st.session_state["xray_query"] = generate_xray_query(site_cible, poste_xray, mots_cles, localisation_xray)
             if exclusions_xray:
                 st.session_state["xray_query"] += f' -("{exclusions_xray}")'
+            st.session_state["xray_snapshot"] = {
+                "site": site_cible,
+                "poste": poste_xray,
+                "mots_cles": mots_cles,
+                "localisation": localisation_xray,
+                "exclusions": exclusions_xray
+            }
             total_time = time.time() - start_time
             st.success(f"✅ Requête générée en {total_time:.1f}s")
 
     if st.session_state.get("xray_query"):
-        st.text_area("Requête X-Ray:", value=st.session_state["xray_query"], height=120, key="xray_area")
+        snapx = st.session_state.get("xray_snapshot", {})
+        changed_x = any([
+            snapx.get("site") != site_cible,
+            snapx.get("poste") != poste_xray,
+            snapx.get("mots_cles") != mots_cles,
+            snapx.get("localisation") != localisation_xray,
+            snapx.get("exclusions") != exclusions_xray
+        ]) if snapx else False
+        label_x = "Requête X-Ray:" + (" 🔄 (obsolète - paramètres modifiés)" if changed_x else "")
+        st.text_area(label_x, value=st.session_state["xray_query"], height=120, key="xray_area")
+        st.markdown(f"<button style='margin-top:4px' data-copy=\"{st.session_state['xray_query'].replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
+        # Variantes
+        x_vars = generate_xray_variants(st.session_state["xray_query"], poste_xray, mots_cles, localisation_xray)
+        if x_vars:
+            st.caption("🔀 Variantes proposées")
+            for i,(title, qv) in enumerate(x_vars):
+                st.text_area(title, value=qv, height=80, key=f"xray_var_{i}")
+                st.markdown(f"<button data-copy=\"{qv.replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
         url = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
         col1, col2, col3 = st.columns([1, 2, 2])
         with col1:
@@ -306,6 +520,7 @@ with tab3:
 
     if st.session_state.get("cse_query"):
         st.text_area("Requête CSE:", value=st.session_state["cse_query"], height=100, key="cse_area")
+        st.markdown(f"<button style='margin-top:4px' data-copy=\"{st.session_state['cse_query'].replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
         col1, col2 = st.columns([1, 2])
         with col1:
             if st.button("💾 Sauvegarder", key="cse_save", width="stretch"):
@@ -332,6 +547,7 @@ with tab4:
             st.success("✅ Requête enregistrée")
     if st.session_state.get("dogpile_query"):
         st.text_area("Requête Dogpile:", value=st.session_state["dogpile_query"], height=80, key="dogpile_area")
+        st.markdown(f"<button style='margin-top:4px' data-copy=\"{st.session_state['dogpile_query'].replace('"','&quot;')}\">📋 Copier</button>", unsafe_allow_html=True)
         col1, col2 = st.columns([1, 2])
         with col1:
             if st.button("💾 Sauvegarder", key="dogpile_save_btn", width="stretch"):
