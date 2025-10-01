@@ -9,6 +9,8 @@ pandas
 numpy
 python-docx
 pypdf
+PyPDF2
+pdfplumber
 PyMuPDF
 json5
 lxml
