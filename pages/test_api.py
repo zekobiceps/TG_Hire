@@ -427,6 +427,11 @@ def ask_deepseek(messages, max_tokens=300):
                 
             suggestions.append(f"Compétences obligatoires: {', '.join(comp_obligatoires) if comp_obligatoires else 'Management, Leadership'}")
             suggestions.append(f"Compétences optionnelles: {', '.join(comp_optionnelles) if comp_optionnelles else 'Pilotage projet, Communication'}")
+        elif "directeur" in fiche_lower and "capital humain" in fiche_lower:
+            suggestions.append(f"Titre: {titre_candidat if titre_candidat else 'Directeur du Capital Humain'}")
+            suggestions.append("Synonymes: Chief Human Resources Officer, DRH (Directeur des Ressources Humaines), DRH (Directeur Capital Humain)")
+            suggestions.append("Compétences obligatoires: Paie & Administration du personnel, Recrutement, Développement des talents")
+            suggestions.append("Compétences optionnelles: Pilotage projet, Esprit d'analyse")
         else:
             # Essayer d'extraire quand même des informations génériques
             if titre_candidat:
@@ -734,28 +739,41 @@ with tab1:
         else:
             with st.spinner("🤖 Génération Intelligence artificielle en cours..."):
                 start_time = time.time()
-                prompt = f"Génère une requête Boolean pour le sourcing avec les critères suivants:\nPoste: {poste}\nSynonymes: {synonymes}\nCompétences obligatoires: {competences_obligatoires}\nCompétences optionnelles: {competences_optionnelles}\nExclusions: {exclusions}\nLocalisation: {localisation}\nSecteur: {secteur}\nEmployeur: {employeur}"
+                
+                # Construct the AI prompt dynamically to avoid redundant fields
+                prompt_parts = [
+                    f"Poste: {poste}",
+                    f"Synonymes: {synonymes}" if synonymes else "",
+                    f"Compétences obligatoires: {competences_obligatoires}" if competences_obligatoires else "",
+                    f"Compétences optionnelles: {competences_optionnelles}" if competences_optionnelles else "",
+                    f"Exclusions: {exclusions}" if exclusions else "",
+                    f"Localisation: {localisation}" if localisation else "",
+                    f"Secteur: {secteur}" if secteur else "",
+                    f"Employeur: {employeur}" if employeur else ""
+                ]
+                prompt = "Génère une requête Boolean pour le sourcing avec les critères suivants:\n" + "\n".join(filter(None, prompt_parts))
+
                 ia_result = ask_deepseek([{"role": "user", "content": prompt}], max_tokens=200)
-                
-                # Récupère les synonymes enrichis, sinon ceux de l'utilisateur
+
+                # Extract enriched synonyms and mandatory skills
                 synonymes_ia = ia_result.get("content", synonymes) if ia_result.get("content", "").strip() else synonymes
-                # Récupère les compétences obligatoires enrichies
                 comp_ob_ia = ia_result.get("comp_ob_ia", competences_obligatoires)
-                
+
+                # Generate the Boolean query
                 st.session_state["boolean_query"] = generate_boolean_query(
-                    poste, synonymes_ia, comp_ob_ia,  # Utilisation de comp_ob_ia
+                    poste, synonymes_ia, comp_ob_ia,
                     competences_optionnelles, exclusions, localisation, secteur, employeur
                 )
-                
-                # Ajouter l'employeur si spécifié
-                if employeur:
-                    st.session_state["boolean_query"] += f' AND ("{employeur}")'
-                
-                # Sauvegarder le snapshot avec les vraies valeurs utilisées
+
+                # Ensure the query ends with NOT if exclusions are specified
+                if exclusions:
+                    st.session_state["boolean_query"] = st.session_state["boolean_query"].rstrip(" AND") + " NOT"
+
+                # Save the snapshot with the actual values used
                 st.session_state["boolean_snapshot"] = {
                     "poste": poste,
-                    "synonymes": synonymes_ia,  # Sauvegarde l'IA enrichie
-                    "comp_ob": comp_ob_ia,     # Sauvegarde l'IA enrichie
+                    "synonymes": synonymes_ia,
+                    "comp_ob": comp_ob_ia,
                     "comp_opt": competences_optionnelles,
                     "exclusions": exclusions,
                     "localisation": localisation,
@@ -1392,11 +1410,6 @@ with tab6:
         return ""
 
     def generate_inmail(donnees_profil, poste, entreprise, ton, max_words, cta_type, genre):
-        terme_organisation = "groupe" if entreprise == "TGCC" else "filiale"
-        objet = f"Opportunité de {poste} au sein du {terme_organisation} {entreprise}"
-
-        # Accroche IA simulée
-        accroche_prompt = f"""
         Tu es un recruteur marocain qui écrit des accroches pour InMail.
         Génère une accroche persuasive adaptée au ton "{ton}".
         Infos candidat: {donnees_profil}.
