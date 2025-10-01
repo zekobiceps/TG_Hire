@@ -403,9 +403,24 @@ with tab1:
                 }
                 st.success("✅ Requête Boolean générée par Intelligence artificielle")
 
-    # Affichage de la requête Boolean - même logique que tour_de_sourcing.py
+    # Affichage de la requête Boolean avec détection des changements
     if st.session_state.get("boolean_query"):
-        st.text_area("Requête Boolean:", value=st.session_state["boolean_query"], height=120, key="boolean_area")
+        # Vérifier si les paramètres ont changé depuis la génération
+        snap = st.session_state.get("boolean_snapshot", {})
+        current_changed = any([
+            snap.get("poste") != poste,
+            snap.get("synonymes") != synonymes,
+            snap.get("comp_ob") != competences_obligatoires,
+            snap.get("comp_opt") != competences_optionnelles,
+            snap.get("exclusions") != exclusions,
+            snap.get("localisation") != localisation,
+            snap.get("secteur") != secteur,
+            snap.get("employeur") != (employeur or "")
+        ]) if snap else False
+        
+        # Affichage avec indication si les paramètres ont changé
+        label_text = "Requête Boolean:" + (" 🔄 (obsolète - paramètres modifiés)" if current_changed else "")
+        st.text_area(label_text, value=st.session_state["boolean_query"], height=120, key="boolean_area")
         # Zone commentaire
         boolean_commentaire = st.text_input("Commentaire (optionnel)", value=st.session_state.get("boolean_commentaire", ""), key="boolean_commentaire")
         # Boutons sur la même ligne à droite
