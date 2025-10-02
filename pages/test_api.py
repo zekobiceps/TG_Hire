@@ -271,13 +271,6 @@ def build_xray_linkedin(poste: str, mots_cles: list[str], localisations: list[st
         parts.append('("' + '" OR "'.join(entreprises) + '")')
     if ecoles:
         parts.append('("' + '" OR "'.join(ecoles) + '")')
-    if seniority:
-        if seniority == 'junior':
-            parts.append('("junior" OR "débutant" OR "1 an" OR "2 ans")')
-        elif seniority == 'senior':
-            parts.append('("senior" OR "expérimenté" OR "8 ans" OR "10 ans")')
-        elif seniority == 'manager':
-            parts.append('("manager" OR "lead" OR "chef" OR "head")')
     return ' '.join(parts)
 
 def generate_accroche_inmail(url_linkedin, poste_accroche):
@@ -893,8 +886,7 @@ with tab2:
     with st.expander("⚙️ Mode avancé LinkedIn", expanded=False):
         coladv1, coladv2, coladv3 = st.columns(3)
         with coladv1:
-            seniority = st.selectbox("Séniorité", ["", "junior", "senior", "manager"], key="xray_senior")
-            langues_adv = st.text_input("Langues (fr,en,ar)", key="xray_langs", placeholder="fr,en")
+            specialite = st.text_input("Spécialité", key="xray_specialite", placeholder="Ex: Génie Civil, Informatique")
         with coladv2:
             entreprises_adv = st.text_input("Entreprises cibles", key="xray_ent_adv", placeholder="OCP, TGCC")
             ecoles_adv = st.text_input("Écoles / Universités", key="xray_ecoles", placeholder="EMI, ENSA")
@@ -948,9 +940,12 @@ with tab2:
             safe_qv = qv.replace('"', '&quot;')
             st.markdown(f'<button data-copy="{safe_qv}">📋 Copier</button>', unsafe_allow_html=True)
     url = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
-    col1, col2, col3 = st.columns([1, 2, 2])
+    col1, col2, col3 = st.columns([1, 1, 1])
     with col1:
-        if st.button("💾 Sauvegarder", key="xray_save", width="stretch"):
+        if st.button("📋 Copier", key="xray_copy"):
+            st.session_state["xray_query"]
+    with col2:
+        if st.button("💾 Sauvegarder", key="xray_save"):
             entry = {
                 "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
                 "type": "X-Ray",
@@ -960,10 +955,10 @@ with tab2:
             st.session_state.library_entries.append(entry)
             save_library_entries()
             st.success("✅ Sauvegardé")
-        with col2:
-            st.link_button("🌐 Ouvrir sur Google", url, width="stretch")
-        with col3:
-            st.link_button("🔎 Recherche avancée", f"https://www.google.com/advanced_search?q={quote(st.session_state['xray_query'])}", width="stretch")
+    with col3:
+        if st.button("🔗 Chercher sur LinkedIn", key="xray_search"):
+            url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['xray_query'])}"
+            st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, use_container_width=True)
 
 # -------------------- Tab 3: CSE --------------------
 with tab3:
