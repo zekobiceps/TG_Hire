@@ -502,8 +502,18 @@ def ask_deepseek(messages, max_tokens=300):
     elif "compétences" in question:
         return {"content": "• Gestion de projet\n• Lecture de plans techniques\n• Management d'équipe\n• Budget et planning\n• Conformité réglementaire\n• Négociation fournisseurs"}
         
-    # Cas par défaut : Retourne un contenu vide
-    return {"content": ""}
+    # Cas par défaut : Génère une réponse générique
+    if "synonymes" in question:
+        return {"content": "Directeur, Manager, Responsable, Chef, Coordinateur, Superviseur"}
+    elif any(word in question for word in ["junior", "débutant", "junior"]):
+        return {"content": "• Stagiaire\n• Assistant\n• Junior\n• Débutant\n• En formation\n• Premier emploi"}
+    elif "secteur" in question:
+        return {"content": "• BTP\n• Construction\n• Industrie\n• Services\n• Consulting\n• Ingénierie"}
+    elif "certification" in question:
+        return {"content": "• PMP\n• ISO 27001\n• ITIL\n• Agile/Scrum\n• Six Sigma\n• PRINCE2"}
+    else:
+        # Réponse générale pour toute autre question
+        return {"content": "Voici quelques suggestions pertinentes pour votre recherche de sourcing :\n• Variez les mots-clés\n• Utilisez des synonymes\n• Pensez aux compétences transversales\n• Considérez l'expérience requise\n• Adaptez selon le secteur"}
 
 def extract_text_from_pdf(uploaded_file):
     """Extrait le texte d'un fichier PDF uploadé"""
@@ -821,12 +831,6 @@ st.set_page_config(
 
 # -------------------- Sidebar --------------------
 with st.sidebar:
-    st.title("📊 Statistiques")
-    used = st.session_state.api_usage["current_session_tokens"]
-    total = st.session_state.api_usage["used_tokens"]
-    st.metric("🔑 Tokens (session)", used)
-    st.metric("📊 Total cumulé", total)
-    st.divider()
     st.info("💡 Assistant IA pour le sourcing et recrutement")
 
 # -------------------- Onglets --------------------
@@ -1971,7 +1975,7 @@ with tab7:
 
     questions_pretes = [
         "Quels sont les synonymes possibles pour le métier de",
-        "Quels outils ou logiciels sont liés au métier de",
+        "Quels outils ou logiciels sont liés au métier de", 
         "Quels mots-clés pour cibler les juniors pour le poste de",
         "Quels intitulés similaires au poste de",
         "Quels critères éliminatoires fréquents pour le poste de",
@@ -1981,41 +1985,53 @@ with tab7:
         "Quelles tendances de recrutement récentes pour le métier de"
     ]
 
-    # Zone de saisie combinée
-    col1, col2 = st.columns([0.7, 0.3])
+    # Interface simplifiée avec une seule zone de saisie
+    col1, col2 = st.columns([0.8, 0.2])
     with col1:
-        q_choice = st.selectbox("📌 Questions prêtes ou saisissez votre question :", 
-                                [""] + questions_pretes + ["Autre (saisie libre)"], key="magicien_qchoice")
+        question = st.selectbox(
+            "📌 Choisissez une question prête ou saisissez votre propre question :",
+            [""] + questions_pretes + ["Autre (saisie libre)"],
+            key="magicien_question",
+            help="Sélectionnez une question prête puis complétez-la, ou choisissez 'Autre' pour une question libre"
+        )
+        
+        # Zone de texte pour compléter ou saisir librement
+        if question and question != "Autre (saisie libre)":
+            question_complete = st.text_input(
+                "Complétez votre question :",
+                value=question + " ",
+                key="magicien_complete",
+                placeholder="Ex: " + question + " développeur web"
+            )
+        elif question == "Autre (saisie libre)":
+            question_complete = st.text_area(
+                "Votre question personnalisée :",
+                key="magicien_libre",
+                height=100,
+                placeholder="Posez votre question personnalisée ici..."
+            )
+        else:
+            question_complete = ""
+    
     with col2:
-        mode_rapide_magicien = st.checkbox("⚡ Mode rapide", key="magicien_fast")
-
-    # Zone de saisie de la question
-    if q_choice and q_choice != "Autre (saisie libre)":
-        # Question prête sélectionnée - permettre de compléter
-        question = st.text_input("Complétez votre question :", 
-                                value=q_choice + " ",
-                                key="magicien_question_complete",
-                                placeholder="Ex: " + q_choice + " développeur web")
-    else:
-        # Saisie libre
-        question = st.text_area("Votre question :", 
-                              key="magicien_question_libre", 
-                              height=100,
-                              placeholder="Posez votre question personnalisée ici...")
+        mode_rapide_magicien = st.checkbox("⚡ Réponse concise", key="magicien_fast")
 
     if st.button("✨ Poser la question", type="primary", key="ask_magicien", use_container_width=True):
-        if question and question.strip():
+        if question_complete and question_complete.strip():
             with st.spinner("⏳ Génération en cours..."):
                 start_time = time.time()
-                enhanced_question = question.strip()
+                enhanced_question = question_complete.strip()
                 
-                # Amélioration automatique selon le type de question
-                if "synonymes" in enhanced_question.lower():
-                    enhanced_question += ". Réponds uniquement avec une liste de synonymes séparés par des virgules, sans introduction."
-                elif "outils" in enhanced_question.lower() or "logiciels" in enhanced_question.lower():
-                    enhanced_question += ". Réponds avec une liste à puces des outils, sans introduction."
-                elif "compétences" in enhanced_question.lower() or "skills" in enhanced_question.lower():
-                    enhanced_question += ". Réponds avec une liste à puces, sans introduction."
+                # Amélioration automatique selon le type de question et mode rapide
+                if mode_rapide_magicien:
+                    enhanced_question += ". Réponse concise et directe."
+                else:
+                    if "synonymes" in enhanced_question.lower():
+                        enhanced_question += ". Réponds uniquement avec une liste de synonymes séparés par des virgules, sans introduction."
+                    elif "outils" in enhanced_question.lower() or "logiciels" in enhanced_question.lower():
+                        enhanced_question += ". Réponds avec une liste à puces des outils, sans introduction."
+                    elif "compétences" in enhanced_question.lower() or "skills" in enhanced_question.lower():
+                        enhanced_question += ". Réponds avec une liste à puces, sans introduction."
                 
                 result = ask_deepseek([{"role": "user", "content": enhanced_question}], 
                                      max_tokens=150 if mode_rapide_magicien else 300)
@@ -2086,19 +2102,7 @@ with tab8:
         entreprise = st.text_input("Entreprise:", key="perm_entreprise", placeholder="TGCC")
         source = st.radio("Source de détection :", ["Site officiel", "Charika.ma"], key="perm_source", horizontal=True)
     
-    # Bouton pour générer de nouveaux noms
-    if st.button("🔄 Nouvelles suggestions de noms", key="refresh_names"):
-        import random
-        noms_masculins = ["Ahmed", "Mohamed", "Youssef", "Omar", "Khalid", "Rachid", "Hassan", "Abdelkader", "Mustapha", "Saïd"]
-        noms_feminins = ["Fatima", "Aicha", "Khadija", "Zineb", "Salma", "Nadia", "Houda", "Laila", "Amina", "Sanaa"]
-        noms_famille = ["Alami", "Bennani", "Cherkaoui", "Filali", "Idrissi", "Jamal", "Kettani", "Lahlou", "Mahfoudi", "Naciri", "Ouazzani", "Qadiri"]
-        
-        st.session_state["random_names"] = {
-            "masculin": random.choice(noms_masculins),
-            "feminin": random.choice(noms_feminins),
-            "nom": random.choice(noms_famille)
-        }
-        st.rerun()
+
 
     if st.button("🔮 Générer permutations", use_container_width=True):
         if prenom and nom and entreprise:
@@ -2112,17 +2116,7 @@ with tab8:
                     domain = detected.split("@")[1]
                 elif source == "Charika.ma":
                     # Email non détecté sur Charika
-                    charika_url = get_charika_search_url(entreprise)
-                    google_search_url = f"https://www.google.com/search?q={quote(f'{entreprise} site:charika.ma')}"
                     st.error(f"❌ Format d'email non détecté sur Charika.ma pour '{entreprise}'")
-                    
-                    # Boutons de fallback
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.markdown(f"🔍 [Rechercher sur Charika.ma]({charika_url})")
-                    with col2:
-                        st.markdown(f"🌐 [Rechercher sur Google]({google_search_url})")
-                    
                     domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"
                 else:
                     domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"
