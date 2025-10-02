@@ -743,14 +743,11 @@ with tab1:
         localisation = st.text_input("Localisation:", key="boolean_loc", placeholder="Ex: Casablanca")
         employeur = st.text_input("Employeur:", key="boolean_employeur", placeholder="Ex: TGCC")
 
-    # Amélioration de l'alignement du bouton Générer
-    col_gen = st.columns([0.7,0.3])
-    with col_gen[0]:
-        gen_mode = st.selectbox("Générer la requête Boolean par :", ["Algorithme", "Intelligence artificielle"], key="boolean_gen_mode")
-        if gen_mode == "Intelligence artificielle":
-            st.caption("💡 L'IA enrichit les synonymes de façon conservatrice pour maximiser les résultats LinkedIn")
-    with col_gen[1]:
-        gen_btn = st.button("Générer la requête Boolean", type="primary", key="boolean_generate_main")
+    gen_mode = st.selectbox("Générer la requête Boolean par :", ["Algorithme", "Intelligence artificielle"], key="boolean_gen_mode")
+    if gen_mode == "Intelligence artificielle":
+        st.caption("💡 L'IA enrichit les synonymes de façon conservatrice pour maximiser les résultats LinkedIn")
+    
+    gen_btn = st.button("🔍 Générer", type="primary", key="boolean_generate_main", use_container_width=True)
     if gen_btn:
         if gen_mode == "Algorithme":
             with st.spinner("⏳ Génération en cours..."):
@@ -930,120 +927,42 @@ with tab2:
         localisation_xray = st.text_input("Localisation:", key="xray_loc", placeholder="Ex: Casablanca")
         exclusions_xray = st.text_input("Mots à exclure:", key="xray_exclusions", placeholder="Ex: Stage, Junior")
 
-        with st.expander("⚙️ Mode avancé LinkedIn", expanded=False):
-            coladv1, coladv2, coladv3 = st.columns(3)
-            with coladv1:
-                specialite = st.text_input("Spécialité", key="xray_specialite", placeholder="Ex: Génie Civil, Informatique")
-                certifications = st.text_input("Certifications", key="xray_certifications", placeholder="Ex: PMP OR ISO 27001")
-            with coladv2:
-                entreprises_adv = st.text_input("Entreprises cibles", key="xray_ent_adv", placeholder="OCP, TGCC")
-                ecoles_adv = st.text_input("Écoles / Universités", key="xray_ecoles", placeholder="EMI, ENSA")
-            with coladv3:
-                anciens_intitules = st.text_input("Anciens Intitulés", key="xray_anciens_intitules", placeholder="Si vous utilisez un intitulé spécifique, vous pouvez cibler les anciens intitulés de poste du candidat : (ancien: OR previous: OR old: OR avant:)")
-                gen_avance = st.checkbox("Utiliser builder avancé", key="xray_use_adv")
-                hint = st.caption("Construit une requête enrichie multi-filtres")
-
-        if st.button("🔍 Construire X-Ray", type="primary", key="xray_build"):
-            with st.spinner("⏳ Génération en cours..."):
-                start_time = time.time()
-                # Logic for X-Ray query generation
-                xray_query = generate_xray_query(
-                    site_cible, poste_xray, mots_cles, localisation_xray,
-                    exclusions_xray, specialite, certifications, entreprises_adv,
-                    ecoles_adv, anciens_intitules, gen_avance
-                )
-                st.session_state["xray_query"] = xray_query
-                st.session_state["xray_snapshot"] = {
-                    "site": site_cible,
-                    "poste": poste_xray,
-                    "mots_cles": mots_cles,
-                    "localisation": localisation_xray,
-                    "exclusions": exclusions_xray,
-                    "specialite": specialite,
-                    "certifications": certifications,
-                    "entreprises": entreprises_adv,
-                    "ecoles": ecoles_adv,
-                    "anciens_intitules": anciens_intitules,
-                    "mode_avance": gen_avance
-                }
-                total_time = time.time() - start_time
-                st.success(f"✅ Requête X-Ray générée en {total_time:.1f}s")
-
-        # Display generated query and actions
-        if st.session_state.get("xray_query"):
-            # Align buttons in the same row below the generated query
-            with st.container():
-                st.text_area("Requête générée", value=st.session_state.get("xray_query", ""), height=100, key="xray_query_display")
-                col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 1])
-                with col_btn1:
-                    st.button("📋 Copier", key="xray_copy")
-                with col_btn2:
-                    st.button("💾 Sauvegarder", key="xray_save")
-                with col_btn3:
-                    st.button("🔗 Ouvrir sur LinkedIn", key="xray_open")
-
-            # Add comment section after generating a query
-            st.text_area("Commentaires", placeholder="Ajoutez vos remarques ici...", key="xray_comments")
-
-            # Add advanced mode fields for Certifications and Anciens Intitulés
-            with st.expander("⚙️ Mode avancé LinkedIn", expanded=False):
-                coladv1, coladv2, coladv3 = st.columns(3)
-                with coladv1:
-                    specialite = st.text_input("Spécialité", key="xray_specialite", placeholder="Ex: Génie Civil, Informatique")
-                with coladv2:
-                    certifications = st.text_input("Certifications", key="xray_certifications", placeholder="Ex: PMP OR ISO 27001")
-                with coladv3:
-                    anciens_intitules = st.text_input("Anciens Intitulés", key="xray_anciens_intitules", placeholder="Si vous utilisez un intitulé spécifique, vous pouvez cibler les anciens intitulés de poste du candidat : (ancien: OR previous: OR old: OR avant:)")
-
-            # Fix query regeneration issue using Boolean tab solution
-            if st.session_state.get("xray_snapshot") != {
+    if st.button("🔍 Construire X-Ray", type="primary", key="xray_build"):
+        with st.spinner("⏳ Génération en cours..."):
+            start_time = time.time()
+            # Logic for X-Ray query generation
+            xray_query = generate_xray_query(site_cible, poste_xray, mots_cles, localisation_xray)
+            
+            # Add exclusions if any
+            if exclusions_xray:
+                exclusion_terms = _split_terms(exclusions_xray)
+                if exclusion_terms:
+                    xray_query += " -" + " -".join(exclusion_terms)
+            
+            st.session_state["xray_query"] = xray_query
+            st.session_state["xray_snapshot"] = {
+                "site": site_cible,
                 "poste": poste_xray,
                 "mots_cles": mots_cles,
                 "localisation": localisation_xray,
-                "specialite": specialite,
-                "certifications": certifications,
-                "anciens_intitules": anciens_intitules,
-                "entreprises": entreprises_adv,
-                "ecoles": ecoles_adv,
                 "exclusions": exclusions_xray
-            }:
-                st.session_state["xray_query"] = build_xray_linkedin(
-                    poste_xray, _split_terms(mots_cles), _split_terms(localisation_xray),
-                    [], [e.strip() for e in entreprises_adv.split(',') if e.strip()],
-                    [e.strip() for e in ecoles_adv.split(',') if e.strip()], None
-                )
-                st.session_state["xray_snapshot"] = {
-                    "poste": poste_xray,
-                    "mots_cles": mots_cles,
-                    "localisation": localisation_xray,
-                    "specialite": specialite,
-                    "certifications": certifications,
-                    "anciens_intitules": anciens_intitules,
-                    "entreprises": entreprises_adv,
-                    "ecoles": ecoles_adv,
-                    "exclusions": exclusions_xray
-                }
-                st.success("✅ Requête X-Ray mise à jour")
-                st.rerun()
+            }
+            total_time = time.time() - start_time
+            st.success(f"✅ Requête X-Ray générée en {total_time:.1f}s")
 
-        # Affichage de la requête X-Ray
-        snapx = st.session_state.get("xray_snapshot", {})
-        query_value_xray = st.session_state.get("xray_query", "")
-        
-        # Vérifier si les paramètres ont changé pour l'indication visuelle
-        params_changed_xray = False
-        if snapx and query_value_xray:
-            params_changed_xray = any([
+    # Affichage unifié de la requête X-Ray
+    snapx = st.session_state.get("xray_snapshot", {})
+    query_value_xray = st.session_state.get("xray_query", "")
+    
+    # Vérifier si les paramètres ont changé pour l'indication visuelle
+    params_changed_xray = False
+    if snapx and query_value_xray:
+        params_changed_xray = any([
             snapx.get("site") != site_cible,
             snapx.get("poste") != poste_xray,
             snapx.get("mots_cles") != mots_cles,
             snapx.get("localisation") != localisation_xray,
-            snapx.get("exclusions") != exclusions_xray,
-            snapx.get("specialite") != specialite,
-            snapx.get("certifications") != certifications,
-            snapx.get("entreprises") != entreprises_adv,
-            snapx.get("ecoles") != ecoles_adv,
-            snapx.get("anciens_intitules") != anciens_intitules
+            snapx.get("exclusions") != exclusions_xray
         ])
     
     # Label avec indication si obsolète
