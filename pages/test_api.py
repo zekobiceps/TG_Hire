@@ -607,7 +607,7 @@ def extract_text_from_pdf(uploaded_file):
         return f"Erreur lors de l'extraction PDF: {str(e)}"
 
 def get_email_from_charika(entreprise):
-    """Recherche d'email d'entreprise depuis Charika.ma"""
+    """Recherche d'email d'entreprise depuis Charika.ma avec amélioration"""
     try:
         # Rechercher sur Charika.ma
         search_url = f"https://www.charika.ma/search?q={quote(entreprise)}"
@@ -618,46 +618,74 @@ def get_email_from_charika(entreprise):
         response = requests.get(search_url, headers=headers, timeout=10)
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # Chercher le lien vers la page de l'entreprise
+        # Chercher le lien vers la page de l'entreprise - approche améliorée
         company_links = soup.find_all('a', href=True)
         company_url = None
         
+        # Chercher d'abord les liens contenant "entreprise"
         for link in company_links:
-            if 'entreprise' in link['href'] and entreprise.lower() in link.text.lower():
-                company_url = "https://www.charika.ma" + link['href']
+            href = link.get('href', '')
+            text = link.get_text().strip().lower()
+            if 'entreprise' in href and any(word in text for word in entreprise.lower().split()):
+                company_url = "https://www.charika.ma" + href if not href.startswith('http') else href
                 break
+        
+        # Si pas trouvé, chercher dans tous les liens
+        if not company_url:
+            for link in company_links:
+                href = link.get('href', '')
+                text = link.get_text().strip().lower()
+                if href and entreprise.lower() in text:
+                    company_url = "https://www.charika.ma" + href if not href.startswith('http') else href
+                    break
         
         if company_url:
             # Accéder à la page de l'entreprise
             company_response = requests.get(company_url, headers=headers, timeout=10)
             company_soup = BeautifulSoup(company_response.content, 'html.parser')
             
-            # Chercher la ligne E-mail
-            email_elements = company_soup.find_all(text=lambda text: text and 'E-mail' in text)
-            for element in email_elements:
-                parent = element.parent
-                # Chercher l'email à droite de "E-mail"
-                email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+            # Méthode améliorée pour trouver l'email
+            email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+            
+            # 1. Chercher directement "E-mail" ou "Email"
+            email_labels = company_soup.find_all(text=re.compile(r'E-?mail', re.IGNORECASE))
+            for label in email_labels:
+                # Chercher dans le même élément parent
+                parent = label.parent
                 if parent:
-                    parent_text = parent.get_text()
-                    emails = re.findall(email_pattern, parent_text)
+                    # Chercher dans tout le texte du parent et ses voisins
+                    full_text = parent.get_text()
+                    emails = re.findall(email_pattern, full_text)
                     if emails:
                         return emails[0]
-                
-                # Chercher dans le parent suivant
-                next_sibling = parent.find_next_sibling()
-                if next_sibling:
-                    sibling_text = next_sibling.get_text()
-                    emails = re.findall(email_pattern, sibling_text)
-                    if emails:
-                        return emails[0]
+                    
+                    # Chercher dans les éléments suivants
+                    for sibling in parent.find_next_siblings():
+                        sibling_text = sibling.get_text()
+                        emails = re.findall(email_pattern, sibling_text)
+                        if emails:
+                            return emails[0]
+            
+            # 2. Chercher dans les éléments contenant des emails
+            all_text = company_soup.get_text()
+            emails = re.findall(email_pattern, all_text)
+            if emails:
+                # Filtrer les emails génériques
+                for email in emails:
+                    if not any(generic in email.lower() for generic in ['noreply', 'no-reply', 'donotreply', 'example']):
+                        return email
         
-        # Si pas trouvé sur Charika, chercher sur le site officiel
-        return search_email_on_website(entreprise)
+        # Retourner None si pas trouvé pour permettre la gestion d'erreur
+        return None
         
     except Exception as e:
         print(f"Erreur lors de la recherche sur Charika: {e}")
-        return search_email_on_website(entreprise)
+        return None
+
+def get_charika_search_url(entreprise):
+    """Génère l'URL de recherche Google pour trouver l'entreprise sur Charika"""
+    search_query = f"{entreprise} charika.ma"
+    return f"https://www.google.com/search?q={quote(search_query)}"
 
 def search_email_on_website(entreprise):
     """Recherche d'email sur le site officiel de l'entreprise"""
@@ -841,16 +869,13 @@ with tab1:
 
     # Mode avancé LinkedIn pour Boolean
     with st.expander("⚙️ Mode avancé LinkedIn", expanded=False):
-        col_adv1, col_adv2, col_adv3 = st.columns(3)
+        col_adv1, col_adv2 = st.columns(2)
         with col_adv1:
-            annee_formation = st.text_input("Année de formation", key="boolean_annee_formation", placeholder="Ex: 2014")
+            specialite = st.text_input("Spécialité", key="boolean_specialite", placeholder="Ex: Génie Civil, Informatique")
             entreprises_precedentes = st.text_input("Entreprises précédentes", key="boolean_entreprises_prec", placeholder="Ex: OCP, TGCC")
         with col_adv2:
             ecoles_cibles = st.text_input("Écoles/Universités", key="boolean_ecoles", placeholder="Ex: EMI, ENSA")
             certifications_bool = st.text_input("Certifications", key="boolean_certifications", placeholder="Ex: PMP, ISO 27001")
-        with col_adv3:
-            langues = st.text_input("Langues", key="boolean_langues", placeholder="Ex: Anglais, Français")
-            niveau_experience = st.selectbox("Niveau d'expérience", ["", "Junior (0-3 ans)", "Senior (3-7 ans)", "Expert (7+ ans)"], key="boolean_niveau_exp")
 
     gen_mode = st.selectbox("Générer la requête Boolean par :", ["Algorithme", "Intelligence artificielle"], key="boolean_gen_mode")
     if gen_mode == "Intelligence artificielle":
@@ -870,8 +895,8 @@ with tab1:
                 
                 # Add advanced LinkedIn filters
                 advanced_parts = []
-                if annee_formation:
-                    advanced_parts.append(f'"{annee_formation}"')
+                if specialite:
+                    advanced_parts.append(f'"{specialite}"')
                 if entreprises_precedentes:
                     ent_terms = _split_terms(entreprises_precedentes)
                     if ent_terms:
@@ -884,17 +909,6 @@ with tab1:
                     cert_terms = _split_terms(certifications_bool)
                     if cert_terms:
                         advanced_parts.append(_or_group(cert_terms))
-                if langues:
-                    lang_terms = _split_terms(langues)
-                    if lang_terms:
-                        advanced_parts.append(_or_group(lang_terms))
-                if niveau_experience and niveau_experience != "":
-                    if "Junior" in niveau_experience:
-                        advanced_parts.append('("0 ans" OR "1 an" OR "2 ans" OR "3 ans" OR "junior" OR "débutant")')
-                    elif "Senior" in niveau_experience:
-                        advanced_parts.append('("4 ans" OR "5 ans" OR "6 ans" OR "7 ans" OR "senior" OR "expérimenté")')
-                    elif "Expert" in niveau_experience:
-                        advanced_parts.append('("8 ans" OR "9 ans" OR "10 ans" OR "+10 ans" OR "expert" OR "lead" OR "principal")')
                 
                 if advanced_parts:
                     st.session_state["boolean_query"] = base_query + " AND " + " AND ".join(advanced_parts)
@@ -911,12 +925,10 @@ with tab1:
                     "secteur": secteur,
                     "employeur": employeur or "",
                     "mode": gen_mode,
-                    "annee_formation": annee_formation,
+                    "specialite": specialite,
                     "entreprises_precedentes": entreprises_precedentes,
                     "ecoles_cibles": ecoles_cibles,
-                    "certifications_bool": certifications_bool,
-                    "langues": langues,
-                    "niveau_experience": niveau_experience
+                    "certifications_bool": certifications_bool
                 }
                 total_time = time.time() - start_time
                 st.success(f"✅ Requête générée en {total_time:.1f}s")
@@ -952,8 +964,8 @@ with tab1:
                 
                 # Add advanced LinkedIn filters
                 advanced_parts = []
-                if annee_formation:
-                    advanced_parts.append(f'"{annee_formation}"')
+                if specialite:
+                    advanced_parts.append(f'"{specialite}"')
                 if entreprises_precedentes:
                     ent_terms = _split_terms(entreprises_precedentes)
                     if ent_terms:
@@ -966,17 +978,6 @@ with tab1:
                     cert_terms = _split_terms(certifications_bool)
                     if cert_terms:
                         advanced_parts.append(_or_group(cert_terms))
-                if langues:
-                    lang_terms = _split_terms(langues)
-                    if lang_terms:
-                        advanced_parts.append(_or_group(lang_terms))
-                if niveau_experience and niveau_experience != "":
-                    if "Junior" in niveau_experience:
-                        advanced_parts.append('("0 ans" OR "1 an" OR "2 ans" OR "3 ans" OR "junior" OR "débutant")')
-                    elif "Senior" in niveau_experience:
-                        advanced_parts.append('("4 ans" OR "5 ans" OR "6 ans" OR "7 ans" OR "senior" OR "expérimenté")')
-                    elif "Expert" in niveau_experience:
-                        advanced_parts.append('("8 ans" OR "9 ans" OR "10 ans" OR "+10 ans" OR "expert" OR "lead" OR "principal")')
                 
                 if advanced_parts:
                     st.session_state["boolean_query"] = base_query + " AND " + " AND ".join(advanced_parts)
@@ -1020,12 +1021,10 @@ with tab1:
             snap.get("localisation") != localisation,
             snap.get("secteur") != secteur,
             snap.get("employeur") != (employeur or ""),
-            snap.get("annee_formation") != annee_formation,
+            snap.get("specialite") != specialite,
             snap.get("entreprises_precedentes") != entreprises_precedentes,
             snap.get("ecoles_cibles") != ecoles_cibles,
-            snap.get("certifications_bool") != certifications_bool,
-            snap.get("langues") != langues,
-            snap.get("niveau_experience") != niveau_experience
+            snap.get("certifications_bool") != certifications_bool
         ])
     
     # Label avec indication si obsolète
@@ -1248,23 +1247,30 @@ with tab3:
 
     if st.session_state.get("cse_query"):
         st.text_area("Requête CSE:", value=st.session_state["cse_query"], height=100, key="cse_area")
-    safe_cse = st.session_state.get('cse_query', '').replace('"', '&quot;')
-    st.markdown(f'<button style="margin-top:4px" data-copy="{safe_cse}">📋 Copier</button>', unsafe_allow_html=True)
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        if st.button("💾 Sauvegarder", key="cse_save", width="stretch"):
-            entry = {
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "type": "CSE",
-                "poste": poste_cse,
-                "requete": st.session_state["cse_query"],
-            }
-            st.session_state.library_entries.append(entry)
-            save_library_entries()
-            st.success("✅ Sauvegardé")
-    with col2:
-        cse_url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
-        st.link_button("🌐 Ouvrir sur CSE", cse_url, width="stretch")
+        
+        # Boutons alignés : Copier, Sauvegarder, Ouvrir
+        cols_actions = st.columns([0.33, 0.33, 0.34])
+        with cols_actions[0]:
+            safe_cse = st.session_state.get('cse_query', '').replace('"', '&quot;')
+            st.markdown(f'<button data-copy="{safe_cse}">📋 Copier</button>', unsafe_allow_html=True)
+        with cols_actions[1]:
+            if st.button("💾 Sauvegarder", key="cse_save", use_container_width=True):
+                entry = {
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "type": "CSE",
+                    "poste": poste_cse,
+                    "requete": st.session_state["cse_query"],
+                    "utilisateur": st.session_state.get("user", ""),
+                    "source": "CSE",
+                    "commentaire": ""
+                }
+                st.session_state.library_entries.append(entry)
+                save_library_entries()
+                save_sourcing_entry_to_gsheet(entry)
+                st.success("✅ Sauvegardé")
+        with cols_actions[2]:
+            cse_url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
+            st.link_button("🌐 Ouvrir sur CSE", cse_url, use_container_width=True)
 
 # -------------------- Tab 4: Dogpile --------------------
 with tab4:
@@ -1277,23 +1283,24 @@ with tab4:
             st.success("✅ Requête enregistrée")
             st.rerun()
 
-    # Affichage unifié avec détection de changement
-    snap_dogpile = st.session_state.get("dogpile_snapshot", "")
-    query_value_dogpile = st.session_state.get("dogpile_query", "")
-    
-    # Vérifier si les paramètres ont changé
-    params_changed_dogpile = False
-    if snap_dogpile and query_value_dogpile:
-        params_changed_dogpile = snap_dogpile != query
-    
-    # Label avec indication si obsolète
-    label_dogpile = "Requête Dogpile:"
-    if params_changed_dogpile:
-        label_dogpile += " ⚠️ (Requête obsolète - paramètres modifiés - Rechercher pour mettre à jour)"
-    
-    # Widget unifié
-    placeholder_text_dogpile = "Entrez votre requête ci-dessus puis cliquez sur 'Rechercher'" if not query_value_dogpile else ""
-    st.text_area(label_dogpile, value=query_value_dogpile, height=80, placeholder=placeholder_text_dogpile)
+    # Affichage uniquement si une requête a été générée
+    if st.session_state.get("dogpile_query"):
+        # Affichage unifié avec détection de changement
+        snap_dogpile = st.session_state.get("dogpile_snapshot", "")
+        query_value_dogpile = st.session_state.get("dogpile_query", "")
+        
+        # Vérifier si les paramètres ont changé
+        params_changed_dogpile = False
+        if snap_dogpile and query_value_dogpile:
+            params_changed_dogpile = snap_dogpile != query
+        
+        # Label avec indication si obsolète
+        label_dogpile = "Requête Dogpile:"
+        if params_changed_dogpile:
+            label_dogpile += " ⚠️ (Requête obsolète - paramètres modifiés - Rechercher pour mettre à jour)"
+        
+        # Widget unifié
+        st.text_area(label_dogpile, value=query_value_dogpile, height=80)
     
     # Boutons et commentaires (seulement si requête existe)
     if st.session_state.get("dogpile_query"):
@@ -1905,32 +1912,40 @@ with tab7:
         "Quelles tendances de recrutement récentes pour le métier de"
     ]
 
-    q_choice = st.selectbox("📌 Questions prêtes :", 
-                            [""] + questions_pretes, key="magicien_qchoice")
+    # Zone de saisie combinée
+    col1, col2 = st.columns([0.7, 0.3])
+    with col1:
+        q_choice = st.selectbox("📌 Questions prêtes ou saisissez votre question :", 
+                                [""] + questions_pretes + ["Autre (saisie libre)"], key="magicien_qchoice")
+    with col2:
+        mode_rapide_magicien = st.checkbox("⚡ Mode rapide", key="magicien_fast")
 
-    if q_choice:
-        default_question = q_choice
+    # Zone de saisie de la question
+    if q_choice and q_choice != "Autre (saisie libre)":
+        # Question prête sélectionnée - permettre de compléter
+        question = st.text_input("Complétez votre question :", 
+                                value=q_choice + " ",
+                                key="magicien_question_complete",
+                                placeholder="Ex: " + q_choice + " développeur web")
     else:
-        default_question = ""
+        # Saisie libre
+        question = st.text_area("Votre question :", 
+                              key="magicien_question_libre", 
+                              height=100,
+                              placeholder="Posez votre question personnalisée ici...")
 
-    question = st.text_area("Modifiez la question si nécessaire :", 
-                          value=default_question, 
-                          key="magicien_question", 
-                          height=100,
-                          placeholder="Posez votre question ici...")
-
-    mode_rapide_magicien = st.checkbox("⚡ Mode rapide (réponse concise)", key="magicien_fast")
-
-    if st.button("✨ Poser la question", type="primary", key="ask_magicien", width="stretch"):
-        if question:
+    if st.button("✨ Poser la question", type="primary", key="ask_magicien", use_container_width=True):
+        if question and question.strip():
             with st.spinner("⏳ Génération en cours..."):
                 start_time = time.time()
-                enhanced_question = question
-                if "synonymes" in question.lower():
+                enhanced_question = question.strip()
+                
+                # Amélioration automatique selon le type de question
+                if "synonymes" in enhanced_question.lower():
                     enhanced_question += ". Réponds uniquement avec une liste de synonymes séparés par des virgules, sans introduction."
-                elif "outils" in question.lower() or "logiciels" in question.lower():
+                elif "outils" in enhanced_question.lower() or "logiciels" in enhanced_question.lower():
                     enhanced_question += ". Réponds avec une liste à puces des outils, sans introduction."
-                elif "compétences" in question.lower() or "skills" in question.lower():
+                elif "compétences" in enhanced_question.lower() or "skills" in enhanced_question.lower():
                     enhanced_question += ". Réponds avec une liste à puces, sans introduction."
                 
                 result = ask_deepseek([{"role": "user", "content": enhanced_question}], 
@@ -1939,13 +1954,24 @@ with tab7:
                 total_time = int(time.time() - start_time)
                 st.success(f"✅ Réponse générée en {total_time}s")
                 
-                st.session_state.magicien_history.append({
-                    "q": question, 
-                    "r": result["content"], 
-                    "time": total_time
-                })
+                # Afficher immédiatement la réponse
+                if result.get("content"):
+                    st.subheader("💡 Réponse :")
+                    st.write(result["content"])
+                    
+                    # Ajouter à l'historique
+                    if not hasattr(st.session_state, 'magicien_history'):
+                        st.session_state.magicien_history = []
+                    
+                    st.session_state.magicien_history.append({
+                        "q": enhanced_question, 
+                        "r": result["content"], 
+                        "time": total_time
+                    })
+                else:
+                    st.error("❌ Aucune réponse générée. Veuillez reformuler votre question.")
         else:
-            st.warning("⚠️ Veuillez poser une question")
+            st.warning("⚠️ Veuillez saisir une question")
 
     if st.session_state.get("magicien_history"):
         st.subheader("📝 Historique des réponses")
@@ -1985,10 +2011,7 @@ with tab8:
 
     col1, col2 = st.columns(2)
     with col1:
-        # Suggestions de noms
-        st.caption(f"💡 Suggestions: {st.session_state['random_names']['masculin']} ou {st.session_state['random_names']['feminin']}")
         prenom = st.text_input("Prénom:", key="perm_prenom", placeholder=st.session_state['random_names']['masculin'])
-        st.caption(f"💡 Suggestion: {st.session_state['random_names']['nom']}")
         nom = st.text_input("Nom:", key="perm_nom", placeholder=st.session_state['random_names']['nom'])
     with col2:
         entreprise = st.text_input("Entreprise:", key="perm_entreprise", placeholder="TGCC")
@@ -2008,18 +2031,24 @@ with tab8:
         }
         st.rerun()
 
-    if st.button("🔮 Générer permutations", width="stretch"):
+    if st.button("🔮 Générer permutations", use_container_width=True):
         if prenom and nom and entreprise:
             with st.spinner("⏳ Génération des permutations..."):
                 start_time = time.time()
                 permutations = []
                 detected = get_email_from_charika(entreprise) if source == "Charika.ma" else None
                 
-                if detected:
-                    st.info(f"📧 Format détecté : {detected}")
+                if detected and source == "Charika.ma":
+                    st.info(f"📧 Format détecté sur Charika.ma : {detected}")
                     domain = detected.split("@")[1]
+                elif source == "Charika.ma":
+                    # Email non détecté sur Charika
+                    charika_url = get_charika_search_url(entreprise)
+                    st.error(f"❌ Format d'email non détecté sur Charika.ma pour '{entreprise}'")
+                    st.markdown(f"🔍 [Rechercher '{entreprise}' sur Charika.ma]({charika_url})")
+                    domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"
                 else:
-                    domain = f"{entreprise.lower().replace(' ', '')}.ma"
+                    domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"
                 
                 # Génération des permutations
                 patterns = [
