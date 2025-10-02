@@ -873,64 +873,138 @@ with tab1:
 
 # -------------------- Tab 2: X-Ray --------------------
 with tab2:
-    st.header("🎯 X-Ray Google")
-    col1, col2 = st.columns(2)
-    with col1:
-        site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub"], key="xray_site")
-        poste_xray = st.text_input("Poste:", key="xray_poste", placeholder="Ex: Développeur Python")
-        mots_cles = st.text_input("Mots-clés:", key="xray_mots_cles", placeholder="Ex: Django, Flask")
-    with col2:
-        localisation_xray = st.text_input("Localisation:", key="xray_loc", placeholder="Ex: Casablanca")
-        exclusions_xray = st.text_input("Mots à exclure:", key="xray_exclusions", placeholder="Ex: Stage, Junior")
+        st.header("🎯 X-Ray Google")
+        col1, col2 = st.columns(2)
+        with col1:
+            site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub"], key="xray_site")
+            poste_xray = st.text_input("Poste:", key="xray_poste", placeholder="Ex: Développeur Python")
+            mots_cles = st.text_input("Mots-clés:", key="xray_mots_cles", placeholder="Ex: Django, Flask")
+        with col2:
+            localisation_xray = st.text_input("Localisation:", key="xray_loc", placeholder="Ex: Casablanca")
+            exclusions_xray = st.text_input("Mots à exclure:", key="xray_exclusions", placeholder="Ex: Stage, Junior")
 
-    with st.expander("⚙️ Mode avancé LinkedIn", expanded=False):
-        coladv1, coladv2, coladv3 = st.columns(3)
-        with coladv1:
-            specialite = st.text_input("Spécialité", key="xray_specialite", placeholder="Ex: Génie Civil, Informatique")
-        with coladv2:
-            entreprises_adv = st.text_input("Entreprises cibles", key="xray_ent_adv", placeholder="OCP, TGCC")
-            ecoles_adv = st.text_input("Écoles / Universités", key="xray_ecoles", placeholder="EMI, ENSA")
-        with coladv3:
-            gen_avance = st.checkbox("Utiliser builder avancé", key="xray_use_adv")
-            hint = st.caption("Construit une requête enrichie multi-filtres")
+        with st.expander("⚙️ Mode avancé LinkedIn", expanded=False):
+            coladv1, coladv2, coladv3 = st.columns(3)
+            with coladv1:
+                specialite = st.text_input("Spécialité", key="xray_specialite", placeholder="Ex: Génie Civil, Informatique")
+                certifications = st.text_input("Certifications", key="xray_certifications", placeholder="Ex: PMP OR ISO 27001")
+            with coladv2:
+                entreprises_adv = st.text_input("Entreprises cibles", key="xray_ent_adv", placeholder="OCP, TGCC")
+                ecoles_adv = st.text_input("Écoles / Universités", key="xray_ecoles", placeholder="EMI, ENSA")
+            with coladv3:
+                anciens_intitules = st.text_input("Anciens Intitulés", key="xray_anciens_intitules", placeholder="Si vous utilisez un intitulé spécifique, vous pouvez cibler les anciens intitulés de poste du candidat : (ancien: OR previous: OR old: OR avant:)")
+                gen_avance = st.checkbox("Utiliser builder avancé", key="xray_use_adv")
+                hint = st.caption("Construit une requête enrichie multi-filtres")
 
-    if st.button("🔍 Construire X-Ray", type="primary", width="stretch", key="xray_build"):
-        with st.spinner("⏳ Génération en cours..."):
-            start_time = time.time()
-            if st.session_state.get("xray_use_adv"):
-                mots_list = _split_terms(mots_cles)
-                loc_list = _split_terms(localisation_xray)
-                langs_list = [l.strip() for l in st.session_state.get("xray_langs", "").split(',') if l.strip()]
-                ent_list = [e.strip() for e in st.session_state.get("xray_ent_adv", "").split(',') if e.strip()]
-                ecol_list = [e.strip() for e in st.session_state.get("xray_ecoles", "").split(',') if e.strip()]
-                st.session_state["xray_query"] = build_xray_linkedin(poste_xray, mots_list, loc_list, langs_list, ent_list, ecol_list, st.session_state.get("xray_senior") or None)
-            else:
-                st.session_state["xray_query"] = generate_xray_query(site_cible, poste_xray, mots_cles, localisation_xray)
-            if exclusions_xray:
-                st.session_state["xray_query"] += f' -("{exclusions_xray}")'
-            st.session_state["xray_snapshot"] = {
-                "site": site_cible,
-                "poste": poste_xray,
-                "mots_cles": mots_cles,
-                "localisation": localisation_xray,
-                "exclusions": exclusions_xray
-            }
-            total_time = time.time() - start_time
-            st.success(f"✅ Requête générée en {total_time:.1f}s")
+        if st.button("🔍 Construire X-Ray", type="primary", key="xray_build"):
+            with st.spinner("⏳ Génération en cours..."):
+                start_time = time.time()
+                # Logic for X-Ray query generation
+                xray_query = generate_xray_query(
+                    site_cible, poste_xray, mots_cles, localisation_xray,
+                    exclusions_xray, specialite, certifications, entreprises_adv,
+                    ecoles_adv, anciens_intitules, gen_avance
+                )
+                st.session_state["xray_query"] = xray_query
+                st.session_state["xray_snapshot"] = {
+                    "site": site_cible,
+                    "poste": poste_xray,
+                    "mots_cles": mots_cles,
+                    "localisation": localisation_xray,
+                    "exclusions": exclusions_xray,
+                    "specialite": specialite,
+                    "certifications": certifications,
+                    "entreprises": entreprises_adv,
+                    "ecoles": ecoles_adv,
+                    "anciens_intitules": anciens_intitules,
+                    "mode_avance": gen_avance
+                }
+                total_time = time.time() - start_time
+                st.success(f"✅ Requête X-Ray générée en {total_time:.1f}s")
 
-    if st.session_state.get("xray_query"):
-        snapx = st.session_state.get("xray_snapshot", {})
-        changed_x = any([
+        # Display generated query and actions
+        if st.session_state.get("xray_query"):
+            xray_commentaire = st.text_input("Commentaire (optionnel)", value=st.session_state.get("xray_commentaire", ""), key="xray_commentaire")
+            cols_actions = st.columns([0.2, 0.4, 0.4])
+            with cols_actions[0]:
+                safe_xray = st.session_state.get('xray_query', '').replace('"', '&quot;')
+                st.markdown(f'<button data-copy="{safe_xray}">📋 Copier</button>', unsafe_allow_html=True)
+            with cols_actions[1]:
+                if st.button("💾 Sauvegarder", key="xray_save", use_container_width=True):
+                    entry = {
+                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "type": "X-Ray",
+                        "poste": poste_xray,
+                        "requete": st.session_state["xray_query"],
+                        "utilisateur": st.session_state.get("user", ""),
+                        "source": "X-Ray",
+                        "commentaire": st.session_state.get("xray_commentaire", "")
+                    }
+                    st.session_state.library_entries.append(entry)
+                    save_library_entries()
+                    save_sourcing_entry_to_gsheet(entry)
+                    st.success("✅ Sauvegardé")
+            with cols_actions[2]:
+                url_xray = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
+                st.link_button("🌐 Ouvrir sur Google", url_xray, use_container_width=True)
+
+    # Affichage de la requête X-Ray
+    snapx = st.session_state.get("xray_snapshot", {})
+    query_value_xray = st.session_state.get("xray_query", "")
+    
+    # Vérifier si les paramètres ont changé pour l'indication visuelle
+    params_changed_xray = False
+    if snapx and query_value_xray:
+        params_changed_xray = any([
             snapx.get("site") != site_cible,
             snapx.get("poste") != poste_xray,
             snapx.get("mots_cles") != mots_cles,
             snapx.get("localisation") != localisation_xray,
-            snapx.get("exclusions") != exclusions_xray
-        ]) if snapx else False
-        label_x = "Requête X-Ray:" + (" 🔄 (obsolète - paramètres modifiés)" if changed_x else "")
-        st.text_area(label_x, value=st.session_state["xray_query"], height=120, key="xray_area")
-    safe_xray = st.session_state.get('xray_query', '').replace('"', '&quot;')
-    st.markdown(f'<button style="margin-top:4px" data-copy="{safe_xray}">📋 Copier</button>', unsafe_allow_html=True)
+            snapx.get("exclusions") != exclusions_xray,
+            snapx.get("specialite") != specialite,
+            snapx.get("certifications") != certifications,
+            snapx.get("entreprises") != entreprises_adv,
+            snapx.get("ecoles") != ecoles_adv,
+            snapx.get("anciens_intitules") != anciens_intitules
+        ])
+    
+    # Label avec indication si obsolète
+    label_xray = "Requête X-Ray:"
+    if params_changed_xray:
+        label_xray += " ⚠️ (Requête obsolète - paramètres modifiés - Reconstruire pour mettre à jour)"
+    
+    # Widget unifié - SANS KEY pour permettre la mise à jour automatique
+    placeholder_text_xray = "Remplissez les critères ci-dessus puis cliquez sur 'Construire X-Ray'" if not query_value_xray else ""
+    st.text_area(label_xray, value=query_value_xray, height=120, placeholder=placeholder_text_xray)
+    
+    # Commentaires et actions
+    if st.session_state.get("xray_query"):
+        # Zone commentaire
+        xray_commentaire = st.text_input("Commentaire (optionnel)", value=st.session_state.get("xray_commentaire", ""), key="xray_commentaire")
+        # Boutons organisés : Copier, Sauvegarder, LinkedIn
+        cols_actions = st.columns([0.2, 0.4, 0.4])
+        with cols_actions[0]:
+            safe_xray = st.session_state.get('xray_query', '').replace('"', '&quot;')
+            st.markdown(f'<button data-copy="{safe_xray}">📋 Copier</button>', unsafe_allow_html=True)
+        with cols_actions[1]:
+            if st.button("💾 Sauvegarder", key="xray_save", use_container_width=True):
+                entry = {
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "type": "X-Ray",
+                    "poste": poste_xray,
+                    "requete": st.session_state["xray_query"],
+                    "utilisateur": st.session_state.get("user", ""),
+                    "source": "X-Ray",
+                    "commentaire": st.session_state.get("xray_commentaire", "")
+                }
+                st.session_state.library_entries.append(entry)
+                save_library_entries()
+                save_sourcing_entry_to_gsheet(entry)
+                st.success("✅ Sauvegardé")
+        with cols_actions[2]:
+            url_xray = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
+            st.link_button("🌐 Ouvrir sur Google", url_xray, use_container_width=True)
+
     # Variantes
     x_vars = generate_xray_variants(st.session_state["xray_query"], poste_xray, mots_cles, localisation_xray)
     if x_vars:
@@ -939,26 +1013,8 @@ with tab2:
             st.text_area(title, value=qv, height=80, key=f"xray_var_{i}")
             safe_qv = qv.replace('"', '&quot;')
             st.markdown(f'<button data-copy="{safe_qv}">📋 Copier</button>', unsafe_allow_html=True)
-    url = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
-    col1, col2, col3 = st.columns([1, 1, 1])
-    with col1:
-        if st.button("📋 Copier", key="xray_copy"):
-            st.session_state["xray_query"]
-    with col2:
-        if st.button("💾 Sauvegarder", key="xray_save"):
-            entry = {
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "type": "X-Ray",
-                "poste": poste_xray,
-                "requete": st.session_state["xray_query"],
-            }
-            st.session_state.library_entries.append(entry)
-            save_library_entries()
-            st.success("✅ Sauvegardé")
-    with col3:
-        if st.button("🔗 Chercher sur LinkedIn", key="xray_search"):
-            url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['xray_query'])}"
-            st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, use_container_width=True)
+    else:
+        st.info("Aucune variante générée pour la requête actuelle.")
 
 # -------------------- Tab 3: CSE --------------------
 with tab3:
@@ -1402,62 +1458,6 @@ with tab6:
         elif cta_type == "Accepter un rendez-vous":
             return f"Je serai ravi{suffix} de convenir d’un rendez-vous afin d’échanger sur cette opportunité."
         return ""
-
-    def generate_inmail(donnees_profil, poste, entreprise, ton, max_words, cta_type, genre, terme_organisation):
-        accroche_prompt = f"""
-        Tu es un recruteur marocain qui écrit des accroches pour InMail.
-        Génère une accroche persuasive adaptée au ton "{ton}".
-        Infos candidat: {donnees_profil}.
-        Poste à pourvoir: {poste}, Entreprise: {entreprise}.
-        L'accroche doit être concise, unique et engageante.
-        """
-
-        accroche_result = ask_deepseek([{"role": "user", "content": accroche_prompt}], max_tokens=80)
-        accroche = accroche_result["content"].strip()
-
-        # 🔧 sécurisation des données
-        prenom = donnees_profil.get("prenom", "Candidat")
-        mission = donnees_profil.get("mission", "")
-        competences = donnees_profil.get("competences_cles", ["", "", ""])
-
-        cta_text = generate_cta(cta_type, prenom, genre)
-
-        response = f"""Bonjour {prenom},
-
-{accroche}
-
-Votre mission actuelle {mission} ainsi que vos compétences principales ({", ".join(filter(None, competences))}) 
-démontrent un potentiel fort pour le poste de {poste} au sein de notre {terme_organisation} {entreprise}.
-
-{cta_text}
-"""
-
-        # Ajustement de longueur
-        words = response.split()
-        if len(words) > max_words:
-            response = " ".join(words[:max_words]) + "..."
-        elif len(words) < int(max_words * 0.8):
-            extend_prompt = f"Développe ce message en {max_words} mots environ sans répétitions :\n{response}"
-            extend_result = ask_deepseek([{"role": "user", "content": extend_prompt}], max_tokens=max_words * 2)
-            response = extend_result["content"]
-
-        return response.strip()
-
-    # --------- IMPORTER UN MODÈLE ---------
-    if st.session_state.library_entries:
-        templates = [f"{e['poste']} - {e['date']}" for e in st.session_state.library_entries if e['type'] == "InMail"]
-        selected_template = st.selectbox("📂 Importer un modèle sauvegardé :", [""] + templates, key="import_template_inmail")
-        if selected_template:
-            template_entry = next(e for e in st.session_state.library_entries if f"{e['poste']} - {e['date']}" == selected_template)
-           
-            st.session_state["inmail_profil_data"] = {
-                "prenom": "Candidat",
-                "nom": "",
-                "poste_actuel": "",
-                "entreprise_actuelle": "",
-                "competences_cles": ["", "", ""],
-                "experience_annees": "",
-                "formation": "",
                 "mission": "",
                 "localisation": ""
             }
