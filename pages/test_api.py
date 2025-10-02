@@ -924,29 +924,60 @@ with tab2:
 
         # Display generated query and actions
         if st.session_state.get("xray_query"):
-            xray_commentaire = st.text_input("Commentaire (optionnel)", value=st.session_state.get("xray_commentaire", ""), key="xray_commentaire")
-            cols_actions = st.columns([0.2, 0.4, 0.4])
-            with cols_actions[0]:
-                safe_xray = st.session_state.get('xray_query', '').replace('"', '&quot;')
-                st.markdown(f'<button data-copy="{safe_xray}">📋 Copier</button>', unsafe_allow_html=True)
-            with cols_actions[1]:
-                if st.button("💾 Sauvegarder", key="xray_save", use_container_width=True):
-                    entry = {
-                        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                        "type": "X-Ray",
-                        "poste": poste_xray,
-                        "requete": st.session_state["xray_query"],
-                        "utilisateur": st.session_state.get("user", ""),
-                        "source": "X-Ray",
-                        "commentaire": st.session_state.get("xray_commentaire", "")
-                    }
-                    st.session_state.library_entries.append(entry)
-                    save_library_entries()
-                    save_sourcing_entry_to_gsheet(entry)
-                    st.success("✅ Sauvegardé")
-            with cols_actions[2]:
-                url_xray = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
-                st.link_button("🌐 Ouvrir sur Google", url_xray, use_container_width=True)
+            # Align buttons in the same row below the generated query
+            with st.container():
+                st.text_area("Requête générée", value=st.session_state.get("xray_query", ""), height=100, key="xray_query_display")
+                col_btn1, col_btn2, col_btn3 = st.columns([1, 1, 1])
+                with col_btn1:
+                    st.button("📋 Copier", key="xray_copy")
+                with col_btn2:
+                    st.button("💾 Sauvegarder", key="xray_save")
+                with col_btn3:
+                    st.button("🔗 Ouvrir sur LinkedIn", key="xray_open")
+
+            # Add comment section after generating a query
+            st.text_area("Commentaires", placeholder="Ajoutez vos remarques ici...", key="xray_comments")
+
+            # Add advanced mode fields for Certifications and Anciens Intitulés
+            with st.expander("⚙️ Mode avancé LinkedIn", expanded=False):
+                coladv1, coladv2, coladv3 = st.columns(3)
+                with coladv1:
+                    specialite = st.text_input("Spécialité", key="xray_specialite", placeholder="Ex: Génie Civil, Informatique")
+                with coladv2:
+                    certifications = st.text_input("Certifications", key="xray_certifications", placeholder="Ex: PMP OR ISO 27001")
+                with coladv3:
+                    anciens_intitules = st.text_input("Anciens Intitulés", key="xray_anciens_intitules", placeholder="Si vous utilisez un intitulé spécifique, vous pouvez cibler les anciens intitulés de poste du candidat : (ancien: OR previous: OR old: OR avant:)")
+
+            # Fix query regeneration issue using Boolean tab solution
+            if st.session_state.get("xray_snapshot") != {
+                "poste": poste_xray,
+                "mots_cles": mots_cles,
+                "localisation": localisation_xray,
+                "specialite": specialite,
+                "certifications": certifications,
+                "anciens_intitules": anciens_intitules,
+                "entreprises": entreprises_adv,
+                "ecoles": ecoles_adv,
+                "exclusions": exclusions_xray
+            }:
+                st.session_state["xray_query"] = build_xray_linkedin(
+                    poste_xray, _split_terms(mots_cles), _split_terms(localisation_xray),
+                    [], [e.strip() for e in entreprises_adv.split(',') if e.strip()],
+                    [e.strip() for e in ecoles_adv.split(',') if e.strip()], None
+                )
+                st.session_state["xray_snapshot"] = {
+                    "poste": poste_xray,
+                    "mots_cles": mots_cles,
+                    "localisation": localisation_xray,
+                    "specialite": specialite,
+                    "certifications": certifications,
+                    "anciens_intitules": anciens_intitules,
+                    "entreprises": entreprises_adv,
+                    "ecoles": ecoles_adv,
+                    "exclusions": exclusions_xray
+                }
+                st.success("✅ Requête X-Ray mise à jour")
+                st.rerun()
 
     # Affichage de la requête X-Ray
     snapx = st.session_state.get("xray_snapshot", {})
