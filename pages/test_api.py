@@ -29,6 +29,53 @@ except ImportError:
 # Fichier de persistance pour la bibliothèque
 LIB_FILE = "library_entries.json"
 
+# Fonction pour générer des messages InMail
+def generate_inmail(donnees_profil, poste_accroche, entreprise, ton_message, longueur_message, cta_option, genre_profil, context):
+    """
+    Génère un message InMail personnalisé basé sur les paramètres fournis.
+    """
+    # Adaptation du ton
+    tone = "formel" if ton_message == "Formel" else "décontracté"
+    
+    # Adaptation de la longueur
+    if longueur_message == "Court":
+        max_words = 50
+    elif longueur_message == "Moyen":
+        max_words = 100
+    else:
+        max_words = 150
+    
+    # Construction du message de base
+    greeting = f"Bonjour {'Madame' if genre_profil == 'Féminin' else 'Monsieur'},"
+    
+    # Corps du message adapté au contexte
+    if context == "entreprise":
+        body = f"""
+Je suis impressionné(e) par votre profil et votre expérience. Nous avons une opportunité {poste_accroche} chez {entreprise} qui pourrait vous intéresser.
+
+Vos compétences correspondent parfaitement à ce que nous recherchons. Cette position offre de belles perspectives d'évolution dans un environnement stimulant.
+        """.strip()
+    else:
+        body = f"Votre profil pour le poste de {poste_accroche} chez {entreprise} a retenu notre attention."
+    
+    # Call-to-action
+    if cta_option == "Appel téléphonique":
+        cta = "Seriez-vous disponible pour un bref appel téléphonique cette semaine ?"
+    elif cta_option == "Rencontre":
+        cta = "Seriez-vous intéressé(e) par une rencontre pour discuter de cette opportunité ?"
+    else:
+        cta = "N'hésitez pas à me contacter si cette opportunité vous intéresse."
+    
+    # Assembly du message final
+    message = f"{greeting}\n\n{body}\n\n{cta}\n\nCordialement"
+    
+    # Limitation de la longueur si nécessaire
+    words = message.split()
+    if len(words) > max_words:
+        message = " ".join(words[:max_words]) + "..."
+    
+    return message
+
 # --- CSS pour augmenter la taille du texte des onglets ---
 st.markdown("""
 <style>
@@ -292,7 +339,7 @@ def ask_deepseek(messages, max_tokens=300):
     
     # 1. Extraction des critères de base
     def extract_field(field_name, content):
-        match = re.search(f"{field_name}:\s*(.*?)(?:\n|$)", content, re.IGNORECASE)
+        match = re.search(f"{field_name}:\\s*(.*?)(?:\\n|$)", content, re.IGNORECASE)
         return match.group(1).strip() if match else ""
     
     poste = extract_field("poste", messages[0]["content"])
@@ -873,15 +920,15 @@ with tab1:
 
 # -------------------- Tab 2: X-Ray --------------------
 with tab2:
-        st.header("🎯 X-Ray Google")
-        col1, col2 = st.columns(2)
-        with col1:
-            site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub"], key="xray_site")
-            poste_xray = st.text_input("Poste:", key="xray_poste", placeholder="Ex: Développeur Python")
-            mots_cles = st.text_input("Mots-clés:", key="xray_mots_cles", placeholder="Ex: Django, Flask")
-        with col2:
-            localisation_xray = st.text_input("Localisation:", key="xray_loc", placeholder="Ex: Casablanca")
-            exclusions_xray = st.text_input("Mots à exclure:", key="xray_exclusions", placeholder="Ex: Stage, Junior")
+    st.header("🎯 X-Ray Google")
+    col1, col2 = st.columns(2)
+    with col1:
+        site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub"], key="xray_site")
+        poste_xray = st.text_input("Poste:", key="xray_poste", placeholder="Ex: Développeur Python")
+        mots_cles = st.text_input("Mots-clés:", key="xray_mots_cles", placeholder="Ex: Django, Flask")
+    with col2:
+        localisation_xray = st.text_input("Localisation:", key="xray_loc", placeholder="Ex: Casablanca")
+        exclusions_xray = st.text_input("Mots à exclure:", key="xray_exclusions", placeholder="Ex: Stage, Junior")
 
         with st.expander("⚙️ Mode avancé LinkedIn", expanded=False):
             coladv1, coladv2, coladv3 = st.columns(3)
@@ -979,14 +1026,14 @@ with tab2:
                 st.success("✅ Requête X-Ray mise à jour")
                 st.rerun()
 
-    # Affichage de la requête X-Ray
-    snapx = st.session_state.get("xray_snapshot", {})
-    query_value_xray = st.session_state.get("xray_query", "")
-    
-    # Vérifier si les paramètres ont changé pour l'indication visuelle
-    params_changed_xray = False
-    if snapx and query_value_xray:
-        params_changed_xray = any([
+        # Affichage de la requête X-Ray
+        snapx = st.session_state.get("xray_snapshot", {})
+        query_value_xray = st.session_state.get("xray_query", "")
+        
+        # Vérifier si les paramètres ont changé pour l'indication visuelle
+        params_changed_xray = False
+        if snapx and query_value_xray:
+            params_changed_xray = any([
             snapx.get("site") != site_cible,
             snapx.get("poste") != poste_xray,
             snapx.get("mots_cles") != mots_cles,
