@@ -607,15 +607,111 @@ def extract_text_from_pdf(uploaded_file):
         return f"Erreur lors de l'extraction PDF: {str(e)}"
 
 def get_email_from_charika(entreprise):
-    """Simule la détection de format d'email depuis Charika"""
-    formats = [
-        "prenom.nom@entreprise.com",
-        "pnom@entreprise.com",
-        "prenom@entreprise.com",
-        "nom.prenom@entreprise.com",
-        "initialenom@entreprise.com"
-    ]
-    return formats[0]
+    """Recherche d'email d'entreprise depuis Charika.ma"""
+    try:
+        # Rechercher sur Charika.ma
+        search_url = f"https://www.charika.ma/search?q={quote(entreprise)}"
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        response = requests.get(search_url, headers=headers, timeout=10)
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Chercher le lien vers la page de l'entreprise
+        company_links = soup.find_all('a', href=True)
+        company_url = None
+        
+        for link in company_links:
+            if 'entreprise' in link['href'] and entreprise.lower() in link.text.lower():
+                company_url = "https://www.charika.ma" + link['href']
+                break
+        
+        if company_url:
+            # Accéder à la page de l'entreprise
+            company_response = requests.get(company_url, headers=headers, timeout=10)
+            company_soup = BeautifulSoup(company_response.content, 'html.parser')
+            
+            # Chercher la ligne E-mail
+            email_elements = company_soup.find_all(text=lambda text: text and 'E-mail' in text)
+            for element in email_elements:
+                parent = element.parent
+                # Chercher l'email à droite de "E-mail"
+                email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+                if parent:
+                    parent_text = parent.get_text()
+                    emails = re.findall(email_pattern, parent_text)
+                    if emails:
+                        return emails[0]
+                
+                # Chercher dans le parent suivant
+                next_sibling = parent.find_next_sibling()
+                if next_sibling:
+                    sibling_text = next_sibling.get_text()
+                    emails = re.findall(email_pattern, sibling_text)
+                    if emails:
+                        return emails[0]
+        
+        # Si pas trouvé sur Charika, chercher sur le site officiel
+        return search_email_on_website(entreprise)
+        
+    except Exception as e:
+        print(f"Erreur lors de la recherche sur Charika: {e}")
+        return search_email_on_website(entreprise)
+
+def search_email_on_website(entreprise):
+    """Recherche d'email sur le site officiel de l'entreprise"""
+    try:
+        # Essayer de trouver le site web de l'entreprise
+        search_query = f"{entreprise} site:ma OR site:com contact"
+        search_url = f"https://www.google.com/search?q={quote(search_query)}"
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }
+        
+        response = requests.get(search_url, headers=headers, timeout=10)
+        soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Extraire les URLs des résultats de recherche
+        result_links = soup.find_all('a', href=True)
+        potential_websites = []
+        
+        for link in result_links:
+            href = link.get('href', '')
+            if href.startswith('/url?q='):
+                actual_url = href.split('/url?q=')[1].split('&')[0]
+                if any(domain in actual_url for domain in ['.ma', '.com']) and 'google' not in actual_url:
+                    potential_websites.append(actual_url)
+        
+        # Visiter les sites potentiels pour chercher des emails
+        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+        
+        for website in potential_websites[:3]:  # Limiter à 3 sites
+            try:
+                site_response = requests.get(website, headers=headers, timeout=8)
+                site_content = site_response.text
+                
+                # Chercher spécifiquement dans les pages contact
+                if 'contact' in site_content.lower():
+                    emails = re.findall(email_pattern, site_content)
+                    # Filtrer les emails génériques
+                    for email in emails:
+                        if not any(generic in email.lower() for generic in ['noreply', 'no-reply', 'donotreply']):
+                            return email
+                            
+            except Exception:
+                continue
+        
+        # Format par défaut si rien trouvé
+        domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"
+        return f"contact@{domain}"
+        
+    except Exception as e:
+        print(f"Erreur lors de la recherche d'email: {e}")
+        # Format par défaut
+        domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"
+        return f"contact@{domain}"
 
 # -------------------- Initialisation --------------------
 init_session_state()
@@ -743,6 +839,19 @@ with tab1:
         localisation = st.text_input("Localisation:", key="boolean_loc", placeholder="Ex: Casablanca")
         employeur = st.text_input("Employeur:", key="boolean_employeur", placeholder="Ex: TGCC")
 
+    # Mode avancé LinkedIn pour Boolean
+    with st.expander("⚙️ Mode avancé LinkedIn", expanded=False):
+        col_adv1, col_adv2, col_adv3 = st.columns(3)
+        with col_adv1:
+            annee_formation = st.text_input("Année de formation", key="boolean_annee_formation", placeholder="Ex: 2014")
+            entreprises_precedentes = st.text_input("Entreprises précédentes", key="boolean_entreprises_prec", placeholder="Ex: OCP, TGCC")
+        with col_adv2:
+            ecoles_cibles = st.text_input("Écoles/Universités", key="boolean_ecoles", placeholder="Ex: EMI, ENSA")
+            certifications_bool = st.text_input("Certifications", key="boolean_certifications", placeholder="Ex: PMP, ISO 27001")
+        with col_adv3:
+            langues = st.text_input("Langues", key="boolean_langues", placeholder="Ex: Anglais, Français")
+            niveau_experience = st.selectbox("Niveau d'expérience", ["", "Junior (0-3 ans)", "Senior (3-7 ans)", "Expert (7+ ans)"], key="boolean_niveau_exp")
+
     gen_mode = st.selectbox("Générer la requête Boolean par :", ["Algorithme", "Intelligence artificielle"], key="boolean_gen_mode")
     if gen_mode == "Intelligence artificielle":
         st.caption("💡 L'IA enrichit les synonymes de façon conservatrice pour maximiser les résultats LinkedIn")
@@ -752,12 +861,46 @@ with tab1:
         if gen_mode == "Algorithme":
             with st.spinner("⏳ Génération en cours..."):
                 start_time = time.time()
-                st.session_state["boolean_query"] = generate_boolean_query(
+                base_query = generate_boolean_query(
                     poste, synonymes, competences_obligatoires,
                     competences_optionnelles, exclusions, localisation, secteur
                 )
                 if employeur:
-                    st.session_state["boolean_query"] += f' AND ("{employeur}")'
+                    base_query += f' AND ("{employeur}")'
+                
+                # Add advanced LinkedIn filters
+                advanced_parts = []
+                if annee_formation:
+                    advanced_parts.append(f'"{annee_formation}"')
+                if entreprises_precedentes:
+                    ent_terms = _split_terms(entreprises_precedentes)
+                    if ent_terms:
+                        advanced_parts.append(_or_group(ent_terms))
+                if ecoles_cibles:
+                    ecole_terms = _split_terms(ecoles_cibles)
+                    if ecole_terms:
+                        advanced_parts.append(_or_group(ecole_terms))
+                if certifications_bool:
+                    cert_terms = _split_terms(certifications_bool)
+                    if cert_terms:
+                        advanced_parts.append(_or_group(cert_terms))
+                if langues:
+                    lang_terms = _split_terms(langues)
+                    if lang_terms:
+                        advanced_parts.append(_or_group(lang_terms))
+                if niveau_experience and niveau_experience != "":
+                    if "Junior" in niveau_experience:
+                        advanced_parts.append('("0 ans" OR "1 an" OR "2 ans" OR "3 ans" OR "junior" OR "débutant")')
+                    elif "Senior" in niveau_experience:
+                        advanced_parts.append('("4 ans" OR "5 ans" OR "6 ans" OR "7 ans" OR "senior" OR "expérimenté")')
+                    elif "Expert" in niveau_experience:
+                        advanced_parts.append('("8 ans" OR "9 ans" OR "10 ans" OR "+10 ans" OR "expert" OR "lead" OR "principal")')
+                
+                if advanced_parts:
+                    st.session_state["boolean_query"] = base_query + " AND " + " AND ".join(advanced_parts)
+                else:
+                    st.session_state["boolean_query"] = base_query
+                
                 st.session_state["boolean_snapshot"] = {
                     "poste": poste,
                     "synonymes": synonymes,
@@ -767,7 +910,13 @@ with tab1:
                     "localisation": localisation,
                     "secteur": secteur,
                     "employeur": employeur or "",
-                    "mode": gen_mode
+                    "mode": gen_mode,
+                    "annee_formation": annee_formation,
+                    "entreprises_precedentes": entreprises_precedentes,
+                    "ecoles_cibles": ecoles_cibles,
+                    "certifications_bool": certifications_bool,
+                    "langues": langues,
+                    "niveau_experience": niveau_experience
                 }
                 total_time = time.time() - start_time
                 st.success(f"✅ Requête générée en {total_time:.1f}s")
@@ -795,11 +944,44 @@ with tab1:
                 synonymes_ia = ia_result.get("content", synonymes) if ia_result.get("content", "").strip() else synonymes
                 comp_ob_ia = ia_result.get("comp_ob_ia", competences_obligatoires)
 
-                # Generate the Boolean query
-                st.session_state["boolean_query"] = generate_boolean_query(
+                # Generate the Boolean query with advanced fields
+                base_query = generate_boolean_query(
                     poste, synonymes_ia, comp_ob_ia,
                     competences_optionnelles, exclusions, localisation, secteur, employeur
                 )
+                
+                # Add advanced LinkedIn filters
+                advanced_parts = []
+                if annee_formation:
+                    advanced_parts.append(f'"{annee_formation}"')
+                if entreprises_precedentes:
+                    ent_terms = _split_terms(entreprises_precedentes)
+                    if ent_terms:
+                        advanced_parts.append(_or_group(ent_terms))
+                if ecoles_cibles:
+                    ecole_terms = _split_terms(ecoles_cibles)
+                    if ecole_terms:
+                        advanced_parts.append(_or_group(ecole_terms))
+                if certifications_bool:
+                    cert_terms = _split_terms(certifications_bool)
+                    if cert_terms:
+                        advanced_parts.append(_or_group(cert_terms))
+                if langues:
+                    lang_terms = _split_terms(langues)
+                    if lang_terms:
+                        advanced_parts.append(_or_group(lang_terms))
+                if niveau_experience and niveau_experience != "":
+                    if "Junior" in niveau_experience:
+                        advanced_parts.append('("0 ans" OR "1 an" OR "2 ans" OR "3 ans" OR "junior" OR "débutant")')
+                    elif "Senior" in niveau_experience:
+                        advanced_parts.append('("4 ans" OR "5 ans" OR "6 ans" OR "7 ans" OR "senior" OR "expérimenté")')
+                    elif "Expert" in niveau_experience:
+                        advanced_parts.append('("8 ans" OR "9 ans" OR "10 ans" OR "+10 ans" OR "expert" OR "lead" OR "principal")')
+                
+                if advanced_parts:
+                    st.session_state["boolean_query"] = base_query + " AND " + " AND ".join(advanced_parts)
+                else:
+                    st.session_state["boolean_query"] = base_query
 
                 # Ensure the query ends with NOT if exclusions are specified
                 if exclusions:
@@ -837,7 +1019,13 @@ with tab1:
             snap.get("exclusions") != exclusions,
             snap.get("localisation") != localisation,
             snap.get("secteur") != secteur,
-            snap.get("employeur") != (employeur or "")
+            snap.get("employeur") != (employeur or ""),
+            snap.get("annee_formation") != annee_formation,
+            snap.get("entreprises_precedentes") != entreprises_precedentes,
+            snap.get("ecoles_cibles") != ecoles_cibles,
+            snap.get("certifications_bool") != certifications_bool,
+            snap.get("langues") != langues,
+            snap.get("niveau_experience") != niveau_experience
         ])
     
     # Label avec indication si obsolète
@@ -927,7 +1115,7 @@ with tab2:
         localisation_xray = st.text_input("Localisation:", key="xray_loc", placeholder="Ex: Casablanca")
         exclusions_xray = st.text_input("Mots à exclure:", key="xray_exclusions", placeholder="Ex: Stage, Junior")
 
-    if st.button("🔍 Construire X-Ray", type="primary", key="xray_build"):
+    if st.button("🔍 Construire X-Ray", type="primary", key="xray_build", use_container_width=True):
         with st.spinner("⏳ Génération en cours..."):
             start_time = time.time()
             # Logic for X-Ray query generation
@@ -1003,15 +1191,37 @@ with tab2:
             st.link_button("🌐 Ouvrir sur Google", url_xray, use_container_width=True)
 
     # Variantes
-    x_vars = generate_xray_variants(st.session_state["xray_query"], poste_xray, mots_cles, localisation_xray)
-    if x_vars:
-        st.caption("🔀 Variantes proposées")
-        for i, (title, qv) in enumerate(x_vars):
-            st.text_area(title, value=qv, height=80, key=f"xray_var_{i}")
-            safe_qv = qv.replace('"', '&quot;')
-            st.markdown(f'<button data-copy="{safe_qv}">📋 Copier</button>', unsafe_allow_html=True)
-    else:
-        st.info("Aucune variante générée pour la requête actuelle.")
+    if st.session_state.get("xray_query"):
+        x_vars = generate_xray_variants(st.session_state["xray_query"], poste_xray, mots_cles, localisation_xray)
+        if x_vars:
+            st.caption("🔀 Variantes proposées")
+            for i, (title, qv) in enumerate(x_vars):
+                st.text_area(title, value=qv, height=80, key=f"xray_var_{i}")
+                st.text_input(f"Commentaire variante {i+1}", value=st.session_state.get(f"xray_commentaire_var_{i}", ""), key=f"xray_commentaire_var_{i}")
+                cols_var = st.columns([0.33, 0.33, 0.34])
+                with cols_var[0]:
+                    safe_qv = qv.replace('"', '&quot;')
+                    st.markdown(f'<button data-copy="{safe_qv}">📋 Copier</button>', unsafe_allow_html=True)
+                with cols_var[1]:
+                    if st.button("💾 Sauvegarder", key=f"xray_save_var_{i}", use_container_width=True):
+                        entry = {
+                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                            "type": "X-Ray Variante",
+                            "poste": poste_xray,
+                            "requete": qv,
+                            "utilisateur": st.session_state.get("user", ""),
+                            "source": "X-Ray",
+                            "commentaire": st.session_state.get(f"xray_commentaire_var_{i}", "")
+                        }
+                        st.session_state.library_entries.append(entry)
+                        save_library_entries()
+                        save_sourcing_entry_to_gsheet(entry)
+                        st.success("✅ Sauvegardé")
+                with cols_var[2]:
+                    url_var = f"https://www.google.com/search?q={quote(qv)}"
+                    st.link_button("🌐 Ouvrir", url_var, use_container_width=True)
+        else:
+            st.info("Aucune variante générée pour la requête actuelle.")
 
 # -------------------- Tab 3: CSE --------------------
 with tab3:
@@ -1060,29 +1270,59 @@ with tab3:
 with tab4:
     st.header("🐶 Dogpile Search")
     query = st.text_input("Requête Dogpile:", key="dogpile_query_input", placeholder="Ex: Python developer Casablanca")
-    if st.button("🔍 Rechercher", key="dogpile_search_btn", type="primary", width="stretch"):
+    if st.button("🔍 Rechercher", key="dogpile_search_btn", type="primary", use_container_width=True):
         if query:
             st.session_state["dogpile_query"] = query
+            st.session_state["dogpile_snapshot"] = query
             st.success("✅ Requête enregistrée")
+            st.rerun()
+
+    # Affichage unifié avec détection de changement
+    snap_dogpile = st.session_state.get("dogpile_snapshot", "")
+    query_value_dogpile = st.session_state.get("dogpile_query", "")
+    
+    # Vérifier si les paramètres ont changé
+    params_changed_dogpile = False
+    if snap_dogpile and query_value_dogpile:
+        params_changed_dogpile = snap_dogpile != query
+    
+    # Label avec indication si obsolète
+    label_dogpile = "Requête Dogpile:"
+    if params_changed_dogpile:
+        label_dogpile += " ⚠️ (Requête obsolète - paramètres modifiés - Rechercher pour mettre à jour)"
+    
+    # Widget unifié
+    placeholder_text_dogpile = "Entrez votre requête ci-dessus puis cliquez sur 'Rechercher'" if not query_value_dogpile else ""
+    st.text_area(label_dogpile, value=query_value_dogpile, height=80, placeholder=placeholder_text_dogpile)
+    
+    # Boutons et commentaires (seulement si requête existe)
     if st.session_state.get("dogpile_query"):
-        st.text_area("Requête Dogpile:", value=st.session_state["dogpile_query"], height=80, key="dogpile_area")
-    safe_dogpile = st.session_state.get('dogpile_query', '').replace('"', '&quot;')
-    st.markdown(f'<button style="margin-top:4px" data-copy="{safe_dogpile}">📋 Copier</button>', unsafe_allow_html=True)
-    col1, col2 = st.columns([1, 2])
-    with col1:
-        if st.button("💾 Sauvegarder", key="dogpile_save_btn", width="stretch"):
-            entry = {
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                "type": "Dogpile",
-                "poste": "Recherche Dogpile",
-                "requete": st.session_state["dogpile_query"],
-            }
-            st.session_state.library_entries.append(entry)
-            save_library_entries()
-            st.success("✅ Sauvegardé")
-    with col2:
-        dogpile_url = f"http://www.dogpile.com/serp?q={quote(st.session_state['dogpile_query'])}"
-        st.link_button("🌐 Ouvrir sur Dogpile", dogpile_url, width="stretch")
+        # Zone commentaire
+        dogpile_commentaire = st.text_input("Commentaire (optionnel)", value=st.session_state.get("dogpile_commentaire", ""), key="dogpile_commentaire")
+        
+        # Boutons organisés : Copier, Sauvegarder, Ouvrir
+        cols_actions = st.columns([0.33, 0.33, 0.34])
+        with cols_actions[0]:
+            safe_dogpile = st.session_state.get('dogpile_query', '').replace('"', '&quot;')
+            st.markdown(f'<button data-copy="{safe_dogpile}">📋 Copier</button>', unsafe_allow_html=True)
+        with cols_actions[1]:
+            if st.button("💾 Sauvegarder", key="dogpile_save_btn", use_container_width=True):
+                entry = {
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "type": "Dogpile",
+                    "poste": "Recherche Dogpile",
+                    "requete": st.session_state["dogpile_query"],
+                    "utilisateur": st.session_state.get("user", ""),
+                    "source": "Dogpile",
+                    "commentaire": st.session_state.get("dogpile_commentaire", "")
+                }
+                st.session_state.library_entries.append(entry)
+                save_library_entries()
+                save_sourcing_entry_to_gsheet(entry)
+                st.success("✅ Sauvegardé")
+        with cols_actions[2]:
+            dogpile_url = f"http://www.dogpile.com/serp?q={quote(st.session_state['dogpile_query'])}"
+            st.link_button("🌐 Ouvrir sur Dogpile", dogpile_url, use_container_width=True)
 
 # -------------------- Tab 5: Web Scraper - Analyse Concurrentielle --------------------
 # -------------------- Tab 5: Web Scraper - Analyse Concurrentielle --------------------
@@ -1478,59 +1718,123 @@ with tab6:
         cta_option = st.selectbox("Call to action (Conclusion)", ["Proposer un appel", "Partager le CV", "Découvrir l'opportunité sur notre site", "Accepter un rendez-vous"], key="inmail_cta")
 
     # --------- INFORMATIONS CANDIDAT ---------
-    st.subheader("📊 Informations candidat")
+    with st.expander("📊 Informations candidat", expanded=False):
+        default_profil = {
+            "prenom": "Candidat",
+            "nom": "",
+            "poste_actuel": "",
+            "entreprise_actuelle": "",
+            "competences_cles": ["", "", ""],
+            "experience_annees": "",
+            "formation": "",
+            "mission": "",
+            "localisation": ""
+        }
+        profil_data = {**default_profil, **st.session_state.get("inmail_profil_data", {})}
 
-    default_profil = {
-        "prenom": "Candidat",
-        "nom": "",
-        "poste_actuel": "",
-        "entreprise_actuelle": "",
-        "competences_cles": ["", "", ""],
-        "experience_annees": "",
-        "formation": "",
-        "mission": "",
-        "localisation": ""
-    }
-    profil_data = {**default_profil, **st.session_state.get("inmail_profil_data", {})}
+        cols = st.columns(5)
+        profil_data["prenom"] = cols[0].text_input("Prénom", profil_data.get("prenom", ""), key="inmail_prenom")
+        profil_data["nom"] = cols[1].text_input("Nom", profil_data.get("nom", ""), key="inmail_nom")
+        profil_data["poste_actuel"] = cols[2].text_input("Poste actuel", profil_data.get("poste_actuel", ""), key="inmail_poste_actuel")
+        profil_data["entreprise_actuelle"] = cols[3].text_input("Entreprise actuelle", profil_data.get("entreprise_actuelle", ""), key="inmail_entreprise_actuelle")
+        profil_data["experience_annees"] = cols[4].text_input("Années d'expérience", profil_data.get("experience_annees", ""), key="inmail_exp")
 
-    cols = st.columns(5)
-    profil_data["prenom"] = cols[0].text_input("Prénom", profil_data.get("prenom", ""), key="inmail_prenom")
-    profil_data["nom"] = cols[1].text_input("Nom", profil_data.get("nom", ""), key="inmail_nom")
-    profil_data["poste_actuel"] = cols[2].text_input("Poste actuel", profil_data.get("poste_actuel", ""), key="inmail_poste_actuel")
-    profil_data["entreprise_actuelle"] = cols[3].text_input("Entreprise actuelle", profil_data.get("entreprise_actuelle", ""), key="inmail_entreprise_actuelle")
-    profil_data["experience_annees"] = cols[4].text_input("Années d'expérience", profil_data.get("experience_annees", ""), key="inmail_exp")
+        cols2 = st.columns(5)
+        profil_data["formation"] = cols2[0].text_input("Domaine de formation", profil_data.get("formation", ""), key="inmail_formation")
+        profil_data["competences_cles"][0] = cols2[1].text_input("Compétence 1", profil_data["competences_cles"][0], key="inmail_comp1")
+        profil_data["competences_cles"][1] = cols2[2].text_input("Compétence 2", profil_data["competences_cles"][1], key="inmail_comp2")
+        profil_data["competences_cles"][2] = cols2[3].text_input("Compétence 3", profil_data["competences_cles"][2], key="inmail_comp3")
+        profil_data["localisation"] = cols2[4].text_input("Localisation", profil_data.get("localisation", ""), key="inmail_loc")
 
-    cols2 = st.columns(5)
-    profil_data["formation"] = cols2[0].text_input("Domaine de formation", profil_data.get("formation", ""), key="inmail_formation")
-    profil_data["competences_cles"][0] = cols2[1].text_input("Compétence 1", profil_data["competences_cles"][0], key="inmail_comp1")
-    profil_data["competences_cles"][1] = cols2[2].text_input("Compétence 2", profil_data["competences_cles"][1], key="inmail_comp2")
-    profil_data["competences_cles"][2] = cols2[3].text_input("Compétence 3", profil_data["competences_cles"][2], key="inmail_comp3")
-    profil_data["localisation"] = cols2[4].text_input("Localisation", profil_data.get("localisation", ""), key="inmail_loc")
+        profil_data["mission"] = st.text_area("Mission du poste", profil_data.get("mission", ""), height=80, key="inmail_mission")
 
-    profil_data["mission"] = st.text_area("Mission du poste", profil_data.get("mission", ""), height=80, key="inmail_mission")
+        col_ap1, col_ap2 = st.columns(2)
+        with col_ap1:
+            if st.button("🔍 Analyser profil", key="btn_analyse_inmail"):
+                profil_data.update({"poste_actuel": "Manager", "entreprise_actuelle": "ExempleCorp"})
+                st.session_state["inmail_profil_data"] = profil_data
+                st.success("✅ Profil pré-rempli automatiquement")
+        with col_ap2:
+            if st.button("💾 Appliquer infos candidat", key="btn_apply_inmail"):
+                st.session_state["inmail_profil_data"] = profil_data
+                st.success("✅ Infos candidat mises à jour")
 
-    col_ap1, col_ap2 = st.columns(2)
-    with col_ap1:
-        if st.button("🔍 Analyser profil", key="btn_analyse_inmail"):
-            profil_data.update({"poste_actuel": "Manager", "entreprise_actuelle": "ExempleCorp"})
-            st.session_state["inmail_profil_data"] = profil_data
-            st.success("✅ Profil pré-rempli automatiquement")
-    with col_ap2:
-        if st.button("💾 Appliquer infos candidat", key="btn_apply_inmail"):
-            st.session_state["inmail_profil_data"] = profil_data
-            st.success("✅ Infos candidat mises à jour")
+    # Garder les données du profil à jour
+    if not st.session_state.get("inmail_profil_data"):
+        st.session_state["inmail_profil_data"] = profil_data
+    else:
+        # Mettre à jour avec les nouvelles valeurs
+        st.session_state["inmail_profil_data"].update(profil_data)
 
     # --------- GÉNÉRATION ---------
-    if st.button("✨ Générer", type="primary", width="stretch", key="btn_generate_inmail"):
+    if st.button("✨ Générer", type="primary", use_container_width=True, key="btn_generate_inmail"):
         donnees_profil = st.session_state.get("inmail_profil_data", profil_data)
-        msg = generate_inmail(donnees_profil, poste_accroche, entreprise, ton_message, longueur_message, cta_option, genre_profil, "entreprise")
+        
+        # Utiliser l'IA pour générer le message
+        ia_prompt = f"""
+        Génère un message InMail personnalisé avec les informations suivantes:
+        - Candidat: {donnees_profil.get('prenom', '')} {donnees_profil.get('nom', '')}
+        - Poste actuel: {donnees_profil.get('poste_actuel', '')}
+        - Entreprise actuelle: {donnees_profil.get('entreprise_actuelle', '')}
+        - Compétences: {', '.join(filter(None, donnees_profil.get('competences_cles', [])))}
+        - Formation: {donnees_profil.get('formation', '')}
+        - Expérience: {donnees_profil.get('experience_annees', '')} ans
+        - Localisation: {donnees_profil.get('localisation', '')}
+        
+        Poste à pourvoir: {poste_accroche}
+        Entreprise: {entreprise}
+        Ton: {ton_message}
+        Genre: {genre_profil}
+        Call-to-action: {cta_option}
+        
+        Le message doit faire environ {longueur_message} mots et être {ton_message.lower()}.
+        """
+        
+        with st.spinner("🤖 Génération IA en cours..."):
+            ia_result = ask_deepseek([{"role": "user", "content": ia_prompt}], max_tokens=300)
+            if ia_result.get("content"):
+                msg = ia_result["content"]
+            else:
+                # Fallback si l'IA ne répond pas
+                msg = generate_inmail(donnees_profil, poste_accroche, entreprise, ton_message, longueur_message, cta_option, genre_profil, "entreprise")
+        
         st.session_state["inmail_message"] = msg
         st.session_state["inmail_objet"] = "Nouvelle opportunité: " + poste_accroche
         st.session_state["inmail_generated"] = True
+        st.session_state["inmail_snapshot"] = {
+            "poste_accroche": poste_accroche,
+            "entreprise": entreprise,
+            "ton_message": ton_message,
+            "longueur_message": longueur_message,
+            "cta_option": cta_option,
+            "genre_profil": genre_profil,
+            "profil_data": donnees_profil.copy()
+        }
 
     # --------- RÉSULTAT ---------
     if st.session_state.get("inmail_generated"):
-        st.subheader("📝 Message InMail généré")
+        # Vérifier si les paramètres ont changé
+        snap_inmail = st.session_state.get("inmail_snapshot", {})
+        current_profil = st.session_state.get("inmail_profil_data", profil_data)
+        
+        params_changed_inmail = False
+        if snap_inmail:
+            params_changed_inmail = any([
+                snap_inmail.get("poste_accroche") != poste_accroche,
+                snap_inmail.get("entreprise") != entreprise,
+                snap_inmail.get("ton_message") != ton_message,
+                snap_inmail.get("longueur_message") != longueur_message,
+                snap_inmail.get("cta_option") != cta_option,
+                snap_inmail.get("genre_profil") != genre_profil,
+                snap_inmail.get("profil_data") != current_profil
+            ])
+        
+        # Titre avec indication si obsolète
+        titre_inmail = "📝 Message InMail généré"
+        if params_changed_inmail:
+            titre_inmail += " ⚠️ (Paramètres modifiés - Régénérer pour mettre à jour)"
+        
+        st.subheader(titre_inmail)
         st.text_input("📧 Objet", st.session_state.get("inmail_objet", ""), key="inmail_objet_display")
         msg = st.session_state["inmail_message"]
         st.text_area("Message", msg, height=250, key="inmail_msg_display")
@@ -1538,23 +1842,51 @@ with tab6:
 
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("🔄 Régénérer avec mêmes paramètres", key="btn_regen_inmail"):
+            if st.button("🔄 Régénérer (nouvelle version)", key="btn_regen_inmail"):
                 donnees_profil = st.session_state.get("inmail_profil_data", profil_data)
-                msg = generate_inmail(donnees_profil, poste_accroche, entreprise, ton_message, longueur_message, cta_option, genre_profil, "entreprise")
-                st.session_state["inmail_message"] = msg
+                
+                # Générer une nouvelle version avec l'IA
+                ia_prompt = f"""
+                Génère une NOUVELLE version d'un message InMail (différente de la précédente) avec:
+                - Candidat: {donnees_profil.get('prenom', '')} {donnees_profil.get('nom', '')}
+                - Poste actuel: {donnees_profil.get('poste_actuel', '')}
+                - Entreprise actuelle: {donnees_profil.get('entreprise_actuelle', '')}
+                - Compétences: {', '.join(filter(None, donnees_profil.get('competences_cles', [])))}
+                - Formation: {donnees_profil.get('formation', '')}
+                - Expérience: {donnees_profil.get('experience_annees', '')} ans
+                
+                Poste à pourvoir: {poste_accroche}
+                Entreprise: {entreprise}
+                Ton: {ton_message}
+                
+                Génère une approche différente, avec un angle nouveau mais professionnel.
+                """
+                
+                with st.spinner("🔄 Régénération IA en cours..."):
+                    ia_result = ask_deepseek([{"role": "user", "content": ia_prompt}], max_tokens=300)
+                    if ia_result.get("content"):
+                        new_msg = ia_result["content"]
+                    else:
+                        new_msg = generate_inmail(donnees_profil, poste_accroche, entreprise, ton_message, longueur_message, cta_option, genre_profil, "entreprise")
+                
+                st.session_state["inmail_message"] = new_msg
                 st.session_state["inmail_objet"] = "Nouvelle opportunité: " + poste_accroche
                 st.rerun()
         with col2:
             if st.button("💾 Sauvegarder comme modèle", key="btn_save_inmail"):
                 entry = {
-                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "type": "InMail",
                     "poste": poste_accroche,
-                    "requete": st.session_state["inmail_message"]
+                    "requete": st.session_state["inmail_message"],
+                    "utilisateur": st.session_state.get("user", ""),
+                    "source": "InMail",
+                    "commentaire": f"Ton: {ton_message}, Longueur: {longueur_message} mots"
                 }
                 st.session_state.library_entries.append(entry)
                 save_library_entries()
-                st.success(f"✅ Modèle '{poste_accroche} - {entry['date']}' sauvegardé")
+                save_sourcing_entry_to_gsheet(entry)
+                st.success(f"✅ Modèle '{poste_accroche} - {entry['timestamp']}' sauvegardé")
 
 
 # -------------------- Tab 7: Magicien --------------------
@@ -1633,13 +1965,48 @@ with tab7:
 with tab8:
     st.header("📧 Permutateur Email")
 
+    # Génération de noms marocains aléatoires
+    if "random_names" not in st.session_state:
+        import random
+        noms_masculins = ["Ahmed", "Mohamed", "Youssef", "Omar", "Khalid", "Rachid", "Hassan", "Abdelkader", "Mustapha", "Saïd"]
+        noms_feminins = ["Fatima", "Aicha", "Khadija", "Zineb", "Salma", "Nadia", "Houda", "Laila", "Amina", "Sanaa"]
+        noms_famille = ["Alami", "Bennani", "Cherkaoui", "Filali", "Idrissi", "Jamal", "Kettani", "Lahlou", "Mahfoudi", "Naciri", "Ouazzani", "Qadiri"]
+        
+        # Sélectionner aléatoirement
+        random_prenom_m = random.choice(noms_masculins)
+        random_prenom_f = random.choice(noms_feminins)
+        random_nom = random.choice(noms_famille)
+        
+        st.session_state["random_names"] = {
+            "masculin": f"{random_prenom_m}",
+            "feminin": f"{random_prenom_f}",
+            "nom": random_nom
+        }
+
     col1, col2 = st.columns(2)
     with col1:
-        prenom = st.text_input("Prénom:", key="perm_prenom", placeholder="Jean")
-        nom = st.text_input("Nom:", key="perm_nom", placeholder="Dupont")
+        # Suggestions de noms
+        st.caption(f"💡 Suggestions: {st.session_state['random_names']['masculin']} ou {st.session_state['random_names']['feminin']}")
+        prenom = st.text_input("Prénom:", key="perm_prenom", placeholder=st.session_state['random_names']['masculin'])
+        st.caption(f"💡 Suggestion: {st.session_state['random_names']['nom']}")
+        nom = st.text_input("Nom:", key="perm_nom", placeholder=st.session_state['random_names']['nom'])
     with col2:
         entreprise = st.text_input("Entreprise:", key="perm_entreprise", placeholder="TGCC")
         source = st.radio("Source de détection :", ["Site officiel", "Charika.ma"], key="perm_source", horizontal=True)
+    
+    # Bouton pour générer de nouveaux noms
+    if st.button("🔄 Nouvelles suggestions de noms", key="refresh_names"):
+        import random
+        noms_masculins = ["Ahmed", "Mohamed", "Youssef", "Omar", "Khalid", "Rachid", "Hassan", "Abdelkader", "Mustapha", "Saïd"]
+        noms_feminins = ["Fatima", "Aicha", "Khadija", "Zineb", "Salma", "Nadia", "Houda", "Laila", "Amina", "Sanaa"]
+        noms_famille = ["Alami", "Bennani", "Cherkaoui", "Filali", "Idrissi", "Jamal", "Kettani", "Lahlou", "Mahfoudi", "Naciri", "Ouazzani", "Qadiri"]
+        
+        st.session_state["random_names"] = {
+            "masculin": random.choice(noms_masculins),
+            "feminin": random.choice(noms_feminins),
+            "nom": random.choice(noms_famille)
+        }
+        st.rerun()
 
     if st.button("🔮 Générer permutations", width="stretch"):
         if prenom and nom and entreprise:
