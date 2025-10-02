@@ -1489,11 +1489,6 @@ with tab6:
         elif cta_type == "Accepter un rendez-vous":
             return f"Je serai ravi{suffix} de convenir d’un rendez-vous afin d’échanger sur cette opportunité."
         return ""
-                "mission": "",
-                "localisation": ""
-            }
-            st.session_state["inmail_message"] = template_entry["requete"]
-            st.success("📥 Modèle importé et infos candidat prêtes")
 
     # --------- PARAMÈTRES GÉNÉRAUX ---------
     col1, col2, col3, col4 = st.columns(4)
