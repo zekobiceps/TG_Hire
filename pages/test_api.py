@@ -134,11 +134,10 @@ def generate_boolean_query(poste: str, synonymes: str, competences_obligatoires:
     - Groupes OR / AND corrects
     """
     parts: list[str] = []
-    if poste:
-        parts.append(f'"{poste}"')
-    syns = _split_terms(synonymes)
-    if syns:
-        parts.append(_or_group(syns))
+    if poste or synonymes:
+        # Combine poste and synonyms with OR
+        poste_and_synonyms = _or_group([poste] + _split_terms(synonymes) if poste else _split_terms(synonymes))
+        parts.append(poste_and_synonyms)
     comp_ob = _split_terms(competences_obligatoires)
     if comp_ob:
         parts.append(_and_group(comp_ob))
