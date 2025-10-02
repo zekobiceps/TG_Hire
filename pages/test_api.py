@@ -622,57 +622,126 @@ def get_email_from_charika(entreprise):
         company_links = soup.find_all('a', href=True)
         company_url = None
         
-        # Chercher d'abord les liens contenant "entreprise"
+        # Approche améliorée pour trouver les liens d'entreprise
+        # 1. Chercher d'abord les liens avec "entreprise" ou "fiche" dans l'URL
         for link in company_links:
             href = link.get('href', '')
             text = link.get_text().strip().lower()
-            if 'entreprise' in href and any(word in text for word in entreprise.lower().split()):
-                company_url = "https://www.charika.ma" + href if not href.startswith('http') else href
+            if ('entreprise' in href or 'fiche' in href or 'company' in href) and any(word in text for word in entreprise.lower().split()):
+                company_url = "https://www.charika.ma" + href if href.startswith('/') else href
                 break
         
-        # Si pas trouvé, chercher dans tous les liens
+        # 2. Si pas trouvé, chercher plus largement
         if not company_url:
             for link in company_links:
                 href = link.get('href', '')
                 text = link.get_text().strip().lower()
-                if href and entreprise.lower() in text:
-                    company_url = "https://www.charika.ma" + href if not href.startswith('http') else href
-                    break
+                # Recherche plus souple dans le texte du lien
+                if href and href.startswith('/') and len(href) > 5:  # URLs relatives significatives
+                    # Vérifier si le nom de l'entreprise est dans le texte
+                    if (entreprise.lower() in text or 
+                        any(word.lower() in text for word in entreprise.split() if len(word) > 2)):
+                        company_url = "https://www.charika.ma" + href
+                        break
+        
+        # 3. Essayer des URLs construites directement (fallback)
+        if not company_url:
+            # Essayer différents formats d'URL possibles
+            possible_urls = [
+                f"https://www.charika.ma/entreprise/{entreprise.lower().replace(' ', '-')}",
+                f"https://www.charika.ma/fiche/{entreprise.lower().replace(' ', '-')}",
+                f"https://www.charika.ma/company/{entreprise.lower().replace(' ', '-')}",
+                f"https://www.charika.ma/entreprise/{entreprise.lower().replace(' ', '').replace('-', '')}",
+            ]
+            
+            for test_url in possible_urls:
+                try:
+                    test_response = requests.get(test_url, headers=headers, timeout=10)
+                    # Vérifier si la page existe et n'est pas une page d'erreur
+                    if test_response.status_code == 200 and 'Page manquante' not in test_response.text:
+                        company_url = test_url
+                        break
+                except:
+                    continue
         
         if company_url:
             # Accéder à la page de l'entreprise
             company_response = requests.get(company_url, headers=headers, timeout=10)
             company_soup = BeautifulSoup(company_response.content, 'html.parser')
             
-            # Méthode améliorée pour trouver l'email
-            email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+            # Méthode améliorée basée sur l'inspection de la structure HTML de Charika.ma
+            # Structure identifiée: <span class="dropdown"> avec <span class="mrg-fiche3"> contenant "E-mail" et lien mailto
             
-            # 1. Chercher directement "E-mail" ou "Email"
-            email_labels = company_soup.find_all(text=re.compile(r'E-?mail', re.IGNORECASE))
-            for label in email_labels:
-                # Chercher dans le même élément parent
-                parent = label.parent
-                if parent:
-                    # Chercher dans tout le texte du parent et ses voisins
-                    full_text = parent.get_text()
-                    emails = re.findall(email_pattern, full_text)
-                    if emails:
-                        return emails[0]
+            # Méthode 1: Chercher spécifiquement la structure HTML observée
+            # Pattern: <span class="dropdown"> contenant "E-mail" et un lien mailto
+            dropdown_spans = company_soup.find_all('span', class_='dropdown')
+            for dropdown in dropdown_spans:
+                dropdown_html = str(dropdown)
+                # Vérifier si ce dropdown contient "E-mail" ET un lien mailto
+                if 'E-mail' in dropdown_html and 'mailto:' in dropdown_html:
+                    # Extraire directement l'email du HTML avec regex (plus fiable)
+                    mailto_pattern = r'mailto:([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,})'
+                    matches = re.findall(mailto_pattern, dropdown_html)
+                    for email in matches:
+                        if 'charika.ma' not in email.lower():
+                            return email
+                
+                # Méthode alternative avec BeautifulSoup
+                mrg_spans = dropdown.find_all('span', class_='mrg-fiche3')
+                for mrg_span in mrg_spans:
+                    if 'E-mail' in mrg_span.get_text():
+                        # Chercher les liens mailto dans ce dropdown
+                        mailto_links = dropdown.find_all('a', href=lambda x: x and x.startswith('mailto:'))
+                        for link in mailto_links:
+                            email = link.get('href').replace('mailto:', '').strip()
+                            if '@' in email and '.' in email.split('@')[1]:
+                                # Vérifier que ce n'est pas l'email de Charika
+                                if 'charika.ma' not in email.lower():
+                                    return email
+            
+            # Méthode 2: Chercher tous les liens mailto dans la page (en excluant Charika)
+            mailto_links = company_soup.find_all('a', href=lambda x: x and x.startswith('mailto:'))
+            for link in mailto_links:
+                email = link.get('href').replace('mailto:', '').strip()
+                if '@' in email and '.' in email.split('@')[1]:
+                    # Filtrer les emails génériques et celui de Charika
+                    excluded = ['noreply', 'no-reply', 'donotreply', 'example', 'test', 'charika.ma', 'contact@charika']
+                    if not any(generic in email.lower() for generic in excluded):
+                        return email
+            
+            # Méthode 3: Chercher dans les éléments contenant "E-mail" avec pattern spécifique
+            # Chercher <span class="mrg-fiche3"> contenant "E-mail"
+            email_elements = company_soup.find_all('span', class_='mrg-fiche3')
+            for element in email_elements:
+                if 'E-mail' in element.get_text():
+                    # Chercher dans le parent (dropdown) ou les éléments suivants
+                    parent = element.parent
+                    if parent:
+                        # Chercher les liens mailto dans le parent
+                        mailto_links = parent.find_all('a', href=lambda x: x and x.startswith('mailto:'))
+                        for link in mailto_links:
+                            email = link.get('href').replace('mailto:', '').strip()
+                            if '@' in email and '.' in email.split('@')[1] and 'charika.ma' not in email.lower():
+                                return email
                     
-                    # Chercher dans les éléments suivants
-                    for sibling in parent.find_next_siblings():
-                        sibling_text = sibling.get_text()
-                        emails = re.findall(email_pattern, sibling_text)
-                        if emails:
-                            return emails[0]
+                    # Chercher aussi dans les éléments suivants (siblings)
+                    for sibling in element.next_siblings:
+                        if hasattr(sibling, 'find_all'):
+                            mailto_links = sibling.find_all('a', href=lambda x: x and x.startswith('mailto:'))
+                            for link in mailto_links:
+                                email = link.get('href').replace('mailto:', '').strip()
+                                if '@' in email and '.' in email.split('@')[1] and 'charika.ma' not in email.lower():
+                                    return email
             
-            # 2. Chercher dans les éléments contenant des emails
+            # Méthode 4: Fallback - regex dans tout le texte (en excluant Charika)
+            email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
             all_text = company_soup.get_text()
             emails = re.findall(email_pattern, all_text)
             if emails:
-                # Filtrer les emails génériques
+                # Filtrer les emails génériques et celui de Charika
+                excluded = ['noreply', 'no-reply', 'donotreply', 'example', 'test', 'charika.ma']
                 for email in emails:
-                    if not any(generic in email.lower() for generic in ['noreply', 'no-reply', 'donotreply', 'example']):
+                    if not any(generic in email.lower() for generic in excluded):
                         return email
         
         # Retourner None si pas trouvé pour permettre la gestion d'erreur
