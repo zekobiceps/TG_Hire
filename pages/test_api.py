@@ -2113,8 +2113,16 @@ with tab8:
                 elif source == "Charika.ma":
                     # Email non détecté sur Charika
                     charika_url = get_charika_search_url(entreprise)
+                    google_search_url = f"https://www.google.com/search?q={quote(f'{entreprise} site:charika.ma')}"
                     st.error(f"❌ Format d'email non détecté sur Charika.ma pour '{entreprise}'")
-                    st.markdown(f"🔍 [Rechercher '{entreprise}' sur Charika.ma]({charika_url})")
+                    
+                    # Boutons de fallback
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown(f"🔍 [Rechercher sur Charika.ma]({charika_url})")
+                    with col2:
+                        st.markdown(f"🌐 [Rechercher sur Google]({google_search_url})")
+                    
                     domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"
                 else:
                     domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"

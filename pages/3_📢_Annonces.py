@@ -15,6 +15,10 @@ spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
 utils = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(utils)
 
+# Vérification de la connexion
+if not st.session_state.get("logged_in", False):
+    st.stop()
+    
 # -------------------- Init session --------------------
 utils.init_session_state()
 

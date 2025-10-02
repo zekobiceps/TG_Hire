@@ -1,8 +1,4 @@
 import streamlit as st
-
-# Vérification de la connexion
-if not st.session_state.get("logged_in", False):
-    st.stop()
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
