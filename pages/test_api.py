@@ -2010,7 +2010,6 @@ with tab7:
     question_type = st.selectbox(
         "📌 Choisissez une question type :",
         questions_pretes + ["Autre (saisie libre)"],
-        key="magicien_question_type",
         help="Sélectionnez une question type puis complétez dans le champ ci-dessous."
     )
     # Zone unique, pré-remplie dès qu'on choisit une question type
