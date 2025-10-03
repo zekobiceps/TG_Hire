@@ -1992,6 +1992,56 @@ with tab6:
                 st.success(f"✅ Modèle '{poste_accroche} - {entry['timestamp']}' sauvegardé")
 
 
+# -------------------- Tab 7: Magicien --------------------
+with tab7:
+    st.header("🤖 Magicien de sourcing")
+
+    questions_pretes = [
+        "Quels sont les synonymes possibles pour le métier de",
+        "Quels outils ou logiciels sont liés au métier de", 
+        "Quels mots-clés pour cibler les juniors pour le poste de",
+        "Quels intitulés similaires au poste de",
+        "Quels critères éliminatoires fréquents pour le poste de",
+        "Quels secteurs d'activité embauchent souvent pour le poste de",
+        "Quelles certifications utiles pour le métier de",
+        "Quels rôles proches à considérer lors du sourcing pour",
+        "Quelles tendances de recrutement récentes pour le métier de"
+    ]
+
+    mode_rapide_magicien = st.checkbox("⚡ Réponse concise", key="magicien_fast")
+    question_type = st.selectbox(
+        "📌 Choisissez une question type :",
+        questions_pretes + ["Autre (saisie libre)"],
+        help="Sélectionnez une question type puis complétez dans le champ ci-dessous."
+    )
+    # Zone unique, pré-remplie dès qu'on choisit une question type
+    if "magicien_last_type" not in st.session_state or st.session_state["magicien_last_type"] != question_type:
+        if question_type != "Autre (saisie libre)":
+            st.session_state["magicien_complete_unique"] = question_type + " "
+        else:
+            st.session_state["magicien_complete_unique"] = ""
+        st.session_state["magicien_last_type"] = question_type
+    question_complete = st.text_input(
+        "Complétez ou modifiez la question :",
+        value=st.session_state.get("magicien_complete_unique", ""),
+        placeholder="Ex: Quels critères éliminatoires fréquents pour le poste de Chargé de recrutement"
+    )
+
+    if st.button("✨ Poser la question", type="primary", key="ask_magicien", use_container_width=True):
+        if question_complete and question_complete.strip():
+            with st.spinner("⏳ Génération en cours..."):
+                start_time = time.time()
+                prompt = question_complete.strip()
+                # Ajout d'une instruction pour forcer une liste d'intitulés/synonymes si la question le demande
+                if "synonymes" in prompt.lower() or "intitulés similaires" in prompt.lower():
+                    prompt += ". Réponds uniquement par une liste de synonymes ou intitulés similaires, séparés par des virgules, sans introduction."
+                elif "outils" in prompt.lower() or "logiciels" in prompt.lower():
+                    prompt += ". Réponds avec une liste à puces des outils, sans introduction."
+                elif "compétences" in prompt.lower() or "skills" in prompt.lower():
+                    prompt += ". Réponds avec une liste à puces, sans introduction."
+                if mode_rapide_magicien:
+                    prompt += " Réponse concise et directe."
+                result = ask_deepseek([{"role": "user", "content": prompt}], max_tokens=300)
                 total_time = int(time.time() - start_time)
                 st.success(f"✅ Réponse générée en {total_time}s")
                 if result.get("content"):
