@@ -15,63 +15,94 @@ import pandas as pd
 from collections import Counter
 
 # Fonctions pour gestion des tokens Google Sheets
+@st.cache_resource
+def get_tokens_gsheet_client():
+    """Connexion spécifique à la feuille Tokens"""
+    try:
+        import gspread
+        from utils import _build_service_account_info_from_st_secrets
+        
+        service_account_info = _build_service_account_info_from_st_secrets()
+        gc = gspread.service_account_from_dict(service_account_info)
+        
+        # Utiliser la même URL que pour Sourcing DB mais feuille "Tokens"
+        SOURCING_SHEET_URL = "https://docs.google.com/spreadsheets/d/1Yw99SS4vU5v0DuD7S1AwaEispJCo-cwioxSsAYnzRkE/edit"
+        spreadsheet = gc.open_by_url(SOURCING_SHEET_URL)
+        
+        # Essayer d'accéder à la feuille Tokens, la créer si elle n'existe pas
+        try:
+            worksheet = spreadsheet.worksheet("Tokens")
+        except gspread.WorksheetNotFound:
+            worksheet = spreadsheet.add_worksheet(title="Tokens", rows="1000", cols="10")
+            # Ajouter les en-têtes
+            headers = ["timestamp", "type", "function", "user", "tokens", "cumulative_total", "action"]
+            worksheet.append_row(headers)
+        
+        return worksheet
+    except Exception as e:
+        st.warning(f"Connexion Tokens Google Sheets indisponible: {e}")
+        return None
+
 def save_tokens_to_gsheet(tokens, function_name="General", user="Unknown", reset=False):
     """Sauvegarde les tokens utilisés dans Google Sheets avec historique"""
     try:
-        from utils import save_sourcing_entry_to_gsheet
+        worksheet = get_tokens_gsheet_client()
+        if worksheet is None:
+            return False
         
         if reset:
             # Entrée de reset total
-            entry = {
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "type": "Token Reset",
-                "function": "Reset Total",
-                "user": user,
-                "tokens": 0,
-                "cumulative_total": 0,
-                "action": "RESET TOTAL"
-            }
+            row = [
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "Token Reset",
+                "Reset Total", 
+                user,
+                0,
+                0,
+                "RESET TOTAL"
+            ]
         else:
             # Récupérer le total actuel
             current_total = st.session_state.get("api_usage", {}).get("used_tokens", 0)
             
             # Entrée d'usage normal
-            entry = {
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                "type": "Token Usage",
-                "function": function_name,
-                "user": user,
-                "tokens": tokens,
-                "cumulative_total": current_total,
-                "action": "USAGE"
-            }
+            row = [
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "Token Usage",
+                function_name,
+                user,
+                tokens,
+                current_total,
+                "USAGE"
+            ]
         
-        # Sauvegarder dans la feuille Tokens
-        save_sourcing_entry_to_gsheet(entry, sheet_name="Tokens")
+        worksheet.append_row(row)
         return True
     except Exception as e:
-        st.error(f"Erreur sauvegarde tokens: {e}")
+        st.warning(f"Erreur sauvegarde tokens: {e}")
         return False
 
 def load_total_tokens_from_gsheet():
     """Charge le total cumulé des tokens depuis Google Sheets"""
     try:
-        from utils import load_sourcing_entries_from_gsheet
+        worksheet = get_tokens_gsheet_client()
+        if worksheet is None:
+            return 0
         
-        # Charger les entrées de la feuille Tokens
-        entries = load_sourcing_entries_from_gsheet(sheet_name="Tokens")
+        # Récupérer toutes les entrées
+        records = worksheet.get_all_records()
         
-        if entries:
-            # Trouver la dernière entrée non-reset pour récupérer le total cumulé
-            for entry in reversed(entries):
-                if entry.get("action") == "RESET TOTAL":
+        if records:
+            # Trouver la dernière entrée pour récupérer le total cumulé
+            for record in reversed(records):
+                if record.get("action") == "RESET TOTAL":
                     return 0  # Si le dernier était un reset, commencer à 0
-                elif entry.get("action") == "USAGE":
-                    return int(entry.get("cumulative_total", 0))
+                elif record.get("action") == "USAGE":
+                    return int(record.get("cumulative_total", 0))
         
         return 0  # Aucune entrée trouvée, commencer à 0
     except Exception as e:
-        st.error(f"Erreur chargement tokens: {e}")
+        st.warning(f"Erreur chargement tokens: {e}")
         return 0
 
 # Configuration pour l'appel à l'IA DeepSeek
