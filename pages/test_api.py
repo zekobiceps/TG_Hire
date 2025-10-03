@@ -1872,7 +1872,7 @@ with tab6:
     # --------- INFORMATIONS CANDIDAT ---------
     with st.expander("📊 Informations candidat", expanded=False):
         default_profil = {
-            "prenom": "Candidat",
+            "prenom": "",
             "nom": "",
             "poste_actuel": "",
             "entreprise_actuelle": "",
@@ -1908,58 +1908,22 @@ with tab6:
     if st.button("✨ Générer", type="primary", use_container_width=True, key="btn_generate_inmail"):
         donnees_profil = st.session_state.get("inmail_profil_data", profil_data)
         
-        # Si Intelligence artificielle est sélectionnée et qu'il y a un lien LinkedIn, analyser d'abord
+        # Si Intelligence artificielle est sélectionnée, avertir de la limitation LinkedIn
         if analyse_profil == "Intelligence artificielle" and url_linkedin.strip():
-            with st.spinner("🤖 Analyse IA du profil LinkedIn..."):
-                analyse_prompt = f"""
-                Analyse ce profil LinkedIn: {url_linkedin}
-                
-                Extrait les informations suivantes au format JSON strict :
-                {{
-                    "prenom": "prénom du candidat",
-                    "nom": "nom du candidat", 
-                    "poste_actuel": "poste/titre actuel",
-                    "entreprise_actuelle": "entreprise actuelle",
-                    "experience_annees": "nombre d'années d'expérience estimé",
-                    "formation": "domaine de formation principal",
-                    "competences_cles": ["compétence1", "compétence2", "compétence3"],
-                    "localisation": "ville/région"
-                }}
-                
-                Réponds UNIQUEMENT avec le JSON valide, sans texte supplémentaire.
-                """
-                
-                ia_result = get_deepseek_response(analyse_prompt, [], "normale")
-                
-                if ia_result.get("content") and "Erreur: Clé API DeepSeek manquante" not in ia_result["content"]:
-                    try:
-                        import json
-                        import re
-                        
-                        # Extraire le JSON de la réponse (au cas où il y aurait du texte supplémentaire)
-                        content = ia_result["content"].strip()
-                        
-                        # Chercher un bloc JSON dans la réponse
-                        json_match = re.search(r'\{.*\}', content, re.DOTALL)
-                        if json_match:
-                            json_str = json_match.group(0)
-                            profil_analyse = json.loads(json_str)
-                            # Mettre à jour les données du profil
-                            donnees_profil.update(profil_analyse)
-                            st.success("✅ Profil LinkedIn analysé automatiquement")
-                        else:
-                            st.warning("⚠️ Aucun JSON trouvé dans la réponse IA")
-                            st.info(f"🔍 Réponse reçue : {content[:200]}...")
-                    except json.JSONDecodeError as e:
-                        st.warning("⚠️ Erreur lors du parsing JSON du profil LinkedIn")
-                        st.info(f"🔍 Réponse reçue : {ia_result['content'][:200]}...")
-                        st.error(f"📝 Erreur JSON : {str(e)}")
-                elif "Erreur: Clé API DeepSeek manquante" in str(ia_result.get("content", "")):
-                    st.error("🔑 **Configuration manquante** : La clé API DeepSeek n'est pas configurée.")
-                    st.info("💡 **Solution** : Contactez l'administrateur pour configurer la clé API DeepSeek dans les secrets Streamlit.")
-                    st.warning("⚠️ **Mode de secours** : Utilisation des données saisies manuellement pour générer le message.")
-                else:
-                    st.warning("⚠️ Impossible d'analyser le profil LinkedIn, utilisation des données manuelles")
+            st.warning("⚠️ **Limitation** : L'IA ne peut pas accéder directement aux profils LinkedIn pour des raisons de sécurité et de confidentialité.")
+            st.info("💡 **Recommandation** : Veuillez remplir manuellement les informations du candidat ci-dessus pour une génération d'InMail précise et personnalisée.")
+            
+            # Désactiver l'analyse automatique LinkedIn et utiliser les données manuelles
+            # with st.spinner("🤖 Analyse IA du profil LinkedIn..."):
+            #     analyse_prompt = f"""
+            #     IMPORTANT: Tu ne peux pas accéder aux profils LinkedIn réels. 
+            #     Au lieu d'inventer des informations, réponds avec ce JSON d'erreur :
+            #     {{
+            #         "erreur": "Impossible d'accéder au profil LinkedIn",
+            #         "message": "Veuillez remplir les informations manuellement"
+            #     }}
+            #     """
+
         
         # Utiliser l'IA pour générer le message
         ia_prompt = f"""
