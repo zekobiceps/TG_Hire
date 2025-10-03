@@ -1934,12 +1934,26 @@ with tab6:
                 if ia_result.get("content") and "Erreur: Clé API DeepSeek manquante" not in ia_result["content"]:
                     try:
                         import json
-                        profil_analyse = json.loads(ia_result["content"])
-                        # Mettre à jour les données du profil
-                        donnees_profil.update(profil_analyse)
-                        st.success("✅ Profil LinkedIn analysé automatiquement")
-                    except json.JSONDecodeError:
-                        st.warning("⚠️ Impossible d'analyser le profil LinkedIn, utilisation des données manuelles")
+                        import re
+                        
+                        # Extraire le JSON de la réponse (au cas où il y aurait du texte supplémentaire)
+                        content = ia_result["content"].strip()
+                        
+                        # Chercher un bloc JSON dans la réponse
+                        json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                        if json_match:
+                            json_str = json_match.group(0)
+                            profil_analyse = json.loads(json_str)
+                            # Mettre à jour les données du profil
+                            donnees_profil.update(profil_analyse)
+                            st.success("✅ Profil LinkedIn analysé automatiquement")
+                        else:
+                            st.warning("⚠️ Aucun JSON trouvé dans la réponse IA")
+                            st.info(f"🔍 Réponse reçue : {content[:200]}...")
+                    except json.JSONDecodeError as e:
+                        st.warning("⚠️ Erreur lors du parsing JSON du profil LinkedIn")
+                        st.info(f"🔍 Réponse reçue : {ia_result['content'][:200]}...")
+                        st.error(f"📝 Erreur JSON : {str(e)}")
                 elif "Erreur: Clé API DeepSeek manquante" in str(ia_result.get("content", "")):
                     st.error("🔑 **Configuration manquante** : La clé API DeepSeek n'est pas configurée.")
                     st.info("💡 **Solution** : Contactez l'administrateur pour configurer la clé API DeepSeek dans les secrets Streamlit.")
