@@ -15,6 +15,38 @@ import hashlib
 import pandas as pd
 from collections import Counter
 
+# Configuration pour l'appel à l'IA DeepSeek
+SYSTEM_PROMPT = """
+Tu es 'TG-Hire Assistant', un expert IA spécialisé dans le recrutement pour le secteur du BTP (Bâtiment et Travaux Publics) au Maroc.
+Ton rôle est d'aider un recruteur humain à optimiser ses tâches quotidiennes.
+Tes réponses doivent être :
+1.  **Contextualisées** : Toujours adaptées au marché de l'emploi marocain et aux spécificités du secteur du BTP.
+2.  **Professionnelles et Précises** : Fournis des informations concrètes et structurées.
+3.  **Orientées Action** : Propose des listes, des questions, des modèles de texte, etc.
+4.  **Adaptables** : Tu dois ajuster la longueur de ta réponse (courte, normale, détaillée) selon la demande.
+"""
+
+def get_deepseek_response(prompt, history, length):
+    api_key = st.secrets.get("DEEPSEEK_API_KEY")
+    if not api_key: return {"content": "Erreur: Clé API DeepSeek manquante.", "usage": 0}
+    
+    final_prompt = f"{prompt}\n\n(Instruction: Fournir une réponse de longueur '{length}')"
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history + [{"role": "user", "content": final_prompt}]
+    
+    try:
+        response = requests.post(
+            "https://api.deepseek.com/v1/chat/completions",
+            headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
+            json={"model": "deepseek-chat", "messages": messages, "max_tokens": 2048}
+        )
+        response.raise_for_status()
+        data = response.json()
+        content = data["choices"][0]["message"]["content"]
+        usage = data.get("usage", {}).get("total_tokens", 0)
+        return {"content": content, "usage": usage}
+    except Exception as e:
+        return {"content": f"❌ Erreur API DeepSeek: {e}", "usage": 0}
+
 # Import optionnel pour l'extraction PDF
 try:
     import PyPDF2
@@ -2041,7 +2073,7 @@ with tab7:
                     prompt += ". Réponds avec une liste à puces, sans introduction."
                 if mode_rapide_magicien:
                     prompt += " Réponse concise et directe."
-                result = ask_deepseek([{"role": "user", "content": prompt}], max_tokens=300)
+                result = get_deepseek_response(prompt, [], "normale" if not mode_rapide_magicien else "courte")
                 total_time = int(time.time() - start_time)
                 st.success(f"✅ Réponse générée en {total_time}s")
                 if result.get("content"):
