@@ -47,6 +47,18 @@ def get_deepseek_response(prompt, history, length):
     except Exception as e:
         return {"content": f"❌ Erreur API DeepSeek: {e}", "usage": 0}
 
+# Fonction de debug pour l'analyse LinkedIn
+def debug_linkedin_analysis(url, ia_result):
+    """Debug détaillé pour l'analyse LinkedIn"""
+    debug_info = {
+        "url_fournie": url,
+        "url_valide": bool(url and ("linkedin.com" in url or "linkedin" in url.lower())),
+        "reponse_api": ia_result,
+        "contenu_present": bool(ia_result.get("content")),
+        "longueur_contenu": len(str(ia_result.get("content", ""))) if ia_result.get("content") else 0
+    }
+    return debug_info
+
 # Import optionnel pour l'extraction PDF
 try:
     import PyPDF2
@@ -1880,17 +1892,17 @@ with tab6:
         profil_data["competences_cles"][2] = cols2[3].text_input("Compétence 3", profil_data["competences_cles"][2], key="inmail_comp3")
         profil_data["localisation"] = cols2[4].text_input("Localisation", profil_data.get("localisation", ""), key="inmail_loc")
 
-        # Ajout du champ pour le lien profil LinkedIn
-        profil_linkedin = st.text_input("🔗 Profil LinkedIn", placeholder="https://www.linkedin.com/in/prenom-nom", key="inmail_linkedin")
-
         col_ap1, col_ap2 = st.columns(2)
         with col_ap1:
             if st.button("🔍 Analyser profil", key="btn_analyse_inmail"):
-                if analyse_profil == "IA" and profil_linkedin.strip():
+                if analyse_profil == "IA" and url_linkedin.strip():
                     with st.spinner("🤖 Analyse IA du profil LinkedIn..."):
+                        # Debug: afficher l'URL utilisée
+                        st.info(f"🔍 Analyse du profil: {url_linkedin}")
+                        
                         # Prompt pour analyser le profil LinkedIn
                         analyse_prompt = f"""
-                        Analyse ce profil LinkedIn: {profil_linkedin}
+                        Analyse ce profil LinkedIn: {url_linkedin}
                         
                         Extrait les informations suivantes au format JSON strict :
                         {{
@@ -1908,9 +1920,16 @@ with tab6:
                         """
                         
                         ia_result = get_deepseek_response(analyse_prompt, [], "normale")
+                        
+                        # Debug détaillé
+                        debug_info = debug_linkedin_analysis(url_linkedin, ia_result)
+                        st.info(f"🔍 Debug analyse:")
+                        st.json(debug_info)
+                        
                         if ia_result.get("content"):
                             try:
                                 import json
+                                st.info(f"📝 Contenu à parser: {ia_result['content'][:200]}...")  # Debug: afficher le début du contenu
                                 profil_analyse = json.loads(ia_result["content"])
                                 
                                 # Mettre à jour les données du profil
@@ -1918,10 +1937,12 @@ with tab6:
                                 st.session_state["inmail_profil_data"] = profil_data
                                 st.success("✅ Profil analysé et rempli automatiquement par l'IA")
                                 st.rerun()
-                            except json.JSONDecodeError:
-                                st.error("❌ Erreur lors de l'analyse du profil")
+                            except json.JSONDecodeError as e:
+                                st.error(f"❌ Erreur JSON: {str(e)}")
+                                st.error(f"Contenu reçu: {ia_result['content']}")
                         else:
                             st.error("❌ Impossible de contacter l'API d'analyse")
+                            st.error(f"Debug - Réponse complète: {ia_result}")
                 elif analyse_profil == "Manuel":
                     profil_data.update({"poste_actuel": "À compléter", "entreprise_actuelle": "À compléter"})
                     st.session_state["inmail_profil_data"] = profil_data
@@ -2011,8 +2032,17 @@ with tab6:
         
         st.subheader(titre_inmail)
         st.text_input("📧 Objet", st.session_state.get("inmail_objet", ""), key="inmail_objet_display")
-        msg = st.session_state["inmail_message"]
-        st.text_area("Message", msg, height=250, key="inmail_msg_display", value=msg)
+        
+        # Debug: Afficher les informations du message
+        msg = st.session_state.get("inmail_message", "")
+        if not msg:
+            msg = "Aucun message généré"
+        
+        try:
+            st.text_area("Message", value=msg, height=250, key="inmail_msg_display")
+        except Exception as e:
+            st.error(f"Erreur affichage message: {e}")
+            st.text_area("Message", msg, height=250)
         st.caption(f"📏 {len(msg.split())} mots | {len(msg)} caractères")
 
         col1, col2 = st.columns(2)
