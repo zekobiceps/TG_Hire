@@ -1926,7 +1926,7 @@ with tab6:
         """
         
         with st.spinner("🤖 Génération IA en cours..."):
-            ia_result = ask_deepseek([{"role": "user", "content": ia_prompt}], max_tokens=300)
+            ia_result = get_deepseek_response(ia_prompt, [], "normale")
             if ia_result.get("content"):
                 msg = ia_result["content"]
             else:
@@ -1998,7 +1998,7 @@ with tab6:
                 """
                 
                 with st.spinner("🔄 Régénération IA en cours..."):
-                    ia_result = ask_deepseek([{"role": "user", "content": ia_prompt}], max_tokens=300)
+                    ia_result = get_deepseek_response(ia_prompt, [], "normale")
                     if ia_result.get("content"):
                         new_msg = ia_result["content"]
                     else:
@@ -2040,26 +2040,29 @@ with tab7:
         "Quelles tendances de recrutement récentes pour le métier de"
     ]
 
-    mode_rapide_magicien = st.checkbox("⚡ Réponse concise", key="magicien_fast")
-    question_type = st.selectbox(
-        "📌 Choisissez une question type :",
-        questions_pretes + ["Autre (saisie libre)"],
-        help="Sélectionnez une question type puis complétez dans le champ ci-dessous."
+    # Zone unique fusionnée : selectbox avec option "Autre" pour saisie libre
+    option_choisie = st.selectbox(
+        "📌 Choisissez une question ou tapez la vôtre :",
+        questions_pretes + ["Autre (tapez votre question)"],
+        help="Sélectionnez une question prête ou choisissez 'Autre' pour taper votre propre question."
     )
-    # Zone unique, pré-remplie dès qu'on choisit une question type
-    if "magicien_last_type" not in st.session_state or st.session_state["magicien_last_type"] != question_type:
-        if question_type != "Autre (saisie libre)":
-            st.session_state["magicien_complete_unique"] = question_type + " "
-        else:
-            st.session_state["magicien_complete_unique"] = ""
-        st.session_state["magicien_last_type"] = question_type
-    question_complete = st.text_input(
-        "Complétez ou modifiez la question :",
-        value=st.session_state.get("magicien_complete_unique", ""),
-        placeholder="Ex: Quels critères éliminatoires fréquents pour le poste de Chargé de recrutement"
-    )
+    
+    # Zone de saisie unique selon le choix
+    if option_choisie == "Autre (tapez votre question)":
+        question_complete = st.text_input(
+            "Votre question :",
+            placeholder="Ex: Quelles sont les compétences clés pour un chef de projet BTP ?"
+        )
+    else:
+        question_complete = st.text_input(
+            "Complétez la question :",
+            value=option_choisie + " ",
+            placeholder="Ex: " + option_choisie + " développeur web"
+        )
 
-    if st.button("✨ Poser la question", type="primary", key="ask_magicien", use_container_width=True):
+    mode_rapide_magicien = st.checkbox("⚡ Réponse concise", key="magicien_fast")
+    
+    if st.button("✨ Poser la question à l'IA", type="primary", key="ask_magicien", use_container_width=True):
         if question_complete and question_complete.strip():
             with st.spinner("⏳ Génération en cours..."):
                 start_time = time.time()
