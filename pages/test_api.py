@@ -2,6 +2,9 @@ import streamlit as st
 import requests
 from datetime import datetime
 import json
+from PIL import Image, ImageDraw, ImageFont
+import io
+import base64
 
 # Configuration de l'outil
 st.set_page_config(
@@ -63,6 +66,113 @@ def get_deepseek_response(prompt, length="normale"):
         return {"content": content, "usage": usage}
     except Exception as e:
         return {"content": f"❌ Erreur API DeepSeek: {e}", "usage": 0}
+
+def generer_lettre_png(texte_lettre, photo_collaborateur=None, nom_fichier="lettre"):
+    """Génère une image PNG de la lettre avec la photo si fournie"""
+    try:
+        # Dimensions de base
+        width, height = 800, 1200
+        background_color = (255, 255, 255)  # Blanc
+        text_color = (0, 0, 0)  # Noir
+        
+        # Créer l'image
+        img = Image.new('RGB', (width, height), background_color)
+        draw = ImageDraw.Draw(img)
+        
+        # Essayer différentes polices
+        try:
+            font_titre = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
+            font_text = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 12)
+        except:
+            font_titre = ImageFont.load_default()
+            font_text = ImageFont.load_default()
+        
+        # Position initiale
+        y_offset = 50
+        x_margin = 50
+        
+        # En-tête TGCC
+        draw.text((x_margin, y_offset), "TGCC", fill=text_color, font=font_titre)
+        y_offset += 40
+        
+        # Zone photo à droite si disponible
+        photo_width = 0
+        if photo_collaborateur is not None:
+            try:
+                photo = Image.open(photo_collaborateur)
+                photo = photo.resize((120, 150), Image.Resampling.LANCZOS)
+                img.paste(photo, (width - 170, y_offset))
+                photo_width = 170
+            except:
+                pass
+        
+        # Texte de la lettre (avec marge pour la photo)
+        text_width = width - x_margin - photo_width - 20
+        lines = texte_lettre.split('\n')
+        
+        for line in lines:
+            if line.strip():
+                # Diviser les lignes trop longues
+                words = line.split(' ')
+                current_line = ''
+                for word in words:
+                    test_line = current_line + word + ' '
+                    if draw.textlength(test_line, font=font_text) < text_width:
+                        current_line = test_line
+                    else:
+                        if current_line:
+                            draw.text((x_margin, y_offset), current_line.strip(), fill=text_color, font=font_text)
+                            y_offset += 20
+                        current_line = word + ' '
+                
+                if current_line:
+                    draw.text((x_margin, y_offset), current_line.strip(), fill=text_color, font=font_text)
+                    y_offset += 20
+            else:
+                y_offset += 10
+        
+        # Convertir en bytes pour téléchargement
+        img_buffer = io.BytesIO()
+        img.save(img_buffer, format='PNG')
+        img_buffer.seek(0)
+        
+        return img_buffer.getvalue()
+        
+    except Exception as e:
+        st.error(f"Erreur génération PNG: {e}")
+        return None
+
+def generer_document_word(texte_lettre, photo_collaborateur=None):
+    """Génère un document Word avec la lettre et la photo intégrée"""
+    try:
+        # Pour l'instant, on génère un format RTF simple qui peut être ouvert par Word
+        rtf_content = r"""{\rtf1\ansi\deff0 {\fonttbl {\f0 Times New Roman;}}
+        """
+        
+        # Ajouter l'en-tête
+        rtf_content += r"""
+        {\pard\qc\b\fs28 TGCC\par}
+        {\pard\qc CONSTRUISONS ENSEMBLE\par}
+        \line\line
+        """
+        
+        # Si photo disponible, indiquer son emplacement
+        if photo_collaborateur is not None:
+            rtf_content += r"""{\pard\qr [PHOTO COLLABORATEUR ICI]\par}"""
+        
+        # Ajouter le contenu de la lettre
+        texte_formate = texte_lettre.replace('\n', r'\line ')
+        rtf_content += f"""
+        {{\\pard {texte_formate}\\par}}
+        """
+        
+        rtf_content += "}"
+        
+        return rtf_content.encode('utf-8')
+        
+    except Exception as e:
+        st.error(f"Erreur génération Word: {e}")
+        return None
 
 # Interface principale
 st.title("📝 Générateur de Lettres RH - TGCC")
@@ -194,7 +304,8 @@ with col11:
     longueur = st.selectbox("Longueur", ["Courte", "Normale", "Détaillée"])
 with col12:
     format_sortie = st.selectbox("Format de sortie", ["Texte modifiable", "PNG téléchargeable", "Les deux"])
-    st.info("ℹ️ En-tête TGCC et signature 'Direction + TGCC CONSTRUISONS ENSEMBLE' inclus automatiquement")
+    # Option de sauvegarde
+    sauvegarder_modele = st.checkbox("Sauvegarder comme modèle", help="Sauvegarde la lettre générée comme modèle réutilisable")
 
 # Bouton de génération
 if st.button("✨ Générer la lettre", type="primary", use_container_width=True):
@@ -234,7 +345,7 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                 1. En-tête avec coordonnées TGCC
                 2. Contenu de la lettre 
                 3. Zone de signature avec :
-                   Direction
+                   {rattachement}
                    TGCC CONSTRUISONS ENSEMBLE
                 """
                 
@@ -269,7 +380,7 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                 1. En-tête avec coordonnées TGCC
                 2. Contenu de l'annonce
                 3. Zone de signature avec :
-                   Direction
+                   {rattachement}
                    TGCC CONSTRUISONS ENSEMBLE
                 """
             
@@ -327,19 +438,43 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                 col13, col14, col15, col16 = st.columns(4)
                 
                 with col13:
-                    st.download_button(
-                        label="📥 Télécharger (.txt)",
-                        data=st.session_state.lettre_modifiable,
-                        file_name=f"lettre_{type_lettre.lower().replace(' ', '_')}_{nom}_{datetime.now().strftime('%Y%m%d')}.txt",
-                        mime="text/plain",
-                        use_container_width=True
-                    )
+                    # Deux options de téléchargement
+                    col_txt, col_word = st.columns(2)
+                    with col_txt:
+                        st.download_button(
+                            label="� TXT",
+                            data=st.session_state.lettre_modifiable,
+                            file_name=f"lettre_{nom}_{datetime.now().strftime('%Y%m%d')}.txt",
+                            mime="text/plain",
+                            use_container_width=True
+                        )
+                    with col_word:
+                        rtf_data = generer_document_word(st.session_state.lettre_modifiable, photo_collaborateur)
+                        if rtf_data:
+                            st.download_button(
+                                label="📝 Word",
+                                data=rtf_data,
+                                file_name=f"lettre_{nom}_{datetime.now().strftime('%Y%m%d')}.rtf",
+                                mime="application/rtf",
+                                use_container_width=True
+                            )
                 
                 with col14:
-                    # Bouton pour génération PNG (simulation pour l'instant)
+                    # Bouton pour génération PNG
                     if st.button("🖼️ Générer PNG", use_container_width=True):
-                        st.info("🔄 Génération PNG en cours de développement. Pour l'instant, copiez le texte dans Word avec l'en-tête TGCC.")
-                        # TODO: Implémenter génération PNG avec PIL/reportlab
+                        with st.spinner("🔄 Génération PNG en cours..."):
+                            png_data = generer_lettre_png(st.session_state.lettre_modifiable, photo_collaborateur, nom)
+                            if png_data:
+                                st.download_button(
+                                    label="📥 Télécharger PNG",
+                                    data=png_data,
+                                    file_name=f"lettre_{nom}_{datetime.now().strftime('%Y%m%d')}.png",
+                                    mime="image/png",
+                                    use_container_width=True
+                                )
+                                st.success("✅ PNG généré avec succès !")
+                            else:
+                                st.error("❌ Erreur lors de la génération PNG")
                 
                 with col15:
                     if st.button("🔄 Régénérer", use_container_width=True):
@@ -351,9 +486,29 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                         st.rerun()
                 
                 with col16:
-                    if st.button("💾 Sauvegarder modèle", use_container_width=True):
-                        # Sauvegarder le modèle modifié
-                        st.success("✅ Modèle sauvegardé !")
+                    if st.button("💾 Sauvegarder", use_container_width=True) or sauvegarder_modele:
+                        # Sauvegarder le modèle avec toutes les informations
+                        modele_data = {
+                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            "type": type_lettre,
+                            "prenom": prenom,
+                            "nom": nom,
+                            "poste": poste,
+                            "entreprise": entreprise,
+                            "contenu": st.session_state.lettre_modifiable,
+                            "rattachement": rattachement,
+                            "has_photo": photo_collaborateur is not None
+                        }
+                        
+                        # Initialiser la liste des modèles sauvegardés si elle n'existe pas
+                        if "modeles_sauvegardes" not in st.session_state:
+                            st.session_state.modeles_sauvegardes = []
+                        
+                        st.session_state.modeles_sauvegardes.append(modele_data)
+                        st.success(f"✅ Modèle sauvegardé : {prenom} {nom} - {poste}")
+                        
+                        if sauvegarder_modele:
+                            st.info("📋 Modèle sauvegardé automatiquement")
                 
                 # Statistiques de génération
                 st.info(f"📊 Tokens utilisés : {result.get('usage', 0)}")
@@ -362,6 +517,29 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                 st.error("❌ Erreur lors de la génération de la lettre")
                 if result.get("content"):
                     st.error(result["content"])
+
+# Section des modèles sauvegardés
+if "modeles_sauvegardes" in st.session_state and st.session_state.modeles_sauvegardes:
+    st.markdown("---")
+    st.markdown("### 📚 Modèles sauvegardés")
+    
+    with st.expander(f"Voir les {len(st.session_state.modeles_sauvegardes)} modèles sauvegardés", expanded=False):
+        for i, modele in enumerate(reversed(st.session_state.modeles_sauvegardes)):
+            col_info, col_actions = st.columns([3, 1])
+            
+            with col_info:
+                st.write(f"**{modele['prenom']} {modele['nom']}** - {modele['poste']}")
+                st.caption(f"{modele['type']} | {modele['entreprise']} | {modele['timestamp']}")
+                
+            with col_actions:
+                if st.button(f"📥 Télécharger", key=f"download_modele_{i}"):
+                    st.download_button(
+                        label="📄 Télécharger ce modèle",
+                        data=modele['contenu'],
+                        file_name=f"modele_{modele['nom']}_{modele['timestamp'][:10]}.txt",
+                        mime="text/plain",
+                        key=f"download_btn_{i}"
+                    )
 
 # Section d'aide
 with st.expander("❓ Guide d'utilisation", expanded=False):
