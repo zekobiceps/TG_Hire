@@ -1008,33 +1008,18 @@ st.set_page_config(
 
 # -------------------- Sidebar --------------------
 with st.sidebar:
-    # Section des statistiques tokens en premier
+    # Section des statistiques tokens centralisée
     st.subheader("📊 Statistiques")
     
     session_tokens = st.session_state.get("api_usage", {}).get("current_session_tokens", 0)
     total_tokens = st.session_state.get("api_usage", {}).get("used_tokens", 0)
     
-    st.metric("🔑 Tokens (session)", session_tokens)
-    st.metric("📊 Total cumulé", total_tokens)
-    
+    # Affichage centré des métriques
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("🔄 Reset session", help="Remet à zéro les tokens de la session actuelle", use_container_width=True):
-            if "api_usage" in st.session_state:
-                st.session_state["api_usage"]["current_session_tokens"] = 0
-            st.success("✅ Session remise à zéro")
-            st.rerun()
-    
+        st.metric("🔑 Session", session_tokens)
     with col2:
-        if st.button("🗑️ Reset total", help="Remet à zéro le total cumulé définitivement", use_container_width=True):
-            if "api_usage" in st.session_state:
-                st.session_state["api_usage"]["current_session_tokens"] = 0
-                st.session_state["api_usage"]["used_tokens"] = 0
-            # Sauvegarder le reset dans Google Sheets
-            user = st.session_state.get("user", "Unknown")
-            save_tokens_to_gsheet(0, "Reset Total", user, reset=True)
-            st.success("✅ Total remis à zéro")
-            st.rerun()
+        st.metric("📊 Total", total_tokens)
     
     st.markdown("---")
     st.info("💡 Assistant IA pour le sourcing et recrutement")
