@@ -5,6 +5,7 @@ import json
 from PIL import Image, ImageDraw, ImageFont
 import io
 import base64
+from utils import deepseek_generate
 
 # Configuration de l'outil
 st.set_page_config(
@@ -197,8 +198,6 @@ type_lettre = st.selectbox(
     [
         "Lettre de nomination",
         "Annonce de nouvelle recrue",
-        "Lettre de félicitations",
-        "Communiqué interne"
     ],
     help="Sélectionnez le type de document à générer"
 )
@@ -225,7 +224,7 @@ with col3:
 
 with col4:
     rattachement = st.text_input("Rattachement", placeholder="Direction Générale")
-    poste_precedent = st.text_input("Poste précédent (optionnel)", placeholder="Chef de projet")
+    # 'Poste précédent' removed per request
 
 # Ligne supplémentaire pour les derniers champs
 col5, col6, col7, col8 = st.columns(4)
@@ -248,28 +247,18 @@ with col8:
     # Espace réservé pour équilibrer
     st.write("")
 
-# Informations complémentaires selon le type de lettre (simplifiées)
-st.markdown("### 📄 Détails complémentaires")
-
-if type_lettre == "Lettre de nomination":
-    col9, col10 = st.columns(2)
-    with col9:
-        salaire = st.text_input("Salaire (optionnel)", placeholder="À définir selon grille")
-        departement = st.text_input("Département/Service", placeholder="Direction Technique")
-    with col10:
-        avantages = st.text_area("Avantages (optionnel)", placeholder="Véhicule de fonction, frais de mission...")
-
-elif type_lettre == "Annonce de nouvelle recrue":
-    col9, col10 = st.columns(2)
-    with col9:
-        experience = st.text_input("Expérience professionnelle", placeholder="5 ans d'expérience en BTP")
-        formation = st.text_input("Formation", placeholder="Ingénieur Civil - EHTP")
-        competences = st.text_area("Compétences clés", placeholder="Gestion de projet, AutoCAD, Management d'équipe")
-    with col10:
-        projets_precedents = st.text_area("Projets/Entreprises précédents", placeholder="Participation aux projets X, Y, Z")
-        certifications = st.text_input("Certifications (optionnel)", placeholder="PMP, AutoCAD certifié...")
-        langues = st.text_input("Langues", placeholder="Arabe, Français, Anglais")
-
+# Defaults for previously-removed "Détails complémentaires" fields
+# We keep the variables so prompts won't fail when those values are referenced.
+experience = ""
+formation = ""
+competences = ""
+projets_precedents = ""
+certifications = ""
+langues = ""
+salaire = ""
+avantages = ""
+departement = ""
+poste_precedent = ""
 
 # Fiche de poste (optionnelle pour enrichir la génération)
 st.markdown("### 📋 Fiche de poste (optionnel - pour enrichissement IA)")
@@ -409,8 +398,16 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                    TGCC CONSTRUISONS ENSEMBLE
                 """
 
-            # Appel à l'IA
-            result = get_deepseek_response(prompt, longueur.lower())
+            # Appel à l'IA via utils.deepseek_generate
+            try:
+                # deepseek_generate returns raw content string
+                content = deepseek_generate(prompt, max_tokens=1500, temperature=0.6)
+                result = {"content": content, "usage": 0}
+            except ValueError as e:
+                # Erreurs liées à la clé API dans utils.deepseek_generate
+                result = {"content": f"Erreur: {e}", "usage": 0}
+            except Exception as e:
+                result = {"content": f"❌ Erreur API DeepSeek: {e}", "usage": 0}
 
             if result.get("content") and "Erreur:" not in result["content"]:
                 st.markdown("### 📝 Lettre générée")
