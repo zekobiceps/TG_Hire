@@ -2022,7 +2022,6 @@ with tab7:
     question_complete = st.text_input(
         "Complétez ou modifiez la question :",
         value=st.session_state.get("magicien_complete_unique", ""),
-        key="magicien_complete_unique",
         placeholder="Ex: Quels critères éliminatoires fréquents pour le poste de Chargé de recrutement"
     )
 
