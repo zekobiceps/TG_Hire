@@ -16,7 +16,7 @@ st.set_page_config(
 
 # Configuration pour l'appel à l'IA DeepSeek
 SYSTEM_PROMPT = """
-Tu es un expert en rédaction de lettres officielles pour les entreprises du BTP au Maroc.
+Tu es un expert en rédaction de lettres officielles pour le                        )       )       )    )TP au Maroc.
 Tu maîtrises parfaitement :
 1. Les codes de la correspondance administrative marocaine
 2. Le vocabulaire technique du BTP
@@ -156,9 +156,11 @@ def generer_document_word(texte_lettre, photo_collaborateur=None):
         \line\line
         """
         
-        # Si photo disponible, indiquer son emplacement
+        # Si photo disponible, essayer de l'intégrer (simplifié pour RTF)
         if photo_collaborateur is not None:
-            rtf_content += r"""{\pard\qr [PHOTO COLLABORATEUR ICI]\par}"""
+            # Pour RTF, on ne peut pas facilement intégrer l'image, mais on indique sa position
+            rtf_content += r"""{\pard\qr [Photo du collaborateur à insérer ici]\par}"""
+            rtf_content += r"""\line"""
         
         # Ajouter le contenu de la lettre
         texte_formate = texte_lettre.replace('\n', r'\line ')
@@ -220,7 +222,6 @@ with col3:
     
 with col4:
     rattachement = st.text_input("Rattachement", placeholder="Direction Générale")
-    poste_precedent = st.text_input("Poste précédent (optionnel)", placeholder="Chef de projet")
 
 # Ligne supplémentaire pour les derniers champs
 col5, col6, col7, col8 = st.columns(4)
@@ -263,7 +264,7 @@ elif type_lettre == "Annonce de nouvelle recrue":
     with col10:
         projets_precedents = st.text_area("Projets/Entreprises précédents", placeholder="Participation aux projets X, Y, Z")
         certifications = st.text_input("Certifications (optionnel)", placeholder="PMP, AutoCAD certifié...")
-        langues = st.text_input("Langues", placeholder="Arabe, Français, Anglais")
+
 
 # Fiche de poste (optionnelle pour enrichir la génération)
 st.markdown("### 📋 Fiche de poste (optionnel - pour enrichissement IA)")
@@ -298,14 +299,13 @@ with tab_pdf:
 
 # Paramètres de génération
 st.markdown("### ⚙️ Paramètres de génération")
-col11, col12 = st.columns(2)
+col11, col12, col13_params = st.columns(3)
 with col11:
     ton_lettre = st.selectbox("Ton de la lettre", ["Formel", "Chaleureux", "Officiel", "Convivial"])
-    longueur = st.selectbox("Longueur", ["Courte", "Normale", "Détaillée"])
 with col12:
+    longueur = st.selectbox("Longueur", ["Courte", "Normale", "Détaillée"])
+with col13_params:
     format_sortie = st.selectbox("Format de sortie", ["Texte modifiable", "PNG téléchargeable", "Les deux"])
-    # Option de sauvegarde
-    sauvegarder_modele = st.checkbox("Sauvegarder comme modèle", help="Sauvegarde la lettre générée comme modèle réutilisable")
 
 # Bouton de génération
 if st.button("✨ Générer la lettre", type="primary", use_container_width=True):
@@ -323,7 +323,7 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                 - Nouveau poste : {poste}
                 - Entreprise : {entreprise}
                 - Date de prise de fonction : {date_prise_fonction.strftime('%d/%m/%Y')}
-                - Poste précédent : {poste_precedent if poste_precedent else 'Non spécifié'}
+
                 - Département : {departement if departement else 'Non spécifié'}
                 - Supérieur hiérarchique : {superviseur if superviseur else 'Direction'}
                 - Lieu de travail : {lieu_travail if lieu_travail else 'Maroc'}
@@ -438,8 +438,16 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                 col13, col14, col15, col16 = st.columns(4)
                 
                 with col13:
-                    # Deux options de téléchargement
-                    col_txt, col_word = st.columns(2)
+                    # Uniquement téléchargement Word
+                    rtf_data = generer_document_word(st.session_state.lettre_modifiable, photo_collaborateur)
+                    if rtf_data:
+                        st.download_button(
+                            label="📝 Télécharger Word",
+                            data=rtf_data,
+                            file_name=f"lettre_{nom}_{datetime.now().strftime('%Y%m%d')}.rtf",
+                            mime="application/rtf",
+                            use_container_width=True
+                        )
                     with col_txt:
                         st.download_button(
                             label="� TXT",
@@ -465,14 +473,17 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                         with st.spinner("🔄 Génération PNG en cours..."):
                             png_data = generer_lettre_png(st.session_state.lettre_modifiable, photo_collaborateur, nom)
                             if png_data:
+                                # Afficher directement le bouton de téléchargement
                                 st.download_button(
                                     label="📥 Télécharger PNG",
                                     data=png_data,
                                     file_name=f"lettre_{nom}_{datetime.now().strftime('%Y%m%d')}.png",
                                     mime="image/png",
-                                    use_container_width=True
+                                    use_container_width=True,
+                                    key=f"download_png_{datetime.now().strftime('%H%M%S')}"
                                 )
-                                st.success("✅ PNG généré avec succès !")
+                                # Afficher un aperçu de l'image
+                                st.image(png_data, caption="Aperçu de la lettre PNG", width=400)
                             else:
                                 st.error("❌ Erreur lors de la génération PNG")
                 
@@ -486,7 +497,7 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                         st.rerun()
                 
                 with col16:
-                    if st.button("💾 Sauvegarder", use_container_width=True) or sauvegarder_modele:
+                    if st.button("💾 Sauvegarder", use_container_width=True):
                         # Sauvegarder le modèle avec toutes les informations
                         modele_data = {
                             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -506,9 +517,6 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                         
                         st.session_state.modeles_sauvegardes.append(modele_data)
                         st.success(f"✅ Modèle sauvegardé : {prenom} {nom} - {poste}")
-                        
-                        if sauvegarder_modele:
-                            st.info("📋 Modèle sauvegardé automatiquement")
                 
                 # Statistiques de génération
                 st.info(f"📊 Tokens utilisés : {result.get('usage', 0)}")
