@@ -1858,9 +1858,9 @@ with tab6:
     with col5:
         poste_accroche = st.text_input("Poste à pourvoir", key="inmail_poste", placeholder="Ex: Directeur Financier")
     with col6:
-        longueur_message = st.slider("Longueur (mots)", 50, 300, 150, key="inmail_longueur")
+        longueur_message = st.slider("Longueur (mots)", 10, 200, 50, key="inmail_longueur")
     with col7:
-        analyse_profil = st.selectbox("Méthode analyse", ["Manuel", "IA"], index=0, key="inmail_analyse")
+        analyse_profil = st.selectbox("Méthode d'analyse du profil LinkedIn", ["Manuel", "Intelligence artificielle"], index=0, key="inmail_analyse")
     with col8:
         cta_option = st.selectbox("Call to action (Conclusion)", ["Proposer un appel", "Partager le CV", "Découvrir l'opportunité sur notre site", "Accepter un rendez-vous"], key="inmail_cta")
 
@@ -1892,68 +1892,6 @@ with tab6:
         profil_data["competences_cles"][2] = cols2[3].text_input("Compétence 3", profil_data["competences_cles"][2], key="inmail_comp3")
         profil_data["localisation"] = cols2[4].text_input("Localisation", profil_data.get("localisation", ""), key="inmail_loc")
 
-        col_ap1, col_ap2 = st.columns(2)
-        with col_ap1:
-            if st.button("🔍 Analyser profil", key="btn_analyse_inmail"):
-                if analyse_profil == "IA" and url_linkedin.strip():
-                    with st.spinner("🤖 Analyse IA du profil LinkedIn..."):
-                        # Debug: afficher l'URL utilisée
-                        st.info(f"🔍 Analyse du profil: {url_linkedin}")
-                        
-                        # Prompt pour analyser le profil LinkedIn
-                        analyse_prompt = f"""
-                        Analyse ce profil LinkedIn: {url_linkedin}
-                        
-                        Extrait les informations suivantes au format JSON strict :
-                        {{
-                            "prenom": "prénom du candidat",
-                            "nom": "nom du candidat", 
-                            "poste_actuel": "poste/titre actuel",
-                            "entreprise_actuelle": "entreprise actuelle",
-                            "experience_annees": "nombre d'années d'expérience estimé",
-                            "formation": "domaine de formation principal",
-                            "competences_cles": ["compétence1", "compétence2", "compétence3"],
-                            "localisation": "ville/région"
-                        }}
-                        
-                        Réponds UNIQUEMENT avec le JSON valide, sans texte supplémentaire.
-                        """
-                        
-                        ia_result = get_deepseek_response(analyse_prompt, [], "normale")
-                        
-                        # Debug détaillé
-                        debug_info = debug_linkedin_analysis(url_linkedin, ia_result)
-                        st.info(f"🔍 Debug analyse:")
-                        st.json(debug_info)
-                        
-                        if ia_result.get("content"):
-                            try:
-                                import json
-                                st.info(f"📝 Contenu à parser: {ia_result['content'][:200]}...")  # Debug: afficher le début du contenu
-                                profil_analyse = json.loads(ia_result["content"])
-                                
-                                # Mettre à jour les données du profil
-                                profil_data.update(profil_analyse)
-                                st.session_state["inmail_profil_data"] = profil_data
-                                st.success("✅ Profil analysé et rempli automatiquement par l'IA")
-                                st.rerun()
-                            except json.JSONDecodeError as e:
-                                st.error(f"❌ Erreur JSON: {str(e)}")
-                                st.error(f"Contenu reçu: {ia_result['content']}")
-                        else:
-                            st.error("❌ Impossible de contacter l'API d'analyse")
-                            st.error(f"Debug - Réponse complète: {ia_result}")
-                elif analyse_profil == "Manuel":
-                    profil_data.update({"poste_actuel": "À compléter", "entreprise_actuelle": "À compléter"})
-                    st.session_state["inmail_profil_data"] = profil_data
-                    st.info("ℹ️ Mode manuel - complétez les champs manuellement")
-                else:
-                    st.warning("⚠️ Veuillez saisir un lien LinkedIn pour l'analyse IA")
-        with col_ap2:
-            if st.button("💾 Appliquer infos candidat", key="btn_apply_inmail"):
-                st.session_state["inmail_profil_data"] = profil_data
-                st.success("✅ Infos candidat mises à jour")
-
     # Garder les données du profil à jour
     if not st.session_state.get("inmail_profil_data"):
         st.session_state["inmail_profil_data"] = profil_data
@@ -1964,6 +1902,39 @@ with tab6:
     # --------- GÉNÉRATION ---------
     if st.button("✨ Générer", type="primary", use_container_width=True, key="btn_generate_inmail"):
         donnees_profil = st.session_state.get("inmail_profil_data", profil_data)
+        
+        # Si Intelligence artificielle est sélectionnée et qu'il y a un lien LinkedIn, analyser d'abord
+        if analyse_profil == "Intelligence artificielle" and url_linkedin.strip():
+            with st.spinner("🤖 Analyse IA du profil LinkedIn..."):
+                analyse_prompt = f"""
+                Analyse ce profil LinkedIn: {url_linkedin}
+                
+                Extrait les informations suivantes au format JSON strict :
+                {{
+                    "prenom": "prénom du candidat",
+                    "nom": "nom du candidat", 
+                    "poste_actuel": "poste/titre actuel",
+                    "entreprise_actuelle": "entreprise actuelle",
+                    "experience_annees": "nombre d'années d'expérience estimé",
+                    "formation": "domaine de formation principal",
+                    "competences_cles": ["compétence1", "compétence2", "compétence3"],
+                    "localisation": "ville/région"
+                }}
+                
+                Réponds UNIQUEMENT avec le JSON valide, sans texte supplémentaire.
+                """
+                
+                ia_result = get_deepseek_response(analyse_prompt, [], "normale")
+                
+                if ia_result.get("content"):
+                    try:
+                        import json
+                        profil_analyse = json.loads(ia_result["content"])
+                        # Mettre à jour les données du profil
+                        donnees_profil.update(profil_analyse)
+                        st.success("✅ Profil LinkedIn analysé automatiquement")
+                    except json.JSONDecodeError:
+                        st.warning("⚠️ Impossible d'analyser le profil LinkedIn, utilisation des données manuelles")
         
         # Utiliser l'IA pour générer le message
         ia_prompt = f"""
@@ -2038,11 +2009,15 @@ with tab6:
         if not msg:
             msg = "Aucun message généré"
         
+        # Utiliser une clé dynamique pour forcer la mise à jour du contenu
+        import time
+        dynamic_key = f"inmail_msg_display_{int(time.time() * 1000) % 10000}"
+        
         try:
-            st.text_area("Message", value=msg, height=250, key="inmail_msg_display")
+            st.text_area("Message", value=msg, height=250, key=dynamic_key)
         except Exception as e:
             st.error(f"Erreur affichage message: {e}")
-            st.text_area("Message", msg, height=250)
+            st.text_area("Message", msg, height=250, key=f"fallback_{dynamic_key}")
         st.caption(f"📏 {len(msg.split())} mots | {len(msg)} caractères")
 
         col1, col2 = st.columns(2)
@@ -2078,6 +2053,7 @@ with tab6:
                 
                 st.session_state["inmail_message"] = new_msg
                 st.session_state["inmail_objet"] = "Nouvelle opportunité: " + poste_accroche
+                # Forcer le rechargement de la page pour mettre à jour l'affichage
                 st.rerun()
         with col2:
             if st.button("💾 Sauvegarder comme modèle", key="btn_save_inmail"):
