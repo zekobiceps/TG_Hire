@@ -907,6 +907,22 @@ st.set_page_config(
 # -------------------- Sidebar --------------------
 with st.sidebar:
     st.info("💡 Assistant IA pour le sourcing et recrutement")
+    
+    # Section des statistiques tokens
+    st.markdown("---")
+    st.subheader("📊 Statistiques")
+    
+    session_tokens = st.session_state.get("api_usage", {}).get("current_session_tokens", 0)
+    total_tokens = st.session_state.get("api_usage", {}).get("used_tokens", 0)
+    
+    st.metric("🔑 Tokens (session)", session_tokens)
+    st.metric("📊 Total cumulé", total_tokens)
+    
+    if st.button("🔄 Reset session", help="Remet à zéro les tokens de la session actuelle", use_container_width=True):
+        if "api_usage" in st.session_state:
+            st.session_state["api_usage"]["current_session_tokens"] = 0
+        st.success("✅ Session remise à zéro")
+        st.rerun()
 
 # -------------------- Onglets --------------------
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
@@ -2079,27 +2095,6 @@ Cordialement."""
                 save_library_entries()
                 save_sourcing_entry_to_gsheet(entry)
                 st.success(f"✅ Modèle '{poste_accroche} - {entry['timestamp']}' sauvegardé")
-
-    # Section des statistiques tokens
-    st.markdown("---")
-    st.subheader("📊 Statistiques")
-    
-    col_stats1, col_stats2, col_stats3 = st.columns(3)
-    
-    with col_stats1:
-        session_tokens = st.session_state.get("api_usage", {}).get("current_session_tokens", 0)
-        st.metric("🔑 Tokens (session)", session_tokens)
-    
-    with col_stats2:
-        total_tokens = st.session_state.get("api_usage", {}).get("used_tokens", 0)
-        st.metric("📊 Total cumulé", total_tokens)
-    
-    with col_stats3:
-        if st.button("🔄 Reset session", help="Remet à zéro les tokens de la session actuelle"):
-            if "api_usage" in st.session_state:
-                st.session_state["api_usage"]["current_session_tokens"] = 0
-            st.success("✅ Compteur de session remis à zéro")
-            st.rerun()
 
 
 # -------------------- Tab 7: Magicien --------------------
