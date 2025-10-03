@@ -304,17 +304,32 @@ with tab_pdf:
 
 # Paramètres de génération
 st.markdown("### ⚙️ Paramètres de génération")
-col11, col12 = st.columns(2)
+# Trois colonnes pour les paramètres
 col11, col12, col13_params = st.columns(3)
 with col11:
-    ton_lettre = st.selectbox("Ton de la lettre", ["Formel", "Chaleureux", "Officiel", "Convivial"])
-    longueur = st.selectbox("Longueur", ["Courte", "Normale", "Détaillée"])
+    ton_lettre = st.selectbox(
+        "Ton de la lettre",
+        ["Formel", "Chaleureux", "Officiel", "Convivial"],
+        key="ton_lettre"
+    )
 with col12:
-    longueur = st.selectbox("Longueur", ["Courte", "Normale", "Détaillée"])
+    longueur = st.selectbox(
+        "Longueur",
+        ["Courte", "Normale", "Détaillée"],
+        key="longueur"
+    )
 with col13_params:
-    format_sortie = st.selectbox("Format de sortie", ["Texte modifiable", "PNG téléchargeable", "Les deux"])
+    format_sortie = st.selectbox(
+        "Format de sortie",
+        ["Texte modifiable", "PNG téléchargeable", "Les deux"],
+        key="format_sortie"
+    )
     # Option de sauvegarde
-    sauvegarder_modele = st.checkbox("Sauvegarder comme modèle", help="Sauvegarde la lettre générée comme modèle réutilisable")
+    sauvegarder_modele = st.checkbox(
+        "Sauvegarder comme modèle",
+        help="Sauvegarde la lettre générée comme modèle réutilisable",
+        key="sauvegarder_modele"
+    )
 
 # Bouton de génération
 if st.button("✨ Générer la lettre", type="primary", use_container_width=True):
