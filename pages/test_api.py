@@ -491,7 +491,6 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                                     data=png_data,
                                     file_name=f"lettre_{nom}_{datetime.now().strftime('%Y%m%d')}.png",
                                     mime="image/png",
-                                    use_container_width=True
                                     use_container_width=True,
                                     key=f"download_png_{datetime.now().strftime('%H%M%S')}"
                                 )
@@ -511,8 +510,7 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                         st.rerun()
 
                 with col16:
-                    if st.button("💾 Sauvegarder", use_container_width=True) or sauvegarder_modele:
-                    if st.button("💾 Sauvegarder", use_container_width=True):
+                    if st.button("💾 Sauvegarder", use_container_width=True) or (sauvegarder_modele if 'sauvegarder_modele' in locals() else False):
                         # Sauvegarder le modèle avec toutes les informations
                         modele_data = {
                             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -596,4 +594,5 @@ with st.expander("❓ Guide d'utilisation", expanded=False):
     - Pied de page avec "TGCC CONSTRUISONS ENSEMBLE"
     
     Cela donnerait un rendu plus professionnel et cohérent. 
-    Pour l'instant, copiez le texte dans Word avec votre modèle d'en-têtesssssss.
+    Pour l'instant, copiez le texte dans Word avec votre modèle d'en-tête.
+    """)
