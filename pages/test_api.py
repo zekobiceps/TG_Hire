@@ -502,18 +502,41 @@ def ask_deepseek(messages, max_tokens=300):
     elif "compétences" in question:
         return {"content": "• Gestion de projet\n• Lecture de plans techniques\n• Management d'équipe\n• Budget et planning\n• Conformité réglementaire\n• Négociation fournisseurs"}
         
-    # Cas par défaut : Génère une réponse générique
+    # Cas par défaut : Génère une réponse intelligente selon le contexte
     if "synonymes" in question:
-        return {"content": "Directeur, Manager, Responsable, Chef, Coordinateur, Superviseur"}
+        # Analyser le métier spécifique pour donner des synonymes pertinents
+        if "chargé de recrutement" in question or "chargée de recrutement" in question:
+            return {"content": "Recruteur, Talent Acquisition Specialist, Responsable Recrutement, Consultant en Recrutement, RH Recrutement, Chasseur de têtes, Sourcing Specialist"}
+        elif "développeur" in question or "programmeur" in question:
+            return {"content": "Développeur, Programmeur, Ingénieur logiciel, Software Engineer, Codeur, Dev, Analyste programmeur"}
+        elif "commercial" in question or "vente" in question:
+            return {"content": "Commercial, Vendeur, Conseiller commercial, Business Developer, Account Manager, Sales Representative, Ingénieur commercial"}
+        elif "comptable" in question or "finance" in question:
+            return {"content": "Comptable, Contrôleur de gestion, Analyste financier, Gestionnaire comptable, Assistant comptable, Expert-comptable"}
+        elif "ingénieur" in question:
+            return {"content": "Ingénieur, Engineer, Technicien supérieur, Ingénieur d'études, Ingénieur de conception, Consultant technique"}
+        elif "manager" in question or "responsable" in question:
+            return {"content": "Manager, Responsable, Chef d'équipe, Superviseur, Directeur, Coordinateur, Team Leader"}
+        else:
+            # Synonymes génériques si métier non reconnu
+            return {"content": "Responsable, Spécialiste, Consultant, Expert, Coordinateur, Assistant, Chargé de mission"}
     elif any(word in question for word in ["junior", "débutant", "junior"]):
-        return {"content": "• Stagiaire\n• Assistant\n• Junior\n• Débutant\n• En formation\n• Premier emploi"}
+        return {"content": "• Junior\n• Débutant\n• Assistant\n• Stagiaire\n• Alternant\n• En formation\n• Premier emploi\n• Entry level"}
+    elif "outils" in question or "logiciels" in question:
+        if "recrutement" in question:
+            return {"content": "• LinkedIn Recruiter\n• Indeed\n• Workday\n• BambooHR\n• Greenhouse\n• Lever\n• SmartRecruiters\n• Taleo"}
+        else:
+            return {"content": "• MS Office\n• Google Workspace\n• CRM\n• ERP\n• Slack\n• Teams\n• Zoom\n• Project management tools"}
     elif "secteur" in question:
-        return {"content": "• BTP\n• Construction\n• Industrie\n• Services\n• Consulting\n• Ingénierie"}
+        return {"content": "• BTP\n• Construction\n• Technologie\n• Finance\n• Santé\n• Industrie\n• Services\n• Consulting\n• E-commerce"}
     elif "certification" in question:
-        return {"content": "• PMP\n• ISO 27001\n• ITIL\n• Agile/Scrum\n• Six Sigma\n• PRINCE2"}
+        if "recrutement" in question or "rh" in question:
+            return {"content": "• CPRP (Certified Professional in Recruitment)\n• PHR (Professional in Human Resources)\n• SHRM-CP\n• CIPD\n• Certification LinkedIn Recruiter"}
+        else:
+            return {"content": "• PMP\n• ISO 27001\n• ITIL\n• Agile/Scrum\n• Six Sigma\n• PRINCE2"}
     else:
         # Réponse générale pour toute autre question
-        return {"content": "Voici quelques suggestions pertinentes pour votre recherche de sourcing :\n• Variez les mots-clés\n• Utilisez des synonymes\n• Pensez aux compétences transversales\n• Considérez l'expérience requise\n• Adaptez selon le secteur"}
+        return {"content": "Voici quelques suggestions pertinentes pour votre recherche de sourcing :\n• Variez les mots-clés selon le métier ciblé\n• Utilisez des synonymes spécifiques au domaine\n• Pensez aux compétences transversales\n• Considérez le niveau d'expérience requis\n• Adaptez selon le secteur d'activité\n• Incluez les outils métiers spécialisés"}
 
 def extract_text_from_pdf(uploaded_file):
     """Extrait le texte d'un fichier PDF uploadé"""
@@ -1973,6 +1996,7 @@ with tab6:
 with tab7:
     st.header("🤖 Magicien de sourcing")
 
+
     questions_pretes = [
         "Quels sont les synonymes possibles pour le métier de",
         "Quels outils ou logiciels sont liés au métier de", 
@@ -1985,34 +2009,20 @@ with tab7:
         "Quelles tendances de recrutement récentes pour le métier de"
     ]
 
-    # Interface simplifiée avec une seule zone de saisie
     col1, col2 = st.columns([0.8, 0.2])
     with col1:
-        question = st.selectbox(
-            "📌 Choisissez une question prête ou saisissez votre propre question :",
-            [""] + questions_pretes + ["Autre (saisie libre)"],
-            key="magicien_question",
-            help="Sélectionnez une question prête puis complétez-la, ou choisissez 'Autre' pour une question libre"
+        question_type = st.selectbox(
+            "📌 Choisissez une question type :",
+            questions_pretes + ["Autre (saisie libre)"],
+            key="magicien_question_type",
+            help="Sélectionnez une question type puis complétez dans le champ ci-dessous."
         )
-        
-        # Zone de texte pour compléter ou saisir librement
-        if question and question != "Autre (saisie libre)":
-            question_complete = st.text_input(
-                "Complétez votre question :",
-                value=question + " ",
-                key="magicien_complete",
-                placeholder="Ex: " + question + " développeur web"
-            )
-        elif question == "Autre (saisie libre)":
-            question_complete = st.text_area(
-                "Votre question personnalisée :",
-                key="magicien_libre",
-                height=100,
-                placeholder="Posez votre question personnalisée ici..."
-            )
-        else:
-            question_complete = ""
-    
+        question_complete = st.text_input(
+            "Complétez ou modifiez la question :",
+            value=question_type + " " if question_type != "Autre (saisie libre)" else "",
+            key="magicien_complete_unique",
+            placeholder="Ex: Quels critères éliminatoires fréquents pour le poste de Chargé de recrutement"
+        )
     with col2:
         mode_rapide_magicien = st.checkbox("⚡ Réponse concise", key="magicien_fast")
 
@@ -2020,37 +2030,22 @@ with tab7:
         if question_complete and question_complete.strip():
             with st.spinner("⏳ Génération en cours..."):
                 start_time = time.time()
-                enhanced_question = question_complete.strip()
-                
-                # Amélioration automatique selon le type de question et mode rapide
+                prompt = question_complete.strip()
                 if mode_rapide_magicien:
-                    enhanced_question += ". Réponse concise et directe."
-                else:
-                    if "synonymes" in enhanced_question.lower():
-                        enhanced_question += ". Réponds uniquement avec une liste de synonymes séparés par des virgules, sans introduction."
-                    elif "outils" in enhanced_question.lower() or "logiciels" in enhanced_question.lower():
-                        enhanced_question += ". Réponds avec une liste à puces des outils, sans introduction."
-                    elif "compétences" in enhanced_question.lower() or "skills" in enhanced_question.lower():
-                        enhanced_question += ". Réponds avec une liste à puces, sans introduction."
-                
-                result = ask_deepseek([{"role": "user", "content": enhanced_question}], 
-                                     max_tokens=150 if mode_rapide_magicien else 300)
-                
+                    prompt += " Réponse concise et directe."
+                # Appel direct à l'API DeepSeek (pas de simulation/fallback)
+                # Utilise la même logique que la page Assistant IA
+                result = ask_deepseek([{"role": "user", "content": prompt}], max_tokens=300)
                 total_time = int(time.time() - start_time)
                 st.success(f"✅ Réponse générée en {total_time}s")
-                
-                # Afficher immédiatement la réponse
                 if result.get("content"):
                     st.subheader("💡 Réponse :")
                     st.write(result["content"])
-                    
-                    # Ajouter à l'historique
                     if not hasattr(st.session_state, 'magicien_history'):
                         st.session_state.magicien_history = []
-                    
                     st.session_state.magicien_history.append({
-                        "q": enhanced_question, 
-                        "r": result["content"], 
+                        "q": prompt,
+                        "r": result["content"],
                         "time": total_time
                     })
                 else:
@@ -2104,6 +2099,7 @@ with tab8:
     
 
 
+
     if st.button("🔮 Générer permutations", use_container_width=True):
         if prenom and nom and entreprise:
             with st.spinner("⏳ Génération des permutations..."):
@@ -2118,6 +2114,9 @@ with tab8:
                     # Email non détecté sur Charika
                     st.error(f"❌ Format d'email non détecté sur Charika.ma pour '{entreprise}'")
                     domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"
+                    # Ajout du bouton/lien Google
+                    google_url = get_charika_search_url(entreprise)
+                    st.markdown(f"<a href='{google_url}' target='_blank' style='font-size:16px;'>🔎 Rechercher sur Google</a>", unsafe_allow_html=True)
                 else:
                     domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"
                 
