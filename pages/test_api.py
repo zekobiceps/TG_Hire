@@ -1,7 +1,6 @@
 import streamlit as st
 from utils import save_sourcing_entry_to_gsheet, load_sourcing_entries_from_gsheet
 
-
 import streamlit as st
 import requests
 from bs4 import BeautifulSoup
@@ -15,6 +14,66 @@ import hashlib
 import pandas as pd
 from collections import Counter
 
+# Fonctions pour gestion des tokens Google Sheets
+def save_tokens_to_gsheet(tokens, function_name="General", user="Unknown", reset=False):
+    """Sauvegarde les tokens utilisés dans Google Sheets avec historique"""
+    try:
+        from utils import save_sourcing_entry_to_gsheet
+        
+        if reset:
+            # Entrée de reset total
+            entry = {
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "type": "Token Reset",
+                "function": "Reset Total",
+                "user": user,
+                "tokens": 0,
+                "cumulative_total": 0,
+                "action": "RESET TOTAL"
+            }
+        else:
+            # Récupérer le total actuel
+            current_total = st.session_state.get("api_usage", {}).get("used_tokens", 0)
+            
+            # Entrée d'usage normal
+            entry = {
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "type": "Token Usage",
+                "function": function_name,
+                "user": user,
+                "tokens": tokens,
+                "cumulative_total": current_total,
+                "action": "USAGE"
+            }
+        
+        # Sauvegarder dans la feuille Tokens
+        save_sourcing_entry_to_gsheet(entry, sheet_name="Tokens")
+        return True
+    except Exception as e:
+        st.error(f"Erreur sauvegarde tokens: {e}")
+        return False
+
+def load_total_tokens_from_gsheet():
+    """Charge le total cumulé des tokens depuis Google Sheets"""
+    try:
+        from utils import load_sourcing_entries_from_gsheet
+        
+        # Charger les entrées de la feuille Tokens
+        entries = load_sourcing_entries_from_gsheet(sheet_name="Tokens")
+        
+        if entries:
+            # Trouver la dernière entrée non-reset pour récupérer le total cumulé
+            for entry in reversed(entries):
+                if entry.get("action") == "RESET TOTAL":
+                    return 0  # Si le dernier était un reset, commencer à 0
+                elif entry.get("action") == "USAGE":
+                    return int(entry.get("cumulative_total", 0))
+        
+        return 0  # Aucune entrée trouvée, commencer à 0
+    except Exception as e:
+        st.error(f"Erreur chargement tokens: {e}")
+        return 0
+
 # Configuration pour l'appel à l'IA DeepSeek
 SYSTEM_PROMPT = """
 Tu es 'TG-Hire Assistant', un expert IA spécialisé dans le recrutement pour le secteur du BTP (Bâtiment et Travaux Publics) au Maroc.
@@ -26,7 +85,7 @@ Tes réponses doivent être :
 4.  **Adaptables** : Tu dois ajuster la longueur de ta réponse (courte, normale, détaillée) selon la demande.
 """
 
-def get_deepseek_response(prompt, history, length):
+def get_deepseek_response(prompt, history, length, function_name="General"):
     api_key = st.secrets.get("DEEPSEEK_API_KEY")
     if not api_key: return {"content": "Erreur: Clé API DeepSeek manquante.", "usage": 0}
     
@@ -50,6 +109,10 @@ def get_deepseek_response(prompt, history, length):
         
         st.session_state["api_usage"]["current_session_tokens"] += usage
         st.session_state["api_usage"]["used_tokens"] += usage
+        
+        # Sauvegarder dans Google Sheets avec détails de la fonction
+        user = st.session_state.get("user", "Unknown")
+        save_tokens_to_gsheet(usage, function_name, user)
         
         return {"content": content, "usage": usage}
     except Exception as e:
@@ -164,8 +227,16 @@ def _load_library_entries():
 
 def init_session_state():
     """Initialise les variables de session"""
+    # Charger le total cumulé depuis Google Sheets au premier chargement
+    if "tokens_loaded" not in st.session_state:
+        total_from_sheets = load_total_tokens_from_gsheet()
+        st.session_state["tokens_loaded"] = True
+        api_usage = {"current_session_tokens": 0, "used_tokens": total_from_sheets}
+    else:
+        api_usage = st.session_state.get("api_usage", {"current_session_tokens": 0, "used_tokens": 0})
+    
     defaults = {
-        "api_usage": {"current_session_tokens": 0, "used_tokens": 0},
+        "api_usage": api_usage,
         "library_entries": _load_library_entries(),
         "magicien_history": [],
         "boolean_query": "",
@@ -906,10 +977,7 @@ st.set_page_config(
 
 # -------------------- Sidebar --------------------
 with st.sidebar:
-    st.info("💡 Assistant IA pour le sourcing et recrutement")
-    
-    # Section des statistiques tokens
-    st.markdown("---")
+    # Section des statistiques tokens en premier
     st.subheader("📊 Statistiques")
     
     session_tokens = st.session_state.get("api_usage", {}).get("current_session_tokens", 0)
@@ -918,11 +986,27 @@ with st.sidebar:
     st.metric("🔑 Tokens (session)", session_tokens)
     st.metric("📊 Total cumulé", total_tokens)
     
-    if st.button("🔄 Reset session", help="Remet à zéro les tokens de la session actuelle", use_container_width=True):
-        if "api_usage" in st.session_state:
-            st.session_state["api_usage"]["current_session_tokens"] = 0
-        st.success("✅ Session remise à zéro")
-        st.rerun()
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔄 Reset session", help="Remet à zéro les tokens de la session actuelle", use_container_width=True):
+            if "api_usage" in st.session_state:
+                st.session_state["api_usage"]["current_session_tokens"] = 0
+            st.success("✅ Session remise à zéro")
+            st.rerun()
+    
+    with col2:
+        if st.button("🗑️ Reset total", help="Remet à zéro le total cumulé définitivement", use_container_width=True):
+            if "api_usage" in st.session_state:
+                st.session_state["api_usage"]["current_session_tokens"] = 0
+                st.session_state["api_usage"]["used_tokens"] = 0
+            # Sauvegarder le reset dans Google Sheets
+            user = st.session_state.get("user", "Unknown")
+            save_tokens_to_gsheet(0, "Reset Total", user, reset=True)
+            st.success("✅ Total remis à zéro")
+            st.rerun()
+    
+    st.markdown("---")
+    st.info("💡 Assistant IA pour le sourcing et recrutement")
 
 # -------------------- Onglets --------------------
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
@@ -1971,7 +2055,7 @@ with tab6:
         """
         
         with st.spinner("🤖 Génération IA en cours..."):
-            ia_result = get_deepseek_response(ia_prompt, [], "normale")
+            ia_result = get_deepseek_response(ia_prompt, [], "normale", "InMail Generation")
             if ia_result.get("content") and "Erreur: Clé API DeepSeek manquante" not in ia_result["content"]:
                 msg = ia_result["content"]
             elif "Erreur: Clé API DeepSeek manquante" in str(ia_result.get("content", "")):
@@ -2070,7 +2154,7 @@ Cordialement."""
                 """
                 
                 with st.spinner("🔄 Régénération IA en cours..."):
-                    ia_result = get_deepseek_response(ia_prompt, [], "normale")
+                    ia_result = get_deepseek_response(ia_prompt, [], "normale", "InMail Regeneration")
                     if ia_result.get("content"):
                         new_msg = ia_result["content"]
                     else:
@@ -2149,7 +2233,7 @@ with tab7:
                     prompt += ". Réponds avec une liste à puces, sans introduction."
                 if mode_rapide_magicien:
                     prompt += " Réponse concise et directe."
-                result = get_deepseek_response(prompt, [], "normale" if not mode_rapide_magicien else "courte")
+                result = get_deepseek_response(prompt, [], "normale" if not mode_rapide_magicien else "courte", "Magicien Sourcing")
                 total_time = int(time.time() - start_time)
                 st.success(f"✅ Réponse générée en {total_time}s")
                 if result.get("content"):
