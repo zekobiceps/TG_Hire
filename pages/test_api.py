@@ -43,6 +43,14 @@ def get_deepseek_response(prompt, history, length):
         data = response.json()
         content = data["choices"][0]["message"]["content"]
         usage = data.get("usage", {}).get("total_tokens", 0)
+        
+        # Mettre à jour les statistiques de tokens
+        if "api_usage" not in st.session_state:
+            st.session_state["api_usage"] = {"current_session_tokens": 0, "used_tokens": 0}
+        
+        st.session_state["api_usage"]["current_session_tokens"] += usage
+        st.session_state["api_usage"]["used_tokens"] += usage
+        
         return {"content": content, "usage": usage}
     except Exception as e:
         return {"content": f"❌ Erreur API DeepSeek: {e}", "usage": 0}
@@ -2071,6 +2079,27 @@ Cordialement."""
                 save_library_entries()
                 save_sourcing_entry_to_gsheet(entry)
                 st.success(f"✅ Modèle '{poste_accroche} - {entry['timestamp']}' sauvegardé")
+
+    # Section des statistiques tokens
+    st.markdown("---")
+    st.subheader("📊 Statistiques")
+    
+    col_stats1, col_stats2, col_stats3 = st.columns(3)
+    
+    with col_stats1:
+        session_tokens = st.session_state.get("api_usage", {}).get("current_session_tokens", 0)
+        st.metric("🔑 Tokens (session)", session_tokens)
+    
+    with col_stats2:
+        total_tokens = st.session_state.get("api_usage", {}).get("used_tokens", 0)
+        st.metric("📊 Total cumulé", total_tokens)
+    
+    with col_stats3:
+        if st.button("🔄 Reset session", help="Remet à zéro les tokens de la session actuelle"):
+            if "api_usage" in st.session_state:
+                st.session_state["api_usage"]["current_session_tokens"] = 0
+            st.success("✅ Compteur de session remis à zéro")
+            st.rerun()
 
 
 # -------------------- Tab 7: Magicien --------------------
