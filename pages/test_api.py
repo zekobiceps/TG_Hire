@@ -1861,6 +1861,11 @@ with tab6:
         longueur_message = st.slider("Longueur (mots)", 10, 200, 50, key="inmail_longueur")
     with col7:
         analyse_profil = st.selectbox("Méthode d'analyse du profil LinkedIn", ["Manuel", "Intelligence artificielle"], index=0, key="inmail_analyse")
+        if analyse_profil == "Intelligence artificielle":
+            # Vérifier si l'API est disponible
+            api_key = st.secrets.get("DEEPSEEK_API_KEY")
+            if not api_key:
+                st.warning("⚠️ API non configurée")
     with col8:
         cta_option = st.selectbox("Call to action (Conclusion)", ["Proposer un appel", "Partager le CV", "Découvrir l'opportunité sur notre site", "Accepter un rendez-vous"], key="inmail_cta")
 
@@ -1926,7 +1931,7 @@ with tab6:
                 
                 ia_result = get_deepseek_response(analyse_prompt, [], "normale")
                 
-                if ia_result.get("content"):
+                if ia_result.get("content") and "Erreur: Clé API DeepSeek manquante" not in ia_result["content"]:
                     try:
                         import json
                         profil_analyse = json.loads(ia_result["content"])
@@ -1935,6 +1940,12 @@ with tab6:
                         st.success("✅ Profil LinkedIn analysé automatiquement")
                     except json.JSONDecodeError:
                         st.warning("⚠️ Impossible d'analyser le profil LinkedIn, utilisation des données manuelles")
+                elif "Erreur: Clé API DeepSeek manquante" in str(ia_result.get("content", "")):
+                    st.error("🔑 **Configuration manquante** : La clé API DeepSeek n'est pas configurée.")
+                    st.info("💡 **Solution** : Contactez l'administrateur pour configurer la clé API DeepSeek dans les secrets Streamlit.")
+                    st.warning("⚠️ **Mode de secours** : Utilisation des données saisies manuellement pour générer le message.")
+                else:
+                    st.warning("⚠️ Impossible d'analyser le profil LinkedIn, utilisation des données manuelles")
         
         # Utiliser l'IA pour générer le message
         ia_prompt = f"""
@@ -1959,8 +1970,20 @@ with tab6:
         
         with st.spinner("🤖 Génération IA en cours..."):
             ia_result = get_deepseek_response(ia_prompt, [], "normale")
-            if ia_result.get("content"):
+            if ia_result.get("content") and "Erreur: Clé API DeepSeek manquante" not in ia_result["content"]:
                 msg = ia_result["content"]
+            elif "Erreur: Clé API DeepSeek manquante" in str(ia_result.get("content", "")):
+                st.error("🔑 **Configuration manquante** : La clé API DeepSeek n'est pas configurée.")
+                st.info("💡 **Solution** : Contactez l'administrateur pour configurer la clé API DeepSeek dans les secrets Streamlit.")
+                st.warning("⚠️ **Mode de secours** : Génération d'un message de base sans IA.")
+                # Fallback avec un message générique
+                msg = f"""Bonjour {donnees_profil.get('prenom', 'Candidat')},
+
+Votre profil a retenu notre attention chez {entreprise}. Nous recherchons actuellement un {poste_accroche} et pensons que votre expérience pourrait correspondre à nos besoins.
+
+Seriez-vous disponible pour échanger sur cette opportunité ?
+
+Cordialement."""
             else:
                 # Fallback si l'IA ne répond pas
                 msg = generate_inmail(donnees_profil, poste_accroche, entreprise, ton_message, longueur_message, cta_option, genre_profil, "entreprise")
