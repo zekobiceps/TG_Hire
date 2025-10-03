@@ -1992,8 +1992,6 @@ with tab6:
                 st.success(f"✅ Modèle '{poste_accroche} - {entry['timestamp']}' sauvegardé")
 
 
-# -------------------- Tab 7: Magicien --------------------
-    # ...existing code for magicien (unique zone, no duplicate keys)...
                 total_time = int(time.time() - start_time)
                 st.success(f"✅ Réponse générée en {total_time}s")
                 if result.get("content"):
