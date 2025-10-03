@@ -1848,7 +1848,7 @@ with tab6:
     with col6:
         longueur_message = st.slider("Longueur (mots)", 50, 300, 150, key="inmail_longueur")
     with col7:
-        analyse_profil = st.selectbox("Méthode analyse", ["Manuel", "Regex", "Compét API"], index=0, key="inmail_analyse")
+        analyse_profil = st.selectbox("Méthode analyse", ["Manuel", "IA"], index=0, key="inmail_analyse")
     with col8:
         cta_option = st.selectbox("Call to action (Conclusion)", ["Proposer un appel", "Partager le CV", "Découvrir l'opportunité sur notre site", "Accepter un rendez-vous"], key="inmail_cta")
 
@@ -1862,7 +1862,6 @@ with tab6:
             "competences_cles": ["", "", ""],
             "experience_annees": "",
             "formation": "",
-            "mission": "",
             "localisation": ""
         }
         profil_data = {**default_profil, **st.session_state.get("inmail_profil_data", {})}
@@ -1881,14 +1880,54 @@ with tab6:
         profil_data["competences_cles"][2] = cols2[3].text_input("Compétence 3", profil_data["competences_cles"][2], key="inmail_comp3")
         profil_data["localisation"] = cols2[4].text_input("Localisation", profil_data.get("localisation", ""), key="inmail_loc")
 
-        profil_data["mission"] = st.text_area("Mission du poste", profil_data.get("mission", ""), height=80, key="inmail_mission")
+        # Ajout du champ pour le lien profil LinkedIn
+        profil_linkedin = st.text_input("🔗 Profil LinkedIn", placeholder="https://www.linkedin.com/in/prenom-nom", key="inmail_linkedin")
 
         col_ap1, col_ap2 = st.columns(2)
         with col_ap1:
             if st.button("🔍 Analyser profil", key="btn_analyse_inmail"):
-                profil_data.update({"poste_actuel": "Manager", "entreprise_actuelle": "ExempleCorp"})
-                st.session_state["inmail_profil_data"] = profil_data
-                st.success("✅ Profil pré-rempli automatiquement")
+                if analyse_profil == "IA" and profil_linkedin.strip():
+                    with st.spinner("🤖 Analyse IA du profil LinkedIn..."):
+                        # Prompt pour analyser le profil LinkedIn
+                        analyse_prompt = f"""
+                        Analyse ce profil LinkedIn: {profil_linkedin}
+                        
+                        Extrait les informations suivantes au format JSON strict :
+                        {{
+                            "prenom": "prénom du candidat",
+                            "nom": "nom du candidat", 
+                            "poste_actuel": "poste/titre actuel",
+                            "entreprise_actuelle": "entreprise actuelle",
+                            "experience_annees": "nombre d'années d'expérience estimé",
+                            "formation": "domaine de formation principal",
+                            "competences_cles": ["compétence1", "compétence2", "compétence3"],
+                            "localisation": "ville/région"
+                        }}
+                        
+                        Réponds UNIQUEMENT avec le JSON valide, sans texte supplémentaire.
+                        """
+                        
+                        ia_result = get_deepseek_response(analyse_prompt, [], "normale")
+                        if ia_result.get("content"):
+                            try:
+                                import json
+                                profil_analyse = json.loads(ia_result["content"])
+                                
+                                # Mettre à jour les données du profil
+                                profil_data.update(profil_analyse)
+                                st.session_state["inmail_profil_data"] = profil_data
+                                st.success("✅ Profil analysé et rempli automatiquement par l'IA")
+                                st.rerun()
+                            except json.JSONDecodeError:
+                                st.error("❌ Erreur lors de l'analyse du profil")
+                        else:
+                            st.error("❌ Impossible de contacter l'API d'analyse")
+                elif analyse_profil == "Manuel":
+                    profil_data.update({"poste_actuel": "À compléter", "entreprise_actuelle": "À compléter"})
+                    st.session_state["inmail_profil_data"] = profil_data
+                    st.info("ℹ️ Mode manuel - complétez les champs manuellement")
+                else:
+                    st.warning("⚠️ Veuillez saisir un lien LinkedIn pour l'analyse IA")
         with col_ap2:
             if st.button("💾 Appliquer infos candidat", key="btn_apply_inmail"):
                 st.session_state["inmail_profil_data"] = profil_data
@@ -1907,7 +1946,7 @@ with tab6:
         
         # Utiliser l'IA pour générer le message
         ia_prompt = f"""
-        Génère un message InMail personnalisé avec les informations suivantes:
+        Génère UNIQUEMENT le contenu du message InMail personnalisé (sans objet, sans titre) avec les informations suivantes:
         - Candidat: {donnees_profil.get('prenom', '')} {donnees_profil.get('nom', '')}
         - Poste actuel: {donnees_profil.get('poste_actuel', '')}
         - Entreprise actuelle: {donnees_profil.get('entreprise_actuelle', '')}
@@ -1922,7 +1961,8 @@ with tab6:
         Genre: {genre_profil}
         Call-to-action: {cta_option}
         
-        Le message doit faire environ {longueur_message} mots et être {ton_message.lower()}.
+        Le message doit faire environ {longueur_message} mots, être {ton_message.lower()}, et commencer directement par la salutation (ex: Bonjour {donnees_profil.get('prenom', 'Candidat')},).
+        Ne pas inclure d'objet, de titre ou de formatage en gras pour l'objet.
         """
         
         with st.spinner("🤖 Génération IA en cours..."):
@@ -1972,7 +2012,7 @@ with tab6:
         st.subheader(titre_inmail)
         st.text_input("📧 Objet", st.session_state.get("inmail_objet", ""), key="inmail_objet_display")
         msg = st.session_state["inmail_message"]
-        st.text_area("Message", msg, height=250, key="inmail_msg_display")
+        st.text_area("Message", msg, height=250, key="inmail_msg_display", value=msg)
         st.caption(f"📏 {len(msg.split())} mots | {len(msg)} caractères")
 
         col1, col2 = st.columns(2)
@@ -1982,7 +2022,7 @@ with tab6:
                 
                 # Générer une nouvelle version avec l'IA
                 ia_prompt = f"""
-                Génère une NOUVELLE version d'un message InMail (différente de la précédente) avec:
+                Génère une NOUVELLE version d'un message InMail UNIQUEMENT LE CONTENU (sans objet, sans titre) différente de la précédente avec:
                 - Candidat: {donnees_profil.get('prenom', '')} {donnees_profil.get('nom', '')}
                 - Poste actuel: {donnees_profil.get('poste_actuel', '')}
                 - Entreprise actuelle: {donnees_profil.get('entreprise_actuelle', '')}
@@ -1995,6 +2035,8 @@ with tab6:
                 Ton: {ton_message}
                 
                 Génère une approche différente, avec un angle nouveau mais professionnel.
+                Commence directement par la salutation (ex: Bonjour {donnees_profil.get('prenom', 'Candidat')},).
+                Ne pas inclure d'objet, de titre ou de formatage en gras.
                 """
                 
                 with st.spinner("🔄 Régénération IA en cours..."):
