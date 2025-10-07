@@ -391,7 +391,7 @@ with tab2:
             all_cols = data_to_clean.columns.tolist()
             # Marquer les colonnes candidates date pour l'info utilisateur
             date_candidate_cols = [c for c in all_cols if 'date' in c.lower() or 'time' in c.lower() or 'jour' in c.lower()]
-            default_date_index = all_cols.index(date_candidate_cols[0]) if date_candidateCols else 0
+            default_date_index = all_cols.index(date_candidate_cols[0]) if date_candidate_cols else 0
             
             date_col = st.selectbox(
                 "Sélectionnez la colonne de date (toutes les colonnes sont listées ci-dessous)",
