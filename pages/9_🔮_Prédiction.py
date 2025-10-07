@@ -363,8 +363,7 @@ with tab1:
                 key="analysis_objective"
             )
             
-            # Stocker l'objectif dans st.session_state
-            st.session_state.analysis_objective = analysis_objective
+            # Stocker l'objectif dans st.session_state (REMOVED: already handled by the radio button key)
             
             # Afficher une explication selon le choix
             if analysis_objective == "Les Demandes de Recrutement":
