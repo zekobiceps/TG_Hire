@@ -275,7 +275,7 @@ with tab1:
         use_sample = st.checkbox("Ou utiliser des données d'exemple", value=False)
         
         if use_sample:
-            st.info("Utilisation des données d'exemple pour la démonstration")
+            st.info("Utilisation des données d'exemple pour la démonstrationn")
             # Créer des données d'exemple plus riches avec Direction et Poste
             date_range = pd.date_range(start='2020-01-01', end='2023-12-31', freq='D')
             
@@ -525,7 +525,7 @@ with tab2:
                             df = df[~future_mask]
                             st.warning(f"⚠️ {n_future} entrées avec dates futures ont été exclues pour éviter des biais dans les prédictions.")
     
-                    # Filtrage selon l'objectif choisi
+                    # Filtrage selon l'obqjectif choissi
                     if objective == "Les Demandes de Recrutement":
                         used_date_col = detect_date_col_for_objective(df, objective) or date_col_auto
                         # Keep rows where statut contains any of the listed values
