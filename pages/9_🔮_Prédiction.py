@@ -437,7 +437,7 @@ with tab2:
         poste_col = poste_cols[0] if poste_cols else None
         statut_col = statut_cols[0] if statut_cols else None
 
-        # Choix d'agrégation (simplifié: M, Q, Y)
+        # Choix d'agrégation (simplifié: M, Q, Y uniquement)
         st.subheader("⏱️ Fréquence d'agrégation")
         aggregation_freq = st.selectbox(
             "Fréquence d'agrégation",
@@ -512,30 +512,34 @@ with tab2:
                 try:
                     df = df_raw.copy()
 
-                    # Determine objective-specific filters and date column
+                    # CORRECTION CRITIQUE: Filtrage des données futures dès le début du processus
+                    # Identifier la colonne de date appropriée selon l'objectif
+                    date_col_objective = detect_date_col_for_objective(df, objective)
+                    if date_col_objective:
+                        current_date = datetime.now()
+                        df[date_col_objective] = pd.to_datetime(df[date_col_objective], errors='coerce')
+                        # Filtre strict: exclure toutes les entrées avec date dans le futur
+                        future_mask = df[date_col_objective] > pd.Timestamp(current_date)
+                        if future_mask.any():
+                            n_future = future_mask.sum()
+                            df = df[~future_mask]
+                            st.warning(f"⚠️ {n_future} entrées avec dates futures ont été exclues pour éviter des biais dans les prédictions.")
+    
+                    # Filtrage selon l'objectif choisi
                     if objective == "Les Demandes de Recrutement":
                         used_date_col = detect_date_col_for_objective(df, objective) or date_col_auto
-                        # Keep rows where statut contains any of the listed values (if statut_col detected)
+                        # Keep rows where statut contains any of the listed values
                         valid_status_values = ["clôture", "cloture", "en cours", "dépriorisé", "depriorisé", "annulé", "annule"]
                         if statut_col:
                             mask_stat = df[statut_col].astype(str).str.strip().str.lower().fillna("")
-                            df = df[mask_stat.isin(valid_status_values) | mask_stat.str.contains('|'.join([v for v in valid_status_values if ' ' in v]) , na=False) | mask_stat.str.len().gt(0) & mask_stat.isin(valid_status_values)]
-                        # else: don't filter by status if none found (keep all)
+                            df = df[mask_stat.isin(valid_status_values) | 
+                                    mask_stat.str.contains('|'.join([v for v in valid_status_values if ' ' in v]), na=False)]
                     else:  # Recrutements Effectifs
                         used_date_col = detect_date_col_for_objective(df, objective) or date_col_auto
-                        # Keep rows where used_date_col is not null OR statut == 'Clôture' when status exists
+                        # Keep only rows where the effective entry date is not null
                         if used_date_col:
                             df[used_date_col] = pd.to_datetime(df[used_date_col], errors='coerce')
-                            mask_date = df[used_date_col].notna()
-                            if statut_col:
-                                mask_status_closed = df[statut_col].astype(str).str.strip().str.lower() == "clôture"
-                                df = df[mask_date | mask_status_closed]
-                            else:
-                                df = df[mask_date]
-                        else:
-                            # if no date col, fallback to keeping only rows with statut == 'clôture' if statut_col exists
-                            if statut_col:
-                                df = df[df[statut_col].astype(str).str.strip().str.lower() == "clôture"]
+                            df = df[df[used_date_col].notna()]
 
                     # Apply temporal filter if available
                     if date_col_auto and start and end:
@@ -718,6 +722,7 @@ with tab4:
                     else:
                         mape_val = np.nan
 
+                    # Affichage du MAPE comme métrique de confiance
                     st.metric("Marge d'Erreur Moyenne", f"± {round(mape_val,2)}%" if not np.isnan(mape_val) else "N/A")
 
                     # Build final forecast for the horizon (aggregate monthly)
@@ -790,7 +795,6 @@ with tab4:
                             st.info("Aucune donnée Poste pour la ventilation.")
 
                     # Consolidated downloadable CSV: monthly_pred + aggregated direction/poste per month
-                    # Build consolidated table: month, total, direction, direction_pred, poste, poste_pred
                     consolidated_rows = []
                     for _, mrow in monthly_pred.iterrows():
                         month_label = mrow['date'].strftime('%b %Y')
@@ -824,7 +828,10 @@ with tab4:
 
                     if not consolidated_df.empty:
                         csv_bytes = convert_df_to_csv(consolidated_df)
-                        st.download_button("📥 Télécharger la ventilation complète (CSV)", data=csv_bytes, file_name="ventilation_previsionnelle.csv", mime="text/csv")
+                        st.download_button("📥 Télécharger la ventilation complète (CSV)", 
+                      data=csv_bytes, 
+                      file_name="ventilation_previsionnelle.csv", 
+                      mime="text/csv")
                     else:
                         st.info("Aucune ventilation à télécharger (données manquantes).")
 
