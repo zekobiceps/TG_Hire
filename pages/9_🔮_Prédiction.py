@@ -677,12 +677,24 @@ with tab4:
                     # Derive predictions for the test period for MAPE
                     # Align forecasts with test_df by matching dates
                     # forecast_full may contain historical + future; ensure columns ds & yhat exist
-                    if 'yhat' not in forecast_full.columns and 'yhat' in forecast_full.columns:
-                        pass
+                    if 'ds' not in forecast_full.columns:
+                        raise RuntimeError("Résultat de prédiction invalide : colonne 'ds' manquante dans forecast_full.")
+
+                    # Ensure forecast_full contains 'yhat' (common Prophet/HW/XGBoost output). If absent, try sensible fallbacks.
+                    if 'yhat' not in forecast_full.columns:
+                        if 'y' in forecast_full.columns:
+                            forecast_full['yhat'] = forecast_full['y']
+                        elif 'y_pred' in forecast_full.columns:
+                            forecast_full['yhat'] = forecast_full['y_pred']
+                        else:
+                            # Create yhat column with NaN to allow safe merges and downstream checks
+                            forecast_full['yhat'] = np.nan
+                            st.warning("Prédictions disponibles mais le format attendu ('yhat') est absent. Les évaluations et la partie prévision seront limitées.")
+
                     # Merge to compute MAPE on test period where actuals exist
                     pred_hist = forecast_full[['ds','yhat']].merge(test_df[['ds','y']], on='ds', how='inner')
                     if pred_hist.empty:
-                        # fallback: use train fitted values vs train actuals
+                        # fallback: try to merge on training period (if models returned fitted values)
                         pred_hist = forecast_full[['ds','yhat']].merge(train_df[['ds','y']], on='ds', how='inner')
 
                     # Compute MAPE safely
@@ -704,9 +716,8 @@ with tab4:
                     # Build final forecast for the horizon (aggregate monthly)
                     # Ensure forecast_full has ds and yhat; take future portion beyond last historical date
                     last_hist = prophet_df_sorted['ds'].max()
-                    if 'yhat' not in forecast_full.columns and 'yhat' not in forecast_full.columns:
-                        st.warning("Prédictions indisponibles dans le format attendu.")
-                        return
+                    if forecast_full['yhat'].isna().all():
+                        st.warning("Aucun score de prédiction disponible pour la période future (les valeurs 'yhat' sont manquantes).")
 
                     future_mask = pd.to_datetime(forecast_full['ds']) > pd.to_datetime(last_hist)
                     future_df = forecast_full.loc[future_mask, ['ds','yhat']].copy()
