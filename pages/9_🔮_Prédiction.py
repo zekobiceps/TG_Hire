@@ -670,7 +670,20 @@ with tab2:
                                 aggregated_data = aggregated_data.rename(columns={cols[1]: value_col})
                         
                         # Mettre à jour les données nettoyées dans l'état de session
-                        st.session_state.cleaned_data = aggregated_data
+                        # Stocker les données filtrées (brutes) et la série agrégée explicitement
+                        st.session_state.cleaned_data_filtered = data_to_clean.copy()
+                        # Normaliser noms de colonnes agrégées
+                        try:
+                            aggregated_data.columns = ['date', 'value']
+                        except Exception:
+                            pass
+                        st.session_state.cleaned_data = aggregated_data.copy()
+                        st.session_state.cleaned_data_aggregated = aggregated_data.copy()
+                        # Conserver métadonnées utiles pour les onglets suivants
+                        st.session_state.date_col = 'date'
+                        st.session_state.value_col = 'value'
+                        st.session_state.freq = freq
+
                         st.success("✅ Données préparées avec succès!")
                     except Exception as e:
                         st.error(f"❌ Erreur lors de la préparation des données: {str(e)}")
