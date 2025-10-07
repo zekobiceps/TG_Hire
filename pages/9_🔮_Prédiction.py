@@ -1,20 +1,15 @@
 import streamlit as st
-import requests
 from datetime import datetime, timedelta
-import json
-from PIL import Image, ImageDraw, ImageFont
-import io
-import base64
-from utils import deepseek_generate
 import pandas as pd
 import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
 from prophet import Prophet
 import xgboost as xgb
-from prophet.plot import add_changepoints_to_plot
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 import warnings
+import io
+from sklearn.metrics import mean_absolute_percentage_error
 warnings.filterwarnings('ignore')
 
 # Configuration de la page
@@ -71,770 +66,1075 @@ st.markdown("""
 # Initialisation des variables de session
 if 'data' not in st.session_state:
     st.session_state.data = None
-if 'cleaned_data' not in st.session_state:
-    st.session_state.cleaned_data = None
-if 'cleaned_data_aggregated' not in st.session_state:
-    st.session_state.cleaned_data_aggregated = None
 if 'cleaned_data_filtered' not in st.session_state:
     st.session_state.cleaned_data_filtered = None
-if 'forecast_results' not in st.session_state:
-    st.session_state.forecast_results = None
-if 'model' not in st.session_state:
-    st.session_state.model = None
-if 'forecast_horizon' not in st.session_state:
-    st.session_state.forecast_horizon = 90
-if 'selected_uid' not in st.session_state:
-    st.session_state.selected_uid = None
+if 'time_series_data' not in st.session_state:
+    st.session_state.time_series_data = None
 if 'analysis_objective' not in st.session_state:
     st.session_state.analysis_objective = "Les Recrutements Effectifs"
+if 'direction_col' not in st.session_state:
+    st.session_state.direction_col = None
+if 'poste_col' not in st.session_state:
+    st.session_state.poste_col = None
+if 'date_col' not in st.session_state:
+    st.session_state.date_col = None
 
 # Fonctions utilitaires
 def convert_df_to_csv(df):
     """Convertir un DataFrame en CSV téléchargeable"""
     return df.to_csv(index=False).encode('utf-8')
 
-def generate_time_features(df, date_col):
-    """Générer des caractéristiques temporelles à partir d'une colonne de date"""
+def apply_temporal_guard(df, date_col, objective):
+    """
+    RÈGLE N°1: GARDE-FOU TEMPOREL - Correction la plus critique
+    Supprime toutes les lignes avec des dates dans le futur
+    """
+    current_date = datetime.now().date()
     df = df.copy()
-    df['date'] = pd.to_datetime(df[date_col])
-    df['month'] = df['date'].dt.month
-    df['year'] = df['date'].dt.year
-    df['quarter'] = df['date'].dt.quarter
-    df['day_of_week'] = df['date'].dt.dayofweek
-    df['week_of_year'] = df['date'].dt.isocalendar().week
-    df['is_month_start'] = df['date'].dt.is_month_start
-    df['is_month_end'] = df['date'].dt.is_month_end
-    df['is_quarter_start'] = df['date'].dt.is_quarter_start
-    df['is_quarter_end'] = df['date'].dt.is_quarter_end
-    df['is_year_start'] = df['date'].dt.is_year_start
-    df['is_year_end'] = df['date'].dt.is_year_end
-    return df
-
-def aggregate_time_series(df, date_col, value_col, freq, agg_func='sum'):
-    """Agréger une série temporelle selon une fréquence donnée"""
-    df = df.copy()
-    df['date'] = pd.to_datetime(df[date_col])
-    df = df.set_index('date')
     
-    if agg_func == 'sum':
-        return df.resample(freq)[value_col].sum().reset_index()
-    elif agg_func == 'mean':
-        return df.resample(freq)[value_col].mean().reset_index()
-    elif agg_func == 'count':
-        return df.resample(freq)[value_col].count().reset_index()
-    elif agg_func == 'median':
-        return df.resample(freq)[value_col].median().reset_index()
-    else:
-        return df.resample(freq)[value_col].sum().reset_index()
+    # Convertir la colonne de date
+    df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+    
+    # Identifier les lignes futures
+    future_mask = df[date_col].dt.date > current_date
+    n_future = future_mask.sum()
+    
+    # Filtrer les données futures
+    df_filtered = df[~future_mask]
+    
+    if n_future > 0:
+        st.warning(f"⚠️ **Garde-Fou Temporel**: {n_future} entrées avec des dates futures ont été automatiquement supprimées pour éviter des biais dans les prédictions.")
+    
+    return df_filtered, n_future
 
-def create_prophet_dataset(df, date_col, value_col):
-    """Créer un dataset au format Prophet (ds, y)"""
-    prophet_df = pd.DataFrame()
-    prophet_df['ds'] = pd.to_datetime(df[date_col])
-    prophet_df['y'] = df[value_col]
-    return prophet_df
+def detect_columns(df):
+    """Détecter automatiquement les colonnes importantes"""
+    columns = df.columns.tolist()
+    
+    # Détecter les colonnes de direction
+    direction_cols = [c for c in columns if any(word in c.lower() for word in ['direction', 'département', 'dept', 'service'])]
+    direction_col = direction_cols[0] if direction_cols else None
+    
+    # Détecter les colonnes de poste
+    poste_cols = [c for c in columns if any(word in c.lower() for word in ['poste', 'fonction', 'job', 'métier', 'emploi'])]
+    poste_col = poste_cols[0] if poste_cols else None
+    
+    # Détecter les colonnes de statut
+    statut_cols = [c for c in columns if any(word in c.lower() for word in ['statut', 'status', 'état', 'state'])]
+    statut_col = statut_cols[0] if statut_cols else None
+    
+    return direction_col, poste_col, statut_col
 
-def predict_with_prophet(df, horizon, seasonality='additive', changepoint_prior_scale=0.05, 
-                        seasonality_prior_scale=10.0, weekly=False, monthly=True, yearly=True):
-    """Effectuer une prévision avec Prophet"""
+def get_date_column_for_objective(df, objective):
+    """
+    RÈGLE N°2: Logique de Filtrage Automatisée
+    Sélectionner automatiquement la colonne de date selon l'objectif
+    """
+    columns = df.columns.tolist()
+    
+    if objective == "Les Demandes de Recrutement":
+        # Chercher la colonne "Date de réception de la demande aprés validation de la DRH"
+        for col in columns:
+            if "réception" in col.lower() and "demande" in col.lower():
+                return col
+        # Fallback
+        for col in columns:
+            if "réception" in col.lower() or ("date" in col.lower() and "demande" in col.lower()):
+                return col
+    else:  # "Les Recrutements Effectifs"
+        # Chercher la colonne "Date d'entrée effective du candidat"
+        for col in columns:
+            if "entrée" in col.lower() and "effective" in col.lower():
+                return col
+        # Fallback
+        for col in columns:
+            if "entrée" in col.lower() or "effective" in col.lower():
+                return col
+    
+    # Fallback général - première colonne contenant "date"
+    date_cols = [c for c in columns if 'date' in c.lower()]
+    return date_cols[0] if date_cols else None
+
+def apply_business_logic_filter(df, objective, statut_col):
+    """
+    RÈGLE N°2: Appliquer le filtrage métier selon l'objectif
+    """
+    df = df.copy()
+    
+    if objective == "Les Demandes de Recrutement":
+        # Garder les lignes où le statut contient: "Clôture", "En cours", "Dépriorisé", "Annulé"
+        if statut_col and statut_col in df.columns:
+            valid_statuses = ["clôture", "cloture", "en cours", "dépriorisé", "depriorise", "annulé", "annule"]
+            mask = df[statut_col].astype(str).str.lower().str.strip().isin(valid_statuses)
+            df_filtered = df[mask]
+            n_filtered = len(df) - len(df_filtered)
+            if n_filtered > 0:
+                st.info(f"📝 **Filtrage Demandes**: {n_filtered} lignes exclues (statut non pertinent pour l'analyse des demandes)")
+        else:
+            df_filtered = df
+            st.warning("⚠️ Aucune colonne de statut détectée. Toutes les demandes sont conservées.")
+    else:  # "Les Recrutements Effectifs"
+        # Garder seulement les lignes où la date d'entrée effective n'est pas vide
+        date_col = get_date_column_for_objective(df, objective)
+        if date_col:
+            mask = df[date_col].notna()
+            df_filtered = df[mask]
+            n_filtered = len(df) - len(df_filtered)
+            if n_filtered > 0:
+                st.info(f"👨‍💼 **Filtrage Recrutements**: {n_filtered} lignes exclues (pas de date d'entrée effective)")
+        else:
+            df_filtered = df
+            st.warning("⚠️ Aucune colonne de date d'entrée effective détectée.")
+    
+    return df_filtered
+
+def create_time_series(df, date_col, freq):
+    """Créer une série temporelle agrégée"""
+    df = df.copy()
+    df['date_parsed'] = pd.to_datetime(df[date_col])
+    df = df.dropna(subset=['date_parsed'])
+    
+    # Agréger par fréquence (compter les lignes)
+    df_agg = df.set_index('date_parsed').resample(freq).size().reset_index(name='volume')
+    df_agg = df_agg.rename(columns={'date_parsed': 'date'})
+    
+    return df_agg
+
+def calculate_mape(y_true, y_pred):
+    """Calculer le MAPE (Mean Absolute Percentage Error)"""
+    y_true = np.array(y_true)
+    y_pred = np.array(y_pred)
+    
+    # Éviter la division par zéro
+    mask = y_true != 0
+    if mask.sum() == 0:
+        return np.nan
+    
+    return np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
+
+def predict_with_prophet(df, horizon_days):
+    """Prédiction avec Prophet"""
+    prophet_df = pd.DataFrame({
+        'ds': df['date'],
+        'y': df['volume']
+    })
+    
     model = Prophet(
-        seasonality_mode=seasonality,
-        weekly_seasonality=weekly,
-        yearly_seasonality=yearly,
-        changepoint_prior_scale=changepoint_prior_scale,
-        seasonality_prior_scale=seasonality_prior_scale
+        yearly_seasonality=True,
+        weekly_seasonality=False,
+        daily_seasonality=False,
+        changepoint_prior_scale=0.05
     )
+    model.fit(prophet_df)
     
-    if monthly:
-        model.add_seasonality(name='monthly', period=30.4375, fourier_order=5)
-    
-    model.fit(df)
-    
-    future = model.make_future_dataframe(periods=horizon, freq='D')
+    future = model.make_future_dataframe(periods=horizon_days, freq='D')
     forecast = model.predict(future)
     
     return model, forecast
 
-def predict_with_holt_winters(df, horizon, seasonal_periods=12):
-    """Effectuer une prévision avec Holt-Winters"""
-    model = ExponentialSmoothing(
-        df['y'].values,
-        seasonal_periods=seasonal_periods,
-        trend='add',
-        seasonal='add'
-    )
-    fitted_model = model.fit()
-    forecast = fitted_model.forecast(horizon)
-    
-    # Créer un dataframe similaire à celui de Prophet pour la cohérence
-    future_dates = pd.date_range(start=df['ds'].iloc[-1] + timedelta(days=1), periods=horizon)
-    forecast_df = pd.DataFrame({
-        'ds': future_dates,
-        'yhat': forecast,
-        'yhat_lower': forecast * 0.9,  # Approximation simplifiée des intervalles
-        'yhat_upper': forecast * 1.1
-    })
-    
-    # Concaténer avec les données historiques pour avoir un format cohérent
-    historical = pd.DataFrame({
-        'ds': df['ds'],
-        'yhat': df['y'],
-        'yhat_lower': df['y'] * 0.9,
-        'yhat_upper': df['y'] * 1.1
-    })
-    
-    full_forecast = pd.concat([historical, forecast_df])
-    
-    return fitted_model, full_forecast
+def predict_with_holt_winters(df, horizon_days):
+    """Prédiction avec Holt-Winters"""
+    try:
+        model = ExponentialSmoothing(
+            df['volume'].values,
+            trend='add',
+            seasonal='add',
+            seasonal_periods=12
+        ).fit()
+        
+        forecast_values = model.forecast(horizon_days)
+        
+        # Créer un DataFrame au format compatible
+        future_dates = pd.date_range(start=df['date'].max() + timedelta(days=1), periods=horizon_days, freq='D')
+        forecast_df = pd.DataFrame({
+            'ds': list(df['date']) + list(future_dates),
+            'yhat': list(df['volume']) + list(forecast_values)
+        })
+        
+        return model, forecast_df
+    except Exception as e:
+        st.error(f"Erreur Holt-Winters: {e}")
+        return None, None
 
-def predict_with_xgboost(df, horizon, lookback=30):
-    """Effectuer une prévision avec XGBoost"""
-    # Préparation des données
-    X, y = [], []
-    data = df['y'].values
-    
-    for i in range(lookback, len(data)):
-        X.append(data[i-lookback:i])
-        y.append(data[i])
-    
-    X = np.array(X)
-    y = np.array(y)
-    
-    # Division train/test
-    train_size = int(len(X) * 0.8)
-    X_train, X_test = X[:train_size], X[train_size:]
-    y_train, y_test = y[:train_size], y[train_size:]
-    
-    # Entraînement du modèle
-    model = xgb.XGBRegressor(objective='reg:squarederror', n_estimators=100)
-    model.fit(X_train, y_train)
-    
-    # Préparation des futures entrées pour la prédiction
-    last_x = data[-lookback:]
-    forecasts = []
-    
-    # Prédiction itérative
-    for i in range(horizon):
-        next_pred = model.predict(np.array([last_x]))[0]
-        forecasts.append(next_pred)
-        last_x = np.append(last_x[1:], next_pred)
-    
-    # Créer un dataframe similaire à celui de Prophet pour la cohérence
-    future_dates = pd.date_range(start=df['ds'].iloc[-1] + timedelta(days=1), periods=horizon)
-    forecast_df = pd.DataFrame({
-        'ds': future_dates,
-        'yhat': forecasts,
-        'yhat_lower': [f * 0.9 for f in forecasts],
-        'yhat_upper': [f * 1.1 for f in forecasts]
-    })
-    
-    # Concaténer avec les données historiques pour avoir un format cohérent
-    historical = pd.DataFrame({
-        'ds': df['ds'],
-        'yhat': df['y'],
-        'yhat_lower': df['y'] * 0.9,
-        'yhat_upper': df['y'] * 1.1
-    })
-    
-    full_forecast = pd.concat([historical, forecast_df])
-    
-    return model, full_forecast
+def predict_with_xgboost(df, horizon_days, lookback=30):
+    """Prédiction avec XGBoost"""
+    try:
+        data = df['volume'].values
+        X, y = [], []
+        
+        for i in range(lookback, len(data)):
+            X.append(data[i-lookback:i])
+            y.append(data[i])
+        
+        X, y = np.array(X), np.array(y)
+        
+        model = xgb.XGBRegressor(n_estimators=100, random_state=42)
+        model.fit(X, y)
+        
+        # Prédictions futures
+        last_sequence = data[-lookback:]
+        forecasts = []
+        
+        for _ in range(horizon_days):
+            next_pred = model.predict(np.array([last_sequence]))[0]
+            forecasts.append(max(0, next_pred))  # Éviter les valeurs négatives
+            last_sequence = np.append(last_sequence[1:], next_pred)
+        
+        # Créer un DataFrame au format compatible
+        future_dates = pd.date_range(start=df['date'].max() + timedelta(days=1), periods=horizon_days, freq='D')
+        forecast_df = pd.DataFrame({
+            'ds': list(df['date']) + list(future_dates),
+            'yhat': list(df['volume']) + forecasts
+        })
+        
+        return model, forecast_df
+    except Exception as e:
+        st.error(f"Erreur XGBoost: {e}")
+        return None, None
 
 # Titre principal
-st.markdown('<div class="main-header">🔮 Prédiction des Recrutements</div>', unsafe_allow_html=True)
+st.markdown("# 🔮 Prédiction des Recrutements")
+st.markdown("---")
 
-# --- Assurer la définition des onglets (évite l'erreur "tab3 is not defined" dans certains contextes) ---
-if not all(n in globals() for n in ('tab1','tab2','tab3','tab4')):
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "📁 Import des Données",
-        "🧹 Nettoyage & Préparation",
-        "📊 Visualisation",
-        "🔮 Modélisation & Prédiction"
-    ])
+# Créer les onglets
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📁 Import des Données",
+    "🧹 Nettoyage & Préparation", 
+    "📊 Visualisation",
+    "🔮 Modélisation & Prédiction"
+])
 
 # ============================
-# TAB 1: IMPORT DES DONNÉES
+# ONGLET 1: IMPORT DES DONNÉES
 # ============================
 with tab1:
-    st.markdown('<div class="sub-header">Import des Données</div>', unsafe_allow_html=True)
-    st.markdown(
-        """Importez vos données de recrutement pour commencer l'analyse. Le fichier doit contenir au minimum:
-        - Une colonne de date (demandes ou recrutements effectifs)
-        - Une colonne de valeurs numériques (nombre de recrutements)"""
-    )
+    st.header("📁 Import des Données")
+    st.markdown("Importez vos données de recrutement ou utilisez les données d'exemple pour commencer.")
     
-    col1, col2 = st.columns([3, 1])
+    col1, col2 = st.columns([2, 1])
     
     with col1:
+        # Upload du fichier
         uploaded_file = st.file_uploader(
             "Choisissez votre fichier de données",
             type=['csv', 'xlsx', 'xls'],
             help="Formats supportés: CSV, Excel"
         )
         
-        use_sample = st.checkbox("Ou utiliser des données d'exemple", value=False)
+        # Option données d'exemple
+        use_sample = st.checkbox("Utiliser des données d'exemple", value=False)
         
         if use_sample:
-            st.info("Utilisation des données d'exemple pour la démonstrationn")
-            # Créer des données d'exemple plus riches avec Direction et Poste
-            date_range = pd.date_range(start='2020-01-01', end='2023-12-31', freq='D')
+            st.info("📊 Génération des données d'exemple en cours...")
             
-            # Générer des directions et postes fictifs
-            directions = ["Direction Technique", "Direction RH", "Direction Commerciale", 
-                         "Direction Financière", "Direction Logistique"]
+            # Générer des données d'exemple réalistes
+            np.random.seed(42)  # Pour la reproductibilité
+            date_range = pd.date_range(start='2020-01-01', end='2024-09-30', freq='D')
             
-            postes = ["Ingénieur", "Technicien", "Chef de projet", "Responsable", 
-                     "Assistant", "Analyste", "Développeur", "Gestionnaire", 
-                     "Consultant", "Chargé de mission"]
+            directions = [
+                "Direction Technique", "Direction RH", "Direction Commerciale", 
+                "Direction Financière", "Direction Logistique", "Direction Marketing"
+            ]
             
-            # Générer des données aléatoires mais cohérentes
-            n_samples = 1000
+            postes = [
+                "Ingénieur", "Technicien", "Chef de projet", "Responsable", 
+                "Assistant", "Analyste", "Développeur", "Gestionnaire", 
+                "Consultant", "Chargé de mission", "Directeur", "Manager"
+            ]
             
+            n_samples = 1200
+            
+            # Générer les demandes
             sample_data = pd.DataFrame({
                 'Date de réception de la demande aprés validation de la DRH': 
-                    pd.to_datetime(np.random.choice(date_range, n_samples)),
+                    np.random.choice(date_range, n_samples),
                 'Direction concernée': 
-                    np.random.choice(directions, n_samples, p=[0.4, 0.2, 0.2, 0.1, 0.1]),
+                    np.random.choice(directions, n_samples, p=[0.25, 0.15, 0.20, 0.15, 0.15, 0.10]),
                 'Poste demandé': 
                     np.random.choice(postes, n_samples),
                 'Statut de la demande': 
-                    np.random.choice(["Clôture", "En cours", "Dépriorisé", "Annulé"], n_samples, p=[0.7, 0.1, 0.1, 0.1])
+                    np.random.choice(["Clôture", "En cours", "Dépriorisé", "Annulé"], 
+                                   n_samples, p=[0.60, 0.15, 0.15, 0.10])
             })
             
-            # Ajouter la date d'entrée effective uniquement pour les recrutements clôturés
-            sample_data['Date d\'entrée effective du candidat'] = None
-            mask_closed = sample_data['Statut de la demande'] == "Clôture"
+            # Ajouter la date d'entrée effective pour les recrutements clôturés
+            sample_data['Date d\'entrée effective du candidat'] = pd.NaT
             
-            # Pour les demandes clôturées, ajouter une date d'entrée entre 30 et 120 jours après la réception
-            for idx in sample_data[mask_closed].index:
-                demand_date = sample_data.loc[idx, 'Date de réception de la demande aprés validation de la DRH']
-                entry_delay = np.random.randint(30, 120)
-                entry_date = demand_date + pd.Timedelta(days=entry_delay)
-                # Ne pas dépasser aujourd'hui
-                if entry_date <= pd.Timestamp.now():
-                    sample_data.loc[idx, 'Date d\'entrée effective du candidat'] = entry_date
+            for idx in sample_data.index:
+                if sample_data.loc[idx, 'Statut de la demande'] == "Clôture":
+                    demand_date = sample_data.loc[idx, 'Date de réception de la demande aprés validation de la DRH']
+                    # Délai d'entrée entre 30 et 120 jours
+                    entry_delay = np.random.randint(30, 120)
+                    entry_date = demand_date + pd.Timedelta(days=entry_delay)
+                    
+                    # Ne pas dépasser la date actuelle
+                    if entry_date <= pd.Timestamp.now():
+                        sample_data.loc[idx, 'Date d\'entrée effective du candidat'] = entry_date
             
             st.session_state.data = sample_data
-            st.success("✅ Données d'exemple chargées avec succès!")
+            st.success("✅ Données d'exemple générées avec succès!")
             
         elif uploaded_file is not None:
             try:
-                # Lecture du fichier (robuste : CSV utf-8/latin-1, puis Excel via BytesIO)
-                fname = uploaded_file.name.lower()
-                file_bytes = uploaded_file.read()
-
-                if fname.endswith('.csv'):
-                    # Essayer utf-8 puis latin-1
+                # Lecture robuste du fichier
+                if uploaded_file.name.endswith('.csv'):
                     try:
-                        data = pd.read_csv(io.StringIO(file_bytes.decode('utf-8')))
+                        data = pd.read_csv(uploaded_file, encoding='utf-8')
                     except UnicodeDecodeError:
-                        data = pd.read_csv(io.StringIO(file_bytes.decode('latin-1')))
-                elif fname.endswith(('.xls', '.xlsx')):
-                    # Utiliser BytesIO pour pandas.read_excel (openpyxl recommandé)
-                    try:
-                        data = pd.read_excel(io.BytesIO(file_bytes), engine='openpyxl')
-                    except Exception:
-                        # fallback sans engine (pandas choisira)
-                        data = pd.read_excel(io.BytesIO(file_bytes))
+                        data = pd.read_csv(uploaded_file, encoding='latin-1')
                 else:
-                    # Extension inconnue : tenter CSV puis Excel
-                    try:
-                        data = pd.read_csv(io.StringIO(file_bytes.decode('utf-8')))
-                    except Exception:
-                        try:
-                            data = pd.read_csv(io.StringIO(file_bytes.decode('latin-1')))
-                        except Exception:
-                            data = pd.read_excel(io.BytesIO(file_bytes))
-
+                    data = pd.read_excel(uploaded_file)
+                
                 st.session_state.data = data
                 st.success(f"✅ Fichier '{uploaded_file.name}' importé avec succès!")
+                
             except Exception as e:
                 st.error(f"❌ Erreur lors de l'import: {str(e)}")
-                
-        # NOUVEAU: Sélection de l'objectif de l'analyse
+        
+        # Sélection de l'objectif d'analyse (RÈGLE CRITIQUE)
         if st.session_state.data is not None:
-            st.markdown("### 🎯 Objectif de l'analyse")
-            st.markdown("Choisissez ce que vous souhaitez analyser et prédire:")
+            st.markdown("### 🎯 Choix de l'Objectif")
             
             analysis_objective = st.radio(
                 "Que souhaitez-vous analyser et prédire ?",
                 options=["Les Demandes de Recrutement", "Les Recrutements Effectifs"],
-                horizontal=True,
                 index=1,  # Par défaut: Recrutements Effectifs
-                key="analysis_objective"
+                help="Ce choix détermine automatiquement la colonne de date et les filtres appliqués."
             )
             
-            # Stocker l'objectif dans st.session_state (REMOVED: already handled by the radio button key)
+            st.session_state.analysis_objective = analysis_objective
             
-            # Afficher une explication selon le choix
             if analysis_objective == "Les Demandes de Recrutement":
-                st.info("📝 Vous allez analyser et prédire les **demandes** de recrutement reçues. "
-                        "L'analyse sera basée sur la date de réception des demandes.")
+                st.info("📝 **Analyse des demandes**: Basée sur la date de réception des demandes. "
+                       "Filtrage automatique sur les statuts pertinents.")
             else:
-                st.info("👨‍💼 Vous allez analyser et prédire les **recrutements effectivement réalisés**. "
-                        "L'analyse sera basée sur la date d'entrée effective des candidats.")
+                st.info("👨‍💼 **Analyse des recrutements effectifs**: Basée sur la date d'entrée effective. "
+                       "Seuls les recrutements réalisés sont pris en compte.")
     
-    # Afficher les informations si les données sont chargées
+    # Informations sur les données
     if st.session_state.data is not None:
         with col2:
-            st.metric("📄 Nombre de lignes", st.session_state.data.shape[0])
-            st.metric("📊 Nombre de colonnes", st.session_state.data.shape[1])
+            st.metric("📄 Lignes", st.session_state.data.shape[0])
+            st.metric("📊 Colonnes", st.session_state.data.shape[1])
             
-            # Date minimale et maximale si une colonne de date est identifiée
-            date_cols = [col for col in st.session_state.data.columns if 'date' in col.lower() or 'time' in col.lower() or 'jour' in col.lower()]
+            # Période des données
+            date_cols = [col for col in st.session_state.data.columns 
+                        if 'date' in col.lower()]
             if date_cols:
                 try:
-                    first_date = pd.to_datetime(st.session_state.data[date_cols[0]]).min()
-                    last_date = pd.to_datetime(st.session_state.data[date_cols[0]]).max()
-                    st.metric("📅 Période", f"{first_date.strftime('%d/%m/%Y')} - {last_date.strftime('%d/%m/%Y')}")
+                    dates = pd.to_datetime(st.session_state.data[date_cols[0]], errors='coerce')
+                    min_date = dates.min().strftime('%m/%Y')
+                    max_date = dates.max().strftime('%m/%Y')
+                    st.metric("📅 Période", f"{min_date} - {max_date}")
                 except:
                     pass
         
         # Aperçu des données
         st.subheader("📋 Aperçu des données")
-        st.dataframe(st.session_state.data.head(10))
+        st.dataframe(st.session_state.data.head(), use_container_width=True)
         
         # Informations sur les colonnes
-        st.subheader("ℹ️ Informations sur les colonnes")
-        col_info = pd.DataFrame({
-            'Type': st.session_state.data.dtypes,
-            'Valeurs non-nulles': st.session_state.data.count(),
-            'Valeurs nulles': st.session_state.data.isnull().sum(),
-            '% Valeurs nulles': (st.session_state.data.isnull().sum() / len(st.session_state.data) * 100).round(2),
-            'Valeurs uniques': [st.session_state.data[col].nunique() for col in st.session_state.data.columns]
-        })
-        st.dataframe(col_info)
-        
-        # Option de téléchargement des données
-        csv = convert_df_to_csv(st.session_state.data)
-        st.download_button(
-            "📥 Télécharger les données",
-            data=csv,
-            file_name="donnees_recrutement.csv",
-            mime="text/csv"
-        )
+        with st.expander("ℹ️ Informations détaillées sur les colonnes"):
+            col_info = pd.DataFrame({
+                'Type': st.session_state.data.dtypes,
+                'Non-nulles': st.session_state.data.count(),
+                'Nulles': st.session_state.data.isnull().sum(),
+                'Uniques': [st.session_state.data[col].nunique() for col in st.session_state.data.columns]
+            })
+            st.dataframe(col_info, use_container_width=True)
     else:
-        st.info("👆 Veuillez importer un fichier ou utiliser les données d'exemple pour commencer")
+        st.info("👆 Veuillez importer un fichier ou utiliser les données d'exemple pour commencer.")
 
 # ============================
-# TAB 2: NETTOYAGE DES DONNÉES (AUTOMATISÉ)
+# ONGLET 2: NETTOYAGE & PRÉPARATION (AUTOMATISÉ)
 # ============================
 with tab2:
-    st.markdown('<div class="sub-header">Nettoyage et Préparation des Données (Automatique)</div>', unsafe_allow_html=True)
-
-    if st.session_state.data is not None:
-        df_raw = st.session_state.data.copy()
-
-        st.info("La préparation est automatisée : la colonne de date et le filtrage de statut sont choisis selon l'objectif sélectionné dans l'onglet Import.")
-
-        # Identifier colonnes utiles
-        all_cols = df_raw.columns.tolist()
-        direction_cols = [c for c in all_cols if 'direction' in c.lower() or 'département' in c.lower()]
-        poste_cols = [c for c in all_cols if 'poste' in c.lower() or 'fonction' in c.lower()]
-        statut_cols = [c for c in all_cols if 'statut' in c.lower() or 'status' in c.lower() or 'state' in c.lower()]
-
-        direction_col = direction_cols[0] if direction_cols else None
-        poste_col = poste_cols[0] if poste_cols else None
-        statut_col = statut_cols[0] if statut_cols else None
-
-        # Choix d'agrégation (simplifié: M, Q, Y uniquement)
-        st.subheader("⏱️ Fréquence d'agrégation")
-        aggregation_freq = st.selectbox(
-            "Fréquence d'agrégation",
-            options=["Mensuelle (M)", "Trimestrielle (Q)", "Annuelle (Y)"],
-            index=0,
-            key="agg_freq_auto"
-        )
-        freq_map = {"Mensuelle (M)": "M", "Trimestrielle (Q)": "Q", "Annuelle (Y)": "Y"}
-        freq = freq_map[aggregation_freq]
-        st.session_state.freq = freq
-
-        # Filtres contextuels sur direction/poste
-        st.subheader("🔍 Filtres contextuels (optionnel)")
-        if direction_col:
-            dirs = sorted(df_raw[direction_col].dropna().unique().tolist())
-            sel_dirs = st.multiselect("Filtrer par Direction", options=["Toutes"] + dirs, default=["Toutes"], key="auto_sel_dirs")
-        else:
-            sel_dirs = ["Toutes"]
-
-        if poste_col:
-            postes = sorted(df_raw[poste_col].dropna().unique().tolist())
-            sel_postes = st.multiselect("Filtrer par Poste", options=["Tous"] + postes, default=["Tous"], key="auto_sel_postes")
-        else:
-            sel_postes = ["Tous"]
-
-        # Période d'analyse
-        st.subheader("📅 Période d'analyse (optionnelle)")
-        # detect best date columns for the two objectives
-        def detect_date_col_for_objective(df, objective):
-            # prefer explicit names
-            name_map = {
-                "Les Demandes de Recrutement": ["date de réception", "date de reception", "date de reception de la demande", "date de réception de la demande aprés validation de la drh"],
-                "Les Recrutements Effectifs": ["date d'entrée effective", "date d'entree effective", "date d'entrée effective du candidat", "date d'entrée du candidat", "date d'entrée"]
-            }
-            candidates = name_map.get(objective, [])
-            for n in candidates:
-                for c in df.columns:
-                    if n in c.lower().replace('_',' '):
-                        return c
-            # fallback to any column with 'entrée' or 'réception' or 'effective' or 'reception'
-            for c in df.columns:
-                low = c.lower()
-                if objective == "Les Demandes de Recrutement" and ("réception" in low or "reception" in low or "demande" in low):
-                    return c
-                if objective == "Les Recrutements Effectifs" and ("entrée" in low or "entree" in low or "effective" in low):
-                    return c
-            # fallback generic date
-            for c in df.columns:
-                if 'date' in c.lower():
-                    return c
-            return None
-
-        objective = st.session_state.get('analysis_objective', "Les Recrutements Effectifs")
-        date_col_auto = detect_date_col_for_objective(df_raw, objective)
-        if date_col_auto is None:
-            st.warning("Aucune colonne de date détectée automatiquement — la préparation risque d'échouer. Vérifiez vos colonnes.")
-        else:
-            try:
-                df_raw[date_col_auto] = pd.to_datetime(df_raw[date_col_auto], errors='coerce')
-                min_date_possible = df_raw[date_col_auto].min().date()
-                max_date_possible = df_raw[date_col_auto].max().date()
-                start = st.date_input("Date de début", value=min_date_possible, min_value=min_date_possible, max_value=max_date_possible, key="auto_start")
-                end = st.date_input("Date de fin", value=max_date_possible, min_value=min_date_possible, max_value=max_date_possible, key="auto_end")
-            except Exception as e:
-                st.error(f"Erreur conversion date automatique: {e}")
-                start = None
-                end = None
-
-        # Bouton : préparer
-        if st.button("✅ Préparer les données automatiquement", type="primary"):
-            with st.spinner("Préparation automatique en cours..."):
-                try:
-                    df = df_raw.copy()
-
-                    # CORRECTION CRITIQUE: Filtrage des données futures dès le début du processus
-                    # Identifier la colonne de date appropriée selon l'objectif
-                    date_col_objective = detect_date_col_for_objective(df, objective)
-                    if date_col_objective:
-                        current_date = datetime.now()
-                        df[date_col_objective] = pd.to_datetime(df[date_col_objective], errors='coerce')
-                        # Filtre strict: exclure toutes les entrées avec date dans le futur
-                        future_mask = df[date_col_objective] > pd.Timestamp(current_date)
-                        if future_mask.any():
-                            n_future = future_mask.sum()
-                            df = df[~future_mask]
-                            st.warning(f"⚠️ {n_future} entrées avec dates futures ont été exclues pour éviter des biais dans les prédictions.")
+    st.header("🧹 Nettoyage & Préparation des Données")
     
-                    # Filtrage selon l'obqjectif choissi
-                    if objective == "Les Demandes de Recrutement":
-                        used_date_col = detect_date_col_for_objective(df, objective) or date_col_auto
-                        # Keep rows where statut contains any of the listed values
-                        valid_status_values = ["clôture", "cloture", "en cours", "dépriorisé", "depriorisé", "annulé", "annule"]
-                        if statut_col:
-                            mask_stat = df[statut_col].astype(str).str.strip().str.lower().fillna("")
-                            df = df[mask_stat.isin(valid_status_values) | 
-                                    mask_stat.str.contains('|'.join([v for v in valid_status_values if ' ' in v]), na=False)]
-                    else:  # Recrutements Effectifs
-                        used_date_col = detect_date_col_for_objective(df, objective) or date_col_auto
-                        # Keep only rows where the effective entry date is not null
-                        if used_date_col:
-                            df[used_date_col] = pd.to_datetime(df[used_date_col], errors='coerce')
-                            df = df[df[used_date_col].notna()]
-
-                    # Apply temporal filter if available
-                    if date_col_auto and start and end:
-                        df = df[(pd.to_datetime(df[date_col_auto]).dt.date >= start) & (pd.to_datetime(df[date_col_auto]).dt.date <= end)]
-
-                    # Apply context filters
-                    if direction_col and sel_dirs and "Toutes" not in sel_dirs:
-                        df = df[df[direction_col].isin(sel_dirs)]
-                    if poste_col and sel_postes and "Tous" not in sel_postes:
-                        df = df[df[poste_col].isin(sel_postes)]
-
-                    # Final cleaned filtered dataframe (raw rows retained for proportions)
-                    st.session_state.cleaned_data_filtered = df.copy()
-
-                    # Aggregation: count rows per period using chosen date
-                    if not date_col_auto:
-                        raise RuntimeError("Aucune colonne de date détectée automatiquement pour l'agrégation.")
-                    df_agg = df.copy()
-                    df_agg['__agg_date'] = pd.to_datetime(df_agg[date_col_auto])
-                    df_agg = df_agg.dropna(subset=['__agg_date'])
-                    df_agg = df_agg.set_index('__agg_date').resample(freq).size().reset_index(name='value')
-                    df_agg = df_agg.rename(columns={'__agg_date': 'date'})
-
-                    # Generate time features for modelling convenience
-                    st.session_state.cleaned_data_aggregated = generate_time_features(df_agg, 'date')
-                    st.session_state.cleaned_data = st.session_state.cleaned_data_aggregated.copy()
-                    st.session_state.direction_col = direction_col
-                    st.session_state.poste_col = poste_col
-                    st.session_state.date_col = 'date'
-                    st.session_state.value_col = 'value'
-
-                    st.success("✅ Données préparées automatiquement et agrégées avec succès!")
-                    # Certains environnements Streamlit n'exposent pas experimental_rerun.
-                    # Appeler seulement si disponible, sinon définir un flag pour indiquer
-                    # que la préparation est terminée.
-                    if hasattr(st, "experimental_rerun"):
-                        st.experimental_rerun()
-                    else:
-                        st.session_state["prepared"] = True
-                        st.info("Les données ont été préparées. Passez à l'onglet Visualisation ou Modélisation.")
-                except Exception as e:
-                    st.error(f"❌ Erreur lors de la préparation automatique: {e}")
+    if st.session_state.data is None:
+        st.info("👆 Veuillez d'abord importer des données dans l'onglet précédent.")
     else:
-        st.info("👆 Veuillez importer des données dans l'onglet Import pour lancer la préparation")
+        objective = st.session_state.get('analysis_objective', "Les Recrutements Effectifs")
+        
+        st.info(f"🤖 **Préparation automatisée** basée sur votre objectif: **{objective}**")
+        st.markdown("La colonne de date et les filtres métier sont sélectionnés automatiquement.")
+        
+        # Configuration simplifiée
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("⏱️ Fréquence d'agrégation")
+            freq_options = {
+                "Mensuelle": "M",
+                "Trimestrielle": "Q", 
+                "Annuelle": "Y"
+            }
+            selected_freq = st.selectbox(
+                "Choisissez la fréquence d'agrégation:",
+                options=list(freq_options.keys()),
+                index=0,
+                help="La fréquence détermine la granularité de l'analyse temporelle"
+            )
+            freq = freq_options[selected_freq]
+        
+        with col2:
+            st.subheader("📅 Période d'analyse")
+            # Détecter la colonne de date selon l'objectif
+            date_col = get_date_column_for_objective(st.session_state.data, objective)
+            
+            if date_col:
+                try:
+                    dates = pd.to_datetime(st.session_state.data[date_col], errors='coerce')
+                    min_date = dates.min().date()
+                    max_date = dates.max().date()
+                    
+                    start_date = st.date_input(
+                        "Date de début",
+                        value=min_date,
+                        min_value=min_date,
+                        max_value=max_date
+                    )
+                    end_date = st.date_input(
+                        "Date de fin", 
+                        value=max_date,
+                        min_value=min_date,
+                        max_value=max_date
+                    )
+                except:
+                    st.warning("⚠️ Impossible de parser les dates automatiquement")
+                    start_date = end_date = None
+            else:
+                st.warning("⚠️ Aucune colonne de date appropriée détectée")
+                start_date = end_date = None
+        
+        # Filtres contextuels optionnels
+        st.subheader("🔍 Filtres contextuels (optionnel)")
+        
+        # Détecter les colonnes automatiquement
+        direction_col, poste_col, statut_col = detect_columns(st.session_state.data)
+        
+        col3, col4 = st.columns(2)
+        
+        with col3:
+            if direction_col:
+                directions = ["Toutes"] + sorted(st.session_state.data[direction_col].dropna().unique().tolist())
+                selected_directions = st.multiselect(
+                    f"Filtrer par {direction_col}",
+                    options=directions,
+                    default=["Toutes"]
+                )
+            else:
+                selected_directions = ["Toutes"]
+                st.info("Aucune colonne Direction détectée")
+        
+        with col4:
+            if poste_col:
+                postes = ["Tous"] + sorted(st.session_state.data[poste_col].dropna().unique().tolist())
+                selected_postes = st.multiselect(
+                    f"Filtrer par {poste_col}",
+                    options=postes,
+                    default=["Tous"]
+                )
+            else:
+                selected_postes = ["Tous"]
+                st.info("Aucune colonne Poste détectée")
+        
+        # Bouton de préparation
+        if st.button("🚀 Préparer les données automatiquement", type="primary", use_container_width=True):
+            with st.spinner("Préparation en cours..."):
+                try:
+                    df = st.session_state.data.copy()
+                    
+                    # RÈGLE N°1: GARDE-FOU TEMPOREL - Application immédiate
+                    if date_col:
+                        df_filtered, n_future = apply_temporal_guard(df, date_col, objective)
+                        df = df_filtered
+                    else:
+                        st.error("❌ Impossible d'appliquer le garde-fou temporel: aucune colonne de date détectée")
+                        st.stop()
+                    
+                    # RÈGLE N°2: LOGIQUE MÉTIER AUTOMATISÉE
+                    df = apply_business_logic_filter(df, objective, statut_col)
+                    
+                    # Filtrage par période
+                    if date_col and start_date and end_date:
+                        df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+                        mask = (df[date_col].dt.date >= start_date) & (df[date_col].dt.date <= end_date)
+                        df = df[mask]
+                        st.info(f"📅 Filtrage temporel appliqué: {start_date} à {end_date}")
+                    
+                    # Filtres contextuels
+                    if direction_col and "Toutes" not in selected_directions:
+                        df = df[df[direction_col].isin(selected_directions)]
+                        st.info(f"🏢 Filtrage par Direction: {len(selected_directions)} sélectionnées")
+                    
+                    if poste_col and "Tous" not in selected_postes:
+                        df = df[df[poste_col].isin(selected_postes)]
+                        st.info(f"👥 Filtrage par Poste: {len(selected_postes)} sélectionnés")
+                    
+                    # Sauvegarder les données filtrées
+                    st.session_state.cleaned_data_filtered = df
+                    
+                    # Créer la série temporelle agrégée
+                    if date_col:
+                        time_series = create_time_series(df, date_col, freq)
+                        st.session_state.time_series_data = time_series
+                        st.session_state.date_col = date_col
+                        st.session_state.direction_col = direction_col
+                        st.session_state.poste_col = poste_col
+                        
+                        # Afficher les résultats de la préparation
+                        col_res1, col_res2, col_res3 = st.columns(3)
+                        
+                        with col_res1:
+                            st.metric("📊 Lignes conservées", len(df))
+                        
+                        with col_res2:
+                            st.metric("📈 Points temporels", len(time_series))
+                        
+                        with col_res3:
+                            st.metric("⏱️ Fréquence", selected_freq)
+                        
+                        st.success("✅ **Données préparées avec succès!** Vous pouvez maintenant passer aux onglets suivants.")
+                        
+                        # Aperçu de la série temporelle
+                        st.subheader("📈 Aperçu de la série temporelle")
+                        fig = px.line(time_series, x='date', y='volume', 
+                                    title=f"Série temporelle - {objective}")
+                        fig.update_layout(height=400)
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                except Exception as e:
+                    st.error(f"❌ Erreur lors de la préparation: {str(e)}")
+                    st.exception(e)
+        
+        # Affichage de l'état actuel
+        if st.session_state.cleaned_data_filtered is not None:
+            st.success("✅ Données déjà préparées. Vous pouvez modifier les paramètres et relancer la préparation si nécessaire.")
 
 # ============================
-# TAB 3: VISUALISATION (Miroir du Passé)
+# ONGLET 3: VISUALISATION - MIROIR DU PASSÉ
 # ============================
 with tab3:
-    st.markdown('<div class="sub-header">Visualisation - Miroir du Passé</div>', unsafe_allow_html=True)
-
-    if st.session_state.cleaned_data_aggregated is not None and st.session_state.cleaned_data_filtered is not None:
-        agg = st.session_state.cleaned_data_aggregated.copy()
-        raw = st.session_state.cleaned_data_filtered.copy()
+    st.header("📊 Visualisation - Miroir du Passé")
+    
+    if st.session_state.time_series_data is None or st.session_state.cleaned_data_filtered is None:
+        st.info("👆 Veuillez d'abord préparer les données dans l'onglet précédent.")
+    else:
+        time_series = st.session_state.time_series_data
+        raw_data = st.session_state.cleaned_data_filtered
         direction_col = st.session_state.direction_col
         poste_col = st.session_state.poste_col
-        analysis_type = st.session_state.get('analysis_objective', "Recrutements")
-
-        st.subheader(f"📈 Historique agrégé - {analysis_type}")
-        fig = px.line(agg, x='date', y='value', title=f"Série historique ({analysis_type})", labels={'date': 'Date', 'value': 'Nombre'})
-        st.plotly_chart(fig, use_container_width=True)
-
+        objective = st.session_state.get('analysis_objective', 'Recrutements')
+        
+        # Graphique principal - Tendance historique
+        st.subheader("📈 Tendance Historique")
+        
+        fig_trend = px.line(
+            time_series, 
+            x='date', 
+            y='volume',
+            title=f"Évolution temporelle - {objective}",
+            labels={'date': 'Date', 'volume': 'Volume'}
+        )
+        
+        fig_trend.update_layout(
+            height=400,
+            showlegend=False,
+            xaxis_title="Période",
+            yaxis_title="Nombre"
+        )
+        
+        fig_trend.update_traces(
+            line=dict(width=3, color='#1f77b4'),
+            mode='lines+markers',
+            marker=dict(size=6)
+        )
+        
+        st.plotly_chart(fig_trend, use_container_width=True)
+        
+        # Statistiques de la série
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("📊 Total Historique", f"{time_series['volume'].sum():,}")
+        
+        with col2:
+            st.metric("📈 Maximum", f"{time_series['volume'].max():,}")
+        
+        with col3:
+            st.metric("📉 Minimum", f"{time_series['volume'].min():,}")
+        
+        with col4:
+            st.metric("🎯 Moyenne", f"{time_series['volume'].mean():.1f}")
+        
         st.markdown("---")
+        
+        # Répartition Historique
         st.subheader("🔍 Répartition Historique")
-
-        cols = st.columns(2)
-        with cols[0]:
-            if direction_col and direction_col in raw.columns:
-                dir_counts = raw[direction_col].value_counts().reset_index()
+        
+        col_left, col_right = st.columns(2)
+        
+        # Répartition par Direction
+        with col_left:
+            st.markdown("#### 🏢 Par Direction")
+            
+            if direction_col and direction_col in raw_data.columns:
+                dir_counts = raw_data[direction_col].value_counts().reset_index()
                 dir_counts.columns = ['Direction', 'Nombre']
-                fig_dir = px.bar(dir_counts.sort_values('Nombre', ascending=False), x='Direction', y='Nombre', title="Répartition historique par Direction", labels={'Nombre': 'Nombre'})
+                
+                fig_dir = px.bar(
+                    dir_counts.sort_values('Nombre', ascending=True).tail(10),  # Top 10
+                    x='Nombre',
+                    y='Direction',
+                    orientation='h',
+                    title="Top 10 Directions",
+                    color='Nombre',
+                    color_continuous_scale='Blues'
+                )
+                
+                fig_dir.update_layout(
+                    height=400,
+                    showlegend=False,
+                    coloraxis_showscale=False
+                )
+                
                 st.plotly_chart(fig_dir, use_container_width=True)
+                
+                # Tableau détaillé
+                with st.expander("📋 Détail par Direction"):
+                    dir_counts['Pourcentage'] = (dir_counts['Nombre'] / dir_counts['Nombre'].sum() * 100).round(1)
+                    st.dataframe(dir_counts, use_container_width=True)
             else:
-                st.info("Aucune colonne 'Direction' détectée pour la répartition.")
-
-        with cols[1]:
-            if poste_col and poste_col in raw.columns:
-                poste_counts = raw[poste_col].value_counts()
-                top10 = poste_counts.head(10)
-                others = poste_counts.iloc[10:].sum() if len(poste_counts) > 10 else 0
-                top_series = pd.concat([top10, pd.Series({"Autres": others})])
-                df_poste = top_series.reset_index()
+                st.info("Aucune colonne Direction détectée dans les données.")
+        
+        # Répartition par Poste  
+        with col_right:
+            st.markdown("#### 👥 Par Poste")
+            
+            if poste_col and poste_col in raw_data.columns:
+                poste_counts = raw_data[poste_col].value_counts()
+                
+                # Top 10 + Autres
+                top_10 = poste_counts.head(10)
+                others_count = poste_counts.iloc[10:].sum() if len(poste_counts) > 10 else 0
+                
+                if others_count > 0:
+                    top_10_with_others = pd.concat([top_10, pd.Series({'Autres': others_count})])
+                else:
+                    top_10_with_others = top_10
+                
+                df_poste = top_10_with_others.reset_index()
                 df_poste.columns = ['Poste', 'Nombre']
-                fig_poste = px.bar(df_poste.sort_values('Nombre', ascending=False), x='Poste', y='Nombre', title="Top 10 des Postes (Historique)", labels={'Nombre': 'Nombre'})
+                
+                fig_poste = px.bar(
+                    df_poste.sort_values('Nombre', ascending=True),
+                    x='Nombre',
+                    y='Poste', 
+                    orientation='h',
+                    title="Top 10 Postes + Autres",
+                    color='Nombre',
+                    color_continuous_scale='Greens'
+                )
+                
+                fig_poste.update_layout(
+                    height=400,
+                    showlegend=False,
+                    coloraxis_showscale=False
+                )
+                
                 st.plotly_chart(fig_poste, use_container_width=True)
+                
+                # Tableau détaillé
+                with st.expander("📋 Détail par Poste"):
+                    poste_df = poste_counts.reset_index()
+                    poste_df.columns = ['Poste', 'Nombre']
+                    poste_df['Pourcentage'] = (poste_df['Nombre'] / poste_df['Nombre'].sum() * 100).round(1)
+                    st.dataframe(poste_df, use_container_width=True)
             else:
-                st.info("Aucune colonne 'Poste' détectée pour la répartition.")
-    else:
-        st.info("👆 Veuillez préparer les données automatiquement dans l'onglet précédent pour visualiser l'historique.")
+                st.info("Aucune colonne Poste détectée dans les données.")
+        
+        st.markdown("---")
+        
+        # Analyse temporelle complémentaire
+        st.subheader("📅 Analyse Temporelle Détaillée")
+        
+        # Préparer les données pour l'analyse temporelle
+        time_analysis = time_series.copy()
+        time_analysis['year'] = time_analysis['date'].dt.year
+        time_analysis['month'] = time_analysis['date'].dt.month
+        time_analysis['quarter'] = time_analysis['date'].dt.quarter
+        
+        col_temp1, col_temp2 = st.columns(2)
+        
+        with col_temp1:
+            # Par année
+            yearly = time_analysis.groupby('year')['volume'].sum().reset_index()
+            if len(yearly) > 1:
+                fig_year = px.bar(
+                    yearly,
+                    x='year',
+                    y='volume',
+                    title="Volume Annuel",
+                    color='volume',
+                    color_continuous_scale='Viridis'
+                )
+                fig_year.update_layout(height=300, coloraxis_showscale=False)
+                st.plotly_chart(fig_year, use_container_width=True)
+        
+        with col_temp2:
+            # Par mois (moyenne)
+            monthly = time_analysis.groupby('month')['volume'].mean().reset_index()
+            month_names = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
+                          'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
+            monthly['month_name'] = monthly['month'].map(lambda x: month_names[x])
+            
+            fig_month = px.bar(
+                monthly,
+                x='month_name',
+                y='volume', 
+                title="Volume Moyen par Mois",
+                color='volume',
+                color_continuous_scale='Plasma'
+            )
+            fig_month.update_layout(height=300, coloraxis_showscale=False)
+            st.plotly_chart(fig_month, use_container_width=True)
 
 # ============================
-# TAB 4: MODÉLISATION & PRÉDICTION (Confiance & Export)
+# ONGLET 4: MODÉLISATION & PRÉDICTION 
 # ============================
 with tab4:
-    st.markdown('<div class="sub-header">Modélisation et Prédiction Stratégique</div>', unsafe_allow_html=True)
-
-    if st.session_state.cleaned_data_aggregated is None or st.session_state.cleaned_data_filtered is None:
-        st.info("👆 Veuillez préparer les données automatiquement dans l'onglet Nettoyage & Préparation avant de modéliser et prédire")
+    st.header("🔮 Modélisation & Prédiction")
+    
+    if st.session_state.time_series_data is None or st.session_state.cleaned_data_filtered is None:
+        st.info("👆 Veuillez d'abord préparer les données dans l'onglet Nettoyage & Préparation.")
     else:
-        # Reminder of objective
-        st.info(f"Vous êtes en train de prédire : **{st.session_state.get('analysis_objective','Recrutements')}**")
-
-        data_to_model = st.session_state.cleaned_data_aggregated.copy()
-        data_filtered = st.session_state.cleaned_data_filtered.copy()
+        # Rappel de l'objectif
+        objective = st.session_state.get('analysis_objective', 'Recrutements')
+        st.info(f"🎯 **Vous prédisez : {objective}**")
+        
+        time_series = st.session_state.time_series_data
+        raw_data = st.session_state.cleaned_data_filtered
         direction_col = st.session_state.direction_col
         poste_col = st.session_state.poste_col
-        freq = st.session_state.freq
-
-        # Forecast horizon selection (keep existing options)
+        
+        # Configuration de la prédiction
         col1, col2 = st.columns(2)
+        
         with col1:
-            horizon_months = st.number_input("Horizon de prévision (mois)", min_value=1, max_value=60, value=12, step=1)
+            horizon_months = st.number_input(
+                "🔮 Horizon de prévision (mois)",
+                min_value=1,
+                max_value=24,
+                value=6,
+                help="Nombre de mois à prédire dans le futur"
+            )
+        
         with col2:
-            model_type = st.selectbox("Type de Modèle", options=["Prophet","Holt-Winters","XGBoost"], index=0)
-
-        if st.button("🚀 Lancer la prévision", type="primary"):
-            with st.spinner("Entraînement et prévision en cours..."):
+            model_type = st.selectbox(
+                "🤖 Algorithme de prédiction",
+                options=["Prophet", "Holt-Winters", "XGBoost"],
+                index=0,
+                help="Prophet: bon pour tendances et saisonnalité | Holt-Winters: classique et robuste | XGBoost: apprentissage automatique"
+            )
+        
+        # Bouton de lancement
+        if st.button("🚀 Lancer la prédiction", type="primary", use_container_width=True):
+            with st.spinner(f"🤖 Entraînement du modèle {model_type} en cours..."):
                 try:
-                    # Prepare prophet-like dataframe
-                    prophet_df = create_prophet_dataset(data_to_model, 'date', 'value')
-
-                    # Compute a simple holdout for MAPE: last 20% of time series
-                    prophet_df_sorted = prophet_df.sort_values('ds').reset_index(drop=True)
-                    n_total = len(prophet_df_sorted)
-                    n_test = max(1, int(n_total * 0.2))
-                    train_df = prophet_df_sorted.iloc[:-n_test]
-                    test_df = prophet_df_sorted.iloc[-n_test:]
-
-                    # Train and forecast according to selected model
+                    # Préparation des données
+                    horizon_days = horizon_months * 30  # Approximation
+                    
+                    # Division train/test pour le calcul du MAPE
+                    n_total = len(time_series)
+                    n_test = max(1, int(n_total * 0.2))  # 20% pour le test
+                    
+                    train_data = time_series.iloc[:-n_test].copy()
+                    test_data = time_series.iloc[-n_test:].copy()
+                    
+                    # Entraînement du modèle
                     if model_type == "Prophet":
-                        model = Prophet()
-                        model.fit(train_df)
-                        future = model.make_future_dataframe(periods=len(test_df) + horizon_months*30, freq='D')
-                        forecast_full = model.predict(future)
+                        model, forecast = predict_with_prophet(train_data, horizon_days)
                     elif model_type == "Holt-Winters":
-                        hw_df = train_df.rename(columns={'ds':'ds','y':'y'})
-                        seasonal_periods = 12
-                        hw_model, forecast_full = predict_with_holt_winters(hw_df, horizon=horizon_months*30, seasonal_periods=seasonal_periods)
-                        model = hw_model
+                        model, forecast = predict_with_holt_winters(train_data, horizon_days)
                     else:  # XGBoost
-                        xgb_df = train_df.rename(columns={'ds':'ds','y':'y'})
-                        lookback = min(max(7, int(len(xgb_df)*0.2)), 60)
-                        xgb_model, forecast_full = predict_with_xgboost(xgb_df, horizon=horizon_months*30, lookback=lookback)
-                        model = xgb_model
-
-                    # Derive predictions for the test period for MAPE
-                    # Align forecasts with test_df by matching dates
-                    # forecast_full may contain historical + future; ensure columns ds & yhat exist
-                    if 'ds' not in forecast_full.columns:
-                        raise RuntimeError("Résultat de prédiction invalide : colonne 'ds' manquante dans forecast_full.")
-
-                    # Ensure forecast_full contains 'yhat' (common Prophet/HW/XGBoost output). If absent, try sensible fallbacks.
-                    if 'yhat' not in forecast_full.columns:
-                        if 'y' in forecast_full.columns:
-                            forecast_full['yhat'] = forecast_full['y']
-                        elif 'y_pred' in forecast_full.columns:
-                            forecast_full['yhat'] = forecast_full['y_pred']
+                        model, forecast = predict_with_xgboost(train_data, horizon_days)
+                    
+                    if model is None or forecast is None:
+                        st.error("❌ Échec de la prédiction. Veuillez essayer un autre modèle.")
+                        st.stop()
+                    
+                    # Calcul du MAPE sur les données de test
+                    test_predictions = []
+                    for test_date in test_data['date']:
+                        pred_row = forecast[forecast['ds'].dt.date == test_date.date()]
+                        if not pred_row.empty:
+                            test_predictions.append(pred_row['yhat'].iloc[0])
                         else:
-                            # Create yhat column with NaN to allow safe merges and downstream checks
-                            forecast_full['yhat'] = np.nan
-                            st.warning("Prédictions disponibles mais le format attendu ('yhat') est absent. Les évaluations et la partie prévision seront limitées.")
-
-                    # Merge to compute MAPE on test period where actuals exist
-                    pred_hist = forecast_full[['ds','yhat']].merge(test_df[['ds','y']], on='ds', how='inner')
-                    if pred_hist.empty:
-                        # fallback: try to merge on training period (if models returned fitted values)
-                        pred_hist = forecast_full[['ds','yhat']].merge(train_df[['ds','y']], on='ds', how='inner')
-
-                    # Compute MAPE safely
-                    def safe_mape(y_true, y_pred):
-                        y_true = np.array(y_true, dtype=float)
-                        y_pred = np.array(y_pred, dtype=float)
-                        mask = y_true != 0
-                        if mask.sum() == 0:
-                            return np.nan
-                        return np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
-
-                    if not pred_hist.empty:
-                        mape_val = safe_mape(pred_hist['y'], pred_hist['yhat'])
+                            test_predictions.append(np.nan)
+                    
+                    # Calculer le MAPE
+                    if len(test_predictions) > 0 and not all(np.isnan(test_predictions)):
+                        mape_score = calculate_mape(test_data['volume'].values, test_predictions)
                     else:
-                        mape_val = np.nan
-
-                    # Affichage du MAPE comme métrique de confiance
-                    st.metric("Marge d'Erreur Moyenne", f"± {round(mape_val,2)}%" if not np.isnan(mape_val) else "N/A")
-
-                    # Build final forecast for the horizon (aggregate monthly)
-                    # Ensure forecast_full has ds and yhat; take future portion beyond last historical date
-                    last_hist = prophet_df_sorted['ds'].max()
-                    if forecast_full['yhat'].isna().all():
-                        st.warning("Aucun score de prédiction disponible pour la période future (les valeurs 'yhat' sont manquantes).")
-
-                    future_mask = pd.to_datetime(forecast_full['ds']) > pd.to_datetime(last_hist)
-                    future_df = forecast_full.loc[future_mask, ['ds','yhat']].copy()
-                    # Resample to monthly buckets
-                    future_df['ds'] = pd.to_datetime(future_df['ds'])
-                    future_df['year_month'] = future_df['ds'].dt.to_period('M').dt.to_timestamp()
-                    monthly_pred = future_df.groupby('year_month')['yhat'].sum().reset_index().rename(columns={'year_month':'date','yhat':'predicted_total'})
-                    monthly_pred['date'] = pd.to_datetime(monthly_pred['date'])
-                    monthly_pred['predicted_total'] = monthly_pred['predicted_total'].round().astype(int)
-
-                    st.subheader("🔮 Prévision mensuelle (volume total)")
-                    st.dataframe(monthly_pred.rename(columns={'date':'Mois','predicted_total':f'Nombre prédit'}), use_container_width=True)
-
-                    # PARTIE: Ventilation par Direction et Poste (proportions historiques)
-                    # Compute historical proportions
-                    results_dir = []
-                    results_poste = []
-
-                    # Use filtered raw rows to compute proportions
-                    if direction_col and direction_col in data_filtered.columns:
-                        dir_props = data_filtered[direction_col].value_counts(normalize=True)
-                    else:
-                        dir_props = pd.Series()
-
-                    if poste_col and poste_col in data_filtered.columns:
-                        poste_props = data_filtered[poste_col].value_counts(normalize=True)
-                    else:
-                        poste_props = pd.Series()
-
-                    # For each month, allocate totals
-                    for _, row in monthly_pred.iterrows():
-                        month_label = row['date'].strftime('%b %Y')
-                        total = row['predicted_total']
-                        # directions
-                        for d, p in dir_props.items():
-                            results_dir.append({'Mois': month_label, 'Direction': d, 'Predicted': int(round(total * p)), 'Proportion': float(p*100)})
-                        # postes
-                        for p_name, p in poste_props.items():
-                            results_poste.append({'Mois': month_label, 'Poste': p_name, 'Predicted': int(round(total * p)), 'Proportion': float(p*100)})
-
-                    df_dir_forecast = pd.DataFrame(results_dir) if results_dir else pd.DataFrame(columns=['Mois','Direction','Predicted','Proportion'])
-                    df_poste_forecast = pd.DataFrame(results_poste) if results_poste else pd.DataFrame(columns=['Mois','Poste','Predicted','Proportion'])
-
-                    # Display summary charts
-                    st.markdown("---")
-                    st.subheader("📊 Ventilation prévisionnelle - Résumé")
-                    colA, colB = st.columns(2)
-                    with colA:
-                        if not df_dir_forecast.empty:
-                            dir_totals = df_dir_forecast.groupby('Direction')['Predicted'].sum().reset_index().sort_values('Predicted', ascending=False)
-                            fig_dir = px.bar(dir_totals, x='Direction', y='Predicted', title='Total prévisionnel par Direction')
-                            st.plotly_chart(fig_dir, use_container_width=True)
+                        mape_score = np.nan
+                    
+                    # Affichage du score de confiance
+                    st.subheader("📊 Score de Confiance")
+                    
+                    col_metric1, col_metric2, col_metric3 = st.columns(3)
+                    
+                    with col_metric1:
+                        if not np.isnan(mape_score):
+                            st.metric(
+                                "Marge d'Erreur Moyenne",
+                                f"± {mape_score:.1f}%",
+                                help="MAPE (Mean Absolute Percentage Error) calculé sur les données de test"
+                            )
                         else:
-                            st.info("Aucune donnée Direction pour la ventilation.")
-
-                    with colB:
-                        if not df_poste_forecast.empty:
-                            poste_totals = df_poste_forecast.groupby('Poste')['Predicted'].sum().reset_index().sort_values('Predicted', ascending=False)
-                            top_n = st.slider("Top N postes à afficher", 5, 20, 10)
-                            fig_poste = px.bar(poste_totals.head(top_n), x='Poste', y='Predicted', title=f'Top {top_n} postes prévus')
-                            st.plotly_chart(fig_poste, use_container_width=True)
-                        else:
-                            st.info("Aucune donnée Poste pour la ventilation.")
-
-                    # Consolidated downloadable CSV: monthly_pred + aggregated direction/poste per month
-                    consolidated_rows = []
-                    for _, mrow in monthly_pred.iterrows():
-                        month_label = mrow['date'].strftime('%b %Y')
-                        total = mrow['predicted_total']
-                        # directions - create per direction rows
-                        if not df_dir_forecast.empty:
-                            dr = df_dir_forecast[df_dir_forecast['Mois'] == month_label]
-                            for _, rr in dr.iterrows():
-                                consolidated_rows.append({
-                                    'Mois': month_label,
-                                    'Niveau': 'Direction',
-                                    'Dimension': rr['Direction'],
-                                    'Predicted': rr['Predicted'],
-                                    'Proportion (%)': rr['Proportion'],
-                                    'Total_Month': total
-                                })
-                        # postes
-                        if not df_poste_forecast.empty:
-                            pr = df_poste_forecast[df_poste_forecast['Mois'] == month_label]
-                            for _, rr in pr.iterrows():
-                                consolidated_rows.append({
-                                    'Mois': month_label,
-                                    'Niveau': 'Poste',
-                                    'Dimension': rr['Poste'],
-                                    'Predicted': rr['Predicted'],
-                                    'Proportion (%)': rr['Proportion'],
-                                    'Total_Month': total
-                                })
-
-                    consolidated_df = pd.DataFrame(consolidated_rows)
-
-                    if not consolidated_df.empty:
-                        csv_bytes = convert_df_to_csv(consolidated_df)
-                        st.download_button("📥 Télécharger la ventilation complète (CSV)", 
-                      data=csv_bytes, 
-                      file_name="ventilation_previsionnelle.csv", 
-                      mime="text/csv")
+                            st.metric("Marge d'Erreur Moyenne", "N/A")
+                    
+                    with col_metric2:
+                        st.metric("Points d'entraînement", len(train_data))
+                    
+                    with col_metric3:
+                        st.metric("Modèle utilisé", model_type)
+                    
+                    # Préparer les prédictions futures mensuelles
+                    last_date = time_series['date'].max()
+                    future_predictions = forecast[forecast['ds'] > last_date].copy()
+                    
+                    if not future_predictions.empty:
+                        # Agrégation mensuelle
+                        future_predictions['year_month'] = future_predictions['ds'].dt.to_period('M')
+                        monthly_forecast = future_predictions.groupby('year_month')['yhat'].sum().reset_index()
+                        monthly_forecast['date'] = monthly_forecast['year_month'].dt.to_timestamp()
+                        monthly_forecast['predicted_volume'] = monthly_forecast['yhat'].round().astype(int)
+                        monthly_forecast = monthly_forecast[['date', 'predicted_volume']]
+                        
+                        # Limiter à l'horizon demandé
+                        monthly_forecast = monthly_forecast.head(horizon_months)
+                        
+                        st.subheader("🔮 Prévisions Mensuelles")
+                        
+                        # Graphique des prédictions
+                        fig_pred = go.Figure()
+                        
+                        # Données historiques
+                        fig_pred.add_trace(go.Scatter(
+                            x=time_series['date'],
+                            y=time_series['volume'],
+                            mode='lines+markers',
+                            name='Historique',
+                            line=dict(color='#1f77b4', width=2)
+                        ))
+                        
+                        # Prédictions
+                        fig_pred.add_trace(go.Scatter(
+                            x=monthly_forecast['date'],
+                            y=monthly_forecast['predicted_volume'],
+                            mode='lines+markers',
+                            name='Prédictions',
+                            line=dict(color='#ff7f0e', width=3, dash='dash'),
+                            marker=dict(size=8)
+                        ))
+                        
+                        fig_pred.update_layout(
+                            title=f"Prédictions {model_type} - {objective}",
+                            xaxis_title="Date",
+                            yaxis_title="Volume",
+                            height=400,
+                            hovermode='x unified'
+                        )
+                        
+                        st.plotly_chart(fig_pred, use_container_width=True)
+                        
+                        # Tableau des prédictions
+                        display_forecast = monthly_forecast.copy()
+                        display_forecast['Mois'] = display_forecast['date'].dt.strftime('%B %Y')
+                        display_forecast = display_forecast[['Mois', 'predicted_volume']].rename(
+                            columns={'predicted_volume': 'Volume Prédit'}
+                        )
+                        
+                        st.dataframe(display_forecast, use_container_width=True)
+                        
+                        st.markdown("---")
+                        
+                        # Ventilation par Direction et Poste
+                        st.subheader("📊 Ventilation Prévisionnelle")
+                        st.markdown("*Basée sur les proportions historiques*")
+                        
+                        # Calculer les proportions historiques
+                        dir_proportions = {}
+                        poste_proportions = {}
+                        
+                        if direction_col and direction_col in raw_data.columns:
+                            dir_counts = raw_data[direction_col].value_counts(normalize=True)
+                            dir_proportions = dir_counts.to_dict()
+                        
+                        if poste_col and poste_col in raw_data.columns:
+                            poste_counts = raw_data[poste_col].value_counts(normalize=True)
+                            poste_proportions = poste_counts.to_dict()
+                        
+                        col_vent1, col_vent2 = st.columns(2)
+                        
+                        # Ventilation par Direction
+                        with col_vent1:
+                            if dir_proportions:
+                                st.markdown("#### 🏢 Par Direction")
+                                
+                                dir_forecast_data = []
+                                for _, row in monthly_forecast.iterrows():
+                                    month = row['date'].strftime('%b %Y')
+                                    total = row['predicted_volume']
+                                    
+                                    for direction, proportion in dir_proportions.items():
+                                        dir_forecast_data.append({
+                                            'Mois': month,
+                                            'Direction': direction,
+                                            'Volume Prédit': int(round(total * proportion)),
+                                            'Proportion (%)': f"{proportion*100:.1f}%"
+                                        })
+                                
+                                df_dir_forecast = pd.DataFrame(dir_forecast_data)
+                                
+                                # Graphique de synthèse
+                                dir_totals = df_dir_forecast.groupby('Direction')['Volume Prédit'].sum().reset_index()
+                                dir_totals = dir_totals.sort_values('Volume Prédit', ascending=True)
+                                
+                                fig_dir = px.bar(
+                                    dir_totals,
+                                    x='Volume Prédit',
+                                    y='Direction',
+                                    orientation='h',
+                                    title=f"Total prévu par Direction ({horizon_months} mois)",
+                                    color='Volume Prédit',
+                                    color_continuous_scale='Blues'
+                                )
+                                fig_dir.update_layout(height=300, coloraxis_showscale=False)
+                                st.plotly_chart(fig_dir, use_container_width=True)
+                                
+                                # Tableau détaillé
+                                with st.expander("📋 Détail mensuel par Direction"):
+                                    st.dataframe(df_dir_forecast, use_container_width=True)
+                            else:
+                                st.info("Aucune colonne Direction disponible pour la ventilation.")
+                        
+                        # Ventilation par Poste
+                        with col_vent2:
+                            if poste_proportions:
+                                st.markdown("#### 👥 Par Poste")
+                                
+                                poste_forecast_data = []
+                                for _, row in monthly_forecast.iterrows():
+                                    month = row['date'].strftime('%b %Y')
+                                    total = row['predicted_volume']
+                                    
+                                    for poste, proportion in poste_proportions.items():
+                                        poste_forecast_data.append({
+                                            'Mois': month,
+                                            'Poste': poste,
+                                            'Volume Prédit': int(round(total * proportion)),
+                                            'Proportion (%)': f"{proportion*100:.1f}%"
+                                        })
+                                
+                                df_poste_forecast = pd.DataFrame(poste_forecast_data)
+                                
+                                # Top N postes
+                                top_n = st.slider("Nombre de postes à afficher", 5, 15, 8, key="top_n_postes")
+                                
+                                poste_totals = df_poste_forecast.groupby('Poste')['Volume Prédit'].sum().reset_index()
+                                poste_totals = poste_totals.sort_values('Volume Prédit', ascending=True).tail(top_n)
+                                
+                                fig_poste = px.bar(
+                                    poste_totals,
+                                    x='Volume Prédit',
+                                    y='Poste',
+                                    orientation='h',
+                                    title=f"Top {top_n} Postes prévus ({horizon_months} mois)",
+                                    color='Volume Prédit',
+                                    color_continuous_scale='Greens'
+                                )
+                                fig_poste.update_layout(height=300, coloraxis_showscale=False)
+                                st.plotly_chart(fig_poste, use_container_width=True)
+                                
+                                # Tableau détaillé
+                                with st.expander("📋 Détail mensuel par Poste"):
+                                    st.dataframe(df_poste_forecast, use_container_width=True)
+                            else:
+                                st.info("Aucune colonne Poste disponible pour la ventilation.")
+                        
+                        st.markdown("---")
+                        
+                        # Export des résultats
+                        st.subheader("📥 Export des Résultats")
+                        
+                        # Créer un DataFrame consolidé pour l'export
+                        export_data = []
+                        
+                        for _, row in monthly_forecast.iterrows():
+                            month = row['date'].strftime('%Y-%m')
+                            month_label = row['date'].strftime('%B %Y')
+                            total_volume = row['predicted_volume']
+                            
+                            # Ligne totale
+                            export_data.append({
+                                'Mois': month,
+                                'Mois_Label': month_label,
+                                'Niveau': 'Total',
+                                'Dimension': 'TOTAL',
+                                'Volume_Predit': total_volume,
+                                'Proportion_Pct': 100.0
+                            })
+                            
+                            # Directions
+                            if dir_proportions:
+                                for direction, proportion in dir_proportions.items():
+                                    export_data.append({
+                                        'Mois': month,
+                                        'Mois_Label': month_label,
+                                        'Niveau': 'Direction',
+                                        'Dimension': direction,
+                                        'Volume_Predit': int(round(total_volume * proportion)),
+                                        'Proportion_Pct': round(proportion * 100, 2)
+                                    })
+                            
+                            # Postes
+                            if poste_proportions:
+                                for poste, proportion in poste_proportions.items():
+                                    export_data.append({
+                                        'Mois': month,
+                                        'Mois_Label': month_label,
+                                        'Niveau': 'Poste',
+                                        'Dimension': poste,
+                                        'Volume_Predit': int(round(total_volume * proportion)),
+                                        'Proportion_Pct': round(proportion * 100, 2)
+                                    })
+                        
+                        export_df = pd.DataFrame(export_data)
+                        
+                        if not export_df.empty:
+                            csv_data = convert_df_to_csv(export_df)
+                            
+                            st.download_button(
+                                label="📥 Télécharger les prévisions détaillées (CSV)",
+                                data=csv_data,
+                                file_name=f"previsions_{objective.lower().replace(' ', '_')}_{horizon_months}m.csv",
+                                mime="text/csv",
+                                use_container_width=True
+                            )
+                            
+                            # Aperçu des données d'export
+                            with st.expander("👀 Aperçu des données d'export"):
+                                st.dataframe(export_df.head(20), use_container_width=True)
+                        
+                        st.success(f"✅ **Prédiction terminée avec succès!** "
+                                 f"Prévisions générées pour {horizon_months} mois avec le modèle {model_type}.")
+                    
                     else:
-                        st.info("Aucune ventilation à télécharger (données manquantes).")
-
+                        st.warning("⚠️ Aucune prédiction future générée. Vérifiez la configuration du modèle.")
+                
                 except Exception as e:
-                    st.error(f"❌ Erreur lors de la prédiction: {e}")
-                    st.exception(e)
+                    st.error(f"❌ Erreur lors de la prédiction : {str(e)}")
+                    with st.expander("🔍 Détails de l'erreur"):
+                        st.exception(e)
