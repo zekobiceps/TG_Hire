@@ -236,7 +236,7 @@ def predict_with_xgboost(df, horizon, lookback=30):
 
 # Titre principal
 st.markdown('<div class="main-header">🔮 Prédiction des Recrutements</div>', unsafe_allow_html=True)
-st.markdown('Analyse et prévision des besoins en recrutement basées sur les données historiques')
+st.markdown('<div class="main-header">🔮 Prédiction des Recrutements</div>', unsafe_allow_html=True)
 st.markdown('---')
 
 # Création des onglets
@@ -384,19 +384,19 @@ with tab2:
         
         st.subheader("🔄 Sélection des colonnes principales")
         
-        # Sélection des colonnes de date et valeur
+        # Sélection des colonnes de date et valeur (montrer toutes les colonnes pour que l'utilisateur choisisse)
         col1, col2 = st.columns(2)
         
         with col1:
-            # Identifier les colonnes de date potentielles
-            date_cols = [col for col in data_to_clean.columns if 'date' in col.lower() or 'time' in col.lower() or 'jour' in col.lower()]
-            if not date_cols:
-                date_cols = data_to_clean.columns.tolist()
+            all_cols = data_to_clean.columns.tolist()
+            # Marquer les colonnes candidates date pour l'info utilisateur
+            date_candidate_cols = [c for c in all_cols if 'date' in c.lower() or 'time' in c.lower() or 'jour' in c.lower()]
+            default_date_index = all_cols.index(date_candidate_cols[0]) if date_candidate_cols else 0
             
             date_col = st.selectbox(
-                "Sélectionnez la colonne de date",
-                options=date_cols,
-                index=0 if date_cols else 0,
+                "Sélectionnez la colonne de date (toutes les colonnes sont listées ci-dessous)",
+                options=all_cols,
+                index=default_date_index,
                 key="date_col"
             )
             
@@ -406,29 +406,37 @@ with tab2:
                 min_date = data_to_clean[date_col].min()
                 max_date = data_to_clean[date_col].max()
                 st.success(f"✓ Colonne de date valide: {min_date.strftime('%d/%m/%Y')} - {max_date.strftime('%d/%m/%Y')}")
-            except:
-                st.warning("⚠️ La colonne sélectionnée ne semble pas être une date valide")
+            except Exception as exc:
+                st.warning(f"⚠️ La colonne sélectionnée ne semble pas être une date valide: {str(exc)}")
         
         with col2:
-            # Identifier les colonnes numériques potentielles pour les valeurs
+            all_cols = data_to_clean.columns.tolist()
+            # Suggestion automatique : colonnes numériques en tête de liste dans le menu (mais laisser tout)
             numeric_cols = data_to_clean.select_dtypes(include=['number']).columns.tolist()
+            # Build ordered options: numeric first (unique), then the rest
+            ordered_cols = list(dict.fromkeys(numeric_cols + [c for c in all_cols if c not in numeric_cols]))
+            default_value_index = 0 if ordered_cols else 0
             
-            if not numeric_cols:
-                st.error("❌ Aucune colonne numérique trouvée dans le jeu de données")
-                value_col = None
-            else:
-                # Trouver les colonnes liées au recrutement
-                recruitment_cols = [col for col in numeric_cols if any(term in col.lower() for term in ['recrutement', 'demande', 'recrut', 'hire', 'nombre', 'count', 'total'])]
-                
-                if not recruitment_cols:
-                    recruitment_cols = numeric_cols
-                
-                value_col = st.selectbox(
-                    "Sélectionnez la colonne de valeurs (recrutements)",
-                    options=numeric_cols,
-                    index=0 if len(recruitment_cols) == 0 else numeric_cols.index(recruitment_cols[0]),
-                    key="value_col"
-                )
+            value_col = st.selectbox(
+                "Sélectionnez la colonne de valeurs (recrutements) — vous pouvez choisir n'importe quelle colonne",
+                options=ordered_cols,
+                index=default_value_index,
+                key="value_col"
+            )
+            
+            # Essayer de convertir la colonne choisie en numérique pour la suite
+            try:
+                coerced = pd.to_numeric(data_to_clean[value_col], errors='coerce')
+                non_null_count = coerced.notna().sum()
+                total_count = len(coerced)
+                if non_null_count == 0:
+                    st.error("❌ La colonne sélectionnée ne contient aucune valeur numérique convertible. Choisissez une autre colonne.")
+                elif non_null_count < total_count:
+                    st.warning(f"⚠️ {total_count - non_null_count} valeurs sur {total_count} sont non-convertibles et seront traitées comme NaN.")
+                else:
+                    st.success("✓ Colonne de valeurs valide (numérique)")
+            except Exception as exc:
+                st.error(f"❌ Erreur lors de la vérification de la colonne de valeurs: {str(exc)}")
         
         # Paramètres d'agrégation
         st.subheader("⏱️ Paramètres d'agrégation temporelle")
