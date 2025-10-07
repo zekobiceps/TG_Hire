@@ -568,7 +568,14 @@ with tab2:
                     st.session_state.value_col = 'value'
 
                     st.success("✅ Données préparées automatiquement et agrégées avec succès!")
-                    st.experimental_rerun()
+                    # Certains environnements Streamlit n'exposent pas experimental_rerun.
+                    # Appeler seulement si disponible, sinon définir un flag pour indiquer
+                    # que la préparation est terminée.
+                    if hasattr(st, "experimental_rerun"):
+                        st.experimental_rerun()
+                    else:
+                        st.session_state["prepared"] = True
+                        st.info("Les données ont été préparées. Passez à l'onglet Visualisation ou Modélisation.")
                 except Exception as e:
                     st.error(f"❌ Erreur lors de la préparation automatique: {e}")
     else:
