@@ -218,7 +218,7 @@ def predict_with_xgboost(df, horizon, lookback=30):
     forecast_df = pd.DataFrame({
         'ds': future_dates,
         'yhat': forecasts,
-        'yhat_lower': [f * 0.9 for f in forecasts],  # Approximation simplifiée des intervalles
+        'yhat_lower': [f * 0.9 for f in forecasts],
         'yhat_upper': [f * 1.1 for f in forecasts]
     })
     
