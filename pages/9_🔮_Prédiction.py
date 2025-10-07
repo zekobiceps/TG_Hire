@@ -391,7 +391,7 @@ with tab2:
             all_cols = data_to_clean.columns.tolist()
             # Marquer les colonnes candidates date pour l'info utilisateur
             date_candidate_cols = [c for c in all_cols if 'date' in c.lower() or 'time' in c.lower() or 'jour' in c.lower()]
-            default_date_index = all_cols.index(date_candidate_cols[0]) if date_candidate_cols else 0
+            default_date_index = all_cols.index(date_candidate_cols[0]) if date_candidateCols else 0
             
             date_col = st.selectbox(
                 "Sélectionnez la colonne de date (toutes les colonnes sont listées ci-dessous)",
@@ -562,9 +562,47 @@ with tab2:
                         # Choisir la colonne de date pour l'agrégation : préférer la date d'entrée effective
                         agg_date_col = recruit_date_col if recruit_date_col else date_col
                         data_to_clean[agg_date_col] = pd.to_datetime(data_to_clean[agg_date_col])
-                        
-                        # Agrégation temporelle
-                        aggregated_data = aggregate_time_series(data_to_clean, agg_date_col, value_col, freq, agg_func)
+
+                        # --- Gestion robuste de la colonne de valeur avant agrégation ---
+                        final_value_col = value_col
+                        tmp_created = False
+
+                        # Si la colonne choisie est numérique -> ok
+                        if pd.api.types.is_numeric_dtype(data_to_clean[final_value_col]):
+                            pass
+                        else:
+                            # Tenter de convertir en numérique
+                            coerced = pd.to_numeric(data_to_clean[final_value_col], errors='coerce')
+                            if coerced.notna().sum() > 0:
+                                # créer une colonne temporaire numérique
+                                tmp_col = "_tmp_value_numeric"
+                                data_to_clean[tmp_col] = coerced
+                                final_value_col = tmp_col
+                                tmp_created = True
+                            else:
+                                # si utilisateur a fourni une colonne status, créer un indicateur recruté
+                                if status_col and confirmed_value:
+                                    tmp_col = "_tmp_recruited_flag"
+                                    data_to_clean[tmp_col] = (data_to_clean[status_col].astype(str).str.strip().str.lower() == str(confirmed_value).strip().lower()).astype(int)
+                                    final_value_col = tmp_col
+                                    tmp_created = True
+                                else:
+                                    # si la fonction d'agrégation est 'count', on peut continuer (count fonctionne sur toute colonne)
+                                    if agg_func != 'count':
+                                        raise RuntimeError(
+                                            "La colonne choisie n'est pas numérique et ne peut pas être agrégée avec la fonction sélectionnée. "
+                                            "Choisissez une colonne numérique, sélectionnez 'Compte' comme fonction d'agrégation, ou indiquez une colonne 'status' pour créer un indicateur de recrutement."
+                                        )
+
+                        # Agrégation temporelle (utiliser final_value_col)
+                        aggregated_data = aggregate_time_series(data_to_clean, agg_date_col, final_value_col, freq, agg_func)
+
+                        # Si on a utilisé une colonne temporaire, renommer la colonne agrégée pour garder le nom original value_col
+                        if tmp_created:
+                            # aggregated_data aura deux colonnes : 'date' et tmp_col (ou le nom final_value_col)
+                            cols = aggregated_data.columns.tolist()
+                            if len(cols) >= 2:
+                                aggregated_data = aggregated_data.rename(columns={cols[1]: value_col})
                         
                         # Mettre à jour les données nettoyées dans l'état de session
                         st.session_state.cleaned_data = aggregated_data
