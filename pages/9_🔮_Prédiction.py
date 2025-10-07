@@ -73,6 +73,10 @@ if 'data' not in st.session_state:
     st.session_state.data = None
 if 'cleaned_data' not in st.session_state:
     st.session_state.cleaned_data = None
+if 'cleaned_data_aggregated' not in st.session_state:
+    st.session_state.cleaned_data_aggregated = None
+if 'cleaned_data_filtered' not in st.session_state:
+    st.session_state.cleaned_data_filtered = None
 if 'forecast_results' not in st.session_state:
     st.session_state.forecast_results = None
 if 'model' not in st.session_state:
@@ -81,6 +85,8 @@ if 'forecast_horizon' not in st.session_state:
     st.session_state.forecast_horizon = 90
 if 'selected_uid' not in st.session_state:
     st.session_state.selected_uid = None
+if 'analysis_objective' not in st.session_state:
+    st.session_state.analysis_objective = "Les Recrutements Effectifs"
 
 # Fonctions utilitaires
 def convert_df_to_csv(df):
@@ -236,8 +242,6 @@ def predict_with_xgboost(df, horizon, lookback=30):
 
 # Titre principal
 st.markdown('<div class="main-header">🔮 Prédiction des Recrutements</div>', unsafe_allow_html=True)
-st.markdown('<div class="main-header">🔮 Prédiction des Recrutements</div>', unsafe_allow_html=True)
-st.markdown('---')
 
 # Création des onglets
 tab1, tab2, tab3, tab4 = st.tabs([
@@ -271,28 +275,43 @@ with tab1:
         
         if use_sample:
             st.info("Utilisation des données d'exemple pour la démonstration")
-            # Créer des données d'exemple
+            # Créer des données d'exemple plus riches avec Direction et Poste
             date_range = pd.date_range(start='2020-01-01', end='2023-12-31', freq='D')
-            values = [
-                # Tendance de base avec saisonnalité
-                10 + i*0.05 + 5*np.sin(i/30) + 
-                # Effet mensuel (plus de recrutements en début de mois)
-                (10 if i % 30 < 5 else 0) +
-                # Effet trimestriel
-                (15 if i % 90 < 10 else 0) +
-                # Bruit aléatoire
-                np.random.normal(0, 3)
-                for i in range(len(date_range))
-            ]
             
-            # Regroupement par jour
+            # Générer des directions et postes fictifs
+            directions = ["Direction Technique", "Direction RH", "Direction Commerciale", 
+                         "Direction Financière", "Direction Logistique"]
+            
+            postes = ["Ingénieur", "Technicien", "Chef de projet", "Responsable", 
+                     "Assistant", "Analyste", "Développeur", "Gestionnaire", 
+                     "Consultant", "Chargé de mission"]
+            
+            # Générer des données aléatoires mais cohérentes
+            n_samples = 1000
+            
             sample_data = pd.DataFrame({
-                'date': date_range,
-                'recrutements': [max(0, int(round(v))) for v in values]
+                'Date de réception de la demande aprés validation de la DRH': 
+                    pd.to_datetime(np.random.choice(date_range, n_samples)),
+                'Direction concernée': 
+                    np.random.choice(directions, n_samples, p=[0.4, 0.2, 0.2, 0.1, 0.1]),
+                'Poste demandé': 
+                    np.random.choice(postes, n_samples),
+                'Statut de la demande': 
+                    np.random.choice(["Clôture", "En cours", "Dépriorisé", "Annulé"], n_samples, p=[0.7, 0.1, 0.1, 0.1])
             })
             
-            # Agrégation par mois pour simplifier
-            sample_data = sample_data.groupby(pd.Grouper(key='date', freq='M')).sum().reset_index()
+            # Ajouter la date d'entrée effective uniquement pour les recrutements clôturés
+            sample_data['Date d\'entrée effective du candidat'] = None
+            mask_closed = sample_data['Statut de la demande'] == "Clôture"
+            
+            # Pour les demandes clôturées, ajouter une date d'entrée entre 30 et 120 jours après la réception
+            for idx in sample_data[mask_closed].index:
+                demand_date = sample_data.loc[idx, 'Date de réception de la demande aprés validation de la DRH']
+                entry_delay = np.random.randint(30, 120)
+                entry_date = demand_date + pd.Timedelta(days=entry_delay)
+                # Ne pas dépasser aujourd'hui
+                if entry_date <= pd.Timestamp.now():
+                    sample_data.loc[idx, 'Date d\'entrée effective du candidat'] = entry_date
             
             st.session_state.data = sample_data
             st.success("✅ Données d'exemple chargées avec succès!")
@@ -330,6 +349,30 @@ with tab1:
                 st.success(f"✅ Fichier '{uploaded_file.name}' importé avec succès!")
             except Exception as e:
                 st.error(f"❌ Erreur lors de l'import: {str(e)}")
+                
+        # NOUVEAU: Sélection de l'objectif de l'analyse
+        if st.session_state.data is not None:
+            st.markdown("### 🎯 Objectif de l'analyse")
+            st.markdown("Choisissez ce que vous souhaitez analyser et prédire:")
+            
+            analysis_objective = st.radio(
+                "Que souhaitez-vous analyser et prédire ?",
+                options=["Les Demandes de Recrutement", "Les Recrutements Effectifs"],
+                horizontal=True,
+                index=1,  # Par défaut: Recrutements Effectifs
+                key="analysis_objective"
+            )
+            
+            # Stocker l'objectif dans st.session_state
+            st.session_state.analysis_objective = analysis_objective
+            
+            # Afficher une explication selon le choix
+            if analysis_objective == "Les Demandes de Recrutement":
+                st.info("📝 Vous allez analyser et prédire les **demandes** de recrutement reçues. "
+                        "L'analyse sera basée sur la date de réception des demandes.")
+            else:
+                st.info("👨‍💼 Vous allez analyser et prédire les **recrutements effectivement réalisés**. "
+                        "L'analyse sera basée sur la date d'entrée effective des candidats.")
     
     # Afficher les informations si les données sont chargées
     if st.session_state.data is not None:
@@ -382,24 +425,47 @@ with tab2:
     if st.session_state.data is not None:
         data_to_clean = st.session_state.data.copy()
         
-        st.subheader("🔄 Sélection des colonnes principales")
+        # Déterminer les colonnes de date selon l'objectif
+        if 'analysis_objective' in st.session_state:
+            if st.session_state.analysis_objective == "Les Demandes de Recrutement":
+                primary_date_col_options = [col for col in data_to_clean.columns 
+                                           if 'demande' in col.lower() or 'réception' in col.lower()]
+                date_col_label = "Date de réception de la demande"
+            else:  # Recrutements Effectifs
+                primary_date_col_options = [col for col in data_to_clean.columns 
+                                          if 'entrée' in col.lower() or 'effective' in col.lower()]
+                date_col_label = "Date d'entrée effective"
+                
+            # Si aucune colonne correspondante n'est trouvée, utiliser toutes les colonnes date
+            if not primary_date_col_options:
+                primary_date_col_options = [col for col in data_to_clean.columns 
+                                          if 'date' in col.lower() or 'time' in col.lower() or 'jour' in col.lower()]
+        else:
+            # Comportement par défaut si l'objectif n'est pas défini
+            primary_date_col_options = [col for col in data_to_clean.columns 
+                                      if 'date' in col.lower() or 'time' in col.lower() or 'jour' in col.lower()]
+            date_col_label = "Colonne de date"
         
-        # Sélection des colonnes de date et valeur (montrer toutes les colonnes pour que l'utilisateur choisisse)
+        st.subheader("🔄 Configuration de l'analyse")
+        
         col1, col2 = st.columns(2)
         
         with col1:
-            all_cols = data_to_clean.columns.tolist()
-            # Marquer les colonnes candidates date pour l'info utilisateur
-            date_candidate_cols = [c for c in all_cols if 'date' in c.lower() or 'time' in c.lower() or 'jour' in c.lower()]
-            default_date_index = all_cols.index(date_candidate_cols[0]) if date_candidate_cols else 0
-            
-            date_col = st.selectbox(
-                "Sélectionnez la colonne de date (toutes les colonnes sont listées ci-dessous)",
-                options=all_cols,
-                index=default_date_index,
-                key="date_col"
-            )
-            
+            # Sélection de la colonne de date principale
+            if primary_date_col_options:
+                date_col = st.selectbox(
+                    f"Sélectionnez la {date_col_label}",
+                    options=data_to_clean.columns,
+                    index=data_to_clean.columns.get_loc(primary_date_col_options[0]) if primary_date_col_options[0] in data_to_clean.columns else 0,
+                    key="clean_date_col"
+                )
+            else:
+                date_col = st.selectbox(
+                    f"Sélectionnez la {date_col_label}",
+                    options=data_to_clean.columns,
+                    key="clean_date_col"
+                )
+                
             # Convertir la colonne en datetime
             try:
                 data_to_clean[date_col] = pd.to_datetime(data_to_clean[date_col])
@@ -713,157 +779,460 @@ with tab3:
 # TAB 4: MODÉLISATION & PRÉDICTION
 # ============================
 with tab4:
-    st.markdown('<div class="sub-header">Modélisation et Prédiction</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">Modélisation et Prédiction Stratégique</div>', unsafe_allow_html=True)
     
-    if st.session_state.cleaned_data is not None:
-        data_to_model = st.session_state.cleaned_data
+    if 'cleaned_data_aggregated' in st.session_state and st.session_state.cleaned_data_aggregated is not None:
+        data_to_model = st.session_state.cleaned_data_aggregated
+        data_filtered = st.session_state.cleaned_data_filtered if 'cleaned_data_filtered' in st.session_state else None
         
-        st.subheader("⚙️ Configuration du Modèle")
+        # Variables contextuelles
+        direction_col = st.session_state.direction_col if 'direction_col' in st.session_state else None
+        poste_col = st.session_state.poste_col if 'poste_col' in st.session_state else None
+        date_col = st.session_state.date_col if 'date_col' in st.session_state else 'date'
+        value_col = st.session_state.value_col if 'value_col' in st.session_state else 'value'
         
-        # Sélection de la colonne de date et de la colonne de valeur
-        date_col = st.selectbox("Colonne de date", options=data_to_model.columns, index=0, key="model_date_col")
-        value_col = st.selectbox("Colonne de valeur", options=data_to_model.columns, index=1, key="model_value_col")
+        # Titre dynamique selon l'objectif
+        if 'analysis_objective' in st.session_state:
+            analysis_type = st.session_state.analysis_objective
+        else:
+            analysis_type = "Recrutements"
         
-        # Options pour définir la cible de prévision
-        target_mode = st.selectbox(
-            "Mode de définition de la période de prévision",
-            options=["Horizon en jours", "Jusqu'à une date", "Pour un mois/année", "Pour une année"],
-            index=0
-        )
+        st.subheader("⚙️ Configuration de la prévision")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Options pour définir la cible de prévision
+            target_mode = st.selectbox(
+                "Mode de définition de la période de prévision",
+                options=["Horizon en jours", "Jusqu'à une date", "Pour un mois/année", "Pour une année"],
+                index=2  # Par défaut: "Pour un mois/année"
+            )
 
-        if target_mode == "Horizon en jours":
-            horizon_days = st.slider("Horizon de prévision (jours)", min_value=30, max_value=1825, value=180, step=30)
-        elif target_mode == "Jusqu'à une date":
-            last_hist_date = pd.to_datetime(data_to_model[date_col]).max().date()
-            target_date = st.date_input("Date cible (prévoir jusqu'à)", value=last_hist_date + timedelta(days=180), min_value=last_hist_date + timedelta(days=1))
-            horizon_days = (pd.to_datetime(target_date) - pd.to_datetime(last_hist_date)).days
-        elif target_mode == "Pour un mois/année":
-            years = list(range(datetime.now().year, datetime.now().year + 11))
-            sel_year = st.selectbox("Année", options=years, index=1)
-            months = list(range(1,13))
-            sel_month = st.selectbox("Mois", options=months, index=0, format_func=lambda m: datetime(2000, m, 1).strftime('%B'))
-            # prévoir jusqu'au dernier jour du mois sélectionné
-            target_date = datetime(sel_year, sel_month, 1) + pd.offsets.MonthEnd(0)
-            horizon_days = (pd.to_datetime(target_date.date()) - pd.to_datetime(pd.to_datetime(data_to_model[date_col]).max().date())).days
-        else:  # "Pour une année"
-            years = list(range(datetime.now().year, datetime.now().year + 11))
-            sel_year = st.selectbox("Année", options=years, index=1)
-            target_date = datetime(sel_year, 12, 31).date()
-            horizon_days = (pd.to_datetime(target_date) - pd.to_datetime(pd.to_datetime(data_to_model[date_col]).max().date())).days
+            if target_mode == "Horizon en jours":
+                horizon_days = st.slider("Horizon de prévision (jours)", min_value=30, max_value=1825, value=365, step=30)
+            elif target_mode == "Jusqu'à une date":
+                last_hist_date = pd.to_datetime(data_to_model[date_col]).max().date()
+                target_date = st.date_input("Date cible (prévoir jusqu'à)", value=last_hist_date + timedelta(days=180), min_value=last_hist_date + timedelta(days=1))
+                horizon_days = (pd.to_datetime(target_date) - pd.to_datetime(last_hist_date)).days
+            elif target_mode == "Pour un mois/année":
+                years = list(range(datetime.now().year, datetime.now().year + 11))
+                sel_year = st.selectbox("Année", options=years, index=1)
+                months = list(range(1,13))
+                sel_month = st.selectbox("Mois", options=months, index=0, format_func=lambda m: datetime(2000, m, 1).strftime('%B'))
+                # prévoir jusqu'au dernier jour du mois sélectionné
+                target_date = datetime(sel_year, sel_month, 1) + pd.offsets.MonthEnd(0)
+                last_hist_date = pd.to_datetime(data_to_model[date_col]).max().date()
+                horizon_days = (pd.to_datetime(target_date.date()) - pd.to_datetime(last_hist_date)).days
+            else:  # "Pour une année"
+                years = list(range(datetime.now().year, datetime.now().year + 11))
+                sel_year = st.selectbox("Année", options=years, index=1)
+                target_date = datetime(sel_year, 12, 31).date()
+                last_hist_date = pd.to_datetime(data_to_model[date_col]).max().date()
+                horizon_days = (pd.to_datetime(target_date) - pd.to_datetime(last_hist_date)).days
 
-        if horizon_days < 1:
-            st.error("La date cible doit être postérieure à la dernière date historique. Ajustez la sélection.")
-        st.session_state.forecast_horizon = int(horizon_days)
+            if horizon_days < 1:
+                st.error("La date cible doit être postérieure à la dernière date historique.")
+            else:
+                st.session_state.forecast_horizon = int(horizon_days)
         
-        # Choix du modèle
-        model_type = st.selectbox(
-            "Type de Modèle",
-            options=["Prophet", "Holt-Winters", "XGBoost"],
-            index=0
-        )
+        with col2:
+            # Choix du modèle
+            model_type = st.selectbox(
+                "Type de Modèle",
+                options=["Prophet", "Holt-Winters", "XGBoost"],
+                index=0
+            )
+            
+            # Options spécifiques selon le modèle
+            if model_type == "Prophet":
+                seasonality = st.selectbox(
+                    "Mode de saisonnalité",
+                    options=["additive", "multiplicative"],
+                    index=0,
+                    help="Additive: variations constantes, Multiplicative: variations proportionnelles"
+                )
+                
+                # Options avancées dans un expander
+                with st.expander("Options avancées"):
+                    changepoint_prior_scale = st.slider(
+                        "Flexibilité de tendance (changepoint_prior_scale)",
+                        min_value=0.001, max_value=0.5, value=0.05, step=0.001,
+                        format="%.3f",
+                        help="Plus la valeur est élevée, plus la tendance est flexible"
+                    )
+                    
+                    seasonality_prior_scale = st.slider(
+                        "Amplitude de saisonnalité (seasonality_prior_scale)",
+                        min_value=0.1, max_value=20.0, value=10.0, step=0.1,
+                        format="%.1f",
+                        help="Plus la valeur est élevée, plus la saisonnalité est forte"
+                    )
+                    
+                    include_seasons = st.multiselect(
+                        "Inclure les saisonnalités",
+                        options=["Hebdomadaire", "Mensuelle", "Annuelle"],
+                        default=["Mensuelle", "Annuelle"],
+                        help="Sélectionnez les saisonnalités à inclure dans le modèle"
+                    )
+                    
+                    weekly = "Hebdomadaire" in include_seasons
+                    monthly = "Mensuelle" in include_seasons
+                    yearly = "Annuelle" in include_seasons
         
-        st.subheader("📊 Résultats de la Prédiction")
+        # Section prévision
+        st.subheader("🔮 Prévision du volume global")
         
-        if st.button("🔮 Effectuer la Prédiction", type="primary"):
-            with st.spinner("Prédiction en cours..."):
+        if st.button("🚀 Lancer la prévision", type="primary"):
+            with st.spinner("Calcul des prévisions en cours..."):
                 try:
+                    # PARTIE 1: PRÉDICTION DU VOLUME GLOBAL
                     if model_type == "Prophet":
                         # Préparer les données pour Prophet
                         prophet_data = create_prophet_dataset(data_to_model, date_col, value_col)
                         
-                        # Effectuer la prédiction avec Prophet
-                        model, forecast = predict_with_prophet(prophet_data, horizon=horizon_days)
-                        
-                        # Afficher les résultats
-                        st.write(f"Prévisions avec Prophet pour les {horizon_days} prochains jours:")
-                        st.dataframe(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail(10))
-                        
-                        # Graphique des prévisions
-                        fig_prophet = go.Figure()
-                        fig_prophet.add_trace(go.Scatter(x=prophet_data['ds'], y=prophet_data['y'], mode='lines', name='Historique'))
-                        fig_prophet.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], mode='lines', name='Prévision', line=dict(color='red')))
-                        fig_prophet.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_lower'], mode='lines', name='Intervalle de Confiance Inférieur', line=dict(color='red', dash='dash')))
-                        fig_prophet.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_upper'], mode='lines', name='Intervalle de Confiance Supérieur', line=dict(color='red', dash='dash')))
-                        
-                        fig_prophet.update_layout(
-                            title="Prévisions avec Prophet",
-                            xaxis_title="Date",
-                            yaxis_title="Nombre de Recrutements",
-                            legend_title="Légende",
-                            template="plotly_white"
+                        # Effectuer la prédiction avec Prophet et les paramètres choisis
+                        model, forecast = predict_with_prophet(
+                            prophet_data, 
+                            horizon=horizon_days,
+                            seasonality=seasonality,
+                            changepoint_prior_scale=changepoint_prior_scale,
+                            seasonality_prior_scale=seasonality_prior_scale,
+                            weekly=weekly,
+                            monthly=monthly,
+                            yearly=yearly
                         )
                         
-                        st.plotly_chart(fig_prophet, use_container_width=True)
-                        
-                        # Enregistrer le modèle dans l'état de session
+                        # Enregistrer les résultats
+                        st.session_state.forecast_results = forecast
                         st.session_state.model = model
-                        st.success("Modèle Prophet entraîné et prévisions effectuées.")
-                    
+                        st.session_state.model_type = "Prophet"
+                        
                     elif model_type == "Holt-Winters":
-                        # Préparer les données (format attendu par Holt-Winters)
+                        # Préparer les données pour Holt-Winters
                         hw_data = data_to_model[[date_col, value_col]].rename(columns={date_col: 'ds', value_col: 'y'})
                         
-                        # Effectuer la prévision avec Holt-Winters
-                        model, forecast = predict_with_holt_winters(hw_data, horizon=horizon_days)
-                        
-                        # Afficher les résultats
-                        st.write(f"Prévisions avec Holt-Winters pour les {horizon_days} prochains jours:")
-                        st.dataframe(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail(10))
-                        
-                        # Graphique des prévisions
-                        fig_hw = go.Figure()
-                        fig_hw.add_trace(go.Scatter(x=hw_data['ds'], y=hw_data['y'], mode='lines', name='Historique'))
-                        fig_hw.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], mode='lines', name='Prévision', line=dict(color='red')))
-                        fig_hw.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_lower'], mode='lines', name='Intervalle de Confiance Inférieur', line=dict(color='red', dash='dash')))
-                        fig_hw.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_upper'], mode='lines', name='Intervalle de Confiance Supérieur', line=dict(color='red', dash='dash')))
-                        
-                        fig_hw.update_layout(
-                            title="Prévisions avec Holt-Winters",
-                            xaxis_title="Date",
-                            yaxis_title="Nombre de Recrutements",
-                            legend_title="Légende",
-                            template="plotly_white"
+                        # Déterminer seasonal_periods selon la fréquence
+                        if st.session_state.freq == "D":
+                            seasonal_periods = 7  # hebdomadaire
+                        elif st.session_state.freq == "W":
+                            seasonal_periods = 52  # annuelle
+                        elif st.session_state.freq == "M":
+                            seasonal_periods = 12  # annuelle
+                        elif st.session_state.freq == "Q":
+                            seasonal_periods = 4  # annuelle
+                        else:
+                            seasonal_periods = 1  # pas de saisonnalité
+                            
+                        # Effectuer la prédiction avec Holt-Winters
+                        model, forecast = predict_with_holt_winters(
+                            hw_data, 
+                            horizon=horizon_days,
+                            seasonal_periods=seasonal_periods
                         )
                         
-                        st.plotly_chart(fig_hw, use_container_width=True)
-                        
-                        # Enregistrer le modèle dans l'état de session
+                        # Enregistrer les résultats
+                        st.session_state.forecast_results = forecast
                         st.session_state.model = model
-                        st.success("Modèle Holt-Winters entraîné et prévisions effectuées.")
-                    
+                        st.session_state.model_type = "Holt-Winters"
+                        
                     else:  # XGBoost
-                        # Préparer les données pour XGBoost (format supervisé)
+                        # Préparer les données pour XGBoost
                         xgb_data = data_to_model[[date_col, value_col]].rename(columns={date_col: 'ds', value_col: 'y'})
                         
-                        # Effectuer la prévision avec XGBoost
-                        model, forecast = predict_with_xgboost(xgb_data, horizon=horizon_days)
+                        # Calculer lookback approprié (environ 20% des données, min 7, max 60)
+                        lookback = min(max(7, int(len(xgb_data) * 0.2)), 60)
                         
-                        # Afficher les résultats
-                        st.write(f"Prévisions avec XGBoost pour les {horizon_days} prochains jours:")
-                        st.dataframe(forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']].tail(10))
-                        
-                        # Graphique des prévisions
-                        fig_xgb = go.Figure()
-                        fig_xgb.add_trace(go.Scatter(x=xgb_data['ds'], y=xgb_data['y'], mode='lines', name='Historique'))
-                        fig_xgb.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat'], mode='lines', name='Prévision', line=dict(color='red')))
-                        fig_xgb.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_lower'], mode='lines', name='Intervalle de Confiance Inférieur', line=dict(color='red', dash='dash')))
-                        fig_xgb.add_trace(go.Scatter(x=forecast['ds'], y=forecast['yhat_upper'], mode='lines', name='Intervalle de Confiance Supérieur', line=dict(color='red', dash='dash')))
-                        
-                        fig_xgb.update_layout(
-                            title="Prévisions avec XGBoost",
-                            xaxis_title="Date",
-                            yaxis_title="Nombre de Recrutements",
-                            legend_title="Légende",
-                            template="plotly_white"
+                        # Effectuer la prédiction avec XGBoost
+                        model, forecast = predict_with_xgboost(
+                            xgb_data, 
+                            horizon=horizon_days,
+                            lookback=lookback
                         )
                         
-                        st.plotly_chart(fig_xgb, use_container_width=True)
-                        
-                        # Enregistrer le modèle dans l'état de session
+                        # Enregistrer les résultats
+                        st.session_state.forecast_results = forecast
                         st.session_state.model = model
-                        st.success("Modèle XGBoost entraîné et prévisions effectuées.")
-                
+                        st.session_state.model_type = "XGBoost"
+                    
+                    # Afficher le graphique de prévision du volume
+                    st.success(f"✅ Prévision du volume global réalisée pour les {horizon_days} prochains jours")
+                    
+                    # Graphique des prévisions
+                    fig_forecast = go.Figure()
+                    
+                    # Période historique
+                    historical_dates = forecast[forecast['ds'] <= pd.to_datetime(last_hist_date)]['ds']
+                    historical_values = forecast[forecast['ds'] <= pd.to_datetime(last_hist_date)]['yhat']
+                    
+                    fig_forecast.add_trace(go.Scatter(
+                        x=historical_dates,
+                        y=historical_values,
+                        mode='lines',
+                        name='Historique',
+                        line=dict(color='blue')
+                    ))
+                    
+                    # Période de prévision
+                    future_dates = forecast[forecast['ds'] > pd.to_datetime(last_hist_date)]['ds']
+                    future_values = forecast[forecast['ds'] > pd.to_datetime(last_hist_date)]['yhat']
+                    future_lower = forecast[forecast['ds'] > pd.to_datetime(last_hist_date)]['yhat_lower']
+                    future_upper = forecast[forecast['ds'] > pd.to_datetime(last_hist_date)]['yhat_upper']
+                    
+                    fig_forecast.add_trace(go.Scatter(
+                        x=future_dates,
+                        y=future_values,
+                        mode='lines',
+                        name='Prévision',
+                        line=dict(color='red')
+                    ))
+                    
+                    # Intervalle de confiance
+                    fig_forecast.add_trace(go.Scatter(
+                        x=future_dates,
+                        y=future_upper,
+                        mode='lines',
+                        name='Borne supérieure',
+                        line=dict(color='rgba(255, 0, 0, 0.2)', dash='dash')
+                    ))
+                    
+                    fig_forecast.add_trace(go.Scatter(
+                        x=future_dates,
+                        y=future_lower,
+                        mode='lines',
+                        name='Borne inférieure',
+                        line=dict(color='rgba(255, 0, 0, 0.2)', dash='dash'),
+                        fill='tonexty'  # Remplir l'aire entre les bornes
+                    ))
+                    
+                    fig_forecast.update_layout(
+                        title=f"Prévision du nombre de {analysis_type} avec {model_type}",
+                        xaxis_title="Date",
+                        yaxis_title=f"Nombre de {analysis_type}",
+                        legend_title="Légende",
+                        template="plotly_white"
+                    )
+                    
+                    st.plotly_chart(fig_forecast, use_container_width=True)
+                    
+                    # PARTIE 2: CALCUL DES PROPORTIONS ET RÉPARTITION STRATÉGIQUE
+                    if data_filtered is not None and (direction_col or poste_col):
+                        st.markdown("---")
+                        st.subheader("📊 Ventilation de la prédiction")
+                        st.markdown(f"Répartition prévisionnelle des {analysis_type} basée sur les proportions historiques")
+                        
+                        # Obtenir uniquement les prévisions futures (après la date max historique)
+                        future_forecast = forecast[forecast['ds'] > pd.to_datetime(last_hist_date)].copy()
+                        
+                        # Agréger par mois pour une meilleure lisibilité
+                        future_forecast['year_month'] = future_forecast['ds'].dt.strftime('%Y-%m')
+                        monthly_forecast = future_forecast.groupby('year_month')['yhat'].sum().reset_index()
+                        monthly_forecast = monthly_forecast.rename(columns={'yhat': 'predicted_volume'})
+                        
+                        # Ajouter la date formatée pour l'affichage
+                        monthly_forecast['month_display'] = pd.to_datetime(monthly_forecast['year_month'] + '-01').dt.strftime('%b %Y')
+                        
+                        # Afficher la prévision mensuelle
+                        st.markdown("#### Prévision mensuelle du volume")
+                        
+                        # Formater en tableau
+                        monthly_table = monthly_forecast.copy()
+                        monthly_table['predicted_volume'] = monthly_table['predicted_volume'].round().astype(int)
+                        monthly_table = monthly_table.rename(columns={
+                            'month_display': 'Mois',
+                            'predicted_volume': f'Nombre de {analysis_type}'
+                        })
+                        
+                        st.dataframe(
+                            monthly_table[['Mois', f'Nombre de {analysis_type}']],
+                            hide_index=True,
+                            use_container_width=True
+                        )
+                        
+                        # Onglets pour les différentes ventilations
+                        ventilation_tabs = st.tabs(["Par Direction", "Par Poste"])
+                        
+                        # VENTILATION PAR DIRECTION
+                        with ventilation_tabs[0]:
+                            if direction_col and direction_col in data_filtered.columns:
+                                # Calculer les proportions historiques par direction
+                                dir_counts = data_filtered[direction_col].value_counts()
+                                dir_proportions = dir_counts / dir_counts.sum()
+                                
+                                # Créer un DataFrame pour les résultats
+                                dir_results = []
+                                
+                                for _, row in monthly_forecast.iterrows():
+                                    month = row['month_display']
+                                    total_volume = row['predicted_volume']
+                                    
+                                    for direction, proportion in dir_proportions.items():
+                                        # Calculer le nombre prévu pour cette direction ce mois-ci
+                                        predicted_count = total_volume * proportion
+                                        
+                                        dir_results.append({
+                                            'month': month,
+                                            'direction': direction,
+                                            'predicted_count': predicted_count,
+                                            'proportion': proportion * 100
+                                        })
+                                
+                                dir_results_df = pd.DataFrame(dir_results)
+                                
+                                # Créer le graphique de répartition par direction
+                                months_to_show = min(len(monthly_forecast), 6)  # Limiter à 6 mois pour la lisibilité
+                                
+                                # Agréger par direction pour tous les mois sélectionnés
+                                dir_summary = dir_results_df.groupby('direction')['predicted_count'].sum().reset_index()
+                                dir_summary = dir_summary.sort_values('predicted_count', ascending=False)
+                                
+                                fig_dir_forecast = px.bar(
+                                    dir_summary,
+                                    x='predicted_count',
+                                    y='direction',
+                                    orientation='h',
+                                    labels={
+                                        'predicted_count': f'Nombre de {analysis_type} prévus',
+                                        'direction': 'Direction'
+                                    },
+                                    title=f"Prévision des {analysis_type} par Direction",
+                                    color='predicted_count',
+                                    color_continuous_scale=px.colors.sequential.Blues
+                                )
+                                
+                                fig_dir_forecast.update_layout(
+                                    yaxis={'categoryorder':'total ascending'},
+                                    showlegend=False
+                                )
+                                
+                                st.plotly_chart(fig_dir_forecast, use_container_width=True)
+                                
+                                # Tableau détaillé par mois
+                                with st.expander("Voir le détail mois par mois"):
+                                    for month in monthly_forecast['month_display'].unique():
+                                        st.markdown(f"##### {month}")
+                                        
+                                        month_data = dir_results_df[dir_results_df['month'] == month].copy()
+                                        month_data['predicted_count'] = month_data['predicted_count'].round().astype(int)
+                                        month_data = month_data.sort_values('predicted_count', ascending=False)
+                                        
+                                        display_df = month_data[['direction', 'predicted_count', 'proportion']]
+                                        display_df.columns = ['Direction', f'Nombre de {analysis_type}', 'Pourcentage (%)']
+                                        display_df['Pourcentage (%)'] = display_df['Pourcentage (%)'].round(1)
+                                        
+                                        st.dataframe(display_df, hide_index=True, use_container_width=True)
+                            else:
+                                st.info("Les données ne contiennent pas d'information de Direction pour la ventilation")
+                        
+                        # VENTILATION PAR POSTE
+                        with ventilation_tabs[1]:
+                            if poste_col and poste_col in data_filtered.columns:
+                                # Paramètres de filtrage des postes
+                                top_n_postes = st.slider(
+                                    "Nombre de postes à afficher:",
+                                    min_value=5,
+                                    max_value=20,
+                                    value=10,
+                                    step=1
+                                )
+                                
+                                search_poste = st.text_input(
+                                    "Rechercher un poste spécifique:",
+                                    placeholder="Ex: Ingénieur, Technicien..."
+                                )
+                                
+                                # Calculer les proportions historiques par poste
+                                poste_counts = data_filtered[poste_col].value_counts()
+                                poste_proportions = poste_counts / poste_counts.sum()
+                                
+                                # Créer un DataFrame pour les résultats
+                                poste_results = []
+                                
+                                for _, row in monthly_forecast.iterrows():
+                                    month = row['month_display']
+                                    total_volume = row['predicted_volume']
+                                    
+                                    for poste, proportion in poste_proportions.items():
+                                        # Calculer le nombre prévu pour ce poste ce mois-ci
+                                        predicted_count = total_volume * proportion
+                                        
+                                        poste_results.append({
+                                            'month': month,
+                                            'poste': poste,
+                                            'predicted_count': predicted_count,
+                                            'proportion': proportion * 100
+                                        })
+                                
+                                poste_results_df = pd.DataFrame(poste_results)
+                                
+                                # Filtrer les résultats selon le critère de recherche
+                                if search_poste:
+                                    search_results = poste_results_df[
+                                        poste_results_df['poste'].str.lower().str.contains(search_poste.lower())
+                                    ]
+                                    
+                                    if len(search_results) > 0:
+                                        st.markdown(f"##### Résultats pour '{search_poste}'")
+                                        
+                                        # Agréger les résultats de recherche par poste
+                                        search_summary = search_results.groupby('poste')['predicted_count'].sum().reset_index()
+                                        search_summary['predicted_count'] = search_summary['predicted_count'].round().astype(int)
+                                        search_summary = search_summary.sort_values('predicted_count', ascending=False)
+                                        
+                                        st.dataframe(
+                                            search_summary.rename(
+                                                columns={'poste': 'Poste', 'predicted_count': f'Nombre de {analysis_type} prévus'}
+                                            ),
+                                            hide_index=True,
+                                            use_container_width=True
+                                        )
+                                    else:
+                                        st.warning(f"Aucun poste correspondant à '{search_poste}' n'a été trouvé")
+                                
+                                # Agréger par poste pour tous les mois
+                                poste_summary = poste_results_df.groupby('poste')['predicted_count'].sum().reset_index()
+                                poste_summary = poste_summary.sort_values('predicted_count', ascending=False)
+                                
+                                # Graphique des top N postes
+                                top_postes = poste_summary.head(top_n_postes)
+                                
+                                fig_poste_forecast = px.bar(
+                                    top_postes,
+                                    x='predicted_count',
+                                    y='poste',
+                                    orientation='h',
+                                    labels={
+                                        'predicted_count': f'Nombre de {analysis_type} prévus',
+                                        'poste': 'Poste'
+                                    },
+                                    title=f"Top {top_n_postes} des postes prévus",
+                                    color='predicted_count',
+                                    color_continuous_scale=px.colors.sequential.Greens
+                                )
+                                
+                                fig_poste_forecast.update_layout(
+                                    yaxis={'categoryorder':'total ascending'},
+                                    showlegend=False
+                                )
+                                
+                                st.plotly_chart(fig_poste_forecast, use_container_width=True)
+                                
+                                # Tableau détaillé
+                                with st.expander(f"Voir le détail des {top_n_postes} postes les plus demandés"):
+                                    display_df = top_postes.copy()
+                                    display_df['predicted_count'] = display_df['predicted_count'].round().astype(int)
+                                    
+                                    # Calculer la proportion
+                                    total = display_df['predicted_count'].sum()
+                                    display_df['proportion'] = (display_df['predicted_count'] / total * 100).round(1)
+                                    
+                                    display_df.columns = ['Poste', f'Nombre de {analysis_type}', 'Pourcentage (%)']
+                                    
+                                    st.dataframe(display_df, hide_index=True, use_container_width=True)
+                            else:
+                                st.info("Les données ne contiennent pas d'information de Poste pour la ventilation")
                 except Exception as e:
                     st.error(f"❌ Erreur lors de la prédiction: {str(e)}")
+                    st.exception(e)
     else:
-        st.info("👆 Veuillez nettoyer et préparer les données dans l'onglet précédent avant de modéliser et prédire")
+        st.info("👆 Veuillez préparer les données dans l'onglet précédent avant de modéliser et prédire")
