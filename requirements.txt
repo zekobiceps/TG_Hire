@@ -1,4 +1,38 @@
 prophet
 xgboost
 statsmodels
+openpyxl>=3.0.10
+
+# Interface et visualisation
+streamlit
 plotly
+altair
+pydeck
+
+# Manipulation de données & fichiers
+pandas
+numpy
+python-docx
+PyMuPDF
+json5
+lxml
+
+# Machine learning
+scikit-learn
+sentence-transformers
+torch
+
+# APIs & connecteurs
+requests
+beautifulsoup4
+GitPython
+google-auth-httplib2
+google-auth-oauthlib
+groq
+google-generativeai
+openai
+
+# PDF / OCR
+reportlab
+pdf2image
+pytesseract
