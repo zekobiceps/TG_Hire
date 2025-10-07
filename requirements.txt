@@ -1,41 +1,4 @@
-# Core dependencies for TG_Hire
-streamlit
+prophet
+xgboost
+statsmodels
 plotly
-altair
-pydeck
-
-# Data & files
-pandas
-numpy
-python-docx
-pypdf
-PyPDF2
-pdfplumber
-PyMuPDF
-json5
-lxml
-
-# ML / Embeddings
-scikit-learn
-sentence-transformers
-torch
-
-# APIs & Connectors
-requests
-beautifulsoup4
-GitPython
-pygithub
-gspread
-google-api-python-client
-google-auth-httplib2
-google-auth-oauthlib
-groq
-google-generativeai
-openai
-
-# PDF Generation
-reportlab
-
-# Optional OCR (install to enable OCR fallback)
-pdf2image
-pytesseract
