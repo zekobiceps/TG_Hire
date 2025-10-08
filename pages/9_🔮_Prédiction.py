@@ -575,7 +575,14 @@ with tab2:
         # Détecter les colonnes automatiquement
         direction_col, poste_col, statut_col = detect_columns(st.session_state.data)
         
-        col3, col4 = st.columns(2)
+        # Détecter la colonne d'entité demandeuse
+        entite_col = None
+        for col in st.session_state.data.columns:
+            if any(word in col.lower() for word in ['entité', 'entite', 'entreprise', 'société', 'societe', 'demandeur', 'demandeuse']):
+                entite_col = col
+                break
+        
+        col3, col4, col5 = st.columns(3)
         
         with col3:
             if direction_col:
@@ -600,6 +607,35 @@ with tab2:
             else:
                 selected_postes = ["Tous"]
                 st.info("Aucune colonne Poste détectée")
+        
+        with col5:
+            if entite_col:
+                # Liste prédéfinie des entités TGCC
+                entites_disponibles = []
+                entites_data = st.session_state.data[entite_col].dropna().unique().tolist()
+                entites_predefinies = ["TGCC", "TGCC Immobilier", "TG ALU", "TGEM", "TG COVER", "TG WOOD", "TG STEEL", "TG STONE"]
+                
+                # Trouver les entités qui correspondent aux données
+                for entite_predefinie in entites_predefinies:
+                    for entite_data in entites_data:
+                        if entite_predefinie.lower() in str(entite_data).lower() or str(entite_data).lower() in entite_predefinie.lower():
+                            entites_disponibles.append(entite_data)
+                            break
+                
+                # Ajouter les autres entités trouvées dans les données
+                for entite_data in entites_data:
+                    if entite_data not in entites_disponibles:
+                        entites_disponibles.append(entite_data)
+                
+                entites_finales = ["Toutes"] + sorted(entites_disponibles)
+                selected_entites = st.multiselect(
+                    "Filtrer par Entité demandeuse",
+                    options=entites_finales,
+                    default=["Toutes"]
+                )
+            else:
+                selected_entites = ["Toutes"]
+                st.info("Aucune colonne Entité détectée")
         
         # Bouton de préparation
         if st.button("🚀 Préparer les données automatiquement", type="primary", use_container_width=True):
@@ -634,6 +670,10 @@ with tab2:
                     if poste_col and "Tous" not in selected_postes:
                         df = df[df[poste_col].isin(selected_postes)]
                         st.info(f"👥 Filtrage par Poste: {len(selected_postes)} sélectionnés")
+                    
+                    if entite_col and "Toutes" not in selected_entites:
+                        df = df[df[entite_col].isin(selected_entites)]
+                        st.info(f"🏭 Filtrage par Entité: {len(selected_entites)} sélectionnées")
                     
                     # Sauvegarder les données filtrées
                     st.session_state.cleaned_data_filtered = df
@@ -706,7 +746,8 @@ with tab3:
             x='date', 
             y='volume',
             title=f"Évolution temporelle - {objective}",
-            labels={'date': 'Date', 'volume': 'Volume'}
+            labels={'date': 'Date', 'volume': 'Volume'},
+            text='volume'
         )
         
         fig_trend.update_layout(
@@ -718,8 +759,10 @@ with tab3:
         
         fig_trend.update_traces(
             line=dict(width=3, color='#1f77b4'),
-            mode='lines+markers',
-            marker=dict(size=6)
+            mode='lines+markers+text',
+            marker=dict(size=6),
+            textposition='top center',
+            textfont=dict(size=10)
         )
         
         st.plotly_chart(fig_trend, use_container_width=True, key='vis_trend_fig')
@@ -842,33 +885,52 @@ with tab3:
             # Par année
             yearly = time_analysis.groupby('year')['volume'].sum().reset_index()
             if len(yearly) > 1:
-                yearly['year'] = yearly['year'].astype(str)
+                yearly['year'] = yearly['year'].astype(int).astype(str)  # Éviter les décimales dans les années
                 fig_year = px.bar(
                     yearly,
                     x='year',
                     y='volume',
                     title="Volume Annuel",
                     color='volume',
-                    color_continuous_scale='Viridis'
+                    color_continuous_scale='Viridis',
+                    text='volume'
                 )
-                fig_year.update_layout(height=300, coloraxis_showscale=False)
+                fig_year.update_traces(textposition='outside')
+                fig_year.update_layout(height=300, coloraxis_showscale=False, xaxis={'type': 'category'})
                 st.plotly_chart(fig_year, use_container_width=True, key='vis_year_fig')
         
         with col_temp2:
-            # Par mois (moyenne)
-            monthly = time_analysis.groupby('month')['volume'].mean().reset_index()
+            # Récupérer la fréquence d'agrégation pour ajuster le graphique mensuel
+            freq = st.session_state.get('freq', 'M')
+            
+            if freq == 'Y':  # Si agrégation annuelle, montrer la moyenne mensuelle réelle (pas cumulée)
+                # Recalculer depuis les données brutes pour avoir les vrais mois
+                raw_data_with_month = st.session_state.cleaned_data_filtered.copy()
+                date_col = st.session_state.date_col
+                if date_col:
+                    raw_data_with_month['month'] = pd.to_datetime(raw_data_with_month[date_col]).dt.month
+                    monthly_real = raw_data_with_month.groupby('month').size().reset_index(name='volume')
+                else:
+                    monthly_real = time_analysis.groupby('month')['volume'].mean().reset_index()
+            else:
+                # Pour les autres fréquences, utiliser la moyenne comme avant
+                monthly_real = time_analysis.groupby('month')['volume'].mean().reset_index()
+            
             month_names = ['', 'Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
                           'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc']
-            monthly['month_name'] = monthly['month'].map(lambda x: month_names[x])
+            monthly_real['month_name'] = monthly_real['month'].map(lambda x: month_names[x])
             
+            title_text = "Volume Moyen par Mois" if freq != 'Y' else "Volume Réel par Mois"
             fig_month = px.bar(
-                monthly,
+                monthly_real,
                 x='month_name',
                 y='volume', 
-                title="Volume Moyen par Mois",
+                title=title_text,
                 color='volume',
-                color_continuous_scale='Plasma'
+                color_continuous_scale='Plasma',
+                text='volume'
             )
+            fig_month.update_traces(textposition='outside')
             fig_month.update_layout(height=300, coloraxis_showscale=False)
             st.plotly_chart(fig_month, use_container_width=True, key='vis_month_fig')
 
@@ -1096,14 +1158,15 @@ with tab4:
                 textfont=dict(size=10)
             ))
             fig_global.update_layout(title=f"Prédictions {model_type} - {objective}", xaxis_title="Date", yaxis_title="Volume", height=450, hovermode='x unified')
-            # Afficher le tableau de prévision AVANT le graphique (sans titre redondant)
+            
+            # Afficher d'abord le graphique puis le tableau
+            st.plotly_chart(fig_global, use_container_width=True, key='model_global_fig')
+            
             if display_forecast is not None:
                 # Centrer le tableau en utilisant des colonnes
                 col1, col2, col3 = st.columns([1, 2, 1])
                 with col2:
                     st.dataframe(display_forecast, use_container_width=True, key='display_forecast_table')
-
-            st.plotly_chart(fig_global, use_container_width=True, key='model_global_fig')
 
             # --- Graphiques de prédiction par Direction et par Poste ---
             st.markdown("---")
@@ -1140,12 +1203,21 @@ with tab4:
                     dir_pred['Predicted'] = (dir_pred['Prop'] * total_pred).round().astype(int)
                     # Créer le détail mensuel par Direction
                     detailed_dir_rows = []
+                    freq = st.session_state.get('freq', 'M')
                     for _, row in monthly_forecast.iterrows():
                         for _, d in dir_pred.iterrows():
                             predicted_vol = int(round(d['Prop'] * row['predicted_volume']))
                             if predicted_vol > 0:  # Éviter les lignes avec 0
+                                # Format de date selon le type d'agrégation
+                                if freq == 'Y':
+                                    date_formatted = row['date'].strftime('%Y')
+                                elif freq in ['M', 'Q', '2Q']:
+                                    date_formatted = row['date'].strftime('%Y-%m')
+                                else:
+                                    date_formatted = row['date'].strftime('%Y-%m-%d')
+                                
                                 detailed_dir_rows.append({
-                                    'date': row['date'].strftime('%Y-%m-%d'), 
+                                    'date': date_formatted, 
                                     'Direction': d['Direction'], 
                                     'predicted_volume': predicted_vol
                                 })
@@ -1168,12 +1240,21 @@ with tab4:
                     poste_pred['Predicted'] = (poste_pred['Prop'] * total_pred).round().astype(int)
                     # Créer le détail mensuel par Poste
                     detailed_poste_rows = []
+                    freq = st.session_state.get('freq', 'M')
                     for _, row in monthly_forecast.iterrows():
                         for _, p in poste_pred.iterrows():
                             predicted_vol = int(round(p['Prop'] * row['predicted_volume']))
                             if predicted_vol > 0:  # Éviter les lignes avec 0
+                                # Format de date selon le type d'agrégation
+                                if freq == 'Y':
+                                    date_formatted = row['date'].strftime('%Y')
+                                elif freq in ['M', 'Q', '2Q']:
+                                    date_formatted = row['date'].strftime('%Y-%m')
+                                else:
+                                    date_formatted = row['date'].strftime('%Y-%m-%d')
+                                
                                 detailed_poste_rows.append({
-                                    'date': row['date'].strftime('%Y-%m-%d'), 
+                                    'date': date_formatted, 
                                     'Poste': p['Poste'], 
                                     'predicted_volume': predicted_vol
                                 })
@@ -1209,11 +1290,14 @@ with tab4:
                                 # Organiser par Direction puis par date
                                 dir_display = dir_detailed.copy()
                                 dir_display = dir_display.sort_values(['Direction', 'date']).reset_index(drop=True)
-                                st.dataframe(dir_display[['Direction', 'date', 'predicted_volume']], use_container_width=True)
+                                dir_display.columns = ['Direction', 'Période', 'Volume Prédit']
+                                st.dataframe(dir_display, use_container_width=True)
                                 
                                 # Ajouter le résumé total
                                 st.subheader("📊 Résumé total par Direction")
-                                st.dataframe(dir_summary, use_container_width=True)
+                                dir_summary_display = dir_summary.copy()
+                                dir_summary_display.columns = ['Direction', 'Volume Total']
+                                st.dataframe(dir_summary_display, use_container_width=True)
 
                 with col_poste:
                     if not poste_summary.empty:
@@ -1225,7 +1309,7 @@ with tab4:
                             color_discrete_sequence=['#2E8B57'] * len(poste_summary)  # Couleur verte unie
                         )
                         fig_poste_pred.update_traces(texttemplate='%{x}', textposition='outside')
-                        fig_poste_pred.update_layout(height=400, showlegend=False)
+                        fig_poste_pred.update_layout(height=400, showlegend=False, xaxis_title="Volume", yaxis_title="")
                         st.plotly_chart(fig_poste_pred, use_container_width=True, key='model_poste_fig')
 
                         with st.expander("📋 Détail mensuel des prédictions par Poste"):
@@ -1233,11 +1317,14 @@ with tab4:
                                 # Organiser par Poste puis par date
                                 poste_display = poste_detailed.copy()
                                 poste_display = poste_display.sort_values(['Poste', 'date']).reset_index(drop=True)
-                                st.dataframe(poste_display[['Poste', 'date', 'predicted_volume']], use_container_width=True)
+                                poste_display.columns = ['Poste', 'Période', 'Volume Prédit']
+                                st.dataframe(poste_display, use_container_width=True)
                                 
                                 # Ajouter le résumé total
                                 st.subheader("📊 Résumé total par Poste")
-                                st.dataframe(poste_summary, use_container_width=True)
+                                poste_summary_display = poste_summary.copy()
+                                poste_summary_display.columns = ['Poste', 'Volume Total']
+                                st.dataframe(poste_summary_display, use_container_width=True)
 
             # --- Export unique: créer un fichier Excel multi-onglets (Global / Par_Direction / Par_Poste)
             try:
