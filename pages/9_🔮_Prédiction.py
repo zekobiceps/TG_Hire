@@ -893,36 +893,79 @@ with tab4:
                     future_predictions = final_forecast[final_forecast['ds'] > last_date].copy()
 
                     if not future_predictions.empty:
-                        forecast_df = future_predictions[['ds', 'yhat']].rename(columns={'ds': 'date'})
+# Code à insérer dans le fichier de prédiction pour corriger les problèmes
+if not future_predictions.empty:
+    # Adapter le format des prévisions selon la fréquence choisie
+    if freq == 'Y':
+        # Pour l'agrégation annuelle, regrouper par année
+        forecast_df['year'] = forecast_df['date'].dt.year
+        forecast_df = forecast_df.groupby('year').agg({
+            'date': 'first',
+            'predicted_volume': 'sum'
+        }).reset_index()
+    
+    # Affichage du graphique d'évolution qui avait été supprimé
+    st.subheader(f"🔮 Prévisions {selected_freq_name}s")
+    
+    fig_pred = go.Figure()
+    fig_pred.add_trace(go.Scatter(x=time_series['date'], y=time_series['volume'], 
+                                 mode='lines+markers', name='Historique', line=dict(color='#1f77b4', width=2)))
+    fig_pred.add_trace(go.Scatter(x=forecast_df['date'], y=forecast_df['predicted_volume'], 
+                                 mode='lines+markers', name='Prédictions', line=dict(color='#ff7f0e', width=3, dash='dash'), 
+                                 marker=dict(size=8)))
+    fig_pred.update_layout(title=f"Prédictions {model_type} - {objective}", 
+                          xaxis_title="Date", yaxis_title="Volume", height=400, hovermode='x unified')
+    st.plotly_chart(fig_pred, use_container_width=True)
+    
+    # Adaptation de l'affichage du tableau selon la fréquence
+    display_forecast = forecast_df.copy()
+    if freq == 'Y':
+        display_forecast['Période'] = display_forecast['date'].dt.strftime('%Y')
+    elif freq == 'Q':
+        display_forecast['Période'] = display_forecast['date'].dt.strftime('%Y-Q%q')
+    elif freq == '2Q':
+        display_forecast['Période'] = display_forecast['date'].dt.strftime('%Y-')
+        display_forecast['quarter'] = display_forecast['date'].dt.quarter
+        display_forecast['Période'] = display_forecast.apply(
+            lambda x: x['Période'] + f"S{1 if x['quarter'] <= 2 else 2}", 
+            axis=1
+        )
+    else:
+        display_forecast['Période'] = display_forecast['date'].dt.strftime('%B %Y')
+    
+    # Afficher le tableau final
+    display_forecast = display_forecast[['Période', 'predicted_volume']].rename(columns={'predicted_volume': 'Volume Prédit'})
+    st.dataframe(display_forecast, use_container_width=True)
                         forecast_df['predicted_volume'] = forecast_df['yhat'].round().astype(int).apply(lambda x: max(0, x))
                         forecast_df = forecast_df.head(horizon_value)
 
                         st.subheader("🔮 Prévisions")
-                        display_forecast = forecast_df.copy()
-                        
-                        # Formater différemment selon la fréquence
-                        if freq == 'Y': 
-                            display_forecast['Période'] = display_forecast['date'].dt.strftime('%Y')
-                        elif freq == 'Q': 
-                            display_forecast['Période'] = display_forecast['date'].dt.to_period('Q').astype(str)
-                        elif freq == '2Q': 
-                            # Gestion spéciale pour le semestriel
-                            display_forecast['Période'] = display_forecast['date'].dt.strftime('%Y-')
-                            display_forecast['quarter'] = display_forecast['date'].dt.quarter
-                            display_forecast['Période'] = display_forecast.apply(
-                                lambda x: x['Période'] + f"S{1 if x['quarter'] <= 2 else 2}", 
-                                axis=1
-                            )
-                        else: 
-                            display_forecast['Période'] = display_forecast['date'].dt.strftime('%B %Y')
-                        
-                        if '2Q' == freq:
-                            display_forecast = display_forecast[['Période', 'predicted_volume']].drop_duplicates('Période')
-                        
-                        display_forecast = display_forecast[['Période', 'predicted_volume']].rename(columns={'predicted_volume': 'Volume Prédit'})
-                        st.dataframe(display_forecast, use_container_width=True)
 
-                        # Reste du code pour graphique et ventilation...
+                        # Ajout du graphique d'évolution et correction de l'affichage du tableau
+                        if not future_predictions.empty:
+                            # Adapter le format des prévisions selon la fréquence choisie
+                            if freq == 'Y':
+                                # Pour l'agrégation annuelle, regrouper par année
+                                forecast_df['year'] = forecast_df['date'].dt.year
+                                forecast_df = forecast_df.groupby('year').agg({
+                                    'date': 'first',
+                                    'predicted_volume': 'sum'
+                                }).reset_index()
+                            
+                            # Affichage du graphique d'évolution qui avait été supprimé
+                            st.subheader(f"🔮 Prévisions {selected_freq_name}s")
+                            
+                            fig_pred = go.Figure()
+                            fig_pred.add_trace(go.Scatter(x=time_series['date'], y=time_series['volume'], 
+                                                         mode='lines+markers', name='Historique', line=dict(color='#1f77b4', width=2)))
+                            fig_pred.add_trace(go.Scatter(x=forecast_df['date'], y=forecast_df['predicted_volume'], 
+                                                         mode='lines+markers', name='Prédictions', line=dict(color='#ff7f0e', width=3, dash='dash'), 
+                                                         marker=dict(size=8)))
+                            fig_pred.update_layout(title=f"Prédictions {model_type} - {objective}", 
+                                                  xaxis_title="Date", yaxis_title="Volume", height=400, hovermode='x unified')
+                            st.plotly_chart(fig_pred, use_container_width=True)
+                            
+                            # Adaptation de l'affichage du tableau selon la fréquence
                 except Exception as e:
                     st.error(f"❌ Erreur lors de la prédiction : {str(e)}")
                     with st.expander("🔍 Détails de l'erreur"):
