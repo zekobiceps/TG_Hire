@@ -1077,23 +1077,31 @@ with tab4:
             fig_global.add_trace(go.Scatter(
                 x=time_series['date'],
                 y=time_series['volume'],
-                mode='lines+markers',
+                mode='lines+markers+text',
                 name='Historique',
-                line=dict(color='#1f77b4', width=2)
+                line=dict(color='#1f77b4', width=2),
+                text=time_series['volume'],
+                textposition='top center',
+                textfont=dict(size=10)
             ))
             fig_global.add_trace(go.Scatter(
                 x=monthly_forecast['date'],
                 y=monthly_forecast['predicted_volume'],
-                mode='lines+markers',
+                mode='lines+markers+text',
                 name='Prédictions',
-                line=dict(color='#ff7f0e', width=3, dash='dash'),
-                marker=dict(size=8)
+                line=dict(color='#ff7f0e', width=3),
+                marker=dict(size=8),
+                text=monthly_forecast['predicted_volume'],
+                textposition='top center',
+                textfont=dict(size=10)
             ))
             fig_global.update_layout(title=f"Prédictions {model_type} - {objective}", xaxis_title="Date", yaxis_title="Volume", height=450, hovermode='x unified')
-            # Afficher le tableau de prévision AVANT le graphique (demande: inverser l'ordre)
+            # Afficher le tableau de prévision AVANT le graphique (sans titre redondant)
             if display_forecast is not None:
-                st.subheader("🔮 Tableau des Prévisions")
-                st.dataframe(display_forecast, use_container_width=True, key='display_forecast_table')
+                # Centrer le tableau en utilisant des colonnes
+                col1, col2, col3 = st.columns([1, 2, 1])
+                with col2:
+                    st.dataframe(display_forecast, use_container_width=True, key='display_forecast_table')
 
             st.plotly_chart(fig_global, use_container_width=True, key='model_global_fig')
 
@@ -1132,8 +1140,13 @@ with tab4:
                     detailed_dir_rows = []
                     for _, row in monthly_forecast.iterrows():
                         for _, d in dir_pred.iterrows():
-                            detailed_dir_rows.append({'date': row['date'], 'Direction': d['Direction'], 'predicted_volume': int(round(d['Prop'] * row['predicted_volume']))})
+                            detailed_dir_rows.append({'date': row['date'].strftime('%Y-%m-%d'), 'Direction': d['Direction'], 'predicted_volume': int(round(d['Prop'] * row['predicted_volume']))})
                     dir_detailed = pd.DataFrame(detailed_dir_rows)
+                    # Centraliser les lignes - grouper par Direction et sommer les volumes
+                    dir_detailed = dir_detailed.groupby(['Direction'], as_index=False).agg({
+                        'predicted_volume': 'sum',
+                        'date': 'first'  # Prendre la première date comme référence
+                    })
                 else:
                     dir_detailed = pd.DataFrame(columns=['date', 'Direction', 'predicted_volume'])
 
@@ -1145,8 +1158,13 @@ with tab4:
                     detailed_poste_rows = []
                     for _, row in monthly_forecast.iterrows():
                         for _, p in poste_pred.iterrows():
-                            detailed_poste_rows.append({'date': row['date'], 'Poste': p['Poste'], 'predicted_volume': int(round(p['Prop'] * row['predicted_volume']))})
+                            detailed_poste_rows.append({'date': row['date'].strftime('%Y-%m-%d'), 'Poste': p['Poste'], 'predicted_volume': int(round(p['Prop'] * row['predicted_volume']))})
                     poste_detailed = pd.DataFrame(detailed_poste_rows)
+                    # Centraliser les lignes - grouper par Poste et sommer les volumes
+                    poste_detailed = poste_detailed.groupby(['Poste'], as_index=False).agg({
+                        'predicted_volume': 'sum',
+                        'date': 'first'  # Prendre la première date comme référence
+                    })
                 else:
                     poste_detailed = pd.DataFrame(columns=['date', 'Poste', 'predicted_volume'])
 
@@ -1155,33 +1173,36 @@ with tab4:
 
                 with col_dir:
                     if not dir_pred.empty:
-                        st.markdown("#### 🏢 Prédictions par Direction")
-                        fig_dir_pred = px.bar(
-                            dir_pred.sort_values('Predicted', ascending=True),
-                            x='Predicted', y='Direction', orientation='h',
+                        # Graphique en secteurs (pie chart) pour les directions
+                        fig_dir_pred = px.pie(
+                            dir_pred,
+                            values='Predicted',
+                            names='Direction',
                             title='Répartition cumulée par Direction',
-                            color='Predicted', color_continuous_scale='Blues'
+                            color_discrete_sequence=px.colors.qualitative.Set3
                         )
-                        fig_dir_pred.update_layout(height=400)
+                        fig_dir_pred.update_traces(textposition='inside', textinfo='percent+label+value')
+                        fig_dir_pred.update_layout(height=400, showlegend=True)
                         st.plotly_chart(fig_dir_pred, use_container_width=True, key='model_dir_fig')
 
                         with st.expander("📋 Tableau des prédictions par Direction"):
-                            st.dataframe(dir_detailed.sort_values(['date', 'Direction']).reset_index(drop=True), use_container_width=True)
+                            st.dataframe(dir_detailed[['Direction', 'predicted_volume', 'date']].sort_values('predicted_volume', ascending=False).reset_index(drop=True), use_container_width=True)
 
                 with col_poste:
                     if not poste_pred.empty:
-                        st.markdown("#### 👥 Prédictions par Poste")
+                        # Graphique en barres horizontales sans gradient de couleur
                         fig_poste_pred = px.bar(
                             poste_pred.sort_values('Predicted', ascending=True),
                             x='Predicted', y='Poste', orientation='h',
                             title='Répartition cumulée par Poste',
-                            color='Predicted', color_continuous_scale='Greens'
+                            color_discrete_sequence=['#2E8B57'] * len(poste_pred)  # Couleur verte unie
                         )
-                        fig_poste_pred.update_layout(height=400)
+                        fig_poste_pred.update_traces(texttemplate='%{x}', textposition='outside')
+                        fig_poste_pred.update_layout(height=400, showlegend=False)
                         st.plotly_chart(fig_poste_pred, use_container_width=True, key='model_poste_fig')
 
                         with st.expander("📋 Tableau des prédictions par Poste"):
-                            st.dataframe(poste_detailed.sort_values(['date', 'Poste']).reset_index(drop=True), use_container_width=True)
+                            st.dataframe(poste_detailed[['Poste', 'predicted_volume', 'date']].sort_values('predicted_volume', ascending=False).reset_index(drop=True), use_container_width=True)
 
             # --- Export unique: créer un fichier Excel multi-onglets (Global / Par_Direction / Par_Poste)
             try:
