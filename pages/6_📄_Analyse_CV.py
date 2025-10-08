@@ -3,7 +3,6 @@ import pandas as pd
 import io
 import requests
 import json
-from pypdf import PdfReader
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import time
@@ -11,6 +10,22 @@ import re
 from datetime import datetime
 import plotly.graph_objects as go
 import plotly.express as px
+
+# Imports optionnels pour la manipulation des PDF (s'il manque, le code utilisera des fallbacks)
+try:
+    import pdfplumber
+except Exception:
+    pdfplumber = None
+
+try:
+    import PyPDF2
+except Exception:
+    PyPDF2 = None
+
+try:
+    from pypdf import PdfReader as PypdfReader
+except Exception:
+    PypdfReader = None
 
 # Imports pour la méthode sémantique
 from sentence_transformers import SentenceTransformer, util
