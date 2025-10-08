@@ -10,6 +10,7 @@ import re
 from datetime import datetime
 import plotly.graph_objects as go
 import plotly.express as px
+import subprocess
 
 # Imports optionnels pour la manipulation des PDF (s'il manque, le code utilisera des fallbacks)
 try:
@@ -45,6 +46,13 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Afficher la version (commit git) pour debug déploiement
+try:
+    commit_hash = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode().strip()
+    st.caption(f"Version: {commit_hash}")
+except Exception:
+    pass
 
 # Initialisation des variables de session
 if "cv_analysis_feedback" not in st.session_state:
