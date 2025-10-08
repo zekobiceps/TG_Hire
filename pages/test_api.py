@@ -1337,13 +1337,18 @@ with tab5:
             # Message de succès avec statistiques
             st.success(f"✅ Traitement terminé : {num_total} CV(s) traité(s), dont {num_classified} classé(s) et {num_unclassified} non classé(s).")
             
+            # Utiliser le dataframe dans la session state si disponible pour l'affichage
+            display_df = df
+            if 'classification_df' in st.session_state:
+                display_df = st.session_state.classification_df
+                
             # Affichage en 3 colonnes
             cols = st.columns(3)
             cats = ['Fonctions supports', 'Logistique', 'Production/Technique']
             for idx, c in enumerate(cats):
                 with cols[idx]:
                     st.subheader(c)
-                    sub = df[df['category'] == c]
+                    sub = display_df[display_df['category'] == c]
                     if sub.empty:
                         st.write('Aucun CV classé ici.')
                     else:
@@ -1352,6 +1357,11 @@ with tab5:
                             with st.expander(r['file']):
                                 st.write(r['text_snippet'])
 
+            # Initialiser la variable de session pour les analyses DeepSeek
+            if 'deepseek_analyses' not in st.session_state:
+                st.session_state.deepseek_analyses = []
+                st.session_state.show_deepseek_analyses = False
+            
             # Non classés
             nc = df[df['category'] == 'Non classé']
             if not nc.empty:
@@ -1360,7 +1370,15 @@ with tab5:
                 st.dataframe(nc[['file', 'text_snippet']], use_container_width=True)
                 
                 # Bouton pour analyser les CV non classés avec DeepSeek
-                if st.button('🔍 Analyser les CV non classés avec DeepSeek AI', type='secondary'):
+                analyze_button = st.button('🔍 Analyser les CV non classés avec DeepSeek AI', type='secondary')
+                
+                # Si on clique sur le bouton OU si des analyses ont déjà été faites et doivent être affichées
+                if analyze_button:
+                    # Sauvegarder les données de classification
+                    if 'classification_df' not in st.session_state:
+                        st.session_state.classification_df = df
+                    
+                    # Exécuter l'analyse uniquement si le bouton est cliqué
                     unclassified_results = []
                     unclassified_progress = st.progress(0)
                     unclassified_total = len(nc)
@@ -1385,19 +1403,40 @@ with tab5:
                     # Nettoyer le placeholder
                     processing_ai_placeholder.empty()
                     
-                    # Afficher les résultats de l'analyse DeepSeek
-                    st.success(f"✅ Analyse IA terminée pour {len(unclassified_results)} CV(s) non classés.")
+                    # Stocker les résultats dans la session state
+                    st.session_state.deepseek_analyses = unclassified_results
+                    st.session_state.show_deepseek_analyses = True
+                
+                # Afficher les résultats s'ils existent
+                if st.session_state.show_deepseek_analyses and st.session_state.deepseek_analyses:
+                    st.markdown('---')
+                    st.subheader("📝 Analyses IA des CV non classés")
                     
-                    for result in unclassified_results:
+                    # Ajouter un bouton pour réinitialiser les analyses si nécessaire
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.success(f"✅ Analyse IA pour {len(st.session_state.deepseek_analyses)} CV(s) non classés.")
+                    with col2:
+                        if st.button("🔄 Réinitialiser", key="reset_deepseek"):
+                            st.session_state.deepseek_analyses = []
+                            st.session_state.show_deepseek_analyses = False
+                            st.experimental_rerun()
+                    
+                    for result in st.session_state.deepseek_analyses:
                         with st.expander(f"📋 Analyse IA pour : {result['file']}"):
                             st.markdown(result['ai_analysis'])
 
+            # Utiliser le dataframe stocké dans la session state si disponible, sinon utiliser le dataframe courant
+            export_df = df
+            if 'classification_df' in st.session_state:
+                export_df = st.session_state.classification_df
+            
             # Préparer un CSV à 4 colonnes : Fonctions supports, Logistique, Production/Technique, Non classés
             # Chaque ligne contient le nom du CV dans la colonne correspondant à sa catégorie.
-            supports = df[df['category'] == 'Fonctions supports']['file'].tolist()
-            logistics = df[df['category'] == 'Logistique']['file'].tolist()
-            production = df[df['category'] == 'Production/Technique']['file'].tolist()
-            unclassified = df[df['category'] == 'Non classé']['file'].tolist()
+            supports = export_df[export_df['category'] == 'Fonctions supports']['file'].tolist()
+            logistics = export_df[export_df['category'] == 'Logistique']['file'].tolist()
+            production = export_df[export_df['category'] == 'Production/Technique']['file'].tolist()
+            unclassified = export_df[export_df['category'] == 'Non classé']['file'].tolist()
 
             max_len = max(len(supports), len(logistics), len(production), len(unclassified)) if max(len(supports), len(logistics), len(production), len(unclassified)) > 0 else 0
             # Pad lists
