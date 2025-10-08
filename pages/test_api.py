@@ -1324,6 +1324,13 @@ with tab5:
             processing_placeholder.empty()
 
             df = pd.DataFrame(results)
+            # Sauvegarder le DataFrame dans la session pour persistance
+            st.session_state['auto_class_df'] = df
+
+            # Afficher counts
+            total_processed = len(df)
+            non_classed_count = df[df['category'] == 'Non classé'].shape[0]
+            st.info(f"Traitement terminé : {total_processed} CV(s) traités — {non_classed_count} non classé(s).")
 
             # Affichage en 3 colonnes
             cols = st.columns(3)
@@ -1357,13 +1364,32 @@ with tab5:
                                 entities = regex_analysis(row['text_snippet'])
                                 st.json(entities)
             with col_action2:
-                reclassify_with_ai = st.button('🔁 Reclassifier les non-classés avec DeepSeek (IA)')
+                # Utiliser on_click pour lancer la reclassification afin d'éviter le reset
+                if st.button('🔁 Reclassifier les non-classés avec DeepSeek (IA)', key='reclass_ai'):
+                    # Stocker un flag pour démarrer la reclassification après le rerun
+                    st.session_state['reclass_ai_requested'] = True
 
-            # Si l'utilisateur demande la reclassification IA pour les non-classés
-            if reclassify_with_ai:
+        # Si un DataFrame est déjà en session (cas où page a rechargé), le récupérer et afficher counts
+    elif 'auto_class_df' in st.session_state:
+        df = st.session_state['auto_class_df']
+        total_processed = len(df)
+        non_classed_count = df[df['category'] == 'Non classé'].shape[0]
+        st.info(f"{total_processed} CV(s) traités antérieurement — {non_classed_count} non classé(s).")
+
+    # Si reclassification IA a été demandée, lancer le job et mettre à jour session_state
+    if st.session_state.get('reclass_ai_requested', False):
+        if 'auto_class_df' not in st.session_state:
+            st.error('Aucun résultat antérieur pour reclassification. Lancez d\'abord l\'analyse.')
+        else:
+            df = st.session_state['auto_class_df']
+            nc = df[df['category'] == 'Non classé']
+            if nc.empty:
+                st.info('Aucun CV non classé à reclassifier.')
+            else:
                 API_KEY = get_api_key()
                 if not API_KEY:
                     st.error('Clé API DeepSeek absente. Configurez le secret DEEPSEEK_API_KEY.')
+                    st.session_state['reclass_ai_requested'] = False
                 else:
                     st.info('Reclassification IA en cours pour les non-classés...')
                     ai_progress = st.progress(0)
@@ -1371,10 +1397,10 @@ with tab5:
                     for idx, irow in enumerate(nc_indices):
                         name = df.at[irow, 'file']
                         text = df.at[irow, 'text_snippet']
-                        # Appel IA pour demander uniquement l'étiquette
+                        processing = st.empty()
+                        processing.info(f"IA traitement ({idx+1}/{len(nc_indices)}) : {name}")
                         try:
                             label = None
-                            # Construire le prompt
                             prompt = (
                                 f"Classifie le CV ci-dessous dans UNE seule des catégories: 'Fonctions supports', 'Logistique', 'Production/Technique'.\n"
                                 f"Réponds uniquement par l'un des trois labels exacts.\n\n"
@@ -1386,7 +1412,6 @@ with tab5:
                             resp = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
                             resp.raise_for_status()
                             content = resp.json().get('choices', [])[0].get('message', {}).get('content', '').strip()
-                            # Normaliser la réponse
                             if 'fonctions' in content.lower():
                                 label = 'Fonctions supports'
                             elif 'logistique' in content.lower():
@@ -1397,12 +1422,17 @@ with tab5:
                                 label = 'Non classé'
                         except Exception as e:
                             label = 'Non classé'
+                        finally:
+                            processing.empty()
 
                         df.at[irow, 'category'] = label
                         ai_progress.progress((idx+1)/len(nc_indices))
 
                     ai_progress.empty()
                     st.success('Reclassification IA terminée. Voir le tableau mis à jour ci-dessus.')
+                    # Mettre à jour le dataframe en session et réinitialiser le flag
+                    st.session_state['auto_class_df'] = df
+                    st.session_state['reclass_ai_requested'] = False
 
             # Préparer un CSV à 4 colonnes : Fonctions supports, Logistique, Production/Technique, Non classés
             supports = df[df['category'] == 'Fonctions supports']['file'].tolist()
