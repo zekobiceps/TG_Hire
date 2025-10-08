@@ -1053,78 +1053,34 @@ with tab4:
                         st.subheader("🔮 Prévisions")
                         st.dataframe(display_forecast, use_container_width=True)
 
-                        # Restaurer le graphique d'évolution (historique agrégé pour lisibilité si nécessaire)
-                        hist = time_series.copy()
-                        if freq == 'Y' or st.session_state.get('selected_freq', '') == 'Annuelle':
-                            # Correction: créer explicitement une colonne year
-                            hist['year'] = hist['date'].dt.year
-                            hist = hist.groupby('year', as_index=False).agg({'volume': 'sum'})
-                            # Créer la date à partir de l'année
-                            hist['date'] = pd.to_datetime(hist['year'].astype(str) + '-01-01')
-                        elif freq == '2Q' or st.session_state.get('selected_freq', '') == 'Semestrielle':
-                            hist['semester'] = np.where(hist['date'].dt.month <= 6, 'S1', 'S2')
-                            hist['year'] = hist['date'].dt.year
-                            hist = hist.groupby(['year', 'semester'], as_index=False)['volume'].sum()
-                            
-                            # fonction nommée pour construire la date représentative du semestre
-                            def _hist_sem_date(row):
-                                try:
-                                    y = int(row['year'])
-                                except Exception:
-                                    y = int(row.get('year', 0))
-                                return pd.to_datetime(f"{y}-04-01") if row['semester'] == 'S1' else pd.to_datetime(f"{y}-10-01")
-                            
-                            hist['date'] = hist.apply(_hist_sem_date, axis=1)
-                        elif freq == 'Q':
-                            hist = hist.set_index('date').resample('Q')['volume'].sum().reset_index()
-
-                        fig_pred = go.Figure()
-                        fig_pred.add_trace(go.Scatter(
-                            x=hist['date'], y=hist['volume'],
-                            mode='lines+markers', name='Historique',
-                            line=dict(color='#1f77b4', width=2)
-                        ))
-                        fig_pred.add_trace(go.Scatter(
-                            x=forecast_df['date'], y=forecast_df['predicted_volume'],
-                            mode='lines+markers', name='Prédictions',
-                            line=dict(color='#ff7f0e', width=3, dash='dash'), marker=dict(size=8)
-                        ))
-                        fig_pred.update_layout(
-                            title=f"Prédictions {model_type} - {objective}",
-                            xaxis_title="Date", yaxis_title="Volume", height=420, hovermode='x unified'
-                        )
-                        st.plotly_chart(fig_pred, use_container_width=True)
-                    st.warning("⚠️ Aucune prédiction future générée. Vérifiez la configuration du modèle.")
+                        # Sauvegarder la forecast pour affichage global et exports
+                        st.session_state.forecast_df = forecast_df.copy()
+                        st.session_state.display_forecast = display_forecast.copy()
                 except Exception as e:
                     st.error(f"❌ Erreur lors de la prédiction : {str(e)}")
                     st.exception(e)
 
-        # Vérifier si la variable forecast_df existe avant d'essayer de l'utiliser
-        if 'forecast_df' not in locals() and 'forecast_df' not in globals():
+        # Vérifier si une prédiction a été stockée dans session_state
+        if 'forecast_df' not in st.session_state:
             # Si la section de visualisation s'exécute avant une prédiction, ne rien afficher
             if st.session_state.time_series_data is not None:
                 st.info("ℹ️ Cliquez sur 'Lancer la prédiction' ci-dessus pour visualiser les résultats.")
         else:
-            # Créer monthly_forecast pour la compatibilité avec le code demandé
-            monthly_forecast = forecast_df.copy()
+            # Récupérer la forecast
+            monthly_forecast = st.session_state.forecast_df.copy()
+            display_forecast = st.session_state.display_forecast.copy() if 'display_forecast' in st.session_state else None
 
-            # --- Affichage des résultats ---
-            st.subheader("🔮 Prévisions Mensuelles")
-
-            # Graphique des prédictions
-            fig_pred = go.Figure()
-
-            # Données historiques
-            fig_pred.add_trace(go.Scatter(
+            # --- Affichage principal: Un seul graphique global combiné ---
+            st.subheader("🔮 Prévisions - Vue Globale")
+            fig_global = go.Figure()
+            fig_global.add_trace(go.Scatter(
                 x=time_series['date'],
                 y=time_series['volume'],
                 mode='lines+markers',
                 name='Historique',
                 line=dict(color='#1f77b4', width=2)
             ))
-
-            # Prédictions
-            fig_pred.add_trace(go.Scatter(
+            fig_global.add_trace(go.Scatter(
                 x=monthly_forecast['date'],
                 y=monthly_forecast['predicted_volume'],
                 mode='lines+markers',
@@ -1132,15 +1088,104 @@ with tab4:
                 line=dict(color='#ff7f0e', width=3, dash='dash'),
                 marker=dict(size=8)
             ))
+            fig_global.update_layout(title=f"Prédictions {model_type} - {objective}", xaxis_title="Date", yaxis_title="Volume", height=450, hovermode='x unified')
+            st.plotly_chart(fig_global, use_container_width=True)
 
-            # Mise en forme du graphique
-            fig_pred.update_layout(
-                title=f"Prédictions {model_type} - {objective}",
-                xaxis_title="Date",
-                yaxis_title="Volume",
-                height=400,
-                hovermode='x unified'
-            )
+            # Export global forecast
+            col_a, col_b = st.columns([3, 1])
+            with col_b:
+                if st.button("⬇️ Exporter prévision CSV", key='export_global'):
+                    csv_bytes = convert_df_to_csv(monthly_forecast.rename(columns={'date': 'Date', 'predicted_volume': 'Predicted_Volume'}))
+                    st.download_button("Télécharger CSV", data=csv_bytes, file_name="prevision_forecast.csv", mime='text/csv')
 
-            # Affichage du graphique
-            st.plotly_chart(fig_pred, use_container_width=True)
+            # --- Graphiques de prédiction par Direction et par Poste ---
+            st.markdown("---")
+            st.subheader("🔍 Détails des Prédictions")
+
+            # Calculer proportions historiques par direction/poste
+            raw = st.session_state.cleaned_data_filtered.copy()
+            if direction_col and direction_col in raw.columns:
+                dir_counts = raw[direction_col].value_counts().reset_index()
+                dir_counts.columns = ['Direction', 'Nombre']
+                dir_counts['Prop'] = dir_counts['Nombre'] / dir_counts['Nombre'].sum()
+            else:
+                dir_counts = pd.DataFrame(columns=['Direction', 'Nombre', 'Prop'])
+
+            if poste_col and poste_col in raw.columns:
+                poste_counts = raw[poste_col].value_counts().reset_index()
+                poste_counts.columns = ['Poste', 'Nombre']
+                poste_counts['Prop'] = poste_counts['Nombre'] / poste_counts['Nombre'].sum()
+            else:
+                poste_counts = pd.DataFrame(columns=['Poste', 'Nombre', 'Prop'])
+
+            # Appliquer la répartition proportionnelle aux prévisions globales
+            total_pred = monthly_forecast['predicted_volume'].sum()
+
+            # Par Direction
+            dir_pred = pd.DataFrame()
+            if not dir_counts.empty:
+                # Distribuer la somme des prédictions proportionnellement
+                dir_pred = dir_counts.copy()
+                dir_pred['Predicted'] = (dir_pred['Prop'] * total_pred).round().astype(int)
+                # Pour afficher par période, on distribue chaque période de monthly_forecast selon la même proportion
+                detailed_dir_rows = []
+                for _, row in monthly_forecast.iterrows():
+                    for _, d in dir_pred.iterrows():
+                        detailed_dir_rows.append({'date': row['date'], 'Direction': d['Direction'], 'predicted_volume': int(round(d['Prop'] * row['predicted_volume']))})
+                dir_detailed = pd.DataFrame(detailed_dir_rows)
+            else:
+                dir_detailed = pd.DataFrame(columns=['date', 'Direction', 'predicted_volume'])
+
+            # Par Poste
+            poste_pred = pd.DataFrame()
+            if not poste_counts.empty:
+                poste_pred = poste_counts.copy()
+                poste_pred['Predicted'] = (poste_pred['Prop'] * total_pred).round().astype(int)
+                detailed_poste_rows = []
+                for _, row in monthly_forecast.iterrows():
+                    for _, p in poste_pred.iterrows():
+                        detailed_poste_rows.append({'date': row['date'], 'Poste': p['Poste'], 'predicted_volume': int(round(p['Prop'] * row['predicted_volume']))})
+                poste_detailed = pd.DataFrame(detailed_poste_rows)
+            else:
+                poste_detailed = pd.DataFrame(columns=['date', 'Poste', 'predicted_volume'])
+
+            # Afficher deux colonnes: Direction et Poste
+            col_dir, col_poste = st.columns(2)
+
+            with col_dir:
+                st.markdown("#### 🏢 Prédictions par Direction")
+                fig_dir_pred = px.bar(
+                    dir_pred.sort_values('Predicted', ascending=True),
+                    x='Predicted', y='Direction', orientation='h',
+                    title='Répartition cumulée des prévisions par Direction',
+                    color='Predicted', color_continuous_scale='Blues'
+                ) if not dir_pred.empty else go.Figure()
+                fig_dir_pred.update_layout(height=350) if not dir_pred.empty else None
+                st.plotly_chart(fig_dir_pred, use_container_width=True)
+
+                with st.expander("📋 Ouvrir/fermer: Tableau des prédictions par Direction"):
+                    st.dataframe(dir_detailed.sort_values(['date', 'Direction']).reset_index(drop=True), use_container_width=True)
+
+                # Export Direction
+                if not dir_detailed.empty:
+                    csv_bytes_dir = convert_df_to_csv(dir_detailed.rename(columns={'date': 'Date'}))
+                    st.download_button("⬇️ Exporter Direction CSV", data=csv_bytes_dir, file_name="prevision_par_direction.csv", mime='text/csv')
+
+            with col_poste:
+                st.markdown("#### 👥 Prédictions par Poste")
+                fig_poste_pred = px.bar(
+                    poste_pred.sort_values('Predicted', ascending=True),
+                    x='Predicted', y='Poste', orientation='h',
+                    title='Répartition cumulée des prévisions par Poste',
+                    color='Predicted', color_continuous_scale='Greens'
+                ) if not poste_pred.empty else go.Figure()
+                fig_poste_pred.update_layout(height=350) if not poste_pred.empty else None
+                st.plotly_chart(fig_poste_pred, use_container_width=True)
+
+                with st.expander("📋 Ouvrir/fermer: Tableau des prédictions par Poste"):
+                    st.dataframe(poste_detailed.sort_values(['date', 'Poste']).reset_index(drop=True), use_container_width=True)
+
+                # Export Poste
+                if not poste_detailed.empty:
+                    csv_bytes_poste = convert_df_to_csv(poste_detailed.rename(columns={'date': 'Date'}))
+                    st.download_button("⬇️ Exporter Poste CSV", data=csv_bytes_poste, file_name="prevision_par_poste.csv", mime='text/csv')
