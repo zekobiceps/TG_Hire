@@ -555,12 +555,31 @@ def get_deepseek_analysis(text):
     if not API_KEY: return "Analyse impossible."
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
-    prompt = f"En tant qu'expert en recrutement, analyse le CV suivant et identifie les points forts et faibles. Texte du CV : {text}"
-    payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}]}
+    prompt = f"""
+    En tant qu'expert en recrutement, analyse le CV suivant et classe-le UNIQUEMENT dans l'une des trois catégories suivantes:
+    - Fonctions supports (RH, Finance, IT, etc.)
+    - Production (Ingénierie, Technique, Opérations, etc.)
+    - Logistique (Supply Chain, Transport, Stockage, etc.)
+    
+    Réponds UNIQUEMENT avec le nom de la catégorie, sans explication ni analyse détaillée.
+    
+    Texte du CV : {text}
+    """
+    payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.2}
     try:
         response = requests.post(url, headers=headers, data=json.dumps(payload))
         response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"]
+        # Récupérer uniquement la catégorie (nettoyer la réponse)
+        result = response.json()["choices"][0]["message"]["content"].strip()
+        # Normaliser la réponse pour s'assurer qu'elle correspond à l'une des trois catégories
+        if "support" in result.lower():
+            return "Fonctions supports"
+        elif "product" in result.lower():
+            return "Production"
+        elif "logistique" in result.lower():
+            return "Logistique"
+        else:
+            return result  # Garder la réponse originale si elle ne correspond pas aux patterns
     except Exception as e:
         return f"Erreur IA : {e}"
 
@@ -1412,10 +1431,10 @@ with tab5:
                             
                             try:
                                 # Utiliser l'API DeepSeek pour analyser le CV
-                                ai_analysis = get_deepseek_analysis(text_snippet)
-                                unclassified_results.append({'file': name, 'ai_analysis': ai_analysis})
+                                category = get_deepseek_analysis(text_snippet)
+                                unclassified_results.append({'Fichier': name, 'Catégorie': category})
                             except Exception as e:
-                                unclassified_results.append({'file': name, 'ai_analysis': f"Erreur: {str(e)}"})
+                                unclassified_results.append({'Fichier': name, 'Catégorie': f"Erreur: {str(e)}"})
                             
                             unclassified_progress.progress((i+1)/unclassified_total)
                     
@@ -1441,9 +1460,11 @@ with tab5:
                         st.session_state.last_action = "reset"
                         st.experimental_rerun()
                 
-                for result in st.session_state.deepseek_analyses:
-                    with st.expander(f"📋 Analyse IA pour : {result['file']}"):
-                        st.markdown(result['ai_analysis'])
+                # Créer un tableau pour afficher les résultats de manière plus organisée
+                ai_results_df = pd.DataFrame(st.session_state.deepseek_analyses)
+                
+                # Afficher le tableau avec les catégories attribuées
+                st.dataframe(ai_results_df, width="stretch", hide_index=True)
 
             # Préparer un CSV à 4 colonnes : Fonctions supports, Logistique, Production/Technique, Non classés
             # Chaque ligne contient le nom du CV dans la colonne correspondant à sa catégorie.
