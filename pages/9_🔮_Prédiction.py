@@ -1089,12 +1089,12 @@ with tab4:
                 marker=dict(size=8)
             ))
             fig_global.update_layout(title=f"Prédictions {model_type} - {objective}", xaxis_title="Date", yaxis_title="Volume", height=450, hovermode='x unified')
-            st.plotly_chart(fig_global, use_container_width=True, key='model_global_fig')
-
-            # Afficher le tableau de prévision juste sous le graphique (réintégration demandée)
+            # Afficher le tableau de prévision AVANT le graphique (demande: inverser l'ordre)
             if display_forecast is not None:
                 st.subheader("🔮 Tableau des Prévisions")
                 st.dataframe(display_forecast, use_container_width=True, key='display_forecast_table')
+
+            st.plotly_chart(fig_global, use_container_width=True, key='model_global_fig')
 
             # --- Graphiques de prédiction par Direction et par Poste ---
             st.markdown("---")
@@ -1198,7 +1198,6 @@ with tab4:
                         poste_detailed.rename(columns={'date': 'Date'}).to_excel(writer, sheet_name='Par_Poste', index=False)
                     else:
                         pd.DataFrame(columns=['Date','Poste','predicted_volume']).to_excel(writer, sheet_name='Par_Poste', index=False)
-                    writer.save()
                 bio.seek(0)
                 export_filename = f"previsions_completes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
                 st.download_button("⬇️ Télécharger l'export complet (Excel)", data=bio.getvalue(), file_name=export_filename, mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', key='download_full_export')
