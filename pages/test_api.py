@@ -1347,6 +1347,23 @@ with tab5:
                 st.subheader('Non classés')
                 st.dataframe(nc[['file', 'text_snippet']], use_container_width=True)
 
-            # Bouton de téléchargement CSV
-            csv = df.to_csv(index=False).encode('utf-8')
+            # Préparer un CSV à 3 colonnes : Fonctions supports, Logistique, Production/Technique
+            # Chaque ligne contient le nom du CV dans la colonne correspondant à sa catégorie.
+            supports = df[df['category'] == 'Fonctions supports']['file'].tolist()
+            logistics = df[df['category'] == 'Logistique']['file'].tolist()
+            production = df[df['category'] == 'Production/Technique']['file'].tolist()
+
+            max_len = max(len(supports), len(logistics), len(production)) if max(len(supports), len(logistics), len(production)) > 0 else 0
+            # Pad lists
+            supports += [''] * (max_len - len(supports))
+            logistics += [''] * (max_len - len(logistics))
+            production += [''] * (max_len - len(production))
+
+            export_df = pd.DataFrame({
+                'Fonctions supports': supports,
+                'Logistique': logistics,
+                'Production/Technique': production
+            })
+
+            csv = export_df.to_csv(index=False).encode('utf-8')
             st.download_button(label='⬇️ Télécharger les résultats (CSV)', data=csv, file_name='classification_results.csv', mime='text/csv')
