@@ -1,8 +1,14 @@
 import streamlit as st
-import gspread
-from google.oauth2 import service_account
 from datetime import datetime
 import pandas as pd
+
+# Imports pouvant causer des problèmes lors du déploiement
+try:
+    import gspread
+    from google.oauth2 import service_account
+    GOOGLE_IMPORTS_OK = True
+except ImportError:
+    GOOGLE_IMPORTS_OK = False
 
 # --- CONFIGURATION ---
 USERS_SHEET_URL = "https://docs.google.com/spreadsheets/d/1fodJWGccSaDmlSEDkJblZoQE-lcifxpnOg5RYf3ovTg/edit?gid=0#gid=0"
@@ -13,7 +19,21 @@ FEATURES_WORKSHEET_NAME = "Features"
 @st.cache_resource
 def get_gsheet_client():
     """Crée et retourne un client gspread authentifié."""
+    if not GOOGLE_IMPORTS_OK:
+        st.error("❌ Les modules Google (gspread, google.oauth2) ne sont pas disponibles. Vérifiez requirements.txt.")
+        return None
+        
     try:
+        # Vérifier d'abord si tous les secrets nécessaires sont présents
+        required_secrets = ["GCP_TYPE", "GCP_PROJECT_ID", "GCP_PRIVATE_KEY_ID", "GCP_PRIVATE_KEY", 
+                           "GCP_CLIENT_EMAIL", "GCP_CLIENT_ID", "GCP_AUTH_URI", "GCP_TOKEN_URI", 
+                           "GCP_AUTH_PROVIDER_CERT_URL", "GCP_CLIENT_CERT_URL"]
+        
+        missing_secrets = [s for s in required_secrets if s not in st.secrets]
+        if missing_secrets:
+            st.error(f"❌ Secrets manquants: {', '.join(missing_secrets)}")
+            return None
+            
         service_account_info = {
             "type": st.secrets["GCP_TYPE"], "project_id": st.secrets["GCP_PROJECT_ID"],
             "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"], "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n').strip(),
