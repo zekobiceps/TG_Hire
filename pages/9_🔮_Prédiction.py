@@ -1186,13 +1186,15 @@ with tab4:
                         color='Predicted', color_continuous_scale='Greens'
                     ) if not poste_pred.empty else go.Figure()
                     fig_poste_pred.update_layout(height=350) if not poste_pred.empty else None
-            st.plotly_chart(fig_poste_pred, use_container_width=True, key='model_poste_fig')
-        print(f"[DEBUG] Finished rendering Direction/Poste block at {datetime.now()}")
+                    st.plotly_chart(fig_poste_pred, use_container_width=True, key='model_poste_fig')
 
                     with st.expander("📋 Ouvrir/fermer: Tableau des prédictions par Poste"):
                         st.dataframe(poste_detailed.sort_values(['date', 'Poste']).reset_index(drop=True), use_container_width=True)
 
                 # Pas de flag stocké en session pour le rendu — le container local évite les duplications
+
+            # debug: finished rendering block
+            print(f"[DEBUG] Finished rendering Direction/Poste block at {datetime.now()}")
 
             # --- Export unique: créer un fichier Excel multi-onglets (Global / Par_Direction / Par_Poste)
             try:
