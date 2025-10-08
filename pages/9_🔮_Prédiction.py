@@ -1091,12 +1091,10 @@ with tab4:
             fig_global.update_layout(title=f"Prédictions {model_type} - {objective}", xaxis_title="Date", yaxis_title="Volume", height=450, hovermode='x unified')
             st.plotly_chart(fig_global, use_container_width=True, key='model_global_fig')
 
-            # Export global forecast
-            col_a, col_b = st.columns([3, 1])
-            with col_b:
-                # Export global forecast (download_button with unique key)
-                csv_bytes = convert_df_to_csv(monthly_forecast.rename(columns={'date': 'Date', 'predicted_volume': 'Predicted_Volume'}))
-                st.download_button("⬇️ Télécharger prévision CSV", data=csv_bytes, file_name="prevision_forecast.csv", mime='text/csv', key='download_global_forecast')
+            # Afficher le tableau de prévision juste sous le graphique (réintégration demandée)
+            if display_forecast is not None:
+                st.subheader("🔮 Tableau des Prévisions")
+                st.dataframe(display_forecast, use_container_width=True, key='display_forecast_table')
 
             # --- Graphiques de prédiction par Direction et par Poste ---
             st.markdown("---")
@@ -1166,10 +1164,7 @@ with tab4:
                 with st.expander("📋 Ouvrir/fermer: Tableau des prédictions par Direction"):
                     st.dataframe(dir_detailed.sort_values(['date', 'Direction']).reset_index(drop=True), use_container_width=True)
 
-                # Export Direction
-                if not dir_detailed.empty:
-                    csv_bytes_dir = convert_df_to_csv(dir_detailed.rename(columns={'date': 'Date'}))
-                    st.download_button("⬇️ Exporter Direction CSV", data=csv_bytes_dir, file_name="prevision_par_direction.csv", mime='text/csv', key='download_dir')
+                # Export Direction (supprimé: utilisation d'un export unique en bas)
 
             with col_poste:
                 st.markdown("#### 👥 Prédictions par Poste")
@@ -1185,7 +1180,27 @@ with tab4:
                 with st.expander("📋 Ouvrir/fermer: Tableau des prédictions par Poste"):
                     st.dataframe(poste_detailed.sort_values(['date', 'Poste']).reset_index(drop=True), use_container_width=True)
 
-                # Export Poste
-                if not poste_detailed.empty:
-                    csv_bytes_poste = convert_df_to_csv(poste_detailed.rename(columns={'date': 'Date'}))
-                    st.download_button("⬇️ Exporter Poste CSV", data=csv_bytes_poste, file_name="prevision_par_poste.csv", mime='text/csv', key='download_poste')
+                # Export Poste (supprimé: utilisation d'un export unique en bas)
+
+            # --- Export unique: créer un fichier Excel multi-onglets (Global / Par_Direction / Par_Poste)
+            try:
+                bio = io.BytesIO()
+                with pd.ExcelWriter(bio, engine='openpyxl') as writer:
+                    # Global
+                    monthly_forecast.rename(columns={'date': 'Date', 'predicted_volume': 'Predicted_Volume'}).to_excel(writer, sheet_name='Global', index=False)
+                    # Par Direction
+                    if not dir_detailed.empty:
+                        dir_detailed.rename(columns={'date': 'Date'}).to_excel(writer, sheet_name='Par_Direction', index=False)
+                    else:
+                        pd.DataFrame(columns=['Date','Direction','predicted_volume']).to_excel(writer, sheet_name='Par_Direction', index=False)
+                    # Par Poste
+                    if not poste_detailed.empty:
+                        poste_detailed.rename(columns={'date': 'Date'}).to_excel(writer, sheet_name='Par_Poste', index=False)
+                    else:
+                        pd.DataFrame(columns=['Date','Poste','predicted_volume']).to_excel(writer, sheet_name='Par_Poste', index=False)
+                    writer.save()
+                bio.seek(0)
+                export_filename = f"previsions_completes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+                st.download_button("⬇️ Télécharger l'export complet (Excel)", data=bio.getvalue(), file_name=export_filename, mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', key='download_full_export')
+            except Exception as e:
+                st.error(f"Erreur lors de la création du fichier d'export: {e}")
