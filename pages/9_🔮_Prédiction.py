@@ -1099,47 +1099,48 @@ with tab4:
                     st.error(f"❌ Erreur lors de la prédiction : {str(e)}")
                     st.exception(e)
 
-        # Ajouter ici la section d'affichage demandée
-        # Créer monthly_forecast pour la compatibilité avec le code demandé
-        monthly_forecast = forecast_df.copy()
+        # Vérifier si la variable forecast_df existe avant d'essayer de l'utiliser
+        if 'forecast_df' not in locals() and 'forecast_df' not in globals():
+            # Si la section de visualisation s'exécute avant une prédiction, ne rien afficher
+            if st.session_state.time_series_data is not None:
+                st.info("ℹ️ Cliquez sur 'Lancer la prédiction' ci-dessus pour visualiser les résultats.")
+        else:
+            # Créer monthly_forecast pour la compatibilité avec le code demandé
+            monthly_forecast = forecast_df.copy()
 
-        # --- Affichage des résultats ---
-        st.subheader("🔮 Prévisions Mensuelles")
+            # --- Affichage des résultats ---
+            st.subheader("🔮 Prévisions Mensuelles")
 
-        # Graphique des prédictions
-        fig_pred = go.Figure()
+            # Graphique des prédictions
+            fig_pred = go.Figure()
 
-        # Données historiques
-        # Cette ligne ajoute la courbe de vos données passées (en bleu)
-        fig_pred.add_trace(go.Scatter(
-            x=time_series['date'],
-            y=time_series['volume'],
-            mode='lines+markers',
-            name='Historique',
-            line=dict(color='#1f77b4', width=2)
-        ))
+            # Données historiques
+            fig_pred.add_trace(go.Scatter(
+                x=time_series['date'],
+                y=time_series['volume'],
+                mode='lines+markers',
+                name='Historique',
+                line=dict(color='#1f77b4', width=2)
+            ))
 
-        # Prédictions
-        # Cette ligne ajoute la courbe des prévisions futures (en orange et en pointillés)
-        fig_pred.add_trace(go.Scatter(
-            x=monthly_forecast['date'],
-            y=monthly_forecast['predicted_volume'],
-            mode='lines+markers',
-            name='Prédictions',
-            line=dict(color='#ff7f0e', width=3, dash='dash'),
-            marker=dict(size=8)
-        ))
+            # Prédictions
+            fig_pred.add_trace(go.Scatter(
+                x=monthly_forecast['date'],
+                y=monthly_forecast['predicted_volume'],
+                mode='lines+markers',
+                name='Prédictions',
+                line=dict(color='#ff7f0e', width=3, dash='dash'),
+                marker=dict(size=8)
+            ))
 
-        # Mise en forme du graphique (titre, axes, etc.)
-        fig_pred.update_layout(
-            title=f"Prédictions {model_type} - {objective}",
-            xaxis_title="Date",
-            yaxis_title="Volume",
-            height=400,
-            hovermode='x unified'
-        )
+            # Mise en forme du graphique
+            fig_pred.update_layout(
+                title=f"Prédictions {model_type} - {objective}",
+                xaxis_title="Date",
+                yaxis_title="Volume",
+                height=400,
+                hovermode='x unified'
+            )
 
-        # Affichage du graphique dans l'application
-        st.plotly_chart(fig_pred, use_container_width=True)
-
-        # Continuer avec le reste du code d'affichage des prévisions...
+            # Affichage du graphique
+            st.plotly_chart(fig_pred, use_container_width=True)
