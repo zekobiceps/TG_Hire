@@ -854,8 +854,6 @@ with tab4:
             with st.spinner(f"🤖 Entraînement du modèle {model_type} en cours..."):
                 try:
                     # --- Étape 1: Évaluation du modèle pour le score MAPE ---
-                    
-                    # Division train/test
                     n_total = len(time_series)
                     n_test = max(1, int(n_total * 0.2))
                     train_data = time_series.iloc[:-n_test].copy()
@@ -871,21 +869,23 @@ with tab4:
 
                     # Calcul du MAPE en comparant les prédictions aux données de test
                     test_predictions = []
-                    if temp_forecast is not None:
+                    if temp_forecast is not None and not temp_forecast.empty:
+                        # s'assurer que la colonne ds est datetime
+                        temp_forecast['ds'] = pd.to_datetime(temp_forecast['ds'])
                         for test_date in test_data['date']:
-                            pred_row = temp_forecast[temp_forecast['ds'].dt.date == test_date.date()]
+                            # comparer par date (sans heure)
+                            pred_row = temp_forecast[temp_forecast['ds'].dt.date == pd.to_datetime(test_date).date()]
                             if not pred_row.empty:
-                                # support yhat (prévu) ou y (Prophet parfois)
                                 if 'yhat' in pred_row.columns:
-                                    test_predictions.append(pred_row['yhat'].iloc[0])
+                                    test_predictions.append(float(pred_row['yhat'].iloc[0]))
                                 elif 'y' in pred_row.columns:
-                                    test_predictions.append(pred_row['y'].iloc[0])
+                                    test_predictions.append(float(pred_row['y'].iloc[0]))
                                 else:
                                     test_predictions.append(np.nan)
                             else:
                                 test_predictions.append(np.nan)
-                    
-                    mape_score = calculate_mape(test_data['volume'].values, test_predictions) if test_predictions else np.nan
+
+                    mape_score = calculate_mape(test_data['volume'].values, test_predictions) if len(test_predictions) > 0 else np.nan
 
                     # Affichage du score de confiance
                     st.subheader("📊 Score de Confiance")
@@ -900,9 +900,7 @@ with tab4:
                     with col_metric3:
                         st.metric("Modèle utilisé", model_type)
 
-                    # --- Étape 2: Génération de la prédiction finale pour l'utilisateur ---
-
-                    # Entraînement du modèle final sur 100% des données historiques
+                    # --- Étape 2: Génération de la prédiction finale ---
                     st.info("Ré-entraînement du modèle sur toutes les données pour la prédiction finale...")
                     if model_type == "Prophet":
                         final_model, final_forecast = predict_with_prophet(time_series, horizon_months)
@@ -915,19 +913,17 @@ with tab4:
                         st.error("❌ Échec de la prédiction finale.")
                         st.stop()
 
-                    # Préparation des prédictions futures
+                    # Préparation des prédictions futures (normaliser ds et filtrer > last_date)
                     last_date = time_series['date'].max()
-                    future_predictions = final_forecast.copy()
-                    future_predictions['ds'] = pd.to_datetime(future_predictions['ds'])
+                    final_forecast = final_forecast.copy()
+                    final_forecast['ds'] = pd.to_datetime(final_forecast['ds'])
                     last_date_ts = pd.to_datetime(last_date)
-
-                    # garder uniquement les dates strictement après la dernière date historique
-                    future_predictions = future_predictions[future_predictions['ds'] > last_date_ts].copy()
+                    future_predictions = final_forecast[final_forecast['ds'] > last_date_ts].copy()
 
                     if future_predictions.empty:
                         st.warning("⚠️ Aucune prédiction future générée. Vérifiez la configuration du modèle.")
                     else:
-                        # Détecter fréquence d'entraînement (ex. annuelle si médiane des deltas > 300 jours)
+                        # Détecter si la série historique est annuelle (écart médian > 300 jours)
                         median_delta = time_series['date'].sort_values().diff().dt.days.median()
                         is_annual = pd.notna(median_delta) and median_delta > 300
 
@@ -935,71 +931,73 @@ with tab4:
                             # répartir les totaux annuels sur les mois selon proportions historiques
                             df_raw = st.session_state.get('cleaned_data_filtered', None)
                             date_col = st.session_state.get('date_col', None)
+
                             if df_raw is None or date_col is None:
-                                month_props = {m: 1/12 for m in range(1,13)}
+                                month_props = {m: 1/12 for m in range(1, 13)}
                             else:
                                 df_tmp = df_raw.copy()
                                 df_tmp[date_col] = pd.to_datetime(df_tmp[date_col], errors='coerce')
                                 df_tmp = df_tmp.dropna(subset=[date_col])
-                                df_tmp['month'] = df_tmp[date_col].dt.month
-                                month_counts = df_tmp['month'].value_counts().sort_index()
-                                if month_counts.sum() == 0:
-                                    month_props = {m: 1/12 for m in range(1,13)}
+                                if df_tmp.empty:
+                                    month_props = {m: 1/12 for m in range(1, 13)}
                                 else:
-                                    month_props = (month_counts / month_counts.sum()).to_dict()
+                                    df_tmp['month'] = df_tmp[date_col].dt.month
+                                    month_counts = df_tmp['month'].value_counts().sort_index()
+                                    if month_counts.sum() == 0:
+                                        month_props = {m: 1/12 for m in range(1, 13)}
+                                    else:
+                                        month_props = (month_counts / month_counts.sum()).to_dict()
 
                             monthly_rows = []
                             for _, row in future_predictions.iterrows():
                                 year = int(row['ds'].year)
                                 total_annual = float(row.get('yhat', row.get('y', 0)))
-                                for m in range(1,13):
+                                # éviter cas total_annual == nan
+                                if np.isnan(total_annual):
+                                    total_annual = 0.0
+                                for m in range(1, 13):
                                     ds_month = pd.Timestamp(year=year, month=m, day=1)
-                                    monthly_val = int(round(total_annual * month_props.get(m, 1/12)))
+                                    prop = month_props.get(m, 1/12)
+                                    monthly_val = int(round(total_annual * prop))
                                     monthly_rows.append({'date': ds_month, 'predicted_volume': monthly_val})
-                            monthly_forecast = pd.DataFrame(monthly_rows).sort_values('date').head(horizon_months).reset_index(drop=True)
+
+                            monthly_forecast = pd.DataFrame(monthly_rows).sort_values('date').reset_index(drop=True)
+                            monthly_forecast = monthly_forecast.head(horizon_months).reset_index(drop=True)
                         else:
                             # comportement normal : la prédiction est déjà mensuelle
                             if 'yhat' in future_predictions.columns:
-                                monthly_forecast = future_predictions[['ds', 'yhat']].copy().rename(columns={'ds':'date','yhat':'predicted_volume'})
+                                monthly_forecast = future_predictions[['ds', 'yhat']].copy().rename(columns={'ds': 'date', 'yhat': 'predicted_volume'})
                             else:
-                                monthly_forecast = future_predictions[['ds', 'y']].copy().rename(columns={'ds':'date','y':'predicted_volume'})
+                                monthly_forecast = future_predictions[['ds', 'y']].copy().rename(columns={'ds': 'date', 'y': 'predicted_volume'})
                             monthly_forecast['date'] = pd.to_datetime(monthly_forecast['date'])
-                            monthly_forecast['predicted_volume'] = monthly_forecast['predicted_volume'].round().astype(int).clip(lower=0)
+                            monthly_forecast['predicted_volume'] = monthly_forecast['predicted_volume'].astype(float).round().astype(int).clip(lower=0)
                             monthly_forecast = monthly_forecast.sort_values('date').head(horizon_months).reset_index(drop=True)
-                        
-                        # --- Affichage des résultats (identique à avant) ---
+
+                        # --- Affichage des résultats ---
                         st.subheader("🔮 Prévisions Mensuelles")
-                        
                         fig_pred = go.Figure()
                         fig_pred.add_trace(go.Scatter(x=time_series['date'], y=time_series['volume'], mode='lines+markers', name='Historique', line=dict(color='#1f77b4', width=2)))
                         fig_pred.add_trace(go.Scatter(x=monthly_forecast['date'], y=monthly_forecast['predicted_volume'], mode='lines+markers', name='Prédictions', line=dict(color='#ff7f0e', width=3, dash='dash'), marker=dict(size=8)))
                         fig_pred.update_layout(title=f"Prédictions {model_type} - {objective}", xaxis_title="Date", yaxis_title="Volume", height=400, hovermode='x unified')
                         st.plotly_chart(fig_pred, use_container_width=True)
-                        
+
                         display_forecast = monthly_forecast.copy()
                         display_forecast['Mois'] = display_forecast['date'].dt.strftime('%B %Y')
                         display_forecast = display_forecast[['Mois', 'predicted_volume']].rename(columns={'predicted_volume': 'Volume Prédit'})
                         st.dataframe(display_forecast, use_container_width=True)
-                        
+
                         st.markdown("---")
-                        
-                        # Ventilation par Direction et Poste
-                        st.subheader("📊 Ventilation Prévisionnelle")
-                        st.markdown("*Basée sur les proportions historiques*")
-                        
+
+                        # Ventilation par Direction et Poste (identique)
                         dir_proportions = {}
                         poste_proportions = {}
-                        
                         if direction_col and direction_col in raw_data.columns:
-                            dir_counts = raw_data[direction_col].value_counts(normalize=True)
-                            dir_proportions = dir_counts.to_dict()
-                        
+                            dir_proportions = raw_data[direction_col].value_counts(normalize=True).to_dict()
                         if poste_col and poste_col in raw_data.columns:
-                            poste_counts = raw_data[poste_col].value_counts(normalize=True)
-                            poste_proportions = poste_counts.to_dict()
-                        
+                            poste_proportions = raw_data[poste_col].value_counts(normalize=True).to_dict()
+
                         col_vent1, col_vent2 = st.columns(2)
-                        
+
                         with col_vent1:
                             if dir_proportions:
                                 st.markdown("#### 🏢 Par Direction")
@@ -1018,7 +1016,7 @@ with tab4:
                                     st.dataframe(df_dir_forecast, use_container_width=True)
                             else:
                                 st.info("Aucune colonne Direction disponible pour la ventilation.")
-                        
+
                         with col_vent2:
                             if poste_proportions:
                                 st.markdown("#### 👥 Par Poste")
@@ -1038,16 +1036,15 @@ with tab4:
                                     st.dataframe(df_poste_forecast, use_container_width=True)
                             else:
                                 st.info("Aucune colonne Poste disponible pour la ventilation.")
-                        
+
                         st.markdown("---")
-                        
+
                         # Export des résultats
-                        st.subheader("📥 Export des Résultats")
                         export_data = []
                         for _, row in monthly_forecast.iterrows():
                             month = row['date'].strftime('%Y-%m')
                             month_label = row['date'].strftime('%B %Y')
-                            total_volume = row['predicted_volume']
+                            total_volume = int(row['predicted_volume'])
                             export_data.append({'Mois': month, 'Mois_Label': month_label, 'Niveau': 'Total', 'Dimension': 'TOTAL', 'Volume_Predit': total_volume, 'Proportion_Pct': 100.0})
                             if dir_proportions:
                                 for direction, proportion in dir_proportions.items():
@@ -1055,18 +1052,15 @@ with tab4:
                             if poste_proportions:
                                 for poste, proportion in poste_proportions.items():
                                     export_data.append({'Mois': month, 'Mois_Label': month_label, 'Niveau': 'Poste', 'Dimension': poste, 'Volume_Predit': int(round(total_volume * proportion)), 'Proportion_Pct': round(proportion * 100, 2)})
-                        
+
                         export_df = pd.DataFrame(export_data)
                         if not export_df.empty:
                             csv_data = convert_df_to_csv(export_df)
                             st.download_button(label="📥 Télécharger les prévisions détaillées (CSV)", data=csv_data, file_name=f"previsions_{objective.lower().replace(' ', '_')}_{horizon_months}m.csv", mime="text/csv", use_container_width=True)
                             with st.expander("👀 Aperçu des données d'export"):
                                 st.dataframe(export_df.head(20), use_container_width=True)
-                        
+
                         st.success(f"✅ **Prédiction terminée avec succès!** Prévisions générées pour {horizon_months} mois avec le modèle {model_type}.")
-                    else:
-                        st.warning("⚠️ Aucune prédiction future générée. Vérifiez la configuration du modèle.")
-                
                 except Exception as e:
                     st.error(f"❌ Erreur lors de la prédiction : {str(e)}")
                     with st.expander("🔍 Détails de l'erreur"):
