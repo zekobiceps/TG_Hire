@@ -1249,11 +1249,40 @@ with tab4:
 
 with st.sidebar:
     st.markdown("### 🔧 Configuration")
+    
+    # Vérifier immédiatement l'état de l'API
+    API_KEY = None
+    try:
+        API_KEY = st.secrets.get("DEEPSEEK_API_KEY")
+    except:
+        pass
+    
+    if not API_KEY:
+        st.warning("⚠️ Clé API DeepSeek non configurée")
+        with st.expander("📝 Comment configurer la clé API"):
+            st.markdown("""
+            Pour activer la reclassification IA avec DeepSeek:
+            
+            1. Accédez à votre tableau de bord Streamlit Cloud
+            2. Sélectionnez cette application
+            3. Cliquez sur "Paramètres" (ou "Settings")
+            4. Rendez-vous dans la section "Secrets"
+            5. Ajoutez une nouvelle clé nommée `DEEPSEEK_API_KEY`
+            6. Collez votre clé API DeepSeek comme valeur
+            7. Cliquez sur "Sauvegarder" (ou "Save")
+            8. Redéployez l'application
+            
+            Vous pouvez obtenir une clé API sur [DeepSeek](https://platform.deepseek.com/)
+            """)
+    else:
+        st.success("✅ Configuration API DeepSeek détectée")
+    
     col1, col2 = st.columns(2)
     
     if col1.button("Test Connexion API DeepSeek"):
-        API_KEY = get_api_key()
-        if API_KEY:
+        if not API_KEY:
+            st.error("❌ Clé API DeepSeek non configurée. Voir instructions ci-dessus.")
+        else:
             try:
                 response = requests.get("https://api.deepseek.com/v1/models", headers={"Authorization": f"Bearer {API_KEY}"})
                 if response.status_code == 200:
@@ -1423,48 +1452,64 @@ with tab5:
                         entities = regex_analysis(row['text_snippet'])
                         st.json(entities)
 
-        if col_action2.button('🔁 Reclassifier les non-classés avec DeepSeek (IA)', key='reclass_ai_button'):
+        # Vérifier si la clé API est disponible avant d'activer le bouton
+        API_KEY = None
+        try:
+            API_KEY = st.secrets.get("DEEPSEEK_API_KEY")
+        except:
+            pass
+            
+        if not API_KEY:
+            col_action2.warning("⚠️ La clé API DeepSeek n'est pas configurée. La reclassification IA est désactivée.")
+            col_action2.info("Pour activer l'IA : configurer le secret DEEPSEEK_API_KEY dans les paramètres de l'application Streamlit.")
+            # Bouton désactivé mais visible pour indiquer la fonctionnalité
+            col_action2.button('🔁 Reclassifier les non-classés avec DeepSeek (IA)', key='reclass_ai_button', disabled=True)
+        elif col_action2.button('🔁 Reclassifier les non-classés avec DeepSeek (IA)', key='reclass_ai_button'):
             # lancer la reclassification inline et mettre à jour session_state
-            API_KEY = get_api_key()
-            if not API_KEY:
-                st.error('Clé API DeepSeek absente. Configurez le secret DEEPSEEK_API_KEY.')
+            nc = df[df['category'] == 'Non classé']
+            if nc.empty:
+                st.info('Aucun CV non classé à reclassifier.')
             else:
-                nc = df[df['category'] == 'Non classé']
-                if nc.empty:
-                    st.info('Aucun CV non classé à reclassifier.')
-                else:
-                    st.info('Reclassification IA en cours pour les non-classés...')
-                    ai_progress = st.progress(0)
-                    nc_indices = nc.index.tolist()
-                    for idx, irow in enumerate(nc_indices):
-                        name = df.at[irow, 'file']
-                        text = df.at[irow, 'text_snippet']
-                        processing = st.empty()
-                        processing.info(f"IA traitement ({idx+1}/{len(nc_indices)}) : {name}")
-                        try:
-                            label = None
-                            prompt = (
-                                f"Classifie le CV ci-dessous dans UNE seule des catégories: 'Fonctions supports', 'Logistique', 'Production/Technique'.\n"
-                                f"Réponds uniquement par l'un des trois labels exacts.\n\n"
-                                f"Texte du CV:\n{text[:2000]}"
-                            )
-                            # Utiliser la fonction utilitaire deepseek_generate pour appeler l'API
-                            content = deepseek_generate(prompt, max_tokens=300, temperature=0.0)
-                            if 'fonctions' in content.lower():
-                                label = 'Fonctions supports'
-                            elif 'logistique' in content.lower():
-                                label = 'Logistique'
-                            elif 'production' in content.lower() or 'travaux' in content.lower() or 'génie' in content.lower():
-                                label = 'Production/Technique'
-                            else:
-                                label = 'Non classé'
-                        except Exception:
+                st.info('Reclassification IA en cours pour les non-classés...')
+                ai_progress = st.progress(0)
+                nc_indices = nc.index.tolist()
+                
+                # Mode alternatif : utiliser une approche heuristique si API indisponible
+                if not API_KEY:
+                    st.warning("⚠️ Mode dégradé : utilisation de règles avancées au lieu de l'IA")
+                    # Nous ne devrions jamais arriver ici grâce à la vérification plus haut
+                    
+                # Mode normal avec API
+                for idx, irow in enumerate(nc_indices):
+                    name = df.at[irow, 'file']
+                    text = df.at[irow, 'text_snippet']
+                    processing = st.empty()
+                    processing.info(f"IA traitement ({idx+1}/{len(nc_indices)}) : {name}")
+                    try:
+                        label = None
+                        prompt = (
+                            f"Classifie le CV ci-dessous dans UNE seule des catégories: 'Fonctions supports', 'Logistique', 'Production/Technique'.\n"
+                            f"Réponds uniquement par l'un des trois labels exacts.\n\n"
+                            f"Texte du CV:\n{text[:2000]}"
+                        )
+                        # Utiliser la fonction utilitaire deepseek_generate pour appeler l'API
+                        content = deepseek_generate(prompt, max_tokens=300, temperature=0.0)
+                        if 'fonctions' in content.lower():
+                            label = 'Fonctions supports'
+                        elif 'logistique' in content.lower():
+                            label = 'Logistique'
+                        elif 'production' in content.lower() or 'travaux' in content.lower() or 'génie' in content.lower():
+                            label = 'Production/Technique'
+                        else:
                             label = 'Non classé'
-                        finally:
-                            processing.empty()
+                    except Exception as e:
+                        st.error(f"Erreur API: {str(e)[:100]}")
+                        label = 'Non classé'
+                    finally:
+                        processing.empty()
 
-                        df.at[irow, 'category'] = label
-                        ai_progress.progress((idx+1)/len(nc_indices))
+                    df.at[irow, 'category'] = label
+                    ai_progress.progress((idx+1)/len(nc_indices))
 
                     ai_progress.empty()
                     st.success('Reclassification IA terminée. Voir le tableau mis à jour ci-dessus.')
@@ -1585,10 +1630,23 @@ with tab5:
                                 entities = regex_analysis(row['text_snippet'])
                                 st.json(entities)
             with col_action2:
-                # Utiliser on_click pour lancer la reclassification afin d'éviter le reset
-                if st.button('🔁 Reclassifier les non-classés avec DeepSeek (IA)', key='reclass_ai'):
-                    # Stocker un flag pour démarrer la reclassification après le rerun
-                    st.session_state['reclass_ai_requested'] = True
+                # Vérifier si la clé API est disponible avant d'activer le bouton
+                API_KEY = None
+                try:
+                    API_KEY = st.secrets.get("DEEPSEEK_API_KEY")
+                except:
+                    pass
+                
+                if not API_KEY:
+                    st.warning("⚠️ La clé API DeepSeek n'est pas configurée. La reclassification IA est désactivée.")
+                    st.info("Pour activer l'IA : configurer le secret DEEPSEEK_API_KEY dans les paramètres de l'application Streamlit.")
+                    # Bouton désactivé mais visible pour indiquer la fonctionnalité
+                    st.button('🔁 Reclassifier les non-classés avec DeepSeek (IA)', disabled=True)
+                else:
+                    # Utiliser on_click pour lancer la reclassification afin d'éviter le reset
+                    if st.button('🔁 Reclassifier les non-classés avec DeepSeek (IA)', key='reclass_ai'):
+                        # Stocker un flag pour démarrer la reclassification après le rerun
+                        st.session_state['reclass_ai_requested'] = True
 
         # Si un DataFrame est déjà en session (cas où page a rechargé), le récupérer et afficher counts
     elif 'auto_class_df' in st.session_state:
@@ -1601,16 +1659,51 @@ with tab5:
     if st.session_state.get('reclass_ai_requested', False):
         if 'auto_class_df' not in st.session_state:
             st.error('Aucun résultat antérieur pour reclassification. Lancez d\'abord l\'analyse.')
+            st.session_state['reclass_ai_requested'] = False
         else:
             df = st.session_state['auto_class_df']
             nc = df[df['category'] == 'Non classé']
             if nc.empty:
                 st.info('Aucun CV non classé à reclassifier.')
+                st.session_state['reclass_ai_requested'] = False
             else:
-                API_KEY = get_api_key()
+                # Vérifier si la clé API est disponible
+                API_KEY = None
+                try:
+                    API_KEY = st.secrets.get("DEEPSEEK_API_KEY")
+                except:
+                    API_KEY = None
+                    
                 if not API_KEY:
-                    st.error('Clé API DeepSeek absente. Configurez le secret DEEPSEEK_API_KEY.')
+                    st.error('❌ Clé API DeepSeek absente. La reclassification IA est impossible.')
+                    st.info('💡 Pour activer cette fonctionnalité, configurez le secret DEEPSEEK_API_KEY dans les paramètres de votre application Streamlit.')
                     st.session_state['reclass_ai_requested'] = False
+                    
+                    # Option alternative : proposer téléchargement quand même
+                    st.info("Vous pouvez néanmoins télécharger les résultats de classification actuels ci-dessous.")
+                    # Préparer les downloads sans reclassification
+                    # Copie du code de téléchargement ici pour ne pas perdre cette fonctionnalité
+                    supports = df[df['category'] == 'Fonctions supports']['file'].tolist()
+                    logistics = df[df['category'] == 'Logistique']['file'].tolist()
+                    production = df[df['category'] == 'Production/Technique']['file'].tolist()
+                    non_classed = df[df['category'] == 'Non classé']['file'].tolist()
+                    
+                    max_len = max(len(supports), len(logistics), len(production), len(non_classed)) if max(len(supports), len(logistics), len(production), len(non_classed)) > 0 else 0
+                    # Pad lists
+                    supports += [''] * (max_len - len(supports))
+                    logistics += [''] * (max_len - len(logistics))
+                    production += [''] * (max_len - len(production))
+                    non_classed += [''] * (max_len - len(non_classed))
+                    
+                    export_df = pd.DataFrame({
+                        'Fonctions supports': supports,
+                        'Logistique': logistics,
+                        'Production/Technique': production,
+                        'Non classés': non_classed
+                    })
+                    
+                    csv = export_df.to_csv(index=False).encode('utf-8')
+                    st.download_button(label='⬇️ Télécharger les résultats actuels (CSV)', data=csv, file_name='classification_results.csv', mime='text/csv')
                 else:
                     st.info('Reclassification IA en cours pour les non-classés...')
                     ai_progress = st.progress(0)
@@ -1638,6 +1731,7 @@ with tab5:
                             else:
                                 label = 'Non classé'
                         except Exception as e:
+                            st.error(f"Erreur API: {str(e)[:100]}")
                             label = 'Non classé'
                         finally:
                             processing.empty()
