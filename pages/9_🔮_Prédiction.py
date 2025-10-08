@@ -7,6 +7,8 @@ import plotly.graph_objects as go
 from prophet import Prophet
 import xgboost as xgb
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
+from sklearn.ensemble import RandomForestRegressor
+from statsmodels.tsa.statespace.sarimax import SARIMAX
 import warnings
 import io
 from sklearn.metrics import mean_absolute_percentage_error
@@ -275,6 +277,83 @@ def predict_with_xgboost(df, horizon_periods, freq, lookback=3):
         return model, forecast_df
     except Exception as e:
         st.error(f"Erreur XGBoost: {e}")
+        return None, None
+
+def predict_with_random_forest(df, horizon_periods, freq, lookback=12):
+    """Prédiction avec Random Forest (adaptée à la fréquence)"""
+    try:
+        data = df['volume'].values
+        effective_lookback = min(lookback, len(data) - 1)
+        if effective_lookback < 1:
+            st.error("Pas assez de données pour Random Forest.")
+            return None, None
+        
+        # Préparation des données (séquences)
+        X, y = [], []
+        for i in range(effective_lookback, len(data)):
+            X.append(data[i-effective_lookback:i])
+            y.append(data[i])
+        
+        X, y = np.array(X), np.array(y)
+        model = RandomForestRegressor(n_estimators=100, random_state=42)
+        model.fit(X, y)
+        
+        # Prédictions
+        last_sequence = data[-effective_lookback:]
+        forecasts = []
+        for _ in range(horizon_periods):
+            next_pred = model.predict(np.array([last_sequence]))[0]
+            forecasts.append(max(0, next_pred))
+            last_sequence = np.append(last_sequence[1:], next_pred)
+        
+        future_dates = pd.date_range(start=df['date'].max(), periods=horizon_periods + 1, freq=freq)[1:]
+        forecast_df = pd.DataFrame({'ds': list(df['date']) + list(future_dates), 'yhat': list(df['volume']) + list(forecasts)})
+        
+        return model, forecast_df
+    except Exception as e:
+        st.error(f"Erreur Random Forest: {e}")
+        return None, None
+
+def predict_with_sarima(df, horizon_periods, freq):
+    """Prédiction avec SARIMA/SARIMAX (adaptée à la fréquence)"""
+    try:
+        # Paramètres selon la fréquence
+        if freq == 'M':  # Mensuel
+            order = (1, 1, 1)
+            seasonal_order = (1, 1, 1, 12)
+        elif freq == 'Q':  # Trimestriel
+            order = (1, 1, 1)
+            seasonal_order = (1, 1, 1, 4)
+        elif freq == '2Q':  # Semestriel
+            order = (1, 1, 1)
+            seasonal_order = (1, 1, 1, 2)
+        else:  # Annuel ou autre
+            order = (1, 1, 1)
+            seasonal_order = (0, 0, 0, 0)
+        
+        # Ajustement du modèle
+        model = SARIMAX(
+            df['volume'], 
+            order=order, 
+            seasonal_order=seasonal_order,
+            enforce_stationarity=False,
+            enforce_invertibility=False
+        )
+        fitted_model = model.fit(disp=False)
+        
+        # Prédiction
+        forecasts = fitted_model.forecast(steps=horizon_periods)
+        forecasts = np.clip(forecasts, 0, None)  # Pas de valeurs négatives
+        future_dates = pd.date_range(start=df['date'].max(), periods=horizon_periods + 1, freq=freq)[1:]
+        
+        forecast_df = pd.DataFrame({
+            'ds': list(df['date']) + list(future_dates),
+            'yhat': list(df['volume']) + list(forecasts)
+        })
+        
+        return fitted_model, forecast_df
+    except Exception as e:
+        st.error(f"Erreur SARIMA: {e}")
         return None, None
 
 # Titre principal
@@ -834,9 +913,9 @@ with tab4:
         with col2:
             model_type = st.selectbox(
                 "🤖 Algorithme de prédiction",
-                options=["Prophet", "Holt-Winters", "XGBoost"],
+                options=["Prophet", "Holt-Winters", "XGBoost", "Random Forest", "SARIMA"],
                 index=0,
-                help="Prophet: bon pour tendances et saisonnalité | Holt-Winters: classique et robuste | XGBoost: apprentissage automatique"
+                help="Prophet: bon pour tendances et saisonnalité | Holt-Winters: classique | XGBoost & Random Forest: ML | SARIMA: séries temporelles statistiques"
             )
         
         # Bouton de lancement
@@ -856,6 +935,10 @@ with tab4:
                             temp_model, temp_forecast = predict_with_prophet(train_data, n_test, freq)
                         elif model_type == "Holt-Winters": 
                             temp_model, temp_forecast = predict_with_holt_winters(train_data, n_test, freq)
+                        elif model_type == "Random Forest":
+                            temp_model, temp_forecast = predict_with_random_forest(train_data, n_test, freq)
+                        elif model_type == "SARIMA": 
+                            temp_model, temp_forecast = predict_with_sarima(train_data, n_test, freq)
                         else: 
                             temp_model, temp_forecast = predict_with_xgboost(train_data, n_test, freq)
                         
@@ -882,7 +965,11 @@ with tab4:
                         final_model, final_forecast = predict_with_prophet(time_series, horizon_value, freq)
                     elif model_type == "Holt-Winters": 
                         final_model, final_forecast = predict_with_holt_winters(time_series, horizon_value, freq)
-                    else: 
+                    elif model_type == "Random Forest":
+                        final_model, final_forecast = predict_with_random_forest(time_series, horizon_value, freq)
+                    elif model_type == "SARIMA":
+                        final_model, final_forecast = predict_with_sarima(time_series, horizon_value, freq)
+                    else:  # XGBoost
                         final_model, final_forecast = predict_with_xgboost(time_series, horizon_value, freq)
 
                     if final_model is None or final_forecast is None:
@@ -969,8 +1056,11 @@ with tab4:
                         # Restaurer le graphique d'évolution (historique agrégé pour lisibilité si nécessaire)
                         hist = time_series.copy()
                         if freq == 'Y' or st.session_state.get('selected_freq', '') == 'Annuelle':
-                            hist = hist.groupby(hist['date'].dt.year, as_index=False).agg({'volume': 'sum'})
-                            hist['date'] = pd.to_datetime(hist['date'].astype(str) + '-01-01')
+                            # Correction: créer explicitement une colonne year
+                            hist['year'] = hist['date'].dt.year
+                            hist = hist.groupby('year', as_index=False).agg({'volume': 'sum'})
+                            # Créer la date à partir de l'année
+                            hist['date'] = pd.to_datetime(hist['year'].astype(str) + '-01-01')
                         elif freq == '2Q' or st.session_state.get('selected_freq', '') == 'Semestrielle':
                             hist['semester'] = np.where(hist['date'].dt.month <= 6, 'S1', 'S2')
                             hist['year'] = hist['date'].dt.year
@@ -1008,3 +1098,48 @@ with tab4:
                 except Exception as e:
                     st.error(f"❌ Erreur lors de la prédiction : {str(e)}")
                     st.exception(e)
+
+        # Ajouter ici la section d'affichage demandée
+        # Créer monthly_forecast pour la compatibilité avec le code demandé
+        monthly_forecast = forecast_df.copy()
+
+        # --- Affichage des résultats ---
+        st.subheader("🔮 Prévisions Mensuelles")
+
+        # Graphique des prédictions
+        fig_pred = go.Figure()
+
+        # Données historiques
+        # Cette ligne ajoute la courbe de vos données passées (en bleu)
+        fig_pred.add_trace(go.Scatter(
+            x=time_series['date'],
+            y=time_series['volume'],
+            mode='lines+markers',
+            name='Historique',
+            line=dict(color='#1f77b4', width=2)
+        ))
+
+        # Prédictions
+        # Cette ligne ajoute la courbe des prévisions futures (en orange et en pointillés)
+        fig_pred.add_trace(go.Scatter(
+            x=monthly_forecast['date'],
+            y=monthly_forecast['predicted_volume'],
+            mode='lines+markers',
+            name='Prédictions',
+            line=dict(color='#ff7f0e', width=3, dash='dash'),
+            marker=dict(size=8)
+        ))
+
+        # Mise en forme du graphique (titre, axes, etc.)
+        fig_pred.update_layout(
+            title=f"Prédictions {model_type} - {objective}",
+            xaxis_title="Date",
+            yaxis_title="Volume",
+            height=400,
+            hovermode='x unified'
+        )
+
+        # Affichage du graphique dans l'application
+        st.plotly_chart(fig_pred, use_container_width=True)
+
+        # Continuer avec le reste du code d'affichage des prévisions...
