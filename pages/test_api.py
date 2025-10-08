@@ -1347,23 +1347,38 @@ with tab5:
                 st.subheader('Non classés')
                 st.dataframe(nc[['file', 'text_snippet']], use_container_width=True)
 
-            # Préparer un CSV à 3 colonnes : Fonctions supports, Logistique, Production/Technique
+            # Préparer un CSV à 4 colonnes : Fonctions supports, Logistique, Production/Technique, Non classés
             # Chaque ligne contient le nom du CV dans la colonne correspondant à sa catégorie.
             supports = df[df['category'] == 'Fonctions supports']['file'].tolist()
             logistics = df[df['category'] == 'Logistique']['file'].tolist()
             production = df[df['category'] == 'Production/Technique']['file'].tolist()
+            unclassified = df[df['category'] == 'Non classé']['file'].tolist()
 
-            max_len = max(len(supports), len(logistics), len(production)) if max(len(supports), len(logistics), len(production)) > 0 else 0
+            max_len = max(len(supports), len(logistics), len(production), len(unclassified)) if max(len(supports), len(logistics), len(production), len(unclassified)) > 0 else 0
             # Pad lists
             supports += [''] * (max_len - len(supports))
             logistics += [''] * (max_len - len(logistics))
             production += [''] * (max_len - len(production))
+            unclassified += [''] * (max_len - len(unclassified))
 
             export_df = pd.DataFrame({
                 'Fonctions supports': supports,
                 'Logistique': logistics,
-                'Production/Technique': production
+                'Production/Technique': production,
+                'Non classés': unclassified
             })
 
+            # Ajouter un texte explicatif pour le téléchargement
+            st.markdown("---")
+            st.info("Le fichier CSV téléchargé contiendra 4 colonnes : Fonctions supports, Logistique, Production/Technique, et Non classés. Chaque CV sera listé dans la colonne correspondant à sa catégorie.")
+            
+            # Comptage des CVs par catégorie pour l'affichage
+            count_support = len([x for x in supports if x])
+            count_logistics = len([x for x in logistics if x]) 
+            count_production = len([x for x in production if x])
+            count_unclassified = len([x for x in unclassified if x])
+            
+            st.markdown(f"**Résumé**: {count_support} en Fonctions supports, {count_logistics} en Logistique, {count_production} en Production/Technique, {count_unclassified} Non classés.")
+            
             csv = export_df.to_csv(index=False).encode('utf-8')
             st.download_button(label='⬇️ Télécharger les résultats (CSV)', data=csv, file_name='classification_results.csv', mime='text/csv')
