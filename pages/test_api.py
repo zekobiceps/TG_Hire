@@ -1419,29 +1419,111 @@ with tab5:
         total_processed = len(df)
         non_classed_count = df[df['category'] == 'Non classé'].shape[0]
         classified_count = total_processed - non_classed_count
-        st.info(f"Traitement terminé : {total_processed} CV(s) traités — {classified_count} classé(s) — {non_classed_count} non classé(s).")
+        
+        # Métriques en haut
+        col_met1, col_met2, col_met3 = st.columns(3)
+        col_met1.metric("Total traité", f"{total_processed}")
+        col_met2.metric("Classés", f"{classified_count}", delta=f"{int(classified_count/total_processed*100)}%" if total_processed > 0 else "0%")
+        col_met3.metric("Non classés", f"{non_classed_count}", delta=f"{int(non_classed_count/total_processed*100)}%" if total_processed > 0 else "0%", delta_color="inverse")
+        
+        # Vue par onglets (colonnes, tableau complet)
+        result_tabs = st.tabs(["Vue par colonnes", "Tableau complet", "Statistiques"])
+        
+        with result_tabs[0]:  # Vue par colonnes
+            # Affichage en 3 colonnes
+            cols = st.columns(3)
+            cats = ['Fonctions supports', 'Logistique', 'Production/Technique']
+            for idx, c in enumerate(cats):
+                with cols[idx]:
+                    st.subheader(c)
+                    sub = df[df['category'] == c]
+                    if sub.empty:
+                        st.write('Aucun CV classé ici.')
+                    else:
+                        # Afficher nom + extrait
+                        for _, r in sub.iterrows():
+                            with st.expander(r['file']):
+                                st.write(r['text_snippet'])
 
-        # Affichage en 3 colonnes
-        cols = st.columns(3)
-        cats = ['Fonctions supports', 'Logistique', 'Production/Technique']
-        for idx, c in enumerate(cats):
-            with cols[idx]:
-                st.subheader(c)
-                sub = df[df['category'] == c]
-                if sub.empty:
-                    st.write('Aucun CV classé ici.')
-                else:
-                    # Afficher nom + extrait
-                    for _, r in sub.iterrows():
-                        with st.expander(r['file']):
-                            st.write(r['text_snippet'])
-
-        # Non classés
-        nc = df[df['category'] == 'Non classé']
-        if not nc.empty:
-            st.markdown('---')
-            st.subheader('Non classés')
-            st.dataframe(nc[['file', 'text_snippet']], use_container_width=True)
+            # Non classés
+            nc = df[df['category'] == 'Non classé']
+            if not nc.empty:
+                st.markdown('---')
+                st.subheader('Non classés')
+                st.dataframe(nc[['file', 'text_snippet']], use_container_width=True)
+        
+        with result_tabs[1]:  # Tableau complet
+            # Préparation du DataFrame pour affichage complet
+            display_df = df.copy()
+            display_df['texte_court'] = display_df['text_snippet'].str[:100] + '...'
+            # Réorganisation des colonnes pour affichage plus clair
+            display_df = display_df[['file', 'category', 'texte_court']]
+            # Renommage des colonnes pour l'affichage
+            display_df.columns = ['Nom du fichier', 'Catégorie', 'Aperçu du texte']
+            
+            # Filtres pour le tableau
+            col_filter1, col_filter2 = st.columns([1, 3])
+            with col_filter1:
+                selected_category = st.multiselect(
+                    "Filtrer par catégorie",
+                    options=['Tous'] + list(display_df['Catégorie'].unique()),
+                    default='Tous'
+                )
+            
+            with col_filter2:
+                search_term = st.text_input("Rechercher par nom de fichier", "")
+            
+            # Application des filtres
+            filtered_df = display_df.copy()
+            if selected_category and 'Tous' not in selected_category:
+                filtered_df = filtered_df[filtered_df['Catégorie'].isin(selected_category)]
+            
+            if search_term:
+                filtered_df = filtered_df[filtered_df['Nom du fichier'].str.contains(search_term, case=False)]
+            
+            # Affichage du tableau filtrable et triable
+            st.dataframe(
+                filtered_df,
+                use_container_width=True,
+                height=400,
+                column_config={
+                    "Nom du fichier": st.column_config.TextColumn("Nom du fichier", width="medium"),
+                    "Catégorie": st.column_config.SelectboxColumn(
+                        "Catégorie",
+                        width="small",
+                        options=['Fonctions supports', 'Logistique', 'Production/Technique', 'Non classé'],
+                        required=True
+                    ),
+                    "Aperçu du texte": st.column_config.TextColumn("Aperçu du texte", width="large")
+                }
+            )
+        
+        with result_tabs[2]:  # Statistiques
+            # Distribution par catégorie
+            cat_counts = df['category'].value_counts().reset_index()
+            cat_counts.columns = ['Catégorie', 'Nombre']
+            
+            # Graphique en barres
+            fig = px.bar(
+                cat_counts,
+                x='Catégorie',
+                y='Nombre',
+                title='Distribution des CV par catégorie',
+                color='Catégorie',
+                text='Nombre',
+                color_discrete_map={
+                    'Fonctions supports': '#3366CC', 
+                    'Logistique': '#FF9900',
+                    'Production/Technique': '#109618', 
+                    'Non classé': '#DC3912'
+                }
+            )
+            fig.update_layout(xaxis_title="Catégorie", yaxis_title="Nombre de CV")
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Tableau récapitulatif
+            st.subheader("Résumé")
+            st.dataframe(cat_counts, use_container_width=True)
 
         # Actions: Regex extraction, AI reclassification
         col_action1, col_action2 = st.columns([1,1])
@@ -1535,21 +1617,54 @@ with tab5:
             'Non classés': non_classed
         })
         csv_all = export_all_df.to_csv(index=False).encode('utf-8')
-
+        
+        # Préparer Excel (tous formats)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Fonction pour exporter en Excel
+        def create_excel_download(df, filename):
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False)
+            excel_data = output.getvalue()
+            return excel_data
+        
+        # Créer les dataframes spécifiques
         classified_only_df = pd.DataFrame({
-            'Fonctions supports': supports[:max_len],
-            'Logistique': logistics[:max_len],
-            'Production/Technique': production[:max_len]
+            'Fonctions supports': supports,
+            'Logistique': logistics,
+            'Production/Technique': production
         })
         csv_classified = classified_only_df.to_csv(index=False).encode('utf-8')
-
+        excel_classified = create_excel_download(classified_only_df, f"classified_results_{timestamp}.xlsx")
+        
         non_classed_df = pd.DataFrame({'Non classés': non_classed})
         csv_non = non_classed_df.to_csv(index=False).encode('utf-8')
-
-        col_dl1, col_dl2, col_dl3 = st.columns(3)
-        col_dl1.download_button(label='⬇️ Télécharger classés (CSV)', data=csv_classified, file_name='classified_results.csv', mime='text/csv')
-        col_dl2.download_button(label='⬇️ Télécharger non classés (CSV)', data=csv_non, file_name='non_classed_results.csv', mime='text/csv')
-        col_dl3.download_button(label='⬇️ Télécharger tout (CSV)', data=csv_all, file_name='classification_results_all.csv', mime='text/csv')
+        excel_non = create_excel_download(non_classed_df, f"non_classed_results_{timestamp}.xlsx")
+        
+        excel_all = create_excel_download(export_all_df, f"classification_results_{timestamp}.xlsx")
+        
+        # Onglets pour formats d'export
+        st.markdown("### Téléchargement des résultats")
+        export_tabs = st.tabs(["CSV", "Excel"])
+        
+        with export_tabs[0]:  # CSV
+            col_dl1, col_dl2, col_dl3 = st.columns(3)
+            col_dl1.download_button(label='⬇️ Classés uniquement', data=csv_classified, 
+                                   file_name=f'classified_results_{timestamp}.csv', mime='text/csv')
+            col_dl2.download_button(label='⬇️ Non classés uniquement', data=csv_non, 
+                                   file_name=f'non_classed_results_{timestamp}.csv', mime='text/csv')
+            col_dl3.download_button(label='⬇️ Tous les résultats', data=csv_all, 
+                                   file_name=f'classification_results_{timestamp}.csv', mime='text/csv')
+        
+        with export_tabs[1]:  # Excel
+            col_dl1, col_dl2, col_dl3 = st.columns(3)
+            col_dl1.download_button(label='⬇️ Classés uniquement', data=excel_classified, 
+                                   file_name=f'classified_results_{timestamp}.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            col_dl2.download_button(label='⬇️ Non classés uniquement', data=excel_non, 
+                                   file_name=f'non_classed_results_{timestamp}.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            col_dl3.download_button(label='⬇️ Tous les résultats', data=excel_all, 
+                                   file_name=f'classification_results_{timestamp}.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
     # Construire la liste de fichiers uniquement à partir des uploads
     file_list = []
