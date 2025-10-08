@@ -1115,6 +1115,13 @@ with tab4:
             st.info("🔎 Début rendu: Prédictions Direction/Poste")
             print(f"[DEBUG] Rendering Direction/Poste block at {datetime.now()}")
             with container:
+                # Compteur de rendus pour debug (combien de fois ce bloc est exécuté)
+                count = st.session_state.get('dir_poste_render_count', 0) + 1
+                st.session_state['dir_poste_render_count'] = count
+                # Afficher le compteur dans l'UI clairement
+                st.write(f"🔁 Direction/Poste render count: {count}", key=f'dir_poste_count_{count}')
+                print(f"[DEBUG] Direction/Poste render count: {count} at {datetime.now()}")
+
                 # Calculer proportions historiques par direction/poste
                 raw = st.session_state.cleaned_data_filtered.copy()
                 if direction_col and direction_col in raw.columns:
