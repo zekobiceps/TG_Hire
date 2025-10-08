@@ -665,7 +665,7 @@ with tab2:
                         fig = px.line(time_series, x='date', y='volume', 
                                     title=f"Série temporelle - {objective}")
                         fig.update_layout(height=400)
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, use_container_width=True, key='prep_timeseries_fig')
                     elif df.empty:
                         st.warning("⚠️ Aucune donnée ne correspond à vos filtres. La série temporelle est vide.")
                         st.session_state.time_series_data = None
@@ -722,7 +722,7 @@ with tab3:
             marker=dict(size=6)
         )
         
-        st.plotly_chart(fig_trend, use_container_width=True)
+        st.plotly_chart(fig_trend, use_container_width=True, key='vis_trend_fig')
         
         # Statistiques de la série
         col1, col2, col3, col4 = st.columns(4)
@@ -770,7 +770,7 @@ with tab3:
                     coloraxis_showscale=False
                 )
                 
-                st.plotly_chart(fig_dir, use_container_width=True)
+                st.plotly_chart(fig_dir, use_container_width=True, key='vis_dir_fig')
                 
                 # Tableau détaillé
                 with st.expander("📋 Détail par Direction"):
@@ -814,7 +814,7 @@ with tab3:
                     coloraxis_showscale=False
                 )
                 
-                st.plotly_chart(fig_poste, use_container_width=True)
+                st.plotly_chart(fig_poste, use_container_width=True, key='vis_poste_fig')
                 
                 # Tableau détaillé
                 with st.expander("📋 Détail par Poste"):
@@ -852,7 +852,7 @@ with tab3:
                     color_continuous_scale='Viridis'
                 )
                 fig_year.update_layout(height=300, coloraxis_showscale=False)
-                st.plotly_chart(fig_year, use_container_width=True)
+                st.plotly_chart(fig_year, use_container_width=True, key='vis_year_fig')
         
         with col_temp2:
             # Par mois (moyenne)
@@ -870,7 +870,7 @@ with tab3:
                 color_continuous_scale='Plasma'
             )
             fig_month.update_layout(height=300, coloraxis_showscale=False)
-            st.plotly_chart(fig_month, use_container_width=True)
+            st.plotly_chart(fig_month, use_container_width=True, key='vis_month_fig')
 
 # ============================
 # ONGLET 4: MODÉLISATION & PRÉDICTION 
@@ -1050,8 +1050,8 @@ with tab4:
                             display_forecast['Période'] = display_forecast['date'].dt.strftime('%B %Y')
                             display_forecast = display_forecast[['Période', 'predicted_volume']].rename(columns={'predicted_volume': 'Volume Prédit'})
 
-                        st.subheader("🔮 Prévisions")
-                        st.dataframe(display_forecast, use_container_width=True)
+                        # Remplacer l'affichage immédiat du tableau par un stockage en session.
+                        # Le tableau sera affiché plus bas (après les graphiques) pour préserver l'ordre visuel.
 
                         # Sauvegarder la forecast pour affichage global et exports
                         st.session_state.forecast_df = forecast_df.copy()
@@ -1089,14 +1089,14 @@ with tab4:
                 marker=dict(size=8)
             ))
             fig_global.update_layout(title=f"Prédictions {model_type} - {objective}", xaxis_title="Date", yaxis_title="Volume", height=450, hovermode='x unified')
-            st.plotly_chart(fig_global, use_container_width=True)
+            st.plotly_chart(fig_global, use_container_width=True, key='model_global_fig')
 
             # Export global forecast
             col_a, col_b = st.columns([3, 1])
             with col_b:
-                if st.button("⬇️ Exporter prévision CSV", key='export_global'):
-                    csv_bytes = convert_df_to_csv(monthly_forecast.rename(columns={'date': 'Date', 'predicted_volume': 'Predicted_Volume'}))
-                    st.download_button("Télécharger CSV", data=csv_bytes, file_name="prevision_forecast.csv", mime='text/csv')
+                # Export global forecast (download_button with unique key)
+                csv_bytes = convert_df_to_csv(monthly_forecast.rename(columns={'date': 'Date', 'predicted_volume': 'Predicted_Volume'}))
+                st.download_button("⬇️ Télécharger prévision CSV", data=csv_bytes, file_name="prevision_forecast.csv", mime='text/csv', key='download_global_forecast')
 
             # --- Graphiques de prédiction par Direction et par Poste ---
             st.markdown("---")
@@ -1161,7 +1161,7 @@ with tab4:
                     color='Predicted', color_continuous_scale='Blues'
                 ) if not dir_pred.empty else go.Figure()
                 fig_dir_pred.update_layout(height=350) if not dir_pred.empty else None
-                st.plotly_chart(fig_dir_pred, use_container_width=True)
+                st.plotly_chart(fig_dir_pred, use_container_width=True, key='model_dir_fig')
 
                 with st.expander("📋 Ouvrir/fermer: Tableau des prédictions par Direction"):
                     st.dataframe(dir_detailed.sort_values(['date', 'Direction']).reset_index(drop=True), use_container_width=True)
@@ -1169,7 +1169,7 @@ with tab4:
                 # Export Direction
                 if not dir_detailed.empty:
                     csv_bytes_dir = convert_df_to_csv(dir_detailed.rename(columns={'date': 'Date'}))
-                    st.download_button("⬇️ Exporter Direction CSV", data=csv_bytes_dir, file_name="prevision_par_direction.csv", mime='text/csv')
+                    st.download_button("⬇️ Exporter Direction CSV", data=csv_bytes_dir, file_name="prevision_par_direction.csv", mime='text/csv', key='download_dir')
 
             with col_poste:
                 st.markdown("#### 👥 Prédictions par Poste")
@@ -1180,7 +1180,7 @@ with tab4:
                     color='Predicted', color_continuous_scale='Greens'
                 ) if not poste_pred.empty else go.Figure()
                 fig_poste_pred.update_layout(height=350) if not poste_pred.empty else None
-                st.plotly_chart(fig_poste_pred, use_container_width=True)
+                st.plotly_chart(fig_poste_pred, use_container_width=True, key='model_poste_fig')
 
                 with st.expander("📋 Ouvrir/fermer: Tableau des prédictions par Poste"):
                     st.dataframe(poste_detailed.sort_values(['date', 'Poste']).reset_index(drop=True), use_container_width=True)
@@ -1188,4 +1188,4 @@ with tab4:
                 # Export Poste
                 if not poste_detailed.empty:
                     csv_bytes_poste = convert_df_to_csv(poste_detailed.rename(columns={'date': 'Date'}))
-                    st.download_button("⬇️ Exporter Poste CSV", data=csv_bytes_poste, file_name="prevision_par_poste.csv", mime='text/csv')
+                    st.download_button("⬇️ Exporter Poste CSV", data=csv_bytes_poste, file_name="prevision_par_poste.csv", mime='text/csv', key='download_poste')
