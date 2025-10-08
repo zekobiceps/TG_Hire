@@ -1358,6 +1358,39 @@ with tab5:
                 st.markdown('---')
                 st.subheader('Non classés')
                 st.dataframe(nc[['file', 'text_snippet']], use_container_width=True)
+                
+                # Bouton pour analyser les CV non classés avec DeepSeek
+                if st.button('🔍 Analyser les CV non classés avec DeepSeek AI', type='secondary'):
+                    unclassified_results = []
+                    unclassified_progress = st.progress(0)
+                    unclassified_total = len(nc)
+                    processing_ai_placeholder = st.empty()
+                    
+                    with st.spinner('Analyse des CVs non classés avec DeepSeek IA...'):
+                        for i, (_, row) in enumerate(nc.iterrows()):
+                            name = row['file']
+                            text_snippet = row['text_snippet']
+                            # Mettre à jour le fichier en cours
+                            processing_ai_placeholder.info(f"Analyse par IA ({i+1}/{unclassified_total}) : {name}")
+                            
+                            try:
+                                # Utiliser l'API DeepSeek pour analyser le CV
+                                ai_analysis = get_deepseek_analysis(text_snippet)
+                                unclassified_results.append({'file': name, 'ai_analysis': ai_analysis})
+                            except Exception as e:
+                                unclassified_results.append({'file': name, 'ai_analysis': f"Erreur: {str(e)}"})
+                            
+                            unclassified_progress.progress((i+1)/unclassified_total)
+                    
+                    # Nettoyer le placeholder
+                    processing_ai_placeholder.empty()
+                    
+                    # Afficher les résultats de l'analyse DeepSeek
+                    st.success(f"✅ Analyse IA terminée pour {len(unclassified_results)} CV(s) non classés.")
+                    
+                    for result in unclassified_results:
+                        with st.expander(f"📋 Analyse IA pour : {result['file']}"):
+                            st.markdown(result['ai_analysis'])
 
             # Préparer un CSV à 4 colonnes : Fonctions supports, Logistique, Production/Technique, Non classés
             # Chaque ligne contient le nom du CV dans la colonne correspondant à sa catégorie.
