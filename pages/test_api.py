@@ -1262,7 +1262,7 @@ with st.sidebar:
                 st.error(f"❌ Erreur: {e}")
 
 with tab5:
-    st.header("🗂️ Auto-classification de CVs (3 catégories)")
+    st.header("🗂️ Auto-classification de CVs (3 catégories) — DEPLOY_DEBUG_MARKER_20251008")
     st.markdown("Chargez jusqu'à 100 CVs (PDF). L'outil extrait le texte et classe automatiquement chaque CV dans l'une des 3 catégories : Fonctions supports, Logistique, Production/Technique.")
 
     # Importer des CVs uniquement via upload
