@@ -10,7 +10,6 @@ import re
 from datetime import datetime
 import plotly.graph_objects as go
 import plotly.express as px
-import subprocess
 
 # Imports optionnels pour la manipulation des PDF (s'il manque, le code utilisera des fallbacks)
 try:
@@ -34,7 +33,7 @@ import torch
 
 # Import des fonctions avancées d'analyse
 from utils import (rank_resumes_with_ensemble, batch_process_resumes, 
-                 save_feedback, get_average_feedback_score, get_feedback_summary, deepseek_generate)
+                 save_feedback, get_average_feedback_score, get_feedback_summary)
 
 # -------------------- Configuration de la clé API DeepSeek --------------------
 # --- CORRECTION : Déplacé à l'intérieur des fonctions pour éviter l'erreur au démarrage ---
@@ -46,13 +45,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-# Afficher la version (commit git) pour debug déploiement
-try:
-    commit_hash = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode().strip()
-    st.caption(f"Version: {commit_hash}")
-except Exception:
-    pass
 
 # Initialisation des variables de session
 if "cv_analysis_feedback" not in st.session_state:
@@ -1249,40 +1241,9 @@ with tab4:
 
 with st.sidebar:
     st.markdown("### 🔧 Configuration")
-    
-    # Vérifier immédiatement l'état de l'API
-    API_KEY = None
-    try:
-        API_KEY = st.secrets.get("DEEPSEEK_API_KEY")
-    except:
-        pass
-    
-    if not API_KEY:
-        st.warning("⚠️ Clé API DeepSeek non configurée")
-        with st.expander("📝 Comment configurer la clé API"):
-            st.markdown("""
-            Pour activer la reclassification IA avec DeepSeek:
-            
-            1. Accédez à votre tableau de bord Streamlit Cloud
-            2. Sélectionnez cette application
-            3. Cliquez sur "Paramètres" (ou "Settings")
-            4. Rendez-vous dans la section "Secrets"
-            5. Ajoutez une nouvelle clé nommée `DEEPSEEK_API_KEY`
-            6. Collez votre clé API DeepSeek comme valeur
-            7. Cliquez sur "Sauvegarder" (ou "Save")
-            8. Redéployez l'application
-            
-            Vous pouvez obtenir une clé API sur [DeepSeek](https://platform.deepseek.com/)
-            """)
-    else:
-        st.success("✅ Configuration API DeepSeek détectée")
-    
-    col1, col2 = st.columns(2)
-    
-    if col1.button("Test Connexion API DeepSeek"):
-        if not API_KEY:
-            st.error("❌ Clé API DeepSeek non configurée. Voir instructions ci-dessus.")
-        else:
+    if st.button("Test Connexion API DeepSeek"):
+        API_KEY = get_api_key()
+        if API_KEY:
             try:
                 response = requests.get("https://api.deepseek.com/v1/models", headers={"Authorization": f"Bearer {API_KEY}"})
                 if response.status_code == 200:
@@ -1291,99 +1252,9 @@ with st.sidebar:
                     st.error(f"❌ Erreur de connexion ({response.status_code})")
             except Exception as e:
                 st.error(f"❌ Erreur: {e}")
-    
-    if col2.button("🔍 Diagnostic complet"):
-        st.info("Diagnostic en cours...")
-        
-        # 1. Vérifier Python et packages importants
-        import sys
-        st.write(f"**Python:** {sys.version}")
-        
-        # 2. Vérifier API DeepSeek
-        API_KEY = get_api_key()
-        if not API_KEY:
-            st.error("❌ Clé API DeepSeek manquante")
-        else:
-            try:
-                start = time.time()
-                response = requests.get("https://api.deepseek.com/v1/models", 
-                                       headers={"Authorization": f"Bearer {API_KEY}"})
-                latence = time.time() - start
-                if response.status_code == 200:
-                    st.success(f"✅ API DeepSeek OK (latence: {latence:.2f}s)")
-                    models = response.json().get("data", [])
-                    model_ids = [m.get("id") for m in models]
-                    st.write(f"Modèles disponibles: {', '.join(model_ids[:5])}...")
-                else:
-                    st.error(f"❌ Erreur API ({response.status_code}): {response.text[:100]}")
-            except Exception as e:
-                st.error(f"❌ Exception: {str(e)}")
-        
-        # 3. Tester extraction PDF
-        st.write("**Test extraction PDF:**")
-        try:
-            pdf_libs = []
-            if pdfplumber:
-                pdf_libs.append(f"pdfplumber {pdfplumber.__version__}")
-            if PyPDF2:
-                pdf_libs.append(f"PyPDF2 {PyPDF2.__version__}")
-            if PypdfReader:
-                import pypdf
-                pdf_libs.append(f"pypdf {pypdf.__version__}")
-            
-            if pdf_libs:
-                st.write(f"✅ Bibliothèques PDF: {', '.join(pdf_libs)}")
-            else:
-                st.error("❌ Aucune bibliothèque PDF disponible")
-        except Exception as e:
-            st.error(f"❌ Erreur PDF: {str(e)}")
-            
-        # 4. Test deepseek_generate
-        if API_KEY:
-            try:
-                start = time.time()
-                test_prompt = "Réponds uniquement par 'TEST OK' si tu reçois ce message."
-                response = deepseek_generate(test_prompt, max_tokens=20)
-                latence = time.time() - start
-                
-                if "TEST OK" in response or "OK" in response:
-                    st.success(f"✅ deepseek_generate fonctionne (latence: {latence:.2f}s)")
-                else:
-                    st.warning(f"⚠️ deepseek_generate réponse inattendue: {response[:100]}")
-            except Exception as e:
-                st.error(f"❌ Erreur deepseek_generate: {str(e)}")
-                
-        # 5. Vérifier session_state
-        st.write("**État de session:**")
-        session_keys = list(st.session_state.keys())
-        st.json(session_keys)
 
 with tab5:
-    st.header("🗂️ Auto-classification de CVs (3 catégories) — DEPLOY_DEBUG_MARKER_20251008")
-    
-    # Boîte de diagnostic pour vérifier l'état des variables importantes
-    with st.expander("🛠️ DEBUG INFO"):
-        st.write(f"**Version Git :** {commit_hash}")
-        # Vérifier si la clé API DeepSeek est disponible
-        has_deepseek_key = False
-        try:
-            has_deepseek_key = bool(st.secrets.get("DEEPSEEK_API_KEY"))
-        except:
-            pass
-        st.write(f"**DEEPSEEK_API_KEY disponible :** {has_deepseek_key}")
-        
-        # Afficher les clés de session_state
-        st.write("**Clés dans session_state:**")
-        session_keys = list(st.session_state.keys())
-        st.json(session_keys)
-        
-        # Afficher combien de CVs sont dans la session si auto_class_df existe
-        if 'auto_class_df' in st.session_state:
-            df = st.session_state['auto_class_df']
-            st.write(f"**CVs en session:** {len(df)} total")
-            cats = df['category'].value_counts().to_dict() if 'category' in df.columns else {}
-            st.json(cats)
-    
+    st.header("🗂️ Auto-classification de CVs (3 catégories)")
     st.markdown("Chargez jusqu'à 100 CVs (PDF). L'outil extrait le texte et classe automatiquement chaque CV dans l'une des 3 catégories : Fonctions supports, Logistique, Production/Technique.")
 
     # Importer des CVs uniquement via upload
@@ -1413,337 +1284,6 @@ with tab5:
             if re.search(pat, t, re.IGNORECASE):
                 return 'Fonctions supports'
         return 'Non classé'
-
-    # Helper: display results (table, counts, actions)
-    def display_results_and_actions(df):
-        total_processed = len(df)
-        non_classed_count = df[df['category'] == 'Non classé'].shape[0]
-        classified_count = total_processed - non_classed_count
-        
-        # Métriques en haut
-        col_met1, col_met2, col_met3 = st.columns(3)
-        col_met1.metric("Total traité", f"{total_processed}")
-        col_met2.metric("Classés", f"{classified_count}", delta=f"{int(classified_count/total_processed*100)}%" if total_processed > 0 else "0%")
-        col_met3.metric("Non classés", f"{non_classed_count}", delta=f"{int(non_classed_count/total_processed*100)}%" if total_processed > 0 else "0%", delta_color="inverse")
-        
-        # Vue par onglets (colonnes, tableau complet)
-        result_tabs = st.tabs(["Vue par colonnes", "Tableau complet", "Statistiques"])
-        
-        with result_tabs[0]:  # Vue par colonnes
-            # Affichage en 3 colonnes
-            cols = st.columns(3)
-            cats = ['Fonctions supports', 'Logistique', 'Production/Technique']
-            for idx, c in enumerate(cats):
-                with cols[idx]:
-                    st.subheader(c)
-                    sub = df[df['category'] == c]
-                    if sub.empty:
-                        st.write('Aucun CV classé ici.')
-                    else:
-                        # Afficher nom + extrait
-                        for _, r in sub.iterrows():
-                            with st.expander(r['file']):
-                                st.write(r['text_snippet'])
-
-            # Non classés
-            nc = df[df['category'] == 'Non classé']
-            if not nc.empty:
-                st.markdown('---')
-                st.subheader('Non classés')
-                st.dataframe(nc[['file', 'text_snippet']], use_container_width=True)
-        
-        with result_tabs[1]:  # Tableau complet
-            # Préparation du DataFrame pour affichage complet
-            display_df = df.copy()
-            display_df['texte_court'] = display_df['text_snippet'].str[:100] + '...'
-            # Réorganisation des colonnes pour affichage plus clair
-            display_df = display_df[['file', 'category', 'texte_court']]
-            # Renommage des colonnes pour l'affichage
-            display_df.columns = ['Nom du fichier', 'Catégorie', 'Aperçu du texte']
-            
-            # Filtres pour le tableau
-            col_filter1, col_filter2 = st.columns([1, 3])
-            with col_filter1:
-                selected_category = st.multiselect(
-                    "Filtrer par catégorie",
-                    options=['Tous'] + list(display_df['Catégorie'].unique()),
-                    default='Tous'
-                )
-            
-            with col_filter2:
-                search_term = st.text_input("Rechercher par nom de fichier", "")
-            
-            # Application des filtres
-            filtered_df = display_df.copy()
-            if selected_category and 'Tous' not in selected_category:
-                filtered_df = filtered_df[filtered_df['Catégorie'].isin(selected_category)]
-            
-            if search_term:
-                filtered_df = filtered_df[filtered_df['Nom du fichier'].str.contains(search_term, case=False)]
-            
-            # Affichage du tableau filtrable et triable
-            st.dataframe(
-                filtered_df,
-                use_container_width=True,
-                height=400,
-                column_config={
-                    "Nom du fichier": st.column_config.TextColumn("Nom du fichier", width="medium"),
-                    "Catégorie": st.column_config.SelectboxColumn(
-                        "Catégorie",
-                        width="small",
-                        options=['Fonctions supports', 'Logistique', 'Production/Technique', 'Non classé'],
-                        required=True
-                    ),
-                    "Aperçu du texte": st.column_config.TextColumn("Aperçu du texte", width="large")
-                }
-            )
-        
-        with result_tabs[2]:  # Statistiques
-            st.subheader("📊 Analyse globale")
-            
-            # Distribution par catégorie
-            cat_counts = df['category'].value_counts().reset_index()
-            cat_counts.columns = ['Catégorie', 'Nombre']
-            
-            # Créer deux colonnes pour les graphiques
-            col_graph1, col_graph2 = st.columns(2)
-            
-            with col_graph1:
-                # Graphique en barres
-                fig = px.bar(
-                    cat_counts,
-                    x='Catégorie',
-                    y='Nombre',
-                    title='Distribution des CV par catégorie',
-                    color='Catégorie',
-                    text='Nombre',
-                    color_discrete_map={
-                        'Fonctions supports': '#3366CC', 
-                        'Logistique': '#FF9900',
-                        'Production/Technique': '#109618', 
-                        'Non classé': '#DC3912'
-                    }
-                )
-                fig.update_layout(xaxis_title="Catégorie", yaxis_title="Nombre de CV")
-                st.plotly_chart(fig, use_container_width=True)
-            
-            with col_graph2:
-                # Graphique en camembert
-                fig2 = px.pie(
-                    cat_counts, 
-                    values='Nombre', 
-                    names='Catégorie',
-                    title='Répartition des CV par catégorie',
-                    color='Catégorie',
-                    color_discrete_map={
-                        'Fonctions supports': '#3366CC', 
-                        'Logistique': '#FF9900',
-                        'Production/Technique': '#109618', 
-                        'Non classé': '#DC3912'
-                    }
-                )
-                fig2.update_traces(textinfo='percent+label')
-                st.plotly_chart(fig2, use_container_width=True)
-            
-            # Tableau récapitulatif
-            st.subheader("Résumé")
-            st.dataframe(cat_counts, use_container_width=True)
-            
-            # Analyse des non-classés (si présents)
-            non_class = df[df['category'] == 'Non classé']
-            if not non_class.empty and len(non_class) > 0:
-                st.subheader("📝 Analyse des non-classés")
-                
-                # Extraction de mots-clés potentiels
-                all_text = " ".join(non_class['text_snippet'].str.lower().tolist())
-                
-                # Liste des mots-clés professionnels courants à rechercher
-                potential_keywords = [
-                    "ingénieur", "technicien", "responsable", "directeur", "manager", "chef", 
-                    "analyste", "consultant", "développeur", "coordinateur", "gestionnaire",
-                    "assistant", "chargé", "spécialiste", "expert", "adjoint", "superviseur",
-                    "contrôleur", "auditeur", "comptable", "commercial", "marketing", "vente",
-                    "finance", "rh", "ressources humaines", "informatique", "it", "qualité",
-                    "production", "opération", "maintenance", "projet", "achat", "logistique",
-                    "supply chain", "juridique", "communication"
-                ]
-                
-                keyword_counts = {}
-                for kw in potential_keywords:
-                    count = all_text.count(kw)
-                    if count > 0:
-                        keyword_counts[kw] = count
-                
-                # Afficher les mots-clés les plus fréquents
-                if keyword_counts:
-                    st.write("#### Mots-clés professionnels fréquents dans les CVs non classés")
-                    kw_df = pd.DataFrame(list(keyword_counts.items()), columns=['Mot-clé', 'Fréquence'])
-                    kw_df = kw_df.sort_values('Fréquence', ascending=False).head(15)
-                    
-                    # Afficher un graphique
-                    fig = px.bar(
-                        kw_df.head(10), 
-                        x='Mot-clé', 
-                        y='Fréquence',
-                        title="Top 10 mots-clés professionnels dans les CVs non classés",
-                        color='Fréquence',
-                        text='Fréquence'
-                    )
-                    fig.update_layout(xaxis_title="Mot-clé", yaxis_title="Fréquence")
-                    st.plotly_chart(fig, use_container_width=True)
-                
-                # Suggestions pour améliorer la classification
-                st.write("#### Suggestions pour améliorer la classification")
-                with st.expander("Conseils pour une meilleure classification"):
-                    st.info("""
-                    Pour améliorer la classification des CVs non-classés:
-                    
-                    1. **Enrichir les expressions régulières** : Ajoutez les mots-clés fréquents ci-dessus aux modèles de regex appropriés
-                    2. **Utiliser la reclassification IA** : Si la clé API est disponible, utilisez le bouton de reclassification par DeepSeek
-                    3. **Vérifier les formats des PDF** : Certains CVs pourraient avoir des problèmes d'extraction de texte
-                    4. **Analyser manuellement** : Examinez quelques exemples pour identifier des motifs récurrents
-                    """)
-
-        # Actions: Regex extraction, AI reclassification
-        col_action1, col_action2 = st.columns([1,1])
-        if col_action1.button('🧾 Extraire par Regex (tous)', key='regex_extract'):
-            with st.spinner('Extraction regex en cours...'):
-                for _, row in df.iterrows():
-                    with st.expander(row['file']):
-                        entities = regex_analysis(row['text_snippet'])
-                        st.json(entities)
-
-        # Vérifier si la clé API est disponible avant d'activer le bouton
-        API_KEY = None
-        try:
-            API_KEY = st.secrets.get("DEEPSEEK_API_KEY")
-        except:
-            pass
-            
-        if not API_KEY:
-            col_action2.warning("⚠️ La clé API DeepSeek n'est pas configurée. La reclassification IA est désactivée.")
-            col_action2.info("Pour activer l'IA : configurer le secret DEEPSEEK_API_KEY dans les paramètres de l'application Streamlit.")
-            # Bouton désactivé mais visible pour indiquer la fonctionnalité
-            col_action2.button('🔁 Reclassifier les non-classés avec DeepSeek (IA)', key='reclass_ai_button', disabled=True)
-        elif col_action2.button('🔁 Reclassifier les non-classés avec DeepSeek (IA)', key='reclass_ai_button'):
-            # lancer la reclassification inline et mettre à jour session_state
-            nc = df[df['category'] == 'Non classé']
-            if nc.empty:
-                st.info('Aucun CV non classé à reclassifier.')
-            else:
-                st.info('Reclassification IA en cours pour les non-classés...')
-                ai_progress = st.progress(0)
-                nc_indices = nc.index.tolist()
-                
-                # Mode alternatif : utiliser une approche heuristique si API indisponible
-                if not API_KEY:
-                    st.warning("⚠️ Mode dégradé : utilisation de règles avancées au lieu de l'IA")
-                    # Nous ne devrions jamais arriver ici grâce à la vérification plus haut
-                    
-                # Mode normal avec API
-                for idx, irow in enumerate(nc_indices):
-                    name = df.at[irow, 'file']
-                    text = df.at[irow, 'text_snippet']
-                    processing = st.empty()
-                    processing.info(f"IA traitement ({idx+1}/{len(nc_indices)}) : {name}")
-                    try:
-                        label = None
-                        prompt = (
-                            f"Classifie le CV ci-dessous dans UNE seule des catégories: 'Fonctions supports', 'Logistique', 'Production/Technique'.\n"
-                            f"Réponds uniquement par l'un des trois labels exacts.\n\n"
-                            f"Texte du CV:\n{text[:2000]}"
-                        )
-                        # Utiliser la fonction utilitaire deepseek_generate pour appeler l'API
-                        content = deepseek_generate(prompt, max_tokens=300, temperature=0.0)
-                        if 'fonctions' in content.lower():
-                            label = 'Fonctions supports'
-                        elif 'logistique' in content.lower():
-                            label = 'Logistique'
-                        elif 'production' in content.lower() or 'travaux' in content.lower() or 'génie' in content.lower():
-                            label = 'Production/Technique'
-                        else:
-                            label = 'Non classé'
-                    except Exception as e:
-                        st.error(f"Erreur API: {str(e)[:100]}")
-                        label = 'Non classé'
-                    finally:
-                        processing.empty()
-
-                    df.at[irow, 'category'] = label
-                    ai_progress.progress((idx+1)/len(nc_indices))
-
-                    ai_progress.empty()
-                    st.success('Reclassification IA terminée. Voir le tableau mis à jour ci-dessus.')
-                    # Mettre à jour le dataframe en session
-                    st.session_state['auto_class_df'] = df
-
-        # Téléchargements : classés (3-col), non-classés séparément, et tout (4-col)
-        supports = df[df['category'] == 'Fonctions supports']['file'].tolist()
-        logistics = df[df['category'] == 'Logistique']['file'].tolist()
-        production = df[df['category'] == 'Production/Technique']['file'].tolist()
-        non_classed = df[df['category'] == 'Non classé']['file'].tolist()
-
-        max_len = max(len(supports), len(logistics), len(production), len(non_classed)) if max(len(supports), len(logistics), len(production), len(non_classed)) > 0 else 0
-        supports += [''] * (max_len - len(supports))
-        logistics += [''] * (max_len - len(logistics))
-        production += [''] * (max_len - len(production))
-        non_classed += [''] * (max_len - len(non_classed))
-
-        export_all_df = pd.DataFrame({
-            'Fonctions supports': supports,
-            'Logistique': logistics,
-            'Production/Technique': production,
-            'Non classés': non_classed
-        })
-        csv_all = export_all_df.to_csv(index=False).encode('utf-8')
-        
-        # Préparer Excel (tous formats)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # Fonction pour exporter en Excel
-        def create_excel_download(df, filename):
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df.to_excel(writer, index=False)
-            excel_data = output.getvalue()
-            return excel_data
-        
-        # Créer les dataframes spécifiques
-        classified_only_df = pd.DataFrame({
-            'Fonctions supports': supports,
-            'Logistique': logistics,
-            'Production/Technique': production
-        })
-        csv_classified = classified_only_df.to_csv(index=False).encode('utf-8')
-        excel_classified = create_excel_download(classified_only_df, f"classified_results_{timestamp}.xlsx")
-        
-        non_classed_df = pd.DataFrame({'Non classés': non_classed})
-        csv_non = non_classed_df.to_csv(index=False).encode('utf-8')
-        excel_non = create_excel_download(non_classed_df, f"non_classed_results_{timestamp}.xlsx")
-        
-        excel_all = create_excel_download(export_all_df, f"classification_results_{timestamp}.xlsx")
-        
-        # Onglets pour formats d'export
-        st.markdown("### Téléchargement des résultats")
-        export_tabs = st.tabs(["CSV", "Excel"])
-        
-        with export_tabs[0]:  # CSV
-            col_dl1, col_dl2, col_dl3 = st.columns(3)
-            col_dl1.download_button(label='⬇️ Classés uniquement', data=csv_classified, 
-                                   file_name=f'classified_results_{timestamp}.csv', mime='text/csv')
-            col_dl2.download_button(label='⬇️ Non classés uniquement', data=csv_non, 
-                                   file_name=f'non_classed_results_{timestamp}.csv', mime='text/csv')
-            col_dl3.download_button(label='⬇️ Tous les résultats', data=csv_all, 
-                                   file_name=f'classification_results_{timestamp}.csv', mime='text/csv')
-        
-        with export_tabs[1]:  # Excel
-            col_dl1, col_dl2, col_dl3 = st.columns(3)
-            col_dl1.download_button(label='⬇️ Classés uniquement', data=excel_classified, 
-                                   file_name=f'classified_results_{timestamp}.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-            col_dl2.download_button(label='⬇️ Non classés uniquement', data=excel_non, 
-                                   file_name=f'non_classed_results_{timestamp}.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-            col_dl3.download_button(label='⬇️ Tous les résultats', data=excel_all, 
-                                   file_name=f'classification_results_{timestamp}.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
     # Construire la liste de fichiers uniquement à partir des uploads
     file_list = []
@@ -1784,13 +1324,6 @@ with tab5:
             processing_placeholder.empty()
 
             df = pd.DataFrame(results)
-            # Sauvegarder le DataFrame dans la session pour persistance
-            st.session_state['auto_class_df'] = df
-
-            # Afficher counts
-            total_processed = len(df)
-            non_classed_count = df[df['category'] == 'Non classé'].shape[0]
-            st.info(f"Traitement terminé : {total_processed} CV(s) traités — {non_classed_count} non classé(s).")
 
             # Affichage en 3 colonnes
             cols = st.columns(3)
@@ -1814,195 +1347,22 @@ with tab5:
                 st.subheader('Non classés')
                 st.dataframe(nc[['file', 'text_snippet']], use_container_width=True)
 
-            # Boutons supplémentaires : extraction regex et reclassification IA
-            col_action1, col_action2 = st.columns([1,1])
-            with col_action1:
-                if st.button('🧾 Extraire par Regex (tous)'):
-                    with st.spinner('Extraction regex en cours...'):
-                        # Créer un DataFrame pour stocker les résultats d'extraction
-                        regex_results = []
-                        
-                        for _, row in df.iterrows():
-                            entities = regex_analysis(row['text_snippet'])
-                            regex_results.append({
-                                'file': row['file'],
-                                'category': row['category'],
-                                'results': entities
-                            })
-                        
-                        # Afficher les résultats d'extraction dans un format plus structuré
-                        regex_tabs = st.tabs(["Vue par fichier", "Résumé global"])
-                        
-                        with regex_tabs[0]:
-                            # Vue détaillée fichier par fichier
-                            for result in regex_results:
-                                with st.expander(f"{result['file']} ({result['category']})"):
-                                    st.json(result['results'])
-                        
-                        with regex_tabs[1]:
-                            # Résumé global - statistiques sur l'expérience moyenne par catégorie
-                            exp_data = []
-                            for result in regex_results:
-                                if 'experience_mois' in result['results']:
-                                    exp_data.append({
-                                        'category': result['category'],
-                                        'experience_mois': result['results'].get('experience_mois', 0),
-                                        'experience_annees': result['results'].get('experience_mois', 0) / 12
-                                    })
-                            
-                            if exp_data:
-                                exp_df = pd.DataFrame(exp_data)
-                                # Graphique d'expérience moyenne par catégorie
-                                fig = px.box(
-                                    exp_df,
-                                    x='category',
-                                    y='experience_annees',
-                                    title="Distribution de l'expérience par catégorie",
-                                    color='category'
-                                )
-                                fig.update_layout(xaxis_title="Catégorie", yaxis_title="Années d'expérience")
-                                st.plotly_chart(fig, use_container_width=True)
-                                
-                                # Tableau récapitulatif
-                                summary = exp_df.groupby('category').agg({
-                                    'experience_annees': ['mean', 'min', 'max', 'count']
-                                }).reset_index()
-                                summary.columns = ['Catégorie', 'Expérience moyenne (années)', 'Expérience min', 'Expérience max', 'Nombre de CVs']
-                                st.dataframe(summary, use_container_width=True)
-            with col_action2:
-                # Vérifier si la clé API est disponible avant d'activer le bouton
-                API_KEY = None
-                try:
-                    API_KEY = st.secrets.get("DEEPSEEK_API_KEY")
-                except:
-                    pass
-                
-                if not API_KEY:
-                    st.warning("⚠️ La clé API DeepSeek n'est pas configurée. La reclassification IA est désactivée.")
-                    st.info("Pour activer l'IA : configurer le secret DEEPSEEK_API_KEY dans les paramètres de l'application Streamlit.")
-                    # Bouton désactivé mais visible pour indiquer la fonctionnalité
-                    st.button('🔁 Reclassifier les non-classés avec DeepSeek (IA)', disabled=True)
-                else:
-                    # Utiliser on_click pour lancer la reclassification afin d'éviter le reset
-                    if st.button('🔁 Reclassifier les non-classés avec DeepSeek (IA)', key='reclass_ai'):
-                        # Stocker un flag pour démarrer la reclassification après le rerun
-                        st.session_state['reclass_ai_requested'] = True
-
-        # Si un DataFrame est déjà en session (cas où page a rechargé), le récupérer et afficher counts
-    elif 'auto_class_df' in st.session_state:
-        df = st.session_state['auto_class_df']
-        total_processed = len(df)
-        non_classed_count = df[df['category'] == 'Non classé'].shape[0]
-        st.info(f"{total_processed} CV(s) traités antérieurement — {non_classed_count} non classé(s).")
-
-    # Si reclassification IA a été demandée, lancer le job et mettre à jour session_state
-    if st.session_state.get('reclass_ai_requested', False):
-        if 'auto_class_df' not in st.session_state:
-            st.error('Aucun résultat antérieur pour reclassification. Lancez d\'abord l\'analyse.')
-            st.session_state['reclass_ai_requested'] = False
-        else:
-            df = st.session_state['auto_class_df']
-            nc = df[df['category'] == 'Non classé']
-            if nc.empty:
-                st.info('Aucun CV non classé à reclassifier.')
-                st.session_state['reclass_ai_requested'] = False
-            else:
-                # Vérifier si la clé API est disponible
-                API_KEY = None
-                try:
-                    API_KEY = st.secrets.get("DEEPSEEK_API_KEY")
-                except:
-                    API_KEY = None
-                    
-                if not API_KEY:
-                    st.error('❌ Clé API DeepSeek absente. La reclassification IA est impossible.')
-                    st.info('💡 Pour activer cette fonctionnalité, configurez le secret DEEPSEEK_API_KEY dans les paramètres de votre application Streamlit.')
-                    st.session_state['reclass_ai_requested'] = False
-                    
-                    # Option alternative : proposer téléchargement quand même
-                    st.info("Vous pouvez néanmoins télécharger les résultats de classification actuels ci-dessous.")
-                    # Préparer les downloads sans reclassification
-                    # Copie du code de téléchargement ici pour ne pas perdre cette fonctionnalité
-                    supports = df[df['category'] == 'Fonctions supports']['file'].tolist()
-                    logistics = df[df['category'] == 'Logistique']['file'].tolist()
-                    production = df[df['category'] == 'Production/Technique']['file'].tolist()
-                    non_classed = df[df['category'] == 'Non classé']['file'].tolist()
-                    
-                    max_len = max(len(supports), len(logistics), len(production), len(non_classed)) if max(len(supports), len(logistics), len(production), len(non_classed)) > 0 else 0
-                    # Pad lists
-                    supports += [''] * (max_len - len(supports))
-                    logistics += [''] * (max_len - len(logistics))
-                    production += [''] * (max_len - len(production))
-                    non_classed += [''] * (max_len - len(non_classed))
-                    
-                    export_df = pd.DataFrame({
-                        'Fonctions supports': supports,
-                        'Logistique': logistics,
-                        'Production/Technique': production,
-                        'Non classés': non_classed
-                    })
-                    
-                    csv = export_df.to_csv(index=False).encode('utf-8')
-                    st.download_button(label='⬇️ Télécharger les résultats actuels (CSV)', data=csv, file_name='classification_results.csv', mime='text/csv')
-                else:
-                    st.info('Reclassification IA en cours pour les non-classés...')
-                    ai_progress = st.progress(0)
-                    nc_indices = nc.index.tolist()
-                    for idx, irow in enumerate(nc_indices):
-                        name = df.at[irow, 'file']
-                        text = df.at[irow, 'text_snippet']
-                        processing = st.empty()
-                        processing.info(f"IA traitement ({idx+1}/{len(nc_indices)}) : {name}")
-                        try:
-                            label = None
-                            prompt = (
-                                f"Classifie le CV ci-dessous dans UNE seule des catégories: 'Fonctions supports', 'Logistique', 'Production/Technique'.\n"
-                                f"Réponds uniquement par l'un des trois labels exacts.\n\n"
-                                f"Texte du CV:\n{text[:2000]}"
-                            )
-                            # Utiliser deepseek_generate (utils) pour uniformité
-                            content = deepseek_generate(prompt, max_tokens=300, temperature=0.0)
-                            if 'fonctions' in content.lower():
-                                label = 'Fonctions supports'
-                            elif 'logistique' in content.lower():
-                                label = 'Logistique'
-                            elif 'production' in content.lower() or 'travaux' in content.lower() or 'génie' in content.lower():
-                                label = 'Production/Technique'
-                            else:
-                                label = 'Non classé'
-                        except Exception as e:
-                            st.error(f"Erreur API: {str(e)[:100]}")
-                            label = 'Non classé'
-                        finally:
-                            processing.empty()
-
-                        df.at[irow, 'category'] = label
-                        ai_progress.progress((idx+1)/len(nc_indices))
-
-                    ai_progress.empty()
-                    st.success('Reclassification IA terminée. Voir le tableau mis à jour ci-dessus.')
-                    # Mettre à jour le dataframe en session et réinitialiser le flag
-                    st.session_state['auto_class_df'] = df
-                    st.session_state['reclass_ai_requested'] = False
-
-            # Préparer un CSV à 4 colonnes : Fonctions supports, Logistique, Production/Technique, Non classés
+            # Préparer un CSV à 3 colonnes : Fonctions supports, Logistique, Production/Technique
+            # Chaque ligne contient le nom du CV dans la colonne correspondant à sa catégorie.
             supports = df[df['category'] == 'Fonctions supports']['file'].tolist()
             logistics = df[df['category'] == 'Logistique']['file'].tolist()
             production = df[df['category'] == 'Production/Technique']['file'].tolist()
-            non_classed = df[df['category'] == 'Non classé']['file'].tolist()
 
-            max_len = max(len(supports), len(logistics), len(production), len(non_classed)) if max(len(supports), len(logistics), len(production), len(non_classed)) > 0 else 0
+            max_len = max(len(supports), len(logistics), len(production)) if max(len(supports), len(logistics), len(production)) > 0 else 0
             # Pad lists
             supports += [''] * (max_len - len(supports))
             logistics += [''] * (max_len - len(logistics))
             production += [''] * (max_len - len(production))
-            non_classed += [''] * (max_len - len(non_classed))
 
             export_df = pd.DataFrame({
                 'Fonctions supports': supports,
                 'Logistique': logistics,
-                'Production/Technique': production,
-                'Non classés': non_classed
+                'Production/Technique': production
             })
 
             csv = export_df.to_csv(index=False).encode('utf-8')
