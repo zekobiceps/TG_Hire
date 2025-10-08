@@ -1056,6 +1056,8 @@ with tab4:
                         # Sauvegarder la forecast pour affichage global et exports
                         st.session_state.forecast_df = forecast_df.copy()
                         st.session_state.display_forecast = display_forecast.copy()
+                        # Reset rendering guard so the Direction/Poste block will run for this new forecast
+                        st.session_state['dir_poste_rendered_once'] = False
                         # (ne pas stocker de DeltaGenerator dans session_state)
                 except Exception as e:
                     st.error(f"❌ Erreur lors de la prédiction : {str(e)}")
@@ -1109,35 +1111,36 @@ with tab4:
                 container.empty()
             except Exception:
                 container = st.container()
-            # Rendu dans le container
+            # Rendu dans le container (guard pour éviter double rendu)
             # Debug logs to trace render executions
             # Visible debug in UI so user can see execution when running on Streamlit Cloud
-            st.info("🔎 Début rendu: Prédictions Direction/Poste")
-            print(f"[DEBUG] Rendering Direction/Poste block at {datetime.now()}")
-            with container:
-                # Compteur de rendus pour debug (combien de fois ce bloc est exécuté)
-                count = st.session_state.get('dir_poste_render_count', 0) + 1
-                st.session_state['dir_poste_render_count'] = count
-                # Afficher le compteur dans l'UI clairement
-                # Note: avoid passing `key=` to st.info here to prevent TypeError on some Streamlit runtimes
-                st.info(f"🔁 Direction/Poste render count: {count}")
-                print(f"[DEBUG] Direction/Poste render count: {count} at {datetime.now()}")
+            if not st.session_state.get('dir_poste_rendered_once', False):
+                st.info("🔎 Début rendu: Prédictions Direction/Poste")
+                print(f"[DEBUG] Rendering Direction/Poste block at {datetime.now()}")
+                with container:
+                    # Compteur de rendus pour debug (combien de fois ce bloc est exécuté)
+                    count = st.session_state.get('dir_poste_render_count', 0) + 1
+                    st.session_state['dir_poste_render_count'] = count
+                    # Afficher le compteur dans l'UI clairement
+                    # Note: avoid passing `key=` to st.info here to prevent TypeError on some Streamlit runtimes
+                    st.info(f"🔁 Direction/Poste render count: {count}")
+                    print(f"[DEBUG] Direction/Poste render count: {count} at {datetime.now()}")
 
-                # Calculer proportions historiques par direction/poste
-                raw = st.session_state.cleaned_data_filtered.copy()
-                if direction_col and direction_col in raw.columns:
-                    dir_counts = raw[direction_col].value_counts().reset_index()
-                    dir_counts.columns = ['Direction', 'Nombre']
-                    dir_counts['Prop'] = dir_counts['Nombre'] / dir_counts['Nombre'].sum()
-                else:
-                    dir_counts = pd.DataFrame(columns=['Direction', 'Nombre', 'Prop'])
+                    # Calculer proportions historiques par direction/poste
+                    raw = st.session_state.cleaned_data_filtered.copy()
+                    if direction_col and direction_col in raw.columns:
+                        dir_counts = raw[direction_col].value_counts().reset_index()
+                        dir_counts.columns = ['Direction', 'Nombre']
+                        dir_counts['Prop'] = dir_counts['Nombre'] / dir_counts['Nombre'].sum()
+                    else:
+                        dir_counts = pd.DataFrame(columns=['Direction', 'Nombre', 'Prop'])
 
-                if poste_col and poste_col in raw.columns:
-                    poste_counts = raw[poste_col].value_counts().reset_index()
-                    poste_counts.columns = ['Poste', 'Nombre']
-                    poste_counts['Prop'] = poste_counts['Nombre'] / poste_counts['Nombre'].sum()
-                else:
-                    poste_counts = pd.DataFrame(columns=['Poste', 'Nombre', 'Prop'])
+                    if poste_col and poste_col in raw.columns:
+                        poste_counts = raw[poste_col].value_counts().reset_index()
+                        poste_counts.columns = ['Poste', 'Nombre']
+                        poste_counts['Prop'] = poste_counts['Nombre'] / poste_counts['Nombre'].sum()
+                    else:
+                        poste_counts = pd.DataFrame(columns=['Poste', 'Nombre', 'Prop'])
 
                 # Appliquer la répartition proportionnelle aux prévisions globales
                 total_pred = monthly_forecast['predicted_volume'].sum()
@@ -1205,9 +1208,11 @@ with tab4:
 
                 # Pas de flag stocké en session pour le rendu — le container local évite les duplications
 
-            # Visible debug end in UI
-            st.info("✅ Fin rendu: Prédictions Direction/Poste")
-            print(f"[DEBUG] Finished rendering Direction/Poste block at {datetime.now()}")
+                # Visible debug end in UI
+                st.info("✅ Fin rendu: Prédictions Direction/Poste")
+                print(f"[DEBUG] Finished rendering Direction/Poste block at {datetime.now()}")
+                # Mark as rendered to avoid duplicate displays on subsequent reruns
+                st.session_state['dir_poste_rendered_once'] = True
 
             # --- Export unique: créer un fichier Excel multi-onglets (Global / Par_Direction / Par_Poste)
             try:
