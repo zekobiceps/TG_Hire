@@ -347,7 +347,7 @@ with tab1:
             
             n_samples = 1200
             
-            # Générer les demandes
+            # Générer des demandes
             sample_data = pd.DataFrame({
                 'Date de réception de la demande aprés validation de la DRH': 
                     np.random.choice(date_range, n_samples),
@@ -917,19 +917,55 @@ with tab4:
 
                     # Préparation des prédictions futures
                     last_date = time_series['date'].max()
-                    future_predictions = final_forecast[final_forecast['ds'] > last_date].copy()
+                    future_predictions = final_forecast.copy()
+                    future_predictions['ds'] = pd.to_datetime(future_predictions['ds'])
+                    last_date_ts = pd.to_datetime(last_date)
 
-                    if not future_predictions.empty:
-                        # Traitement des résultats (identique à avant)
-                        if 'yhat' in future_predictions.columns:
-                            monthly_forecast = future_predictions[['ds', 'yhat']].copy()
+                    # garder uniquement les dates strictement après la dernière date historique
+                    future_predictions = future_predictions[future_predictions['ds'] > last_date_ts].copy()
+
+                    if future_predictions.empty:
+                        st.warning("⚠️ Aucune prédiction future générée. Vérifiez la configuration du modèle.")
+                    else:
+                        # Détecter fréquence d'entraînement (ex. annuelle si médiane des deltas > 300 jours)
+                        median_delta = time_series['date'].sort_values().diff().dt.days.median()
+                        is_annual = pd.notna(median_delta) and median_delta > 300
+
+                        if is_annual:
+                            # répartir les totaux annuels sur les mois selon proportions historiques
+                            df_raw = st.session_state.get('cleaned_data_filtered', None)
+                            date_col = st.session_state.get('date_col', None)
+                            if df_raw is None or date_col is None:
+                                month_props = {m: 1/12 for m in range(1,13)}
+                            else:
+                                df_tmp = df_raw.copy()
+                                df_tmp[date_col] = pd.to_datetime(df_tmp[date_col], errors='coerce')
+                                df_tmp = df_tmp.dropna(subset=[date_col])
+                                df_tmp['month'] = df_tmp[date_col].dt.month
+                                month_counts = df_tmp['month'].value_counts().sort_index()
+                                if month_counts.sum() == 0:
+                                    month_props = {m: 1/12 for m in range(1,13)}
+                                else:
+                                    month_props = (month_counts / month_counts.sum()).to_dict()
+
+                            monthly_rows = []
+                            for _, row in future_predictions.iterrows():
+                                year = int(row['ds'].year)
+                                total_annual = float(row.get('yhat', row.get('y', 0)))
+                                for m in range(1,13):
+                                    ds_month = pd.Timestamp(year=year, month=m, day=1)
+                                    monthly_val = int(round(total_annual * month_props.get(m, 1/12)))
+                                    monthly_rows.append({'date': ds_month, 'predicted_volume': monthly_val})
+                            monthly_forecast = pd.DataFrame(monthly_rows).sort_values('date').head(horizon_months).reset_index(drop=True)
                         else:
-                            monthly_forecast = future_predictions[['ds', 'y']].rename(columns={'y': 'yhat'}).copy()
-                        monthly_forecast.rename(columns={'ds': 'date'}, inplace=True)
-                        monthly_forecast['predicted_volume'] = monthly_forecast['yhat'].round().astype(int)
-                        monthly_forecast['predicted_volume'] = monthly_forecast['predicted_volume'].apply(lambda x: max(0, x))
-                        monthly_forecast = monthly_forecast[['date', 'predicted_volume']]
-                        monthly_forecast = monthly_forecast.head(horizon_months)
+                            # comportement normal : la prédiction est déjà mensuelle
+                            if 'yhat' in future_predictions.columns:
+                                monthly_forecast = future_predictions[['ds', 'yhat']].copy().rename(columns={'ds':'date','yhat':'predicted_volume'})
+                            else:
+                                monthly_forecast = future_predictions[['ds', 'y']].copy().rename(columns={'ds':'date','y':'predicted_volume'})
+                            monthly_forecast['date'] = pd.to_datetime(monthly_forecast['date'])
+                            monthly_forecast['predicted_volume'] = monthly_forecast['predicted_volume'].round().astype(int).clip(lower=0)
+                            monthly_forecast = monthly_forecast.sort_values('date').head(horizon_months).reset_index(drop=True)
                         
                         # --- Affichage des résultats (identique à avant) ---
                         st.subheader("🔮 Prévisions Mensuelles")
