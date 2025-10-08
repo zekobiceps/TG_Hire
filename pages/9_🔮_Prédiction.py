@@ -853,118 +853,96 @@ with tab4:
         if st.button("🚀 Lancer la prédiction", type="primary", use_container_width=True):
             with st.spinner(f"🤖 Entraînement du modèle {model_type} en cours..."):
                 try:
-                    # Division train/test pour le calcul du MAPE
+                    # --- Étape 1: Évaluation du modèle pour le score MAPE ---
+                    
+                    # Division train/test
                     n_total = len(time_series)
                     n_test = max(1, int(n_total * 0.2))
-                    
                     train_data = time_series.iloc[:-n_test].copy()
                     test_data = time_series.iloc[-n_test:].copy()
-                    
-                    # Entraînement du modèle
+
+                    # Entraînement d'un modèle temporaire sur les données d'entraînement
                     if model_type == "Prophet":
-                        model, forecast = predict_with_prophet(train_data, horizon_months)
+                        temp_model, temp_forecast = predict_with_prophet(train_data, n_test)
                     elif model_type == "Holt-Winters":
-                        model, forecast = predict_with_holt_winters(train_data, horizon_months)
+                        temp_model, temp_forecast = predict_with_holt_winters(train_data, n_test)
                     else:  # XGBoost
-                        model, forecast = predict_with_xgboost(train_data, horizon_months)
-                    
-                    if model is None or forecast is None:
-                        st.error("❌ Échec de la prédiction. Veuillez essayer un autre modèle.")
-                        st.stop()
-                    
-                    # Calcul du MAPE sur les données de test
+                        temp_model, temp_forecast = predict_with_xgboost(train_data, n_test)
+
+                    # Calcul du MAPE en comparant les prédictions aux données de test
                     test_predictions = []
-                    for test_date in test_data['date']:
-                        pred_row = forecast[forecast['ds'].dt.date == test_date.date()]
-                        if not pred_row.empty:
-                            test_predictions.append(pred_row['yhat'].iloc[0])
-                        else:
-                            test_predictions.append(np.nan)
+                    if temp_forecast is not None:
+                        for test_date in test_data['date']:
+                            pred_row = temp_forecast[temp_forecast['ds'].dt.date == test_date.date()]
+                            if not pred_row.empty:
+                                # support yhat (prévu) ou y (Prophet parfois)
+                                if 'yhat' in pred_row.columns:
+                                    test_predictions.append(pred_row['yhat'].iloc[0])
+                                elif 'y' in pred_row.columns:
+                                    test_predictions.append(pred_row['y'].iloc[0])
+                                else:
+                                    test_predictions.append(np.nan)
+                            else:
+                                test_predictions.append(np.nan)
                     
-                    # Calculer le MAPE
-                    if len(test_predictions) > 0 and not all(np.isnan(test_predictions)):
-                        mape_score = calculate_mape(test_data['volume'].values, test_predictions)
-                    else:
-                        mape_score = np.nan
-                    
+                    mape_score = calculate_mape(test_data['volume'].values, test_predictions) if test_predictions else np.nan
+
                     # Affichage du score de confiance
                     st.subheader("📊 Score de Confiance")
-                    
                     col_metric1, col_metric2, col_metric3 = st.columns(3)
-                    
                     with col_metric1:
                         if not np.isnan(mape_score):
-                            st.metric(
-                                "Marge d'Erreur Moyenne",
-                                f"± {mape_score:.1f}%",
-                                help="MAPE (Mean Absolute Percentage Error) calculé sur les données de test"
-                            )
+                            st.metric("Marge d'Erreur Moyenne", f"± {mape_score:.1f}%", help="MAPE calculé sur les données de test")
                         else:
                             st.metric("Marge d'Erreur Moyenne", "N/A")
-                    
                     with col_metric2:
                         st.metric("Points d'entraînement", len(train_data))
-                    
                     with col_metric3:
                         st.metric("Modèle utilisé", model_type)
-                    
-                    # Préparer les prédictions futures mensuelles
+
+                    # --- Étape 2: Génération de la prédiction finale pour l'utilisateur ---
+
+                    # Entraînement du modèle final sur 100% des données historiques
+                    st.info("Ré-entraînement du modèle sur toutes les données pour la prédiction finale...")
+                    if model_type == "Prophet":
+                        final_model, final_forecast = predict_with_prophet(time_series, horizon_months)
+                    elif model_type == "Holt-Winters":
+                        final_model, final_forecast = predict_with_holt_winters(time_series, horizon_months)
+                    else:  # XGBoost
+                        final_model, final_forecast = predict_with_xgboost(time_series, horizon_months)
+
+                    if final_model is None or final_forecast is None:
+                        st.error("❌ Échec de la prédiction finale.")
+                        st.stop()
+
+                    # Préparation des prédictions futures
                     last_date = time_series['date'].max()
-                    future_predictions = forecast[forecast['ds'] > last_date].copy()
-                    
+                    future_predictions = final_forecast[final_forecast['ds'] > last_date].copy()
+
                     if not future_predictions.empty:
-                        # Les données sont déjà mensuelles, pas besoin d'agréger
-                        monthly_forecast = future_predictions[['ds', 'yhat']].copy()
+                        # Traitement des résultats (identique à avant)
+                        if 'yhat' in future_predictions.columns:
+                            monthly_forecast = future_predictions[['ds', 'yhat']].copy()
+                        else:
+                            monthly_forecast = future_predictions[['ds', 'y']].rename(columns={'y': 'yhat'}).copy()
                         monthly_forecast.rename(columns={'ds': 'date'}, inplace=True)
                         monthly_forecast['predicted_volume'] = monthly_forecast['yhat'].round().astype(int)
-                        # Sécurité pour éviter les prédictions négatives
                         monthly_forecast['predicted_volume'] = monthly_forecast['predicted_volume'].apply(lambda x: max(0, x))
                         monthly_forecast = monthly_forecast[['date', 'predicted_volume']]
-                        
-                        # Limiter à l'horizon demandé
                         monthly_forecast = monthly_forecast.head(horizon_months)
                         
+                        # --- Affichage des résultats (identique à avant) ---
                         st.subheader("🔮 Prévisions Mensuelles")
                         
-                        # Graphique des prédictions
                         fig_pred = go.Figure()
-                        
-                        # Données historiques
-                        fig_pred.add_trace(go.Scatter(
-                            x=time_series['date'],
-                            y=time_series['volume'],
-                            mode='lines+markers',
-                            name='Historique',
-                            line=dict(color='#1f77b4', width=2)
-                        ))
-                        
-                        # Prédictions
-                        fig_pred.add_trace(go.Scatter(
-                            x=monthly_forecast['date'],
-                            y=monthly_forecast['predicted_volume'],
-                            mode='lines+markers',
-                            name='Prédictions',
-                            line=dict(color='#ff7f0e', width=3, dash='dash'),
-                            marker=dict(size=8)
-                        ))
-                        
-                        fig_pred.update_layout(
-                            title=f"Prédictions {model_type} - {objective}",
-                            xaxis_title="Date",
-                            yaxis_title="Volume",
-                            height=400,
-                            hovermode='x unified'
-                        )
-                        
+                        fig_pred.add_trace(go.Scatter(x=time_series['date'], y=time_series['volume'], mode='lines+markers', name='Historique', line=dict(color='#1f77b4', width=2)))
+                        fig_pred.add_trace(go.Scatter(x=monthly_forecast['date'], y=monthly_forecast['predicted_volume'], mode='lines+markers', name='Prédictions', line=dict(color='#ff7f0e', width=3, dash='dash'), marker=dict(size=8)))
+                        fig_pred.update_layout(title=f"Prédictions {model_type} - {objective}", xaxis_title="Date", yaxis_title="Volume", height=400, hovermode='x unified')
                         st.plotly_chart(fig_pred, use_container_width=True)
                         
-                        # Tableau des prédictions
                         display_forecast = monthly_forecast.copy()
                         display_forecast['Mois'] = display_forecast['date'].dt.strftime('%B %Y')
-                        display_forecast = display_forecast[['Mois', 'predicted_volume']].rename(
-                            columns={'predicted_volume': 'Volume Prédit'}
-                        )
-                        
+                        display_forecast = display_forecast[['Mois', 'predicted_volume']].rename(columns={'predicted_volume': 'Volume Prédit'})
                         st.dataframe(display_forecast, use_container_width=True)
                         
                         st.markdown("---")
@@ -973,7 +951,6 @@ with tab4:
                         st.subheader("📊 Ventilation Prévisionnelle")
                         st.markdown("*Basée sur les proportions historiques*")
                         
-                        # Calculer les proportions historiques
                         dir_proportions = {}
                         poste_proportions = {}
                         
@@ -987,87 +964,40 @@ with tab4:
                         
                         col_vent1, col_vent2 = st.columns(2)
                         
-                        # Ventilation par Direction
                         with col_vent1:
                             if dir_proportions:
                                 st.markdown("#### 🏢 Par Direction")
-                                
                                 dir_forecast_data = []
                                 for _, row in monthly_forecast.iterrows():
                                     month = row['date'].strftime('%b %Y')
                                     total = row['predicted_volume']
-                                    
                                     for direction, proportion in dir_proportions.items():
-                                        dir_forecast_data.append({
-                                            'Mois': month,
-                                            'Direction': direction,
-                                            'Volume Prédit': int(round(total * proportion)),
-                                            'Proportion (%)': f"{proportion*100:.1f}%"
-                                        })
-                                
+                                        dir_forecast_data.append({'Mois': month, 'Direction': direction, 'Volume Prédit': int(round(total * proportion)), 'Proportion (%)': f"{proportion*100:.1f}%"})
                                 df_dir_forecast = pd.DataFrame(dir_forecast_data)
-                                
-                                # Graphique de synthèse
-                                dir_totals = df_dir_forecast.groupby('Direction')['Volume Prédit'].sum().reset_index()
-                                dir_totals = dir_totals.sort_values('Volume Prédit', ascending=True)
-                                
-                                fig_dir = px.bar(
-                                    dir_totals,
-                                    x='Volume Prédit',
-                                    y='Direction',
-                                    orientation='h',
-                                    title=f"Total prévu par Direction ({horizon_months} mois)",
-                                    color='Volume Prédit',
-                                    color_continuous_scale='Blues'
-                                )
+                                dir_totals = df_dir_forecast.groupby('Direction')['Volume Prédit'].sum().reset_index().sort_values('Volume Prédit', ascending=True)
+                                fig_dir = px.bar(dir_totals, x='Volume Prédit', y='Direction', orientation='h', title=f"Total prévu par Direction ({horizon_months} mois)", color='Volume Prédit', color_continuous_scale='Blues')
                                 fig_dir.update_layout(height=300, coloraxis_showscale=False)
                                 st.plotly_chart(fig_dir, use_container_width=True)
-                                
-                                # Tableau détaillé
                                 with st.expander("📋 Détail mensuel par Direction"):
                                     st.dataframe(df_dir_forecast, use_container_width=True)
                             else:
                                 st.info("Aucune colonne Direction disponible pour la ventilation.")
                         
-                        # Ventilation par Poste
                         with col_vent2:
                             if poste_proportions:
                                 st.markdown("#### 👥 Par Poste")
-                                
                                 poste_forecast_data = []
                                 for _, row in monthly_forecast.iterrows():
                                     month = row['date'].strftime('%b %Y')
                                     total = row['predicted_volume']
-                                    
                                     for poste, proportion in poste_proportions.items():
-                                        poste_forecast_data.append({
-                                            'Mois': month,
-                                            'Poste': poste,
-                                            'Volume Prédit': int(round(total * proportion)),
-                                            'Proportion (%)': f"{proportion*100:.1f}%"
-                                        })
-                                
+                                        poste_forecast_data.append({'Mois': month, 'Poste': poste, 'Volume Prédit': int(round(total * proportion)), 'Proportion (%)': f"{proportion*100:.1f}%"})
                                 df_poste_forecast = pd.DataFrame(poste_forecast_data)
-                                
-                                # Top N postes
                                 top_n = st.slider("Nombre de postes à afficher", 5, 15, 8, key="top_n_postes")
-                                
-                                poste_totals = df_poste_forecast.groupby('Poste')['Volume Prédit'].sum().reset_index()
-                                poste_totals = poste_totals.sort_values('Volume Prédit', ascending=True).tail(top_n)
-                                
-                                fig_poste = px.bar(
-                                    poste_totals,
-                                    x='Volume Prédit',
-                                    y='Poste',
-                                    orientation='h',
-                                    title=f"Top {top_n} Postes prévus ({horizon_months} mois)",
-                                    color='Volume Prédit',
-                                    color_continuous_scale='Greens'
-                                )
+                                poste_totals = df_poste_forecast.groupby('Poste')['Volume Prédit'].sum().reset_index().sort_values('Volume Prédit', ascending=True).tail(top_n)
+                                fig_poste = px.bar(poste_totals, x='Volume Prédit', y='Poste', orientation='h', title=f"Top {top_n} Postes prévus ({horizon_months} mois)", color='Volume Prédit', color_continuous_scale='Greens')
                                 fig_poste.update_layout(height=300, coloraxis_showscale=False)
                                 st.plotly_chart(fig_poste, use_container_width=True)
-                                
-                                # Tableau détaillé
                                 with st.expander("📋 Détail mensuel par Poste"):
                                     st.dataframe(df_poste_forecast, use_container_width=True)
                             else:
@@ -1077,69 +1007,27 @@ with tab4:
                         
                         # Export des résultats
                         st.subheader("📥 Export des Résultats")
-                        
-                        # Créer un DataFrame consolidé pour l'export
                         export_data = []
-                        
                         for _, row in monthly_forecast.iterrows():
                             month = row['date'].strftime('%Y-%m')
                             month_label = row['date'].strftime('%B %Y')
                             total_volume = row['predicted_volume']
-                            
-                            # Ligne totale
-                            export_data.append({
-                                'Mois': month,
-                                'Mois_Label': month_label,
-                                'Niveau': 'Total',
-                                'Dimension': 'TOTAL',
-                                'Volume_Predit': total_volume,
-                                'Proportion_Pct': 100.0
-                            })
-                            
-                            # Directions
+                            export_data.append({'Mois': month, 'Mois_Label': month_label, 'Niveau': 'Total', 'Dimension': 'TOTAL', 'Volume_Predit': total_volume, 'Proportion_Pct': 100.0})
                             if dir_proportions:
                                 for direction, proportion in dir_proportions.items():
-                                    export_data.append({
-                                        'Mois': month,
-                                        'Mois_Label': month_label,
-                                        'Niveau': 'Direction',
-                                        'Dimension': direction,
-                                        'Volume_Predit': int(round(total_volume * proportion)),
-                                        'Proportion_Pct': round(proportion * 100, 2)
-                                    })
-                            
-                            # Postes
+                                    export_data.append({'Mois': month, 'Mois_Label': month_label, 'Niveau': 'Direction', 'Dimension': direction, 'Volume_Predit': int(round(total_volume * proportion)), 'Proportion_Pct': round(proportion * 100, 2)})
                             if poste_proportions:
                                 for poste, proportion in poste_proportions.items():
-                                    export_data.append({
-                                        'Mois': month,
-                                        'Mois_Label': month_label,
-                                        'Niveau': 'Poste',
-                                        'Dimension': poste,
-                                        'Volume_Predit': int(round(total_volume * proportion)),
-                                        'Proportion_Pct': round(proportion * 100, 2)
-                                    })
+                                    export_data.append({'Mois': month, 'Mois_Label': month_label, 'Niveau': 'Poste', 'Dimension': poste, 'Volume_Predit': int(round(total_volume * proportion)), 'Proportion_Pct': round(proportion * 100, 2)})
                         
                         export_df = pd.DataFrame(export_data)
-                        
                         if not export_df.empty:
                             csv_data = convert_df_to_csv(export_df)
-                            
-                            st.download_button(
-                                label="📥 Télécharger les prévisions détaillées (CSV)",
-                                data=csv_data,
-                                file_name=f"previsions_{objective.lower().replace(' ', '_')}_{horizon_months}m.csv",
-                                mime="text/csv",
-                                use_container_width=True
-                            )
-                            
-                            # Aperçu des données d'export
+                            st.download_button(label="📥 Télécharger les prévisions détaillées (CSV)", data=csv_data, file_name=f"previsions_{objective.lower().replace(' ', '_')}_{horizon_months}m.csv", mime="text/csv", use_container_width=True)
                             with st.expander("👀 Aperçu des données d'export"):
                                 st.dataframe(export_df.head(20), use_container_width=True)
                         
-                        st.success(f"✅ **Prédiction terminée avec succès!** "
-                                 f"Prévisions générées pour {horizon_months} mois avec le modèle {model_type}.")
-                    
+                        st.success(f"✅ **Prédiction terminée avec succès!** Prévisions générées pour {horizon_months} mois avec le modèle {model_type}.")
                     else:
                         st.warning("⚠️ Aucune prédiction future générée. Vérifiez la configuration du modèle.")
                 
