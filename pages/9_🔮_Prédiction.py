@@ -856,7 +856,7 @@ with tab4:
             horizon_value = st.number_input(
                 "🔮 Horizon de prédiction",
                 min_value=1,
-                max_valvalue=60,  # Augmentation de la limite à 60
+                max_value=60,  # Augmentation de la limite à 60
                 value=6,
                 help="Nombre de périodes à prédire dans le futur (mois ou années selon l'agrégation)"
             )
