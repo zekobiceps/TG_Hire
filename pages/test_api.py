@@ -1499,31 +1499,110 @@ with tab5:
             )
         
         with result_tabs[2]:  # Statistiques
+            st.subheader("📊 Analyse globale")
+            
             # Distribution par catégorie
             cat_counts = df['category'].value_counts().reset_index()
             cat_counts.columns = ['Catégorie', 'Nombre']
             
-            # Graphique en barres
-            fig = px.bar(
-                cat_counts,
-                x='Catégorie',
-                y='Nombre',
-                title='Distribution des CV par catégorie',
-                color='Catégorie',
-                text='Nombre',
-                color_discrete_map={
-                    'Fonctions supports': '#3366CC', 
-                    'Logistique': '#FF9900',
-                    'Production/Technique': '#109618', 
-                    'Non classé': '#DC3912'
-                }
-            )
-            fig.update_layout(xaxis_title="Catégorie", yaxis_title="Nombre de CV")
-            st.plotly_chart(fig, use_container_width=True)
+            # Créer deux colonnes pour les graphiques
+            col_graph1, col_graph2 = st.columns(2)
+            
+            with col_graph1:
+                # Graphique en barres
+                fig = px.bar(
+                    cat_counts,
+                    x='Catégorie',
+                    y='Nombre',
+                    title='Distribution des CV par catégorie',
+                    color='Catégorie',
+                    text='Nombre',
+                    color_discrete_map={
+                        'Fonctions supports': '#3366CC', 
+                        'Logistique': '#FF9900',
+                        'Production/Technique': '#109618', 
+                        'Non classé': '#DC3912'
+                    }
+                )
+                fig.update_layout(xaxis_title="Catégorie", yaxis_title="Nombre de CV")
+                st.plotly_chart(fig, use_container_width=True)
+            
+            with col_graph2:
+                # Graphique en camembert
+                fig2 = px.pie(
+                    cat_counts, 
+                    values='Nombre', 
+                    names='Catégorie',
+                    title='Répartition des CV par catégorie',
+                    color='Catégorie',
+                    color_discrete_map={
+                        'Fonctions supports': '#3366CC', 
+                        'Logistique': '#FF9900',
+                        'Production/Technique': '#109618', 
+                        'Non classé': '#DC3912'
+                    }
+                )
+                fig2.update_traces(textinfo='percent+label')
+                st.plotly_chart(fig2, use_container_width=True)
             
             # Tableau récapitulatif
             st.subheader("Résumé")
             st.dataframe(cat_counts, use_container_width=True)
+            
+            # Analyse des non-classés (si présents)
+            non_class = df[df['category'] == 'Non classé']
+            if not non_class.empty and len(non_class) > 0:
+                st.subheader("📝 Analyse des non-classés")
+                
+                # Extraction de mots-clés potentiels
+                all_text = " ".join(non_class['text_snippet'].str.lower().tolist())
+                
+                # Liste des mots-clés professionnels courants à rechercher
+                potential_keywords = [
+                    "ingénieur", "technicien", "responsable", "directeur", "manager", "chef", 
+                    "analyste", "consultant", "développeur", "coordinateur", "gestionnaire",
+                    "assistant", "chargé", "spécialiste", "expert", "adjoint", "superviseur",
+                    "contrôleur", "auditeur", "comptable", "commercial", "marketing", "vente",
+                    "finance", "rh", "ressources humaines", "informatique", "it", "qualité",
+                    "production", "opération", "maintenance", "projet", "achat", "logistique",
+                    "supply chain", "juridique", "communication"
+                ]
+                
+                keyword_counts = {}
+                for kw in potential_keywords:
+                    count = all_text.count(kw)
+                    if count > 0:
+                        keyword_counts[kw] = count
+                
+                # Afficher les mots-clés les plus fréquents
+                if keyword_counts:
+                    st.write("#### Mots-clés professionnels fréquents dans les CVs non classés")
+                    kw_df = pd.DataFrame(list(keyword_counts.items()), columns=['Mot-clé', 'Fréquence'])
+                    kw_df = kw_df.sort_values('Fréquence', ascending=False).head(15)
+                    
+                    # Afficher un graphique
+                    fig = px.bar(
+                        kw_df.head(10), 
+                        x='Mot-clé', 
+                        y='Fréquence',
+                        title="Top 10 mots-clés professionnels dans les CVs non classés",
+                        color='Fréquence',
+                        text='Fréquence'
+                    )
+                    fig.update_layout(xaxis_title="Mot-clé", yaxis_title="Fréquence")
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                # Suggestions pour améliorer la classification
+                st.write("#### Suggestions pour améliorer la classification")
+                with st.expander("Conseils pour une meilleure classification"):
+                    st.info("""
+                    Pour améliorer la classification des CVs non-classés:
+                    
+                    1. **Enrichir les expressions régulières** : Ajoutez les mots-clés fréquents ci-dessus aux modèles de regex appropriés
+                    2. **Utiliser la reclassification IA** : Si la clé API est disponible, utilisez le bouton de reclassification par DeepSeek
+                    3. **Vérifier les formats des PDF** : Certains CVs pourraient avoir des problèmes d'extraction de texte
+                    4. **Analyser manuellement** : Examinez quelques exemples pour identifier des motifs récurrents
+                    """)
 
         # Actions: Regex extraction, AI reclassification
         col_action1, col_action2 = st.columns([1,1])
@@ -1740,10 +1819,56 @@ with tab5:
             with col_action1:
                 if st.button('🧾 Extraire par Regex (tous)'):
                     with st.spinner('Extraction regex en cours...'):
+                        # Créer un DataFrame pour stocker les résultats d'extraction
+                        regex_results = []
+                        
                         for _, row in df.iterrows():
-                            with st.expander(row['file']):
-                                entities = regex_analysis(row['text_snippet'])
-                                st.json(entities)
+                            entities = regex_analysis(row['text_snippet'])
+                            regex_results.append({
+                                'file': row['file'],
+                                'category': row['category'],
+                                'results': entities
+                            })
+                        
+                        # Afficher les résultats d'extraction dans un format plus structuré
+                        regex_tabs = st.tabs(["Vue par fichier", "Résumé global"])
+                        
+                        with regex_tabs[0]:
+                            # Vue détaillée fichier par fichier
+                            for result in regex_results:
+                                with st.expander(f"{result['file']} ({result['category']})"):
+                                    st.json(result['results'])
+                        
+                        with regex_tabs[1]:
+                            # Résumé global - statistiques sur l'expérience moyenne par catégorie
+                            exp_data = []
+                            for result in regex_results:
+                                if 'experience_mois' in result['results']:
+                                    exp_data.append({
+                                        'category': result['category'],
+                                        'experience_mois': result['results'].get('experience_mois', 0),
+                                        'experience_annees': result['results'].get('experience_mois', 0) / 12
+                                    })
+                            
+                            if exp_data:
+                                exp_df = pd.DataFrame(exp_data)
+                                # Graphique d'expérience moyenne par catégorie
+                                fig = px.box(
+                                    exp_df,
+                                    x='category',
+                                    y='experience_annees',
+                                    title="Distribution de l'expérience par catégorie",
+                                    color='category'
+                                )
+                                fig.update_layout(xaxis_title="Catégorie", yaxis_title="Années d'expérience")
+                                st.plotly_chart(fig, use_container_width=True)
+                                
+                                # Tableau récapitulatif
+                                summary = exp_df.groupby('category').agg({
+                                    'experience_annees': ['mean', 'min', 'max', 'count']
+                                }).reset_index()
+                                summary.columns = ['Catégorie', 'Expérience moyenne (années)', 'Expérience min', 'Expérience max', 'Nombre de CVs']
+                                st.dataframe(summary, use_container_width=True)
             with col_action2:
                 # Vérifier si la clé API est disponible avant d'activer le bouton
                 API_KEY = None
