@@ -1313,7 +1313,7 @@ with tab5:
     # Afficher immédiatement combien de CVs ont été uploadés
     if len(file_list) > 0:
         st.success(f"✅ {len(file_list)} CV(s) uploadé(s) et prêts pour traitement.")
-        st.markdown(f"Cliquez sur le bouton **Lancer l'auto-classification** ci-dessous pour démarrer l'analyse.")
+        # Message d'instruction supprimé
 
         # Limiter à 200 pour sécurité
         if len(file_list) > 200:
@@ -1466,12 +1466,34 @@ with tab5:
                 # Afficher le tableau avec les catégories attribuées
                 st.dataframe(ai_results_df, width="stretch", hide_index=True)
 
-            # Préparer un CSV à 4 colonnes : Fonctions supports, Logistique, Production/Technique, Non classés
-            # Chaque ligne contient le nom du CV dans la colonne correspondant à sa catégorie.
+            # Préparer un CSV à 4 colonnes en prenant en compte les analyses IA
+            # Récupérer les classifications initiales
             supports = df[df['category'] == 'Fonctions supports']['file'].tolist()
             logistics = df[df['category'] == 'Logistique']['file'].tolist()
             production = df[df['category'] == 'Production/Technique']['file'].tolist()
             unclassified = df[df['category'] == 'Non classé']['file'].tolist()
+            
+            # Intégrer les résultats de l'analyse IA si disponible
+            if hasattr(st.session_state, 'deepseek_analyses') and st.session_state.deepseek_analyses:
+                for result in st.session_state.deepseek_analyses:
+                    filename = result['Fichier']
+                    category = result['Catégorie']
+                    
+                    # Ne traiter que si le fichier est dans la liste des non classés
+                    if filename in unclassified:
+                        # Supprimer de non classés
+                        unclassified.remove(filename)
+                        
+                        # Ajouter à la catégorie appropriée
+                        if "support" in category.lower():
+                            supports.append(filename)
+                        elif "logistique" in category.lower():
+                            logistics.append(filename)
+                        elif "production" in category.lower() or "technique" in category.lower():
+                            production.append(filename)
+                        else:
+                            # Remettre dans non classés si la catégorie n'est pas reconnue
+                            unclassified.append(filename)
 
             max_len = max(len(supports), len(logistics), len(production), len(unclassified)) if max(len(supports), len(logistics), len(production), len(unclassified)) > 0 else 0
             # Pad lists
@@ -1487,9 +1509,8 @@ with tab5:
                 'Non classés': unclassified
             })
 
-            # Ajouter un texte explicatif pour le téléchargement
+            # Séparateur visuel
             st.markdown("---")
-            st.info("Le fichier CSV téléchargé contiendra 4 colonnes : Fonctions supports, Logistique, Production/Technique, et Non classés. Chaque CV sera listé dans la colonne correspondant à sa catégorie.")
             
             # Comptage des CVs par catégorie pour l'affichage
             count_support = len([x for x in supports if x])
@@ -1497,7 +1518,9 @@ with tab5:
             count_production = len([x for x in production if x])
             count_unclassified = len([x for x in unclassified if x])
             
-            st.markdown(f"**Résumé**: {count_support} en Fonctions supports, {count_logistics} en Logistique, {count_production} en Production/Technique, {count_unclassified} Non classés.")
+            # Ajouter un indicateur pour montrer que les analyses IA sont incluses
+            ai_indicator = " (incluant les analyses IA)" if hasattr(st.session_state, 'deepseek_analyses') and st.session_state.deepseek_analyses else ""
+            st.markdown(f"**Résumé{ai_indicator}**: {count_support} en Fonctions supports, {count_logistics} en Logistique, {count_production} en Production/Technique, {count_unclassified} Non classés.")
             
             csv = export_df.to_csv(index=False).encode('utf-8')
             st.download_button(label='⬇️ Télécharger les résultats (CSV)', data=csv, file_name='classification_results.csv', mime='text/csv')
