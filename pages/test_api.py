@@ -1285,6 +1285,131 @@ with tab5:
                 return 'Fonctions supports'
         return 'Non classé'
 
+    # Helper: display results (table, counts, actions)
+    def display_results_and_actions(df):
+        total_processed = len(df)
+        non_classed_count = df[df['category'] == 'Non classé'].shape[0]
+        classified_count = total_processed - non_classed_count
+        st.info(f"Traitement terminé : {total_processed} CV(s) traités — {classified_count} classé(s) — {non_classed_count} non classé(s).")
+
+        # Affichage en 3 colonnes
+        cols = st.columns(3)
+        cats = ['Fonctions supports', 'Logistique', 'Production/Technique']
+        for idx, c in enumerate(cats):
+            with cols[idx]:
+                st.subheader(c)
+                sub = df[df['category'] == c]
+                if sub.empty:
+                    st.write('Aucun CV classé ici.')
+                else:
+                    # Afficher nom + extrait
+                    for _, r in sub.iterrows():
+                        with st.expander(r['file']):
+                            st.write(r['text_snippet'])
+
+        # Non classés
+        nc = df[df['category'] == 'Non classé']
+        if not nc.empty:
+            st.markdown('---')
+            st.subheader('Non classés')
+            st.dataframe(nc[['file', 'text_snippet']], use_container_width=True)
+
+        # Actions: Regex extraction, AI reclassification
+        col_action1, col_action2 = st.columns([1,1])
+        if col_action1.button('🧾 Extraire par Regex (tous)', key='regex_extract'):
+            with st.spinner('Extraction regex en cours...'):
+                for _, row in df.iterrows():
+                    with st.expander(row['file']):
+                        entities = regex_analysis(row['text_snippet'])
+                        st.json(entities)
+
+        if col_action2.button('🔁 Reclassifier les non-classés avec DeepSeek (IA)', key='reclass_ai_button'):
+            # lancer la reclassification inline et mettre à jour session_state
+            API_KEY = get_api_key()
+            if not API_KEY:
+                st.error('Clé API DeepSeek absente. Configurez le secret DEEPSEEK_API_KEY.')
+            else:
+                nc = df[df['category'] == 'Non classé']
+                if nc.empty:
+                    st.info('Aucun CV non classé à reclassifier.')
+                else:
+                    st.info('Reclassification IA en cours pour les non-classés...')
+                    ai_progress = st.progress(0)
+                    nc_indices = nc.index.tolist()
+                    for idx, irow in enumerate(nc_indices):
+                        name = df.at[irow, 'file']
+                        text = df.at[irow, 'text_snippet']
+                        processing = st.empty()
+                        processing.info(f"IA traitement ({idx+1}/{len(nc_indices)}) : {name}")
+                        try:
+                            label = None
+                            prompt = (
+                                f"Classifie le CV ci-dessous dans UNE seule des catégories: 'Fonctions supports', 'Logistique', 'Production/Technique'.\n"
+                                f"Réponds uniquement par l'un des trois labels exacts.\n\n"
+                                f"Texte du CV:\n{text[:2000]}"
+                            )
+                            url = "https://api.deepseek.com/v1/chat/completions"
+                            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
+                            payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.0}
+                            resp = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
+                            resp.raise_for_status()
+                            content = resp.json().get('choices', [])[0].get('message', {}).get('content', '').strip()
+                            if 'fonctions' in content.lower():
+                                label = 'Fonctions supports'
+                            elif 'logistique' in content.lower():
+                                label = 'Logistique'
+                            elif 'production' in content.lower() or 'travaux' in content.lower() or 'génie' in content.lower():
+                                label = 'Production/Technique'
+                            else:
+                                label = 'Non classé'
+                        except Exception:
+                            label = 'Non classé'
+                        finally:
+                            processing.empty()
+
+                        df.at[irow, 'category'] = label
+                        ai_progress.progress((idx+1)/len(nc_indices))
+
+                    ai_progress.empty()
+                    st.success('Reclassification IA terminée. Voir le tableau mis à jour ci-dessus.')
+                    # Mettre à jour le dataframe en session
+                    st.session_state['auto_class_df'] = df
+
+        # Téléchargements : classés (3-col), non-classés séparément, et tout (4-col)
+        supports = df[df['category'] == 'Fonctions supports']['file'].tolist()
+        logistics = df[df['category'] == 'Logistique']['file'].tolist()
+        production = df[df['category'] == 'Production/Technique']['file'].tolist()
+        non_classed = df[df['category'] == 'Non classé']['file'].tolist()
+
+        max_len = max(len(supports), len(logistics), len(production), len(non_classed)) if max(len(supports), len(logistics), len(production), len(non_classed)) > 0 else 0
+        supports += [''] * (max_len - len(supports))
+        logistics += [''] * (max_len - len(logistics))
+        production += [''] * (max_len - len(production))
+        non_classed += [''] * (max_len - len(non_classed))
+
+        export_all_df = pd.DataFrame({
+            'Fonctions supports': supports,
+            'Logistique': logistics,
+            'Production/Technique': production,
+            'Non classés': non_classed
+        })
+        csv_all = export_all_df.to_csv(index=False).encode('utf-8')
+
+        classified_only_df = pd.DataFrame({
+            'Fonctions supports': supports[:max_len],
+            'Logistique': logistics[:max_len],
+            'Production/Technique': production[:max_len]
+        })
+        csv_classified = classified_only_df.to_csv(index=False).encode('utf-8')
+
+        non_classed_df = pd.DataFrame({'Non classés': non_classed})
+        csv_non = non_classed_df.to_csv(index=False).encode('utf-8')
+
+        col_dl1, col_dl2, col_dl3 = st.columns(3)
+        col_dl1.download_button(label='⬇️ Télécharger classés (CSV)', data=csv_classified, file_name='classified_results.csv', mime='text/csv')
+        col_dl2.download_button(label='⬇️ Télécharger non classés (CSV)', data=csv_non, file_name='non_classed_results.csv', mime='text/csv')
+        col_dl3.download_button(label='⬇️ Télécharger tout (CSV)', data=csv_all, file_name='classification_results_all.csv', mime='text/csv')
+
     # Construire la liste de fichiers uniquement à partir des uploads
     file_list = []
     if uploaded_files_auto:
