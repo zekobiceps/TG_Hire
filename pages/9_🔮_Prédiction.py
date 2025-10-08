@@ -1056,6 +1056,8 @@ with tab4:
                         # Sauvegarder la forecast pour affichage global et exports
                         st.session_state.forecast_df = forecast_df.copy()
                         st.session_state.display_forecast = display_forecast.copy()
+                        # Reset render guard for Direction/Poste charts so they will render once after new prediction
+                        st.session_state.rendered_dir_poste = False
                 except Exception as e:
                     st.error(f"❌ Erreur lors de la prédiction : {str(e)}")
                     st.exception(e)
@@ -1100,87 +1102,90 @@ with tab4:
             st.markdown("---")
             st.subheader("🔍 Détails des Prédictions")
 
-            # Calculer proportions historiques par direction/poste
-            raw = st.session_state.cleaned_data_filtered.copy()
-            if direction_col and direction_col in raw.columns:
-                dir_counts = raw[direction_col].value_counts().reset_index()
-                dir_counts.columns = ['Direction', 'Nombre']
-                dir_counts['Prop'] = dir_counts['Nombre'] / dir_counts['Nombre'].sum()
+            # Empêcher le rendu multiple des mêmes graphiques dans la même session
+            if st.session_state.get('rendered_dir_poste', False):
+                st.info("ℹ️ Les graphiques Direction/Poste ont déjà été rendus pour cette prévision.")
             else:
-                dir_counts = pd.DataFrame(columns=['Direction', 'Nombre', 'Prop'])
+                # Calculer proportions historiques par direction/poste
+                raw = st.session_state.cleaned_data_filtered.copy()
+                if direction_col and direction_col in raw.columns:
+                    dir_counts = raw[direction_col].value_counts().reset_index()
+                    dir_counts.columns = ['Direction', 'Nombre']
+                    dir_counts['Prop'] = dir_counts['Nombre'] / dir_counts['Nombre'].sum()
+                else:
+                    dir_counts = pd.DataFrame(columns=['Direction', 'Nombre', 'Prop'])
 
-            if poste_col and poste_col in raw.columns:
-                poste_counts = raw[poste_col].value_counts().reset_index()
-                poste_counts.columns = ['Poste', 'Nombre']
-                poste_counts['Prop'] = poste_counts['Nombre'] / poste_counts['Nombre'].sum()
-            else:
-                poste_counts = pd.DataFrame(columns=['Poste', 'Nombre', 'Prop'])
+                if poste_col and poste_col in raw.columns:
+                    poste_counts = raw[poste_col].value_counts().reset_index()
+                    poste_counts.columns = ['Poste', 'Nombre']
+                    poste_counts['Prop'] = poste_counts['Nombre'] / poste_counts['Nombre'].sum()
+                else:
+                    poste_counts = pd.DataFrame(columns=['Poste', 'Nombre', 'Prop'])
 
-            # Appliquer la répartition proportionnelle aux prévisions globales
-            total_pred = monthly_forecast['predicted_volume'].sum()
+                # Appliquer la répartition proportionnelle aux prévisions globales
+                total_pred = monthly_forecast['predicted_volume'].sum()
 
-            # Par Direction
-            dir_pred = pd.DataFrame()
-            if not dir_counts.empty:
-                # Distribuer la somme des prédictions proportionnellement
-                dir_pred = dir_counts.copy()
-                dir_pred['Predicted'] = (dir_pred['Prop'] * total_pred).round().astype(int)
-                # Pour afficher par période, on distribue chaque période de monthly_forecast selon la même proportion
-                detailed_dir_rows = []
-                for _, row in monthly_forecast.iterrows():
-                    for _, d in dir_pred.iterrows():
-                        detailed_dir_rows.append({'date': row['date'], 'Direction': d['Direction'], 'predicted_volume': int(round(d['Prop'] * row['predicted_volume']))})
-                dir_detailed = pd.DataFrame(detailed_dir_rows)
-            else:
-                dir_detailed = pd.DataFrame(columns=['date', 'Direction', 'predicted_volume'])
+                # Par Direction
+                dir_pred = pd.DataFrame()
+                if not dir_counts.empty:
+                    # Distribuer la somme des prédictions proportionnellement
+                    dir_pred = dir_counts.copy()
+                    dir_pred['Predicted'] = (dir_pred['Prop'] * total_pred).round().astype(int)
+                    # Pour afficher par période, on distribue chaque période de monthly_forecast selon la même proportion
+                    detailed_dir_rows = []
+                    for _, row in monthly_forecast.iterrows():
+                        for _, d in dir_pred.iterrows():
+                            detailed_dir_rows.append({'date': row['date'], 'Direction': d['Direction'], 'predicted_volume': int(round(d['Prop'] * row['predicted_volume']))})
+                    dir_detailed = pd.DataFrame(detailed_dir_rows)
+                else:
+                    dir_detailed = pd.DataFrame(columns=['date', 'Direction', 'predicted_volume'])
 
-            # Par Poste
-            poste_pred = pd.DataFrame()
-            if not poste_counts.empty:
-                poste_pred = poste_counts.copy()
-                poste_pred['Predicted'] = (poste_pred['Prop'] * total_pred).round().astype(int)
-                detailed_poste_rows = []
-                for _, row in monthly_forecast.iterrows():
-                    for _, p in poste_pred.iterrows():
-                        detailed_poste_rows.append({'date': row['date'], 'Poste': p['Poste'], 'predicted_volume': int(round(p['Prop'] * row['predicted_volume']))})
-                poste_detailed = pd.DataFrame(detailed_poste_rows)
-            else:
-                poste_detailed = pd.DataFrame(columns=['date', 'Poste', 'predicted_volume'])
+                # Par Poste
+                poste_pred = pd.DataFrame()
+                if not poste_counts.empty:
+                    poste_pred = poste_counts.copy()
+                    poste_pred['Predicted'] = (poste_pred['Prop'] * total_pred).round().astype(int)
+                    detailed_poste_rows = []
+                    for _, row in monthly_forecast.iterrows():
+                        for _, p in poste_pred.iterrows():
+                            detailed_poste_rows.append({'date': row['date'], 'Poste': p['Poste'], 'predicted_volume': int(round(p['Prop'] * row['predicted_volume']))})
+                    poste_detailed = pd.DataFrame(detailed_poste_rows)
+                else:
+                    poste_detailed = pd.DataFrame(columns=['date', 'Poste', 'predicted_volume'])
 
-            # Afficher deux colonnes: Direction et Poste
-            col_dir, col_poste = st.columns(2)
+                # Afficher deux colonnes: Direction et Poste
+                col_dir, col_poste = st.columns(2)
 
-            with col_dir:
-                st.markdown("#### 🏢 Prédictions par Direction")
-                fig_dir_pred = px.bar(
-                    dir_pred.sort_values('Predicted', ascending=True),
-                    x='Predicted', y='Direction', orientation='h',
-                    title='Répartition cumulée des prévisions par Direction',
-                    color='Predicted', color_continuous_scale='Blues'
-                ) if not dir_pred.empty else go.Figure()
-                fig_dir_pred.update_layout(height=350) if not dir_pred.empty else None
-                st.plotly_chart(fig_dir_pred, use_container_width=True, key='model_dir_fig')
+                with col_dir:
+                    st.markdown("#### 🏢 Prédictions par Direction")
+                    fig_dir_pred = px.bar(
+                        dir_pred.sort_values('Predicted', ascending=True),
+                        x='Predicted', y='Direction', orientation='h',
+                        title='Répartition cumulée des prévisions par Direction',
+                        color='Predicted', color_continuous_scale='Blues'
+                    ) if not dir_pred.empty else go.Figure()
+                    fig_dir_pred.update_layout(height=350) if not dir_pred.empty else None
+                    st.plotly_chart(fig_dir_pred, use_container_width=True, key='model_dir_fig')
 
-                with st.expander("📋 Ouvrir/fermer: Tableau des prédictions par Direction"):
-                    st.dataframe(dir_detailed.sort_values(['date', 'Direction']).reset_index(drop=True), use_container_width=True)
+                    with st.expander("📋 Ouvrir/fermer: Tableau des prédictions par Direction"):
+                        st.dataframe(dir_detailed.sort_values(['date', 'Direction']).reset_index(drop=True), use_container_width=True)
 
-                # Export Direction (supprimé: utilisation d'un export unique en bas)
+                with col_poste:
+                    st.markdown("#### 👥 Prédictions par Poste")
+                    fig_poste_pred = px.bar(
+                        poste_pred.sort_values('Predicted', ascending=True),
+                        x='Predicted', y='Poste', orientation='h',
+                        title='Répartition cumulée des prévisions par Poste',
+                        color='Predicted', color_continuous_scale='Greens'
+                    ) if not poste_pred.empty else go.Figure()
+                    fig_poste_pred.update_layout(height=350) if not poste_pred.empty else None
+                    st.plotly_chart(fig_poste_pred, use_container_width=True, key='model_poste_fig')
 
-            with col_poste:
-                st.markdown("#### 👥 Prédictions par Poste")
-                fig_poste_pred = px.bar(
-                    poste_pred.sort_values('Predicted', ascending=True),
-                    x='Predicted', y='Poste', orientation='h',
-                    title='Répartition cumulée des prévisions par Poste',
-                    color='Predicted', color_continuous_scale='Greens'
-                ) if not poste_pred.empty else go.Figure()
-                fig_poste_pred.update_layout(height=350) if not poste_pred.empty else None
-                st.plotly_chart(fig_poste_pred, use_container_width=True, key='model_poste_fig')
+                    with st.expander("📋 Ouvrir/fermer: Tableau des prédictions par Poste"):
+                        st.dataframe(poste_detailed.sort_values(['date', 'Poste']).reset_index(drop=True), use_container_width=True)
 
-                with st.expander("📋 Ouvrir/fermer: Tableau des prédictions par Poste"):
-                    st.dataframe(poste_detailed.sort_values(['date', 'Poste']).reset_index(drop=True), use_container_width=True)
-
-                # Export Poste (supprimé: utilisation d'un export unique en bas)
+                # Marquer comme rendu pour éviter duplication
+                st.session_state.rendered_dir_poste = True
 
             # --- Export unique: créer un fichier Excel multi-onglets (Global / Par_Direction / Par_Poste)
             try:
