@@ -212,7 +212,7 @@ def calculate_mape(y_true, y_pred):
     
     return np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
 
-def predict_with_prophet(df, horizon_days):
+def predict_with_prophet(df, horizon_months):
     """Prédiction avec Prophet"""
     prophet_df = pd.DataFrame({
         'ds': df['date'],
@@ -227,12 +227,12 @@ def predict_with_prophet(df, horizon_days):
     )
     model.fit(prophet_df)
     
-    future = model.make_future_dataframe(periods=horizon_days, freq='D')
+    future = model.make_future_dataframe(periods=horizon_months, freq='M')
     forecast = model.predict(future)
     
     return model, forecast
 
-def predict_with_holt_winters(df, horizon_days):
+def predict_with_holt_winters(df, horizon_months):
     """Prédiction avec Holt-Winters"""
     try:
         model = ExponentialSmoothing(
@@ -242,10 +242,9 @@ def predict_with_holt_winters(df, horizon_days):
             seasonal_periods=12
         ).fit()
         
-        forecast_values = model.forecast(horizon_days)
+        forecast_values = model.forecast(horizon_months)
         
-        # Créer un DataFrame au format compatible
-        future_dates = pd.date_range(start=df['date'].max() + timedelta(days=1), periods=horizon_days, freq='D')
+        future_dates = pd.date_range(start=df['date'].max(), periods=horizon_months + 1, freq='M')[1:]
         forecast_df = pd.DataFrame({
             'ds': list(df['date']) + list(future_dates),
             'yhat': list(df['volume']) + list(forecast_values)
@@ -256,14 +255,20 @@ def predict_with_holt_winters(df, horizon_days):
         st.error(f"Erreur Holt-Winters: {e}")
         return None, None
 
-def predict_with_xgboost(df, horizon_days, lookback=30):
+def predict_with_xgboost(df, horizon_months, lookback=12):
     """Prédiction avec XGBoost"""
     try:
         data = df['volume'].values
         X, y = [], []
         
-        for i in range(lookback, len(data)):
-            X.append(data[i-lookback:i])
+        # Ajuster le lookback s'il est trop grand pour les données mensuelles
+        effective_lookback = min(lookback, len(data) - 1)
+        if effective_lookback < 1:
+            st.error("Pas assez de données pour XGBoost avec cette configuration.")
+            return None, None
+
+        for i in range(effective_lookback, len(data)):
+            X.append(data[i-effective_lookback:i])
             y.append(data[i])
         
         X, y = np.array(X), np.array(y)
@@ -271,17 +276,15 @@ def predict_with_xgboost(df, horizon_days, lookback=30):
         model = xgb.XGBRegressor(n_estimators=100, random_state=42)
         model.fit(X, y)
         
-        # Prédictions futures
-        last_sequence = data[-lookback:]
+        last_sequence = data[-effective_lookback:]
         forecasts = []
         
-        for _ in range(horizon_days):
+        for _ in range(horizon_months):
             next_pred = model.predict(np.array([last_sequence]))[0]
-            forecasts.append(max(0, next_pred))  # Éviter les valeurs négatives
+            forecasts.append(max(0, next_pred))
             last_sequence = np.append(last_sequence[1:], next_pred)
         
-        # Créer un DataFrame au format compatible
-        future_dates = pd.date_range(start=df['date'].max() + timedelta(days=1), periods=horizon_days, freq='D')
+        future_dates = pd.date_range(start=df['date'].max(), periods=horizon_months + 1, freq='M')[1:]
         forecast_df = pd.DataFrame({
             'ds': list(df['date']) + list(future_dates),
             'yhat': list(df['volume']) + forecasts
@@ -771,6 +774,7 @@ with tab3:
             # Par année
             yearly = time_analysis.groupby('year')['volume'].sum().reset_index()
             if len(yearly) > 1:
+                yearly['year'] = yearly['year'].astype(str)
                 fig_year = px.bar(
                     yearly,
                     x='year',
@@ -842,23 +846,20 @@ with tab4:
         if st.button("🚀 Lancer la prédiction", type="primary", use_container_width=True):
             with st.spinner(f"🤖 Entraînement du modèle {model_type} en cours..."):
                 try:
-                    # Préparation des données
-                    horizon_days = horizon_months * 30  # Approximation
-                    
                     # Division train/test pour le calcul du MAPE
                     n_total = len(time_series)
-                    n_test = max(1, int(n_total * 0.2))  # 20% pour le test
+                    n_test = max(1, int(n_total * 0.2))
                     
                     train_data = time_series.iloc[:-n_test].copy()
                     test_data = time_series.iloc[-n_test:].copy()
                     
                     # Entraînement du modèle
                     if model_type == "Prophet":
-                        model, forecast = predict_with_prophet(train_data, horizon_days)
+                        model, forecast = predict_with_prophet(train_data, horizon_months)
                     elif model_type == "Holt-Winters":
-                        model, forecast = predict_with_holt_winters(train_data, horizon_days)
+                        model, forecast = predict_with_holt_winters(train_data, horizon_months)
                     else:  # XGBoost
-                        model, forecast = predict_with_xgboost(train_data, horizon_days)
+                        model, forecast = predict_with_xgboost(train_data, horizon_months)
                     
                     if model is None or forecast is None:
                         st.error("❌ Échec de la prédiction. Veuillez essayer un autre modèle.")
@@ -905,11 +906,12 @@ with tab4:
                     future_predictions = forecast[forecast['ds'] > last_date].copy()
                     
                     if not future_predictions.empty:
-                        # Agrégation mensuelle
-                        future_predictions['year_month'] = future_predictions['ds'].dt.to_period('M')
-                        monthly_forecast = future_predictions.groupby('year_month')['yhat'].sum().reset_index()
-                        monthly_forecast['date'] = monthly_forecast['year_month'].dt.to_timestamp()
+                        # Les données sont déjà mensuelles, pas besoin d'agréger
+                        monthly_forecast = future_predictions[['ds', 'yhat']].copy()
+                        monthly_forecast.rename(columns={'ds': 'date'}, inplace=True)
                         monthly_forecast['predicted_volume'] = monthly_forecast['yhat'].round().astype(int)
+                        # Sécurité pour éviter les prédictions négatives
+                        monthly_forecast['predicted_volume'] = monthly_forecast['predicted_volume'].apply(lambda x: max(0, x))
                         monthly_forecast = monthly_forecast[['date', 'predicted_volume']]
                         
                         # Limiter à l'horizon demandé
