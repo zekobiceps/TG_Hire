@@ -1118,8 +1118,9 @@ with tab4:
                 # Compteur de rendus pour debug (combien de fois ce bloc est exécuté)
                 count = st.session_state.get('dir_poste_render_count', 0) + 1
                 st.session_state['dir_poste_render_count'] = count
-                # Afficher le compteur dans l'UI clairement (st.info accepte key)
-                st.info(f"🔁 Direction/Poste render count: {count}", key='dir_poste_count')
+                # Afficher le compteur dans l'UI clairement
+                # Note: avoid passing `key=` to st.info here to prevent TypeError on some Streamlit runtimes
+                st.info(f"🔁 Direction/Poste render count: {count}")
                 print(f"[DEBUG] Direction/Poste render count: {count} at {datetime.now()}")
 
                 # Calculer proportions historiques par direction/poste
