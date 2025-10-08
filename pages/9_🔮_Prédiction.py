@@ -1111,6 +1111,8 @@ with tab4:
                 container = st.container()
             # Rendu dans le container
             # Debug logs to trace render executions
+            # Visible debug in UI so user can see execution when running on Streamlit Cloud
+            st.info("🔎 Début rendu: Prédictions Direction/Poste")
             print(f"[DEBUG] Rendering Direction/Poste block at {datetime.now()}")
             with container:
                 # Calculer proportions historiques par direction/poste
@@ -1193,7 +1195,8 @@ with tab4:
 
                 # Pas de flag stocké en session pour le rendu — le container local évite les duplications
 
-            # debug: finished rendering block
+            # Visible debug end in UI
+            st.info("✅ Fin rendu: Prédictions Direction/Poste")
             print(f"[DEBUG] Finished rendering Direction/Poste block at {datetime.now()}")
 
             # --- Export unique: créer un fichier Excel multi-onglets (Global / Par_Direction / Par_Poste)
