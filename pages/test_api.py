@@ -1347,22 +1347,81 @@ with tab5:
                 st.subheader('Non classés')
                 st.dataframe(nc[['file', 'text_snippet']], use_container_width=True)
 
-            # Préparer un CSV à 3 colonnes : Fonctions supports, Logistique, Production/Technique
-            # Chaque ligne contient le nom du CV dans la colonne correspondant à sa catégorie.
+            # Boutons supplémentaires : extraction regex et reclassification IA
+            col_action1, col_action2 = st.columns([1,1])
+            with col_action1:
+                if st.button('🧾 Extraire par Regex (tous)'):
+                    with st.spinner('Extraction regex en cours...'):
+                        for _, row in df.iterrows():
+                            with st.expander(row['file']):
+                                entities = regex_analysis(row['text_snippet'])
+                                st.json(entities)
+            with col_action2:
+                reclassify_with_ai = st.button('🔁 Reclassifier les non-classés avec DeepSeek (IA)')
+
+            # Si l'utilisateur demande la reclassification IA pour les non-classés
+            if reclassify_with_ai:
+                API_KEY = get_api_key()
+                if not API_KEY:
+                    st.error('Clé API DeepSeek absente. Configurez le secret DEEPSEEK_API_KEY.')
+                else:
+                    st.info('Reclassification IA en cours pour les non-classés...')
+                    ai_progress = st.progress(0)
+                    nc_indices = nc.index.tolist()
+                    for idx, irow in enumerate(nc_indices):
+                        name = df.at[irow, 'file']
+                        text = df.at[irow, 'text_snippet']
+                        # Appel IA pour demander uniquement l'étiquette
+                        try:
+                            label = None
+                            # Construire le prompt
+                            prompt = (
+                                f"Classifie le CV ci-dessous dans UNE seule des catégories: 'Fonctions supports', 'Logistique', 'Production/Technique'.\n"
+                                f"Réponds uniquement par l'un des trois labels exacts.\n\n"
+                                f"Texte du CV:\n{text[:2000]}"
+                            )
+                            url = "https://api.deepseek.com/v1/chat/completions"
+                            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
+                            payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.0}
+                            resp = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
+                            resp.raise_for_status()
+                            content = resp.json().get('choices', [])[0].get('message', {}).get('content', '').strip()
+                            # Normaliser la réponse
+                            if 'fonctions' in content.lower():
+                                label = 'Fonctions supports'
+                            elif 'logistique' in content.lower():
+                                label = 'Logistique'
+                            elif 'production' in content.lower() or 'travaux' in content.lower() or 'génie' in content.lower():
+                                label = 'Production/Technique'
+                            else:
+                                label = 'Non classé'
+                        except Exception as e:
+                            label = 'Non classé'
+
+                        df.at[irow, 'category'] = label
+                        ai_progress.progress((idx+1)/len(nc_indices))
+
+                    ai_progress.empty()
+                    st.success('Reclassification IA terminée. Voir le tableau mis à jour ci-dessus.')
+
+            # Préparer un CSV à 4 colonnes : Fonctions supports, Logistique, Production/Technique, Non classés
             supports = df[df['category'] == 'Fonctions supports']['file'].tolist()
             logistics = df[df['category'] == 'Logistique']['file'].tolist()
             production = df[df['category'] == 'Production/Technique']['file'].tolist()
+            non_classed = df[df['category'] == 'Non classé']['file'].tolist()
 
-            max_len = max(len(supports), len(logistics), len(production)) if max(len(supports), len(logistics), len(production)) > 0 else 0
+            max_len = max(len(supports), len(logistics), len(production), len(non_classed)) if max(len(supports), len(logistics), len(production), len(non_classed)) > 0 else 0
             # Pad lists
             supports += [''] * (max_len - len(supports))
             logistics += [''] * (max_len - len(logistics))
             production += [''] * (max_len - len(production))
+            non_classed += [''] * (max_len - len(non_classed))
 
             export_df = pd.DataFrame({
                 'Fonctions supports': supports,
                 'Logistique': logistics,
-                'Production/Technique': production
+                'Production/Technique': production,
+                'Non classés': non_classed
             })
 
             csv = export_df.to_csv(index=False).encode('utf-8')
