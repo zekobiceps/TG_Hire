@@ -1174,6 +1174,7 @@ with tab4:
                         color='Predicted', color_continuous_scale='Blues'
                     ) if not dir_pred.empty else go.Figure()
                     fig_dir_pred.update_layout(height=350) if not dir_pred.empty else None
+                    st.info("📌 Rendu graphique: Direction (container)")
                     st.plotly_chart(fig_dir_pred, use_container_width=True, key='model_dir_fig')
 
                     with st.expander("📋 Ouvrir/fermer: Tableau des prédictions par Direction"):
@@ -1188,6 +1189,7 @@ with tab4:
                         color='Predicted', color_continuous_scale='Greens'
                     ) if not poste_pred.empty else go.Figure()
                     fig_poste_pred.update_layout(height=350) if not poste_pred.empty else None
+                    st.info("📌 Rendu graphique: Poste (container)")
                     st.plotly_chart(fig_poste_pred, use_container_width=True, key='model_poste_fig')
 
                     with st.expander("📋 Ouvrir/fermer: Tableau des prédictions par Poste"):
