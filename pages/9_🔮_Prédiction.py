@@ -893,141 +893,112 @@ with tab4:
                     future_predictions = final_forecast[final_forecast['ds'] > last_date].copy()
 
                     if not future_predictions.empty:
-# Code à insérer dans le fichier de prédiction pour corriger les problèmes
-if not future_predictions.empty:
-    # Adapter le format des prévisions selon la fréquence choisie
-    if freq == 'Y':
-        # Pour l'agrégation annuelle, regrouper par année
-        forecast_df['year'] = forecast_df['date'].dt.year
-        forecast_df = forecast_df.groupby('year').agg({
-            'date': 'first',
-            'predicted_volume': 'sum'
-        }).reset_index()
-    
-    # Affichage du graphique d'évolution qui avait été supprimé
-    st.subheader(f"🔮 Prévisions {selected_freq_name}s")
-    
-    fig_pred = go.Figure()
-    fig_pred.add_trace(go.Scatter(x=time_series['date'], y=time_series['volume'], 
-                                 mode='lines+markers', name='Historique', line=dict(color='#1f77b4', width=2)))
-    fig_pred.add_trace(go.Scatter(x=forecast_df['date'], y=forecast_df['predicted_volume'], 
-                                 mode='lines+markers', name='Prédictions', line=dict(color='#ff7f0e', width=3, dash='dash'), 
-                                 marker=dict(size=8)))
-    fig_pred.update_layout(title=f"Prédictions {model_type} - {objective}", 
-                          xaxis_title="Date", yaxis_title="Volume", height=400, hovermode='x unified')
-    st.plotly_chart(fig_pred, use_container_width=True)
-    
-    # Adaptation de l'affichage du tableau selon la fréquence
-    display_forecast = forecast_df.copy()
-    if freq == 'Y':
-        display_forecast['Période'] = display_forecast['date'].dt.strftime('%Y')
-    elif freq == 'Q':
-        display_forecast['Période'] = display_forecast['date'].dt.strftime('%Y-Q%q')
-    elif freq == '2Q':
-        display_forecast['Période'] = display_forecast['date'].dt.strftime('%Y-')
-        display_forecast['quarter'] = display_forecast['date'].dt.quarter
-        display_forecast['Période'] = display_forecast.apply(
-            lambda x: x['Période'] + f"S{1 if x['quarter'] <= 2 else 2}", 
-            axis=1
-        )
-    else:
-        display_forecast['Période'] = display_forecast['date'].dt.strftime('%B %Y')
-    
-    # Afficher le tableau final
-    display_forecast = display_forecast[['Période', 'predicted_volume']].rename(columns={'predicted_volume': 'Volume Prédit'})
-    st.dataframe(display_forecast, use_container_width=True)
-    forecast_df['predicted_volume'] = forecast_df['yhat'].round().astype(int).apply(lambda x: max(0, x))
-                        forecast_df = forecast_df.head(horizon_value)
+                        # Adapter le format des prévisions selon la fréquence choisie
+                        if freq == 'Y':
+                            # Pour l'agrégation annuelle, regrouper par année
+                            forecast_df['year'] = forecast_df['date'].dt.year
+                            forecast_df = forecast_df.groupby('year').agg({
+                                'date': 'first',
+                                'predicted_volume': 'sum'
+                            }).reset_index()
+                        
+                        # Affichage du graphique d'évolution qui avait été supprimé
+                        st.subheader(f"🔮 Prévisions {selected_freq_name}s")
+                        
+                        fig_pred = go.Figure()
+                        fig_pred.add_trace(go.Scatter(x=time_series['date'], y=time_series['volume'], 
+                                                     mode='lines+markers', name='Historique', line=dict(color='#1f77b4', width=2)))
+                        fig_pred.add_trace(go.Scatter(x=forecast_df['date'], y=forecast_df['predicted_volume'], 
+                                                     mode='lines+markers', name='Prédictions', line=dict(color='#ff7f0e', width=3, dash='dash'), 
+                                                     marker=dict(size=8)))
+                        fig_pred.update_layout(title=f"Prédictions {model_type} - {objective}", 
+                                              xaxis_title="Date", yaxis_title="Volume", height=400, hovermode='x unified')
+                        st.plotly_chart(fig_pred, use_container_width=True)
+                        
+                        # Normaliser la sortie du modèle dans forecast_df
+                        forecast_df = future_predictions.copy()
+                        if 'yhat' in forecast_df.columns:
+                            forecast_df['yhat'] = forecast_df['yhat'].astype(float)
+                        elif 'y' in forecast_df.columns:
+                            forecast_df['yhat'] = forecast_df['y'].astype(float)
+                        else:
+                            forecast_df['yhat'] = 0.0
+
+                        forecast_df = forecast_df[['ds', 'yhat']].rename(columns={'ds': 'date'})
+                        forecast_df['predicted_volume'] = forecast_df['yhat'].round().astype(int).clip(lower=0)
+                        forecast_df = forecast_df.sort_values('date').reset_index(drop=True)
+
+                        # Prendre uniquement le nombre de périodes demandé
+                        forecast_df = forecast_df.head(horizon_value).copy()
+
+                        # Agrégation annuelle si demandée
+                        if freq == 'Y' or st.session_state.get('selected_freq', '') == 'Annuelle':
+                            forecast_df['year'] = forecast_df['date'].dt.year
+                            ann = forecast_df.groupby('year', as_index=False)['predicted_volume'].sum()
+                            ann['date'] = pd.to_datetime(ann['year'].astype(str) + '-01-01')
+                            forecast_df = ann[['date', 'predicted_volume']].sort_values('date').reset_index(drop=True)
+
+                        # Agrégation semestrielle si demandée (2 semesters par année)
+                        if freq == '2Q' or st.session_state.get('selected_freq', '') == 'Semestrielle':
+                            tmp = forecast_df.copy()
+                            tmp['month'] = tmp['date'].dt.month
+                            tmp['year'] = tmp['date'].dt.year
+                            tmp['semester'] = np.where(tmp['month'] <= 6, 'S1', 'S2')
+                            sem = tmp.groupby(['year', 'semester'], as_index=False)['predicted_volume'].sum()
+                            # crée une date représentative pour le semestre (1er avril pour S1, 1er oct pour S2)
+                            sem['date'] = sem.apply(lambda r: pd.to_datetime(f"{r.year}-04-01") if r.semester == 'S1' else pd.to_datetime(f"{r.year}-10-01"), axis=1)
+                            forecast_df = sem[['date', 'predicted_volume', 'year', 'semester']].sort_values(['date']).reset_index(drop=True)
+
+                        # Préparer l'affichage (Période textuelle)
+                        if freq == 'Y' or st.session_state.get('selected_freq', '') == 'Annuelle':
+                            display_forecast = forecast_df.copy()
+                            display_forecast['Période'] = display_forecast['date'].dt.strftime('%Y')
+                            display_forecast = display_forecast[['Période', 'predicted_volume']].rename(columns={'predicted_volume': 'Volume Prédit'})
+                        elif freq == '2Q' or st.session_state.get('selected_freq', '') == 'Semestrielle':
+                            display_forecast = forecast_df.copy()
+                            display_forecast['Période'] = display_forecast['year'].astype(str) + display_forecast['semester']
+                            display_forecast = display_forecast[['Période', 'predicted_volume']].rename(columns={'predicted_volume': 'Volume Prédit'})
+                        elif freq == 'Q':
+                            display_forecast = forecast_df.copy()
+                            display_forecast['Période'] = display_forecast['date'].dt.to_period('Q').astype(str)
+                            display_forecast = display_forecast[['Période', 'predicted_volume']].rename(columns={'predicted_volume': 'Volume Prédit'})
+                        else:
+                            display_forecast = forecast_df.copy()
+                            display_forecast['Période'] = display_forecast['date'].dt.strftime('%B %Y')
+                            display_forecast = display_forecast[['Période', 'predicted_volume']].rename(columns={'predicted_volume': 'Volume Prédit'})
 
                         st.subheader("🔮 Prévisions")
+                        st.dataframe(display_forecast, use_container_width=True)
 
-                        # Ajout du graphique d'évolution et correction de l'affichage du tableau
-                        if not future_predictions.empty:
-                            # Adapter le format des prévisions selon la fréquence choisie
-                            if freq == 'Y':
-                                # Pour l'agrégation annuelle, regrouper par année
-                                forecast_df['year'] = forecast_df['date'].dt.year
-                                forecast_df = forecast_df.groupby('year').agg({
-                                    'date': 'first',
-                                    'predicted_volume': 'sum'
-                                }).reset_index()
-                            
-                            # Affichage du graphique d'évolution qui avait été supprimé
-                            st.subheader(f"🔮 Prévisions {selected_freq_name}s")
-                            
-                            fig_pred = go.Figure()
-                            fig_pred.add_trace(go.Scatter(x=time_series['date'], y=time_series['volume'], 
-                                                         mode='lines+markers', name='Historique', line=dict(color='#1f77b4', width=2)))
-                            fig_pred.add_trace(go.Scatter(x=forecast_df['date'], y=forecast_df['predicted_volume'], 
-                                                         mode='lines+markers', name='Prédictions', line=dict(color='#ff7f0e', width=3, dash='dash'), 
-                                                         marker=dict(size=8)))
-                            fig_pred.update_layout(title=f"Prédictions {model_type} - {objective}", 
-                                                  xaxis_title="Date", yaxis_title="Volume", height=400, hovermode='x unified')
-                            st.plotly_chart(fig_pred, use_container_width=True)
-                            
-                            # Adaptation de l'affichage du tableau selon la fréquence
-except Exception as e:
-        st.error(f"❌ Erreur lors de la prédiction : {str(e)}")
-                    with st.expander("🔍 Détails de l'erreur"):
-                        st.exception(e)
+                        # Restaurer le graphique d'évolution (historique agrégé pour lisibilité si nécessaire)
+                        hist = time_series.copy()
+                        # si affichage annuel ou semestriel, agréger l'historique pour cohérence visuelle
+                        if freq == 'Y' or st.session_state.get('selected_freq', '') == 'Annuelle':
+                            hist = hist.groupby(hist['date'].dt.year, as_index=False).agg({'volume': 'sum'})
+                            hist['date'] = pd.to_datetime(hist['date'].astype(str) + '-01-01')
+                        elif freq == '2Q' or st.session_state.get('selected_freq', '') == 'Semestrielle':
+                            hist['semester'] = np.where(hist['date'].dt.month <= 6, 'S1', 'S2')
+                            hist['year'] = hist['date'].dt.year
+                            hist = hist.groupby(['year', 'semester'], as_index=False)['volume'].sum()
+                            hist['date'] = hist.apply(lambda r: pd.to_datetime(f"{r.year}-04-01") if r.semester == 'S1' else pd.to_datetime(f"{r.year}-10-01"), axis=1)
+                        elif freq == 'Q':
+                            hist = hist.set_index('date').resample('Q')['volume'].sum().reset_index()
 
-# ============================
-# EXPORT DES RÉSULTATS
-# ============================
-# Onglet caché pour le téléchargement
-with st.expander("📥 Export des Résultats", expanded=False):
-    if st.session_state.time_series_data is not None and st.session_state.time_series_data.empty == False:
-        st.markdown("### Exporter les prévisions détaillées")
-        
-        # Choix du format d'export
-        export_format = st.selectbox(
-            "Choisissez le format d'export:",
-            options=["CSV", "Excel"],
-            index=0
-        )
-        
-        # Chemin par défaut pour le téléchargement
-        default_filename = f"export_predit_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        
-        if export_format == "CSV":
-            # Export CSV
-            csv_data = convert_df_to_csv(st.session_state.time_series_data)
-            st.download_button(
-                label="📥 Télécharger en CSV",
-                data=csv_data,
-                file_name=f"{default_filename}.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-        else:
-            # Export Excel
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                st.session_state.time_series_data.to_excel(writer, sheet_name='Prévisions', index=False)
-                
-                # Formatage conditionnel pour les cellules
-                workbook = writer.book
-                worksheet = writer.sheets['Prévisions']
-                
-                # Appliquer un format monétaire aux colonnes de volume
-                money_format = workbook.add_format({'num_format': '#,##0.00 €'})
-                worksheet.set_column('B:B', 18, money_format)  # Volume
-                
-                # Ajuster la largeur des colonnes
-                for i, col in enumerate(st.session_state.time_series_data.columns):
-                    max_length = max(
-                        st.session_state.time_series_data[col].astype(str).map(len).max(),
-                        len(col)  # longueur du nom de la colonne
-                    )
-                    worksheet.set_column(i, i, max_length + 2)  # Ajouter un peu d'espace
-        
-            output.seek(0)
-            st.download_button(
-                label="📥 Télécharger en Excel",
-                data=output,
-                file_name=f"{default_filename}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
-    else:
-        st.info("Aucune donnée à exporter. Veuillez exécuter la prédiction d'abord.")
+                        fig_pred = go.Figure()
+                        fig_pred.add_trace(go.Scatter(
+                            x=hist['date'], y=hist['volume'],
+                            mode='lines+markers', name='Historique',
+                            line=dict(color='#1f77b4', width=2)
+                        ))
+                        fig_pred.add_trace(go.Scatter(
+                            x=forecast_df['date'], y=forecast_df['predicted_volume'],
+                            mode='lines+markers', name='Prédictions',
+                            line=dict(color='#ff7f0e', width=3, dash='dash'), marker=dict(size=8)
+                        ))
+                        fig_pred.update_layout(
+                            title=f"Prédictions {model_type} - {objective}",
+                            xaxis_title="Date", yaxis_title="Volume", height=420, hovermode='x unified'
+                        )
+                        st.plotly_chart(fig_pred, use_container_width=True)
+                    else:
+                        st.warning("⚠️ Aucune prédiction future générée. Vérifiez la configuration du modèle.")
