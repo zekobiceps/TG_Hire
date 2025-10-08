@@ -1249,7 +1249,9 @@ with tab4:
 
 with st.sidebar:
     st.markdown("### 🔧 Configuration")
-    if st.button("Test Connexion API DeepSeek"):
+    col1, col2 = st.columns(2)
+    
+    if col1.button("Test Connexion API DeepSeek"):
         API_KEY = get_api_key()
         if API_KEY:
             try:
@@ -1260,9 +1262,99 @@ with st.sidebar:
                     st.error(f"❌ Erreur de connexion ({response.status_code})")
             except Exception as e:
                 st.error(f"❌ Erreur: {e}")
+    
+    if col2.button("🔍 Diagnostic complet"):
+        st.info("Diagnostic en cours...")
+        
+        # 1. Vérifier Python et packages importants
+        import sys
+        st.write(f"**Python:** {sys.version}")
+        
+        # 2. Vérifier API DeepSeek
+        API_KEY = get_api_key()
+        if not API_KEY:
+            st.error("❌ Clé API DeepSeek manquante")
+        else:
+            try:
+                start = time.time()
+                response = requests.get("https://api.deepseek.com/v1/models", 
+                                       headers={"Authorization": f"Bearer {API_KEY}"})
+                latence = time.time() - start
+                if response.status_code == 200:
+                    st.success(f"✅ API DeepSeek OK (latence: {latence:.2f}s)")
+                    models = response.json().get("data", [])
+                    model_ids = [m.get("id") for m in models]
+                    st.write(f"Modèles disponibles: {', '.join(model_ids[:5])}...")
+                else:
+                    st.error(f"❌ Erreur API ({response.status_code}): {response.text[:100]}")
+            except Exception as e:
+                st.error(f"❌ Exception: {str(e)}")
+        
+        # 3. Tester extraction PDF
+        st.write("**Test extraction PDF:**")
+        try:
+            pdf_libs = []
+            if pdfplumber:
+                pdf_libs.append(f"pdfplumber {pdfplumber.__version__}")
+            if PyPDF2:
+                pdf_libs.append(f"PyPDF2 {PyPDF2.__version__}")
+            if PypdfReader:
+                import pypdf
+                pdf_libs.append(f"pypdf {pypdf.__version__}")
+            
+            if pdf_libs:
+                st.write(f"✅ Bibliothèques PDF: {', '.join(pdf_libs)}")
+            else:
+                st.error("❌ Aucune bibliothèque PDF disponible")
+        except Exception as e:
+            st.error(f"❌ Erreur PDF: {str(e)}")
+            
+        # 4. Test deepseek_generate
+        if API_KEY:
+            try:
+                start = time.time()
+                test_prompt = "Réponds uniquement par 'TEST OK' si tu reçois ce message."
+                response = deepseek_generate(test_prompt, max_tokens=20)
+                latence = time.time() - start
+                
+                if "TEST OK" in response or "OK" in response:
+                    st.success(f"✅ deepseek_generate fonctionne (latence: {latence:.2f}s)")
+                else:
+                    st.warning(f"⚠️ deepseek_generate réponse inattendue: {response[:100]}")
+            except Exception as e:
+                st.error(f"❌ Erreur deepseek_generate: {str(e)}")
+                
+        # 5. Vérifier session_state
+        st.write("**État de session:**")
+        session_keys = list(st.session_state.keys())
+        st.json(session_keys)
 
 with tab5:
     st.header("🗂️ Auto-classification de CVs (3 catégories) — DEPLOY_DEBUG_MARKER_20251008")
+    
+    # Boîte de diagnostic pour vérifier l'état des variables importantes
+    with st.expander("🛠️ DEBUG INFO"):
+        st.write(f"**Version Git :** {commit_hash}")
+        # Vérifier si la clé API DeepSeek est disponible
+        has_deepseek_key = False
+        try:
+            has_deepseek_key = bool(st.secrets.get("DEEPSEEK_API_KEY"))
+        except:
+            pass
+        st.write(f"**DEEPSEEK_API_KEY disponible :** {has_deepseek_key}")
+        
+        # Afficher les clés de session_state
+        st.write("**Clés dans session_state:**")
+        session_keys = list(st.session_state.keys())
+        st.json(session_keys)
+        
+        # Afficher combien de CVs sont dans la session si auto_class_df existe
+        if 'auto_class_df' in st.session_state:
+            df = st.session_state['auto_class_df']
+            st.write(f"**CVs en session:** {len(df)} total")
+            cats = df['category'].value_counts().to_dict() if 'category' in df.columns else {}
+            st.json(cats)
+    
     st.markdown("Chargez jusqu'à 100 CVs (PDF). L'outil extrait le texte et classe automatiquement chaque CV dans l'une des 3 catégories : Fonctions supports, Logistique, Production/Technique.")
 
     # Importer des CVs uniquement via upload
