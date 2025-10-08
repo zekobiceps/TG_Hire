@@ -487,9 +487,10 @@ with tab2:
             
             if date_col:
                 try:
-                    dates = pd.to_datetime(st.session_state.data[date_col], errors='coerce')
-                    min_date = dates.min().date()
-                    max_date = dates.max().date()
+                    # Coerce errors to NaT, then drop them to get a clean date range
+                    clean_dates = pd.to_datetime(st.session_state.data[date_col], errors='coerce').dropna()
+                    min_date = clean_dates.min().date()
+                    max_date = clean_dates.max().date()
                     
                     start_date = st.date_input(
                         "Date de début",
@@ -503,12 +504,13 @@ with tab2:
                         min_value=min_date,
                         max_value=max_date
                     )
-                except:
-                    st.warning("⚠️ Impossible de parser les dates automatiquement")
+                except Exception as e:
+                    st.warning("⚠️ Impossible de parser les dates automatiquement.")
                     start_date = end_date = None
             else:
                 st.warning("⚠️ Aucune colonne de date appropriée détectée")
                 start_date = end_date = None
+
         
         # Filtres contextuels optionnels
         st.subheader("🔍 Filtres contextuels (optionnel)")
@@ -562,6 +564,7 @@ with tab2:
                     # Filtrage par période
                     if date_col and start_date and end_date:
                         df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+                        df.dropna(subset=[date_col], inplace=True) # Important: drop rows that failed conversion
                         mask = (df[date_col].dt.date >= start_date) & (df[date_col].dt.date <= end_date)
                         df = df[mask]
                         st.info(f"📅 Filtrage temporel appliqué: {start_date} à {end_date}")
@@ -579,7 +582,7 @@ with tab2:
                     st.session_state.cleaned_data_filtered = df
                     
                     # Créer la série temporelle agrégée
-                    if date_col:
+                    if date_col and not df.empty:
                         time_series = create_time_series(df, date_col, freq)
                         st.session_state.time_series_data = time_series
                         st.session_state.date_col = date_col
@@ -606,7 +609,11 @@ with tab2:
                                     title=f"Série temporelle - {objective}")
                         fig.update_layout(height=400)
                         st.plotly_chart(fig, use_container_width=True)
-                    
+                    elif df.empty:
+                        st.warning("⚠️ Aucune donnée ne correspond à vos filtres. La série temporelle est vide.")
+                        st.session_state.time_series_data = None
+                        st.session_state.cleaned_data_filtered = None
+
                 except Exception as e:
                     st.error(f"❌ Erreur lors de la préparation: {str(e)}")
                     st.exception(e)
@@ -621,7 +628,7 @@ with tab2:
 with tab3:
     st.header("📊 Visualisation - Miroir du Passé")
     
-    if st.session_state.time_series_data is None or st.session_state.cleaned_data_filtered is None:
+    if st.session_state.time_series_data is None or st.session_state.time_series_data.empty or st.session_state.cleaned_data_filtered is None:
         st.info("👆 Veuillez d'abord préparer les données dans l'onglet précédent.")
     else:
         time_series = st.session_state.time_series_data
@@ -810,7 +817,7 @@ with tab3:
 with tab4:
     st.header("🔮 Modélisation & Prédiction")
     
-    if st.session_state.time_series_data is None or st.session_state.cleaned_data_filtered is None:
+    if st.session_state.time_series_data is None or st.session_state.time_series_data.empty or st.session_state.cleaned_data_filtered is None:
         st.info("👆 Veuillez d'abord préparer les données dans l'onglet Nettoyage & Préparation.")
     else:
         # Rappel de l'objectif
