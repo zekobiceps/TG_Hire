@@ -1133,50 +1133,69 @@ with tab4:
 
                 # Par Direction
                 dir_pred = pd.DataFrame()
+                dir_detailed = pd.DataFrame()
+                dir_summary = pd.DataFrame()
                 if not dir_counts.empty:
                     dir_pred = dir_counts.copy()
                     dir_pred['Predicted'] = (dir_pred['Prop'] * total_pred).round().astype(int)
-                    # Pour afficher par période, on distribue chaque période de monthly_forecast selon la même proportion
+                    # Créer le détail mensuel par Direction
                     detailed_dir_rows = []
                     for _, row in monthly_forecast.iterrows():
                         for _, d in dir_pred.iterrows():
-                            detailed_dir_rows.append({'date': row['date'].strftime('%Y-%m-%d'), 'Direction': d['Direction'], 'predicted_volume': int(round(d['Prop'] * row['predicted_volume']))})
+                            predicted_vol = int(round(d['Prop'] * row['predicted_volume']))
+                            if predicted_vol > 0:  # Éviter les lignes avec 0
+                                detailed_dir_rows.append({
+                                    'date': row['date'].strftime('%Y-%m-%d'), 
+                                    'Direction': d['Direction'], 
+                                    'predicted_volume': predicted_vol
+                                })
                     dir_detailed = pd.DataFrame(detailed_dir_rows)
-                    # Centraliser les lignes - grouper par Direction et sommer les volumes
-                    dir_detailed = dir_detailed.groupby(['Direction'], as_index=False).agg({
-                        'predicted_volume': 'sum',
-                        'date': 'first'  # Prendre la première date comme référence
-                    })
+                    # Créer le résumé (total par Direction)
+                    if not dir_detailed.empty:
+                        dir_summary = dir_detailed.groupby(['Direction'], as_index=False).agg({
+                            'predicted_volume': 'sum'
+                        }).sort_values('predicted_volume', ascending=False)
                 else:
                     dir_detailed = pd.DataFrame(columns=['date', 'Direction', 'predicted_volume'])
+                    dir_summary = pd.DataFrame(columns=['Direction', 'predicted_volume'])
 
                 # Par Poste
                 poste_pred = pd.DataFrame()
+                poste_detailed = pd.DataFrame()
+                poste_summary = pd.DataFrame()
                 if not poste_counts.empty:
                     poste_pred = poste_counts.copy()
                     poste_pred['Predicted'] = (poste_pred['Prop'] * total_pred).round().astype(int)
+                    # Créer le détail mensuel par Poste
                     detailed_poste_rows = []
                     for _, row in monthly_forecast.iterrows():
                         for _, p in poste_pred.iterrows():
-                            detailed_poste_rows.append({'date': row['date'].strftime('%Y-%m-%d'), 'Poste': p['Poste'], 'predicted_volume': int(round(p['Prop'] * row['predicted_volume']))})
+                            predicted_vol = int(round(p['Prop'] * row['predicted_volume']))
+                            if predicted_vol > 0:  # Éviter les lignes avec 0
+                                detailed_poste_rows.append({
+                                    'date': row['date'].strftime('%Y-%m-%d'), 
+                                    'Poste': p['Poste'], 
+                                    'predicted_volume': predicted_vol
+                                })
                     poste_detailed = pd.DataFrame(detailed_poste_rows)
-                    # Centraliser les lignes - grouper par Poste et sommer les volumes
-                    poste_detailed = poste_detailed.groupby(['Poste'], as_index=False).agg({
-                        'predicted_volume': 'sum',
-                        'date': 'first'  # Prendre la première date comme référence
-                    })
+                    # Créer le résumé (total par Poste)
+                    if not poste_detailed.empty:
+                        poste_summary = poste_detailed.groupby(['Poste'], as_index=False).agg({
+                            'predicted_volume': 'sum'
+                        }).sort_values('predicted_volume', ascending=False)
                 else:
                     poste_detailed = pd.DataFrame(columns=['date', 'Poste', 'predicted_volume'])
+                    poste_summary = pd.DataFrame(columns=['Poste', 'predicted_volume'])
 
                 # Afficher deux colonnes: Direction et Poste
                 col_dir, col_poste = st.columns(2)
 
                 with col_dir:
-                    if not dir_pred.empty:
+                    if not dir_summary.empty:
                         # Graphique en secteurs (pie chart) pour les directions
                         fig_dir_pred = px.pie(
-                            dir_pred,
-                            values='Predicted',
+                            dir_summary,
+                            values='predicted_volume',
                             names='Direction',
                             title='Répartition cumulée par Direction',
                             color_discrete_sequence=px.colors.qualitative.Set3
@@ -1185,24 +1204,40 @@ with tab4:
                         fig_dir_pred.update_layout(height=400, showlegend=True)
                         st.plotly_chart(fig_dir_pred, use_container_width=True, key='model_dir_fig')
 
-                        with st.expander("📋 Tableau des prédictions par Direction"):
-                            st.dataframe(dir_detailed[['Direction', 'predicted_volume', 'date']].sort_values('predicted_volume', ascending=False).reset_index(drop=True), use_container_width=True)
+                        with st.expander("📋 Détail mensuel des prédictions par Direction"):
+                            if not dir_detailed.empty:
+                                # Organiser par Direction puis par date
+                                dir_display = dir_detailed.copy()
+                                dir_display = dir_display.sort_values(['Direction', 'date']).reset_index(drop=True)
+                                st.dataframe(dir_display[['Direction', 'date', 'predicted_volume']], use_container_width=True)
+                                
+                                # Ajouter le résumé total
+                                st.subheader("📊 Résumé total par Direction")
+                                st.dataframe(dir_summary, use_container_width=True)
 
                 with col_poste:
-                    if not poste_pred.empty:
+                    if not poste_summary.empty:
                         # Graphique en barres horizontales sans gradient de couleur
                         fig_poste_pred = px.bar(
-                            poste_pred.sort_values('Predicted', ascending=True),
-                            x='Predicted', y='Poste', orientation='h',
+                            poste_summary.sort_values('predicted_volume', ascending=True),
+                            x='predicted_volume', y='Poste', orientation='h',
                             title='Répartition cumulée par Poste',
-                            color_discrete_sequence=['#2E8B57'] * len(poste_pred)  # Couleur verte unie
+                            color_discrete_sequence=['#2E8B57'] * len(poste_summary)  # Couleur verte unie
                         )
                         fig_poste_pred.update_traces(texttemplate='%{x}', textposition='outside')
                         fig_poste_pred.update_layout(height=400, showlegend=False)
                         st.plotly_chart(fig_poste_pred, use_container_width=True, key='model_poste_fig')
 
-                        with st.expander("📋 Tableau des prédictions par Poste"):
-                            st.dataframe(poste_detailed[['Poste', 'predicted_volume', 'date']].sort_values('predicted_volume', ascending=False).reset_index(drop=True), use_container_width=True)
+                        with st.expander("📋 Détail mensuel des prédictions par Poste"):
+                            if not poste_detailed.empty:
+                                # Organiser par Poste puis par date
+                                poste_display = poste_detailed.copy()
+                                poste_display = poste_display.sort_values(['Poste', 'date']).reset_index(drop=True)
+                                st.dataframe(poste_display[['Poste', 'date', 'predicted_volume']], use_container_width=True)
+                                
+                                # Ajouter le résumé total
+                                st.subheader("📊 Résumé total par Poste")
+                                st.dataframe(poste_summary, use_container_width=True)
 
             # --- Export unique: créer un fichier Excel multi-onglets (Global / Par_Direction / Par_Poste)
             try:
