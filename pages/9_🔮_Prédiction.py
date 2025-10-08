@@ -1056,8 +1056,7 @@ with tab4:
                         # Sauvegarder la forecast pour affichage global et exports
                         st.session_state.forecast_df = forecast_df.copy()
                         st.session_state.display_forecast = display_forecast.copy()
-                        # Reset render guard for Direction/Poste charts so they will render once after new prediction
-                        st.session_state.rendered_dir_poste = False
+                        # (ne pas stocker de DeltaGenerator dans session_state)
                 except Exception as e:
                     st.error(f"❌ Erreur lors de la prédiction : {str(e)}")
                     st.exception(e)
@@ -1102,10 +1101,16 @@ with tab4:
             st.markdown("---")
             st.subheader("🔍 Détails des Prédictions")
 
-            # Empêcher le rendu multiple des mêmes graphiques dans la même session
-            if st.session_state.get('rendered_dir_poste', False):
-                st.info("ℹ️ Les graphiques Direction/Poste ont déjà été rendus pour cette prévision.")
-            else:
+            # Créer un container local pour rendre les graphiques Direction/Poste.
+            # On n'utilise pas st.session_state pour stocker des DeltaGenerator (cause de duplications sur Streamlit Cloud).
+            container = st.container()
+            # Vider le container précédent si nécessaire
+            try:
+                container.empty()
+            except Exception:
+                container = st.container()
+            # Rendu dans le container
+            with container:
                 # Calculer proportions historiques par direction/poste
                 raw = st.session_state.cleaned_data_filtered.copy()
                 if direction_col and direction_col in raw.columns:
@@ -1184,8 +1189,7 @@ with tab4:
                     with st.expander("📋 Ouvrir/fermer: Tableau des prédictions par Poste"):
                         st.dataframe(poste_detailed.sort_values(['date', 'Poste']).reset_index(drop=True), use_container_width=True)
 
-                # Marquer comme rendu pour éviter duplication
-                st.session_state.rendered_dir_poste = True
+                # Pas de flag stocké en session pour le rendu — le container local évite les duplications
 
             # --- Export unique: créer un fichier Excel multi-onglets (Global / Par_Direction / Par_Poste)
             try:
