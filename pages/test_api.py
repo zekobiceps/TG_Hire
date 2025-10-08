@@ -1257,22 +1257,18 @@ with tab5:
     st.header("🗂️ Auto-classification de CVs (3 catégories)")
     st.markdown("Chargez jusqu'à 100 CVs (PDF). L'outil extrait le texte et classe automatiquement chaque CV dans l'une des 3 catégories : Fonctions supports, Logistique, Production/Technique.")
 
-    # Source: dossier cvs/ ou upload
-    col_a, col_b = st.columns(2)
-    with col_a:
-        use_folder = st.checkbox("Charger depuis le dossier `cvs/` du repository", value=True)
-    with col_b:
-        uploaded_files_auto = st.file_uploader("Ou importer des CVs (PDF)", type=["pdf"], accept_multiple_files=True, key="auto_uploader")
+    # Importer des CVs uniquement via upload
+    uploaded_files_auto = st.file_uploader("Importer des CVs (PDF)", type=["pdf"], accept_multiple_files=True, key="auto_uploader")
 
-    # Définitions de mots-clés pour chaque catégorie (peut être enrichi)
+    # Définitions de mots-clés pour chaque catégorie (basées sur votre liste)
     SUPPORT_KEYS = [
-        r'\b(finance|comptable|paie|rh|ressources humaines|recrutement|audit|achats|acheteur|contrôle de gestion|contrôleur|trésorerie)\b'
+        r"\b(directeur(?: des)? ressources humaines|drh|responsable(?: des)? ressources humaines|charg(?:e|é)\w* des ressources humaines|hr business partner|gestionnaire de paie|charg(?:e|é) de recrutement|responsable formation|directeur administratif et financier|daf|responsable comptable|comptable|contr(?:ô|o)leur de gestion|trésorier|directeur(?: des)? syst(?:è|e)m?es d'?information|dsi|administrateur syst(?:è|e)m?es et r(?:é|e)seaux|technicien de support|juriste d'entreprise|assistant(?:e)? juridique|responsable qhse|ingénieur qhse|animateur qhse|responsable des services g(?:é|e)n(?:é|e)raux|office manager|assistant(?:e)? de direction|assistant(?:e)? administratif(?:ve)?|charg(?:e|é) d'accueil|standardiste)\b"
     ]
     LOGISTICS_KEYS = [
-        r'\b(logistique|logisticien|supply chain|approvisionnement|magasinier|entrepôt|warehouse|transport|expédition|fleet)\b'
+        r"\b(responsable supply chain|responsable logistique|coordinateur logistique|analyste logistique|planificateur|ordonnanceur|responsable d'entrep[oô]t|chef de d(?:é|e)p[oô]t|gestionnaire de stocks|magasinier|cariste|pr(?:é|e)parateur de commandes|responsable transport|gestionnaire de parc|affr(?:é|e)teur|agent d'exploitation|chauffeur|d(?:é|e)clarant en douane|agent de transit|import\s*/?\s*export|supply chain)\b"
     ]
     PRODUCTION_KEYS = [
-        r"\b(ingénieur travaux|responsable travaux|chef de projets|chef de projet|conducteur de travaux|maîtrise d'œuvre|btp|génie civil|chantier|mécanique|électrique|maintenance)\b"
+        r"\b(directeur de travaux|conducteur de travaux|ingénieur de travaux|ingénieur travaux|chef de projet(?:s)?|chef de projets|ingénieur g(?:é|e)nie civil|ingénieur études de prix|ingénieur m(?:é|e)thodes|dessinateur|projeteur|m(?:é|e)treur|(?:é|e)conomiste de la construction|g(?:é|e)om(?:è|e)tre|topographe|technicien de laboratoire|encadrement|gestion de chantier|maîtrise d'?oeuvre|maîtrise d'œuvre)\b"
     ]
 
     def classify_text(text):
@@ -1289,24 +1285,8 @@ with tab5:
                 return 'Fonctions supports'
         return 'Non classé'
 
-    # Charger les fichiers depuis cvs/ si demandé
+    # Construire la liste de fichiers uniquement à partir des uploads
     file_list = []
-    if use_folder:
-        import os
-        cvs_dir = os.path.join(os.getcwd(), 'cvs')
-        if os.path.isdir(cvs_dir):
-            for fname in sorted(os.listdir(cvs_dir)):
-                if fname.lower().endswith('.pdf'):
-                    file_path = os.path.join(cvs_dir, fname)
-                    try:
-                        f = open(file_path, 'rb')
-                        file_list.append({'name': fname, 'file': f})
-                    except Exception:
-                        continue
-        else:
-            st.warning('Le dossier `cvs/` est introuvable dans le repository.')
-
-    # Ajouter les uploads (si fournis)
     if uploaded_files_auto:
         for uf in uploaded_files_auto:
             file_list.append({'name': uf.name, 'file': uf})
