@@ -213,7 +213,7 @@ def calculate_mape(y_true, y_pred):
     return np.mean(np.abs((y_true[mask] - y_pred[mask]) / y_true[mask])) * 100
 
 def predict_with_prophet(df, horizon, freq='M'):
-    """Prédiction avec Prophet (freq='M' ou 'Y')"""
+    """Prédiction avec Prophet (freq='M' pour mensuel ou 'Y' pour annuel)"""
     prophet_df = pd.DataFrame({
         'ds': df['date'],
         'y': df['volume']
@@ -225,21 +225,24 @@ def predict_with_prophet(df, horizon, freq='M'):
         changepoint_prior_scale=0.05
     )
     model.fit(prophet_df)
-    future = model.make_future_dataframe(periods=horizon, freq='Y' if freq == 'Y' else 'M')
+    
+    # Créer le dataframe futur selon la fréquence choisie
+    future = model.make_future_dataframe(periods=horizon, freq='M' if freq == 'M' else 'Y')
     forecast = model.predict(future)
     return model, forecast
 
 def predict_with_holt_winters(df, horizon, freq='M'):
-    """Prédiction avec Holt-Winters (adaptée à la fréquence)"""
+    """Prédiction avec Holt-Winters (freq='M' pour mensuel ou 'Y' pour annuel)"""
     try:
         if freq == 'Y':
-            # Pas de saisonnalité annuelle (chaque point = 1 an)
+            # Pas de saisonnalité pour l'annuel
             model = ExponentialSmoothing(
                 df['volume'].values,
                 trend='add',
                 seasonal=None
             ).fit()
         else:
+            # Saisonnalité de 12 mois pour le mensuel
             model = ExponentialSmoothing(
                 df['volume'].values,
                 trend='add',
@@ -248,8 +251,14 @@ def predict_with_holt_winters(df, horizon, freq='M'):
             ).fit()
 
         forecast_values = model.forecast(horizon)
-
-        future_dates = pd.date_range(start=df['date'].max(), periods=horizon + 1, freq='Y' if freq == 'Y' else 'M')[1:]
+        
+        # Générer les dates futures selon la fréquence
+        future_dates = pd.date_range(
+            start=df['date'].max() + pd.DateOffset(days=1),
+            periods=horizon,
+            freq='M' if freq == 'M' else 'Y'
+        )
+        
         forecast_df = pd.DataFrame({
             'ds': list(df['date']) + list(future_dates),
             'yhat': list(df['volume']) + list(forecast_values)
@@ -261,12 +270,12 @@ def predict_with_holt_winters(df, horizon, freq='M'):
         return None, None
 
 def predict_with_xgboost(df, horizon, lookback=12, freq='M'):
-    """Prédiction avec XGBoost (freq='M' ou 'Y')"""
+    """Prédiction avec XGBoost (freq='M' pour mensuel ou 'Y' pour annuel)"""
     try:
         data = df['volume'].values
         X, y = [], []
 
-        # Ajuster le lookback s'il est trop grand pour les données
+        # Ajuster le lookback pour éviter les erreurs
         effective_lookback = min(lookback, len(data) - 1)
         if effective_lookback < 1:
             st.error("Pas assez de données pour XGBoost avec cette configuration.")
@@ -289,7 +298,13 @@ def predict_with_xgboost(df, horizon, lookback=12, freq='M'):
             forecasts.append(max(0, next_pred))
             last_sequence = np.append(last_sequence[1:], next_pred)
 
-        future_dates = pd.date_range(start=df['date'].max(), periods=horizon + 1, freq='Y' if freq == 'Y' else 'M')[1:]
+        # Générer les dates futures selon la fréquence
+        future_dates = pd.date_range(
+            start=df['date'].max() + pd.DateOffset(days=1),
+            periods=horizon,
+            freq='M' if freq == 'M' else 'Y'
+        )
+        
         forecast_df = pd.DataFrame({
             'ds': list(df['date']) + list(future_dates),
             'yhat': list(df['volume']) + forecasts
@@ -838,12 +853,12 @@ with tab4:
         col1, col2 = st.columns(2)
         
         with col1:
-            horizon_months = st.number_input(
-                "🔮 Horizon de prévision (mois)",
+            horizon_value = st.number_input(
+                "🔮 Horizon de prédiction",
                 min_value=1,
-                max_value=24,
-                value=6,
-                help="Nombre de mois à prédire dans le futur"
+                max_value=60,  # Augmentation de la limite à 60
+                ue=6,
+                help="Nombre de périodes à prédire dans le futur (mois ou années selon l'agrégation)"
             )
         
         with col2:
@@ -909,21 +924,20 @@ with tab4:
                     st.info("Ré-entraînement du modèle sur toutes les données pour la prédiction finale...")
 
                     # Si l'utilisateur a choisi une agrégation annuelle, convertir l'horizon (mois -> périodes)
-                    agg_freq = st.session_state.get('agg_freq', None)
+                    agg_freq = st.session_state.get('agg_freq', 'M')  # défaut sur mensuel si non spécifié
+
+                    # Ajuster l'horizon et la fréquence selon l'agrégation choisie
                     if agg_freq == 'Y':
-                        # nombre d'années à prédire (arrondi vers le haut)
-                        import math
-                        horizon_periods = max(1, math.ceil(horizon_months / 12))
+                        horizon_periods = horizon_value  # nombre d'années directement
                         model_freq = 'Y'
-                        # agréger la série historique par année
-                        ts_for_model = time_series.copy()
-                        ts_for_model['year'] = ts_for_model['date'].dt.year
-                        ts_for_model = ts_for_model.groupby('year', as_index=False)['volume'].sum()
-                        # définir une colonne date pour chaque année (1er Jan)
-                        ts_for_model['date'] = pd.to_datetime(ts_for_model['year'].astype(str) + '-01-01')
-                        ts_for_model = ts_for_model[['date', 'volume']].sort_values('date').reset_index(drop=True)
+                        # Préparer des données agrégées par année
+                        ts_annual = time_series.copy()
+                        ts_annual['year'] = ts_annual['date'].dt.year
+                        ts_annual = ts_annual.groupby('year').agg({'volume': 'sum'}).reset_index()
+                        ts_annual['date'] = pd.to_datetime(ts_annual['year'], format='%Y')
+                        ts_for_model = ts_annual[['date', 'volume']]
                     else:
-                        horizon_periods = horizon_months
+                        horizon_periods = horizon_value
                         model_freq = 'M'
                         ts_for_model = time_series.copy()
 
@@ -985,7 +999,7 @@ with tab4:
                                 monthly_forecast = future_predictions[['ds', 'y']].copy().rename(columns={'ds':'date','y':'predicted_volume'})
                             monthly_forecast['date'] = pd.to_datetime(monthly_forecast['date'])
                             monthly_forecast['predicted_volume'] = monthly_forecast['predicted_volume'].astype(float).round().astype(int).clip(lower=0)
-                            monthly_forecast = monthly_forecast.sort_values('date').head(horizon_months).reset_index(drop=True)
+                            monthly_forecast = monthly_forecast.sort_values('date').head(horizon_value).reset_index(drop=True)
 
                             # affichage mensuel identique à avant
                             st.subheader("🔮 Prévisions Mensuelles")
@@ -1003,3 +1017,64 @@ with tab4:
                     st.error(f"❌ Erreur lors de la prédiction : {str(e)}")
                     with st.expander("🔍 Détails de l'erreur"):
                         st.exception(e)
+
+# ============================
+# EXPORT DES RÉSULTATS
+# ============================
+# Onglet caché pour le téléchargement
+with st.expander("📥 Export des Résultats", expanded=False):
+    if st.session_state.time_series_data is not None and st.session_state.time_series_data.empty == False:
+        st.markdown("### Exporter les prévisions détaillées")
+        
+        # Choix du format d'export
+        export_format = st.selectbox(
+            "Choisissez le format d'export:",
+            options=["CSV", "Excel"],
+            index=0
+        )
+        
+        # Chemin par défaut pour le téléchargement
+        default_filename = f"export_predit_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        
+        if export_format == "CSV":
+            # Export CSV
+            csv_data = convert_df_to_csv(st.session_state.time_series_data)
+            st.download_button(
+                label="📥 Télécharger en CSV",
+                data=csv_data,
+                file_name=f"{default_filename}.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        else:
+            # Export Excel
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                st.session_state.time_series_data.to_excel(writer, sheet_name='Prévisions', index=False)
+                
+                # Formatage conditionnel pour les cellules
+                workbook = writer.book
+                worksheet = writer.sheets['Prévisions']
+                
+                # Appliquer un format monétaire aux colonnes de volume
+                money_format = workbook.add_format({'num_format': '#,##0.00 €'})
+                worksheet.set_column('B:B', 18, money_format)  # Volume
+                
+                # Ajuster la largeur des colonnes
+                for i, col in enumerate(st.session_state.time_series_data.columns):
+                    max_length = max(
+                        st.session_state.time_series_data[col].astype(str).map(len).max(),
+                        len(col)  # longueur du nom de la colonne
+                    )
+                    worksheet.set_column(i, i, max_length + 2)  # Ajouter un peu d'espace
+        
+            output.seek(0)
+            st.download_button(
+                label="📥 Télécharger en Excel",
+                data=output,
+                file_name=f"{default_filename}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                use_container_width=True
+            )
+    else:
+        st.info("Aucune donnée à exporter. Veuillez exécuter la prédiction d'abord.")
