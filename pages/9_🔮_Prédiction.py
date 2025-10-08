@@ -933,7 +933,16 @@ with tab4:
                                 tmp['year'] = tmp.get('year', pd.Series(dtype=int))
                             tmp['semester'] = np.where(tmp['month'] <= 6, 'S1', 'S2')
                             sem = tmp.groupby(['year', 'semester'], as_index=False)['predicted_volume'].sum()
-                            sem['date'] = sem.apply(lambda r: pd.to_datetime(f"{r.year}-04-01") if r.semester == 'S1' else pd.to_datetime(f"{r.year}-10-01"), axis=1)
+                            
+                            # remplace la lambda problématique par une fonction nommée
+                            def _sem_date(row):
+                                try:
+                                    y = int(row['year'])
+                                except Exception:
+                                    y = int(row.get('year', 0))
+                                return pd.to_datetime(f"{y}-04-01") if row['semester'] == 'S1' else pd.to_datetime(f"{y}-10-01")
+                            
+                            sem['date'] = sem.apply(_sem_date, axis=1)
                             forecast_df = sem[['date', 'predicted_volume', 'year', 'semester']].sort_values(['date']).reset_index(drop=True)
 
                         # Préparer l'affichage (Période textuelle)
@@ -966,7 +975,16 @@ with tab4:
                             hist['semester'] = np.where(hist['date'].dt.month <= 6, 'S1', 'S2')
                             hist['year'] = hist['date'].dt.year
                             hist = hist.groupby(['year', 'semester'], as_index=False)['volume'].sum()
-                            hist['date'] = hist.apply(lambda r: pd.to_datetime(f"{r.year}-04-01") if r.semester == 'S1' else pd.to_datetime(f"{r.year}-10-01"), axis=1)
+                            
+                            # fonction nommée pour construire la date représentative du semestre
+                            def _hist_sem_date(row):
+                                try:
+                                    y = int(row['year'])
+                                except Exception:
+                                    y = int(row.get('year', 0))
+                                return pd.to_datetime(f"{y}-04-01") if row['semester'] == 'S1' else pd.to_datetime(f"{y}-10-01")
+                            
+                            hist['date'] = hist.apply(_hist_sem_date, axis=1)
                         elif freq == 'Q':
                             hist = hist.set_index('date').resample('Q')['volume'].sum().reset_index()
 
@@ -986,8 +1004,7 @@ with tab4:
                             xaxis_title="Date", yaxis_title="Volume", height=420, hovermode='x unified'
                         )
                         st.plotly_chart(fig_pred, use_container_width=True)
-                    else:
-                        st.warning("⚠️ Aucune prédiction future générée. Vérifiez la configuration du modèle.")
+                    st.warning("⚠️ Aucune prédiction future générée. Vérifiez la configuration du modèle.")
                 except Exception as e:
                     st.error(f"❌ Erreur lors de la prédiction : {str(e)}")
                     st.exception(e)
