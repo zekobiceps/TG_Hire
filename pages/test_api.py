@@ -1293,7 +1293,8 @@ with tab5:
 
     # Afficher immédiatement combien de CVs ont été uploadés
     if len(file_list) > 0:
-        st.info(f"{len(file_list)} CV(s) uploadé(s) et prêts pour traitement.")
+        st.success(f"✅ {len(file_list)} CV(s) uploadé(s) et prêts pour traitement.")
+        st.markdown(f"Cliquez sur le bouton **Lancer l'auto-classification** ci-dessous pour démarrer l'analyse.")
 
         # Limiter à 200 pour sécurité
         if len(file_list) > 200:
@@ -1324,7 +1325,18 @@ with tab5:
             processing_placeholder.empty()
 
             df = pd.DataFrame(results)
-
+            
+            # Calcul des statistiques pour le message de résumé
+            num_total = len(df)
+            num_supports = len(df[df['category'] == 'Fonctions supports'])
+            num_logistics = len(df[df['category'] == 'Logistique'])
+            num_production = len(df[df['category'] == 'Production/Technique'])
+            num_unclassified = len(df[df['category'] == 'Non classé'])
+            num_classified = num_total - num_unclassified
+            
+            # Message de succès avec statistiques
+            st.success(f"✅ Traitement terminé : {num_total} CV(s) traité(s), dont {num_classified} classé(s) et {num_unclassified} non classé(s).")
+            
             # Affichage en 3 colonnes
             cols = st.columns(3)
             cats = ['Fonctions supports', 'Logistique', 'Production/Technique']
