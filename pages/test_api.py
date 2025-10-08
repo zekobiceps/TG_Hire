@@ -1291,50 +1291,62 @@ with tab5:
         for uf in uploaded_files_auto:
             file_list.append({'name': uf.name, 'file': uf})
 
-    if len(file_list) == 0:
-        st.info('Aucun CV trouvé. Activez le dossier `cvs/` ou importez des fichiers.')
-    else:
+    # Afficher immédiatement combien de CVs ont été uploadés
+    if len(file_list) > 0:
+        st.info(f"{len(file_list)} CV(s) uploadé(s) et prêts pour traitement.")
+
         # Limiter à 200 pour sécurité
         if len(file_list) > 200:
             st.warning('Plus de 200 CVs trouvés. Seuls les 200 premiers seront traités.')
             file_list = file_list[:200]
 
         if st.button('📂 Lancer l\'auto-classification', type='primary'):
+            results = []
+            progress = st.progress(0)
+            total = len(file_list)
+            # placeholder pour afficher le fichier en cours de traitement
+            processing_placeholder = st.empty()
             with st.spinner('Extraction et classification en cours...'):
-                results = []
-                progress = st.progress(0)
-                total = len(file_list)
                 for i, item in enumerate(file_list):
                     f = item['file']
                     name = item['name']
+                    # Mettre à jour le fichier en cours
+                    processing_placeholder.info(f"Traitement ({i+1}/{total}) : {name}")
                     try:
                         text = extract_text_from_pdf(f)
-                    except Exception as e:
+                    except Exception:
                         text = ''
                     cat = classify_text(text)
                     results.append({'file': name, 'category': cat, 'text_snippet': (text or '')[:800]})
                     progress.progress((i+1)/total)
 
-                df = pd.DataFrame(results)
+            # Nettoyer le placeholder
+            processing_placeholder.empty()
 
-                # Affichage en 3 colonnes
-                cols = st.columns(3)
-                cats = ['Fonctions supports', 'Logistique', 'Production/Technique']
-                for idx, c in enumerate(cats):
-                    with cols[idx]:
-                        st.subheader(c)
-                        sub = df[df['category'] == c]
-                        if sub.empty:
-                            st.write('Aucun CV classé ici.')
-                        else:
-                            # Afficher nom + extrait
-                            for _, r in sub.iterrows():
-                                with st.expander(r['file']):
-                                    st.write(r['text_snippet'])
+            df = pd.DataFrame(results)
 
-                # Non classés
-                nc = df[df['category'] == 'Non classé']
-                if not nc.empty:
-                    st.markdown('---')
-                    st.subheader('Non classés')
-                    st.dataframe(nc[['file', 'text_snippet']], use_container_width=True)
+            # Affichage en 3 colonnes
+            cols = st.columns(3)
+            cats = ['Fonctions supports', 'Logistique', 'Production/Technique']
+            for idx, c in enumerate(cats):
+                with cols[idx]:
+                    st.subheader(c)
+                    sub = df[df['category'] == c]
+                    if sub.empty:
+                        st.write('Aucun CV classé ici.')
+                    else:
+                        # Afficher nom + extrait
+                        for _, r in sub.iterrows():
+                            with st.expander(r['file']):
+                                st.write(r['text_snippet'])
+
+            # Non classés
+            nc = df[df['category'] == 'Non classé']
+            if not nc.empty:
+                st.markdown('---')
+                st.subheader('Non classés')
+                st.dataframe(nc[['file', 'text_snippet']], use_container_width=True)
+
+            # Bouton de téléchargement CSV
+            csv = df.to_csv(index=False).encode('utf-8')
+            st.download_button(label='⬇️ Télécharger les résultats (CSV)', data=csv, file_name='classification_results.csv', mime='text/csv')
