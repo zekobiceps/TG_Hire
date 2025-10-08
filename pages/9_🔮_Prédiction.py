@@ -892,30 +892,10 @@ with tab4:
                     last_date = time_series['date'].max()
                     future_predictions = final_forecast[final_forecast['ds'] > last_date].copy()
 
-                    if not future_predictions.empty:
-                        # Adapter le format des prévisions selon la fréquence choisie
-                        if freq == 'Y':
-                            # Pour l'agrégation annuelle, regrouper par année
-                            forecast_df['year'] = forecast_df['date'].dt.year
-                            forecast_df = forecast_df.groupby('year').agg({
-                                'date': 'first',
-                                'predicted_volume': 'sum'
-                            }).reset_index()
-                        
-                        # Affichage du graphique d'évolution qui avait été supprimé
-                        st.subheader(f"🔮 Prévisions {selected_freq_name}s")
-                        
-                        fig_pred = go.Figure()
-                        fig_pred.add_trace(go.Scatter(x=time_series['date'], y=time_series['volume'], 
-                                                     mode='lines+markers', name='Historique', line=dict(color='#1f77b4', width=2)))
-                        fig_pred.add_trace(go.Scatter(x=forecast_df['date'], y=forecast_df['predicted_volume'], 
-                                                     mode='lines+markers', name='Prédictions', line=dict(color='#ff7f0e', width=3, dash='dash'), 
-                                                     marker=dict(size=8)))
-                        fig_pred.update_layout(title=f"Prédictions {model_type} - {objective}", 
-                                              xaxis_title="Date", yaxis_title="Volume", height=400, hovermode='x unified')
-                        st.plotly_chart(fig_pred, use_container_width=True)
-                        
-                        # Normaliser la sortie du modèle dans forecast_df
+                    if future_predictions.empty:
+                        st.warning("⚠️ Aucune prédiction future générée. Vérifiez la configuration du modèle.")
+                    else:
+                        # Normaliser la sortie du modèle dans forecast_df (doit être fait avant toute manipulation)
                         forecast_df = future_predictions.copy()
                         if 'yhat' in forecast_df.columns:
                             forecast_df['yhat'] = forecast_df['yhat'].astype(float)
@@ -938,14 +918,21 @@ with tab4:
                             ann['date'] = pd.to_datetime(ann['year'].astype(str) + '-01-01')
                             forecast_df = ann[['date', 'predicted_volume']].sort_values('date').reset_index(drop=True)
 
-                        # Agrégation semestrielle si demandée (2 semesters par année)
+                        # Agrégation semestrielle si demandée (2 semestres par année)
                         if freq == '2Q' or st.session_state.get('selected_freq', '') == 'Semestrielle':
                             tmp = forecast_df.copy()
-                            tmp['month'] = tmp['date'].dt.month
-                            tmp['year'] = tmp['date'].dt.year
+                            # si on vient d'une agrégation annuelle, s'assurer d'avoir des mois/years cohérents
+                            if 'predicted_volume' not in tmp.columns and 'volume' in tmp.columns:
+                                tmp['predicted_volume'] = tmp['volume']
+                            # si la série est déjà annuelle (year col), reconstruire mois fictifs pour semestre
+                            if 'date' in tmp.columns:
+                                tmp['month'] = tmp['date'].dt.month
+                                tmp['year'] = tmp['date'].dt.year
+                            else:
+                                tmp['month'] = 1
+                                tmp['year'] = tmp.get('year', pd.Series(dtype=int))
                             tmp['semester'] = np.where(tmp['month'] <= 6, 'S1', 'S2')
                             sem = tmp.groupby(['year', 'semester'], as_index=False)['predicted_volume'].sum()
-                            # crée une date représentative pour le semestre (1er avril pour S1, 1er oct pour S2)
                             sem['date'] = sem.apply(lambda r: pd.to_datetime(f"{r.year}-04-01") if r.semester == 'S1' else pd.to_datetime(f"{r.year}-10-01"), axis=1)
                             forecast_df = sem[['date', 'predicted_volume', 'year', 'semester']].sort_values(['date']).reset_index(drop=True)
 
@@ -972,7 +959,6 @@ with tab4:
 
                         # Restaurer le graphique d'évolution (historique agrégé pour lisibilité si nécessaire)
                         hist = time_series.copy()
-                        # si affichage annuel ou semestriel, agréger l'historique pour cohérence visuelle
                         if freq == 'Y' or st.session_state.get('selected_freq', '') == 'Annuelle':
                             hist = hist.groupby(hist['date'].dt.year, as_index=False).agg({'volume': 'sum'})
                             hist['date'] = pd.to_datetime(hist['date'].astype(str) + '-01-01')
@@ -1002,3 +988,6 @@ with tab4:
                         st.plotly_chart(fig_pred, use_container_width=True)
                     else:
                         st.warning("⚠️ Aucune prédiction future générée. Vérifiez la configuration du modèle.")
+                except Exception as e:
+                    st.error(f"❌ Erreur lors de la prédiction : {str(e)}")
+                    st.exception(e)
