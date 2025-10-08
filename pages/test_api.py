@@ -33,7 +33,7 @@ import torch
 
 # Import des fonctions avancées d'analyse
 from utils import (rank_resumes_with_ensemble, batch_process_resumes, 
-                 save_feedback, get_average_feedback_score, get_feedback_summary)
+                 save_feedback, get_average_feedback_score, get_feedback_summary, deepseek_generate)
 
 # -------------------- Configuration de la clé API DeepSeek --------------------
 # --- CORRECTION : Déplacé à l'intérieur des fonctions pour éviter l'erreur au démarrage ---
@@ -1348,12 +1348,8 @@ with tab5:
                                 f"Réponds uniquement par l'un des trois labels exacts.\n\n"
                                 f"Texte du CV:\n{text[:2000]}"
                             )
-                            url = "https://api.deepseek.com/v1/chat/completions"
-                            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
-                            payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.0}
-                            resp = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
-                            resp.raise_for_status()
-                            content = resp.json().get('choices', [])[0].get('message', {}).get('content', '').strip()
+                            # Utiliser la fonction utilitaire deepseek_generate pour appeler l'API
+                            content = deepseek_generate(prompt, max_tokens=300, temperature=0.0)
                             if 'fonctions' in content.lower():
                                 label = 'Fonctions supports'
                             elif 'logistique' in content.lower():
@@ -1531,12 +1527,8 @@ with tab5:
                                 f"Réponds uniquement par l'un des trois labels exacts.\n\n"
                                 f"Texte du CV:\n{text[:2000]}"
                             )
-                            url = "https://api.deepseek.com/v1/chat/completions"
-                            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
-                            payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.0}
-                            resp = requests.post(url, headers=headers, data=json.dumps(payload), timeout=30)
-                            resp.raise_for_status()
-                            content = resp.json().get('choices', [])[0].get('message', {}).get('content', '').strip()
+                            # Utiliser deepseek_generate (utils) pour uniformité
+                            content = deepseek_generate(prompt, max_tokens=300, temperature=0.0)
                             if 'fonctions' in content.lower():
                                 label = 'Fonctions supports'
                             elif 'logistique' in content.lower():
