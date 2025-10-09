@@ -75,6 +75,26 @@ st.markdown("""
         background-color: #e3f2fd;
         border-bottom: 2px solid #1e88e5;
     }
+    
+    /* Optimisation des tableaux */
+    .stDataFrame {
+        font-size: 0.85rem;
+    }
+    .stDataFrame table {
+        margin: 0 auto;
+        max-width: 95%;
+    }
+    .stDataFrame th {
+        text-align: center !important;
+        padding: 8px 4px !important;
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .stDataFrame td {
+        text-align: center !important;
+        padding: 6px 4px !important;
+        font-size: 0.8rem;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -270,7 +290,7 @@ def get_missing_documents_count(documents_json):
     except:
         return 0
 
-def send_email_reminder(recipient_email, recipient_name, missing_docs, delay_date=None):
+def send_email_reminder(recipient_email, recipient_name, missing_docs, delay_date=None, custom_body=None):
     """Envoie un email de relance via l'API Gmail"""
     try:
         from googleapiclient.discovery import build
@@ -284,10 +304,14 @@ def send_email_reminder(recipient_email, recipient_name, missing_docs, delay_dat
         # Service Gmail API
         service = build('gmail', 'v1', credentials=creds)
         
-        # Créer le corps du message avec le nouveau template
-        docs_list = '\n'.join([f"• {doc}" for doc in missing_docs])
-        
-        body = f"""Bonjour,
+        # Utiliser le corps personnalisé s'il est fourni, sinon utiliser le template par défaut
+        if custom_body:
+            body = custom_body
+        else:
+            # Créer le corps du message avec le template par défaut
+            docs_list = '\n'.join([f"• {doc}" for doc in missing_docs])
+            
+            body = f"""Bonjour {recipient_name},
 
 Merci de noter que votre dossier administratif RH demeure incomplet à ce jour.
 Merci de remettre les éléments suivants afin de le compléter:
@@ -711,36 +735,38 @@ with tab3:
         # Formulaire de relance
         st.subheader("📨 Envoyer une relance")
         
-        with st.form("relance_form"):
-            # Sélection du collaborateur
-            collab_options = incomplete_collabs.apply(lambda x: f"{x['Prénom']} {x['Nom']} ({x['Email']})", axis=1).tolist()
-            selected_collab_relance = st.selectbox("Choisir le collaborateur:", collab_options)
+        # Sélection du collaborateur (en dehors du formulaire pour actualisation dynamique)
+        collab_options = incomplete_collabs.apply(lambda x: f"{x['Prénom']} {x['Nom']} ({x['Email']})", axis=1).tolist()
+        selected_collab_relance = st.selectbox("Choisir le collaborateur:", collab_options, key="collab_selectbox")
+        
+        if selected_collab_relance:
+            # Trouver les données du collaborateur sélectionné
+            selected_idx_relance = collab_options.index(selected_collab_relance)
+            collab_relance_data = incomplete_collabs.iloc[selected_idx_relance]
             
-            if selected_collab_relance:
-                # Trouver les données du collaborateur sélectionné
-                selected_idx_relance = collab_options.index(selected_collab_relance)
-                collab_relance_data = incomplete_collabs.iloc[selected_idx_relance]
+            # Afficher les documents manquants
+            try:
+                missing_docs_relance = json.loads(collab_relance_data['Documents_manquants'])
+            except:
+                missing_docs_relance = []
+            
+            # Section expandable pour les documents manquants
+            with st.expander(f"📄 Documents manquants pour {collab_relance_data['Prénom']} {collab_relance_data['Nom']} ({len(missing_docs_relance)} documents)", expanded=True):
+                for doc in missing_docs_relance:
+                    st.write(f"• {doc}")
+            
+            # Calculer les dates selon le type de relance
+            delay_date_now = (datetime.now() + timedelta(days=14)).strftime('%d/%m/%Y')
+            send_date_1week = (datetime.now() + timedelta(days=7))
+            delay_date_1week = (send_date_1week + timedelta(days=14)).strftime('%d/%m/%Y')
+            send_date_2weeks = (datetime.now() + timedelta(days=14))
+            delay_date_2weeks = (send_date_2weeks + timedelta(days=14)).strftime('%d/%m/%Y')
+            
+            # Section template email avec possibilité d'édition
+            with st.expander("📧 Éditer le modèle d'email", expanded=False):
+                docs_list_preview = '\n'.join([f"• {doc}" for doc in missing_docs_relance])
                 
-                # Afficher les documents manquants
-                try:
-                    missing_docs_relance = json.loads(collab_relance_data['Documents_manquants'])
-                except:
-                    missing_docs_relance = []
-                
-                # Section expandable pour les documents manquants
-                with st.expander(f"📄 Documents manquants pour {collab_relance_data['Prénom']} {collab_relance_data['Nom']} ({len(missing_docs_relance)} documents)", expanded=True):
-                    for doc in missing_docs_relance:
-                        st.write(f"• {doc}")
-                
-                # Section template email
-                with st.expander("📧 Aperçu du modèle d'email", expanded=False):
-                    docs_list_preview = '\n'.join([f"• {doc}" for doc in missing_docs_relance])
-                    
-                    email_preview = f"""**Objet :** URGENT: Complément du dossier administrative RH
-
-**Corps du message :**
-
-Bonjour,
+                default_email_body = f"""Bonjour {collab_relance_data['Prénom']},
 
 Merci de noter que votre dossier administratif RH demeure incomplet à ce jour.
 Merci de remettre les éléments suivants afin de le compléter:
@@ -749,13 +775,23 @@ Merci de remettre les éléments suivants afin de le compléter:
 
 Les documents doivent être envoyés via le pointeur chantier dans une enveloppe fermée, en mentionnant CONFIDENTIEL et A L'ATTENTION DE M.L'EQUIPE RECRUTEMENT.
 
-Merci de noter que le dernier délai pour compléter votre dossier c'est le [DATE_LIMITE]
+Merci de noter que le dernier délai pour compléter votre dossier c'est le {delay_date_now}
 
 Comptant sur votre précieuse collaboration.
 
 Cordialement"""
-                    
-                    st.markdown(email_preview)
+                
+                # Zone de texte éditable pour le corps du message
+                custom_email_body = st.text_area(
+                    "Corps du message (modifiable):",
+                    value=default_email_body,
+                    height=300,
+                    key=f"email_body_{selected_idx_relance}"
+                )
+                
+                st.info("💡 Vous pouvez modifier le texte ci-dessus. La date limite sera automatiquement mise à jour selon le type de relance choisi.")
+
+            with st.form("relance_form"):
                 
                 # Options de relance
                 st.subheader("⏰ Type de relance")
@@ -765,23 +801,18 @@ Cordialement"""
                     horizontal=False
                 )
                 
-                # Calcul des dates selon le type de relance
+                # Affichage des informations selon le type de relance
                 if relance_type == "📧 Envoyer maintenant":
-                    # Date limite = 2 semaines après envoi immédiat
-                    delay_date = (datetime.now() + timedelta(days=14)).strftime('%d/%m/%Y')
-                    st.info(f"📅 Date limite dans l'email: {delay_date}")
+                    st.info(f"📅 Date limite dans l'email: {delay_date_now}")
+                    final_delay_date = delay_date_now
                 elif relance_type == "⏰ Programmer dans 1 semaine":
-                    # Envoi dans 1 semaine + 2 semaines pour la date limite
-                    send_date = (datetime.now() + timedelta(days=7))
-                    delay_date = (send_date + timedelta(days=14)).strftime('%d/%m/%Y')
-                    st.info(f"📧 La relance sera envoyée le: {send_date.strftime('%d/%m/%Y')}")
-                    st.info(f"📅 Date limite dans l'email: {delay_date}")
+                    st.info(f"📧 La relance sera envoyée le: {send_date_1week.strftime('%d/%m/%Y')}")
+                    st.info(f"� Date limite dans l'email: {delay_date_1week}")
+                    final_delay_date = delay_date_1week
                 else:  # 2 semaines
-                    # Envoi dans 2 semaines + 2 semaines pour la date limite
-                    send_date = (datetime.now() + timedelta(days=14))
-                    delay_date = (send_date + timedelta(days=14)).strftime('%d/%m/%Y')
-                    st.info(f"📧 La relance sera envoyée le: {send_date.strftime('%d/%m/%Y')}")
-                    st.info(f"📅 Date limite dans l'email: {delay_date}")
+                    st.info(f"📧 La relance sera envoyée le: {send_date_2weeks.strftime('%d/%m/%Y')}")
+                    st.info(f"� Date limite dans l'email: {delay_date_2weeks}")
+                    final_delay_date = delay_date_2weeks
                 
                 # Bouton d'envoi
                 send_button = st.form_submit_button("📧 Envoyer/Programmer la relance", type="primary", use_container_width=True)
@@ -790,11 +821,15 @@ Cordialement"""
                     with st.spinner("📤 Traitement de la relance en cours..."):
                         if relance_type == "📧 Envoyer maintenant":
                             # Envoi immédiat
+                            # Utiliser le corps d'email personnalisé avec la date limite mise à jour
+                            final_email_body = custom_email_body.replace(delay_date_now, final_delay_date)
+                            
                             success = send_email_reminder(
                                 collab_relance_data['Email'],
                                 collab_relance_data['Prénom'],
                                 missing_docs_relance,
-                                delay_date
+                                final_delay_date,
+                                final_email_body
                             )
                             
                             if success:
@@ -835,7 +870,7 @@ Cordialement"""
                                 'Collaborateur': [f"{collab_relance_data['Prénom']} {collab_relance_data['Nom']}"],
                                 'Email': [collab_relance_data['Email']],
                                 'Documents_relances': [json.dumps(missing_docs_relance)],
-                                'Date_limite': [delay_date],
+                                'Date_limite': [final_delay_date],
                                 'Statut': ['Programmée']
                             })
                             
