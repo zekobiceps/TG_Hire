@@ -542,13 +542,17 @@ with tab1:
     
     if len(filtered_df) > 0:
         # Préparer les données pour l'affichage
-        display_df = filtered_df[['Nom', 'Prénom', 'Poste', 'Service', 'Téléphone', 'Email', 
-                     'Date_integration', 'Statut', 'Nb_docs_manquants', 
-                     'Derniere_relance', 'Nombre_relances']].copy()
+        # S'assurer que toutes les colonnes attendues existent dans le DataFrame (évite KeyError si la feuille Google a un schéma différent)
+        expected_cols = ['Nom', 'Prénom', 'Poste', 'Service', 'Téléphone', 'Email', 'Date_integration', 'Statut', 'Nb_docs_manquants', 'Derniere_relance', 'Nombre_relances']
+        for c in expected_cols:
+            if c not in filtered_df.columns:
+                filtered_df[c] = ''
+
+        display_df = filtered_df[expected_cols].copy()
         
-        display_df.columns = ['Nom', 'Prénom', 'Poste', 'Affectation', 'Téléphone', 'Email', 
-                         'Date Intégration', 'Statut', 'Docs Manquants', 
-                         'Dernière Relance', 'Nb Relances']
+    display_df.columns = ['Nom', 'Prénom', 'Poste', 'Affectation', 'Téléphone', 'Email', 
+             'Date Intégration', 'Statut', 'Docs Manquants', 
+             'Dernière Relance', 'Nb Relances']
         
         # Affichage avec formatage conditionnel
         st.dataframe(
