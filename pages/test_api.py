@@ -1383,8 +1383,10 @@ with tab5:
             num_unclassified = len(df[df['category'] == 'Non classé'])
             num_classified = num_total - num_unclassified
             
-            # Message de succès avec statistiques
-            st.success(f"✅ Traitement terminé : {num_total} CV(s) traité(s), dont {num_classified} classé(s) et {num_unclassified} non classé(s).")
+            # Message de succès avec statistiques et pourcentages
+            percent_classified = int(round(num_classified / num_total * 100)) if num_total > 0 else 0
+            percent_unclassified = int(round(num_unclassified / num_total * 100)) if num_total > 0 else 0
+            st.success(f"✅ Traitement terminé : {num_total} CV(s) traité(s), dont {num_classified} ({percent_classified}%) classé(s) et {num_unclassified} ({percent_unclassified}%) non classé(s).")
             
             # Utiliser le DataFrame pour l'affichage
             display_df = df
@@ -1412,7 +1414,7 @@ with tab5:
                 st.dataframe(nc[['file', 'text_snippet']], use_container_width=True)
                 
                 # Bouton pour analyser les CV non classés avec DeepSeek
-                analyze_button = st.button('🔍 Analyser les CV non classés avec DeepSeek AI', type='secondary')
+                analyze_button = st.button('🔍 Analyser les CV non classés avec Intelligence Artificielle', type='secondary')
                 
                 # Si on clique sur le bouton
                 if analyze_button:
@@ -1422,7 +1424,7 @@ with tab5:
                     unclassified_total = len(nc)
                     processing_ai_placeholder = st.empty()
                     
-                    with st.spinner('Analyse des CVs non classés avec DeepSeek IA...'):
+                    with st.spinner('Analyse des CVs non classés avec Intelligence Artificielle...'):
                         for i, (_, row) in enumerate(nc.iterrows()):
                             name = row['file']
                             text_snippet = row['text_snippet']
@@ -1445,15 +1447,15 @@ with tab5:
                     st.session_state.deepseek_analyses = unclassified_results
                     st.session_state.last_action = "analyzed"
             
-            # Afficher les analyses DeepSeek s'il y en a
+            # Afficher les analyses IA s'il y en a
             if st.session_state.deepseek_analyses:
                 st.markdown('---')
-                st.subheader("📝 Analyses IA des CV non classés")
+                st.subheader("📝 Analyses par Intelligence Artificielle des CV non classés")
                 
                 # Ajouter un bouton pour réinitialiser les analyses si nécessaire
                 col1, col2 = st.columns([3, 1])
                 with col1:
-                    st.success(f"✅ Analyse IA pour {len(st.session_state.deepseek_analyses)} CV(s) non classés.")
+                    st.success(f"✅ Analyse par Intelligence Artificielle pour {len(st.session_state.deepseek_analyses)} CV(s) non classés.")
                 with col2:
                     if st.button("🔄 Réinitialiser analyses", key="reset_deepseek"):
                         st.session_state.deepseek_analyses = []
