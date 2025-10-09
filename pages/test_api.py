@@ -321,7 +321,27 @@ def update_row_in_gsheet(row_index, updated_data):
         print(f"Erreur Google Sheets (masquée): {e}")
         return False
 # Définition utilitaire: normalisation du DataFrame HR (placer avant l'initialisation)
-# ... existing code ...
+def normalize_hr_database(df):
+    """Normalise les colonnes et types du DataFrame HR pour éviter les problèmes
+    si l'en-tête de la feuille change entre 'Service' et 'Affectation'."""
+    if df is None or len(df) == 0:
+        return df
+    # Supporter à la fois 'Service' et 'Affectation'
+    if 'Affectation' in df.columns and 'Service' not in df.columns:
+        df['Service'] = df['Affectation']
+    if 'Service' in df.columns and 'Affectation' not in df.columns:
+        df['Affectation'] = df['Service']
+    # Nombre_relances en int
+    if 'Nombre_relances' in df.columns:
+        df['Nombre_relances'] = pd.to_numeric(df['Nombre_relances'], errors='coerce').fillna(0).astype(int)
+    else:
+        df['Nombre_relances'] = 0
+    # Documents_manquants assurer string JSON
+    if 'Documents_manquants' in df.columns:
+        df['Documents_manquants'] = df['Documents_manquants'].fillna('[]').astype(str)
+    else:
+        df['Documents_manquants'] = '[]'
+    return df
 
 # Initialisation des données en session
 if 'hr_database' not in st.session_state:
