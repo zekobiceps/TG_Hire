@@ -127,6 +127,43 @@ def _build_service_account_info_from_st_secrets():
 
     return info
 
+
+def get_api_secret(name: str, alt_names=None, env_fallback=True):
+    """Récupère un secret en essayant plusieurs variantes et en retombant sur les variables d'environnement.
+
+    - name: nom principal du secret attendu dans st.secrets
+    - alt_names: liste de noms alternatifs à tester
+    - env_fallback: si True, essaie os.environ[name] si st.secrets ne contient rien
+
+    Retourne la valeur (str) ou None.
+    """
+    alt_names = alt_names or []
+    # 1) st.secrets direct
+    try:
+        val = st.secrets.get(name)
+        if val:
+            return val
+    except Exception:
+        # st.secrets peut ne pas être disponible en environnement de test
+        pass
+
+    # 2) noms alternatifs
+    for alt in alt_names:
+        try:
+            val = st.secrets.get(alt)
+            if val:
+                return val
+        except Exception:
+            continue
+
+    # 3) fallback vers variables d'environnement
+    if env_fallback:
+        val = os.environ.get(name) or next((os.environ.get(a) for a in alt_names if os.environ.get(a)), None)
+        if val:
+            return val
+
+    return None
+
 try:
     from openai import OpenAI
     OPENAI_CLIENT_AVAILABLE = True

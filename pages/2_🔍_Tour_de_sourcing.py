@@ -116,9 +116,13 @@ Tes réponses doivent être :
 4.  **Adaptables** : Tu dois ajuster la longueur de ta réponse (courte, normale, détaillée) selon la demande.
 """
 
+from utils import get_api_secret
+
+
 def get_deepseek_response(prompt, history, length, function_name="General"):
-    api_key = st.secrets.get("DEEPSEEK_API_KEY")
-    if not api_key: return {"content": "Erreur: Clé API DeepSeek manquante.", "usage": 0}
+    api_key = get_api_secret("DEEPSEEK_API_KEY", alt_names=["DEEPSEEK_KEY", "DEEPSEEK"], env_fallback=True)
+    if not api_key:
+        return {"content": "Erreur: Clé API DeepSeek manquante.", "usage": 0}
     
     final_prompt = f"{prompt}\n\n(Instruction: Fournir une réponse de longueur '{length}')"
     messages = [{"role": "system", "content": SYSTEM_PROMPT}] + history + [{"role": "user", "content": final_prompt}]
@@ -1987,7 +1991,7 @@ with tab6:
         analyse_profil = st.selectbox("Méthode d'analyse du profil LinkedIn", ["Manuel", "Intelligence artificielle"], index=0, key="inmail_analyse")
         if analyse_profil == "Intelligence artificielle":
             # Vérifier si l'API est disponible
-            api_key = st.secrets.get("DEEPSEEK_API_KEY")
+            api_key = get_api_secret("DEEPSEEK_API_KEY", alt_names=["DEEPSEEK_KEY", "DEEPSEEK"], env_fallback=True)
             if not api_key:
                 st.warning("⚠️ API non configurée")
     with col8:
