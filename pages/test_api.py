@@ -829,10 +829,8 @@ with tab1:
                         # Signaler le succès après le rerun
                         st.session_state['_last_reload_successful'] = True
                         # Forcer un rerun afin que l'UI reflète immédiatement les nouvelles données
-                        try:
-                            st.experimental_rerun()
-                        except Exception:
-                            pass
+                        # Appel direct : ne pas attraper l'exception, Streamlit gère le rerun
+                        st.experimental_rerun()
                 except Exception as e:
                     st.error(f"Erreur lors du rechargement direct: {e}")
 
