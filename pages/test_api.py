@@ -632,10 +632,14 @@ with tab1:
             c0 = c1 = c2 = c3 = 0
 
         rel_df = pd.DataFrame({'Relances': ['0', '1', '2', '3+'], 'Count': [c0, c1, c2, c3]})
-        # Afficher en barres verticales
+        # Afficher en barres verticales (x catégoriel strict) et y en entier
         fig_rel = px.bar(rel_df, x='Relances', y='Count', title='Distribution des relances (0 / 1 / 2 / 3+)')
-        # Nettoyer les libellés d'axes gênants
-        fig_rel.update_layout(xaxis_title='', yaxis_title='')
+        fig_rel.update_layout(
+            xaxis={'type': 'category', 'categoryorder': 'array', 'categoryarray': ['0', '1', '2', '3+']},
+            yaxis={'tickformat': '.0f', 'dtick': 1},
+            xaxis_title='',
+            yaxis_title=''
+        )
         st.plotly_chart(fig_rel, use_container_width=True)
 
     col_filter1, col_filter2, col_filter3, col_filter4 = st.columns(4)
@@ -680,8 +684,15 @@ with tab1:
     
     if len(filtered_df) > 0:
         # Préparer les données pour l'affichage
-        # S'assurer que toutes les colonnes attendues existent dans le DataFrame (évite KeyError si la feuille Google a un schéma différent)
-        expected_cols = ['Nom', 'Prénom', 'Poste', 'Service', 'Téléphone', 'Email', 'Date_integration', 'Statut', 'Nb_docs_manquants', 'Derniere_relance', 'Nombre_relances']
+        # Prioriser la colonne 'Affectation' si elle existe, sinon utiliser 'Service'
+        if 'Affectation' in filtered_df.columns:
+            filtered_df['Affectation_display'] = filtered_df['Affectation']
+        else:
+            # si seulement 'Service' existe, l'utiliser
+            filtered_df['Affectation_display'] = filtered_df['Service'] if 'Service' in filtered_df.columns else ''
+
+        # S'assurer que toutes les colonnes attendues existent dans le DataFrame (évite KeyError)
+        expected_cols = ['Nom', 'Prénom', 'Poste', 'Affectation_display', 'Téléphone', 'Email', 'Date_integration', 'Statut', 'Nb_docs_manquants', 'Derniere_relance', 'Nombre_relances']
         for c in expected_cols:
             if c not in filtered_df.columns:
                 filtered_df[c] = ''
@@ -1139,7 +1150,15 @@ Cordialement"""
             # Affichage de l'historique
             history_display = st.session_state.relance_history.copy()
             history_display = history_display.sort_values('Date', ascending=False)
-            
+            # Pretty-print Documents_relances JSON -> 'doc1, doc2'
+            if 'Documents_relances' in history_display.columns:
+                def _pretty_docs(x):
+                    try:
+                        arr = json.loads(x) if isinstance(x, str) and x.strip()!='' else []
+                        return ', '.join(arr)
+                    except Exception:
+                        return str(x)
+                history_display['Documents_relances'] = history_display['Documents_relances'].apply(_pretty_docs)
             st.dataframe(history_display, use_container_width=True, hide_index=True)
             
             # Statistiques des relances
@@ -1175,7 +1194,15 @@ Cordialement"""
             # Affichage des relances programmées
             scheduled_display = st.session_state.scheduled_relances.copy()
             scheduled_display = scheduled_display.sort_values('Date_programmee', ascending=True)
-            
+            # Pretty-print Documents_relances
+            if 'Documents_relances' in scheduled_display.columns:
+                def _pretty_docs_sched(x):
+                    try:
+                        arr = json.loads(x) if isinstance(x, str) and x.strip()!='' else []
+                        return ', '.join(arr)
+                    except Exception:
+                        return str(x)
+                scheduled_display['Documents_relances'] = scheduled_display['Documents_relances'].apply(_pretty_docs_sched)
             st.dataframe(scheduled_display, use_container_width=True, hide_index=True)
             
             # Option pour annuler une relance programmée
