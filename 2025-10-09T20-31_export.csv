@@ -1,0 +1,66 @@
+﻿Nom,Prénom,Poste,Affectation,Téléphone,Email,Date Intégration,Statut,Docs Manquants,Dernière Relance,Nb Relances
+TEST,Test,test,MZINDA,,test@test.com,2025-10-09,En cours,1,,0
+TEST2,Test,test,USINE OULAD SALEH,,test@test.com,2025-10-09,En cours,8,,0
+SSS,Sss,dsd,MZINDA,,dsds,2025-10-09,En cours,2,,0
+ZAKARIAA,Fassihh,Animateur HSE,CASA SUD,,zakariametinn@gmail.com,2025-10-09,En cours,2,2025-10-09,2
+Zeroual,Sanae,Chef de projet,PALAIS JAMAI FES,212691096220,sanae.zeroual@example.ma,2023-03-12,En cours,3,,0
+Benjelloun,Youssef,Chargé RH,SIEGE,212689712417,youssef.benjelloun@example.ma,2025-09-12,Complet,0,,1
+Bennani,Youssef,Chargé RH,MZINDA,212650849088,youssef.bennani@example.ma,2024-10-09,Complet,0,,3
+El Amrani,Youssef,Technicien,CAMPUS PH 3,212645761919,youssef.el amrani@example.ma,2024-08-30,En cours,3,,3
+Khattabi,Youssef,Comptable,MZINDA,212656969851,youssef.khattabi@example.ma,2024-12-25,En cours,3,,0
+Meziane,Youssef,Chargé RH,TRÉMIE RN 08,212672354968,youssef.meziane@example.ma,2023-05-12,Complet,0,,4
+El Idrissi,Ahmed,Comptable,SIEGE,212622206055,ahmed.el idrissi@example.ma,2024-10-08,En cours,2,,2
+El Idrissi,Fatima,Ingénieur,STADE AGADIR,212684999219,fatima.el idrissi@example.ma,2024-05-14,En cours,3,,2
+Rachidi,Fatima,Chargé RH,M-TOWER,212695415591,fatima.rachidi@example.ma,2023-04-09,En cours,1,,1
+El Amrani,Omar,Technicien,HALLS SAFI,212696812260,omar.el amrani@example.ma,2023-08-02,En cours,3,,2
+Bouaziz,Fatima,Chargé RH,SANTA MINES,212693309869,fatima.bouaziz@example.ma,2025-01-31,En cours,1,,4
+Rachidi,Ahmed,Technicien,TREMIE MARRAKECH,212656620114,ahmed.rachidi@example.ma,2023-07-10,Complet,0,,2
+Khattabi,Hajar,Technicien,MUSEE LEILA MEZIANE,212643154048,hajar.khattabi@example.ma,2023-12-20,En cours,5,,2
+Ouarzazi,Ahmed,Chargé RH,PALAIS JAMAI FES,212610663517,ahmed.ouarzazi@example.ma,2025-09-25,En cours,5,,3
+Rachidi,Omar,Ingénieur,USINE OULAD SALEH,212685316044,omar.rachidi@example.ma,2023-05-13,En cours,1,,0
+Benjelloun,Omar,Technicien,SIEGE,212637300440,omar.benjelloun@example.ma,2024-03-08,Complet,0,,4
+El Idrissi,Omar,Technicien,VILLAS MANDARIN,212663485737,omar.el idrissi@example.ma,2023-11-12,En cours,3,,2
+Khattabi,Ahmed,Chargé RH,TREMIE LOT 7,212653254021,ahmed.khattabi@example.ma,2024-09-18,En cours,4,,1
+Zeroual,Fatima,Chef de projet,FONDATION M6,212698189320,fatima.zeroual@example.ma,2023-02-13,En cours,3,,3
+Bouaziz,Mohamed,Comptable,SIEGE,212617445343,mohamed.bouaziz@example.ma,2025-05-03,En cours,4,,1
+Bennani,Saad,Ingénieur,CENTRAL ELECTRIQUE,212693609751,saad.bennani@example.ma,2023-05-06,En cours,1,,4
+Zeroual,Mohamed,Chargé RH,PST BENGUERIR,212621631661,mohamed.zeroual@example.ma,2025-09-15,En cours,3,,1
+Ouarzazi,Fatima,Ingénieur,MZINDA,212678817077,fatima.ouarzazi@example.ma,2024-07-31,En cours,3,,3
+Rachidi,Imane,Chef de projet,TOARC 4,212674446868,imane.rachidi@example.ma,2025-03-11,En cours,5,,1
+Bennani,Kamal,Ingénieur,COEUR D'ANFA,212630221956,kamal.bennani@example.ma,2023-04-17,En cours,5,,0
+Ouarzazi,Omar,Ingénieur,SAFRAN,212614301647,omar.ouarzazi@example.ma,2023-05-01,En cours,3,,2
+Zeroual,Ahmed,Technicien,BIM,212617819322,ahmed.zeroual@example.ma,2024-10-23,En cours,5,,3
+Rachidi,Ahmed,Ingénieur,SIEGE ANP,212699257658,ahmed.rachidi@example.ma,2024-05-31,En cours,1,,0
+Rachidi,Kamal,Comptable,AVI,212637836518,kamal.rachidi@example.ma,2023-05-20,En cours,5,,4
+Benjelloun,Imane,Chargé RH,M TOWER,212613702906,imane.benjelloun@example.ma,2024-09-08,En cours,3,,3
+Khattabi,Sanae,Ingénieur,JORF,212677696028,sanae.khattabi@example.ma,2023-02-11,En cours,3,,0
+Bouaziz,Saad,Comptable,M AVENNUE,212693831692,saad.bouaziz@example.ma,2024-06-02,En cours,2,,3
+Rachidi,Saad,Technicien,KENZ TAMARIS,212629971737,saad.rachidi@example.ma,2025-05-14,En cours,5,,0
+El Idrissi,Ahmed,Chargé RH,ROYAL PARK,212653258819,ahmed.el idrissi@example.ma,2025-08-17,En cours,2,,2
+Benjelloun,Imane,Chargé RH,MALABATA,212662547772,imane.benjelloun@example.ma,2023-03-15,En cours,1,,4
+El Amrani,Imane,Chef de projet,UM6P RABAT,212616674115,imane.el amrani@example.ma,2025-01-13,Complet,0,,3
+Khattabi,Hajar,Chef de projet,SALLE MULTISPORTS,212692856116,hajar.khattabi@example.ma,2023-05-30,En cours,5,,2
+El Idrissi,Mohamed,Chef de projet,SALLE COUVERTE,212695118288,mohamed.el idrissi@example.ma,2023-04-20,En cours,4,,3
+Rachidi,Saad,Chargé RH,PALAIS JAMAI FES,212675855078,saad.rachidi@example.ma,2023-01-18,En cours,1,,2
+Bouaziz,Mohamed,Technicien,PALAIS JAMAI FES,212688381069,mohamed.bouaziz@example.ma,2024-09-26,En cours,1,,4
+Meziane,Sanae,Chargé RH,PALAIS JAMAI FES,212655128562,sanae.meziane@example.ma,2025-01-22,En cours,4,,4
+Ouarzazi,Imane,Chef de projet,MALABATA,212674578808,imane.ouarzazi@example.ma,2025-04-01,En cours,2,,2
+Ouarzazi,Saad,Chef de projet,UM6P RABAT,212644556723,saad.ouarzazi@example.ma,2024-06-15,En cours,4,,2
+Rachidi,Youssef,Chef de projet,SALLE MULTISPORTS,212654423907,youssef.rachidi@example.ma,2023-04-29,Complet,0,,4
+El Amrani,Omar,Chargé RH,USINE OULAD SALEH,212639488305,omar.el amrani@example.ma,2023-10-16,En cours,3,,3
+Bennani,Hajar,Technicien,SIEGE ANP,212667812046,hajar.bennani@example.ma,2025-04-03,En cours,4,,4
+Benjelloun,Mohamed,Chef de projet,AVI,212651434726,mohamed.benjelloun@example.ma,2024-11-28,En cours,4,,4
+Khattabi,Ahmed,Chargé RH,M TOWER,212616572523,ahmed.khattabi@example.ma,2025-02-19,En cours,3,,0
+Bouaziz,Omar,Comptable,JORF,212665084256,omar.bouaziz@example.ma,2025-08-20,En cours,5,,4
+Bouaziz,Imane,Technicien,SIEGE ANP,212693542267,imane.bouaziz@example.ma,2025-09-02,En cours,3,,2
+El Amrani,Fatima,Technicien,AVI,212670739612,fatima.el amrani@example.ma,2024-12-14,En cours,1,,1
+Rachidi,Fatima,Chef de projet,M TOWER,212667222785,fatima.rachidi@example.ma,2023-08-22,En cours,5,,1
+Meziane,Hajar,Ingénieur,JORF,212642960327,hajar.meziane@example.ma,2023-12-20,Complet,0,,2
+Rachidi,Kamal,Chef de projet,MUSEE LEILA MEZIANE,212676561881,kamal.rachidi@example.ma,2024-08-31,Complet,0,,4
+Ouarzazi,Kamal,Ingénieur,MUSEE LEILA MEZIANE,212638458426,kamal.ouarzazi@example.ma,2023-03-09,En cours,1,,4
+Rachidi,Youssef,Ingénieur,SIEGE ANP,212669681031,youssef.rachidi@example.ma,2024-06-06,En cours,3,,3
+Zeroual,Omar,Chargé RH,AVI,212690505897,omar.zeroual@example.ma,2023-05-02,En cours,2,,2
+Khattabi,Youssef,Ingénieur,M TOWER,212628207252,youssef.khattabi@example.ma,2025-08-17,En cours,2,,0
+Zeroual,Sanae,Ingénieur,JORF,212696347533,sanae.zeroual@example.ma,2025-04-30,En cours,5,,1
+El Idrissi,Mohamed,Ingénieur,TREMIE MARRAKECH,212670861579,mohamed.el idrissi@example.ma,2025-04-29,En cours,4,,1
+QQQQQQ,Qqqqqqqqqq,qqqqqqqqqq,qqqqqqqqqqqq,ssssssssss,qqqqqqqqq,2025-10-09,En cours,20,,0

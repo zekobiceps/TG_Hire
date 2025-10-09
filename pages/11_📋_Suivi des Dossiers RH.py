@@ -1343,3 +1343,5 @@ Cordialement"""
 # Footer
 st.markdown("---")
 st.markdown("**💼 Système de Suivi des Dossiers RH - TGCC** | Version 1.0")
+
+# (Outils admin supprimés par demande de l'utilisateur)
