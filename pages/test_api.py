@@ -549,9 +549,7 @@ with tab1:
         completion_rate = calculate_completion_percentage()
         st.metric("📈 Taux de Complétude", f"{completion_rate:.1f}%")
     
-    # Barre de progression globale supprimée (affichage uniquement du taux)
-    st.subheader("")
-    st.write(f"**{completion_rate:.1f}%** des dossiers sont complets")
+    # Ne pas afficher la ligne de pourcentage demandée (supprimée)
     
     # Graphiques
     col_chart1, col_chart2 = st.columns(2)
@@ -622,11 +620,20 @@ with tab1:
 
     with col_doc2:
         st.subheader("📧 Répartition du nombre de relances")
-        nb0 = int((st.session_state.hr_database['Nombre_relances'] == 0).sum())
-        nb1 = int((st.session_state.hr_database['Nombre_relances'] == 1).sum())
-        nb2p = int((st.session_state.hr_database['Nombre_relances'] >= 2).sum())
-        rel_df = pd.DataFrame({'Relances': ['0', '1', '2+'], 'Count': [nb0, nb1, nb2p]})
-        fig_rel = px.bar(rel_df, x='Relances', y='Count', title='Distribution des relances (0 / 1 / 2+)')
+        # Construire des catégories 0,1,2,3 (3 => 3 ou plus)
+        if 'Nombre_relances' in st.session_state.hr_database.columns and len(st.session_state.hr_database) > 0:
+            counts = st.session_state.hr_database['Nombre_relances'].fillna(0).astype(int).clip(lower=0)
+            c0 = int((counts == 0).sum())
+            c1 = int((counts == 1).sum())
+            c2 = int((counts == 2).sum())
+            c3 = int((counts >= 3).sum())
+        else:
+            c0 = c1 = c2 = c3 = 0
+
+        rel_df = pd.DataFrame({'Relances': ['0', '1', '2', '3+'], 'Count': [c0, c1, c2, c3]})
+        # Afficher en 'pyramide' -- on utilise un bar horizontal trié pour l'effet
+        fig_rel = px.bar(rel_df, x='Count', y='Relances', orientation='h', title='Distribution des relances (0 / 1 / 2 / 3+)')
+        fig_rel.update_layout(yaxis={'categoryorder':'array','categoryarray':['0','1','2','3+']})
         st.plotly_chart(fig_rel, use_container_width=True)
 
     col_filter1, col_filter2, col_filter3, col_filter4 = st.columns(4)
@@ -1189,3 +1196,96 @@ Cordialement"""
 # Footer
 st.markdown("---")
 st.markdown("**💼 Système de Suivi des Dossiers RH - TGCC** | Version 1.0")
+
+# --- Section admin pour actions rapides (rename header, injecter données de test)
+with st.expander("⚙️ Outils admin (rename colonnes / injecter exemples)", expanded=False):
+    st.caption("Utilisez ces outils uniquement en environnement de test. Les opérations modifient la Google Sheet liée.")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button("Renommer 'Affectation' → 'Service' dans la feuille Google"):
+            try:
+                gc = get_gsheet_client()
+                if not gc:
+                    st.error("Impossible d'authentifier Google Sheets.")
+                else:
+                    sh = gc.open_by_url(GOOGLE_SHEET_URL)
+                    ws = sh.worksheet(WORKSHEET_NAME)
+                    headers = ws.row_values(1)
+                    # remplacer si présent
+                    headers = ['Service' if h.strip().lower()=='affectation' else h for h in headers]
+                    ws.delete_rows(1)
+                    ws.insert_row(headers, index=1)
+                    st.success("✅ En-tête renommée (Affectation -> Service)")
+            except Exception as e:
+                st.error(f"Erreur rename header: {e}")
+    with col_b:
+        if st.button("Renommer 'Service' → 'Affectation' dans la feuille Google"):
+            try:
+                gc = get_gsheet_client()
+                if not gc:
+                    st.error("Impossible d'authentifier Google Sheets.")
+                else:
+                    sh = gc.open_by_url(GOOGLE_SHEET_URL)
+                    ws = sh.worksheet(WORKSHEET_NAME)
+                    headers = ws.row_values(1)
+                    headers = ['Affectation' if h.strip().lower()=='service' else h for h in headers]
+                    ws.delete_rows(1)
+                    ws.insert_row(headers, index=1)
+                    st.success("✅ En-tête renommée (Service -> Affectation)")
+            except Exception as e:
+                st.error(f"Erreur rename header: {e}")
+
+    st.markdown("---")
+    if st.button("Générer 30 exemples de collaborateurs (local)"):
+        # Générer 30 exemples fictifs marocains
+        import random
+        villes = ['Casablanca', 'Rabat', 'Fès', 'Marrakech', 'Tanger', 'Agadir']
+        postes = ['Ingénieur', 'Technicien', 'Chargé RH', 'Comptable', 'Chef de projet']
+        noms = ['El Amrani','Bennani','Bouaziz','Rachidi','Zeroual','El Idrissi','Benjelloun','Khattabi','Ouarzazi','Meziane']
+        prenoms = ['Mohamed','Ahmed','Youssef','Kamal','Sanae','Fatima','Hajar','Imane','Omar','Saad']
+        fake_rows = []
+        for i in range(30):
+            nom = random.choice(noms)
+            prenom = random.choice(prenoms)
+            poste = random.choice(postes)
+            service = random.choice(villes)
+            tel = f"+2126{random.randint(10000000,99999999)}"
+            email = f"{prenom.lower()}.{nom.lower()}@example.ma"
+            date_int = (datetime.now() - timedelta(days=random.randint(0,1000))).strftime('%Y-%m-%d')
+            missing = random.sample(DOCUMENTS_RH, k=random.randint(0,5))
+            statut = 'Complet' if len(missing)==0 else 'En cours'
+            last_rel = ''
+            num_rel = random.randint(0,4)
+            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            fake_rows.append({
+                'Nom': nom,
+                'Prénom': prenom,
+                'Poste': poste,
+                'Service': service,
+                'Téléphone': tel,
+                'Email': email,
+                'Date_integration': date_int,
+                'Documents_manquants': json.dumps(missing),
+                'Statut': statut,
+                'Derniere_relance': last_rel,
+                'Nombre_relances': int(num_rel),
+                'Date_creation': now,
+                'Date_modification': now
+            })
+        fake_df = pd.DataFrame(fake_rows)
+        st.session_state.hr_database = pd.concat([st.session_state.hr_database, fake_df], ignore_index=True)
+        st.success("✅ 30 exemples ajoutés localement. (Utilisez 'Sauvegarder' pour les écrire dans Google Sheets)")
+
+    if st.button("Générer et sauvegarder 30 exemples dans Google Sheets"):
+        try:
+            # Réutiliser la génération précédente si présente
+            if 'fake_df' not in locals():
+                st.button('Génération d\'exemples non trouvée — cliquez d\'abord sur génération locale')
+            else:
+                # Sauvegarder st.session_state.hr_database
+                if save_data_to_gsheet(st.session_state.hr_database):
+                    st.success('✅ Exemples sauvegardés dans Google Sheets.')
+                else:
+                    st.error('❌ Échec de la sauvegarde dans Google Sheets.')
+        except Exception as e:
+            st.error(f"Erreur lors de la sauvegarde des exemples: {e}")
