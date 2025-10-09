@@ -23,6 +23,8 @@ except ImportError:
 # --- CONFIGURATION GOOGLE SHEETS ---
 GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1p8gSC84LZllAaTT6F88xH8nVqZS9jLiOlqiPXHLmJhU/edit"
 WORKSHEET_NAME = "HR_Dossiers"
+HISTORY_SHEET_NAME = "Relance_History"
+SCHEDULED_SHEET_NAME = "Scheduled_Relances"
 
 # Configuration de la page
 st.set_page_config(
@@ -212,6 +214,78 @@ def save_data_to_gsheet(df):
         st.error(f"❌ Erreur lors de la sauvegarde Google Sheets: {e}")
         return False
 
+
+def _load_df_from_worksheet(worksheet_name, default_headers=None):
+    """Charge un DataFrame depuis une worksheet spécifique. Si la worksheet n'existe pas,
+    renvoie un DataFrame vide avec les en-têtes fournis (si fournis).
+    """
+    try:
+        gc = get_gsheet_client()
+        if not gc:
+            return pd.DataFrame(columns=default_headers) if default_headers else pd.DataFrame()
+
+        sheet = gc.open_by_url(GOOGLE_SHEET_URL)
+        try:
+            ws = sheet.worksheet(worksheet_name)
+        except Exception:
+            # Worksheet manquante
+            return pd.DataFrame(columns=default_headers) if default_headers else pd.DataFrame()
+
+        data = ws.get_all_records()
+        if not data:
+            return pd.DataFrame(columns=default_headers) if default_headers else pd.DataFrame()
+
+        return pd.DataFrame(data)
+    except Exception as e:
+        # Ne pas interrompre l'app: afficher en console et renvoyer vide
+        print(f"Erreur chargement worksheet {worksheet_name}: {e}")
+        return pd.DataFrame(columns=default_headers) if default_headers else pd.DataFrame()
+
+
+def _save_df_to_worksheet(df, worksheet_name):
+    """Sauvegarde un DataFrame dans une worksheet spécifique; crée la worksheet si nécessaire."""
+    try:
+        gc = get_gsheet_client()
+        if not gc:
+            return False
+
+        sh = gc.open_by_url(GOOGLE_SHEET_URL)
+        try:
+            ws = sh.worksheet(worksheet_name)
+            ws.clear()
+        except Exception:
+            # créer la worksheet si elle n'existe pas
+            rows = max(10, len(df) + 10)
+            cols = max(1, len(df.columns))
+            ws = sh.add_worksheet(title=worksheet_name, rows=str(rows), cols=str(cols))
+
+        headers = list(df.columns)
+        ws.append_row(headers)
+        if len(df) > 0:
+            ws.append_rows(df.fillna('').values.tolist())
+        return True
+    except Exception as e:
+        print(f"Erreur sauvegarde worksheet {worksheet_name}: {e}")
+        return False
+
+
+def load_relance_history_from_gsheet():
+    headers = ['Date', 'Collaborateur', 'Email', 'Documents_relances', 'Statut_envoi', 'Email_body']
+    return _load_df_from_worksheet(HISTORY_SHEET_NAME, default_headers=headers)
+
+
+def save_relance_history_to_gsheet(df):
+    return _save_df_to_worksheet(df, HISTORY_SHEET_NAME)
+
+
+def load_scheduled_relances_from_gsheet():
+    headers = ['Date_programmee', 'Collaborateur', 'Email', 'Documents_relances', 'Date_limite', 'Statut', 'Actor_email', 'CC', 'Email_body']
+    return _load_df_from_worksheet(SCHEDULED_SHEET_NAME, default_headers=headers)
+
+
+def save_scheduled_relances_to_gsheet(df):
+    return _save_df_to_worksheet(df, SCHEDULED_SHEET_NAME)
+
 def add_row_to_gsheet(new_row_data):
     """Ajoute une nouvelle ligne à Google Sheets"""
     try:
@@ -252,14 +326,23 @@ if 'hr_database' not in st.session_state:
     st.session_state.hr_database = load_data_from_gsheet()
 
 if 'relance_history' not in st.session_state:
-    st.session_state.relance_history = pd.DataFrame(columns=[
-        'Date', 'Collaborateur', 'Email', 'Documents_relances', 'Statut_envoi', 'Email_body'
-    ])
+    # Charger depuis Google Sheets si disponible
+    loaded_hist = load_relance_history_from_gsheet()
+    if loaded_hist is not None and len(loaded_hist) > 0:
+        st.session_state.relance_history = loaded_hist
+    else:
+        st.session_state.relance_history = pd.DataFrame(columns=[
+            'Date', 'Collaborateur', 'Email', 'Documents_relances', 'Statut_envoi', 'Email_body'
+        ])
 
 if 'scheduled_relances' not in st.session_state:
-    st.session_state.scheduled_relances = pd.DataFrame(columns=[
-        'Date_programmee', 'Collaborateur', 'Email', 'Documents_relances', 'Date_limite', 'Statut', 'Actor_email', 'CC', 'Email_body'
-    ])
+    loaded_sched = load_scheduled_relances_from_gsheet()
+    if loaded_sched is not None and len(loaded_sched) > 0:
+        st.session_state.scheduled_relances = loaded_sched
+    else:
+        st.session_state.scheduled_relances = pd.DataFrame(columns=[
+            'Date_programmee', 'Collaborateur', 'Email', 'Documents_relances', 'Date_limite', 'Statut', 'Actor_email', 'CC', 'Email_body'
+        ])
 
 # Fonctions utilitaires
 def save_data():
@@ -417,8 +500,8 @@ with tab1:
         completion_rate = calculate_completion_percentage()
         st.metric("📈 Taux de Complétude", f"{completion_rate:.1f}%")
     
-    # Barre de progression globale
-    st.subheader("🎯 Progression Globale")
+    # Barre de progression globale (étiquette modifiée)
+    st.subheader("Progression Globale")
     progress_bar = st.progress(completion_rate / 100)
     st.write(f"**{completion_rate:.1f}%** des dossiers sont complets")
     
@@ -603,9 +686,9 @@ with tab1:
 with tab2:
     st.header("👤 Ajout / Mise à jour d'un Collaborateur")
     
-    # Choix: Nouveau collaborateur ou mise à jour
+    # Choix: Nouveau collaborateur ou mise à jour (label simplifié)
     action_type = st.radio(
-        "Que souhaitez-vous faire ?",
+        "",
         ["➕ Ajouter un nouveau collaborateur", "✏️ Mettre à jour un collaborateur existant"],
         horizontal=True
     )
@@ -625,17 +708,20 @@ with tab2:
             with col_info2:
                 poste = st.text_input("Poste *", placeholder="Ex: Ingénieur IT")
                 affectation = st.text_input("Affectation *", placeholder="Ex: Service IT")
-                telephone = st.text_input("Téléphone (optionnel)", placeholder="Ex: +212600000000")
+                telephone = st.text_input("Téléphone", placeholder="Ex: +212600000000")
                 date_integration = st.date_input("Date d'intégration")
             
             st.subheader("📋 Documents RH - Cochez les documents FOURNIS")
             st.info("ℹ️ Cochez uniquement les documents que le collaborateur a DÉJÀ fournis")
             
-            # Checklist des documents
+            # Checklist des documents en deux colonnes
             provided_docs = []
+            cols_docs = st.columns(2)
             for i, doc in enumerate(DOCUMENTS_RH):
-                if st.checkbox(f"{doc}", key=f"new_{i}"):
-                    provided_docs.append(doc)
+                col = cols_docs[i % 2]
+                with col:
+                    if st.checkbox(f"{doc}", key=f"new_{i}"):
+                        provided_docs.append(doc)
             
             # Calculer les documents manquants (ceux non cochés)
             missing_docs = [doc for doc in DOCUMENTS_RH if doc not in provided_docs]
@@ -732,14 +818,17 @@ with tab2:
                     st.info("ℹ️ Cochez les documents qui ont été FOURNIS")
 
                     # Possibilité de mettre à jour le téléphone
-                    telephone = st.text_input("Téléphone (optionnel)", value=collab_data.get('Téléphone', ''))
-                    
-                    # Checklist avec état actuel (inverse de la logique précédente)
+                    telephone = st.text_input("Téléphone", value=collab_data.get('Téléphone', ''))
+
+                    # Checklist avec état actuel (inverse de la logique précédente) en deux colonnes
                     provided_docs = []
+                    cols_docs_update = st.columns(2)
                     for i, doc in enumerate(DOCUMENTS_RH):
                         is_currently_provided = doc not in current_missing  # Inverse de la logique
-                        if st.checkbox(f"{doc}", value=is_currently_provided, key=f"update_{i}"):
-                            provided_docs.append(doc)
+                        col = cols_docs_update[i % 2]
+                        with col:
+                            if st.checkbox(f"{doc}", value=is_currently_provided, key=f"update_{i}"):
+                                provided_docs.append(doc)
                     
                     # Calculer les documents manquants (ceux non cochés)
                     new_missing_docs = [doc for doc in DOCUMENTS_RH if doc not in provided_docs]
@@ -838,9 +927,12 @@ with tab3:
             send_date_2weeks = (datetime.now() + timedelta(days=14))
             delay_date_2weeks = (send_date_2weeks + timedelta(days=14)).strftime('%d/%m/%Y')
             
-            # Section: informations de l'émetteur (email pour Reply-To) + template email éditable
-            actor_email = st.text_input("Email de l'émetteur (optionnel, utilisé en Reply-To)", value=st.session_state.get('actor_email', ''))
-            cc_emails = st.text_input("CC (emails séparés par des virgules, optionnel)", value=st.session_state.get('cc_emails', ''))
+            # Section: informations de l'émetteur (Email et CC sur la même ligne)
+            col_actor, col_cc = st.columns([1,1])
+            with col_actor:
+                actor_email = st.text_input("Email de l'émetteur (optionnel, utilisé en Reply-To)", value=st.session_state.get('actor_email', ''))
+            with col_cc:
+                cc_emails = st.text_input("CC (emails séparés par des virgules, optionnel)", value=st.session_state.get('cc_emails', ''))
 
             st.markdown("---")
 
@@ -878,22 +970,20 @@ Cordialement"""
                 # Options de relance
                 st.subheader("⏰ Type de relance")
                 relance_type = st.radio(
-                    "Choisir le type de relance:",
+                    "",
                     ["📧 Envoyer maintenant", "⏰ Programmer dans 1 semaine", "⏰ Programmer dans 2 semaines"],
-                    horizontal=False
+                    horizontal=True
                 )
                 
-                # Affichage des informations selon le type de relance
+                # Affichage compact des informations selon le type de relance
                 if relance_type == "📧 Envoyer maintenant":
-                    st.info(f"📅 Date limite dans l'email: {delay_date_now}")
+                    st.write(f"Date limite dans l'email: {delay_date_now}")
                     final_delay_date = delay_date_now
                 elif relance_type == "⏰ Programmer dans 1 semaine":
-                    st.info(f"📧 La relance sera envoyée le: {send_date_1week.strftime('%d/%m/%Y')}")
-                    st.info(f"� Date limite dans l'email: {delay_date_1week}")
+                    st.write(f"Relance programmée: {send_date_1week.strftime('%d/%m/%Y')} — Date limite: {delay_date_1week}")
                     final_delay_date = delay_date_1week
                 else:  # 2 semaines
-                    st.info(f"📧 La relance sera envoyée le: {send_date_2weeks.strftime('%d/%m/%Y')}")
-                    st.info(f"� Date limite dans l'email: {delay_date_2weeks}")
+                    st.write(f"Relance programmée: {send_date_2weeks.strftime('%d/%m/%Y')} — Date limite: {delay_date_2weeks}")
                     final_delay_date = delay_date_2weeks
                 
                 # Bouton d'envoi
@@ -937,7 +1027,12 @@ Cordialement"""
                                 })
                                 
                                 st.session_state.relance_history = pd.concat([st.session_state.relance_history, nouvelle_relance], ignore_index=True)
-                                
+                                # Persister historique dans Google Sheets
+                                try:
+                                    save_relance_history_to_gsheet(st.session_state.relance_history)
+                                except Exception:
+                                    pass
+
                                 st.success(f"✅ Email envoyé avec succès à {collab_relance_data['Prénom']} {collab_relance_data['Nom']}!")
                                 st.rerun()
                             else:
@@ -964,9 +1059,13 @@ Cordialement"""
                             })
                             
                             st.session_state.scheduled_relances = pd.concat([st.session_state.scheduled_relances, relance_programmee], ignore_index=True)
-                            
+                            # Persister relances programmées
+                            try:
+                                save_scheduled_relances_to_gsheet(st.session_state.scheduled_relances)
+                            except Exception:
+                                pass
+
                             st.success(f"✅ Relance programmée pour le {date_programmee} pour {collab_relance_data['Prénom']} {collab_relance_data['Nom']}!")
-                            st.info("📋 La relance sera envoyée automatiquement à la date programmée.")
     
     else:
         st.success("🎉 Aucune relance nécessaire! Tous les dossiers sont complets.")
@@ -1022,6 +1121,11 @@ Cordialement"""
                 st.session_state.scheduled_relances = pd.DataFrame(columns=[
                     'Date_programmee', 'Collaborateur', 'Email', 'Documents_relances', 'Date_limite', 'Statut', 'Actor_email', 'CC', 'Email_body'
                 ])
+                # Persister la suppression
+                try:
+                    save_scheduled_relances_to_gsheet(st.session_state.scheduled_relances)
+                except Exception:
+                    pass
                 st.success("✅ Toutes les relances programmées ont été supprimées.")
                 st.rerun()
         else:
