@@ -11,6 +11,19 @@ import plotly.graph_objects as go
 from pathlib import Path
 import os
 
+# --- IMPORTS POUR GOOGLE API ---
+try:
+    from google.oauth2 import service_account
+    from googleapiclient.discovery import build
+    import gspread
+except ImportError:
+    st.error("❌ Bibliothèques Google API manquantes. Exécutez : pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib gspread")
+    st.stop()
+
+# --- CONFIGURATION GOOGLE SHEETS ---
+GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1p8gSC84LZllAaTT6F88xH8nVqZS9jLiOlqiPXHLmJhU/edit"
+WORKSHEET_NAME = "HR_Dossiers"
+
 # Configuration de la page
 st.set_page_config(
     page_title="Suivi des Dossiers RH - TGCC",
@@ -79,25 +92,130 @@ DOCUMENTS_RH = [
     "Références professionnelles"
 ]
 
+# -------------------- FONCTIONS D'AUTHENTIFICATION GOOGLE --------------------
+def get_google_credentials():
+    """Crée les identifiants à partir des secrets Streamlit."""
+    try:
+        service_account_info = {
+            "type": st.secrets["GCP_TYPE"],
+            "project_id": st.secrets["GCP_PROJECT_ID"],
+            "private_key_id": st.secrets.get("GCP_PRIVATE_KEY_ID", ""),
+            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n'),
+            "client_email": st.secrets["GCP_CLIENT_EMAIL"],
+            "client_id": st.secrets.get("GCP_CLIENT_ID", ""),
+            "auth_uri": st.secrets.get("GCP_AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
+            "token_uri": st.secrets["GCP_TOKEN_URI"],
+            "auth_provider_x509_cert_url": st.secrets.get("GCP_AUTH_PROVIDER_CERT_URL", "https://www.googleapis.com/oauth2/v1/certs"),
+            "client_x509_cert_url": st.secrets.get("GCP_CLIENT_CERT_URL", "")
+        }
+        return service_account.Credentials.from_service_account_info(service_account_info)
+    except Exception as e:
+        st.error(f"❌ Erreur de format des secrets Google: {e}")
+        return None
+
+def get_gsheet_client():
+    """Authentification pour Google Sheets."""
+    try:
+        creds = get_google_credentials()
+        if creds:
+            scoped_creds = creds.with_scopes([
+                "https://www.googleapis.com/auth/spreadsheets",
+                "https://www.googleapis.com/auth/drive.readonly",
+            ])
+            gc = gspread.Client(auth=scoped_creds)
+            return gc
+    except Exception as e:
+        st.error(f"❌ Erreur d'authentification Google Sheets: {str(e)}")
+    return None
+
+# -------------------- FONCTIONS GOOGLE SHEETS --------------------
+@st.cache_data(ttl=60)  # Cache pendant 1 minute
+def load_data_from_gsheet():
+    """Charge les données depuis Google Sheets"""
+    try:
+        gc = get_gsheet_client()
+        if not gc:
+            return pd.DataFrame()
+        
+        sheet = gc.open_by_url(GOOGLE_SHEET_URL).worksheet(WORKSHEET_NAME)
+        data = sheet.get_all_records()
+        
+        if not data:
+            # Créer les en-têtes si la feuille est vide
+            headers = ['Nom', 'Prénom', 'Poste', 'Service', 'Email', 'Date_integration', 
+                      'Documents_manquants', 'Statut', 'Derniere_relance', 'Nombre_relances',
+                      'Date_creation', 'Date_modification']
+            sheet.clear()
+            sheet.append_row(headers)
+            return pd.DataFrame(columns=headers)
+        
+        df = pd.DataFrame(data)
+        return df
+    except Exception as e:
+        st.error(f"❌ Erreur lors du chargement des données Google Sheets: {e}")
+        return pd.DataFrame()
+
+def save_data_to_gsheet(df):
+    """Sauvegarde les données dans Google Sheets"""
+    try:
+        gc = get_gsheet_client()
+        if not gc:
+            return False
+        
+        sheet = gc.open_by_url(GOOGLE_SHEET_URL).worksheet(WORKSHEET_NAME)
+        
+        # Vider la feuille et réécrire toutes les données
+        sheet.clear()
+        
+        # Ajouter les en-têtes
+        headers = list(df.columns)
+        sheet.append_row(headers)
+        
+        # Ajouter les données
+        if len(df) > 0:
+            values = df.fillna('').values.tolist()
+            sheet.append_rows(values)
+        
+        return True
+    except Exception as e:
+        st.error(f"❌ Erreur lors de la sauvegarde Google Sheets: {e}")
+        return False
+
+def add_row_to_gsheet(new_row_data):
+    """Ajoute une nouvelle ligne à Google Sheets"""
+    try:
+        gc = get_gsheet_client()
+        if not gc:
+            return False
+        
+        sheet = gc.open_by_url(GOOGLE_SHEET_URL).worksheet(WORKSHEET_NAME)
+        sheet.append_row(new_row_data)
+        return True
+    except Exception as e:
+        st.error(f"❌ Erreur lors de l'ajout de ligne Google Sheets: {e}")
+        return False
+
+def update_row_in_gsheet(row_index, updated_data):
+    """Met à jour une ligne spécifique dans Google Sheets"""
+    try:
+        gc = get_gsheet_client()
+        if not gc:
+            return False
+        
+        sheet = gc.open_by_url(GOOGLE_SHEET_URL).worksheet(WORKSHEET_NAME)
+        
+        # row_index + 2 car : +1 pour l'index Python (0-based) vers Google Sheets (1-based), +1 pour ignorer l'en-tête
+        for col_idx, value in enumerate(updated_data, start=1):
+            sheet.update_cell(row_index + 2, col_idx, value)
+        
+        return True
+    except Exception as e:
+        st.error(f"❌ Erreur lors de la mise à jour Google Sheets: {e}")
+        return False
+
 # Initialisation des données en session
 if 'hr_database' not in st.session_state:
-    # Base de données initiale avec quelques exemples
-    st.session_state.hr_database = pd.DataFrame({
-        'Nom': ['ALAMI', 'BENALI', 'CHERKAOUI'],
-        'Prénom': ['Ahmed', 'Fatima', 'Mohamed'],
-        'Poste': ['Ingénieur IT', 'Comptable', 'Technicien'],
-        'Service': ['IT', 'Finance', 'Production'],
-        'Email': ['ahmed.alami@tgcc.ma', 'fatima.benali@tgcc.ma', 'mohamed.cherkaoui@tgcc.ma'],
-        'Date_integration': ['2024-01-15', '2024-02-01', '2024-01-30'],
-        'Documents_manquants': [
-            json.dumps(['Certificat médical d\'aptitude', 'Photo d\'identité']),
-            json.dumps(['RIB (Relevé d\'Identité Bancaire)']),
-            json.dumps([])
-        ],
-        'Statut': ['En cours', 'En cours', 'Complet'],
-        'Derniere_relance': ['2024-01-20', '2024-02-05', ''],
-        'Nombre_relances': [1, 2, 0]
-    })
+    st.session_state.hr_database = load_data_from_gsheet()
 
 if 'relance_history' not in st.session_state:
     st.session_state.relance_history = pd.DataFrame(columns=[
@@ -106,23 +224,17 @@ if 'relance_history' not in st.session_state:
 
 # Fonctions utilitaires
 def save_data():
-    """Sauvegarde les données dans un fichier CSV"""
-    try:
-        st.session_state.hr_database.to_csv('hr_dossiers.csv', index=False)
-        return True
-    except Exception as e:
-        st.error(f"Erreur lors de la sauvegarde: {e}")
-        return False
+    """Sauvegarde les données dans Google Sheets"""
+    return save_data_to_gsheet(st.session_state.hr_database)
 
 def load_data():
-    """Charge les données depuis un fichier CSV si il existe"""
+    """Recharge les données depuis Google Sheets"""
     try:
-        if Path('hr_dossiers.csv').exists():
-            st.session_state.hr_database = pd.read_csv('hr_dossiers.csv')
-            return True
+        st.session_state.hr_database = load_data_from_gsheet()
+        return True
     except Exception as e:
-        st.error(f"Erreur lors du chargement: {e}")
-    return False
+        st.error(f"Erreur lors du rechargement: {e}")
+        return False
 
 def calculate_completion_percentage():
     """Calcule le pourcentage de dossiers complets"""
@@ -322,15 +434,21 @@ with tab1:
     col_action1, col_action2 = st.columns(2)
     
     with col_action1:
-        if st.button("💾 Sauvegarder les données", use_container_width=True):
-            if save_data():
-                st.success("✅ Données sauvegardées avec succès!")
+        if st.button("💾 Sauvegarder dans Google Sheets", use_container_width=True):
+            with st.spinner("Sauvegarde en cours..."):
+                if save_data():
+                    st.success("✅ Données sauvegardées dans Google Sheets!")
+                    # Vider le cache pour forcer le rechargement
+                    st.cache_data.clear()
     
     with col_action2:
-        if st.button("📁 Charger les données", use_container_width=True):
-            if load_data():
-                st.success("✅ Données chargées avec succès!")
-                st.rerun()
+        if st.button("� Recharger depuis Google Sheets", use_container_width=True):
+            with st.spinner("Rechargement en cours..."):
+                # Vider le cache pour forcer le rechargement
+                st.cache_data.clear()
+                if load_data():
+                    st.success("✅ Données rechargées depuis Google Sheets!")
+                    st.rerun()
 
 # ============================
 # ONGLET 2: GESTION COLLABORATEUR
@@ -379,6 +497,9 @@ with tab2:
                     # Déterminer le statut
                     statut = "Complet" if len(missing_docs) == 0 else "En cours"
                     
+                    # Timestamps
+                    now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    
                     # Créer la nouvelle entrée
                     nouvelle_ligne = pd.DataFrame({
                         'Nom': [nom.upper()],
@@ -390,13 +511,29 @@ with tab2:
                         'Documents_manquants': [json.dumps(missing_docs)],
                         'Statut': [statut],
                         'Derniere_relance': [''],
-                        'Nombre_relances': [0]
+                        'Nombre_relances': [0],
+                        'Date_creation': [now],
+                        'Date_modification': [now]
                     })
                     
-                    # Ajouter à la base de données
+                    # Ajouter à la base de données locale
                     st.session_state.hr_database = pd.concat([st.session_state.hr_database, nouvelle_ligne], ignore_index=True)
                     
-                    st.success(f"✅ {prenom} {nom} a été ajouté(e) avec succès!")
+                    # Ajouter directement à Google Sheets
+                    new_row_data = [
+                        nom.upper(), prenom.title(), poste, service, email.lower(),
+                        str(date_integration), json.dumps(missing_docs), statut,
+                        '', 0, now, now
+                    ]
+                    
+                    with st.spinner("Ajout à Google Sheets..."):
+                        if add_row_to_gsheet(new_row_data):
+                            st.success(f"✅ {prenom} {nom} ajouté(e) dans Google Sheets!")
+                            # Vider le cache pour forcer le rechargement
+                            st.cache_data.clear()
+                        else:
+                            st.warning("⚠️ Ajouté localement, mais erreur Google Sheets. Utilisez 'Sauvegarder' manuellement.")
+                    
                     st.success(f"📊 Statut: **{statut}** ({len(missing_docs)} documents manquants)")
                     
                     if len(missing_docs) > 0:
@@ -456,9 +593,24 @@ with tab2:
                         # Déterminer le nouveau statut
                         nouveau_statut = "Complet" if len(new_missing_docs) == 0 else "En cours"
                         
-                        # Mettre à jour la base de données
+                        # Timestamp de modification
+                        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        
+                        # Mettre à jour la base de données locale
                         st.session_state.hr_database.loc[selected_idx, 'Documents_manquants'] = json.dumps(new_missing_docs)
                         st.session_state.hr_database.loc[selected_idx, 'Statut'] = nouveau_statut
+                        st.session_state.hr_database.loc[selected_idx, 'Date_modification'] = now
+                        
+                        # Mettre à jour Google Sheets
+                        updated_row = st.session_state.hr_database.iloc[selected_idx].fillna('').tolist()
+                        
+                        with st.spinner("Mise à jour dans Google Sheets..."):
+                            if update_row_in_gsheet(selected_idx, updated_row):
+                                st.success("✅ Mis à jour dans Google Sheets!")
+                                # Vider le cache pour forcer le rechargement
+                                st.cache_data.clear()
+                            else:
+                                st.warning("⚠️ Mis à jour localement, mais erreur Google Sheets. Utilisez 'Sauvegarder' manuellement.")
                         
                         # Afficher le résultat
                         if nouveau_statut == "Complet":
