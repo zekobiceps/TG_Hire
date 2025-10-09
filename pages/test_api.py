@@ -80,16 +80,27 @@ st.markdown("""
 
 # Définition des documents RH standard
 DOCUMENTS_RH = [
-    "Copie CIN",
-    "Attestation de travail précédente", 
-    "Diplôme/Certificat de formation",
-    "RIB (Relevé d'Identité Bancaire)",
-    "Certificat médical d'aptitude",
-    "Photo d'identité",
-    "Contrat de travail signé",
-    "Attestation de sécurité sociale",
-    "Certificat de résidence",
-    "Références professionnelles"
+    "Curriculum vitae actualisé",
+    "3 copies certifiées conformes des diplômes obtenus et/ou des certificats de scolarité",
+    "Copie certifiée conforme des certificats de travail des employeurs précédents",
+    "3 derniers bulletins de paie délivrés par l'employeur précédent",
+    "Certificat de résidence datant d'au moins 3 mois",
+    "Copie certifiée conforme de votre C.I.N.",
+    "Extrait d'acte de naissance en français",
+    "Copie de la carte C.N.S.S (ou copie de la C.I.N + 2 photos d'identité récentes)",
+    "Fiche anthropométrique originale datant d'au moins 3 mois",
+    "2 photos d'identité identique datant d'au moins 3 mois (Format standard)",
+    "Copie du permis de conduire",
+    "Relevé d'Identité Bancaire (RIB) comportant les 24 chiffres",
+    "Copie certifiée conforme de l'acte de mariage",
+    "Copie de la CIN du conjoint",
+    "Extrait d'acte de naissance de chaque enfant",
+    "Fiche de renseignement dûment remplie et signée par le salarié",
+    "Contrat de travail en double exemplaire à signer et à légaliser",
+    "Check-list d'intégration signée par votre N+1/tuteur/la DSI et la DQHSE",
+    "Annexes du code de bonne conduite signées par vos soins",
+    "Photo au format digital, 600*600 pixels sur fond blanc",
+    "Récapitulatif de carrière CNSS (téléchargeable sur l'application MACNSS)"
 ]
 
 # -------------------- FONCTIONS D'AUTHENTIFICATION GOOGLE --------------------
@@ -222,6 +233,11 @@ if 'relance_history' not in st.session_state:
         'Date', 'Collaborateur', 'Email', 'Documents_relances', 'Statut_envoi'
     ])
 
+if 'scheduled_relances' not in st.session_state:
+    st.session_state.scheduled_relances = pd.DataFrame(columns=[
+        'Date_programmee', 'Collaborateur', 'Email', 'Documents_relances', 'Date_limite', 'Statut'
+    ])
+
 # Fonctions utilitaires
 def save_data():
     """Sauvegarde les données dans Google Sheets"""
@@ -251,50 +267,56 @@ def get_missing_documents_count(documents_json):
     except:
         return 0
 
-def send_email_reminder(recipient_email, recipient_name, missing_docs, sender_email, sender_password):
-    """Envoie un email de relance"""
+def send_email_reminder(recipient_email, recipient_name, missing_docs, delay_date=None):
+    """Envoie un email de relance via l'API Gmail"""
     try:
-        # Configuration SMTP Gmail
-        smtp_server = "smtp.gmail.com"
-        smtp_port = 587
+        from googleapiclient.discovery import build
+        import base64
+        
+        # Obtenir les credentials Google
+        creds = get_google_credentials()
+        if not creds:
+            return False
+        
+        # Service Gmail API
+        service = build('gmail', 'v1', credentials=creds)
+        
+        # Créer le corps du message avec le nouveau template
+        docs_list = '\n'.join([f"R  {doc}" for doc in missing_docs])
+        
+        body = f"""Bonjour,
+
+Merci de noter que votre dossier administratif RH demeure incomplet à ce jour.
+Merci de remettre les éléments suivants afin de le compléter:
+
+{docs_list}
+
+Les documents doivent être envoyés via le pointeur chantier dans une enveloppe fermée, en mentionnant CONFIDENTIEL et A L'ATTENTION DE M.L'EQUIPE RECRUTEMENT.
+
+Merci de noter que le dernier délais pour compléter votre dossier c'est le {delay_date if delay_date else (datetime.now() + timedelta(days=7)).strftime('%d/%m/%Y')}
+
+Comptant sur votre précieuse collaboration.
+
+Cordialement"""
         
         # Créer le message
-        msg = MIMEMultipart()
-        msg['From'] = sender_email
-        msg['To'] = recipient_email
-        msg['Subject'] = f"Rappel - Documents manquants pour votre dossier RH"
+        message = MIMEMultipart()
+        message['to'] = recipient_email
+        message['subject'] = "URGENT: Complément du dossier administrative RH"
+        message.attach(MIMEText(body, 'plain', 'utf-8'))
         
-        # Corps du message
-        body = f"""
-Bonjour {recipient_name},
-
-J'espère que vous allez bien.
-
-Je me permets de vous rappeler qu'il manque encore quelques documents pour compléter votre dossier RH :
-
-{chr(10).join([f"• {doc}" for doc in missing_docs])}
-
-Merci de bien vouloir nous transmettre ces documents dans les plus brefs délais pour finaliser votre intégration.
-
-Si vous avez des questions, n'hésitez pas à me contacter.
-
-Cordialement,
-Service RH - TGCC
-        """
-        
-        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+        # Encoder le message en base64
+        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
         
         # Envoyer l'email
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        server.login(sender_email, sender_password)
-        text = msg.as_string()
-        server.sendmail(sender_email, recipient_email, text)
-        server.quit()
+        send_message = service.users().messages().send(
+            userId='me', 
+            body={'raw': raw_message}
+        ).execute()
         
         return True
     except Exception as e:
-        st.error(f"Erreur lors de l'envoi de l'email: {e}")
+        st.error(f"Erreur lors de l'envoi de l'email via API Gmail: {e}")
         return False
 
 # Titre principal
@@ -394,9 +416,12 @@ with tab1:
         service_filter = st.selectbox("Filtrer par Service", services)
     
     with col_filter3:
-        sort_by = st.selectbox("Trier par", [
-            "Nom", "Date d'intégration", "Nombre de documents manquants", "Dernière relance"
-        ])
+        relance_filter = st.selectbox("Filtrer par Relances", ["Toutes", "0 relance", "1 relance", "2+ relances"])
+    
+    # Nouveau filtre pour le tri
+    sort_by = st.selectbox("Trier par", [
+        "Nom", "Date d'intégration", "Nombre de documents manquants", "Dernière relance"
+    ])
     
     # Application des filtres
     filtered_df = st.session_state.hr_database.copy()
@@ -406,6 +431,14 @@ with tab1:
     
     if service_filter != "Tous":
         filtered_df = filtered_df[filtered_df['Service'] == service_filter]
+    
+    if relance_filter != "Toutes":
+        if relance_filter == "0 relance":
+            filtered_df = filtered_df[filtered_df['Nombre_relances'] == 0]
+        elif relance_filter == "1 relance":
+            filtered_df = filtered_df[filtered_df['Nombre_relances'] == 1]
+        elif relance_filter == "2+ relances":
+            filtered_df = filtered_df[filtered_df['Nombre_relances'] >= 2]
     
     # Ajouter le nombre de documents manquants pour l'affichage
     filtered_df['Nb_docs_manquants'] = filtered_df['Documents_manquants'].apply(get_missing_documents_count)
@@ -496,14 +529,17 @@ with tab2:
                 service = st.selectbox("Service *", ["IT", "Finance", "Production", "RH", "Marketing", "Ventes", "Autre"])
                 date_integration = st.date_input("Date d'intégration prévue")
             
-            st.subheader("📋 Documents RH - Cochez les documents MANQUANTS")
-            st.info("ℹ️ Cochez uniquement les documents que le collaborateur n'a PAS encore fournis")
+            st.subheader("📋 Documents RH - Cochez les documents FOURNIS")
+            st.info("ℹ️ Cochez uniquement les documents que le collaborateur a DÉJÀ fournis")
             
             # Checklist des documents
-            missing_docs = []
+            provided_docs = []
             for i, doc in enumerate(DOCUMENTS_RH):
-                if st.checkbox(f"❌ {doc}", key=f"new_{i}"):
-                    missing_docs.append(doc)
+                if st.checkbox(f"✅ {doc}", key=f"new_{i}"):
+                    provided_docs.append(doc)
+            
+            # Calculer les documents manquants (ceux non cochés)
+            missing_docs = [doc for doc in DOCUMENTS_RH if doc not in provided_docs]
             
             # Bouton de soumission
             submitted = st.form_submit_button("➕ Ajouter le collaborateur", type="primary", use_container_width=True)
@@ -592,15 +628,18 @@ with tab2:
                 
                 # Formulaire de mise à jour
                 with st.form("mise_a_jour"):
-                    st.subheader("📋 Mise à jour des documents manquants")
-                    st.info("ℹ️ Cochez les documents qui sont ENCORE manquants")
+                    st.subheader("📋 Mise à jour des documents fournis")
+                    st.info("ℹ️ Cochez les documents qui ont été FOURNIS")
                     
-                    # Checklist avec état actuel
-                    new_missing_docs = []
+                    # Checklist avec état actuel (inverse de la logique précédente)
+                    provided_docs = []
                     for i, doc in enumerate(DOCUMENTS_RH):
-                        is_currently_missing = doc in current_missing
-                        if st.checkbox(f"❌ {doc}", value=is_currently_missing, key=f"update_{i}"):
-                            new_missing_docs.append(doc)
+                        is_currently_provided = doc not in current_missing  # Inverse de la logique
+                        if st.checkbox(f"✅ {doc}", value=is_currently_provided, key=f"update_{i}"):
+                            provided_docs.append(doc)
+                    
+                    # Calculer les documents manquants (ceux non cochés)
+                    new_missing_docs = [doc for doc in DOCUMENTS_RH if doc not in provided_docs]
                     
                     # Bouton de mise à jour
                     update_submitted = st.form_submit_button("🔄 Mettre à jour", type="primary", use_container_width=True)
@@ -648,21 +687,8 @@ with tab2:
 with tab3:
     st.header("📧 Système de Relances Automatiques")
     
-    # Configuration Gmail
-    with st.expander("⚙️ Configuration Gmail", expanded=False):
-        st.info("🔐 Configuration sécurisée de votre compte Gmail pour l'envoi automatique")
-        
-        col_gmail1, col_gmail2 = st.columns(2)
-        
-        with col_gmail1:
-            sender_email = st.text_input("📧 Votre email Gmail", placeholder="votre.email@gmail.com")
-        
-        with col_gmail2:
-            sender_password = st.text_input("🔑 Mot de passe d'application", type="password", 
-                                          help="Utilisez un mot de passe d'application Gmail (pas votre mot de passe principal)")
-        
-        st.warning("⚠️ **Important**: Utilisez un 'Mot de passe d'application' Gmail, pas votre mot de passe principal. "
-                  "Allez dans votre compte Google > Sécurité > Mots de passe d'application pour en créer un.")
+    # Configuration automatique via l'API Google (pas de configuration manuelle requise)
+    st.info("� **Configuration automatique** : Les emails sont envoyés via l'API Google configurée pour l'application.")
     
     # Sélection des collaborateurs à relancer
     st.subheader("👥 Collaborateurs avec documents manquants")
@@ -702,36 +728,36 @@ with tab3:
                 for doc in missing_docs_relance:
                     st.write(f"  • {doc}")
                 
-                # Template de message (modifiable)
-                default_message = f"""Bonjour {collab_relance_data['Prénom']},
-
-J'espère que vous allez bien.
-
-Je me permets de vous rappeler qu'il manque encore quelques documents pour compléter votre dossier RH :
-
-{chr(10).join([f"• {doc}" for doc in missing_docs_relance])}
-
-Merci de bien vouloir nous transmettre ces documents dans les plus brefs délais pour finaliser votre intégration.
-
-Si vous avez des questions, n'hésitez pas à me contacter.
-
-Cordialement,
-Service RH - TGCC"""
+                # Options de relance
+                st.subheader("⏰ Type de relance")
+                relance_type = st.radio(
+                    "Choisir le type de relance:",
+                    ["📧 Envoyer maintenant", "⏰ Programmer dans 1 semaine", "⏰ Programmer dans 2 semaines"],
+                    horizontal=False
+                )
                 
-                message_body = st.text_area("✏️ Message de relance (modifiable):", value=default_message, height=300)
+                # Calcul de la date limite selon le type de relance
+                if relance_type == "📧 Envoyer maintenant":
+                    delay_date = (datetime.now() + timedelta(days=7)).strftime('%d/%m/%Y')
+                elif relance_type == "⏰ Programmer dans 1 semaine":
+                    delay_date = (datetime.now() + timedelta(days=14)).strftime('%d/%m/%Y')
+                else:  # 2 semaines
+                    delay_date = (datetime.now() + timedelta(days=21)).strftime('%d/%m/%Y')
+                
+                st.info(f"📅 Date limite dans l'email: {delay_date}")
                 
                 # Bouton d'envoi
-                send_button = st.form_submit_button("📧 Envoyer la relance", type="primary", use_container_width=True)
+                send_button = st.form_submit_button("📧 Envoyer/Programmer la relance", type="primary", use_container_width=True)
                 
                 if send_button:
-                    if sender_email and sender_password:
-                        with st.spinner("📤 Envoi de l'email en cours..."):
+                    with st.spinner("📤 Traitement de la relance en cours..."):
+                        if relance_type == "� Envoyer maintenant":
+                            # Envoi immédiat
                             success = send_email_reminder(
                                 collab_relance_data['Email'],
                                 collab_relance_data['Prénom'],
                                 missing_docs_relance,
-                                sender_email,
-                                sender_password
+                                delay_date
                             )
                             
                             if success:
@@ -750,7 +776,7 @@ Service RH - TGCC"""
                                     'Collaborateur': [f"{collab_relance_data['Prénom']} {collab_relance_data['Nom']}"],
                                     'Email': [collab_relance_data['Email']],
                                     'Documents_relances': [json.dumps(missing_docs_relance)],
-                                    'Statut_envoi': ['Envoyé']
+                                    'Statut_envoi': ['Envoyé immédiatement']
                                 })
                                 
                                 st.session_state.relance_history = pd.concat([st.session_state.relance_history, nouvelle_relance], ignore_index=True)
@@ -758,18 +784,41 @@ Service RH - TGCC"""
                                 st.success(f"✅ Email envoyé avec succès à {collab_relance_data['Prénom']} {collab_relance_data['Nom']}!")
                                 st.rerun()
                             else:
-                                st.error("❌ Erreur lors de l'envoi de l'email. Vérifiez vos paramètres Gmail.")
-                    else:
-                        st.error("❌ Veuillez configurer vos paramètres Gmail d'abord.")
+                                st.error("❌ Erreur lors de l'envoi de l'email via l'API Gmail.")
+                        else:
+                            # Relance programmée
+                            if relance_type == "⏰ Programmer dans 1 semaine":
+                                date_programmee = (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d %H:%M')
+                            else:  # 2 semaines
+                                date_programmee = (datetime.now() + timedelta(days=14)).strftime('%Y-%m-%d %H:%M')
+                            
+                            # Ajouter à la liste des relances programmées
+                            relance_programmee = pd.DataFrame({
+                                'Date_programmee': [date_programmee],
+                                'Collaborateur': [f"{collab_relance_data['Prénom']} {collab_relance_data['Nom']}"],
+                                'Email': [collab_relance_data['Email']],
+                                'Documents_relances': [json.dumps(missing_docs_relance)],
+                                'Date_limite': [delay_date],
+                                'Statut': ['Programmée']
+                            })
+                            
+                            st.session_state.scheduled_relances = pd.concat([st.session_state.scheduled_relances, relance_programmee], ignore_index=True)
+                            
+                            st.success(f"✅ Relance programmée pour le {date_programmee} pour {collab_relance_data['Prénom']} {collab_relance_data['Nom']}!")
+                            st.info("📋 La relance sera envoyée automatiquement à la date programmée.")
     
     else:
         st.success("🎉 Aucune relance nécessaire! Tous les dossiers sont complets.")
     
     # Historique des relances
     st.markdown("---")
-    st.subheader("📈 Historique des Relances")
+    st.subheader("📈 Historique et Programmation des Relances")
     
-    if len(st.session_state.relance_history) > 0:
+    # Onglets pour séparer l'historique et les relances programmées
+    hist_tab1, hist_tab2 = st.tabs(["📧 Relances Envoyées", "⏰ Relances Programmées"])
+    
+    with hist_tab1:
+        if len(st.session_state.relance_history) > 0:
         # Affichage de l'historique
         history_display = st.session_state.relance_history.copy()
         history_display = history_display.sort_values('Date', ascending=False)
@@ -789,15 +838,33 @@ Service RH - TGCC"""
             ])
             st.metric("📅 Relances Aujourd'hui", relances_today)
         
-        with col_stat3:
-            avg_relances = st.session_state.hr_database[st.session_state.hr_database['Nombre_relances'] > 0]['Nombre_relances'].mean()
-            if pd.notna(avg_relances):
-                st.metric("📊 Moyenne Relances/Collab", f"{avg_relances:.1f}")
-            else:
-                st.metric("📊 Moyenne Relances/Collab", "0")
+            with col_stat3:
+                avg_relances = st.session_state.hr_database[st.session_state.hr_database['Nombre_relances'] > 0]['Nombre_relances'].mean()
+                if pd.notna(avg_relances):
+                    st.metric("📊 Moyenne Relances/Collab", f"{avg_relances:.1f}")
+                else:
+                    st.metric("📊 Moyenne Relances/Collab", "0")
+        
+        else:
+            st.info("📭 Aucune relance envoyée pour le moment.")
     
-    else:
-        st.info("📭 Aucune relance envoyée pour le moment.")
+    with hist_tab2:
+        if len(st.session_state.scheduled_relances) > 0:
+            # Affichage des relances programmées
+            scheduled_display = st.session_state.scheduled_relances.copy()
+            scheduled_display = scheduled_display.sort_values('Date_programmee', ascending=True)
+            
+            st.dataframe(scheduled_display, use_container_width=True, hide_index=True)
+            
+            # Option pour annuler une relance programmée
+            if st.button("🗑️ Supprimer toutes les relances programmées", type="secondary"):
+                st.session_state.scheduled_relances = pd.DataFrame(columns=[
+                    'Date_programmee', 'Collaborateur', 'Email', 'Documents_relances', 'Date_limite', 'Statut'
+                ])
+                st.success("✅ Toutes les relances programmées ont été supprimées.")
+                st.rerun()
+        else:
+            st.info("📅 Aucune relance programmée pour le moment.")
 
 # Footer
 st.markdown("---")
