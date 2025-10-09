@@ -583,6 +583,194 @@ def get_deepseek_analysis(text):
     except Exception as e:
         return f"Erreur IA : {e}"
 
+# -------------------- Extraction de noms des CV --------------------
+def extract_name_from_cv_text(text):
+    """
+    Extrait le nom et prénom d'un CV à partir du texte.
+    Retourne un dictionnaire avec 'name', 'confidence' et 'method_used'
+    """
+    if not text or len(text.strip()) < 10:
+        return {"name": None, "confidence": 0, "method_used": "text_too_short"}
+    
+    # Prendre les premières lignes (plus probable de contenir le nom)
+    lines = text.split('\n')[:15]  # Premières 15 lignes
+    text_upper = text.upper()
+    
+    # Méthode 1: Chercher des patterns explicites
+    explicit_patterns = [
+        r'(?:nom\s*[:;]\s*)([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)*)',
+        r'(?:prénom\s*[:;]\s*)([A-ZÀ-Ÿ][a-zà-ÿ]+)',
+        r'(?:name\s*[:;]\s*)([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)*)',
+    ]
+    
+    nom, prenom = None, None
+    
+    for line in lines:
+        for pattern in explicit_patterns:
+            match = re.search(pattern, line, re.IGNORECASE)
+            if match:
+                if 'nom' in pattern.lower() and not 'prénom' in pattern.lower():
+                    nom = match.group(1).strip()
+                elif 'prénom' in pattern.lower():
+                    prenom = match.group(1).strip()
+                elif 'name' in pattern.lower():
+                    parts = match.group(1).strip().split()
+                    if len(parts) >= 2:
+                        nom, prenom = parts[0], parts[1]
+    
+    if nom and prenom:
+        formatted_name = f"{nom.upper()} {prenom.capitalize()}"
+        return {"name": formatted_name, "confidence": 0.9, "method_used": "explicit_pattern"}
+    
+    # Méthode 2: Chercher près d'email ou téléphone
+    email_phone_patterns = [
+        r'[\w\.-]+@[\w\.-]+\.\w+',
+        r'(?:\+33|0)[1-9](?:[.\-\s]?\d{2}){4}',
+        r'\d{2}[\.\-\s]?\d{2}[\.\-\s]?\d{2}[\.\-\s]?\d{2}[\.\-\s]?\d{2}'
+    ]
+    
+    for i, line in enumerate(lines):
+        for pattern in email_phone_patterns:
+            if re.search(pattern, line):
+                # Chercher dans les 2 lignes précédentes et suivantes
+                search_lines = lines[max(0, i-2):min(len(lines), i+3)]
+                for search_line in search_lines:
+                    candidate = extract_name_from_line(search_line)
+                    if candidate:
+                        return {"name": candidate, "confidence": 0.7, "method_used": "near_contact"}
+    
+    # Méthode 3: Chercher des mots en majuscules dans les premières lignes
+    for line in lines[:5]:  # Seulement les 5 premières lignes
+        candidate = extract_name_from_line(line)
+        if candidate:
+            return {"name": candidate, "confidence": 0.6, "method_used": "capitalized_words"}
+    
+    return {"name": None, "confidence": 0, "method_used": "not_found"}
+
+def extract_name_from_line(line):
+    """Extrait un nom candidat d'une ligne en utilisant des heuristiques"""
+    if not line or len(line.strip()) < 5:
+        return None
+    
+    # Nettoyer la ligne
+    line = line.strip()
+    
+    # Mots à ignorer (mots métier courants)
+    ignore_words = {
+        'cv', 'curriculum', 'vitae', 'resume', 'directeur', 'manager', 'ingénieur', 
+        'consultant', 'développeur', 'analyst', 'chef', 'responsable', 'assistant',
+        'senior', 'junior', 'stage', 'stagiaire', 'étudiant', 'expérience',
+        'formation', 'diplôme', 'université', 'école', 'master', 'licence',
+        'téléphone', 'email', 'adresse', 'né', 'age', 'ans', 'contact',
+        'projet', 'projets', 'compétences', 'skills'
+    }
+    
+    # Chercher 2-3 mots consécutifs commençant par une majuscule
+    words = line.split()
+    candidates = []
+    
+    for i in range(len(words) - 1):
+        if i + 1 < len(words):
+            word1, word2 = words[i], words[i + 1]
+            
+            # Vérifier que les mots sont des candidats valides
+            if (word1[0].isupper() and word2[0].isupper() and 
+                len(word1) > 1 and len(word2) > 1 and
+                word1.lower() not in ignore_words and 
+                word2.lower() not in ignore_words and
+                word1.isalpha() and word2.isalpha()):
+                
+                # Format: NOM Prénom
+                formatted = f"{word1.upper()} {word2.capitalize()}"
+                candidates.append(formatted)
+    
+    return candidates[0] if candidates else None
+
+# -------------------- Génération du ZIP organisé --------------------
+def create_organized_zip(results, file_list):
+    """
+    Crée un fichier ZIP avec les CV organisés par catégorie et renommés.
+    Retourne les bytes du ZIP et un DataFrame manifest.
+    """
+    import zipfile
+    import io
+    from io import BytesIO
+    
+    zip_buffer = BytesIO()
+    manifest_data = []
+    
+    # Créer les dossiers par catégorie
+    folders = {
+        'Production': 'Production/',
+        'Production/Technique': 'Production/',
+        'Fonctions supports': 'Fonctions_supports/',
+        'Logistique': 'Logistique/',
+        'Non classé': 'Non_classe/'
+    }
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # Créer les dossiers vides
+        for folder in set(folders.values()):
+            zip_file.writestr(folder, '')
+        
+        # Traiter chaque CV
+        for result in results:
+            original_name = result['file']
+            category = result['category']
+            
+            # Déterminer le nom final du fichier
+            if 'extracted_name' in result and result['extracted_name'] and result['extracted_name']['name']:
+                # Utiliser le nom extrait
+                extracted_name = result['extracted_name']['name']
+                final_name = f"{extracted_name}.pdf"
+                confidence = result['extracted_name']['confidence']
+                method = result['extracted_name']['method_used']
+            else:
+                # Garder le nom original
+                final_name = original_name
+                confidence = 0
+                method = 'original_name'
+            
+            # Déterminer le dossier de destination
+            folder = folders.get(category, 'Non_classe/')
+            file_path_in_zip = folder + final_name
+            
+            # Trouver le fichier original dans file_list
+            original_file = None
+            for item in file_list:
+                if item['name'] == original_name:
+                    original_file = item['file']
+                    break
+            
+            if original_file:
+                try:
+                    # Lire le contenu du fichier original
+                    original_file.seek(0)
+                    file_content = original_file.read()
+                    # Ajouter au ZIP
+                    zip_file.writestr(file_path_in_zip, file_content)
+                    
+                    # Ajouter au manifest
+                    manifest_data.append({
+                        'fichier_original': original_name,
+                        'nouveau_nom': final_name,
+                        'categorie': category,
+                        'confiance_extraction': confidence,
+                        'methode_extraction': method,
+                        'dossier': folder.rstrip('/')
+                    })
+                except Exception as e:
+                    st.warning(f"Erreur lors du traitement de {original_name}: {e}")
+        
+        # Créer et ajouter le manifest CSV
+        if manifest_data:
+            manifest_df = pd.DataFrame(manifest_data)
+            manifest_csv = manifest_df.to_csv(index=False, encoding='utf-8')
+            zip_file.writestr('manifest.csv', manifest_csv)
+    
+    zip_buffer.seek(0)
+    return zip_buffer.getvalue(), pd.DataFrame(manifest_data)
+
 # -------------------- Interface Utilisateur --------------------
 st.title("📄 Analyseur de CVs Intelligent")
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Classement de CVs", "🎯 Analyse de Profil", "📖 Guide des Méthodes", "📈 Statistiques de Feedback", "🗂️ Auto-classification"])
@@ -1339,6 +1527,12 @@ with tab5:
             # Réinitialiser pour ne pas afficher le message à chaque rechargement
             st.session_state.last_action = None
         
+        # Option pour renommer et organiser les CV
+        rename_and_organize = st.checkbox(
+            "📁 Renommer les CV et organiser par dossiers",
+            help="Extrait automatiquement les noms des candidats et organise les CV par catégorie dans un fichier ZIP"
+        )
+        
         # Bouton de classification primaire
         if st.button('📂 Lancer l\'auto-classification', type='primary'):
             # Réinitialiser les analyses DeepSeek lors d'une nouvelle classification
@@ -1349,7 +1543,9 @@ with tab5:
             total = len(file_list)
             # placeholder pour afficher le fichier en cours de traitement
             processing_placeholder = st.empty()
-            with st.spinner('Extraction et classification en cours...'):
+            spinner_text = 'Extraction, classification et extraction des noms en cours...' if rename_and_organize else 'Extraction et classification en cours...'
+            
+            with st.spinner(spinner_text):
                 for i, item in enumerate(file_list):
                     f = item['file']
                     name = item['name']
@@ -1360,7 +1556,23 @@ with tab5:
                     except Exception:
                         text = ''
                     cat = classify_text(text)
-                    results.append({'file': name, 'category': cat, 'text_snippet': (text or '')[:800]})
+                    
+                    # Extraction du nom si l'option est cochée
+                    extracted_name_info = None
+                    if rename_and_organize and text:
+                        extracted_name_info = extract_name_from_cv_text(text)
+                    
+                    result_item = {
+                        'file': name, 
+                        'category': cat, 
+                        'text_snippet': (text or '')[:800],
+                        'full_text': text  # Garder le texte complet pour le ZIP
+                    }
+                    
+                    if rename_and_organize:
+                        result_item['extracted_name'] = extracted_name_info
+                    
+                    results.append(result_item)
                     progress.progress((i+1)/total)
 
             # Nettoyer le placeholder
@@ -1368,6 +1580,8 @@ with tab5:
 
             # Stocker les résultats de classification dans la session state
             st.session_state.classification_results = results
+            st.session_state.rename_and_organize_option = rename_and_organize
+            st.session_state.uploaded_files_list = file_list  # Stocker pour le ZIP
             st.session_state.last_action = "classified"
         
         # Si des résultats de classification existent (soit de l'action actuelle ou précédente), les afficher
@@ -1469,11 +1683,21 @@ with tab5:
                 st.dataframe(ai_results_df, width="stretch", hide_index=True)
 
             # Préparer un CSV à 4 colonnes en prenant en compte les analyses IA
-            # Récupérer les classifications initiales
-            supports = df[df['category'] == 'Fonctions supports']['file'].tolist()
-            logistics = df[df['category'] == 'Logistique']['file'].tolist()
-            production = df[df['category'] == 'Production/Technique']['file'].tolist()
-            unclassified = df[df['category'] == 'Non classé']['file'].tolist()
+            # Déterminer les noms à utiliser (extraits ou originaux)
+            def get_display_name(row):
+                original_name = row['file']
+                if (hasattr(st.session_state, 'rename_and_organize_option') and 
+                    st.session_state.rename_and_organize_option and 
+                    'extracted_name' in row and row['extracted_name'] and 
+                    row['extracted_name']['name']):
+                    return row['extracted_name']['name']
+                return original_name
+            
+            # Récupérer les classifications initiales avec les bons noms
+            supports = [get_display_name(row) for _, row in df[df['category'] == 'Fonctions supports'].iterrows()]
+            logistics = [get_display_name(row) for _, row in df[df['category'] == 'Logistique'].iterrows()]
+            production = [get_display_name(row) for _, row in df[df['category'] == 'Production/Technique'].iterrows()]
+            unclassified = [get_display_name(row) for _, row in df[df['category'] == 'Non classé'].iterrows()]
             
             # Intégrer les résultats de l'analyse IA si disponible
             if hasattr(st.session_state, 'deepseek_analyses') and st.session_state.deepseek_analyses:
@@ -1525,4 +1749,33 @@ with tab5:
             st.markdown(f"**Résumé{ai_indicator}**: {count_support} en Fonctions supports, {count_logistics} en Logistique, {count_production} en Production/Technique, {count_unclassified} Non classés.")
             
             csv = export_df.to_csv(index=False).encode('utf-8')
-            st.download_button(label='⬇️ Télécharger les résultats (CSV)', data=csv, file_name='classification_results.csv', mime='text/csv')
+            
+            # Boutons de téléchargement
+            col1, col2 = st.columns(2)
+            with col1:
+                st.download_button(label='⬇️ Télécharger les résultats (CSV)', data=csv, file_name='classification_results.csv', mime='text/csv')
+            
+            with col2:
+                # Bouton ZIP disponible si l'option de renommage était cochée
+                if hasattr(st.session_state, 'rename_and_organize_option') and st.session_state.rename_and_organize_option:
+                    if st.button('📦 Préparer et télécharger le ZIP organisé'):
+                        with st.spinner('Création du fichier ZIP organisé...'):
+                            try:
+                                zip_data, manifest_df = create_organized_zip(st.session_state.classification_results, st.session_state.uploaded_files_list)
+                                st.success('✅ ZIP créé avec succès !')
+                                
+                                # Afficher un aperçu du manifest
+                                with st.expander("📋 Aperçu du contenu du ZIP"):
+                                    st.dataframe(manifest_df, use_container_width=True)
+                                
+                                # Bouton de téléchargement du ZIP
+                                st.download_button(
+                                    label='⬇️ Télécharger le ZIP organisé',
+                                    data=zip_data,
+                                    file_name='CVs_Classes_Organises.zip',
+                                    mime='application/zip'
+                                )
+                            except Exception as e:
+                                st.error(f"❌ Erreur lors de la création du ZIP : {e}")
+                else:
+                    st.info("💡 Cochez l'option 'Renommer les CV' lors du prochain traitement pour activer le téléchargement ZIP organisé.")
