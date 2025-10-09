@@ -324,6 +324,8 @@ def update_row_in_gsheet(row_index, updated_data):
 # Initialisation des données en session
 if 'hr_database' not in st.session_state:
     st.session_state.hr_database = load_data_from_gsheet()
+    # Normaliser les colonnes/types immédiatement
+    st.session_state.hr_database = normalize_hr_database(st.session_state.hr_database)
 
 if 'relance_history' not in st.session_state:
     # Charger depuis Google Sheets si disponible
@@ -353,6 +355,28 @@ def load_data():
     """Recharge les données depuis Google Sheets"""
     try:
         st.session_state.hr_database = load_data_from_gsheet()
+        # Normaliser les colonnes et types
+        def _normalize_hr(df):
+            if df is None or len(df) == 0:
+                return df
+            # Supporter à la fois 'Service' et 'Affectation'
+            if 'Affectation' in df.columns and 'Service' not in df.columns:
+                df['Service'] = df['Affectation']
+            if 'Service' in df.columns and 'Affectation' not in df.columns:
+                df['Affectation'] = df['Service']
+            # Nombre_relances en int
+            if 'Nombre_relances' in df.columns:
+                df['Nombre_relances'] = pd.to_numeric(df['Nombre_relances'], errors='coerce').fillna(0).astype(int)
+            else:
+                df['Nombre_relances'] = 0
+            # Documents_manquants assurer string JSON
+            if 'Documents_manquants' in df.columns:
+                df['Documents_manquants'] = df['Documents_manquants'].fillna('[]').astype(str)
+            else:
+                df['Documents_manquants'] = '[]'
+            return df
+
+        st.session_state.hr_database = _normalize_hr(st.session_state.hr_database)
         return True
     except Exception as e:
         st.error(f"Erreur lors du rechargement: {e}")
@@ -372,6 +396,29 @@ def get_missing_documents_count(documents_json):
         return len(docs)
     except:
         return 0
+
+
+def normalize_hr_database(df):
+    """Normalise les colonnes et types du DataFrame HR pour éviter les problèmes
+    si l'en-tête de la feuille change entre 'Service' et 'Affectation'."""
+    if df is None or len(df) == 0:
+        return df
+    # Supporter à la fois 'Service' et 'Affectation'
+    if 'Affectation' in df.columns and 'Service' not in df.columns:
+        df['Service'] = df['Affectation']
+    if 'Service' in df.columns and 'Affectation' not in df.columns:
+        df['Affectation'] = df['Service']
+    # Nombre_relances en int
+    if 'Nombre_relances' in df.columns:
+        df['Nombre_relances'] = pd.to_numeric(df['Nombre_relances'], errors='coerce').fillna(0).astype(int)
+    else:
+        df['Nombre_relances'] = 0
+    # Documents_manquants assurer string JSON
+    if 'Documents_manquants' in df.columns:
+        df['Documents_manquants'] = df['Documents_manquants'].fillna('[]').astype(str)
+    else:
+        df['Documents_manquants'] = '[]'
+    return df
 
 def send_email_reminder(
     recipient_email,
@@ -500,9 +547,8 @@ with tab1:
         completion_rate = calculate_completion_percentage()
         st.metric("📈 Taux de Complétude", f"{completion_rate:.1f}%")
     
-    # Barre de progression globale (étiquette modifiée)
-    st.subheader("Progression Globale")
-    progress_bar = st.progress(completion_rate / 100)
+    # Barre de progression globale supprimée (affichage uniquement du taux)
+    st.subheader("")
     st.write(f"**{completion_rate:.1f}%** des dossiers sont complets")
     
     # Graphiques
@@ -580,18 +626,16 @@ with tab1:
         rel_df = pd.DataFrame({'Relances': ['0', '1', '2+'], 'Count': [nb0, nb1, nb2p]})
         fig_rel = px.bar(rel_df, x='Relances', y='Count', title='Distribution des relances (0 / 1 / 2+)')
         st.plotly_chart(fig_rel, use_container_width=True)
-    
-    # Filtres
-    st.subheader("🔍 Filtres")
+
     col_filter1, col_filter2, col_filter3, col_filter4 = st.columns(4)
-    
+
     with col_filter1:
         status_filter = st.selectbox("Filtrer par Statut", ["Tous", "Complet", "En cours"])
-    
+
     with col_filter2:
         services = ["Tous"] + list(st.session_state.hr_database['Service'].unique())
         service_filter = st.selectbox("Filtrer par Affectation", services)
-    
+
     with col_filter3:
         relance_filter = st.selectbox("Filtrer par Relances", ["Toutes", "0 relance", "1 relance", "2+ relances"])
     
@@ -678,7 +722,7 @@ with tab1:
                 st.cache_data.clear()
                 if load_data():
                     st.success("✅ Données rechargées depuis Google Sheets!")
-                    st.rerun()
+                    # previously: st.rerun() — removed to avoid automatic tab switching
 
 # ============================
 # ONGLET 2: GESTION COLLABORATEUR
@@ -779,7 +823,7 @@ with tab2:
                         for doc in missing_docs:
                             st.write(f"  • {doc}")
                     
-                    st.rerun()
+                        # previously: st.rerun() — removed to avoid automatic tab switching
                 else:
                     st.error("❌ Veuillez remplir tous les champs obligatoires (*)")
     
@@ -797,7 +841,11 @@ with tab2:
                 selected_idx = collaborateurs.index(selected_collab)
                 collab_data = st.session_state.hr_database.iloc[selected_idx]
                 
-                st.info(f"📊 Statut actuel: **{collab_data['Statut']}**")
+                # Afficher le statut actuel, et si complet ajouter le message de dossier complet sur la même ligne
+                if collab_data['Statut'] == 'Complet':
+                    st.info(f"📊 Statut actuel: **{collab_data['Statut']}** — ✅ Dossier complet - Aucun document manquant!")
+                else:
+                    st.info(f"📊 Statut actuel: **{collab_data['Statut']}**")
                 
                 # Afficher les documents actuellement manquants
                 try:
@@ -870,7 +918,7 @@ with tab2:
                                 for doc in new_missing_docs:
                                     st.write(f"  • {doc}")
                         
-                        st.rerun()
+                        # pas de rerun ici pour éviter de changer d'onglet
         else:
             st.info("📭 Aucun collaborateur dans la base de données. Ajoutez d'abord un collaborateur.")
 
@@ -1034,7 +1082,7 @@ Cordialement"""
                                     pass
 
                                 st.success(f"✅ Email envoyé avec succès à {collab_relance_data['Prénom']} {collab_relance_data['Nom']}!")
-                                st.rerun()
+                                # Ne pas forcer le rerun pour éviter changement d'onglet
                             else:
                                 st.error("❌ Erreur lors de l'envoi de l'email via l'API Gmail.")
                         else:
@@ -1101,7 +1149,12 @@ Cordialement"""
             with col_stat3:
                 avg_relances = st.session_state.hr_database[st.session_state.hr_database['Nombre_relances'] > 0]['Nombre_relances'].mean()
                 if pd.notna(avg_relances):
-                    st.metric("📊 Moyenne Relances/Collab", f"{avg_relances:.1f}")
+                    # afficher sans décimales inutiles (ex: 0.5 -> 1 si on veut entier, ou 0.5 affiché proprement)
+                    # on affiche 1 décimale mais s'il s'agit d'un .0 on affiche sans décimale
+                    if float(avg_relances).is_integer():
+                        st.metric("📊 Moyenne Relances/Collab", f"{int(avg_relances)}")
+                    else:
+                        st.metric("📊 Moyenne Relances/Collab", f"{avg_relances:.1f}")
                 else:
                     st.metric("📊 Moyenne Relances/Collab", "0")
         
@@ -1127,7 +1180,7 @@ Cordialement"""
                 except Exception:
                     pass
                 st.success("✅ Toutes les relances programmées ont été supprimées.")
-                st.rerun()
+                                # Ne pas forcer le rerun pour éviter changement d'onglet
         else:
             st.info("📅 Aucune relance programmée pour le moment.")
 
