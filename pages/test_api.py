@@ -550,9 +550,9 @@ with tab1:
 
         display_df = filtered_df[expected_cols].copy()
         
-    display_df.columns = ['Nom', 'Prénom', 'Poste', 'Affectation', 'Téléphone', 'Email', 
-             'Date Intégration', 'Statut', 'Docs Manquants', 
-             'Dernière Relance', 'Nb Relances']
+        display_df.columns = ['Nom', 'Prénom', 'Poste', 'Affectation', 'Téléphone', 'Email', 
+                 'Date Intégration', 'Statut', 'Docs Manquants', 
+                 'Dernière Relance', 'Nb Relances']
         
         # Affichage avec formatage conditionnel
         st.dataframe(
