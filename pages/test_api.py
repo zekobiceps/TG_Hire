@@ -634,7 +634,19 @@ with tab1:
                         color_discrete_map={'Complet': '#28a745', 'En cours': '#ffc107'}
                     )
                     # Ajouter les labels de valeur par pile
-                    fig_bar.update_traces(texttemplate='%{y}', textposition='outside')
+                    # Ne pas afficher les valeurs numériques sur les barres (demande utilisateur)
+                    # Filtrer les affectations sans valeur (somme des statuts = 0) et trier
+                    for stc in ['Complet', 'En cours']:
+                        if stc not in df_service.columns:
+                            df_service[stc] = 0
+
+                    # Retirer les affectations où il n'y a aucune entrée
+                    df_service = df_service[df_service[['Complet', 'En cours']].sum(axis=1) > 0]
+
+                    # Trier par nombre de dossiers 'En cours' décroissant pour montrer d'abord les chantiers les plus problématiques
+                    if 'En cours' in df_service.columns:
+                        df_service = df_service.sort_values('En cours', ascending=False)
+
                     fig_bar.update_layout(xaxis_title='Affectation', uniformtext_minsize=8, uniformtext_mode='hide')
                     st.plotly_chart(fig_bar, use_container_width=True)
                 except Exception as e:
@@ -665,29 +677,30 @@ with tab1:
             fig_docs.update_layout(xaxis_title='', yaxis_title='', uniformtext_minsize=8, uniformtext_mode='hide')
             st.plotly_chart(fig_docs, use_container_width=True)
 
-        # Calcul de la distribution des relances (0 / 1 / 2 / 3+)
-        try:
-            counts = st.session_state.hr_database['Nombre_relances'].fillna(0).astype(int)
-        except Exception:
-            counts = pd.Series(dtype=int)
+        # Déplacer le graphique 'Distribution des relances' dans la colonne de droite (col_doc2)
+        with col_doc2:
+            st.subheader("📊 Distribution des relances")
+            try:
+                counts = st.session_state.hr_database['Nombre_relances'].fillna(0).astype(int)
+            except Exception:
+                counts = pd.Series(dtype=int)
 
-        c0 = int((counts == 0).sum())
-        c1 = int((counts == 1).sum())
-        c2 = int((counts == 2).sum())
-        c3 = int((counts >= 3).sum())
+            c0 = int((counts == 0).sum())
+            c1 = int((counts == 1).sum())
+            c2 = int((counts == 2).sum())
+            c3 = int((counts >= 3).sum())
 
-        rel_df = pd.DataFrame({'Relances': ['0', '1', '2', '3+'], 'Count': [c0, c1, c2, c3]})
-        # Afficher en barres verticales (x catégoriel strict) et y en entier, afficher la valeur sur chaque barre
-        fig_rel = px.bar(rel_df, x='Relances', y='Count', title='Distribution des relances (0 / 1 / 2 / 3+)', text='Count')
-        fig_rel.update_traces(texttemplate='%{text}', textposition='outside')
-        fig_rel.update_layout(
-            xaxis={'type': 'category', 'categoryorder': 'array', 'categoryarray': ['0', '1', '2', '3+']},
-            yaxis={'tickformat': '.0f', 'dtick': 1},
-            xaxis_title='',
-            yaxis_title='',
-            uniformtext_minsize=8, uniformtext_mode='hide'
-        )
-        st.plotly_chart(fig_rel, use_container_width=True)
+            rel_df = pd.DataFrame({'Relances': ['0', '1', '2', '3+'], 'Count': [c0, c1, c2, c3]})
+            fig_rel = px.bar(rel_df, x='Relances', y='Count', title='Distribution des relances (0 / 1 / 2 / 3+)', text='Count')
+            fig_rel.update_traces(texttemplate='%{text}', textposition='outside')
+            fig_rel.update_layout(
+                xaxis={'type': 'category', 'categoryorder': 'array', 'categoryarray': ['0', '1', '2', '3+']},
+                yaxis={'tickformat': '.0f', 'dtick': 1},
+                xaxis_title='',
+                yaxis_title='',
+                uniformtext_minsize=8, uniformtext_mode='hide'
+            )
+            st.plotly_chart(fig_rel, use_container_width=True)
 
     col_filter1, col_filter2, col_filter3, col_filter4 = st.columns(4)
 
@@ -790,13 +803,9 @@ with tab1:
     # Boutons d'action
     col_action1, col_action2 = st.columns(2)
     
+    # Retirer le bouton de sauvegarde de l'onglet principal (inutile)
     with col_action1:
-        if st.button("💾 Sauvegarder dans Google Sheets", use_container_width=True):
-            with st.spinner("Sauvegarde en cours..."):
-                if save_data():
-                    st.success("✅ Données sauvegardées dans Google Sheets!")
-                    # Vider le cache pour forcer le rechargement
-                    st.cache_data.clear()
+        st.write("")
     
     with col_action2:
         if st.button("🔄 Recharger depuis Google Sheets", use_container_width=True):
@@ -805,7 +814,11 @@ with tab1:
                 st.cache_data.clear()
                 if load_data():
                     st.success("✅ Données rechargées depuis Google Sheets!")
-                    # previously: st.rerun() — removed to avoid automatic tab switching
+                    # Forcer un rerun afin que l'UI reflète immédiatement les nouvelles données
+                    try:
+                        st.experimental_rerun()
+                    except Exception:
+                        pass
 
 # ============================
 # ONGLET 2: GESTION COLLABORATEUR
