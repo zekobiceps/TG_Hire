@@ -819,25 +819,25 @@ with tab3:
     
     with hist_tab1:
         if len(st.session_state.relance_history) > 0:
-        # Affichage de l'historique
-        history_display = st.session_state.relance_history.copy()
-        history_display = history_display.sort_values('Date', ascending=False)
-        
-        st.dataframe(history_display, use_container_width=True, hide_index=True)
-        
-        # Statistiques des relances
-        col_stat1, col_stat2, col_stat3 = st.columns(3)
-        
-        with col_stat1:
-            total_relances = len(st.session_state.relance_history)
-            st.metric("📧 Total Relances", total_relances)
-        
-        with col_stat2:
-            relances_today = len(st.session_state.relance_history[
-                st.session_state.relance_history['Date'].str.startswith(datetime.now().strftime('%Y-%m-%d'))
-            ])
-            st.metric("📅 Relances Aujourd'hui", relances_today)
-        
+            # Affichage de l'historique
+            history_display = st.session_state.relance_history.copy()
+            history_display = history_display.sort_values('Date', ascending=False)
+            
+            st.dataframe(history_display, use_container_width=True, hide_index=True)
+            
+            # Statistiques des relances
+            col_stat1, col_stat2, col_stat3 = st.columns(3)
+            
+            with col_stat1:
+                total_relances = len(st.session_state.relance_history)
+                st.metric("📧 Total Relances", total_relances)
+            
+            with col_stat2:
+                relances_today = len(st.session_state.relance_history[
+                    st.session_state.relance_history['Date'].str.startswith(datetime.now().strftime('%Y-%m-%d'))
+                ])
+                st.metric("📅 Relances Aujourd'hui", relances_today)
+            
             with col_stat3:
                 avg_relances = st.session_state.hr_database[st.session_state.hr_database['Nombre_relances'] > 0]['Nombre_relances'].mean()
                 if pd.notna(avg_relances):
