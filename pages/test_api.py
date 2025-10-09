@@ -173,7 +173,7 @@ def load_data_from_gsheet():
         
         if not data:
             # Créer les en-têtes si la feuille est vide
-            headers = ['Nom', 'Prénom', 'Poste', 'Service', 'Email', 'Date_integration', 
+            headers = ['Nom', 'Prénom', 'Poste', 'Service', 'Téléphone', 'Email', 'Date_integration', 
                       'Documents_manquants', 'Statut', 'Derniere_relance', 'Nombre_relances',
                       'Date_creation', 'Date_modification']
             sheet.clear()
@@ -253,12 +253,12 @@ if 'hr_database' not in st.session_state:
 
 if 'relance_history' not in st.session_state:
     st.session_state.relance_history = pd.DataFrame(columns=[
-        'Date', 'Collaborateur', 'Email', 'Documents_relances', 'Statut_envoi'
+        'Date', 'Collaborateur', 'Email', 'Documents_relances', 'Statut_envoi', 'Email_body'
     ])
 
 if 'scheduled_relances' not in st.session_state:
     st.session_state.scheduled_relances = pd.DataFrame(columns=[
-        'Date_programmee', 'Collaborateur', 'Email', 'Documents_relances', 'Date_limite', 'Statut'
+        'Date_programmee', 'Collaborateur', 'Email', 'Documents_relances', 'Date_limite', 'Statut', 'Actor_email', 'CC', 'Email_body'
     ])
 
 # Fonctions utilitaires
@@ -296,7 +296,6 @@ def send_email_reminder(
     missing_docs,
     delay_date=None,
     custom_body=None,
-    actor_name=None,
     actor_email=None,
     cc_emails=None
 ):
@@ -349,9 +348,9 @@ Comptant sur votre précieuse collaboration.
 
 Cordialement"""
 
-        # Préfixer par qui envoie si fourni
-        if actor_name or actor_email:
-            sender_info = actor_name if actor_name else actor_email
+        # Préfixer par qui envoie si un Reply-To est fourni (on utilise l'email)
+        if actor_email:
+            sender_info = actor_email
             body = f"Envoyé par : {sender_info}\n\n" + body
 
         # Créer le message
@@ -393,7 +392,7 @@ tab1, tab2, tab3 = st.tabs([
     "📧 Relances Automatiques"
 ])
 
-# ============================
+    # ============================
 # ONGLET 1: SUIVI GLOBAL
 # ============================
 with tab1:
@@ -458,14 +457,46 @@ with tab1:
                         df_service,
                         x='Service',
                         y=y_cols,
-                        title="Statuts par Service",
+                        title="Statuts par Affectation",
                         color_discrete_map={'Complet': '#28a745', 'En cours': '#ffc107'}
                     )
+                    fig_bar.update_layout(xaxis_title='Affectation')
                     st.plotly_chart(fig_bar, use_container_width=True)
                 except Exception as e:
                     st.error(f"Erreur affichage graphique par service: {e}")
     
     st.markdown("---")
+
+    # Nouveaux graphiques demandés :
+    col_doc1, col_doc2 = st.columns(2)
+    with col_doc1:
+        st.subheader("📄 Documents les plus souvent manquants")
+        # Aggrégation des documents manquants
+        docs_counter = {}
+        for v in st.session_state.hr_database['Documents_manquants'].fillna(''):
+            try:
+                docs = json.loads(v)
+            except:
+                docs = []
+            for d in docs:
+                docs_counter[d] = docs_counter.get(d, 0) + 1
+
+        if docs_counter:
+            docs_df = pd.DataFrame(list(docs_counter.items()), columns=['Document', 'Count']).sort_values('Count', ascending=False)
+            top_n = docs_df.head(10)
+            fig_docs = px.bar(top_n, x='Document', y='Count', title='Top 10 des documents manquants')
+            st.plotly_chart(fig_docs, use_container_width=True)
+        else:
+            st.info("Aucun document manquant enregistré pour le moment.")
+
+    with col_doc2:
+        st.subheader("📧 Répartition du nombre de relances")
+        nb0 = int((st.session_state.hr_database['Nombre_relances'] == 0).sum())
+        nb1 = int((st.session_state.hr_database['Nombre_relances'] == 1).sum())
+        nb2p = int((st.session_state.hr_database['Nombre_relances'] >= 2).sum())
+        rel_df = pd.DataFrame({'Relances': ['0', '1', '2+'], 'Count': [nb0, nb1, nb2p]})
+        fig_rel = px.bar(rel_df, x='Relances', y='Count', title='Distribution des relances (0 / 1 / 2+)')
+        st.plotly_chart(fig_rel, use_container_width=True)
     
     # Filtres
     st.subheader("🔍 Filtres")
@@ -476,7 +507,7 @@ with tab1:
     
     with col_filter2:
         services = ["Tous"] + list(st.session_state.hr_database['Service'].unique())
-        service_filter = st.selectbox("Filtrer par Service", services)
+        service_filter = st.selectbox("Filtrer par Affectation", services)
     
     with col_filter3:
         relance_filter = st.selectbox("Filtrer par Relances", ["Toutes", "0 relance", "1 relance", "2+ relances"])
@@ -511,13 +542,13 @@ with tab1:
     
     if len(filtered_df) > 0:
         # Préparer les données pour l'affichage
-        display_df = filtered_df[['Nom', 'Prénom', 'Poste', 'Service', 'Email', 
-                                 'Date_integration', 'Statut', 'Nb_docs_manquants', 
-                                 'Derniere_relance', 'Nombre_relances']].copy()
+        display_df = filtered_df[['Nom', 'Prénom', 'Poste', 'Service', 'Téléphone', 'Email', 
+                     'Date_integration', 'Statut', 'Nb_docs_manquants', 
+                     'Derniere_relance', 'Nombre_relances']].copy()
         
-        display_df.columns = ['Nom', 'Prénom', 'Poste', 'Service', 'Email', 
-                             'Date Intégration', 'Statut', 'Docs Manquants', 
-                             'Dernière Relance', 'Nb Relances']
+        display_df.columns = ['Nom', 'Prénom', 'Poste', 'Affectation', 'Téléphone', 'Email', 
+                         'Date Intégration', 'Statut', 'Docs Manquants', 
+                         'Dernière Relance', 'Nb Relances']
         
         # Affichage avec formatage conditionnel
         st.dataframe(
@@ -590,6 +621,7 @@ with tab2:
             with col_info2:
                 poste = st.text_input("Poste *", placeholder="Ex: Ingénieur IT")
                 affectation = st.text_input("Affectation *", placeholder="Ex: Service IT")
+                telephone = st.text_input("Téléphone (optionnel)", placeholder="Ex: +212600000000")
                 date_integration = st.date_input("Date d'intégration")
             
             st.subheader("📋 Documents RH - Cochez les documents FOURNIS")
@@ -621,6 +653,7 @@ with tab2:
                         'Prénom': [prenom.title()],
                         'Poste': [poste],
                         'Service': [affectation],
+                        'Téléphone': [telephone],
                         'Email': [email.lower()],
                         'Date_integration': [str(date_integration)],
                         'Documents_manquants': [json.dumps(missing_docs)],
@@ -636,7 +669,7 @@ with tab2:
                     
                     # Ajouter directement à Google Sheets
                     new_row_data = [
-                        nom.upper(), prenom.title(), poste, affectation, email.lower(),
+                        nom.upper(), prenom.title(), poste, affectation, telephone, email.lower(),
                         str(date_integration), json.dumps(missing_docs), statut,
                         '', 0, now, now
                     ]
@@ -693,6 +726,9 @@ with tab2:
                 with st.form("mise_a_jour"):
                     st.subheader("📋 Mise à jour des documents fournis")
                     st.info("ℹ️ Cochez les documents qui ont été FOURNIS")
+
+                    # Possibilité de mettre à jour le téléphone
+                    telephone = st.text_input("Téléphone (optionnel)", value=collab_data.get('Téléphone', ''))
                     
                     # Checklist avec état actuel (inverse de la logique précédente)
                     provided_docs = []
@@ -718,6 +754,7 @@ with tab2:
                         st.session_state.hr_database.loc[selected_idx, 'Documents_manquants'] = json.dumps(new_missing_docs)
                         st.session_state.hr_database.loc[selected_idx, 'Statut'] = nouveau_statut
                         st.session_state.hr_database.loc[selected_idx, 'Date_modification'] = now
+                        st.session_state.hr_database.loc[selected_idx, 'Téléphone'] = telephone
                         
                         # Mettre à jour Google Sheets
                         updated_row = st.session_state.hr_database.iloc[selected_idx].fillna('').tolist()
@@ -751,7 +788,6 @@ with tab3:
     st.header("📧 Système de Relances Automatiques")
     
     # Configuration SMTP
-    st.info("📧 **Configuration SMTP** : Les emails sont envoyés via SMTP. Assurez-vous que SENDER_EMAIL et SENDER_PASSWORD sont configurés dans les secrets.")
     
     # Sélection des collaborateurs à relancer
     st.subheader("👥 Collaborateurs avec documents manquants")
@@ -798,14 +834,8 @@ with tab3:
             send_date_2weeks = (datetime.now() + timedelta(days=14))
             delay_date_2weeks = (send_date_2weeks + timedelta(days=14)).strftime('%d/%m/%Y')
             
-            # Section: informations de l'émetteur + template email éditable
-            st.markdown("#### Informations de l'émetteur (optionnel)")
-            col_actor1, col_actor2 = st.columns(2)
-            with col_actor1:
-                actor_name = st.text_input("Nom de l'émetteur (optionnel)", value=st.session_state.get('actor_name', ''))
-            with col_actor2:
-                actor_email = st.text_input("Email de l'émetteur (optionnel, utilisé en Reply-To)", value=st.session_state.get('actor_email', ''))
-
+            # Section: informations de l'émetteur (email pour Reply-To) + template email éditable
+            actor_email = st.text_input("Email de l'émetteur (optionnel, utilisé en Reply-To)", value=st.session_state.get('actor_email', ''))
             cc_emails = st.text_input("CC (emails séparés par des virgules, optionnel)", value=st.session_state.get('cc_emails', ''))
 
             st.markdown("---")
@@ -878,7 +908,6 @@ Cordialement"""
                                 missing_docs_relance,
                                 final_delay_date,
                                 final_email_body,
-                                actor_name=actor_name,
                                 actor_email=actor_email,
                                 cc_emails=cc_emails
                             )
@@ -899,7 +928,8 @@ Cordialement"""
                                     'Collaborateur': [f"{collab_relance_data['Prénom']} {collab_relance_data['Nom']}"],
                                     'Email': [collab_relance_data['Email']],
                                     'Documents_relances': [json.dumps(missing_docs_relance)],
-                                    'Statut_envoi': ['Envoyé immédiatement']
+                                    'Statut_envoi': ['Envoyé immédiatement'],
+                                    'Email_body': [final_email_body]
                                 })
                                 
                                 st.session_state.relance_history = pd.concat([st.session_state.relance_history, nouvelle_relance], ignore_index=True)
@@ -915,7 +945,8 @@ Cordialement"""
                             else:  # 2 semaines
                                 date_programmee = (datetime.now() + timedelta(days=14)).strftime('%Y-%m-%d %H:%M')
                             
-                            # Ajouter à la liste des relances programmées
+                            # Construire le corps final (avec date mise à jour) et l'enregistrer
+                            scheduled_body = custom_email_body.replace(delay_date_now, final_delay_date)
                             relance_programmee = pd.DataFrame({
                                 'Date_programmee': [date_programmee],
                                 'Collaborateur': [f"{collab_relance_data['Prénom']} {collab_relance_data['Nom']}"],
@@ -923,9 +954,9 @@ Cordialement"""
                                 'Documents_relances': [json.dumps(missing_docs_relance)],
                                 'Date_limite': [final_delay_date],
                                 'Statut': ['Programmée'],
-                                'Actor_name': [actor_name],
                                 'Actor_email': [actor_email],
-                                'CC': [cc_emails]
+                                'CC': [cc_emails],
+                                'Email_body': [scheduled_body]
                             })
                             
                             st.session_state.scheduled_relances = pd.concat([st.session_state.scheduled_relances, relance_programmee], ignore_index=True)
@@ -985,7 +1016,7 @@ Cordialement"""
             # Option pour annuler une relance programmée
             if st.button("🗑️ Supprimer toutes les relances programmées", type="secondary"):
                 st.session_state.scheduled_relances = pd.DataFrame(columns=[
-                    'Date_programmee', 'Collaborateur', 'Email', 'Documents_relances', 'Date_limite', 'Statut'
+                    'Date_programmee', 'Collaborateur', 'Email', 'Documents_relances', 'Date_limite', 'Statut', 'Actor_email', 'CC', 'Email_body'
                 ])
                 st.success("✅ Toutes les relances programmées ont été supprimées.")
                 st.rerun()
