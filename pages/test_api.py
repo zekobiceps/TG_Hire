@@ -291,18 +291,17 @@ def get_missing_documents_count(documents_json):
         return 0
 
 def send_email_reminder(recipient_email, recipient_name, missing_docs, delay_date=None, custom_body=None):
-    """Envoie un email de relance via l'API Gmail"""
+    """Envoie un email de relance via SMTP"""
     try:
-        from googleapiclient.discovery import build
-        import base64
+        # Configuration SMTP - utiliser les secrets Streamlit
+        smtp_server = st.secrets.get("SMTP_SERVER", "smtp.gmail.com")
+        smtp_port = int(st.secrets.get("SMTP_PORT", 587))
+        sender_email = st.secrets.get("SENDER_EMAIL", "")
+        sender_password = st.secrets.get("SENDER_PASSWORD", "")
         
-        # Obtenir les credentials Google
-        creds = get_google_credentials()
-        if not creds:
+        if not sender_email or not sender_password:
+            st.error("❌ Configuration email manquante. Veuillez configurer SENDER_EMAIL et SENDER_PASSWORD dans les secrets.")
             return False
-        
-        # Service Gmail API
-        service = build('gmail', 'v1', credentials=creds)
         
         # Utiliser le corps personnalisé s'il est fourni, sinon utiliser le template par défaut
         if custom_body:
@@ -328,22 +327,20 @@ Cordialement"""
         
         # Créer le message
         message = MIMEMultipart()
-        message['to'] = recipient_email
-        message['subject'] = "URGENT: Complément du dossier administrative RH"
+        message['From'] = sender_email
+        message['To'] = recipient_email
+        message['Subject'] = "URGENT: Complément du dossier administrative RH"
         message.attach(MIMEText(body, 'plain', 'utf-8'))
         
-        # Encoder le message en base64
-        raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-        
-        # Envoyer l'email
-        send_message = service.users().messages().send(
-            userId='me', 
-            body={'raw': raw_message}
-        ).execute()
+        # Envoyer l'email via SMTP
+        with smtplib.SMTP(smtp_server, smtp_port) as server:
+            server.starttls()  # Activer la sécurité
+            server.login(sender_email, sender_password)
+            server.send_message(message)
         
         return True
     except Exception as e:
-        st.error(f"Erreur lors de l'envoi de l'email via API Gmail: {e}")
+        st.error(f"Erreur lors de l'envoi de l'email via SMTP: {e}")
         return False
 
 # Titre principal
@@ -714,8 +711,8 @@ with tab2:
 with tab3:
     st.header("📧 Système de Relances Automatiques")
     
-    # Configuration automatique via l'API Google (pas de configuration manuelle requise)
-    st.info("� **Configuration automatique** : Les emails sont envoyés via l'API Google configurée pour l'application.")
+    # Configuration SMTP
+    st.info("📧 **Configuration SMTP** : Les emails sont envoyés via SMTP. Assurez-vous que SENDER_EMAIL et SENDER_PASSWORD sont configurés dans les secrets.")
     
     # Sélection des collaborateurs à relancer
     st.subheader("👥 Collaborateurs avec documents manquants")
