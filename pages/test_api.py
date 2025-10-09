@@ -356,10 +356,7 @@ if 'hr_database' not in st.session_state:
     # Normaliser les colonnes/types immédiatement
     st.session_state.hr_database = normalize_hr_database(st.session_state.hr_database)
 
-# Si on vient de recharger (flag), afficher le message de succès puis effacer le flag
-if st.session_state.get('_last_reload_successful', False):
-    st.success("✅ Données rechargées depuis Google Sheets!")
-    st.session_state['_last_reload_successful'] = False
+# (Le message de succès après rechargement est affiché localement près du bouton Recharger)
 
 if 'relance_history' not in st.session_state:
     # Charger depuis Google Sheets si disponible
@@ -380,28 +377,7 @@ if 'scheduled_relances' not in st.session_state:
             'Date_programmee', 'Collaborateur', 'Email', 'Documents_relances', 'Date_limite', 'Statut', 'Actor_email', 'CC', 'Email_body'
         ])
 
-    # -- Debug helper UI: afficher en un clic les en-têtes bruts lus et un aperçu des données --
-    with st.expander("🔍 Debug: voir en-têtes bruts et aperçu (temporaire)"):
-        if st.button("🔄 Charger et afficher l'aperçu brut des données depuis Google Sheets"):
-            # Lire directement via le helper bas-niveau pour voir ce qui est lu
-            raw = _load_df_from_worksheet(WORKSHEET_NAME)
-            st.markdown("**En-têtes lus (raw):**")
-            try:
-                st.write(list(raw.columns))
-            except Exception as e:
-                st.write(f"Impossible d'afficher les en-têtes: {e}")
-
-            st.markdown("**Colonnes du DataFrame normalisé en session:**")
-            try:
-                st.write(list(st.session_state.hr_database.columns))
-            except Exception as e:
-                st.write(f"Impossible d'afficher les colonnes de st.session_state.hr_database: {e}")
-
-            st.markdown("**Aperçu (head(10)) du DataFrame en session:**")
-            try:
-                st.dataframe(st.session_state.hr_database.head(10))
-            except Exception as e:
-                st.write(f"Impossible d'afficher l'aperçu: {e}")
+    # Debug helper removed as requested
 
 # Fonctions utilitaires
 def save_data():
@@ -860,6 +836,11 @@ with tab1:
                         safe_rerun()
                 except Exception as e:
                     st.error(f"Erreur lors du rechargement direct: {e}")
+        # Afficher le message de succès localement juste sous le bouton (une seule fois)
+        if st.session_state.get('_last_reload_successful', False):
+            st.success("✅ Données rechargées depuis Google Sheets!")
+            # Effacer le flag immédiatement pour n'afficher le message qu'une seule fois
+            st.session_state['_last_reload_successful'] = False
 
 # ============================
 # ONGLET 2: GESTION COLLABORATEUR
