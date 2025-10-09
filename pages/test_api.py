@@ -795,18 +795,28 @@ with tab1:
             hide_index=True
         )
         
-        # Détails des documents manquants — afficher un expander par collaborateur
+        # Détails des documents manquants — afficher les expanders en grille 6 colonnes
         with st.expander("📄 Détail des documents manquants"):
-            # Construire la liste des collaborateurs ayant des documents manquants
+            # Rassembler les lignes avec documents manquants
+            rows_with_docs = []
             for idx, row in filtered_df.iterrows():
                 if row.get('Statut', '') == 'En cours':
                     try:
                         missing_docs = json.loads(row.get('Documents_manquants', '[]'))
                     except Exception:
                         missing_docs = []
-
                     if missing_docs:
-                        title = f"{row.get('Prénom','')} {row.get('Nom','')} — {row.get('Poste','')} ({len(missing_docs)} docs)"
+                        rows_with_docs.append((idx, row, missing_docs))
+
+            if not rows_with_docs:
+                st.info("Aucun document manquant détecté pour les collaborateurs filtrés.")
+            else:
+                cols = st.columns(6)
+                # Distribuer les expanders en round-robin dans les 6 colonnes
+                for i, (idx, row, missing_docs) in enumerate(rows_with_docs):
+                    col = cols[i % 6]
+                    title = f"{row.get('Prénom','')} {row.get('Nom','')} — {row.get('Poste','')} ({len(missing_docs)} docs)"
+                    with col:
                         with st.expander(title, expanded=False):
                             for doc in missing_docs:
                                 st.write(f"• {doc}")
