@@ -751,7 +751,7 @@ with tab3:
                 
                 if send_button:
                     with st.spinner("📤 Traitement de la relance en cours..."):
-                        if relance_type == "� Envoyer maintenant":
+                        if relance_type == "📧 Envoyer maintenant":
                             # Envoi immédiat
                             success = send_email_reminder(
                                 collab_relance_data['Email'],
