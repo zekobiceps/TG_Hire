@@ -687,14 +687,45 @@ def extract_name_from_line(line):
     return candidates[0] if candidates else None
 
 # -------------------- Génération du ZIP organisé --------------------
+def merge_results_with_ai_analysis(original_results):
+    """
+    Intègre les résultats des analyses IA dans les résultats originaux.
+    Met à jour les catégories des CV qui ont été analysés par l'IA.
+    """
+    # Créer une copie pour ne pas modifier l'original
+    updated_results = original_results.copy()
+    
+    # Si des analyses IA existent, intégrer les résultats
+    if hasattr(st.session_state, 'deepseek_analyses') and st.session_state.deepseek_analyses:
+        ai_results = {result['Fichier']: result['Catégorie'] for result in st.session_state.deepseek_analyses}
+        
+        for i, result in enumerate(updated_results):
+            filename = result['file']
+            if filename in ai_results:
+                ai_category = ai_results[filename]
+                # Normaliser la catégorie IA selon nos catégories standard
+                if "support" in ai_category.lower():
+                    updated_results[i]['category'] = 'Fonctions supports'
+                elif "logistique" in ai_category.lower():
+                    updated_results[i]['category'] = 'Logistique'
+                elif "production" in ai_category.lower() or "technique" in ai_category.lower():
+                    updated_results[i]['category'] = 'Production/Technique'
+                # Si la catégorie IA n'est pas reconnue, on garde "Non classé"
+    
+    return updated_results
+
 def create_organized_zip(results, file_list):
     """
     Crée un fichier ZIP avec les CV organisés par catégorie et renommés.
+    Intègre automatiquement les résultats des analyses IA.
     Retourne les bytes du ZIP et un DataFrame manifest.
     """
     import zipfile
     import io
     from io import BytesIO
+    
+    # Intégrer les analyses IA dans les résultats
+    merged_results = merge_results_with_ai_analysis(results)
     
     zip_buffer = BytesIO()
     manifest_data = []
@@ -708,13 +739,20 @@ def create_organized_zip(results, file_list):
         'Non classé': 'Non_classe/'
     }
     
+    # Déterminer quelles catégories sont réellement présentes
+    categories_present = set(result['category'] for result in merged_results)
+    folders_to_create = set()
+    for category in categories_present:
+        if category in folders:
+            folders_to_create.add(folders[category])
+    
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        # Créer les dossiers vides
-        for folder in set(folders.values()):
+        # Créer seulement les dossiers nécessaires
+        for folder in folders_to_create:
             zip_file.writestr(folder, '')
         
-        # Traiter chaque CV
-        for result in results:
+        # Traiter chaque CV avec les résultats intégrant l'IA
+        for result in merged_results:
             original_name = result['file']
             category = result['category']
             
@@ -1693,33 +1731,15 @@ with tab5:
                     return row['extracted_name']['name']
                 return original_name
             
-            # Récupérer les classifications initiales avec les bons noms
-            supports = [get_display_name(row) for _, row in df[df['category'] == 'Fonctions supports'].iterrows()]
-            logistics = [get_display_name(row) for _, row in df[df['category'] == 'Logistique'].iterrows()]
-            production = [get_display_name(row) for _, row in df[df['category'] == 'Production/Technique'].iterrows()]
-            unclassified = [get_display_name(row) for _, row in df[df['category'] == 'Non classé'].iterrows()]
+            # Créer un DataFrame avec les résultats intégrés (incluant les analyses IA)
+            merged_results_for_csv = merge_results_with_ai_analysis(st.session_state.classification_results)
+            df_merged = pd.DataFrame(merged_results_for_csv)
             
-            # Intégrer les résultats de l'analyse IA si disponible
-            if hasattr(st.session_state, 'deepseek_analyses') and st.session_state.deepseek_analyses:
-                for result in st.session_state.deepseek_analyses:
-                    filename = result['Fichier']
-                    category = result['Catégorie']
-                    
-                    # Ne traiter que si le fichier est dans la liste des non classés
-                    if filename in unclassified:
-                        # Supprimer de non classés
-                        unclassified.remove(filename)
-                        
-                        # Ajouter à la catégorie appropriée
-                        if "support" in category.lower():
-                            supports.append(filename)
-                        elif "logistique" in category.lower():
-                            logistics.append(filename)
-                        elif "production" in category.lower() or "technique" in category.lower():
-                            production.append(filename)
-                        else:
-                            # Remettre dans non classés si la catégorie n'est pas reconnue
-                            unclassified.append(filename)
+            # Récupérer les classifications finales (après IA) avec les bons noms
+            supports = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Fonctions supports'].iterrows()]
+            logistics = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Logistique'].iterrows()]
+            production = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Production/Technique'].iterrows()]
+            unclassified = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Non classé'].iterrows()]
 
             max_len = max(len(supports), len(logistics), len(production), len(unclassified)) if max(len(supports), len(logistics), len(production), len(unclassified)) > 0 else 0
             # Pad lists
