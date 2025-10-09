@@ -320,6 +320,8 @@ def update_row_in_gsheet(row_index, updated_data):
         # Log l'erreur sans afficher le message transitoire
         print(f"Erreur Google Sheets (masquée): {e}")
         return False
+# Définition utilitaire: normalisation du DataFrame HR (placer avant l'initialisation)
+# ... existing code ...
 
 # Initialisation des données en session
 if 'hr_database' not in st.session_state:
