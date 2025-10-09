@@ -421,6 +421,33 @@ def load_data():
         st.error(f"Erreur lors du rechargement: {e}")
         return False
 
+
+def safe_rerun():
+    """Fallback-safe rerun helper for Streamlit.
+    Some Streamlit builds may not expose `st.experimental_rerun`. This wrapper
+    tries available rerun functions and otherwise sets a session flag and stops
+    the script to allow the front-end to refresh on next interaction.
+    """
+    try:
+        if hasattr(st, 'experimental_rerun'):
+            return st.experimental_rerun()
+        # Older/newer variants
+        if hasattr(st, 'rerun'):
+            return st.rerun()
+        # Fallback: indicate success and stop execution so the UI can refresh
+        st.session_state['_last_reload_successful'] = True
+        try:
+            return st.stop()
+        except Exception:
+            return None
+    except Exception:
+        # Ensure we at least set the flag if rerun isn't available
+        st.session_state['_last_reload_successful'] = True
+        try:
+            st.stop()
+        except Exception:
+            pass
+
 def calculate_completion_percentage():
     """Calcule le pourcentage de dossiers complets"""
     if len(st.session_state.hr_database) == 0:
@@ -829,8 +856,8 @@ with tab1:
                         # Signaler le succès après le rerun
                         st.session_state['_last_reload_successful'] = True
                         # Forcer un rerun afin que l'UI reflète immédiatement les nouvelles données
-                        # Appel direct : ne pas attraper l'exception, Streamlit gère le rerun
-                        st.experimental_rerun()
+                        # Utiliser safe_rerun() pour gérer différentes versions de Streamlit
+                        safe_rerun()
                 except Exception as e:
                     st.error(f"Erreur lors du rechargement direct: {e}")
 
