@@ -217,11 +217,14 @@ def update_row_in_gsheet(row_index, updated_data):
         
         # row_index + 2 car : +1 pour l'index Python (0-based) vers Google Sheets (1-based), +1 pour ignorer l'en-tête
         for col_idx, value in enumerate(updated_data, start=1):
-            sheet.update_cell(row_index + 2, col_idx, value)
+            # Convertir les valeurs NaN en chaînes vides
+            cell_value = '' if pd.isna(value) else str(value)
+            sheet.update_cell(row_index + 2, col_idx, cell_value)
         
         return True
     except Exception as e:
-        st.error(f"❌ Erreur lors de la mise à jour Google Sheets: {e}")
+        # Log l'erreur sans afficher le message transitoire
+        print(f"Erreur Google Sheets (masquée): {e}")
         return False
 
 # Initialisation des données en session
@@ -282,7 +285,7 @@ def send_email_reminder(recipient_email, recipient_name, missing_docs, delay_dat
         service = build('gmail', 'v1', credentials=creds)
         
         # Créer le corps du message avec le nouveau template
-        docs_list = '\n'.join([f"R  {doc}" for doc in missing_docs])
+        docs_list = '\n'.join([f"• {doc}" for doc in missing_docs])
         
         body = f"""Bonjour,
 
@@ -293,7 +296,7 @@ Merci de remettre les éléments suivants afin de le compléter:
 
 Les documents doivent être envoyés via le pointeur chantier dans une enveloppe fermée, en mentionnant CONFIDENTIEL et A L'ATTENTION DE M.L'EQUIPE RECRUTEMENT.
 
-Merci de noter que le dernier délais pour compléter votre dossier c'est le {delay_date if delay_date else (datetime.now() + timedelta(days=7)).strftime('%d/%m/%Y')}
+Merci de noter que le dernier délai pour compléter votre dossier c'est le {delay_date if delay_date else (datetime.now() + timedelta(days=14)).strftime('%d/%m/%Y')}
 
 Comptant sur votre précieuse collaboration.
 
@@ -406,7 +409,7 @@ with tab1:
     
     # Filtres
     st.subheader("🔍 Filtres")
-    col_filter1, col_filter2, col_filter3 = st.columns(3)
+    col_filter1, col_filter2, col_filter3, col_filter4 = st.columns(4)
     
     with col_filter1:
         status_filter = st.selectbox("Filtrer par Statut", ["Tous", "Complet", "En cours"])
@@ -418,10 +421,10 @@ with tab1:
     with col_filter3:
         relance_filter = st.selectbox("Filtrer par Relances", ["Toutes", "0 relance", "1 relance", "2+ relances"])
     
-    # Nouveau filtre pour le tri
-    sort_by = st.selectbox("Trier par", [
-        "Nom", "Date d'intégration", "Nombre de documents manquants", "Dernière relance"
-    ])
+    with col_filter4:
+        sort_by = st.selectbox("Trier par", [
+            "Nom", "Date d'intégration", "Nombre de documents manquants", "Dernière relance"
+        ])
     
     # Application des filtres
     filtered_df = st.session_state.hr_database.copy()
@@ -526,8 +529,8 @@ with tab2:
             
             with col_info2:
                 poste = st.text_input("Poste *", placeholder="Ex: Ingénieur IT")
-                service = st.selectbox("Service *", ["IT", "Finance", "Production", "RH", "Marketing", "Ventes", "Autre"])
-                date_integration = st.date_input("Date d'intégration prévue")
+                affectation = st.text_input("Affectation *", placeholder="Ex: Service IT")
+                date_integration = st.date_input("Date d'intégration")
             
             st.subheader("📋 Documents RH - Cochez les documents FOURNIS")
             st.info("ℹ️ Cochez uniquement les documents que le collaborateur a DÉJÀ fournis")
@@ -535,7 +538,7 @@ with tab2:
             # Checklist des documents
             provided_docs = []
             for i, doc in enumerate(DOCUMENTS_RH):
-                if st.checkbox(f"✅ {doc}", key=f"new_{i}"):
+                if st.checkbox(f"{doc}", key=f"new_{i}"):
                     provided_docs.append(doc)
             
             # Calculer les documents manquants (ceux non cochés)
@@ -545,7 +548,7 @@ with tab2:
             submitted = st.form_submit_button("➕ Ajouter le collaborateur", type="primary", use_container_width=True)
             
             if submitted:
-                if nom and prenom and email and poste and service:
+                if nom and prenom and email and poste and affectation:
                     # Déterminer le statut
                     statut = "Complet" if len(missing_docs) == 0 else "En cours"
                     
@@ -557,7 +560,7 @@ with tab2:
                         'Nom': [nom.upper()],
                         'Prénom': [prenom.title()],
                         'Poste': [poste],
-                        'Service': [service],
+                        'Service': [affectation],
                         'Email': [email.lower()],
                         'Date_integration': [str(date_integration)],
                         'Documents_manquants': [json.dumps(missing_docs)],
@@ -573,7 +576,7 @@ with tab2:
                     
                     # Ajouter directement à Google Sheets
                     new_row_data = [
-                        nom.upper(), prenom.title(), poste, service, email.lower(),
+                        nom.upper(), prenom.title(), poste, affectation, email.lower(),
                         str(date_integration), json.dumps(missing_docs), statut,
                         '', 0, now, now
                     ]
@@ -635,7 +638,7 @@ with tab2:
                     provided_docs = []
                     for i, doc in enumerate(DOCUMENTS_RH):
                         is_currently_provided = doc not in current_missing  # Inverse de la logique
-                        if st.checkbox(f"✅ {doc}", value=is_currently_provided, key=f"update_{i}"):
+                        if st.checkbox(f"{doc}", value=is_currently_provided, key=f"update_{i}"):
                             provided_docs.append(doc)
                     
                     # Calculer les documents manquants (ceux non cochés)
@@ -724,9 +727,35 @@ with tab3:
                 except:
                     missing_docs_relance = []
                 
-                st.info(f"📄 Documents manquants pour {collab_relance_data['Prénom']} {collab_relance_data['Nom']}:")
-                for doc in missing_docs_relance:
-                    st.write(f"  • {doc}")
+                # Section expandable pour les documents manquants
+                with st.expander(f"📄 Documents manquants pour {collab_relance_data['Prénom']} {collab_relance_data['Nom']} ({len(missing_docs_relance)} documents)", expanded=True):
+                    for doc in missing_docs_relance:
+                        st.write(f"• {doc}")
+                
+                # Section template email
+                with st.expander("📧 Aperçu du modèle d'email", expanded=False):
+                    docs_list_preview = '\n'.join([f"• {doc}" for doc in missing_docs_relance])
+                    
+                    email_preview = f"""**Objet :** URGENT: Complément du dossier administrative RH
+
+**Corps du message :**
+
+Bonjour,
+
+Merci de noter que votre dossier administratif RH demeure incomplet à ce jour.
+Merci de remettre les éléments suivants afin de le compléter:
+
+{docs_list_preview}
+
+Les documents doivent être envoyés via le pointeur chantier dans une enveloppe fermée, en mentionnant CONFIDENTIEL et A L'ATTENTION DE M.L'EQUIPE RECRUTEMENT.
+
+Merci de noter que le dernier délai pour compléter votre dossier c'est le [DATE_LIMITE]
+
+Comptant sur votre précieuse collaboration.
+
+Cordialement"""
+                    
+                    st.markdown(email_preview)
                 
                 # Options de relance
                 st.subheader("⏰ Type de relance")
@@ -736,15 +765,23 @@ with tab3:
                     horizontal=False
                 )
                 
-                # Calcul de la date limite selon le type de relance
+                # Calcul des dates selon le type de relance
                 if relance_type == "📧 Envoyer maintenant":
-                    delay_date = (datetime.now() + timedelta(days=7)).strftime('%d/%m/%Y')
-                elif relance_type == "⏰ Programmer dans 1 semaine":
+                    # Date limite = 2 semaines après envoi immédiat
                     delay_date = (datetime.now() + timedelta(days=14)).strftime('%d/%m/%Y')
+                    st.info(f"📅 Date limite dans l'email: {delay_date}")
+                elif relance_type == "⏰ Programmer dans 1 semaine":
+                    # Envoi dans 1 semaine + 2 semaines pour la date limite
+                    send_date = (datetime.now() + timedelta(days=7))
+                    delay_date = (send_date + timedelta(days=14)).strftime('%d/%m/%Y')
+                    st.info(f"📧 La relance sera envoyée le: {send_date.strftime('%d/%m/%Y')}")
+                    st.info(f"📅 Date limite dans l'email: {delay_date}")
                 else:  # 2 semaines
-                    delay_date = (datetime.now() + timedelta(days=21)).strftime('%d/%m/%Y')
-                
-                st.info(f"📅 Date limite dans l'email: {delay_date}")
+                    # Envoi dans 2 semaines + 2 semaines pour la date limite
+                    send_date = (datetime.now() + timedelta(days=14))
+                    delay_date = (send_date + timedelta(days=14)).strftime('%d/%m/%Y')
+                    st.info(f"📧 La relance sera envoyée le: {send_date.strftime('%d/%m/%Y')}")
+                    st.info(f"📅 Date limite dans l'email: {delay_date}")
                 
                 # Bouton d'envoi
                 send_button = st.form_submit_button("📧 Envoyer/Programmer la relance", type="primary", use_container_width=True)
