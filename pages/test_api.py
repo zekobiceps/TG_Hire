@@ -355,14 +355,30 @@ with tab1:
     with col_chart2:
         # Graphique en barres - Par service
         service_stats = st.session_state.hr_database.groupby(['Service', 'Statut']).size().unstack(fill_value=0)
-        fig_bar = px.bar(
-            service_stats.reset_index(), 
-            x='Service', 
-            y=['Complet', 'En cours'] if 'En cours' in service_stats.columns else ['Complet'],
-            title="Statuts par Service",
-            color_discrete_map={'Complet': '#28a745', 'En cours': '#ffc107'}
-        )
-        st.plotly_chart(fig_bar, use_container_width=True)
+
+        # Guard: si aucune donnée disponible
+        if service_stats.empty:
+            st.info("Aucune donnée par service disponible pour l'instant.")
+        else:
+            df_service = service_stats.reset_index()
+            # Déterminer les colonnes y disponibles (évite ShapeError si une colonne manque)
+            desired_cols = ['Complet', 'En cours']
+            y_cols = [c for c in desired_cols if c in service_stats.columns]
+
+            if not y_cols:
+                st.info("Aucune colonne de statut standard ('Complet'/'En cours') trouvée pour les services.")
+            else:
+                try:
+                    fig_bar = px.bar(
+                        df_service,
+                        x='Service',
+                        y=y_cols,
+                        title="Statuts par Service",
+                        color_discrete_map={'Complet': '#28a745', 'En cours': '#ffc107'}
+                    )
+                    st.plotly_chart(fig_bar, use_container_width=True)
+                except Exception as e:
+                    st.error(f"Erreur affichage graphique par service: {e}")
     
     st.markdown("---")
     
