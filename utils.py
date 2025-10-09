@@ -1292,6 +1292,61 @@ def get_feedback_google_credentials():
 
 def get_feedback_gsheet_client():
     """Authentification pour Google Sheets."""
+def load_feedback_from_gsheet():
+    """
+    Tente de charger les feedbacks depuis la Google Sheet configurée.
+    Retourne une liste de dictionnaires (mêmes clefs que le fichier local) ou [] en cas d'échec.
+    Si la lecture réussit, on met également à jour le fichier local `FEEDBACK_DATA_PATH` pour mise en cache.
+    """
+    try:
+        if not GSPREAD_AVAILABLE:
+            return []
+
+        gc = get_feedback_gsheet_client()
+        if not gc:
+            return []
+
+        sh = gc.open_by_url(FEEDBACK_GSHEET_URL)
+        try:
+            worksheet = sh.worksheet(FEEDBACK_GSHEET_NAME)
+        except Exception:
+            return []
+
+        records = worksheet.get_all_records()
+        # Normaliser quelques champs attendus
+        cleaned = []
+        for r in records:
+            entry = dict(r)
+            # Tentative de conversion de types
+            if 'feedback_score' in entry:
+                try:
+                    entry['feedback_score'] = int(float(entry.get('feedback_score') or 0))
+                except Exception:
+                    try:
+                        entry['feedback_score'] = int(entry.get('feedback_score', 0))
+                    except Exception:
+                        entry['feedback_score'] = 0
+            if 'cv_count' in entry:
+                try:
+                    entry['cv_count'] = int(float(entry.get('cv_count') or 0))
+                except Exception:
+                    try:
+                        entry['cv_count'] = int(entry.get('cv_count', 0))
+                    except Exception:
+                        entry['cv_count'] = 0
+            cleaned.append(entry)
+
+        # Mettre en cache local
+        try:
+            with open(FEEDBACK_DATA_PATH, 'w', encoding='utf-8') as f:
+                json.dump(cleaned, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+        return cleaned
+    except Exception as e:
+        print(f"Erreur chargement feedbacks depuis Google Sheets: {e}")
+        return []
     try:
         creds = get_feedback_google_credentials()
         if creds and GSPREAD_AVAILABLE:
@@ -1403,11 +1458,41 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
                 last_row = len(worksheet.get_all_values()) + 1
                 worksheet.insert_row(row_data, index=last_row)
                 st.success("✅ Feedback envoyé avec succès à Google Sheets")
+                # Mettre à jour le cache local et la session Streamlit si présent
+                try:
+                    # Recharge les données depuis la feuille pour garder la consistance
+                    updated = load_feedback_from_gsheet()
+                    if updated:
+                        with open(FEEDBACK_DATA_PATH, 'w', encoding='utf-8') as f:
+                            json.dump(updated, f, ensure_ascii=False, indent=2)
+                except Exception:
+                    pass
+                try:
+                    # Mettre à jour st.session_state si la page est active
+                    if hasattr(st, 'session_state'):
+                        try:
+                            from utils import get_feedback_summary
+                            st.session_state.feedback_stats = get_feedback_summary()
+                        except Exception:
+                            # fallback: ne pas bloquer l'exécution si import circulaire
+                            pass
+                except Exception:
+                    pass
                 return True
                 
     except Exception as e:
         st.error(f"❌ Erreur lors de la sauvegarde du feedback dans Google Sheets : {e}")
         # Ne pas faire échouer si Google Sheets n'est pas disponible
+        # Mettre à jour la session locale si possible
+        try:
+            if hasattr(st, 'session_state'):
+                try:
+                    from utils import get_feedback_summary
+                    st.session_state.feedback_stats = get_feedback_summary()
+                except Exception:
+                    pass
+        except Exception:
+            pass
         return True
     
     return True
@@ -1425,21 +1510,44 @@ def get_average_feedback_score(analysis_method=None):
     if not os.path.exists(FEEDBACK_DATA_PATH):
         return 0, 0
     
+    feedback_data = []
     try:
-        with open(FEEDBACK_DATA_PATH, 'r', encoding='utf-8') as f:
-            feedback_data = json.load(f)
-        
+        if os.path.exists(FEEDBACK_DATA_PATH):
+            with open(FEEDBACK_DATA_PATH, 'r', encoding='utf-8') as f:
+                feedback_data = json.load(f)
+    except Exception:
+        feedback_data = []
+
+    if not feedback_data:
+        # tenter Google Sheets si disponible
+        gs_data = load_feedback_from_gsheet()
+        if gs_data:
+            feedback_data = gs_data
+
+    if not feedback_data:
+        return 0, 0
+    try:
         if analysis_method:
-            relevant_feedback = [f for f in feedback_data if f["analysis_method"] == analysis_method]
+            relevant_feedback = [entry for entry in feedback_data if entry.get("analysis_method") == analysis_method]
         else:
             relevant_feedback = feedback_data
-        
+
         if not relevant_feedback:
             return 0, 0
-        
-        total_score = sum(f["feedback_score"] for f in relevant_feedback)
-        return total_score / len(relevant_feedback), len(relevant_feedback)
-    
+
+        total_score = 0
+        count = 0
+        for entry in relevant_feedback:
+            try:
+                total_score += float(entry.get("feedback_score", 0))
+                count += 1
+            except Exception:
+                continue
+
+        if count == 0:
+            return 0, 0
+
+        return total_score / count, count
     except Exception as e:
         print(f"Erreur lors de la récupération des scores de feedback: {e}")
         return 0, 0
