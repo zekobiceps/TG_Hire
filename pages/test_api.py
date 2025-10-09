@@ -286,6 +286,7 @@ def load_scheduled_relances_from_gsheet():
 def save_scheduled_relances_to_gsheet(df):
     return _save_df_to_worksheet(df, SCHEDULED_SHEET_NAME)
 
+
 def add_row_to_gsheet(new_row_data):
     """Ajoute une nouvelle ligne à Google Sheets"""
     try:
@@ -320,13 +321,19 @@ def update_row_in_gsheet(row_index, updated_data):
         # Log l'erreur sans afficher le message transitoire
         print(f"Erreur Google Sheets (masquée): {e}")
         return False
-# Définition utilitaire: normalisation du DataFrame HR (placer avant l'initialisation)
+# --- Normalisation centralisée (définie une seule fois) ---
 def normalize_hr_database(df):
     """Normalise les colonnes et types du DataFrame HR pour éviter les problèmes
     si l'en-tête de la feuille change entre 'Service' et 'Affectation'."""
-    if df is None or len(df) == 0:
+    if df is None:
+        return df
+    if isinstance(df, pd.DataFrame) and df.empty:
         return df
     # Supporter à la fois 'Service' et 'Affectation'
+    try:
+        cols = list(df.columns)
+    except Exception:
+        return df
     if 'Affectation' in df.columns and 'Service' not in df.columns:
         df['Service'] = df['Affectation']
     if 'Service' in df.columns and 'Affectation' not in df.columns:
@@ -367,6 +374,29 @@ if 'scheduled_relances' not in st.session_state:
         st.session_state.scheduled_relances = pd.DataFrame(columns=[
             'Date_programmee', 'Collaborateur', 'Email', 'Documents_relances', 'Date_limite', 'Statut', 'Actor_email', 'CC', 'Email_body'
         ])
+
+    # -- Debug helper UI: afficher en un clic les en-têtes bruts lus et un aperçu des données --
+    with st.expander("🔍 Debug: voir en-têtes bruts et aperçu (temporaire)"):
+        if st.button("🔄 Charger et afficher l'aperçu brut des données depuis Google Sheets"):
+            # Lire directement via le helper bas-niveau pour voir ce qui est lu
+            raw = _load_df_from_worksheet(WORKSHEET_NAME)
+            st.markdown("**En-têtes lus (raw):**")
+            try:
+                st.write(list(raw.columns))
+            except Exception as e:
+                st.write(f"Impossible d'afficher les en-têtes: {e}")
+
+            st.markdown("**Colonnes du DataFrame normalisé en session:**")
+            try:
+                st.write(list(st.session_state.hr_database.columns))
+            except Exception as e:
+                st.write(f"Impossible d'afficher les colonnes de st.session_state.hr_database: {e}")
+
+            st.markdown("**Aperçu (head(10)) du DataFrame en session:**")
+            try:
+                st.dataframe(st.session_state.hr_database.head(10))
+            except Exception as e:
+                st.write(f"Impossible d'afficher l'aperçu: {e}")
 
 # Fonctions utilitaires
 def save_data():
@@ -565,8 +595,14 @@ with tab1:
         st.plotly_chart(fig_pie, use_container_width=True)
     
     with col_chart2:
-        # Graphique en barres - Par service
-        service_stats = st.session_state.hr_database.groupby(['Service', 'Statut']).size().unstack(fill_value=0)
+        # Graphique en barres - Par affectation
+        # Construire une colonne d'affichage 'Affectation_display' pour regrouper correctement
+        tmp_hr = st.session_state.hr_database.copy()
+        if 'Affectation' in tmp_hr.columns:
+            tmp_hr['Affectation_display'] = tmp_hr['Affectation']
+        else:
+            tmp_hr['Affectation_display'] = tmp_hr['Service'] if 'Service' in tmp_hr.columns else ''
+        service_stats = tmp_hr.groupby(['Affectation_display', 'Statut']).size().unstack(fill_value=0)
 
         # Guard: si aucune donnée disponible
         if service_stats.empty:
@@ -581,14 +617,25 @@ with tab1:
                 st.info("Aucune colonne de statut standard ('Complet'/'En cours') trouvée pour les services.")
             else:
                 try:
+                    # Déterminer la colonne d'axe X : préférer 'Affectation_display' puis 'Service'
+                    if 'Affectation_display' in df_service.columns:
+                        xcol = 'Affectation_display'
+                    elif 'Service' in df_service.columns:
+                        xcol = 'Service'
+                    else:
+                        # fallback sur la première colonne (sécurité)
+                        xcol = df_service.columns[0]
+
                     fig_bar = px.bar(
                         df_service,
-                        x='Service',
+                        x=xcol,
                         y=y_cols,
                         title="Statuts par Affectation",
                         color_discrete_map={'Complet': '#28a745', 'En cours': '#ffc107'}
                     )
-                    fig_bar.update_layout(xaxis_title='Affectation')
+                    # Ajouter les labels de valeur par pile
+                    fig_bar.update_traces(texttemplate='%{y}', textposition='outside')
+                    fig_bar.update_layout(xaxis_title='Affectation', uniformtext_minsize=8, uniformtext_mode='hide')
                     st.plotly_chart(fig_bar, use_container_width=True)
                 except Exception as e:
                     st.error(f"Erreur affichage graphique par service: {e}")
@@ -612,33 +659,33 @@ with tab1:
         if docs_counter:
             docs_df = pd.DataFrame(list(docs_counter.items()), columns=['Document', 'Count']).sort_values('Count', ascending=False)
             top_n = docs_df.head(10)
-            fig_docs = px.bar(top_n, x='Document', y='Count', title='Top 10 des documents manquants')
+            fig_docs = px.bar(top_n, x='Document', y='Count', title='Top 10 des documents manquants', text='Count')
             # Nettoyer les libellés génériques
-            fig_docs.update_layout(xaxis_title='', yaxis_title='')
+            fig_docs.update_traces(texttemplate='%{text}', textposition='outside')
+            fig_docs.update_layout(xaxis_title='', yaxis_title='', uniformtext_minsize=8, uniformtext_mode='hide')
             st.plotly_chart(fig_docs, use_container_width=True)
-        else:
-            st.info("Aucun document manquant enregistré pour le moment.")
 
-    with col_doc2:
-        st.subheader("📧 Répartition du nombre de relances")
-        # Construire des catégories 0,1,2,3 (3 => 3 ou plus)
-        if 'Nombre_relances' in st.session_state.hr_database.columns and len(st.session_state.hr_database) > 0:
-            counts = st.session_state.hr_database['Nombre_relances'].fillna(0).astype(int).clip(lower=0)
-            c0 = int((counts == 0).sum())
-            c1 = int((counts == 1).sum())
-            c2 = int((counts == 2).sum())
-            c3 = int((counts >= 3).sum())
-        else:
-            c0 = c1 = c2 = c3 = 0
+        # Calcul de la distribution des relances (0 / 1 / 2 / 3+)
+        try:
+            counts = st.session_state.hr_database['Nombre_relances'].fillna(0).astype(int)
+        except Exception:
+            counts = pd.Series(dtype=int)
+
+        c0 = int((counts == 0).sum())
+        c1 = int((counts == 1).sum())
+        c2 = int((counts == 2).sum())
+        c3 = int((counts >= 3).sum())
 
         rel_df = pd.DataFrame({'Relances': ['0', '1', '2', '3+'], 'Count': [c0, c1, c2, c3]})
-        # Afficher en barres verticales (x catégoriel strict) et y en entier
-        fig_rel = px.bar(rel_df, x='Relances', y='Count', title='Distribution des relances (0 / 1 / 2 / 3+)')
+        # Afficher en barres verticales (x catégoriel strict) et y en entier, afficher la valeur sur chaque barre
+        fig_rel = px.bar(rel_df, x='Relances', y='Count', title='Distribution des relances (0 / 1 / 2 / 3+)', text='Count')
+        fig_rel.update_traces(texttemplate='%{text}', textposition='outside')
         fig_rel.update_layout(
             xaxis={'type': 'category', 'categoryorder': 'array', 'categoryarray': ['0', '1', '2', '3+']},
             yaxis={'tickformat': '.0f', 'dtick': 1},
             xaxis_title='',
-            yaxis_title=''
+            yaxis_title='',
+            uniformtext_minsize=8, uniformtext_mode='hide'
         )
         st.plotly_chart(fig_rel, use_container_width=True)
 
@@ -648,7 +695,17 @@ with tab1:
         status_filter = st.selectbox("Filtrer par Statut", ["Tous", "Complet", "En cours"])
 
     with col_filter2:
-        services = ["Tous"] + list(st.session_state.hr_database['Service'].unique())
+        # Préférer la colonne 'Affectation' si elle existe (contient les noms des chantiers).
+        if 'Affectation' in st.session_state.hr_database.columns:
+            raw_services = st.session_state.hr_database['Affectation'].dropna().astype(str).unique().tolist()
+        elif 'Service' in st.session_state.hr_database.columns:
+            raw_services = st.session_state.hr_database['Service'].dropna().astype(str).unique().tolist()
+        else:
+            raw_services = []
+        # Nettoyer et trier pour une UI plus propre
+        raw_services = [s for s in raw_services if str(s).strip() != '']
+        raw_services = sorted(raw_services)
+        services = ["Tous"] + raw_services
         service_filter = st.selectbox("Filtrer par Affectation", services)
 
     with col_filter3:
@@ -666,7 +723,11 @@ with tab1:
         filtered_df = filtered_df[filtered_df['Statut'] == status_filter]
     
     if service_filter != "Tous":
-        filtered_df = filtered_df[filtered_df['Service'] == service_filter]
+        # Filtrer en privilégiant 'Affectation' si disponible
+        if 'Affectation' in filtered_df.columns:
+            filtered_df = filtered_df[filtered_df['Affectation'] == service_filter]
+        else:
+            filtered_df = filtered_df[filtered_df['Service'] == service_filter]
     
     if relance_filter != "Toutes":
         if relance_filter == "0 relance":
@@ -1043,15 +1104,18 @@ Cordialement"""
                     horizontal=True
                 )
                 
+                # Choix d'heure pour la relance programmée (par défaut 09:00)
+                send_time = st.time_input("Heure d'envoi (pour relances programmées)", value=datetime.strptime("09:00", "%H:%M").time())
+
                 # Affichage compact des informations selon le type de relance
                 if relance_type == "📧 Envoyer maintenant":
                     st.write(f"Date limite dans l'email: {delay_date_now}")
                     final_delay_date = delay_date_now
                 elif relance_type == "⏰ Programmer dans 1 semaine":
-                    st.write(f"Relance programmée: {send_date_1week.strftime('%d/%m/%Y')} — Date limite: {delay_date_1week}")
+                    st.write(f"Relance programmée: {send_date_1week.strftime('%d/%m/%Y')} — Date limite: {delay_date_1week} à {send_time.strftime('%H:%M')}")
                     final_delay_date = delay_date_1week
                 else:  # 2 semaines
-                    st.write(f"Relance programmée: {send_date_2weeks.strftime('%d/%m/%Y')} — Date limite: {delay_date_2weeks}")
+                    st.write(f"Relance programmée: {send_date_2weeks.strftime('%d/%m/%Y')} — Date limite: {delay_date_2weeks} à {send_time.strftime('%H:%M')}")
                     final_delay_date = delay_date_2weeks
                 
                 # Bouton d'envoi
@@ -1107,10 +1171,14 @@ Cordialement"""
                                 st.error("❌ Erreur lors de l'envoi de l'email via l'API Gmail.")
                         else:
                             # Relance programmée
+                            # Construire la date programmée avec l'heure choisie
                             if relance_type == "⏰ Programmer dans 1 semaine":
-                                date_programmee = (datetime.now() + timedelta(days=7)).strftime('%Y-%m-%d %H:%M')
-                            else:  # 2 semaines
-                                date_programmee = (datetime.now() + timedelta(days=14)).strftime('%Y-%m-%d %H:%M')
+                                base_dt = datetime.now() + timedelta(days=7)
+                            else:
+                                base_dt = datetime.now() + timedelta(days=14)
+                            # Remplacer l'heure par celle choisie
+                            date_programmee_dt = base_dt.replace(hour=send_time.hour, minute=send_time.minute, second=0, microsecond=0)
+                            date_programmee = date_programmee_dt.strftime('%Y-%m-%d %H:%M')
                             
                             # Construire le corps final (avec date mise à jour) et l'enregistrer
                             scheduled_body = custom_email_body.replace(delay_date_now, final_delay_date)
@@ -1204,19 +1272,24 @@ Cordialement"""
                         return str(x)
                 scheduled_display['Documents_relances'] = scheduled_display['Documents_relances'].apply(_pretty_docs_sched)
             st.dataframe(scheduled_display, use_container_width=True, hide_index=True)
-            
-            # Option pour annuler une relance programmée
-            if st.button("🗑️ Supprimer toutes les relances programmées", type="secondary"):
-                st.session_state.scheduled_relances = pd.DataFrame(columns=[
-                    'Date_programmee', 'Collaborateur', 'Email', 'Documents_relances', 'Date_limite', 'Statut', 'Actor_email', 'CC', 'Email_body'
-                ])
-                # Persister la suppression
+
+            st.markdown("---")
+            st.subheader("Gérer les relances programmées")
+            # Permettre la suppression d'une relance programmée individuelle
+            options = scheduled_display.apply(lambda r: f"{r['Date_programmee']} — {r['Collaborateur']} — {r.get('Email','')}", axis=1).tolist()
+            to_delete = st.selectbox("Sélectionnez une relance programmée à supprimer:", options)
+            if st.button("🗑️ Supprimer la relance sélectionnée"):
                 try:
-                    save_scheduled_relances_to_gsheet(st.session_state.scheduled_relances)
-                except Exception:
-                    pass
-                st.success("✅ Toutes les relances programmées ont été supprimées.")
-                                # Ne pas forcer le rerun pour éviter changement d'onglet
+                    idx = options.index(to_delete)
+                    # Retirer de la session_state et persister
+                    st.session_state.scheduled_relances = st.session_state.scheduled_relances.drop(st.session_state.scheduled_relances.index[idx]).reset_index(drop=True)
+                    try:
+                        save_scheduled_relances_to_gsheet(st.session_state.scheduled_relances)
+                    except Exception:
+                        pass
+                    st.success("✅ Relance programmée supprimée.")
+                except Exception as e:
+                    st.error(f"Erreur suppression: {e}")
         else:
             st.info("📅 Aucune relance programmée pour le moment.")
 
