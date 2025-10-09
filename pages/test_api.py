@@ -356,6 +356,11 @@ if 'hr_database' not in st.session_state:
     # Normaliser les colonnes/types immédiatement
     st.session_state.hr_database = normalize_hr_database(st.session_state.hr_database)
 
+# Si on vient de recharger (flag), afficher le message de succès puis effacer le flag
+if st.session_state.get('_last_reload_successful', False):
+    st.success("✅ Données rechargées depuis Google Sheets!")
+    st.session_state['_last_reload_successful'] = False
+
 if 'relance_history' not in st.session_state:
     # Charger depuis Google Sheets si disponible
     loaded_hist = load_relance_history_from_gsheet()
@@ -815,13 +820,21 @@ with tab1:
             with st.spinner("Rechargement en cours..."):
                 # Vider le cache pour forcer le rechargement
                 st.cache_data.clear()
-                if load_data():
-                    st.success("✅ Données rechargées depuis Google Sheets!")
-                    # Forcer un rerun afin que l'UI reflète immédiatement les nouvelles données
-                    try:
-                        st.experimental_rerun()
-                    except Exception:
-                        pass
+                try:
+                    raw = _load_df_from_worksheet(WORKSHEET_NAME)
+                    if raw is None:
+                        st.error("❌ Impossible de lire la feuille Google Sheets.")
+                    else:
+                        st.session_state.hr_database = normalize_hr_database(raw)
+                        # Signaler le succès après le rerun
+                        st.session_state['_last_reload_successful'] = True
+                        # Forcer un rerun afin que l'UI reflète immédiatement les nouvelles données
+                        try:
+                            st.experimental_rerun()
+                        except Exception:
+                            pass
+                except Exception as e:
+                    st.error(f"Erreur lors du rechargement direct: {e}")
 
 # ============================
 # ONGLET 2: GESTION COLLABORATEUR
