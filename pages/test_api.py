@@ -376,29 +376,8 @@ def save_data():
 def load_data():
     """Recharge les données depuis Google Sheets"""
     try:
-        st.session_state.hr_database = load_data_from_gsheet()
-        # Normaliser les colonnes et types
-        def _normalize_hr(df):
-            if df is None or len(df) == 0:
-                return df
-            # Supporter à la fois 'Service' et 'Affectation'
-            if 'Affectation' in df.columns and 'Service' not in df.columns:
-                df['Service'] = df['Affectation']
-            if 'Service' in df.columns and 'Affectation' not in df.columns:
-                df['Affectation'] = df['Service']
-            # Nombre_relances en int
-            if 'Nombre_relances' in df.columns:
-                df['Nombre_relances'] = pd.to_numeric(df['Nombre_relances'], errors='coerce').fillna(0).astype(int)
-            else:
-                df['Nombre_relances'] = 0
-            # Documents_manquants assurer string JSON
-            if 'Documents_manquants' in df.columns:
-                df['Documents_manquants'] = df['Documents_manquants'].fillna('[]').astype(str)
-            else:
-                df['Documents_manquants'] = '[]'
-            return df
-
-        st.session_state.hr_database = _normalize_hr(st.session_state.hr_database)
+        # Recharger puis normaliser via la fonction centralisée
+        st.session_state.hr_database = normalize_hr_database(load_data_from_gsheet())
         return True
     except Exception as e:
         st.error(f"Erreur lors du rechargement: {e}")
@@ -634,6 +613,8 @@ with tab1:
             docs_df = pd.DataFrame(list(docs_counter.items()), columns=['Document', 'Count']).sort_values('Count', ascending=False)
             top_n = docs_df.head(10)
             fig_docs = px.bar(top_n, x='Document', y='Count', title='Top 10 des documents manquants')
+            # Nettoyer les libellés génériques
+            fig_docs.update_layout(xaxis_title='', yaxis_title='')
             st.plotly_chart(fig_docs, use_container_width=True)
         else:
             st.info("Aucun document manquant enregistré pour le moment.")
@@ -651,9 +632,10 @@ with tab1:
             c0 = c1 = c2 = c3 = 0
 
         rel_df = pd.DataFrame({'Relances': ['0', '1', '2', '3+'], 'Count': [c0, c1, c2, c3]})
-        # Afficher en 'pyramide' -- on utilise un bar horizontal trié pour l'effet
-        fig_rel = px.bar(rel_df, x='Count', y='Relances', orientation='h', title='Distribution des relances (0 / 1 / 2 / 3+)')
-        fig_rel.update_layout(yaxis={'categoryorder':'array','categoryarray':['0','1','2','3+']})
+        # Afficher en barres verticales
+        fig_rel = px.bar(rel_df, x='Relances', y='Count', title='Distribution des relances (0 / 1 / 2 / 3+)')
+        # Nettoyer les libellés d'axes gênants
+        fig_rel.update_layout(xaxis_title='', yaxis_title='')
         st.plotly_chart(fig_rel, use_container_width=True)
 
     col_filter1, col_filter2, col_filter3, col_filter4 = st.columns(4)
@@ -745,7 +727,7 @@ with tab1:
                     st.cache_data.clear()
     
     with col_action2:
-        if st.button("� Recharger depuis Google Sheets", use_container_width=True):
+        if st.button("🔄 Recharger depuis Google Sheets", use_container_width=True):
             with st.spinner("Rechargement en cours..."):
                 # Vider le cache pour forcer le rechargement
                 st.cache_data.clear()
@@ -894,8 +876,7 @@ with tab2:
                     st.subheader("📋 Mise à jour des documents fournis")
                     st.info("ℹ️ Cochez les documents qui ont été FOURNIS")
 
-                    # Possibilité de mettre à jour le téléphone
-                    telephone = st.text_input("Téléphone", value=collab_data.get('Téléphone', ''))
+                    # Téléphone retiré de la mise à jour des documents (conforme à la demande)
 
                     # Checklist avec état actuel (inverse de la logique précédente) en deux colonnes
                     provided_docs = []
@@ -924,7 +905,6 @@ with tab2:
                         st.session_state.hr_database.loc[selected_idx, 'Documents_manquants'] = json.dumps(new_missing_docs)
                         st.session_state.hr_database.loc[selected_idx, 'Statut'] = nouveau_statut
                         st.session_state.hr_database.loc[selected_idx, 'Date_modification'] = now
-                        st.session_state.hr_database.loc[selected_idx, 'Téléphone'] = telephone
                         
                         # Mettre à jour Google Sheets
                         updated_row = st.session_state.hr_database.iloc[selected_idx].fillna('').tolist()
@@ -1217,95 +1197,4 @@ Cordialement"""
 st.markdown("---")
 st.markdown("**💼 Système de Suivi des Dossiers RH - TGCC** | Version 1.0")
 
-# --- Section admin pour actions rapides (rename header, injecter données de test)
-with st.expander("⚙️ Outils admin (rename colonnes / injecter exemples)", expanded=False):
-    st.caption("Utilisez ces outils uniquement en environnement de test. Les opérations modifient la Google Sheet liée.")
-    col_a, col_b = st.columns(2)
-    with col_a:
-        if st.button("Renommer 'Affectation' → 'Service' dans la feuille Google"):
-            try:
-                gc = get_gsheet_client()
-                if not gc:
-                    st.error("Impossible d'authentifier Google Sheets.")
-                else:
-                    sh = gc.open_by_url(GOOGLE_SHEET_URL)
-                    ws = sh.worksheet(WORKSHEET_NAME)
-                    headers = ws.row_values(1)
-                    # remplacer si présent
-                    headers = ['Service' if h.strip().lower()=='affectation' else h for h in headers]
-                    ws.delete_rows(1)
-                    ws.insert_row(headers, index=1)
-                    st.success("✅ En-tête renommée (Affectation -> Service)")
-            except Exception as e:
-                st.error(f"Erreur rename header: {e}")
-    with col_b:
-        if st.button("Renommer 'Service' → 'Affectation' dans la feuille Google"):
-            try:
-                gc = get_gsheet_client()
-                if not gc:
-                    st.error("Impossible d'authentifier Google Sheets.")
-                else:
-                    sh = gc.open_by_url(GOOGLE_SHEET_URL)
-                    ws = sh.worksheet(WORKSHEET_NAME)
-                    headers = ws.row_values(1)
-                    headers = ['Affectation' if h.strip().lower()=='service' else h for h in headers]
-                    ws.delete_rows(1)
-                    ws.insert_row(headers, index=1)
-                    st.success("✅ En-tête renommée (Service -> Affectation)")
-            except Exception as e:
-                st.error(f"Erreur rename header: {e}")
-
-    st.markdown("---")
-    if st.button("Générer 30 exemples de collaborateurs (local)"):
-        # Générer 30 exemples fictifs marocains
-        import random
-        villes = ['Casablanca', 'Rabat', 'Fès', 'Marrakech', 'Tanger', 'Agadir']
-        postes = ['Ingénieur', 'Technicien', 'Chargé RH', 'Comptable', 'Chef de projet']
-        noms = ['El Amrani','Bennani','Bouaziz','Rachidi','Zeroual','El Idrissi','Benjelloun','Khattabi','Ouarzazi','Meziane']
-        prenoms = ['Mohamed','Ahmed','Youssef','Kamal','Sanae','Fatima','Hajar','Imane','Omar','Saad']
-        fake_rows = []
-        for i in range(30):
-            nom = random.choice(noms)
-            prenom = random.choice(prenoms)
-            poste = random.choice(postes)
-            service = random.choice(villes)
-            tel = f"+2126{random.randint(10000000,99999999)}"
-            email = f"{prenom.lower()}.{nom.lower()}@example.ma"
-            date_int = (datetime.now() - timedelta(days=random.randint(0,1000))).strftime('%Y-%m-%d')
-            missing = random.sample(DOCUMENTS_RH, k=random.randint(0,5))
-            statut = 'Complet' if len(missing)==0 else 'En cours'
-            last_rel = ''
-            num_rel = random.randint(0,4)
-            now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            fake_rows.append({
-                'Nom': nom,
-                'Prénom': prenom,
-                'Poste': poste,
-                'Service': service,
-                'Téléphone': tel,
-                'Email': email,
-                'Date_integration': date_int,
-                'Documents_manquants': json.dumps(missing),
-                'Statut': statut,
-                'Derniere_relance': last_rel,
-                'Nombre_relances': int(num_rel),
-                'Date_creation': now,
-                'Date_modification': now
-            })
-        fake_df = pd.DataFrame(fake_rows)
-        st.session_state.hr_database = pd.concat([st.session_state.hr_database, fake_df], ignore_index=True)
-        st.success("✅ 30 exemples ajoutés localement. (Utilisez 'Sauvegarder' pour les écrire dans Google Sheets)")
-
-    if st.button("Générer et sauvegarder 30 exemples dans Google Sheets"):
-        try:
-            # Réutiliser la génération précédente si présente
-            if 'fake_df' not in locals():
-                st.button('Génération d\'exemples non trouvée — cliquez d\'abord sur génération locale')
-            else:
-                # Sauvegarder st.session_state.hr_database
-                if save_data_to_gsheet(st.session_state.hr_database):
-                    st.success('✅ Exemples sauvegardés dans Google Sheets.')
-                else:
-                    st.error('❌ Échec de la sauvegarde dans Google Sheets.')
-        except Exception as e:
-            st.error(f"Erreur lors de la sauvegarde des exemples: {e}")
+# (Outils admin supprimés par demande de l'utilisateur)
