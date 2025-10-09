@@ -555,18 +555,263 @@ def get_deepseek_analysis(text):
     if not API_KEY: return "Analyse impossible."
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
-    prompt = f"En tant qu'expert en recrutement, analyse le CV suivant et identifie les points forts et faibles. Texte du CV : {text}"
-    payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}]}
+    prompt = f"""
+    En tant qu'expert en recrutement, analyse le CV suivant et classe-le UNIQUEMENT dans l'une des trois catégories suivantes:
+    - Fonctions supports (RH, Finance, IT, etc.)
+    - Production (Ingénierie, Technique, Opérations, etc.)
+    - Logistique (Supply Chain, Transport, Stockage, etc.)
+    
+    Réponds UNIQUEMENT avec le nom de la catégorie, sans explication ni analyse détaillée.
+    
+    Texte du CV : {text}
+    """
+    payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.2}
     try:
         response = requests.post(url, headers=headers, data=json.dumps(payload))
         response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"]
+        # Récupérer uniquement la catégorie (nettoyer la réponse)
+        result = response.json()["choices"][0]["message"]["content"].strip()
+        # Normaliser la réponse pour s'assurer qu'elle correspond à l'une des trois catégories
+        if "support" in result.lower():
+            return "Fonctions supports"
+        elif "product" in result.lower():
+            return "Production"
+        elif "logistique" in result.lower():
+            return "Logistique"
+        else:
+            return result  # Garder la réponse originale si elle ne correspond pas aux patterns
     except Exception as e:
         return f"Erreur IA : {e}"
 
+# -------------------- Extraction de noms des CV --------------------
+def extract_name_from_cv_text(text):
+    """
+    Extrait le nom et prénom d'un CV à partir du texte.
+    Retourne un dictionnaire avec 'name', 'confidence' et 'method_used'
+    """
+    if not text or len(text.strip()) < 10:
+        return {"name": None, "confidence": 0, "method_used": "text_too_short"}
+    
+    # Prendre les premières lignes (plus probable de contenir le nom)
+    lines = text.split('\n')[:15]  # Premières 15 lignes
+    text_upper = text.upper()
+    
+    # Méthode 1: Chercher des patterns explicites
+    explicit_patterns = [
+        r'(?:nom\s*[:;]\s*)([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)*)',
+        r'(?:prénom\s*[:;]\s*)([A-ZÀ-Ÿ][a-zà-ÿ]+)',
+        r'(?:name\s*[:;]\s*)([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)*)',
+    ]
+    
+    nom, prenom = None, None
+    
+    for line in lines:
+        for pattern in explicit_patterns:
+            match = re.search(pattern, line, re.IGNORECASE)
+            if match:
+                if 'nom' in pattern.lower() and not 'prénom' in pattern.lower():
+                    nom = match.group(1).strip()
+                elif 'prénom' in pattern.lower():
+                    prenom = match.group(1).strip()
+                elif 'name' in pattern.lower():
+                    parts = match.group(1).strip().split()
+                    if len(parts) >= 2:
+                        nom, prenom = parts[0], parts[1]
+    
+    if nom and prenom:
+        formatted_name = f"{nom.upper()} {prenom.capitalize()}"
+        return {"name": formatted_name, "confidence": 0.9, "method_used": "explicit_pattern"}
+    
+    # Méthode 2: Chercher près d'email ou téléphone
+    email_phone_patterns = [
+        r'[\w\.-]+@[\w\.-]+\.\w+',
+        r'(?:\+33|0)[1-9](?:[.\-\s]?\d{2}){4}',
+        r'\d{2}[\.\-\s]?\d{2}[\.\-\s]?\d{2}[\.\-\s]?\d{2}[\.\-\s]?\d{2}'
+    ]
+    
+    for i, line in enumerate(lines):
+        for pattern in email_phone_patterns:
+            if re.search(pattern, line):
+                # Chercher dans les 2 lignes précédentes et suivantes
+                search_lines = lines[max(0, i-2):min(len(lines), i+3)]
+                for search_line in search_lines:
+                    candidate = extract_name_from_line(search_line)
+                    if candidate:
+                        return {"name": candidate, "confidence": 0.7, "method_used": "near_contact"}
+    
+    # Méthode 3: Chercher des mots en majuscules dans les premières lignes
+    for line in lines[:5]:  # Seulement les 5 premières lignes
+        candidate = extract_name_from_line(line)
+        if candidate:
+            return {"name": candidate, "confidence": 0.6, "method_used": "capitalized_words"}
+    
+    return {"name": None, "confidence": 0, "method_used": "not_found"}
+
+def extract_name_from_line(line):
+    """Extrait un nom candidat d'une ligne en utilisant des heuristiques"""
+    if not line or len(line.strip()) < 5:
+        return None
+    
+    # Nettoyer la ligne
+    line = line.strip()
+    
+    # Mots à ignorer (mots métier courants)
+    ignore_words = {
+        'cv', 'curriculum', 'vitae', 'resume', 'directeur', 'manager', 'ingénieur', 
+        'consultant', 'développeur', 'analyst', 'chef', 'responsable', 'assistant',
+        'senior', 'junior', 'stage', 'stagiaire', 'étudiant', 'expérience',
+        'formation', 'diplôme', 'université', 'école', 'master', 'licence',
+        'téléphone', 'email', 'adresse', 'né', 'age', 'ans', 'contact',
+        'projet', 'projets', 'compétences', 'skills'
+    }
+    
+    # Chercher 2-3 mots consécutifs commençant par une majuscule
+    words = line.split()
+    candidates = []
+    
+    for i in range(len(words) - 1):
+        if i + 1 < len(words):
+            word1, word2 = words[i], words[i + 1]
+            
+            # Vérifier que les mots sont des candidats valides
+            if (word1[0].isupper() and word2[0].isupper() and 
+                len(word1) > 1 and len(word2) > 1 and
+                word1.lower() not in ignore_words and 
+                word2.lower() not in ignore_words and
+                word1.isalpha() and word2.isalpha()):
+                
+                # Format: NOM Prénom
+                formatted = f"{word1.upper()} {word2.capitalize()}"
+                candidates.append(formatted)
+    
+    return candidates[0] if candidates else None
+
+# -------------------- Génération du ZIP organisé --------------------
+def merge_results_with_ai_analysis(original_results):
+    """
+    Intègre les résultats des analyses IA dans les résultats originaux.
+    Met à jour les catégories des CV qui ont été analysés par l'IA.
+    """
+    # Créer une copie pour ne pas modifier l'original
+    updated_results = original_results.copy()
+    
+    # Si des analyses IA existent, intégrer les résultats
+    if hasattr(st.session_state, 'deepseek_analyses') and st.session_state.deepseek_analyses:
+        ai_results = {result['Fichier']: result['Catégorie'] for result in st.session_state.deepseek_analyses}
+        
+        for i, result in enumerate(updated_results):
+            filename = result['file']
+            if filename in ai_results:
+                ai_category = ai_results[filename]
+                # Normaliser la catégorie IA selon nos catégories standard
+                if "support" in ai_category.lower():
+                    updated_results[i]['category'] = 'Fonctions supports'
+                elif "logistique" in ai_category.lower():
+                    updated_results[i]['category'] = 'Logistique'
+                elif "production" in ai_category.lower() or "technique" in ai_category.lower():
+                    updated_results[i]['category'] = 'Production/Technique'
+                # Si la catégorie IA n'est pas reconnue, on garde "Non classé"
+    
+    return updated_results
+
+def create_organized_zip(results, file_list):
+    """
+    Crée un fichier ZIP avec les CV organisés par catégorie et renommés.
+    Intègre automatiquement les résultats des analyses IA.
+    Retourne les bytes du ZIP et un DataFrame manifest.
+    """
+    import zipfile
+    import io
+    from io import BytesIO
+    
+    # Intégrer les analyses IA dans les résultats
+    merged_results = merge_results_with_ai_analysis(results)
+    
+    zip_buffer = BytesIO()
+    manifest_data = []
+    
+    # Créer les dossiers par catégorie
+    folders = {
+        'Production': 'Production/',
+        'Production/Technique': 'Production/',
+        'Fonctions supports': 'Fonctions_supports/',
+        'Logistique': 'Logistique/',
+        'Non classé': 'Non_classe/'
+    }
+    
+    # Déterminer quelles catégories sont réellement présentes
+    categories_present = set(result['category'] for result in merged_results)
+    folders_to_create = set()
+    for category in categories_present:
+        if category in folders:
+            folders_to_create.add(folders[category])
+    
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+        # Créer seulement les dossiers nécessaires
+        for folder in folders_to_create:
+            zip_file.writestr(folder, '')
+        
+        # Traiter chaque CV avec les résultats intégrant l'IA
+        for result in merged_results:
+            original_name = result['file']
+            category = result['category']
+            
+            # Déterminer le nom final du fichier
+            if 'extracted_name' in result and result['extracted_name'] and result['extracted_name']['name']:
+                # Utiliser le nom extrait
+                extracted_name = result['extracted_name']['name']
+                final_name = f"{extracted_name}.pdf"
+                confidence = result['extracted_name']['confidence']
+                method = result['extracted_name']['method_used']
+            else:
+                # Garder le nom original
+                final_name = original_name
+                confidence = 0
+                method = 'original_name'
+            
+            # Déterminer le dossier de destination
+            folder = folders.get(category, 'Non_classe/')
+            file_path_in_zip = folder + final_name
+            
+            # Trouver le fichier original dans file_list
+            original_file = None
+            for item in file_list:
+                if item['name'] == original_name:
+                    original_file = item['file']
+                    break
+            
+            if original_file:
+                try:
+                    # Lire le contenu du fichier original
+                    original_file.seek(0)
+                    file_content = original_file.read()
+                    # Ajouter au ZIP
+                    zip_file.writestr(file_path_in_zip, file_content)
+                    
+                    # Ajouter au manifest
+                    manifest_data.append({
+                        'fichier_original': original_name,
+                        'nouveau_nom': final_name,
+                        'categorie': category,
+                        'confiance_extraction': confidence,
+                        'methode_extraction': method,
+                        'dossier': folder.rstrip('/')
+                    })
+                except Exception as e:
+                    st.warning(f"Erreur lors du traitement de {original_name}: {e}")
+        
+        # Créer et ajouter le manifest CSV
+        if manifest_data:
+            manifest_df = pd.DataFrame(manifest_data)
+            manifest_csv = manifest_df.to_csv(index=False, encoding='utf-8')
+            zip_file.writestr('manifest.csv', manifest_csv)
+    
+    zip_buffer.seek(0)
+    return zip_buffer.getvalue(), pd.DataFrame(manifest_data)
+
 # -------------------- Interface Utilisateur --------------------
 st.title("📄 Analyseur de CVs Intelligent")
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Classement de CVs", "🎯 Analyse de Profil", "📖 Guide des Méthodes", "📈 Statistiques de Feedback"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Classement de CVs", "🎯 Analyse de Profil", "📖 Guide des Méthodes", "📈 Statistiques de Feedback", "🗂️ Auto-classification"])
 
 with tab1:
     st.markdown("### 📄 Informations du Poste")
@@ -1252,3 +1497,305 @@ with st.sidebar:
                     st.error(f"❌ Erreur de connexion ({response.status_code})")
             except Exception as e:
                 st.error(f"❌ Erreur: {e}")
+
+with tab5:
+    st.header("🗂️ Auto-classification de CVs (3 catégories)")
+    st.markdown("Chargez jusqu'à 100 CVs (PDF). L'outil extrait le texte et classe automatiquement chaque CV dans l'une des 3 catégories : Fonctions supports, Logistique, Production/Technique.")
+
+    # Importer des CVs uniquement via upload
+    uploaded_files_auto = st.file_uploader("Importer des CVs (PDF)", type=["pdf"], accept_multiple_files=True, key="auto_uploader")
+
+    # Définitions de mots-clés pour chaque catégorie (basées sur votre liste)
+    SUPPORT_KEYS = [
+        r"\b(directeur(?: des)? ressources humaines|drh|responsable(?: des)? ressources humaines|charg(?:e|é)\w* des ressources humaines|hr business partner|gestionnaire de paie|charg(?:e|é) de recrutement|responsable formation|directeur administratif et financier|daf|responsable comptable|comptable|contr(?:ô|o)leur de gestion|trésorier|directeur(?: des)? syst(?:è|e)m?es d'?information|dsi|administrateur syst(?:è|e)m?es et r(?:é|e)seaux|technicien de support|juriste d'entreprise|assistant(?:e)? juridique|responsable qhse|ingénieur qhse|animateur qhse|responsable des services g(?:é|e)n(?:é|e)raux|office manager|assistant(?:e)? de direction|assistant(?:e)? administratif(?:ve)?|charg(?:e|é) d'accueil|standardiste)\b"
+    ]
+    LOGISTICS_KEYS = [
+        r"\b(responsable supply chain|responsable logistique|coordinateur logistique|analyste logistique|planificateur|ordonnanceur|responsable d'entrep[oô]t|chef de d(?:é|e)p[oô]t|gestionnaire de stocks|magasinier|cariste|pr(?:é|e)parateur de commandes|responsable transport|gestionnaire de parc|affr(?:é|e)teur|agent d'exploitation|chauffeur|d(?:é|e)clarant en douane|agent de transit|import\s*/?\s*export|supply chain)\b"
+    ]
+    PRODUCTION_KEYS = [
+        r"\b(directeur de travaux|conducteur de travaux|ingénieur de travaux|ingénieur travaux|chef de projet(?:s)?|chef de projets|ingénieur g(?:é|e)nie civil|ingénieur études de prix|ingénieur m(?:é|e)thodes|dessinateur|projeteur|m(?:é|e)treur|(?:é|e)conomiste de la construction|g(?:é|e)om(?:è|e)tre|topographe|technicien de laboratoire|encadrement|gestion de chantier|maîtrise d'?oeuvre|maîtrise d'œuvre)\b"
+    ]
+
+    def classify_text(text):
+        t = (text or "").lower()
+        # Priorité : Production > Logistique > Support (si plusieurs matches)
+        for pat in PRODUCTION_KEYS:
+            if re.search(pat, t, re.IGNORECASE):
+                return 'Production/Technique'
+        for pat in LOGISTICS_KEYS:
+            if re.search(pat, t, re.IGNORECASE):
+                return 'Logistique'
+        for pat in SUPPORT_KEYS:
+            if re.search(pat, t, re.IGNORECASE):
+                return 'Fonctions supports'
+        return 'Non classé'
+
+    # Construire la liste de fichiers uniquement à partir des uploads
+    file_list = []
+    if uploaded_files_auto:
+        for uf in uploaded_files_auto:
+            file_list.append({'name': uf.name, 'file': uf})
+
+    # Afficher immédiatement combien de CVs ont été uploadés
+    if len(file_list) > 0:
+        st.success(f"✅ {len(file_list)} CV(s) uploadé(s) et prêts pour traitement.")
+        # Message d'instruction supprimé
+
+        # Limiter à 200 pour sécurité
+        if len(file_list) > 200:
+            st.warning('Plus de 200 CVs trouvés. Seuls les 200 premiers seront traités.')
+            file_list = file_list[:200]
+
+        # Initialiser les variables de session pour la classification et l'analyse DeepSeek
+        if 'classification_results' not in st.session_state:
+            st.session_state.classification_results = None
+        if 'deepseek_analyses' not in st.session_state:
+            st.session_state.deepseek_analyses = []
+        if 'last_action' not in st.session_state:
+            st.session_state.last_action = None
+        
+        # Afficher un indicateur de statut si une action a été effectuée précédemment
+        if st.session_state.last_action:
+            action_message = {
+                "classified": "✅ CVs classifiés avec succès ! Vous pouvez maintenant analyser les CVs non classés avec l'IA.",
+                "analyzed": "✅ CVs non classés analysés avec DeepSeek IA !",
+                "reset": "🔄 Analyses IA réinitialisées."
+            }
+            st.success(action_message.get(st.session_state.last_action, ""))
+            # Réinitialiser pour ne pas afficher le message à chaque rechargement
+            st.session_state.last_action = None
+        
+        # Option pour renommer et organiser les CV
+        rename_and_organize = st.checkbox(
+            "📁 Renommer les CV et organiser par dossiers",
+            help="Extrait automatiquement les noms des candidats et organise les CV par catégorie dans un fichier ZIP"
+        )
+        
+        # Bouton de classification primaire
+        if st.button('📂 Lancer l\'auto-classification', type='primary'):
+            # Réinitialiser les analyses DeepSeek lors d'une nouvelle classification
+            st.session_state.deepseek_analyses = []
+            
+            results = []
+            progress = st.progress(0)
+            total = len(file_list)
+            # placeholder pour afficher le fichier en cours de traitement
+            processing_placeholder = st.empty()
+            spinner_text = 'Extraction, classification et extraction des noms en cours...' if rename_and_organize else 'Extraction et classification en cours...'
+            
+            with st.spinner(spinner_text):
+                for i, item in enumerate(file_list):
+                    f = item['file']
+                    name = item['name']
+                    # Mettre à jour le fichier en cours
+                    processing_placeholder.info(f"Traitement ({i+1}/{total}) : {name}")
+                    try:
+                        text = extract_text_from_pdf(f)
+                    except Exception:
+                        text = ''
+                    cat = classify_text(text)
+                    
+                    # Extraction du nom si l'option est cochée
+                    extracted_name_info = None
+                    if rename_and_organize and text:
+                        extracted_name_info = extract_name_from_cv_text(text)
+                    
+                    result_item = {
+                        'file': name, 
+                        'category': cat, 
+                        'text_snippet': (text or '')[:800],
+                        'full_text': text  # Garder le texte complet pour le ZIP
+                    }
+                    
+                    if rename_and_organize:
+                        result_item['extracted_name'] = extracted_name_info
+                    
+                    results.append(result_item)
+                    progress.progress((i+1)/total)
+
+            # Nettoyer le placeholder
+            processing_placeholder.empty()
+
+            # Stocker les résultats de classification dans la session state
+            st.session_state.classification_results = results
+            st.session_state.rename_and_organize_option = rename_and_organize
+            st.session_state.uploaded_files_list = file_list  # Stocker pour le ZIP
+            st.session_state.last_action = "classified"
+        
+        # Si des résultats de classification existent (soit de l'action actuelle ou précédente), les afficher
+        if st.session_state.classification_results:
+            # Convertir les résultats en DataFrame
+            df = pd.DataFrame(st.session_state.classification_results)
+            
+            # Calcul des statistiques pour le message de résumé
+            num_total = len(df)
+            num_supports = len(df[df['category'] == 'Fonctions supports'])
+            num_logistics = len(df[df['category'] == 'Logistique'])
+            num_production = len(df[df['category'] == 'Production/Technique'])
+            num_unclassified = len(df[df['category'] == 'Non classé'])
+            num_classified = num_total - num_unclassified
+            
+            # Message de succès avec statistiques et pourcentages
+            percent_classified = int(round(num_classified / num_total * 100)) if num_total > 0 else 0
+            percent_unclassified = int(round(num_unclassified / num_total * 100)) if num_total > 0 else 0
+            st.success(f"✅ Traitement terminé : {num_total} CV(s) traité(s), dont {num_classified} ({percent_classified}%) classé(s) et {num_unclassified} ({percent_unclassified}%) non classé(s).")
+            
+            # Utiliser le DataFrame pour l'affichage
+            display_df = df
+                
+            # Affichage en 3 colonnes
+            cols = st.columns(3)
+            cats = ['Fonctions supports', 'Logistique', 'Production/Technique']
+            for idx, c in enumerate(cats):
+                with cols[idx]:
+                    st.subheader(c)
+                    sub = display_df[display_df['category'] == c]
+                    if sub.empty:
+                        st.write('Aucun CV classé ici.')
+                    else:
+                        # Afficher nom + extrait
+                        for _, r in sub.iterrows():
+                            with st.expander(r['file']):
+                                st.write(r['text_snippet'])
+
+            # Non classés
+            nc = df[df['category'] == 'Non classé']
+            if not nc.empty:
+                st.markdown('---')
+                st.subheader('Non classés')
+                st.dataframe(nc[['file', 'text_snippet']], use_container_width=True)
+                
+                # Bouton pour analyser les CV non classés avec DeepSeek
+                analyze_button = st.button('🔍 Analyser les CV non classés avec Intelligence Artificielle', type='secondary')
+                
+                # Si on clique sur le bouton
+                if analyze_button:
+                    # Exécuter l'analyse
+                    unclassified_results = []
+                    unclassified_progress = st.progress(0)
+                    unclassified_total = len(nc)
+                    processing_ai_placeholder = st.empty()
+                    
+                    with st.spinner('Analyse des CVs non classés avec Intelligence Artificielle...'):
+                        for i, (_, row) in enumerate(nc.iterrows()):
+                            name = row['file']
+                            text_snippet = row['text_snippet']
+                            # Mettre à jour le fichier en cours
+                            processing_ai_placeholder.info(f"Analyse par IA ({i+1}/{unclassified_total}) : {name}")
+                            
+                            try:
+                                # Utiliser l'API DeepSeek pour analyser le CV
+                                category = get_deepseek_analysis(text_snippet)
+                                unclassified_results.append({'Fichier': name, 'Catégorie': category})
+                            except Exception as e:
+                                unclassified_results.append({'Fichier': name, 'Catégorie': f"Erreur: {str(e)}"})
+                            
+                            unclassified_progress.progress((i+1)/unclassified_total)
+                    
+                    # Nettoyer le placeholder
+                    processing_ai_placeholder.empty()
+                    
+                    # Stocker les résultats dans la session state
+                    st.session_state.deepseek_analyses = unclassified_results
+                    st.session_state.last_action = "analyzed"
+            
+            # Afficher les analyses IA s'il y en a
+            if st.session_state.deepseek_analyses:
+                st.markdown('---')
+                st.subheader("📝 Analyses par Intelligence Artificielle des CV non classés")
+                
+                # Ajouter un bouton pour réinitialiser les analyses si nécessaire
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.success(f"✅ Analyse par Intelligence Artificielle pour {len(st.session_state.deepseek_analyses)} CV(s) non classés.")
+                with col2:
+                    if st.button("🔄 Réinitialiser analyses", key="reset_deepseek"):
+                        st.session_state.deepseek_analyses = []
+                        st.session_state.last_action = "reset"
+                        st.experimental_rerun()
+                
+                # Créer un tableau pour afficher les résultats de manière plus organisée
+                ai_results_df = pd.DataFrame(st.session_state.deepseek_analyses)
+                
+                # Afficher le tableau avec les catégories attribuées
+                st.dataframe(ai_results_df, width="stretch", hide_index=True)
+
+            # Préparer un CSV à 4 colonnes en prenant en compte les analyses IA
+            # Déterminer les noms à utiliser (extraits ou originaux)
+            def get_display_name(row):
+                original_name = row['file']
+                if (hasattr(st.session_state, 'rename_and_organize_option') and 
+                    st.session_state.rename_and_organize_option and 
+                    'extracted_name' in row and row['extracted_name'] and 
+                    row['extracted_name']['name']):
+                    return row['extracted_name']['name']
+                return original_name
+            
+            # Créer un DataFrame avec les résultats intégrés (incluant les analyses IA)
+            merged_results_for_csv = merge_results_with_ai_analysis(st.session_state.classification_results)
+            df_merged = pd.DataFrame(merged_results_for_csv)
+            
+            # Récupérer les classifications finales (après IA) avec les bons noms
+            supports = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Fonctions supports'].iterrows()]
+            logistics = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Logistique'].iterrows()]
+            production = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Production/Technique'].iterrows()]
+            unclassified = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Non classé'].iterrows()]
+
+            max_len = max(len(supports), len(logistics), len(production), len(unclassified)) if max(len(supports), len(logistics), len(production), len(unclassified)) > 0 else 0
+            # Pad lists
+            supports += [''] * (max_len - len(supports))
+            logistics += [''] * (max_len - len(logistics))
+            production += [''] * (max_len - len(production))
+            unclassified += [''] * (max_len - len(unclassified))
+
+            export_df = pd.DataFrame({
+                'Fonctions supports': supports,
+                'Logistique': logistics,
+                'Production/Technique': production,
+                'Non classés': unclassified
+            })
+
+            # Séparateur visuel
+            st.markdown("---")
+            
+            # Comptage des CVs par catégorie pour l'affichage
+            count_support = len([x for x in supports if x])
+            count_logistics = len([x for x in logistics if x]) 
+            count_production = len([x for x in production if x])
+            count_unclassified = len([x for x in unclassified if x])
+            
+            # Ajouter un indicateur pour montrer que les analyses IA sont incluses
+            ai_indicator = " (incluant les analyses IA)" if hasattr(st.session_state, 'deepseek_analyses') and st.session_state.deepseek_analyses else ""
+            st.markdown(f"**Résumé{ai_indicator}**: {count_support} en Fonctions supports, {count_logistics} en Logistique, {count_production} en Production/Technique, {count_unclassified} Non classés.")
+            
+            csv = export_df.to_csv(index=False).encode('utf-8')
+            
+            # Boutons de téléchargement
+            col1, col2 = st.columns(2)
+            with col1:
+                st.download_button(label='⬇️ Télécharger les résultats (CSV)', data=csv, file_name='classification_results.csv', mime='text/csv')
+            
+            with col2:
+                # Bouton ZIP disponible si l'option de renommage était cochée
+                if hasattr(st.session_state, 'rename_and_organize_option') and st.session_state.rename_and_organize_option:
+                    if st.button('📦 Préparer et télécharger le ZIP organisé'):
+                        with st.spinner('Création du fichier ZIP organisé...'):
+                            try:
+                                zip_data, manifest_df = create_organized_zip(st.session_state.classification_results, st.session_state.uploaded_files_list)
+                                st.success('✅ ZIP créé avec succès !')
+                                
+                                # Afficher un aperçu du manifest
+                                with st.expander("📋 Aperçu du contenu du ZIP"):
+                                    st.dataframe(manifest_df, use_container_width=True)
+                                
+                                # Bouton de téléchargement du ZIP
+                                st.download_button(
+                                    label='⬇️ Télécharger le ZIP organisé',
+                                    data=zip_data,
+                                    file_name='CVs_Classes_Organises.zip',
+                                    mime='application/zip'
+                                )
+                            except Exception as e:
+                                st.error(f"❌ Erreur lors de la création du ZIP : {e}")
+                else:
+                    st.info("💡 Cochez l'option 'Renommer les CV' lors du prochain traitement pour activer le téléchargement ZIP organisé.")
