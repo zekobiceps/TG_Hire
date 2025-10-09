@@ -406,8 +406,11 @@ def save_data():
 def load_data():
     """Recharge les données depuis Google Sheets"""
     try:
-        # Recharger puis normaliser via la fonction centralisée
-        st.session_state.hr_database = normalize_hr_database(load_data_from_gsheet())
+        # Lire directement depuis la worksheet (bypass du cache) puis normaliser
+        raw = _load_df_from_worksheet(WORKSHEET_NAME)
+        if raw is None:
+            return False
+        st.session_state.hr_database = normalize_hr_database(raw)
         return True
     except Exception as e:
         st.error(f"Erreur lors du rechargement: {e}")
