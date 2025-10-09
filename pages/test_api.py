@@ -795,19 +795,21 @@ with tab1:
             hide_index=True
         )
         
-        # Détails des documents manquants
+        # Détails des documents manquants — afficher un expander par collaborateur
         with st.expander("📄 Détail des documents manquants"):
+            # Construire la liste des collaborateurs ayant des documents manquants
             for idx, row in filtered_df.iterrows():
-                if row['Statut'] == 'En cours':
+                if row.get('Statut', '') == 'En cours':
                     try:
-                        missing_docs = json.loads(row['Documents_manquants'])
-                        if missing_docs:
-                            st.write(f"**{row['Prénom']} {row['Nom']}** ({row['Poste']}):")
+                        missing_docs = json.loads(row.get('Documents_manquants', '[]'))
+                    except Exception:
+                        missing_docs = []
+
+                    if missing_docs:
+                        title = f"{row.get('Prénom','')} {row.get('Nom','')} — {row.get('Poste','')} ({len(missing_docs)} docs)"
+                        with st.expander(title, expanded=False):
                             for doc in missing_docs:
-                                st.write(f"  • {doc}")
-                            st.write("")
-                    except:
-                        pass
+                                st.write(f"• {doc}")
     else:
         st.info("Aucun collaborateur ne correspond aux filtres sélectionnés.")
     
