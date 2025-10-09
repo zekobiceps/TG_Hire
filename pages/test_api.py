@@ -290,26 +290,50 @@ def get_missing_documents_count(documents_json):
     except:
         return 0
 
-def send_email_reminder(recipient_email, recipient_name, missing_docs, delay_date=None, custom_body=None):
-    """Envoie un email de relance via SMTP"""
+def send_email_reminder(
+    recipient_email,
+    recipient_name,
+    missing_docs,
+    delay_date=None,
+    custom_body=None,
+    actor_name=None,
+    actor_email=None,
+    cc_emails=None
+):
+    """Envoie un email de relance via SMTP.
+
+    - actor_name / actor_email : informations facultatives de la personne qui déclenche l'envoi
+      (utilisées pour Reply-To et pour afficher "Envoyé par" dans le corps).
+    - cc_emails : chaîne séparée par des virgules ou liste d'emails à mettre en copie.
+    """
     try:
         # Configuration SMTP - utiliser les secrets Streamlit
         smtp_server = st.secrets.get("SMTP_SERVER", "smtp.gmail.com")
         smtp_port = int(st.secrets.get("SMTP_PORT", 587))
-        sender_email = st.secrets.get("SENDER_EMAIL", "")
+        # Valeur par défaut pratique si l'utilisateur n'a pas encore ajouté le secret
+        default_sender = "recrutement@tgcc.ma"
+        sender_email = st.secrets.get("SENDER_EMAIL", default_sender)
         sender_password = st.secrets.get("SENDER_PASSWORD", "")
         
         if not sender_email or not sender_password:
             st.error("❌ Configuration email manquante. Veuillez configurer SENDER_EMAIL et SENDER_PASSWORD dans les secrets.")
             return False
-        
+
+        # Préparer la liste des CC
+        cc_list = []
+        if cc_emails:
+            if isinstance(cc_emails, str):
+                # séparer par virgule et nettoyer
+                cc_list = [e.strip() for e in cc_emails.split(',') if e.strip()]
+            elif isinstance(cc_emails, (list, tuple)):
+                cc_list = [e.strip() for e in cc_emails if str(e).strip()]
+
         # Utiliser le corps personnalisé s'il est fourni, sinon utiliser le template par défaut
         if custom_body:
             body = custom_body
         else:
             # Créer le corps du message avec le template par défaut
             docs_list = '\n'.join([f"• {doc}" for doc in missing_docs])
-            
             body = f"""Bonjour {recipient_name},
 
 Merci de noter que votre dossier administratif RH demeure incomplet à ce jour.
@@ -324,20 +348,35 @@ Merci de noter que le dernier délai pour compléter votre dossier c'est le {del
 Comptant sur votre précieuse collaboration.
 
 Cordialement"""
-        
+
+        # Préfixer par qui envoie si fourni
+        if actor_name or actor_email:
+            sender_info = actor_name if actor_name else actor_email
+            body = f"Envoyé par : {sender_info}\n\n" + body
+
         # Créer le message
         message = MIMEMultipart()
         message['From'] = sender_email
         message['To'] = recipient_email
+        if cc_list:
+            message['Cc'] = ', '.join(cc_list)
         message['Subject'] = "URGENT: Complément du dossier administrative RH"
+
+        # Reply-To vers la personne qui effectue l'envoi (facultatif)
+        if actor_email:
+            message.add_header('Reply-To', actor_email)
+
         message.attach(MIMEText(body, 'plain', 'utf-8'))
-        
+
+        # Destinataires effectifs
+        recipients = [recipient_email] + cc_list
+
         # Envoyer l'email via SMTP
         with smtplib.SMTP(smtp_server, smtp_port) as server:
             server.starttls()  # Activer la sécurité
             server.login(sender_email, sender_password)
-            server.send_message(message)
-        
+            server.sendmail(sender_email, recipients, message.as_string())
+
         return True
     except Exception as e:
         st.error(f"Erreur lors de l'envoi de l'email via SMTP: {e}")
@@ -759,6 +798,18 @@ with tab3:
             send_date_2weeks = (datetime.now() + timedelta(days=14))
             delay_date_2weeks = (send_date_2weeks + timedelta(days=14)).strftime('%d/%m/%Y')
             
+            # Section: informations de l'émetteur + template email éditable
+            st.markdown("#### Informations de l'émetteur (optionnel)")
+            col_actor1, col_actor2 = st.columns(2)
+            with col_actor1:
+                actor_name = st.text_input("Nom de l'émetteur (optionnel)", value=st.session_state.get('actor_name', ''))
+            with col_actor2:
+                actor_email = st.text_input("Email de l'émetteur (optionnel, utilisé en Reply-To)", value=st.session_state.get('actor_email', ''))
+
+            cc_emails = st.text_input("CC (emails séparés par des virgules, optionnel)", value=st.session_state.get('cc_emails', ''))
+
+            st.markdown("---")
+
             # Section template email avec possibilité d'édition
             with st.expander("📧 Éditer le modèle d'email", expanded=False):
                 docs_list_preview = '\n'.join([f"• {doc}" for doc in missing_docs_relance])
@@ -826,7 +877,10 @@ Cordialement"""
                                 collab_relance_data['Prénom'],
                                 missing_docs_relance,
                                 final_delay_date,
-                                final_email_body
+                                final_email_body,
+                                actor_name=actor_name,
+                                actor_email=actor_email,
+                                cc_emails=cc_emails
                             )
                             
                             if success:
@@ -868,7 +922,10 @@ Cordialement"""
                                 'Email': [collab_relance_data['Email']],
                                 'Documents_relances': [json.dumps(missing_docs_relance)],
                                 'Date_limite': [final_delay_date],
-                                'Statut': ['Programmée']
+                                'Statut': ['Programmée'],
+                                'Actor_name': [actor_name],
+                                'Actor_email': [actor_email],
+                                'CC': [cc_emails]
                             })
                             
                             st.session_state.scheduled_relances = pd.concat([st.session_state.scheduled_relances, relance_programmee], ignore_index=True)
