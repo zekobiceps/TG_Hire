@@ -6,6 +6,7 @@ from plotly.subplots import make_subplots
 import numpy as np
 from datetime import datetime, timedelta
 import warnings
+import os
 warnings.filterwarnings('ignore')
 
 st.set_page_config(
@@ -14,79 +15,52 @@ st.set_page_config(
     layout="wide"
 )
 
-def load_data():
-    """Charger et préparer les données"""
+def load_data_from_files(csv_file=None, excel_file=None):
+    """Charger et préparer les données depuis les fichiers uploadés ou locaux"""
+    df_integration = None
+    df_recrutement = None
+    
     try:
         # Charger le CSV (données d'intégration)
-        df_integration = pd.read_csv('/workspaces/TG_Hire/2025-10-09T20-31_export.csv')
-        df_integration['Date Intégration'] = pd.to_datetime(df_integration['Date Intégration'])
+        if csv_file is not None:
+            df_integration = pd.read_csv(csv_file)
+        else:
+            # Fallback vers fichier local s'il existe
+            local_csv = '2025-10-09T20-31_export.csv'
+            if os.path.exists(local_csv):
+                df_integration = pd.read_csv(local_csv)
+        
+        if df_integration is not None and 'Date Intégration' in df_integration.columns:
+            df_integration['Date Intégration'] = pd.to_datetime(df_integration['Date Intégration'])
         
         # Charger l'Excel (données de recrutement)
-        df_recrutement = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (5).xlsx', sheet_name=0)
+        if excel_file is not None:
+            df_recrutement = pd.read_excel(excel_file, sheet_name=0)
+        else:
+            # Fallback vers fichier local s'il existe
+            local_excel = 'Recrutement global PBI All  google sheet (5).xlsx'
+            if os.path.exists(local_excel):
+                df_recrutement = pd.read_excel(local_excel, sheet_name=0)
         
-        # Nettoyer et préparer les données de recrutement
-        # Convertir les dates
-        date_columns = ['Date de réception de la demande aprés validation de la DRH',
-                       'Date d\'entrée effective du candidat', 
-                       'Date d\'annulation /dépriorisation de la demande']
-        
-        for col in date_columns:
-            if col in df_recrutement.columns:
-                df_recrutement[col] = pd.to_datetime(df_recrutement[col], errors='coerce')
-        
-        # Nettoyer les colonnes avec des espaces
-        df_recrutement.columns = df_recrutement.columns.str.strip()
+        if df_recrutement is not None:
+            # Nettoyer et préparer les données de recrutement
+            # Convertir les dates
+            date_columns = ['Date de réception de la demande aprés validation de la DRH',
+                           'Date d\'entrée effective du candidat', 
+                           'Date d\'annulation /dépriorisation de la demande']
+            
+            for col in date_columns:
+                if col in df_recrutement.columns:
+                    df_recrutement[col] = pd.to_datetime(df_recrutement[col], errors='coerce')
+            
+            # Nettoyer les colonnes avec des espaces
+            df_recrutement.columns = df_recrutement.columns.str.strip()
         
         return df_integration, df_recrutement
+        
     except Exception as e:
         st.error(f"Erreur lors du chargement des données: {e}")
         return None, None
-
-def create_kpi_cards(df_integration, df_recrutement):
-    """Créer les cartes KPI"""
-    col1, col2, col3, col4, col5 = st.columns(5)
-    
-    with col1:
-        total_integrations = len(df_integration)
-        st.metric(
-            label="📥 Total Intégrations", 
-            value=total_integrations,
-            help="Nombre total de personnes intégrées"
-        )
-    
-    with col2:
-        en_cours = len(df_integration[df_integration['Statut'] == 'En cours'])
-        st.metric(
-            label="⏳ En Cours", 
-            value=en_cours,
-            delta=f"{en_cours/total_integrations*100:.1f}%",
-            help="Intégrations en cours de finalisation"
-        )
-    
-    with col3:
-        complet = len(df_integration[df_integration['Statut'] == 'Complet'])
-        st.metric(
-            label="✅ Complet", 
-            value=complet,
-            delta=f"{complet/total_integrations*100:.1f}%",
-            help="Intégrations terminées"
-        )
-    
-    with col4:
-        avg_docs_manquants = df_integration['Docs Manquants'].mean()
-        st.metric(
-            label="📄 Docs Moy/Personne", 
-            value=f"{avg_docs_manquants:.1f}",
-            help="Moyenne de documents manquants par personne"
-        )
-    
-    with col5:
-        total_recrutements = len(df_recrutement) if df_recrutement is not None else 0
-        st.metric(
-            label="🎯 Demandes Recrutement", 
-            value=total_recrutements,
-            help="Total des demandes de recrutement"
-        )
 
 def create_integration_timeline(df):
     """Créer un graphique de timeline des intégrations"""
@@ -127,101 +101,6 @@ def create_affectation_chart(df):
     fig.update_layout(height=400)
     
     return fig
-
-def create_poste_chart(df):
-    """Créer un graphique par poste"""
-    poste_stats = df['Poste'].value_counts().head(8)
-    
-    fig = px.bar(
-        x=poste_stats.values,
-        y=poste_stats.index,
-        orientation='h',
-        title="👥 Répartition par Poste (Top 8)",
-        color=poste_stats.values,
-        color_continuous_scale='viridis'
-    )
-    
-    fig.update_layout(
-        xaxis_title="Nombre de personnes",
-        yaxis_title="Poste",
-        height=400,
-        showlegend=False
-    )
-    
-    return fig
-
-def create_docs_analysis(df):
-    """Analyser les documents manquants"""
-    # Distribution des documents manquants
-    fig1 = px.histogram(
-        df, 
-        x='Docs Manquants',
-        nbins=10,
-        title="📋 Distribution des Documents Manquants",
-        color_discrete_sequence=['#ff9999']
-    )
-    fig1.update_layout(height=350)
-    
-    # Box plot par statut
-    fig2 = px.box(
-        df, 
-        x='Statut', 
-        y='Docs Manquants',
-        title="📊 Documents Manquants par Statut",
-        color='Statut',
-        color_discrete_map={'En cours': '#ff6b6b', 'Complet': '#51cf66'}
-    )
-    fig2.update_layout(height=350)
-    
-    return fig1, fig2
-
-def create_relances_analysis(df):
-    """Analyser les relances"""
-    # Filtrer les données avec des relances
-    df_relances = df[df['Nb Relances'] > 0]
-    
-    if len(df_relances) > 0:
-        fig = px.scatter(
-            df_relances,
-            x='Docs Manquants',
-            y='Nb Relances',
-            size='Docs Manquants',
-            color='Statut',
-            title="🔄 Relation Documents Manquants vs Nombre de Relances",
-            hover_data=['Nom', 'Prénom', 'Poste'],
-            color_discrete_map={'En cours': '#ff6b6b', 'Complet': '#51cf66'}
-        )
-        fig.update_layout(height=400)
-        return fig
-    else:
-        return None
-
-def create_recrutement_analysis(df_recrutement):
-    """Analyser les données de recrutement"""
-    if df_recrutement is None or len(df_recrutement) == 0:
-        return None, None
-    
-    # Statut des demandes
-    statut_counts = df_recrutement['Statut de la demande'].value_counts()
-    fig1 = px.pie(
-        values=statut_counts.values,
-        names=statut_counts.index,
-        title="🎯 Statut des Demandes de Recrutement"
-    )
-    
-    # Top postes demandés
-    poste_counts = df_recrutement['Poste demandé '].value_counts().head(10)
-    fig2 = px.bar(
-        x=poste_counts.values,
-        y=poste_counts.index,
-        orientation='h',
-        title="📝 Top 10 Postes Demandés",
-        color=poste_counts.values,
-        color_continuous_scale='blues'
-    )
-    fig2.update_layout(height=500)
-    
-    return fig1, fig2
 
 def create_recrutements_clotures_tab(df_recrutement):
     """Onglet Recrutements Clôturés (Image 1)"""
@@ -331,38 +210,58 @@ def create_recrutements_clotures_tab(df_recrutement):
             st.plotly_chart(fig_canal, use_container_width=True)
     
     with col4:
-        # Analyse promesses d'embauche vs refus
-        col_promesses = 'Nb de promesses d\'embauche réalisée'
-        col_refus = 'Nb de refus aux promesses d\'embauches'
+        # Analyse candidats présélectionnés
+        col_candidats = 'Nb de candidats pré-selectionnés'
         
-        if col_promesses in df_filtered.columns and col_refus in df_filtered.columns:
-            total_promesses = df_filtered[col_promesses].fillna(0).sum()
-            total_refus = df_filtered[col_refus].fillna(0).sum()
+        if col_candidats in df_filtered.columns:
+            # Créer un graphique en jauge pour les candidats présélectionnés
+            total_candidats = df_filtered[col_candidats].fillna(0).sum()
+            nb_demandes = len(df_filtered)
             
-            # Gauge chart pour promesses vs refus
-            fig_gauge = go.Figure()
-            
-            fig_gauge.add_trace(go.Indicator(
-                mode = "gauge+number+delta",
-                value = total_promesses,
+            fig_candidats = go.Figure(go.Indicator(
+                mode = "gauge+number",
+                value = total_candidats,
+                title = {'text': f"Candidats présélectionnés<br>({nb_demandes} demandes)"},
                 domain = {'x': [0, 1], 'y': [0, 1]},
-                title = {'text': "Promesses réalisées vs refusées"},
-                delta = {'reference': total_refus, 'relative': True},
                 gauge = {
-                    'axis': {'range': [None, max(total_promesses, total_refus) * 1.2]},
-                    'bar': {'color': "darkgreen"},
+                    'axis': {'range': [None, total_candidats * 1.2]},
+                    'bar': {'color': "green"},
                     'steps': [
-                        {'range': [0, total_refus], 'color': "lightgray"},
+                        {'range': [0, total_candidats * 0.5], 'color': "lightgray"},
+                        {'range': [total_candidats * 0.5, total_candidats], 'color': "gray"}
                     ],
-                    'threshold': {
-                        'line': {'color': "red", 'width': 4},
-                        'thickness': 0.75,
-                        'value': total_refus
-                    }
                 }
             ))
-            fig_gauge.update_layout(height=400)
-            st.plotly_chart(fig_gauge, use_container_width=True)
+            fig_candidats.update_layout(height=400)
+            st.plotly_chart(fig_candidats, use_container_width=True)
+
+    # Délai moyen de recrutement (comme dans l'image)
+    st.subheader("⏱️ Délai moyen de recrutement")
+    
+    if 'Date de réception de la demande aprés validation de la DRH' in df_filtered.columns and 'Date d\'entrée effective du candidat' in df_filtered.columns:
+        # Calculer les délais
+        df_filtered['Délai_jours'] = (df_filtered['Date d\'entrée effective du candidat'] - 
+                                     df_filtered['Date de réception de la demande aprés validation de la DRH']).dt.days
+        
+        delai_moyen = df_filtered['Délai_jours'].mean()
+        
+        if not pd.isna(delai_moyen):
+            # Créer un graphique de barre horizontale pour le délai
+            fig_delai = go.Figure(go.Bar(
+                x=[delai_moyen],
+                y=['Délai moyen'],
+                orientation='h',
+                marker_color='#1f77b4',
+                text=[f'{delai_moyen:.0f} jours'],
+                textposition='auto'
+            ))
+            fig_delai.update_layout(
+                title="⏱️ Délai moyen de recrutement",
+                xaxis_title="Jours",
+                height=200,
+                showlegend=False
+            )
+            st.plotly_chart(fig_delai, use_container_width=True)
 
 def create_demandes_recrutement_tab(df_recrutement):
     """Onglet Demandes de Recrutement (Image 2)"""
@@ -390,8 +289,8 @@ def create_demandes_recrutement_tab(df_recrutement):
     # KPI principal - Nombre de demandes (comme dans l'image 2)
     col1, col2, col3 = st.columns([2, 1, 1])
     with col1:
-        st.metric("📊 Nombre de demandes", len(df_filtered), 
-                 help="Nombre total de demandes de recrutement")
+        st.markdown(f"<h1 style='text-align: center; color: #1f77b4; font-size: 4em;'>{len(df_filtered)}</h1>", unsafe_allow_html=True)
+        st.markdown(f"<p style='text-align: center; font-size: 1.2em;'>Nombre de demandes</p>", unsafe_allow_html=True)
     
     # Graphiques principaux
     col1, col2, col3 = st.columns(3)
@@ -446,7 +345,7 @@ def create_demandes_recrutement_tab(df_recrutement):
                 monthly_demandes, 
                 x='Mois_str', 
                 y='Count',
-                title="� Évolution des demandes",
+                title="📈 Évolution des demandes",
                 color='Count',
                 color_continuous_scale='blues'
             )
@@ -487,60 +386,139 @@ def create_demandes_recrutement_tab(df_recrutement):
         st.plotly_chart(fig_poste, use_container_width=True)
 
 def main():
-    st.title("📊 Tableau de Bord RH - Reporting Power BI Style")
+    st.title("📊 Tableau de Bord RH - Style Power BI")
     st.markdown("---")
     
-    # Charger les données
-    df_integration, df_recrutement = load_data()
-    
-    if df_recrutement is None:
-        st.error("Impossible de charger les données de recrutement")
-        return
-    
     # Créer les onglets
-    tab1, tab2, tab3 = st.tabs(["🎯 Recrutements (Clôture)", "📋 Demandes Recrutement", "📊 Intégrations"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📂 Upload Fichiers", "🎯 Recrutements (Clôture)", "📋 Demandes Recrutement", "📊 Intégrations"])
+    
+    # Variables pour stocker les fichiers uploadés
+    uploaded_csv = None
+    uploaded_excel = None
     
     with tab1:
-        create_recrutements_clotures_tab(df_recrutement)
+        st.header("📂 Upload des Fichiers de Données")
+        st.markdown("Uploadez vos fichiers pour mettre à jour les graphiques en temps réel.")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("📄 Fichier CSV - Données d'Intégration")
+            uploaded_csv = st.file_uploader(
+                "Choisir le fichier CSV d'intégration",
+                type=['csv'],
+                help="Fichier contenant les données d'intégration des candidats",
+                key="csv_uploader"
+            )
+            
+            if uploaded_csv is not None:
+                st.success(f"✅ Fichier CSV chargé: {uploaded_csv.name}")
+                # Aperçu des données
+                try:
+                    preview_csv = pd.read_csv(uploaded_csv)
+                    st.write("**Aperçu des données CSV:**")
+                    st.write(f"- Lignes: {len(preview_csv)}")
+                    st.write(f"- Colonnes: {len(preview_csv.columns)}")
+                    st.dataframe(preview_csv.head(3), use_container_width=True)
+                    # Reset file pointer for later use
+                    uploaded_csv.seek(0)
+                except Exception as e:
+                    st.error(f"Erreur lors de la lecture du CSV: {e}")
+        
+        with col2:
+            st.subheader("📊 Fichier Excel - Données de Recrutement")
+            uploaded_excel = st.file_uploader(
+                "Choisir le fichier Excel de recrutement",
+                type=['xlsx', 'xls'],
+                help="Fichier Excel contenant les données de recrutement",
+                key="excel_uploader"
+            )
+            
+            if uploaded_excel is not None:
+                st.success(f"✅ Fichier Excel chargé: {uploaded_excel.name}")
+                # Aperçu des données
+                try:
+                    preview_excel = pd.read_excel(uploaded_excel, sheet_name=0)
+                    st.write("**Aperçu des données Excel:**")
+                    st.write(f"- Lignes: {len(preview_excel)}")
+                    st.write(f"- Colonnes: {len(preview_excel.columns)}")
+                    st.dataframe(preview_excel.head(3), use_container_width=True)
+                    # Reset file pointer for later use
+                    uploaded_excel.seek(0)
+                except Exception as e:
+                    st.error(f"Erreur lors de la lecture de l'Excel: {e}")
+        
+        # Bouton pour actualiser les données
+        if st.button("🔄 Actualiser les Graphiques", type="primary"):
+            st.session_state.data_updated = True
+            st.success("Données mises à jour ! Consultez les autres onglets.")
+    
+    # Charger les données (avec fichiers uploadés ou fichiers locaux)
+    df_integration, df_recrutement = load_data_from_files(uploaded_csv, uploaded_excel)
+    
+    # Message d'information sur les données chargées
+    if df_recrutement is None and df_integration is None:
+        st.sidebar.warning("⚠️ Aucune donnée disponible. Veuillez uploader vos fichiers dans l'onglet 'Upload Fichiers'.")
+    elif df_recrutement is None:
+        st.sidebar.warning("⚠️ Données de recrutement non disponibles. Seules les données d'intégration sont chargées.")
+    elif df_integration is None:
+        st.sidebar.warning("⚠️ Données d'intégration non disponibles. Seules les données de recrutement sont chargées.")
+    else:
+        st.sidebar.success("✅ Toutes les données sont chargées avec succès !")
     
     with tab2:
-        create_demandes_recrutement_tab(df_recrutement)
+        if df_recrutement is not None:
+            create_recrutements_clotures_tab(df_recrutement)
+        else:
+            st.warning("📊 Aucune donnée de recrutement disponible. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
     
     with tab3:
+        if df_recrutement is not None:
+            create_demandes_recrutement_tab(df_recrutement)
+        else:
+            st.warning("📋 Aucune donnée de recrutement disponible. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
+    
+    with tab4:
         # Onglet pour les données d'intégration (données CSV)
         if df_integration is not None:
-            st.header("� Suivi des Intégrations")
+            st.header("📊 Suivi des Intégrations")
             
             # KPIs d'intégration
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.metric("👥 Total Intégrations", len(df_integration))
             with col2:
-                en_cours = len(df_integration[df_integration['Statut'] == 'En cours'])
+                en_cours = len(df_integration[df_integration['Statut'] == 'En cours']) if 'Statut' in df_integration.columns else 0
                 st.metric("⏳ En Cours", en_cours)
             with col3:
-                complet = len(df_integration[df_integration['Statut'] == 'Complet'])
+                complet = len(df_integration[df_integration['Statut'] == 'Complet']) if 'Statut' in df_integration.columns else 0
                 st.metric("✅ Complet", complet)
             with col4:
-                avg_docs = df_integration['Docs Manquants'].mean()
+                avg_docs = df_integration['Docs Manquants'].mean() if 'Docs Manquants' in df_integration.columns else 0
                 st.metric("📄 Docs Moy/Personne", f"{avg_docs:.1f}")
             
             # Graphiques d'intégration
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                timeline_fig = create_integration_timeline(df_integration)
-                st.plotly_chart(timeline_fig, use_container_width=True)
-            
-            with col2:
-                affectation_fig = create_affectation_chart(df_integration)
-                st.plotly_chart(affectation_fig, use_container_width=True)
+            if 'Date Intégration' in df_integration.columns and 'Statut' in df_integration.columns:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    timeline_fig = create_integration_timeline(df_integration)
+                    st.plotly_chart(timeline_fig, use_container_width=True)
+                
+                with col2:
+                    if 'Affectation' in df_integration.columns:
+                        affectation_fig = create_affectation_chart(df_integration)
+                        st.plotly_chart(affectation_fig, use_container_width=True)
+                    else:
+                        st.info("Colonne 'Affectation' non trouvée dans les données")
+            else:
+                st.info("Colonnes requises non trouvées pour les graphiques (Date Intégration, Statut)")
             
             # Tableau de données
             st.subheader("📊 Données Détaillées - Intégrations")
             st.dataframe(df_integration, use_container_width=True)
         else:
-            st.error("Données d'intégration non disponibles")
+            st.warning("📊 Aucune donnée d'intégration disponible. Veuillez uploader un fichier CSV dans l'onglet 'Upload Fichiers'.")
 
 if __name__ == "__main__":
     main()
