@@ -1340,19 +1340,9 @@ with tab3:
 
 with tab4:
 
+
     # Récupération des statistiques (pré-chargement à l'ouverture de l'onglet)
-    # On stocke dans session_state pour que l'UI affiche toujours une valeur même sans nouvel enregistrement
-    if 'feedback_stats' not in st.session_state or st.session_state.get('feedback_stats') is None:
-        st.session_state.feedback_stats = get_feedback_summary()
-
-    # Bouton pour forcer le rafraîchissement depuis Google Sheets
-    col_refresh, _ = st.columns([1, 10])
-    with col_refresh:
-        if st.button('🔁 Rafraîchir les statistiques'):
-            # Recharger depuis la source (get_feedback_summary tentera Google Sheets si nécessaire)
-            st.session_state.feedback_stats = get_feedback_summary()
-
-    feedback_stats = st.session_state.feedback_stats
+    feedback_stats = get_feedback_summary()
 
     if len(feedback_stats) > 0:
         # Métriques principales
