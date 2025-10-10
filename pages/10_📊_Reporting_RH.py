@@ -55,6 +55,16 @@ def load_data_from_files(csv_file=None, excel_file=None):
             
             # Nettoyer les colonnes avec des espaces
             df_recrutement.columns = df_recrutement.columns.str.strip()
+
+            # Vérification basique des colonnes critiques et message dans les logs
+            required_cols = [
+                'Statut de la demande', 'Poste demandé', 'Direction concernée',
+                'Entité demandeuse', 'Modalité de recrutement', "Canal de publication de l'offre"
+            ]
+            missing = [c for c in required_cols if c not in df_recrutement.columns]
+            if missing:
+                # Log via st.warning but don't raise — keep app running
+                st.warning(f"Colonnes attendues manquantes dans le fichier de recrutement: {missing}")
         
         return df_integration, df_recrutement
         
@@ -165,7 +175,7 @@ def create_recrutements_clotures_tab(df_recrutement):
                 y='Count',
                 title="📈 Évolution des recrutements",
                 color='Count',
-                color_continuous_scale='blues'
+                color_continuous_scale='Blues'
             )
             fig_evolution.update_layout(height=400, showlegend=False)
             st.plotly_chart(fig_evolution, use_container_width=True)
@@ -323,16 +333,23 @@ def create_demandes_recrutement_tab(df_recrutement):
         if 'Raison du recrutement' in df_filtered.columns:
             raison_counts = df_filtered['Raison du recrutement'].value_counts()
             
-            fig_raison = px.bar(
-                x=raison_counts.values,
-                y=raison_counts.index,
-                orientation='h',
-                title="🔄 Comparaison par raison du recrutement",
-                color=raison_counts.values,
-                color_continuous_scale='grays'
-            )
-            fig_raison.update_layout(height=400, showlegend=False)
-            st.plotly_chart(fig_raison, use_container_width=True)
+            try:
+                fig_raison = px.bar(
+                    x=raison_counts.values,
+                    y=raison_counts.index,
+                    orientation='h',
+                    title="🔄 Comparaison par raison du recrutement",
+                    color=raison_counts.values,
+                    color_continuous_scale='Greys'
+                )
+                fig_raison.update_layout(height=400, showlegend=False)
+            except Exception as e:
+                st.error(f"Erreur lors de la création du graphique des raisons: {e}")
+                fig_raison = None
+            if fig_raison is not None:
+                st.plotly_chart(fig_raison, use_container_width=True)
+            else:
+                st.info("Graphique 'Raison du recrutement' indisponible pour ces données.")
     
     with col3:
         # Évolution des demandes par mois (bar chart comme dans l'image 2)
@@ -347,10 +364,13 @@ def create_demandes_recrutement_tab(df_recrutement):
                 y='Count',
                 title="📈 Évolution des demandes",
                 color='Count',
-                color_continuous_scale='blues'
+                color_continuous_scale='Blues'
             )
             fig_evolution_demandes.update_layout(height=400, showlegend=False)
-            st.plotly_chart(fig_evolution_demandes, use_container_width=True)
+            try:
+                st.plotly_chart(fig_evolution_demandes, use_container_width=True)
+            except Exception as e:
+                st.error(f"Erreur lors de l'affichage du graphique d'évolution des demandes: {e}")
     
     # Deuxième ligne de graphiques
     col4, col5 = st.columns(2)
@@ -365,10 +385,13 @@ def create_demandes_recrutement_tab(df_recrutement):
             orientation='h',
             title="🏢 Comparaison par direction",
             color=direction_counts.values,
-            color_continuous_scale='oranges'
+            color_continuous_scale='Oranges'
         )
         fig_direction.update_layout(height=500, showlegend=False)
-        st.plotly_chart(fig_direction, use_container_width=True)
+        try:
+            st.plotly_chart(fig_direction, use_container_width=True)
+        except Exception as e:
+            st.error(f"Erreur lors de l'affichage du graphique par direction: {e}")
     
     with col5:
         # Comparaison par poste (bar horizontal comme dans l'image 2)
@@ -380,10 +403,13 @@ def create_demandes_recrutement_tab(df_recrutement):
             orientation='h',
             title="👥 Comparaison par poste",
             color=poste_counts.values,
-            color_continuous_scale='greens'
+            color_continuous_scale='Greens'
         )
         fig_poste.update_layout(height=500, showlegend=False)
-        st.plotly_chart(fig_poste, use_container_width=True)
+        try:
+            st.plotly_chart(fig_poste, use_container_width=True)
+        except Exception as e:
+            st.error(f"Erreur lors de l'affichage du graphique par poste: {e}")
 
 def main():
     st.title("📊 Tableau de Bord RH - Style Power BI")
@@ -393,8 +419,15 @@ def main():
     tab1, tab2, tab3, tab4 = st.tabs(["📂 Upload Fichiers", "🎯 Recrutements (Clôture)", "📋 Demandes Recrutement", "📊 Intégrations"])
     
     # Variables pour stocker les fichiers uploadés
-    uploaded_csv = None
-    uploaded_excel = None
+    # Use session_state to persist upload/refresh state
+    if 'data_updated' not in st.session_state:
+        st.session_state.data_updated = False
+    if 'uploaded_csv' not in st.session_state:
+        st.session_state.uploaded_csv = None
+    if 'uploaded_excel' not in st.session_state:
+        st.session_state.uploaded_excel = None
+    uploaded_csv = st.session_state.uploaded_csv
+    uploaded_excel = st.session_state.uploaded_excel
     
     with tab1:
         st.header("📂 Upload des Fichiers de Données")
@@ -422,6 +455,7 @@ def main():
                     st.dataframe(preview_csv.head(3), use_container_width=True)
                     # Reset file pointer for later use
                     uploaded_csv.seek(0)
+                    st.session_state.uploaded_csv = uploaded_csv
                 except Exception as e:
                     st.error(f"Erreur lors de la lecture du CSV: {e}")
         
@@ -445,6 +479,7 @@ def main():
                     st.dataframe(preview_excel.head(3), use_container_width=True)
                     # Reset file pointer for later use
                     uploaded_excel.seek(0)
+                    st.session_state.uploaded_excel = uploaded_excel
                 except Exception as e:
                     st.error(f"Erreur lors de la lecture de l'Excel: {e}")
         
@@ -457,6 +492,8 @@ def main():
     df_integration, df_recrutement = load_data_from_files(uploaded_csv, uploaded_excel)
     
     # Message d'information sur les données chargées
+    # Only show a success if the user uploaded files or explicitly refreshed
+    has_uploaded = (st.session_state.uploaded_csv is not None) or (st.session_state.uploaded_excel is not None)
     if df_recrutement is None and df_integration is None:
         st.sidebar.warning("⚠️ Aucune donnée disponible. Veuillez uploader vos fichiers dans l'onglet 'Upload Fichiers'.")
     elif df_recrutement is None:
@@ -464,7 +501,10 @@ def main():
     elif df_integration is None:
         st.sidebar.warning("⚠️ Données d'intégration non disponibles. Seules les données de recrutement sont chargées.")
     else:
-        st.sidebar.success("✅ Toutes les données sont chargées avec succès !")
+        if has_uploaded or st.session_state.data_updated:
+            st.sidebar.success("✅ Toutes les données sont chargées avec succès !")
+        else:
+            st.sidebar.info("ℹ️ Données chargées depuis les fichiers locaux de l'application. Uploadez vos fichiers pour remplacer ces données.")
     
     with tab2:
         if df_recrutement is not None:
