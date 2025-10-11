@@ -411,14 +411,23 @@ def generate_xray_query(site_cible: str, poste: str, mots_cles: str, localisatio
     # Use site:linkedin.com (wider) so queries that target CVs with phrases like "télécharger mon CV"
     # can match documents hosted on linkedin.com (some users publish PDFs on linkedin.com or personal pages).
     site_map = {"LinkedIn": "site:linkedin.com", "GitHub": "site:github.com", "Web": ""}
-    site = site_map.get(site_cible, "site:linkedin.com")
     parts = []
-    # If user explicitly selected LinkedIn, always include the site constraint.
-    if site_cible == 'LinkedIn' and site:
-        parts.append(site)
-    elif site_cible != 'LinkedIn' and site:
-        # For GitHub include the site constraint; for Web (empty) do not.
-        parts.append(site)
+    
+    # Detect the contradictory case (LinkedIn + PDF) but store it for later warning
+    linkedin_pdf_conflict = (site_cible == 'LinkedIn' and file_type and file_type.strip().lower() == 'pdf')
+    
+    # Only append site constraint if not the contradictory case, or if using GitHub
+    site = site_map.get(site_cible, "site:linkedin.com")
+    if not linkedin_pdf_conflict:
+        if site:  # For Web (empty string) we don't add anything
+            parts.append(site)
+    
+    # For LinkedIn + PDF searches (CV searches) where contradiction exists,
+    # add special indicators for CV content instead of site constraint
+    if linkedin_pdf_conflict:
+        # These phrases help find actual CVs, not job postings
+        cv_indicators = ['intitle:cv', '"curriculum vitae"']
+        parts.append(f"({' OR '.join(cv_indicators)})")
     if poste:
         parts.append(f'"{poste}"')
     kws = _split_terms(mots_cles)
@@ -440,11 +449,12 @@ def generate_xray_query(site_cible: str, poste: str, mots_cles: str, localisatio
         if file_type and file_type != "aucun":
             parts.append(f"filetype:{file_type}")
 
-            # If we're searching for PDFs without a site constraint, add common exclusions
+            # If we're searching for PDFs, add common exclusions to reduce job posting noise
             # to reduce job-ad noise when looking for CVs/PDF resumes.
-            if file_type == 'pdf' and (not parts or not parts[0].startswith('site:')):
+            if file_type == 'pdf':
                 parts.append('-intitle:"offre"')
                 parts.append('-inurl:"emploi"')
+                parts.append('-stage')
 
     return ' '.join(parts)
 
@@ -1453,8 +1463,15 @@ with tab2:
             }
             # Inform user if they asked for LinkedIn + filetype:pdf (contradiction)
             if file_type and file_type.strip().lower() == 'pdf' and site_cible == 'LinkedIn':
-                st.info("Vous avez demandé des PDF et LinkedIn. Les profils LinkedIn ne sont pas des PDF.\n" \
-                        "L'application a donc omis la contrainte site:linkedin.com/in et ajouté des exclusions utiles (ex: -intitle:\"offre\", -inurl:\"emploi\").")
+                st.warning("""⚠️ **Attention**: Vous avez demandé des PDF sur LinkedIn. Cette combinaison donne généralement 0 résultat.
+                
+Les pages LinkedIn sont des pages web (HTML), pas des PDF. Une requête avec `site:linkedin.com` et `filetype:pdf` est contradictoire.
+
+L'application a donc:
+- Remplacé la contrainte `site:linkedin.com` par des indicateurs de CV (`intitle:cv OR "curriculum vitae"`)
+- Ajouté `filetype:pdf` et des exclusions utiles (`-offre`, `-emploi`, `-stage`)
+
+Cette requête trouve des CV PDF sur le web entier, pas seulement sur LinkedIn.""")
             total_time = time.time() - start_time
             st.success(f"✅ Requête X-Ray générée en {total_time:.1f}s")
 
