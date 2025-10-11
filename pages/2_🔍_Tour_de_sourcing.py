@@ -2265,7 +2265,8 @@ with tab6:
 
         mode_rapide_magicien = st.checkbox("⚡ Réponse concise", key="magicien_fast", value=True)
 
-    gen_submitted = st.form_submit_button("✨ Poser la question à l'IA", type="primary", use_container_width=True, key="ask_magicien")
+        # Submit button must be inside the form
+        gen_submitted = st.form_submit_button("✨ Poser la question à l'IA", type="primary", use_container_width=True, key="ask_magicien")
 
     # Traitement après soumission du formulaire (exécuté sans provoquer un changement d'onglet)
     if gen_submitted:
