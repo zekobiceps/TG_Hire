@@ -831,43 +831,264 @@ def deepseek_generate(prompt, max_tokens=2000, temperature=0.7):
 # -------------------- Exemples contextuels --------------------
 def get_example_for_field(section_title, field_title):
     """Retourne un exemple contextuel pour un champ donné, adapté au BTP."""
-    examples = {
+    # Pour chaque champ nous construisons une petite banque d'exemples
+    # et retournons jusqu'à 10 exemples aléatoires (séparés par une ligne).
+    import random
+
+    base_examples = {
         "Contexte du poste": {
-            "Raison de l'ouverture": "Remplacement d’un départ en retraite sur un chantier majeur",
-            "Impact stratégique": "Assurer la gestion des projets BTP stratégiques de l’entreprise",
-            "Tâches principales": "Gestion de chantier complexe, coordination d’équipe sur site, suivi des normes de sécurité BTP",
+            "Raison de l'ouverture": [
+                "Remplacement d’un départ en retraite sur un chantier majeur",
+                "Ouverture d’un nouveau site suite à un gain d’appel d’offres",
+                "Renforcement temporaire pour pic d’activité saisonnier",
+                "Création d’un poste pour piloter un projet de rénovation urbaine",
+                "Remplacement d’un congé maternité pour 12 mois",
+                "Augmentation de l’équipe suite extension du périmètre travaux",
+                "Remplacement d’un collaborateur promu sur un autre site",
+                "Besoin de compétences spécifiques pour un chantier industriel",
+                "Remplacement suite à un départ imprévu (démission)",
+                "Poste créé pour améliorer le pilotage sécurité chantier"
+            ],
+            "Impact stratégique": [
+                "Assurer la gestion des projets BTP stratégiques de l’entreprise",
+                "Réduire les retards de livraison sur les chantiers clés",
+                "Améliorer la conformité sécurité et réduire les incidents",
+                "Optimiser les coûts de sous-traitance et ressources internes",
+                "Renforcer la capacité de pilotage de projets multi-sites",
+                "Accélérer la mise en service d’un projet d’infrastructure critique",
+                "Permettre la montée en compétence d’une équipe locale",
+                "Soutenir la stratégie de croissance sur le segment infrastructures",
+                "Garantir la qualité technique sur des lots sensibles",
+                "Contribuer à l’obtention d’une certification qualité environnementale"
+            ],
+            "Tâches principales": [
+                "Gestion de chantier complexe, coordination d’équipe sur site, suivi des normes de sécurité BTP",
+                "Planification des phases travaux et coordination des sous-traitants",
+                "Suivi budgétaire et reporting hebdomadaire au manager de projet",
+                "Contrôle qualité des ouvrages et respect des cahiers des charges",
+                "Animation des réunions de chantier et gestion des aléas",
+                "Pilotage des livrables techniques et validation des plans",
+                "Supervision sécurité et application des procédures HSE",
+                "Gestion des commandes matérielles et approvisionnement",
+                "Rédaction des comptes-rendus et reporting client",
+                "Coordination interface entre bureaux d’études et équipes opérationnelles"
+            ]
         },
         "Must-have (Indispensables)": {
-            "Expérience": "5 ans d’expérience dans le secteur BTP sur des chantiers similaires",
-            "Connaissances / Diplômes / Certifications": "Diplôme en génie civil, certification CACES pour engins de chantier",
-            "Compétences / Outils": "Maîtrise d'AutoCAD et de la gestion de projet BTP",
-            "Soft skills / aptitudes comportementales": "Leadership sur terrain et rigueur en sécurité",
+            "Expérience": [
+                "5 ans d’expérience dans le secteur BTP sur des chantiers similaires",
+                "3 à 7 ans dans la gestion de chantiers industriels",
+                "Expérience significative en pilotage de projets en extension",
+                "Antécédents sur chantiers d’infrastructures et grands projets",
+                "Expérience en coordination multi-stakeholders",
+                "Preuve de livraison de projets respectant délais et budget",
+                "Expérience en management d’équipes de 10+ personnes",
+                "Historique de management de sous-traitants",
+                "Expérience en conduite de travaux et lecture de plans techniques",
+                "Expérience en suivi de travaux HSE et conformité"
+            ],
+            "Connaissances / Diplômes / Certifications": [
+                "Diplôme en génie civil, certification CACES pour engins de chantier",
+                "BTS/DUT ou licence en BTP ou génie civil",
+                "Certifications sécurité chantiers (HSE) requises",
+                "Formation en conduite de travaux confirmée",
+                "Certification en management de projets (Prince2/PMI) appréciée",
+                "Attestation CACES pour engins de terrassement",
+                "Formation en réglementation du bâtiment (Code du travail)",
+                "Diplôme d’ingénieur spécialisé BTP souhaitable",
+                "Certificat en gestion financière de projet",
+                "Qualification professionnelle reconnue dans le secteur"
+            ],
+            "Compétences / Outils": [
+                "Maîtrise d'AutoCAD et de la gestion de projet BTP",
+                "Bon niveau sur MS Project / Gantt / planning chantier",
+                "Capacité à lire et interpréter plans d’exécution",
+                "Connaissance des process achats et commandes chantier",
+                "Expérience avec outils de suivi HSE et sécurité",
+                "Compétences en estimation et chiffrage des lots",
+                "Maîtrise d’outils collaboratifs (Teams, Sharepoint)",
+                "Capacité à piloter sous-traitance et relation fournisseurs",
+                "Maîtrise de la gestion documentaire chantier",
+                "Savoir-faire en coordination technique multi-lots"
+            ],
+            "Soft skills / aptitudes comportementales": [
+                "Leadership sur terrain et rigueur en sécurité",
+                "Capacité à gérer le stress et les priorités",
+                "Communication claire avec équipes et clients",
+                "Orientation résultats et sens du service",
+                "Esprit d’équipe et mentorat des juniors",
+                "Autonomie et prise d’initiative sur site",
+                "Rigueur administrative et reporting régulier",
+                "Adaptabilité face aux imprévus chantier",
+                "Sens de l’organisation et gestion du temps",
+                "Capacité décisionnelle lors d’aléas techniques"
+            ]
         },
         "Nice-to-have (Atouts)": {
-            "Expérience additionnelle": "Projets internationaux de BTP ou multi-sites",
-            "Diplômes / Certifications valorisantes": "Certification LEED pour le BTP durable",
-            "Compétences complémentaires": "Connaissance en BIM pour modélisation de chantiers",
+            "Expérience additionnelle": [
+                "Projets internationaux de BTP ou multi-sites",
+                "Expérience en chantiers en zone urbaine dense",
+                "Participation à projets de renovation patrimoniale",
+                "Expérience sur projets d’énergie ou infrastructures",
+                "Gestion de projet écologique / chantier bas-carbone",
+                "Projets en BIM / modélisation numérique",
+                "Expérience en marchés publics et appels d’offres",
+                "Connaissance projets PPP ou financement privé-public",
+                "Travail sur sites industriels sensibles",
+                "Coordination multi-pays / équipes internationales"
+            ],
+            "Diplômes / Certifications valorisantes": [
+                "Certification LEED pour le BTP durable",
+                "Formation complémentaire en BIM ou numérique",
+                "Certificat en management QSE",
+                "Titre d’ingénieur spécialisé en structures",
+                "Certification management de projet avancé",
+                "Formation en coordination sécurité avancée",
+                "Attestation en gestion des risques environnementaux",
+                "Diplôme complémentaire en économique de la construction",
+                "Certification en gestion contractuelle",
+                "Qualification en conduite d’équipes pluridisciplinaires"
+            ],
+            "Compétences complémentaires": [
+                "Connaissance en BIM pour modélisation de chantiers",
+                "Compétences en estimation coûts et optimisation",
+                "Maîtrise des normes environnementales BTP",
+                "Expérience en digitalisation des processus chantier",
+                "Savoir utiliser les logiciels de simulation chantier",
+                "Capacité à conduire audits qualité",
+                "Connaissance en supervision d’essais matériaux",
+                "Compétences en relation client et contrats",
+                "Idées innovantes pour réduction des coûts",
+                "Expérience en lean construction"
+            ]
         },
         "Conditions et contraintes": {
-            "Localisation": "Chantier principal à Paris avec 20% de télétravail",
-            "Budget recrutement": "Salaire entre 40k et 50k€ + primes",
+            "Localisation": [
+                "Chantier principal à Paris avec 20% de télétravail",
+                "Poste basé sur site (déplacements fréquents inter-chantiers)",
+                "Localisation régionale avec hébergement temporaire possible",
+                "Travail principalement sur site, quelques réunions au siège",
+                "Déplacements nationaux ponctuels prévus",
+                "Mission sur zone industrielle avec contraintes horaires",
+                "Présence requise sur site dès 7h30 certains jours",
+                "Site éloigné avec voiture de service fournie",
+                "Mission avec rotation entre 2 chantiers principaux",
+                "Localisation multi-sites selon planning trimestriel"
+            ],
+            "Budget recrutement": [
+                "Salaire entre 40k et 50k€ + primes",
+                "Rémunération selon profil + 13ème mois possible",
+                "Package mobilité et prime d’expatriation selon cas",
+                "Budget fixe avec fourchette 38k-45k€",
+                "Salaire compétitif sur marché local",
+                "Contrat CDI avec prime d’objectif annuelle",
+                "Rémunération négociable selon expérience",
+                "Forfait jour ou heures selon convention collective",
+                "Avantages en nature (véhicule, téléphone) inclus",
+                "Indemnités de chantier et panier repas prévues"
+            ]
         },
         "Sourcing et marché": {
-            "Entreprises où trouver ce profil": "Vinci, Bouygues, Eiffage",
-            "Synonymes / intitulés proches": "Conducteur de Travaux, Ingénieur Chantier",
-            "Canaux à utiliser": "LinkedIn pour profils BTP, jobboards comme Batiweb",
+            "Entreprises où trouver ce profil": [
+                "Vinci, Bouygues, Eiffage",
+                "Entreprises locales de construction spécialisées",
+                "Sous-traitants de réseaux et TP",
+                "Sociétés d’ingénierie structurelle",
+                "PME régionales actives sur grands chantiers",
+                "Groupes internationaux de BTP présents en France",
+                "Prestataires de maintenance industrielle",
+                "Ateliers de préfabrication et modélisation BIM",
+                "Intégrateurs de solutions chantiers connectés",
+                "Entreprises spécialisées en infrastructures routières"
+            ],
+            "Synonymes / intitulés proches": [
+                "Conducteur de Travaux, Ingénieur Chantier",
+                "Chef de chantier, Responsable travaux",
+                "Coordinateur de réalisation, Pilotage de travaux",
+                "Chef de projet chantier junior/senior",
+                "Responsable de lot, Chargé d’affaires technique",
+                "Ingénieur d’exécution, Superviseur terrain",
+                "Coordinateur HSE chantier",
+                "Responsable études d’exécution",
+                "Chef de groupe travaux",
+                "Gestionnaire opérations chantier"
+            ],
+            "Canaux à utiliser": [
+                "LinkedIn pour profils BTP, jobboards comme Batiweb",
+                "Candidatures via réseaux professionnels et salons",
+                "Approche directe (chasse) sur LinkedIn",
+                "Partenariat écoles d’ingénieurs locales",
+                "Diffusion sur jobboards spécialisés BTP",
+                "Utiliser CVthèques et viviers internes",
+                "Annonces sur journaux sectoriels",
+                "Groupes professionnels et forums métiers",
+                "Recommandations internes (employee referral)",
+                "Chasse via cabinets spécialisés" 
+            ]
         },
         "Profils pertinents": {
-            "Lien profil 1": "https://linkedin.com/in/exemple-btp",
-            "Lien profil 2": "https://linkedin.com/in/exemple-btp-2",
-            "Lien profil 3": "https://linkedin.com/in/exemple-btp-3",
+            "Lien profil 1": [
+                "https://linkedin.com/in/exemple-btp",
+                "https://linkedin.com/in/exemple-btp-2",
+                "https://linkedin.com/in/exemple-btp-3"
+            ],
+            "Lien profil 2": [
+                "https://linkedin.com/in/exemple-btp-4",
+                "https://linkedin.com/in/exemple-btp-5",
+                "https://linkedin.com/in/exemple-btp-6"
+            ],
+            "Lien profil 3": [
+                "https://linkedin.com/in/exemple-btp-7",
+                "https://linkedin.com/in/exemple-btp-8",
+                "https://linkedin.com/in/exemple-btp-9"
+            ]
         },
         "Notes libres": {
-            "Points à discuter ou à clarifier avec le manager": "Clarifier les délais du projet",
-            "Case libre": "Note sur les priorités du chantier",
+            "Points à discuter ou à clarifier avec le manager": [
+                "Clarifier les délais du projet",
+                "Valider la disponibilité des ressources internes",
+                "Préciser le périmètre exact des responsabilités",
+                "Discuter des contraintes HSE spécifiques",
+                "Valider la plage budgétaire disponible",
+                "S’assurer des conditions d’accès site et sécurité",
+                "Préciser la durée estimée du chantier",
+                "Vérifier les interfaces avec autres prestataires",
+                "Confirmer les priorités clients sur les lots",
+                "Demander les éléments manquants du dossier technique"
+            ],
+            "Case libre": [
+                "Note sur les priorités du chantier",
+                "Remarques générales à partager avec l’équipe",
+                "Points de vigilance pour la phase d’études",
+                "Idées d’amélioration du processus recrutement",
+                "Observations terrain reportées par le manager",
+                "Notes administratives et contacts clés",
+                "Résumés d’échanges avec client/maître d’ouvrage",
+                "Consignes particulières pour les habilitations",
+                "Informations utiles pour la prise de poste",
+                "Bref historique du projet et enjeux"
+            ]
         }
     }
-    return examples.get(section_title, {}).get(field_title, "Exemple non disponible")
+
+    pool = base_examples.get(section_title, {}).get(field_title)
+    if not pool:
+        # fallback simple
+        return "Exemple non disponible"
+
+    # Si l'élément du pool est une liste d'URL (liens), retourner jusqu'à 10 liens
+    if isinstance(pool, list):
+        n = min(10, len(pool))
+        # si le pool a moins de 10 éléments, on répète des variantes aléatoires
+        if len(pool) < 10:
+            # duplicate with minor index suffix
+            chosen = [random.choice(pool) for _ in range(n)]
+        else:
+            chosen = random.sample(pool, n)
+        # Formatage : bullet list
+        return "\n".join([f"- {s}" for s in chosen])
+
+    return str(pool)
 
 # -------------------- Génération de nom de brief automatique --------------------
 def generate_automatic_brief_name(poste: str = None, manager: str = None, date_obj=None):
@@ -944,6 +1165,24 @@ def export_brief_pdf_pretty(brief_name: str, brief_data: dict, ksa_df):
         for seg in str(txt).split("\n"):
             c.drawString(margin_x, y, seg[:max_len])
             y -= leading
+
+    # Dessiner le logo TGCC centré en haut si disponible
+    possible_logo_paths = [
+        os.path.join(os.path.dirname(__file__), '..', 'tgcc.png'),
+        os.path.join(os.getcwd(), 'tgcc.png'),
+        os.path.join(os.path.dirname(__file__), 'tgcc.png')
+    ]
+    logo_path = next((p for p in possible_logo_paths if os.path.exists(p)), None)
+    if logo_path:
+        try:
+            logo_w = 40 * mm
+            x = (W - logo_w) / 2
+            c.drawImage(logo_path, x, H - 20 * mm, width=logo_w, preserveAspectRatio=True, mask='auto')
+            y = H - 35 * mm
+        except Exception:
+            y = H - 25 * mm
+    else:
+        y = H - 25 * mm
 
     line(f"Brief: {brief_name}", size=14, leading=18, bold=True)
     line(f"Poste: {brief_data.get('POSTE_INTITULE', brief_data.get('poste_intitule',''))}", bold=True)

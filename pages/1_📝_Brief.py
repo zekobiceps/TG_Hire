@@ -77,13 +77,21 @@ def generate_custom_pdf(brief_name:str, data:dict, ksa:pd.DataFrame|None)->Bytes
         c = canvas.Canvas(buffer, pagesize=A4)
         w,h = A4
         y = h-40
-        logo_path = os.path.join(os.path.dirname(__file__), '..', 'tgcc.png')
-        if os.path.exists(logo_path):
+        # Recherche robuste du logo et centrage
+        possible_paths = [
+            os.path.join(os.path.dirname(__file__), '..', 'tgcc.png'),
+            os.path.join(os.path.dirname(__file__), '..', 'static', 'tgcc.png'),
+            os.path.join(os.getcwd(), 'tgcc.png')
+        ]
+        logo_path = next((p for p in possible_paths if os.path.exists(p)), None)
+        if logo_path:
             try:
-                c.drawImage(logo_path,40,y-30,width=140,preserveAspectRatio=True,mask='auto')
+                logo_width = 140
+                x_center = (w - logo_width) / 2
+                c.drawImage(logo_path, x_center, y-30, width=logo_width, preserveAspectRatio=True, mask='auto')
             except Exception:
                 pass
-        c.setFont('Helvetica-Bold',18); c.drawString(210,y-10,f"Brief - {brief_name}")
+        c.setFont('Helvetica-Bold',18); c.drawString(40,y-10,f"Brief - {brief_name}")
         meta = [
             f"Poste : {data.get('POSTE_INTITULE') or data.get('poste_intitule','')}",
             f"Manager : {data.get('MANAGER_NOM') or data.get('manager_nom','')}",
@@ -381,13 +389,18 @@ def delete_current_brief():
             
             st.success(f"✅ Brief '{brief_name}' supprimé avec succès")
             st.session_state.brief_phase = "📁 Gestion"
+            # Met à jour la liste des briefs et les statistiques
+            try:
+                refresh_saved_briefs()
+            except Exception:
+                pass
             st.rerun()
 
 # ---------------- INIT ----------------
 init_session_state()
 st.set_page_config(
     page_title="Brief de Calibration",
-    page_icon="🤖",
+    page_icon=None,
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -512,7 +525,7 @@ with st.sidebar:
         test_deepseek_connection()
 
 # ---------------- NAVIGATION PRINCIPALE ----------------
-st.title("🤖 Brief de Calibration")
+st.title("Brief de Calibration")
 
 # Define tabs before using them
 tabs = st.tabs([
@@ -1129,7 +1142,7 @@ with tabs[3]:
     elif not st.session_state.reunion_completed:
         st.warning("Complétez la réunion avant la synthèse.")
     else:
-        st.subheader(f"📝 Synthèse - {st.session_state.current_brief_name}")
+        st.subheader(f"Synthèse - {st.session_state.current_brief_name}")
         bd = load_briefs().get(st.session_state.current_brief_name, {})
         st.write(f"- **Poste :** {bd.get('POSTE_INTITULE') or bd.get('poste_intitule','')}")
         st.write(f"- **Manager :** {bd.get('MANAGER_NOM') or bd.get('manager_nom','')}")
@@ -1172,19 +1185,34 @@ with tabs[3]:
         col_act, col_exp = st.columns(2)
         with col_act:
             st.markdown("#### Actions")
-            if st.button("💾 Sauvegarder synthèse", type="primary", key="btn_save_synthese"):
-                save_briefs(); save_brief_to_gsheet(st.session_state.current_brief_name, bd); st.success("Synthèse sauvegardée.")
-            if st.button("🗑️ Supprimer le brief", key="btn_delete_synthese"):
-                st.session_state.saved_briefs.pop(st.session_state.current_brief_name, None); save_briefs(); st.session_state.current_brief_name = ""; st.success("Brief supprimé."); st.rerun()
+            a1, a2 = st.columns([1,1])
+            with a1:
+                if st.button("💾 Sauvegarder synthèse", type="primary", key="btn_save_synthese", use_container_width=True):
+                    save_briefs(); save_brief_to_gsheet(st.session_state.current_brief_name, bd); st.success("Synthèse sauvegardée.")
+            with a2:
+                if st.button("🗑️ Supprimer le brief", key="btn_delete_synthese", use_container_width=True):
+                    st.session_state.saved_briefs.pop(st.session_state.current_brief_name, None)
+                    save_briefs()
+                    # Mettre à jour les stats
+                    try:
+                        refresh_saved_briefs()
+                    except Exception:
+                        pass
+                    st.session_state.current_brief_name = ""
+                    st.success("Brief supprimé.")
+                    st.rerun()
         with col_exp:
             st.markdown("#### Export")
+            e1, e2 = st.columns([1,1])
             pdf_buf = generate_custom_pdf(st.session_state.current_brief_name, bd, st.session_state.ksa_matrix if "ksa_matrix" in st.session_state else None)
-            if pdf_buf:
-                st.download_button("⬇️ PDF", data=pdf_buf, file_name=f"{st.session_state.current_brief_name}.pdf", mime="application/pdf")
-            else:
-                st.info("PDF indisponible.")
+            with e1:
+                if pdf_buf:
+                    st.download_button("⬇️ PDF", data=pdf_buf, file_name=f"{st.session_state.current_brief_name}.pdf", mime="application/pdf", use_container_width=True)
+                else:
+                    st.info("PDF indisponible.")
             word_buf = generate_custom_word(st.session_state.current_brief_name, bd, st.session_state.ksa_matrix if "ksa_matrix" in st.session_state else None)
-            if word_buf:
-                st.download_button("⬇️ Word", data=word_buf, file_name=f"{st.session_state.current_brief_name}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-            else:
-                st.info("Word indisponible.")
+            with e2:
+                if word_buf:
+                    st.download_button("⬇️ Word", data=word_buf, file_name=f"{st.session_state.current_brief_name}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
+                else:
+                    st.info("Word indisponible.")
