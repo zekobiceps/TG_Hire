@@ -410,13 +410,14 @@ def generate_xray_query(site_cible: str, poste: str, mots_cles: str, localisatio
     """
     # Use site:linkedin.com (wider) so queries that target CVs with phrases like "télécharger mon CV"
     # can match documents hosted on linkedin.com (some users publish PDFs on linkedin.com or personal pages).
-    site_map = {"LinkedIn": "site:linkedin.com", "GitHub": "site:github.com"}
-    # If user requests filetype:pdf while targeting LinkedIn profiles, this is contradictory
-    # (LinkedIn profile pages aren't PDFs). In that case we omit the site constraint and
-    # add sensible PDF exclusions to avoid job-posting noise.
-    site = site_map.get(site_cible, "site:linkedin.com/in")
+    site_map = {"LinkedIn": "site:linkedin.com", "GitHub": "site:github.com", "Web": ""}
+    site = site_map.get(site_cible, "site:linkedin.com")
     parts = []
-    if not (file_type and file_type.strip().lower() == 'pdf' and site_cible == 'LinkedIn'):
+    # If user explicitly selected LinkedIn, always include the site constraint.
+    if site_cible == 'LinkedIn' and site:
+        parts.append(site)
+    elif site_cible != 'LinkedIn' and site:
+        # For GitHub include the site constraint; for Web (empty) do not.
         parts.append(site)
     if poste:
         parts.append(f'"{poste}"')
@@ -1416,7 +1417,7 @@ with tab2:
     with st.form(key="xray_form"):
         col1, col2 = st.columns(2)
         with col1:
-            site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub"], key="xray_site")
+            site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub", "Web"], key="xray_site")
             poste_xray = st.text_input("Poste:", key="xray_poste", placeholder="Ex: Développeur Python")
             mots_cles = st.text_input("Mots-clés:", key="xray_mots_cles", placeholder="Ex: Django, Flask")
             synonymes_or = st.text_input("Synonymes:", key="xray_synonymes_or", placeholder="Ex: dev backend, backend developer")
