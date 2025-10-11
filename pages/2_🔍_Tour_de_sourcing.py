@@ -291,8 +291,6 @@ def init_session_state():
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
-
-def save_library_entries():
     """Sauvegarde les entrées de la bibliothèque en JSON"""
     try:
         with open(LIB_FILE, 'w', encoding='utf-8') as f:
@@ -1082,13 +1080,16 @@ with st.sidebar:
     st.info("💡 Assistant IA pour le sourcing et recrutement")
 
 # -------------------- Onglets --------------------
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
-    "🔍 Boolean", "🎯 X-Ray", "🔎 CSE LinkedIn", 
+# Utiliser un radio horizontal au lieu de st.tabs pour conserver l'onglet actif
+tab_options = [
+    "🔍 Boolean", "🎯 X-Ray", "🔎 CSE LinkedIn",
     "🕷️ Web Scraper", "✉️ InMail", "🤖 Assistant Sourcing", "📧 Permutateur", "📚 Bibliothèque"
-])
+]
+selected_tab = st.session_state.get("selected_tab", tab_options[0])
+selected_tab = st.radio("", tab_options, index=tab_options.index(selected_tab), horizontal=True, key="selected_tab")
 
 # -------------------- Tab 1: Boolean Search --------------------
-with tab1:
+if selected_tab == "🔍 Boolean":
     st.header("🔍 Recherche Boolean")
     
     # Option fiche de poste pour l'IA
@@ -1424,7 +1425,7 @@ with tab1:
 
 
 # -------------------- Tab 2: X-Ray --------------------
-with tab2:
+if selected_tab == "🎯 X-Ray":
     st.header("🎯 X-Ray Google")
     # Regrouper les champs dans un formulaire pour éviter des reruns automatiques lors de la saisie
     with st.form(key="xray_form"):
@@ -1575,7 +1576,7 @@ Cette requête trouve des CV PDF sur le web entier, pas seulement sur LinkedIn.
             st.info("Aucune variante générée pour la requête actuelle.")
 
 # -------------------- Tab 3: CSE --------------------
-with tab3:
+if selected_tab == "🔎 CSE LinkedIn":
     st.header("🔎 CSE LinkedIn")
     col1, col2 = st.columns(2)
     with col1:
@@ -1625,7 +1626,7 @@ with tab3:
             st.link_button("🌐 Ouvrir sur CSE", cse_url, use_container_width=True)
 
 # -------------------- Tab 4: Web Scraper - Analyse Concurrentielle --------------------
-with tab4:
+if selected_tab == "🕷️ Web Scraper":
     st.header("🔍 Analyse Concurrentielle - Offres d'Emploi")
     
     # Configuration du scraping
@@ -1979,7 +1980,7 @@ with tab4:
         """)
 
 # -------------------- Tab 5: InMail --------------------
-with tab5:
+if selected_tab == "✉️ InMail":
     st.header("✉️ Générateur d'InMail Personnalisé")
 
     # --------- FONCTIONS UTILES ---------
@@ -2226,8 +2227,7 @@ Cordialement."""
 
 
 # -------------------- Tab 6: Assistant Sourcing --------------------
-with tab6:
-
+if selected_tab == "🤖 Assistant Sourcing":
     questions_pretes = [
         "Quels sont les synonymes possibles pour le métier de",
         "Quels outils ou logiciels sont liés au métier de", 
@@ -2309,7 +2309,7 @@ with tab6:
             st.rerun()
             
 # -------------------- Tab 7: Permutateur --------------------
-with tab7:
+if selected_tab == "📧 Permutateur":
     st.header("📧 Permutateur Email")
 
     # Génération de noms marocains aléatoires
@@ -2367,22 +2367,28 @@ with tab7:
                         if not (prenom_cb and nom_cb and entreprise_cb):
                             return
 
-                        # Déterminer le domaine
+                            if selected_tab == "🔎 CSE LinkedIn":
+                                st.header("🔎 CSE LinkedIn")
                         if email_format_cb and '@' in email_format_cb:
                             domain_cb = email_format_cb.split('@')[1]
-                        else:
+                            if selected_tab == "🕷️ Web Scraper":
+                                st.header("🔍 Analyse Concurrentielle - Offres d'Emploi")
                             domain_cb = f"{entreprise_cb.lower().replace(' ', '').replace('-', '')}.ma"
 
-                        # Construire les patterns
+                            if selected_tab == "✉️ InMail":
+                                st.header("📨 InMail Generator")
                         if source_cb == "Charika.ma" and email_format_cb and '@' in email_format_cb:
                             # Si l'utilisateur a saisi un format contenant des mots-clés (prenom/nom/p/n)
-                            ef = email_format_cb
+                            if selected_tab == "🤖 Assistant Sourcing":
+                                # Title intentionally removed per user's request; section kept
                             if 'prenom' in ef.lower() or 'prénom' in ef.lower() or 'nom' in ef.lower() or 'p' in ef.lower() or 'n' in ef.lower():
                                 # Remplacements simples : prenom -> prenom, nom -> nom, p -> first initial, n -> last initial
-                                pattern = ef.replace('prenom', prenom_cb.lower())
+                            if selected_tab == "📧 Permutateur":
+                                st.header("📧 Permutateur Email")
                                 pattern = pattern.replace('prénom', prenom_cb.lower())
                                 pattern = pattern.replace('nom', nom_cb.lower())
-                                # p and n could be ambiguous; support single-letter placeholders
+                            if selected_tab == "📚 Bibliothèque":
+                                st.header("📚 Bibliothèque des recherches")
                                 pattern = pattern.replace('p', prenom_cb[0].lower()) if 'p' in ef else pattern
                                 pattern = pattern.replace('n', nom_cb[0].lower()) if 'n' in ef else pattern
                                 patterns_cb = [pattern]
@@ -2410,13 +2416,21 @@ with tab7:
                         st.markdown(f"<a href='{google_url}' target='_blank' style='font-size:16px;'>🔎 Rechercher sur Google</a>", unsafe_allow_html=True)
 
                     with col_format:
-                        # Utiliser on_change pour déclencher la callback sur Enter / blur
-                        email_format = st.text_input(
-                            "Format d'email trouvé:",
-                            key="perm_email_format",
-                            placeholder="exemple@domaine.ma",
-                            on_change=_perm_apply_format_callback
-                        )
+                        # Layout pour input + bouton appliquer
+                        c_input, c_btn = st.columns([3, 1])
+                        with c_input:
+                            email_format = st.text_input(
+                                "Format d'email trouvé:",
+                                key="perm_email_format",
+                                placeholder="exemple@domaine.ma",
+                                on_change=_perm_apply_format_callback
+                            )
+                        with c_btn:
+                            if st.button("Appliquer", key="perm_apply_btn"):
+                                # Appeler explicitement la même callback
+                                _perm_apply_format_callback()
+                                st.success("✅ Format appliqué")
+
                         # Si un format est déjà présent dans l'état, afficher le domaine utilisé
                         if st.session_state.get("perm_email_format") and '@' in st.session_state.get("perm_email_format"):
                             domain = st.session_state.get("perm_email_format").split('@')[1]
@@ -2476,7 +2490,7 @@ with tab7:
         st.caption("🔍 Tester sur : [Hunter.io](https://hunter.io/) ou [NeverBounce](https://neverbounce.com/)")
 
 # -------------------- Tab 8: Bibliothèque --------------------
-with tab8:
+if selected_tab == "📚 Bibliothèque":
     st.header("📚 Bibliothèque des recherches")
     # Actualisation auto depuis Google Sheets
     entries_local = st.session_state.library_entries if st.session_state.library_entries else []
