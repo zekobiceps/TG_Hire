@@ -8,9 +8,6 @@ import re
 import time
 from urllib.parse import quote
 from datetime import datetime
-                elif source == "Charika.ma":
-                    # Email non détecté sur Charika
-                    st.error(f"❌ Format d'email non détecté sur Charika.ma pour '{entreprise}'")
 
 def load_total_tokens_from_gsheet():
     """Charge le total cumulé des tokens depuis Google Sheets"""
