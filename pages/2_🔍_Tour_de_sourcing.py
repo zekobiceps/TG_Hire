@@ -1084,7 +1084,7 @@ with st.sidebar:
 # -------------------- Onglets --------------------
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "🔍 Boolean", "🎯 X-Ray", "🔎 CSE LinkedIn", 
-    "🕷️ Web Scraper", "✉️ InMail", "🤖 Magicien", "📧 Permutateur", "📚 Bibliothèque"
+    "🕷️ Web Scraper", "✉️ InMail", "🤖 Assistant Sourcing", "📧 Permutateur", "📚 Bibliothèque"
 ])
 
 # -------------------- Tab 1: Boolean Search --------------------
@@ -2012,8 +2012,8 @@ with tab5:
     with col6:
         longueur_message = st.slider("Longueur (mots)", 10, 200, 50, key="inmail_longueur")
     with col7:
-        analyse_profil = st.selectbox("Méthode d'analyse du profil LinkedIn", ["Manuel", "Intelligence artificielle"], index=0, key="inmail_analyse")
-        if analyse_profil == "Intelligence artificielle":
+        analyse_profil = st.selectbox("Méthode d'analyse du profil LinkedIn", ["Manuel", "Intelligence artificielle (Désactiver)"], index=0, key="inmail_analyse")
+        if analyse_profil == "Intelligence artificielle (Désactiver)":
             # Vérifier si l'API est disponible
             api_key = get_api_secret("DEEPSEEK_API_KEY", alt_names=["DEEPSEEK_KEY", "DEEPSEEK"], env_fallback=True)
             if not api_key:
@@ -2061,7 +2061,7 @@ with tab5:
         donnees_profil = st.session_state.get("inmail_profil_data", profil_data)
         
         # Si Intelligence artificielle est sélectionnée, avertir de la limitation LinkedIn
-        if analyse_profil == "Intelligence artificielle" and url_linkedin.strip():
+        if analyse_profil == "Intelligence artificielle (Désactiver)" and url_linkedin.strip():
             st.warning("⚠️ **Limitation** : L'IA ne peut pas accéder directement aux profils LinkedIn pour des raisons de sécurité et de confidentialité.")
             st.info("💡 **Recommandation** : Veuillez remplir manuellement les informations du candidat ci-dessus pour une génération d'InMail précise et personnalisée.")
             
@@ -2225,7 +2225,7 @@ Cordialement."""
                 st.success(f"✅ Modèle '{poste_accroche} - {entry['timestamp']}' sauvegardé")
 
 
-# -------------------- Tab 6: Magicien --------------------
+# -------------------- Tab 6: Assistant Sourcing --------------------
 with tab6:
 
     questions_pretes = [
@@ -2276,7 +2276,7 @@ with tab6:
                     prompt += ". Réponds avec une liste à puces, sans introduction."
                 if mode_rapide_magicien:
                     prompt += " Réponse concise et directe."
-                result = get_deepseek_response(prompt, [], "normale" if not mode_rapide_magicien else "courte", "Magicien Sourcing")
+                result = get_deepseek_response(prompt, [], "normale" if not mode_rapide_magicien else "courte", "Assistant Sourcing")
                 total_time = int(time.time() - start_time)
                 st.success(f"✅ Réponse générée en {total_time}s")
                 if result.get("content"):
@@ -2354,24 +2354,61 @@ with tab7:
                 elif source == "Charika.ma":
                     # Email non détecté sur Charika
                     st.error(f"❌ Format d'email non détecté sur Charika.ma pour '{entreprise}'")
-                    domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"
-                    # Ajout du bouton/lien Google
-                    google_url = get_charika_search_url(entreprise)
-                    st.markdown(f"<a href='{google_url}' target='_blank' style='font-size:16px;'>🔎 Rechercher sur Google</a>", unsafe_allow_html=True)
+                    
+                    # Ajout du bouton/lien Google et champ pour format d'email
+                    col_search, col_format = st.columns([1, 2])
+                    with col_search:
+                        google_url = get_charika_search_url(entreprise)
+                        st.markdown(f"<a href='{google_url}' target='_blank' style='font-size:16px;'>🔎 Rechercher sur Google</a>", unsafe_allow_html=True)
+                    
+                    with col_format:
+                        email_format = st.text_input("Format d'email trouvé:", key="perm_email_format", placeholder="exemple@domaine.ma")
+                        if email_format and '@' in email_format:
+                            domain = email_format.split('@')[1]
+                            st.success(f"✅ Domaine utilisé: @{domain}")
+                        else:
+                            domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"
                 else:
                     domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"
                 
                 # Génération des permutations
-                patterns = [
-                    f"{prenom.lower()}.{nom.lower()}@{domain}",
-                    f"{prenom[0].lower()}{nom.lower()}@{domain}",
-                    f"{nom.lower()}.{prenom.lower()}@{domain}",
-                    f"{prenom.lower()}{nom.lower()}@{domain}",
-                    f"{prenom.lower()}-{nom.lower()}@{domain}",
-                    f"{nom.lower()}{prenom[0].lower()}@{domain}",
-                    f"{prenom[0].lower()}.{nom.lower()}@{domain}",
-                    f"{nom.lower()}.{prenom[0].lower()}@{domain}"
-                ]
+                # Vérifier si un format d'email personnalisé a été saisi
+                if source == "Charika.ma" and st.session_state.get("perm_email_format") and '@' in st.session_state.get("perm_email_format"):
+                    email_format = st.session_state.get("perm_email_format")
+                    
+                    # Analyser le format pour créer un pattern
+                    if 'prenom' in email_format.lower() or 'prénom' in email_format.lower():
+                        # Si le format contient "prenom" ou "prénom"
+                        patterns = [email_format.replace('prenom', prenom.lower())
+                                   .replace('prénom', prenom.lower())
+                                   .replace('nom', nom.lower())
+                                   .replace('p', prenom[0].lower())
+                                   .replace('n', nom[0].lower())]
+                        st.info("💡 Format d'email personnalisé appliqué")
+                    else:
+                        # Format standard avec les permutations habituelles
+                        patterns = [
+                            f"{prenom.lower()}.{nom.lower()}@{domain}",
+                            f"{prenom[0].lower()}{nom.lower()}@{domain}",
+                            f"{nom.lower()}.{prenom.lower()}@{domain}",
+                            f"{prenom.lower()}{nom.lower()}@{domain}",
+                            f"{prenom.lower()}-{nom.lower()}@{domain}",
+                            f"{nom.lower()}{prenom[0].lower()}@{domain}",
+                            f"{prenom[0].lower()}.{nom.lower()}@{domain}",
+                            f"{nom.lower()}.{prenom[0].lower()}@{domain}"
+                        ]
+                else:
+                    # Format standard avec les permutations habituelles
+                    patterns = [
+                        f"{prenom.lower()}.{nom.lower()}@{domain}",
+                        f"{prenom[0].lower()}{nom.lower()}@{domain}",
+                        f"{nom.lower()}.{prenom.lower()}@{domain}",
+                        f"{prenom.lower()}{nom.lower()}@{domain}",
+                        f"{prenom.lower()}-{nom.lower()}@{domain}",
+                        f"{nom.lower()}{prenom[0].lower()}@{domain}",
+                        f"{prenom[0].lower()}.{nom.lower()}@{domain}",
+                        f"{nom.lower()}.{prenom[0].lower()}@{domain}"
+                    ]
                 
                 total_time = time.time() - start_time
                 st.session_state["perm_result"] = list(set(patterns))
