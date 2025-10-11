@@ -8,46 +8,79 @@ import re
 import time
 from urllib.parse import quote
 from datetime import datetime
-import os
 import json
+import os
+import hashlib
 import pandas as pd
 from collections import Counter
 
-# Définitions par défaut pour éviter les NameError si l'import utils échoue
+# Fonctions pour gestion des tokens Google Sheets
+@st.cache_resource
 def get_tokens_gsheet_client():
-    """Défaut non bloquant : retourne None si le client Google Sheets n'est pas disponible."""
-    return None
-
-
-# Tentative d'import des helpers tokens (Google Sheets). Si absents, fournir des wrappers
-try:
-    # Prefer a module-level helper if present, fallback to utils
+    """Connexion spécifique à la feuille Tokens"""
     try:
-        # si un getter local spécifique existe dans un autre module, importer en priorité
-        from utils import get_tokens_gsheet_client as _utils_get_tokens_gsheet_client, save_tokens_to_gsheet
-        get_tokens_gsheet_client = _utils_get_tokens_gsheet_client
-    except Exception:
-        from utils import get_tokens_gsheet_client, save_tokens_to_gsheet
-except Exception:
-    def get_tokens_gsheet_client():
-        """Fallback minimal: retourne None si la connexion Google Sheets n'est pas configurée."""
+        import gspread
+        from utils import _build_service_account_info_from_st_secrets
+        
+        service_account_info = _build_service_account_info_from_st_secrets()
+        gc = gspread.service_account_from_dict(service_account_info)
+        
+        # Utiliser la même URL que pour Sourcing DB mais feuille "Tokens"
+        SOURCING_SHEET_URL = "https://docs.google.com/spreadsheets/d/1Yw99SS4vU5v0DuD7S1AwaEispJCo-cwioxSsAYnzRkE/edit"
+        spreadsheet = gc.open_by_url(SOURCING_SHEET_URL)
+        
+        # Essayer d'accéder à la feuille Tokens, la créer si elle n'existe pas
+        try:
+            worksheet = spreadsheet.worksheet("Tokens")
+        except gspread.WorksheetNotFound:
+            worksheet = spreadsheet.add_worksheet(title="Tokens", rows="1000", cols="10")
+            # Ajouter les en-têtes
+            headers = ["timestamp", "type", "function", "user", "tokens", "cumulative_total", "action"]
+            worksheet.append_row(headers)
+        
+        return worksheet
+    except Exception as e:
+        st.warning(f"Connexion Tokens Google Sheets indisponible: {e}")
         return None
 
-    def save_tokens_to_gsheet(usage, function_name, user):
-        """Fallback minimal: journalise localement si Google Sheets indisponible."""
-        try:
-            entry = {
-                "timestamp": datetime.now().isoformat(),
-                "usage": int(usage or 0),
-                "function": function_name,
-                "user": user or "",
-            }
-            # append as newline-delimited JSON for simple local inspection
-            with open("tokens_log.ndjson", "a", encoding="utf-8") as f:
-                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        except Exception:
-            # silent fallback
-            pass
+def save_tokens_to_gsheet(tokens, function_name="General", user="Unknown", reset=False):
+    """Sauvegarde les tokens utilisés dans Google Sheets avec historique"""
+    try:
+        worksheet = get_tokens_gsheet_client()
+        if worksheet is None:
+            return False
+        
+        if reset:
+            # Entrée de reset total
+            row = [
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "Token Reset",
+                "Reset Total", 
+                user,
+                0,
+                0,
+                "RESET TOTAL"
+            ]
+        else:
+            # Récupérer le total actuel
+            current_total = st.session_state.get("api_usage", {}).get("used_tokens", 0)
+            
+            # Entrée d'usage normal
+            row = [
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "Token Usage",
+                function_name,
+                user,
+                tokens,
+                current_total,
+                "USAGE"
+            ]
+        
+        worksheet.append_row(row)
+        return True
+    except Exception as e:
+        st.warning(f"Erreur sauvegarde tokens: {e}")
+        return False
 
 def load_total_tokens_from_gsheet():
     """Charge le total cumulé des tokens depuis Google Sheets"""
@@ -231,13 +264,7 @@ def init_session_state():
     """Initialise les variables de session"""
     # Charger le total cumulé depuis Google Sheets au premier chargement
     if "tokens_loaded" not in st.session_state:
-        try:
-            total_from_sheets = load_total_tokens_from_gsheet()
-        except Exception as e:
-            # En production (Streamlit Cloud) il est possible que la fonction ne soit
-            # pas disponible ou l'appel provoque une NameError; on tombe proprement à 0.
-            st.warning(f"⚠️ Impossible de charger le total depuis Google Sheets, fallback à 0 : {e}")
-            total_from_sheets = 0
+        total_from_sheets = load_total_tokens_from_gsheet()
         st.session_state["tokens_loaded"] = True
         api_usage = {"current_session_tokens": 0, "used_tokens": total_from_sheets}
     else:
@@ -260,15 +287,6 @@ def init_session_state():
         "inmail_objet": "",
         "inmail_generated": False,
         "inmail_profil_data": {},
-        # Defaults to avoid NameError when UI variables are referenced before being set
-        "submitted": False,
-        "site_cible": "",
-        "poste_xray": "",
-        "mots_cles": "",
-        "localisation_xray": "",
-        "synonymes_or": "",
-        "file_type": None,
-        "exclusions_xray": "",
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -1349,41 +1367,105 @@ with tab1:
             safe_boolean = st.session_state.get('boolean_query', '').replace('"', '&quot;')
             st.markdown(f'<button data-copy="{safe_boolean}">📋 Copier</button>', unsafe_allow_html=True)
         with cols_actions[1]:
-            # Placeholder pour les actions liées (ex: Sauvegarder)
-            pass
-    if st.session_state.get("submitted"):
+            if st.button("💾 Sauvegarder", key="boolean_save", use_container_width=True):
+                entry = {
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                    "type": "Boolean",
+                    "poste": poste,
+                    "requete": st.session_state["boolean_query"],
+                    "utilisateur": st.session_state.get("user", ""),
+                    "source": "Boolean",
+                    "commentaire": st.session_state.get("boolean_commentaire", "")
+                }
+                st.session_state.library_entries.append(entry)
+                save_library_entries()
+                save_sourcing_entry_to_gsheet(entry)
+                st.success("✅ Sauvegardé")
+        with cols_actions[2]:
+            url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
+            st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, use_container_width=True)
+
+    # Variantes (seulement si requête existe)
+    if st.session_state.get("boolean_query"):
+        # Générer les variantes avec les valeurs ACTUELLES des champs
+        variants = generate_boolean_variants(st.session_state["boolean_query"], synonymes, competences_optionnelles)
+        
+        st.caption("🔀 Variantes proposées")
+        if variants:
+            for idx, (title, vq) in enumerate(variants):
+                # Supprimer la key pour permettre la mise à jour automatique
+                st.text_area(f"{title}", value=vq, height=80)
+                st.text_input(f"Commentaire variante {idx+1}", value=st.session_state.get(f"boolean_commentaire_var_{idx}", ""), key=f"boolean_commentaire_var_{idx}")
+                cols_var = st.columns([0.2,0.4,0.4])
+                with cols_var[0]:
+                    safe_vq = vq.replace('"', '&quot;')
+                    st.markdown(f'<button data-copy="{safe_vq}">📋 Copier</button>', unsafe_allow_html=True)
+                with cols_var[1]:
+                    if st.button(f"💾 Sauvegarder {idx+1}", key=f"bool_save_{idx}", use_container_width=True):
+                        entry = {
+                            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                            "type": "Boolean",
+                            "poste": poste,
+                            "requete": vq,
+                            "utilisateur": st.session_state.get("user", ""),
+                            "source": f"Boolean Variante {idx+1}",
+                            "commentaire": st.session_state.get(f"boolean_commentaire_var_{idx}", "")
+                        }
+                        st.session_state.library_entries.append(entry)
+                        save_library_entries()
+                        save_sourcing_entry_to_gsheet(entry)
+                        st.success(f"✅ Variante {idx+1} sauvegardée")
+                with cols_var[2]:
+                    url_var = f"https://www.linkedin.com/search/results/people/?keywords={quote(vq)}"
+                    st.link_button(f"🌐 LinkedIn {idx+1}", url_var, use_container_width=True)
+        else:
+            st.info("Aucune variante générée pour la requête actuelle.")
+
+
+
+# -------------------- Tab 2: X-Ray --------------------
+with tab2:
+    st.header("🎯 X-Ray Google")
+    # Regrouper les champs dans un formulaire pour éviter des reruns automatiques lors de la saisie
+    with st.form(key="xray_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub", "Web"], key="xray_site")
+            poste_xray = st.text_input("Poste:", key="xray_poste", placeholder="Ex: Développeur Python")
+            mots_cles = st.text_input("Mots-clés:", key="xray_mots_cles", placeholder="Ex: Django, Flask")
+            synonymes_or = st.text_input("Synonymes:", key="xray_synonymes_or", placeholder="Ex: dev backend, backend developer")
+        with col2:
+            localisation_xray = st.text_input("Localisation:", key="xray_loc", placeholder="Ex: Casablanca")
+            exclusions_xray = st.text_input("Mots à exclure:", key="xray_exclusions", placeholder="Ex: Stage, Junior")
+            file_type = st.selectbox("Recherche par fichier (optionnel):", ["aucun", "pdf", "docx", "CV(test PX)"], index=0, key="xray_filetype")
+
+        submitted = st.form_submit_button(label="🔍 Construire X-Ray")
+
+    if submitted:
         with st.spinner("⏳ Génération en cours..."):
             start_time = time.time()
-            # Read inputs from session_state safely
-            site_cible_val = st.session_state.get("site_cible", "")
-            poste_xray_val = st.session_state.get("poste_xray", "")
-            mots_cles_val = st.session_state.get("mots_cles", "")
-            localisation_xray_val = st.session_state.get("localisation_xray", "")
-            synonymes_or_val = st.session_state.get("synonymes_or", "")
-            file_type_val = st.session_state.get("file_type", None)
-            exclusions_xray_val = st.session_state.get("exclusions_xray", "")
-
             # Logic for X-Ray query generation
-            xray_query = generate_xray_query(site_cible_val, poste_xray_val, mots_cles_val, localisation_xray_val, synonymes_or_val, file_type_val)
+            # pass synonymes_or and file_type to enhance the query
+            xray_query = generate_xray_query(site_cible, poste_xray, mots_cles, localisation_xray, synonymes_or, file_type)
 
             # Add exclusions if any
-            if exclusions_xray_val:
-                exclusion_terms = _split_terms(exclusions_xray_val)
+            if exclusions_xray:
+                exclusion_terms = _split_terms(exclusions_xray)
                 if exclusion_terms:
                     xray_query += " -" + " -".join(exclusion_terms)
 
             st.session_state["xray_query"] = xray_query
             st.session_state["xray_snapshot"] = {
-                "site": site_cible_val,
-                "poste": poste_xray_val,
-                "mots_cles": mots_cles_val,
-                "localisation": localisation_xray_val,
-                "exclusions": exclusions_xray_val,
-                "synonymes_or": synonymes_or_val,
-                "file_type": file_type_val
+                "site": site_cible,
+                "poste": poste_xray,
+                "mots_cles": mots_cles,
+                "localisation": localisation_xray,
+                "exclusions": exclusions_xray,
+                "synonymes_or": synonymes_or,
+                "file_type": file_type
             }
             # Inform user if they asked for LinkedIn + filetype:pdf (contradiction)
-            if file_type_val and isinstance(file_type_val, str) and file_type_val.strip().lower() == 'pdf' and site_cible_val == 'LinkedIn':
+            if file_type and file_type.strip().lower() == 'pdf' and site_cible == 'LinkedIn':
                 st.warning("""⚠️ **Attention**: Vous avez demandé des PDF sur LinkedIn. Cette combinaison donne généralement 0 résultat.
                 
 Les pages LinkedIn sont des pages web (HTML), pas des PDF. Une requête avec `site:linkedin.com` et `filetype:pdf` est contradictoire.
@@ -1406,11 +1488,11 @@ Cette requête trouve des CV PDF sur le web entier, pas seulement sur LinkedIn.
     params_changed_xray = False
     if snapx and query_value_xray:
         params_changed_xray = any([
-            snapx.get("site") != st.session_state.get("site_cible", ""),
-            snapx.get("poste") != st.session_state.get("poste_xray", ""),
-            snapx.get("mots_cles") != st.session_state.get("mots_cles", ""),
-            snapx.get("localisation") != st.session_state.get("localisation_xray", ""),
-            snapx.get("exclusions") != st.session_state.get("exclusions_xray", ""),
+            snapx.get("site") != site_cible,
+            snapx.get("poste") != poste_xray,
+            snapx.get("mots_cles") != mots_cles,
+            snapx.get("localisation") != localisation_xray,
+            snapx.get("exclusions") != exclusions_xray,
             snapx.get("synonymes_or", "") != st.session_state.get("xray_synonymes_or", ""),
             snapx.get("file_type", "") != st.session_state.get("xray_filetype", "")
         ])
@@ -1438,7 +1520,7 @@ Cette requête trouve des CV PDF sur le web entier, pas seulement sur LinkedIn.
                 entry = {
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "type": "X-Ray",
-                    "poste": st.session_state.get("poste_xray", ""),
+                    "poste": poste_xray,
                     "requete": st.session_state["xray_query"],
                     "utilisateur": st.session_state.get("user", ""),
                     "source": "X-Ray",
@@ -1456,9 +1538,9 @@ Cette requête trouve des CV PDF sur le web entier, pas seulement sur LinkedIn.
     if st.session_state.get("xray_query"):
         x_vars = generate_xray_variants(
             st.session_state["xray_query"],
-            st.session_state.get("poste_xray", ""),
-            st.session_state.get("mots_cles", ""),
-            st.session_state.get("localisation_xray", ""),
+            poste_xray,
+            mots_cles,
+            localisation_xray,
             st.session_state.get("xray_synonymes_or", ""),
             st.session_state.get("xray_filetype", None)
         )
@@ -1476,7 +1558,7 @@ Cette requête trouve des CV PDF sur le web entier, pas seulement sur LinkedIn.
                         entry = {
                             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                             "type": "X-Ray Variante",
-                            "poste": st.session_state.get("poste_xray", ""),
+                            "poste": poste_xray,
                             "requete": qv,
                             "utilisateur": st.session_state.get("user", ""),
                             "source": "X-Ray",
@@ -2255,71 +2337,137 @@ with tab7:
     with col2:
         entreprise = st.text_input("Entreprise:", key="perm_entreprise", placeholder="TGCC")
         source = st.radio("Source de détection :", ["Site officiel", "Charika.ma"], key="perm_source", horizontal=True)
-
-    # Fonction utilitaire : génère et écrit st.session_state['perm_result'] à partir des champs en session
-    def _perm_generate():
-        prenom_cb = st.session_state.get("perm_prenom", "").strip()
-        nom_cb = st.session_state.get("perm_nom", "").strip()
-        entreprise_cb = st.session_state.get("perm_entreprise", "").strip()
-        source_cb = st.session_state.get("perm_source", "Site officiel")
-        if not (prenom_cb and nom_cb and entreprise_cb):
-            st.session_state["perm_result"] = []
-            return
-
-        detected_cb = get_email_from_charika(entreprise_cb) if source_cb == "Charika.ma" else None
-
-        # Priorité : détection Charika, sinon format utilisateur, sinon domaine par défaut
-        if detected_cb and source_cb == "Charika.ma":
-            domain_cb = detected_cb.split("@")[1]
-        else:
-            email_format_cb = st.session_state.get("perm_email_format", "").strip()
-            if email_format_cb and '@' in email_format_cb:
-                # si l'utilisateur a donné un exemple complet
-                domain_cb = email_format_cb.split('@')[1]
-            else:
-                domain_cb = f"{entreprise_cb.lower().replace(' ', '').replace('-', '')}.ma"
-
-        patterns_cb = []
-        ef = st.session_state.get("perm_email_format", "").strip() if source_cb == "Charika.ma" else ""
-        if source_cb == "Charika.ma" and ef and '@' in ef:
-            # si l'utilisateur fournit un format contenant des placeholders reconnus
-            lower_ef = ef.lower()
-            if ('{p}' in ef) or ('{n}' in ef) or ('prenom' in lower_ef) or ('prénom' in lower_ef) or ('nom' in lower_ef):
-                pattern = ef
-                # remplacements explicites et sûrs
-                pattern = pattern.replace('{p}', prenom_cb[0].lower()).replace('{n}', nom_cb[0].lower())
-                pattern = pattern.replace('prenom', prenom_cb.lower()).replace('prénom', prenom_cb.lower()).replace('nom', nom_cb.lower())
-                # si le format n'inclut pas de domaine, ajouter le domaine détecté
-                if '@' not in pattern:
-                    pattern = f"{pattern}@{domain_cb}"
-                patterns_cb = [pattern]
-            else:
-                # Exemple d'email complet -> on l'utilise tel quel
-                patterns_cb = [ef]
-        else:
-            # patterns standards
-            patterns_cb = [
-                f"{prenom_cb.lower()}.{nom_cb.lower()}@{domain_cb}",
-                f"{prenom_cb[0].lower()}{nom_cb.lower()}@{domain_cb}",
-                f"{nom_cb.lower()}.{prenom_cb.lower()}@{domain_cb}",
-                f"{prenom_cb.lower()}{nom_cb.lower()}@{domain_cb}",
-                f"{prenom_cb.lower()}-{nom_cb.lower()}@{domain_cb}",
-                f"{nom_cb.lower()}{prenom_cb[0].lower()}@{domain_cb}",
-                f"{prenom_cb[0].lower()}.{nom_cb.lower()}@{domain_cb}",
-                f"{nom_cb.lower()}.{prenom_cb[0].lower()}@{domain_cb}"
-            ]
-
-        # dédupliquer en conservant l'ordre
-        st.session_state["perm_result"] = list(dict.fromkeys(patterns_cb))
     
 
 
 
     if st.button("🔮 Générer permutations", use_container_width=True):
-        # Génère en utilisant les valeurs présentes dans st.session_state
-        _perm_generate()
-        if st.session_state.get("perm_result"):
-            st.success(f"✅ {len(st.session_state.get('perm_result'))} permutations générées")
+        if prenom and nom and entreprise:
+            with st.spinner("⏳ Génération des permutations..."):
+                start_time = time.time()
+                permutations = []
+                detected = get_email_from_charika(entreprise) if source == "Charika.ma" else None
+                
+                if detected and source == "Charika.ma":
+                    st.info(f"📧 Format détecté sur Charika.ma : {detected}")
+                    domain = detected.split("@")[1]
+                elif source == "Charika.ma":
+                    # Email non détecté sur Charika
+                    st.error(f"❌ Format d'email non détecté sur Charika.ma pour '{entreprise}'")
+
+                    # Callback local pour appliquer le format d'email saisi et régénérer les permutations
+                    def _perm_apply_format_callback():
+                        prenom_cb = st.session_state.get("perm_prenom", "").strip()
+                        nom_cb = st.session_state.get("perm_nom", "").strip()
+                        entreprise_cb = st.session_state.get("perm_entreprise", "").strip()
+                        source_cb = st.session_state.get("perm_source", "Site officiel")
+                        email_format_cb = st.session_state.get("perm_email_format", "").strip()
+
+                        # Nécessite les champs de base
+                        if not (prenom_cb and nom_cb and entreprise_cb):
+                            return
+
+                        # Déterminer le domaine
+                        if email_format_cb and '@' in email_format_cb:
+                            domain_cb = email_format_cb.split('@')[1]
+                        else:
+                            domain_cb = f"{entreprise_cb.lower().replace(' ', '').replace('-', '')}.ma"
+
+                        # Construire les patterns
+                        if source_cb == "Charika.ma" and email_format_cb and '@' in email_format_cb:
+                            # Si l'utilisateur a saisi un format contenant des mots-clés (prenom/nom/p/n)
+                            ef = email_format_cb
+                            if 'prenom' in ef.lower() or 'prénom' in ef.lower() or 'nom' in ef.lower() or 'p' in ef.lower() or 'n' in ef.lower():
+                                # Remplacements simples : prenom -> prenom, nom -> nom, p -> first initial, n -> last initial
+                                pattern = ef.replace('prenom', prenom_cb.lower())
+                                pattern = pattern.replace('prénom', prenom_cb.lower())
+                                pattern = pattern.replace('nom', nom_cb.lower())
+                                # p and n could be ambiguous; support single-letter placeholders
+                                pattern = pattern.replace('p', prenom_cb[0].lower()) if 'p' in ef else pattern
+                                pattern = pattern.replace('n', nom_cb[0].lower()) if 'n' in ef else pattern
+                                patterns_cb = [pattern]
+                            else:
+                                # si l'utilisateur a fourni un exemple d'email, on l'adapte
+                                patterns_cb = [email_format_cb]
+                        else:
+                            patterns_cb = [
+                                f"{prenom_cb.lower()}.{nom_cb.lower()}@{domain_cb}",
+                                f"{prenom_cb[0].lower()}{nom_cb.lower()}@{domain_cb}",
+                                f"{nom_cb.lower()}.{prenom_cb.lower()}@{domain_cb}",
+                                f"{prenom_cb.lower()}{nom_cb.lower()}@{domain_cb}",
+                                f"{prenom_cb.lower()}-{nom_cb.lower()}@{domain_cb}",
+                                f"{nom_cb.lower()}{prenom_cb[0].lower()}@{domain_cb}",
+                                f"{prenom_cb[0].lower()}.{nom_cb.lower()}@{domain_cb}",
+                                f"{nom_cb.lower()}.{prenom_cb[0].lower()}@{domain_cb}"
+                            ]
+
+                        st.session_state["perm_result"] = list(dict.fromkeys(patterns_cb))
+
+                    # Ajout du bouton/lien Google et champ pour format d'email
+                    col_search, col_format = st.columns([1, 2])
+                    with col_search:
+                        google_url = get_charika_search_url(entreprise)
+                        st.markdown(f"<a href='{google_url}' target='_blank' style='font-size:16px;'>🔎 Rechercher sur Google</a>", unsafe_allow_html=True)
+
+                    with col_format:
+                        # Utiliser on_change pour déclencher la callback sur Enter / blur
+                        email_format = st.text_input(
+                            "Format d'email trouvé:",
+                            key="perm_email_format",
+                            placeholder="exemple@domaine.ma",
+                            on_change=_perm_apply_format_callback
+                        )
+                        # Si un format est déjà présent dans l'état, afficher le domaine utilisé
+                        if st.session_state.get("perm_email_format") and '@' in st.session_state.get("perm_email_format"):
+                            domain = st.session_state.get("perm_email_format").split('@')[1]
+                            st.success(f"✅ Domaine utilisé: @{domain}")
+                        else:
+                            domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"
+                else:
+                    domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"
+                
+                # Génération des permutations
+                # Vérifier si un format d'email personnalisé a été saisi
+                if source == "Charika.ma" and st.session_state.get("perm_email_format") and '@' in st.session_state.get("perm_email_format"):
+                    email_format = st.session_state.get("perm_email_format")
+                    
+                    # Analyser le format pour créer un pattern
+                    if 'prenom' in email_format.lower() or 'prénom' in email_format.lower():
+                        # Si le format contient "prenom" ou "prénom"
+                        patterns = [email_format.replace('prenom', prenom.lower())
+                                   .replace('prénom', prenom.lower())
+                                   .replace('nom', nom.lower())
+                                   .replace('p', prenom[0].lower())
+                                   .replace('n', nom[0].lower())]
+                        st.info("💡 Format d'email personnalisé appliqué")
+                    else:
+                        # Format standard avec les permutations habituelles
+                        patterns = [
+                            f"{prenom.lower()}.{nom.lower()}@{domain}",
+                            f"{prenom[0].lower()}{nom.lower()}@{domain}",
+                            f"{nom.lower()}.{prenom.lower()}@{domain}",
+                            f"{prenom.lower()}{nom.lower()}@{domain}",
+                            f"{prenom.lower()}-{nom.lower()}@{domain}",
+                            f"{nom.lower()}{prenom[0].lower()}@{domain}",
+                            f"{prenom[0].lower()}.{nom.lower()}@{domain}",
+                            f"{nom.lower()}.{prenom[0].lower()}@{domain}"
+                        ]
+                else:
+                    # Format standard avec les permutations habituelles
+                    patterns = [
+                        f"{prenom.lower()}.{nom.lower()}@{domain}",
+                        f"{prenom[0].lower()}{nom.lower()}@{domain}",
+                        f"{nom.lower()}.{prenom.lower()}@{domain}",
+                        f"{prenom.lower()}{nom.lower()}@{domain}",
+                        f"{prenom.lower()}-{nom.lower()}@{domain}",
+                        f"{nom.lower()}{prenom[0].lower()}@{domain}",
+                        f"{prenom[0].lower()}.{nom.lower()}@{domain}",
+                        f"{nom.lower()}.{prenom[0].lower()}@{domain}"
+                    ]
+                
+                total_time = time.time() - start_time
+                st.session_state["perm_result"] = list(set(patterns))
+                st.success(f"✅ {len(patterns)} permutations générées en {total_time:.1f}s")
         else:
             st.warning("⚠️ Veuillez remplir tous les champs")
 
