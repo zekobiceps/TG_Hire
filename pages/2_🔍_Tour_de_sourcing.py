@@ -402,10 +402,11 @@ def generate_boolean_variants(base_query: str, synonymes: str, comp_opt: str) ->
             seen.add(q); final.append((title, q))
     return final[:3]
 
-def generate_xray_query(site_cible: str, poste: str, mots_cles: str, localisation: str) -> str:
+def generate_xray_query(site_cible: str, poste: str, mots_cles: str, localisation: str, synonymes_or: str = "", file_type: str | None = None) -> str:
     """Génère une requête X-Ray améliorée.
     - Support multi mots-clés / localisations
     - Groupes OR pour élargir la recherche
+    - Prend en charge un champ de synonymes (OR) et un filtre de type de fichier (ex: pdf)
     """
     site_map = {"LinkedIn": "site:linkedin.com/in", "GitHub": "site:github.com"}
     site = site_map.get(site_cible, "site:linkedin.com/in")
@@ -415,12 +416,25 @@ def generate_xray_query(site_cible: str, poste: str, mots_cles: str, localisatio
     kws = _split_terms(mots_cles)
     if kws:
         parts.append(_or_group(kws))
+
+    # Synonymes OR optionnels (champ séparé pour élargir la recherche)
+    syns = _split_terms(synonymes_or)
+    if syns:
+        parts.append(_or_group(syns))
+
     locs = _split_terms(localisation)
     if locs:
         parts.append(_or_group(locs))
+
+    # Filtre de type de fichier (Google filetype)
+    if file_type:
+        file_type = file_type.strip().lower()
+        if file_type and file_type != "aucun":
+            parts.append(f"filetype:{file_type}")
+
     return ' '.join(parts)
 
-def generate_xray_variants(query: str, poste: str, mots_cles: str, localisation: str) -> list:
+def generate_xray_variants(query: str, poste: str, mots_cles: str, localisation: str, synonymes_or: str = "", file_type: str | None = None) -> list:
     variants = []
     try:
         if not query:
@@ -441,6 +455,18 @@ def generate_xray_variants(query: str, poste: str, mots_cles: str, localisation:
             loc_block = '(' + ' OR '.join(f'"{l}"' for l in locs) + ')'
             if any(l in query for l in locs):
                 variants.append(("Localisations OR", query + ' ' + loc_block))
+
+        # Ajouter une variante avec les synonymes fournis séparément
+        syns = _split_terms(synonymes_or)
+        if syns:
+            syn_block = '(' + ' OR '.join(f'"{s}"' for s in syns) + ')'
+            if syn_block not in query:
+                variants.append(("Synonymes OR séparés", query + ' ' + syn_block))
+
+        # Variante: si on cherche des PDFs, montrer la version avec filetype:pdf
+        if file_type and file_type.strip().lower() == 'pdf':
+            if 'filetype:pdf' not in query:
+                variants.append(("Avec filetype:pdf", query + ' filetype:pdf'))
     except Exception:
         pass
     # dédup
@@ -1373,34 +1399,43 @@ with tab1:
 # -------------------- Tab 2: X-Ray --------------------
 with tab2:
     st.header("🎯 X-Ray Google")
-    col1, col2 = st.columns(2)
-    with col1:
-        site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub"], key="xray_site")
-        poste_xray = st.text_input("Poste:", key="xray_poste", placeholder="Ex: Développeur Python")
-        mots_cles = st.text_input("Mots-clés:", key="xray_mots_cles", placeholder="Ex: Django, Flask")
-    with col2:
-        localisation_xray = st.text_input("Localisation:", key="xray_loc", placeholder="Ex: Casablanca")
-        exclusions_xray = st.text_input("Mots à exclure:", key="xray_exclusions", placeholder="Ex: Stage, Junior")
+    # Regrouper les champs dans un formulaire pour éviter des reruns automatiques lors de la saisie
+    with st.form(key="xray_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub"], key="xray_site")
+            poste_xray = st.text_input("Poste:", key="xray_poste", placeholder="Ex: Développeur Python")
+            mots_cles = st.text_input("Mots-clés:", key="xray_mots_cles", placeholder="Ex: Django, Flask")
+            synonymes_or = st.text_input("Synonymes (OR):", key="xray_synonymes_or", placeholder="Ex: dev backend, backend developer")
+        with col2:
+            localisation_xray = st.text_input("Localisation:", key="xray_loc", placeholder="Ex: Casablanca")
+            exclusions_xray = st.text_input("Mots à exclure:", key="xray_exclusions", placeholder="Ex: Stage, Junior")
+            file_type = st.selectbox("Type de fichier (optionnel):", ["aucun", "pdf", "docx"], index=0, key="xray_filetype")
 
-    if st.button("🔍 Construire X-Ray", type="primary", key="xray_build", use_container_width=True):
+        submitted = st.form_submit_button(label="🔍 Construire X-Ray")
+
+    if submitted:
         with st.spinner("⏳ Génération en cours..."):
             start_time = time.time()
             # Logic for X-Ray query generation
-            xray_query = generate_xray_query(site_cible, poste_xray, mots_cles, localisation_xray)
-            
+            # pass synonymes_or and file_type to enhance the query
+            xray_query = generate_xray_query(site_cible, poste_xray, mots_cles, localisation_xray, synonymes_or, file_type)
+
             # Add exclusions if any
             if exclusions_xray:
                 exclusion_terms = _split_terms(exclusions_xray)
                 if exclusion_terms:
                     xray_query += " -" + " -".join(exclusion_terms)
-            
+
             st.session_state["xray_query"] = xray_query
             st.session_state["xray_snapshot"] = {
                 "site": site_cible,
                 "poste": poste_xray,
                 "mots_cles": mots_cles,
                 "localisation": localisation_xray,
-                "exclusions": exclusions_xray
+                "exclusions": exclusions_xray,
+                "synonymes_or": synonymes_or,
+                "file_type": file_type
             }
             total_time = time.time() - start_time
             st.success(f"✅ Requête X-Ray générée en {total_time:.1f}s")
@@ -1417,7 +1452,9 @@ with tab2:
             snapx.get("poste") != poste_xray,
             snapx.get("mots_cles") != mots_cles,
             snapx.get("localisation") != localisation_xray,
-            snapx.get("exclusions") != exclusions_xray
+            snapx.get("exclusions") != exclusions_xray,
+            snapx.get("synonymes_or", "") != st.session_state.get("xray_synonymes_or", ""),
+            snapx.get("file_type", "") != st.session_state.get("xray_filetype", "")
         ])
     
     # Label avec indication si obsolète
@@ -1459,7 +1496,14 @@ with tab2:
 
     # Variantes
     if st.session_state.get("xray_query"):
-        x_vars = generate_xray_variants(st.session_state["xray_query"], poste_xray, mots_cles, localisation_xray)
+        x_vars = generate_xray_variants(
+            st.session_state["xray_query"],
+            poste_xray,
+            mots_cles,
+            localisation_xray,
+            st.session_state.get("xray_synonymes_or", ""),
+            st.session_state.get("xray_filetype", None)
+        )
         if x_vars:
             st.caption("🔀 Variantes proposées")
             for i, (title, qv) in enumerate(x_vars):
