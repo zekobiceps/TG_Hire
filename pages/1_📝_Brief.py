@@ -638,66 +638,106 @@ with tabs[0]:
                 date_brief_value = _parse_date_any(raw)
                 chosen_date = st.date_input("Date du brief", value=date_brief_value, key="date_brief")
 
-        if st.button("💾 Créer brief", type="primary", width="stretch", key="create_brief"):
-            required_fields = ["poste_intitule", "manager_nom", "affectation_nom", "date_brief"]
-            missing_fields = [field for field in required_fields if not st.session_state.get(field)]
-            if missing_fields:
-                st.error(f"Veuillez remplir les champs suivants : {', '.join(missing_fields)}")
-            else:
-                date_arg = st.session_state.date_brief
-                if isinstance(date_arg, str):
-                    for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
-                        try:
-                            date_arg = datetime.strptime(date_arg, fmt).date()
-                            break
-                        except:
-                            continue
-                if isinstance(date_arg, datetime):
-                    date_arg = date_arg.date()
+        # Si un brief est actuellement sélectionné, proposer de sauvegarder les modifications
+        if st.session_state.get("current_brief_name"):
+            if st.button("💾 Sauvegarder les modifications", type="primary", width="stretch", key="save_existing_brief"):
+                current = st.session_state.current_brief_name
+                bd = st.session_state.saved_briefs.get(current, {})
+                # Mettre à jour les champs de base
+                for low in ["poste_intitule","manager_nom","recruteur","affectation_type","affectation_nom","date_brief"]:
+                    if low in st.session_state:
+                        v = st.session_state.get(low, "")
+                        bd[low] = v
+                        bd[low.upper()] = v
 
-                new_brief_name = generate_automatic_brief_name(
-                    st.session_state.poste_intitule,
-                    st.session_state.manager_nom,
-                    date_arg
-                )
-                date_str = date_arg.strftime("%Y-%m-%d")
-
-                new_brief_data = {}
-                base_pairs = {
-                    "poste_intitule": "POSTE_INTITULE",
-                    "manager_nom": "MANAGER_NOM",
-                    "recruteur": "RECRUTEUR",
-                    "affectation_type": "AFFECTATION_TYPE",
-                    "affectation_nom": "AFFECTATION_NOM",
-                    "date_brief": "DATE_BRIEF"
-                }
-                for low, up in base_pairs.items():
-                    v = date_str if low == "date_brief" else st.session_state.get(low, "")
-                    new_brief_data[low] = v
-                    new_brief_data[up] = v
-
+                # Champs étendus
                 for k in all_field_keys:
                     v = st.session_state.get(k, "")
-                    new_brief_data[k] = v
+                    bd[k] = v
                     if k.startswith("profil_link_"):
                         suffix = k.split("_")[-1]
-                        new_brief_data[f"LIEN_PROFIL_{suffix}"] = v
+                        bd[f"LIEN_PROFIL_{suffix}"] = v
                     else:
-                        new_brief_data[k.upper()] = v
+                        bd[k.upper()] = v
 
-                new_brief_data["BRIEF_NAME"] = new_brief_name
+                # KSA
+                if "ksa_matrix" in st.session_state and isinstance(st.session_state.ksa_matrix, pd.DataFrame):
+                    bd["KSA_MATRIX_JSON"] = st.session_state.ksa_matrix.to_json(orient="records", force_ascii=False)
 
-                # Mise à jour session + sauvegarde
-                st.session_state.saved_briefs[new_brief_name] = new_brief_data
-                st.session_state.current_brief_name = new_brief_name
-                st.session_state.reunion_step = 1
-                st.session_state.reunion_completed = False
+                st.session_state.saved_briefs[current] = bd
                 save_briefs()
-                save_brief_to_gsheet(new_brief_name, new_brief_data)
-                # Recalcule les stats immédiatement
+                try:
+                    save_brief_to_gsheet(current, bd)
+                except Exception:
+                    pass
                 refresh_saved_briefs()
-                st.success(f"✅ Brief '{new_brief_name}' créé avec succès !")
+                st.success("✅ Modifications sauvegardées.")
                 st.rerun()
+        else:
+            # Mode création d'un nouveau brief
+            if st.button("💾 Créer brief", type="primary", width="stretch", key="create_brief"):
+                required_fields = ["poste_intitule", "manager_nom", "affectation_nom", "date_brief"]
+                missing_fields = [field for field in required_fields if not st.session_state.get(field)]
+                if missing_fields:
+                    st.error(f"Veuillez remplir les champs suivants : {', '.join(missing_fields)}")
+                else:
+                    date_arg = st.session_state.date_brief
+                    if isinstance(date_arg, str):
+                        for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+                            try:
+                                date_arg = datetime.strptime(date_arg, fmt).date()
+                                break
+                            except:
+                                continue
+                    if isinstance(date_arg, datetime):
+                        date_arg = date_arg.date()
+
+                    new_brief_name = generate_automatic_brief_name(
+                        st.session_state.poste_intitule,
+                        st.session_state.manager_nom,
+                        date_arg
+                    )
+                    date_str = date_arg.strftime("%Y-%m-%d")
+
+                    new_brief_data = {}
+                    base_pairs = {
+                        "poste_intitule": "POSTE_INTITULE",
+                        "manager_nom": "MANAGER_NOM",
+                        "recruteur": "RECRUTEUR",
+                        "affectation_type": "AFFECTATION_TYPE",
+                        "affectation_nom": "AFFECTATION_NOM",
+                        "date_brief": "DATE_BRIEF"
+                    }
+                    for low, up in base_pairs.items():
+                        v = date_str if low == "date_brief" else st.session_state.get(low, "")
+                        new_brief_data[low] = v
+                        new_brief_data[up] = v
+
+                    for k in all_field_keys:
+                        v = st.session_state.get(k, "")
+                        new_brief_data[k] = v
+                        if k.startswith("profil_link_"):
+                            suffix = k.split("_")[-1]
+                            new_brief_data[f"LIEN_PROFIL_{suffix}"] = v
+                        else:
+                            new_brief_data[k.upper()] = v
+
+                    new_brief_data["BRIEF_NAME"] = new_brief_name
+
+                    # Mise à jour session + sauvegarde
+                    st.session_state.saved_briefs[new_brief_name] = new_brief_data
+                    st.session_state.current_brief_name = new_brief_name
+                    st.session_state.reunion_step = 1
+                    st.session_state.reunion_completed = False
+                    save_briefs()
+                    try:
+                        save_brief_to_gsheet(new_brief_name, new_brief_data)
+                    except Exception:
+                        pass
+                    # Recalcule les stats immédiatement
+                    refresh_saved_briefs()
+                    st.success(f"✅ Brief '{new_brief_name}' créé avec succès !")
+                    st.rerun()
 
     # Bloc "Filtrer les briefs"
     with col_right:
@@ -1206,7 +1246,47 @@ with tabs[3]:
             a1, a2 = st.columns([1,1])
             with a1:
                 if st.button("💾 Sauvegarder synthèse", type="primary", key="btn_save_synthese", use_container_width=True):
-                    save_briefs(); save_brief_to_gsheet(st.session_state.current_brief_name, bd); st.success("Synthèse sauvegardée.")
+                    # Construire un dict complet à partir de la session (tous les onglets)
+                    try:
+                        name = st.session_state.current_brief_name
+                        brief_data = {}
+
+                        # Champs mappés (clé sheet -> clé session)
+                        for sheet_key, session_key in key_mapping.items():
+                            brief_data[sheet_key] = st.session_state.get(session_key, "")
+
+                        # Champs des sections (construits depuis les clés locales)
+                        for section in sections:
+                            for title, field_key, _ in section["fields"]:
+                                header = field_key.upper()
+                                unique_key = f"{section['title'].replace(' ', '_')}_{field_key}"
+                                brief_data[header] = st.session_state.get(unique_key, st.session_state.get(field_key, ""))
+
+                        # KSA (conserver DataFrame afin que save_brief_to_gsheet puisse le convertir)
+                        ksa = st.session_state.get("ksa_matrix")
+                        if ksa is not None:
+                            brief_data["ksa_matrix"] = ksa
+
+                        # Sauvegarde en session locale
+                        st.session_state.saved_briefs[name] = brief_data
+                        save_briefs()
+
+                        # Sauvegarde sur Google Sheets
+                        try:
+                            save_brief_to_gsheet(name, brief_data)
+                        except Exception as e:
+                            # Montrer un message non bloquant si l'envoi Sheets échoue
+                            st.warning(f"La sauvegarde vers Google Sheets a rencontré une erreur : {e}")
+
+                        # Rafraîchir les briefs chargés
+                        try:
+                            refresh_saved_briefs()
+                        except Exception:
+                            pass
+
+                        st.success("Synthèse sauvegardée.")
+                    except Exception as e:
+                        st.error(f"Erreur lors de la sauvegarde de la synthèse : {e}")
             with a2:
                 if st.button("🗑️ Supprimer le brief", key="btn_delete_synthese", use_container_width=True):
                     name = st.session_state.current_brief_name

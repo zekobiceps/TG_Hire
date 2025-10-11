@@ -1093,22 +1093,40 @@ def delete_brief_from_gsheet(brief_name: str) -> bool:
     Retourne True si la suppression réussit ou si la feuille n'est pas disponible.
     """
     try:
-        # get_briefs_gsheet_client retourne une worksheet
         worksheet = get_briefs_gsheet_client()
         if not worksheet:
-            # Aucun accès à Google Sheets -> rien à faire
+            # Pas de client Sheets : considérer comme succès silencieux
             return True
+
+        # Récupérer toutes les valeurs de la colonne A (BRIEF_NAME)
         try:
-            cell = worksheet.find(brief_name, in_column=1, case_sensitive=True)
-            if cell:
-                worksheet.delete_row(cell.row)
-                return True
+            col_values = worksheet.col_values(1)
         except Exception:
-            # si la recherche échoue, on ignore (feuille peut ne pas contenir)
+            # Si col_values échoue, retomber sur find (ancienne méthode)
+            try:
+                cell = worksheet.find(brief_name, in_column=1, case_sensitive=True)
+                if cell:
+                    worksheet.delete_row(cell.row)
+                return True
+            except Exception:
+                return False
+
+        # Trouver toutes les lignes où la valeur correspond exactement au nom
+        rows_to_delete = [i+1 for i, v in enumerate(col_values) if v == brief_name]
+        if not rows_to_delete:
+            # rien à supprimer
             return True
+
+        # Supprimer de la plus grande ligne vers la plus petite pour garder les indices valides
+        for row in sorted(rows_to_delete, reverse=True):
+            try:
+                worksheet.delete_row(row)
+            except Exception:
+                # si une suppression particulière échoue, continuer
+                continue
+        return True
     except Exception:
         return False
-    return True
 
 # -------------------- Génération de nom de brief automatique --------------------
 def generate_automatic_brief_name(poste: str = None, manager: str = None, date_obj=None):
