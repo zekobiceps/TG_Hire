@@ -964,7 +964,7 @@ def get_example_for_field(section_title, field_title):
         },
         "Conditions et contraintes": {
             "Localisation": [
-                "Chantier principal à Paris avec 20% de télétravail",
+                "Chantier principal à Rabat avec Déplacements fréquents sur d'autres chantiers",
                 "Poste basé sur site (déplacements fréquents inter-chantiers)",
                 "Localisation régionale avec hébergement temporaire possible",
                 "Travail principalement sur site, quelques réunions au siège",
@@ -976,28 +976,21 @@ def get_example_for_field(section_title, field_title):
                 "Localisation multi-sites selon planning trimestriel"
             ],
             "Budget recrutement": [
-                "Salaire entre 40k et 50k€ + primes",
-                "Rémunération selon profil + 13ème mois possible",
+                "Salaire entre X et Y + Avantages (voiture, téléphone...)",
                 "Package mobilité et prime d’expatriation selon cas",
-                "Budget fixe avec fourchette 38k-45k€",
-                "Salaire compétitif sur marché local",
-                "Contrat CDI avec prime d’objectif annuelle",
-                "Rémunération négociable selon expérience",
-                "Forfait jour ou heures selon convention collective",
-                "Avantages en nature (véhicule, téléphone) inclus",
-                "Indemnités de chantier et panier repas prévues"
+                "Budget fixe sur max X",
+                "Contrat CDD avec Fourchette X-Y",
             ]
         },
         "Sourcing et marché": {
             "Entreprises où trouver ce profil": [
                 "Vinci, Bouygues, Eiffage",
-                "Entreprises locales de construction spécialisées",
                 "Sous-traitants de réseaux et TP",
                 "Sociétés d’ingénierie structurelle",
                 "PME régionales actives sur grands chantiers",
-                "Groupes internationaux de BTP présents en France",
+                "Groupes internationaux de BTP présents au Maroc",
                 "Prestataires de maintenance industrielle",
-                "Ateliers de préfabrication et modélisation BIM",
+                "Bureau d'études modélisation BIM",
                 "Intégrateurs de solutions chantiers connectés",
                 "Entreprises spécialisées en infrastructures routières"
             ],
