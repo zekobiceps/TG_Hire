@@ -446,15 +446,18 @@ def generate_xray_query(site_cible: str, poste: str, mots_cles: str, localisatio
     # Filtre de type de fichier (Google filetype)
     if file_type:
         file_type = file_type.strip().lower()
-        if file_type and file_type != "aucun":
+        
+        # Cas spécial pour CV(test PX) - Requête spéciale pour trouver des CV sur LinkedIn
+        if file_type == 'cv(test px)':
+            # Réinitialiser les parts pour construire la requête spécifique CV
+            parts = ["site:linkedin.com"]
+            parts.append('("télécharger mon CV" OR "consultez mon CV" OR "mon portfolio")')
+            # On garde le poste s'il est spécifié
+            if poste:
+                parts.append(f'"{poste}"')
+        elif file_type != "aucun":
+            # Cas standard pour pdf et docx
             parts.append(f"filetype:{file_type}")
-
-            # If we're searching for PDFs, add common exclusions to reduce job posting noise
-            # to reduce job-ad noise when looking for CVs/PDF resumes.
-            if file_type == 'pdf':
-                parts.append('-intitle:"offre"')
-                parts.append('-inurl:"emploi"')
-                parts.append('-stage')
 
     return ' '.join(parts)
 
@@ -1434,7 +1437,7 @@ with tab2:
         with col2:
             localisation_xray = st.text_input("Localisation:", key="xray_loc", placeholder="Ex: Casablanca")
             exclusions_xray = st.text_input("Mots à exclure:", key="xray_exclusions", placeholder="Ex: Stage, Junior")
-            file_type = st.selectbox("Recherche par fichier (optionnel):", ["aucun", "pdf", "docx"], index=0, key="xray_filetype")
+            file_type = st.selectbox("Recherche par fichier (optionnel):", ["aucun", "pdf", "docx", "CV(test PX)"], index=0, key="xray_filetype")
 
         submitted = st.form_submit_button(label="🔍 Construire X-Ray")
 
@@ -1469,9 +1472,11 @@ Les pages LinkedIn sont des pages web (HTML), pas des PDF. Une requête avec `si
 
 L'application a donc:
 - Remplacé la contrainte `site:linkedin.com` par des indicateurs de CV (`intitle:cv OR "curriculum vitae"`)
-- Ajouté `filetype:pdf` et des exclusions utiles (`-offre`, `-emploi`, `-stage`)
+- Ajouté `filetype:pdf`
 
-Cette requête trouve des CV PDF sur le web entier, pas seulement sur LinkedIn.""")
+Cette requête trouve des CV PDF sur le web entier, pas seulement sur LinkedIn.
+
+**Conseil**: Pour trouver des CV sur LinkedIn, essayez l'option "CV(test PX)" dans le menu "Recherche par fichier".""")
             total_time = time.time() - start_time
             st.success(f"✅ Requête X-Ray générée en {total_time:.1f}s")
 
