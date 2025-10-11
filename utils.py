@@ -1073,22 +1073,42 @@ def get_example_for_field(section_title, field_title):
 
     pool = base_examples.get(section_title, {}).get(field_title)
     if not pool:
-        # fallback simple
         return "Exemple non disponible"
 
-    # Si l'élément du pool est une liste d'URL (liens), retourner jusqu'à 10 liens
+    # Toujours retourner exactement 2 exemples (ou moins si indisponible)
+    n = 2
     if isinstance(pool, list):
-        n = min(10, len(pool))
-        # si le pool a moins de 10 éléments, on répète des variantes aléatoires
-        if len(pool) < 10:
-            # duplicate with minor index suffix
-            chosen = [random.choice(pool) for _ in range(n)]
+        if len(pool) <= n:
+            chosen = pool
         else:
             chosen = random.sample(pool, n)
-        # Formatage : bullet list
         return "\n".join([f"- {s}" for s in chosen])
 
     return str(pool)
+
+
+def delete_brief_from_gsheet(brief_name: str) -> bool:
+    """Supprime une ligne correspondant à brief_name dans la feuille Google Sheets "Briefs".
+
+    Retourne True si la suppression réussit ou si la feuille n'est pas disponible.
+    """
+    try:
+        # get_briefs_gsheet_client retourne une worksheet
+        worksheet = get_briefs_gsheet_client()
+        if not worksheet:
+            # Aucun accès à Google Sheets -> rien à faire
+            return True
+        try:
+            cell = worksheet.find(brief_name, in_column=1, case_sensitive=True)
+            if cell:
+                worksheet.delete_row(cell.row)
+                return True
+        except Exception:
+            # si la recherche échoue, on ignore (feuille peut ne pas contenir)
+            return True
+    except Exception:
+        return False
+    return True
 
 # -------------------- Génération de nom de brief automatique --------------------
 def generate_automatic_brief_name(poste: str = None, manager: str = None, date_obj=None):

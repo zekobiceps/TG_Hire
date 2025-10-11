@@ -752,7 +752,22 @@ with tabs[0]:
                                 st.session_state.import_brief_flag=True; st.session_state.brief_to_import=name; st.rerun()
                         with c_del:
                             if st.button("🗑️ Supprimer", key=f"del_{name}", width="stretch"):
-                                st.session_state.saved_briefs.pop(name,None); save_briefs(); st.session_state.filtered_briefs.pop(name,None); st.success("Supprimé"); st.rerun()
+                                # Suppression locale
+                                st.session_state.saved_briefs.pop(name, None)
+                                save_briefs()
+                                st.session_state.filtered_briefs.pop(name, None)
+                                # Tentative suppression dans Google Sheets
+                                try:
+                                    from utils import delete_brief_from_gsheet, refresh_saved_briefs
+                                    delete_brief_from_gsheet(name)
+                                    refresh_saved_briefs()
+                                except Exception:
+                                    try:
+                                        refresh_saved_briefs()
+                                    except Exception:
+                                        pass
+                                st.success("Supprimé")
+                                st.rerun()
             else:
                 st.info("Aucun brief sauvegardé ou correspondant aux filtres.")
             # CSS pour réduire la taille des boutons éditer/supprimer
@@ -779,7 +794,10 @@ with tabs[1]:
         st.markdown("### 💡 Assistance IA (conseils ciblés)")
         c_ai1, c_ai2 = st.columns([3,1])
         with c_ai1:
-            ai_field_options = [f"{s['title']} ➜ {title}" for s in sections for title,_,_ in s["fields"]]
+            # Exclure la section 'Profils pertinents' du menu déroulant
+            ai_field_options = [f"{s['title']} ➜ {title}"
+                                for s in sections if s['title'] != 'Profils pertinents'
+                                for title,_,_ in s["fields"]]
             ai_selected = st.selectbox("Champ à enrichir", ai_field_options, key="ab_ai_field")
         with c_ai2:
             st.markdown("<div class='ai-red-btn'>", unsafe_allow_html=True)
@@ -1191,13 +1209,19 @@ with tabs[3]:
                     save_briefs(); save_brief_to_gsheet(st.session_state.current_brief_name, bd); st.success("Synthèse sauvegardée.")
             with a2:
                 if st.button("🗑️ Supprimer le brief", key="btn_delete_synthese", use_container_width=True):
-                    st.session_state.saved_briefs.pop(st.session_state.current_brief_name, None)
+                    name = st.session_state.current_brief_name
+                    st.session_state.saved_briefs.pop(name, None)
                     save_briefs()
-                    # Mettre à jour les stats
+                    # Tentative suppression sur Google Sheets + refresh
                     try:
+                        from utils import delete_brief_from_gsheet, refresh_saved_briefs
+                        delete_brief_from_gsheet(name)
                         refresh_saved_briefs()
                     except Exception:
-                        pass
+                        try:
+                            refresh_saved_briefs()
+                        except Exception:
+                            pass
                     st.session_state.current_brief_name = ""
                     st.success("Brief supprimé.")
                     st.rerun()
