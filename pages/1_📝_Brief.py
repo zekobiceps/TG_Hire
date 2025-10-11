@@ -53,8 +53,10 @@ st.markdown("""
     .streamlit-expanderHeader{font-weight:600;}
     .stDataFrame{width:100%;}
     .stTextArea textarea{min-height:100px;resize:vertical;white-space:pre-wrap!important;}
+    /* cible plus spécifique pour les boutons dans les forms (st.form) */
     .ai-red-btn button{background:#C40000!important;color:#fff!important;border:1px solid #960000!important;font-weight:600!important;}
     .ai-red-btn button:hover{background:#E00000!important;}
+    form .ai-red-btn button, .stForm .ai-red-btn button { background:#C40000!important; color:#fff!important; border:1px solid #960000!important; }
     .ai-suggestion-box{background:linear-gradient(135deg,#e6ffed,#f4fff7);border-left:5px solid #23C552;padding:0.6rem 0.8rem;margin:0.3rem 0 0.8rem;border-radius:6px;font-size:.9rem;}
     .score-cible{font-size:24px!important;font-weight:700;color:#0057B7;margin-top:.5rem;}
     .brief-name{padding-top:0.05rem;font-size:1.05rem;font-weight:650;display:flex;align-items:center;}
@@ -1026,9 +1028,10 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                     evaluation = st.slider("Évaluation (1-5)", 1,5,3, key="ks_evaluation")
 
                 ai_prompt = st.text_input("Prompt IA (génération question)", key="ks_ai_prompt",
-                                          value=st.session_state.get("ks_ai_prompt",""),
+                                          value=st.session_state.get("ks_ai_prompt", ""),
                                           placeholder="Ex: question comportementale sur gestion de conflit priorisation")
-                concise = st.checkbox("⚡ Mode rapide (réponse concise)", key="ks_concise")
+                # Par défaut, mode concis activé
+                concise = st.checkbox("⚡ Mode rapide (réponse concise)", key="ks_concise", value=True)
 
                 bcol1, bcol2 = st.columns([1,1])
                 with bcol1:
