@@ -1084,13 +1084,16 @@ with st.sidebar:
     st.info("💡 Assistant IA pour le sourcing et recrutement")
 
 # -------------------- Onglets --------------------
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+# Utiliser un radio horizontal au lieu de st.tabs pour conserver l'onglet actif
+tab_options = [
     "🔍 Boolean", "🎯 X-Ray", "🔎 CSE LinkedIn",
     "🕷️ Web Scraper", "✉️ InMail", "🤖 Assistant Sourcing", "📧 Permutateur", "📚 Bibliothèque"
-])
+]
+selected_tab = st.session_state.get("selected_tab", tab_options[0])
+selected_tab = st.radio("", tab_options, index=tab_options.index(selected_tab), horizontal=True, key="selected_tab")
 
 # -------------------- Tab 1: Boolean Search --------------------
-with tab1:
+if selected_tab == "🔍 Boolean":
     st.header("🔍 Recherche Boolean")
     
     # Option fiche de poste pour l'IA
@@ -1426,7 +1429,7 @@ with tab1:
 
 
 # -------------------- Tab 2: X-Ray --------------------
-with tab2:
+if selected_tab == "🎯 X-Ray":
     st.header("🎯 X-Ray Google")
     # Regrouper les champs dans un formulaire pour éviter des reruns automatiques lors de la saisie
     with st.form(key="xray_form"):
@@ -1577,7 +1580,7 @@ Cette requête trouve des CV PDF sur le web entier, pas seulement sur LinkedIn.
             st.info("Aucune variante générée pour la requête actuelle.")
 
 # -------------------- Tab 3: CSE --------------------
-with tab3:
+if selected_tab == "🔎 CSE LinkedIn":
     st.header("🔎 CSE LinkedIn")
     col1, col2 = st.columns(2)
     with col1:
@@ -1627,7 +1630,7 @@ with tab3:
             st.link_button("🌐 Ouvrir sur CSE", cse_url, use_container_width=True)
 
 # -------------------- Tab 4: Web Scraper - Analyse Concurrentielle --------------------
-with tab4:
+if selected_tab == "🕷️ Web Scraper":
     st.header("🔍 Analyse Concurrentielle - Offres d'Emploi")
     
     # Configuration du scraping
@@ -1981,7 +1984,7 @@ with tab4:
         """)
 
 # -------------------- Tab 5: InMail --------------------
-with tab5:
+if selected_tab == "✉️ InMail":
     st.header("✉️ Générateur d'InMail Personnalisé")
 
     # --------- FONCTIONS UTILES ---------
@@ -2228,7 +2231,7 @@ Cordialement."""
 
 
 # -------------------- Tab 6: Assistant Sourcing --------------------
-with tab6:
+if selected_tab == "🤖 Assistant Sourcing":
     questions_pretes = [
         "Quels sont les synonymes possibles pour le métier de",
         "Quels outils ou logiciels sont liés au métier de", 
@@ -2310,7 +2313,7 @@ with tab6:
             st.rerun()
             
 # -------------------- Tab 7: Permutateur --------------------
-with tab7:
+if selected_tab == "📧 Permutateur":
     st.header("📧 Permutateur Email")
 
     # Génération de noms marocains aléatoires
@@ -2338,135 +2341,90 @@ with tab7:
     with col2:
         entreprise = st.text_input("Entreprise:", key="perm_entreprise", placeholder="TGCC")
         source = st.radio("Source de détection :", ["Site officiel", "Charika.ma"], key="perm_source", horizontal=True)
-    
 
+    # Callback to apply custom format
+    def _perm_apply_format_callback():
+        prenom_cb = st.session_state.get("perm_prenom", "").strip()
+        nom_cb = st.session_state.get("perm_nom", "").strip()
+        entreprise_cb = st.session_state.get("perm_entreprise", "").strip()
+        source_cb = st.session_state.get("perm_source", "Site officiel")
+        email_format_cb = st.session_state.get("perm_email_format", "").strip()
 
+        if not (prenom_cb and nom_cb and entreprise_cb):
+            return
 
+        if email_format_cb and '@' in email_format_cb:
+            domain_cb = email_format_cb.split('@', 1)[1]
+        else:
+            domain_cb = f"{entreprise_cb.lower().replace(' ', '').replace('-', '')}.ma"
+
+        patterns_cb = []
+        if source_cb == "Charika.ma" and email_format_cb and '@' in email_format_cb:
+            ef = email_format_cb
+            if ('prenom' in ef.lower() or 'prénom' in ef.lower() or 'nom' in ef.lower() or
+                    '{p}' in ef or '{n}' in ef or '{prenom}' in ef.lower() or '{nom}' in ef.lower()):
+                pat = ef
+                pat = pat.replace('{prenom}', prenom_cb.lower()).replace('{Prenom}', prenom_cb.lower())
+                pat = pat.replace('{nom}', nom_cb.lower()).replace('{Nom}', nom_cb.lower())
+                if prenom_cb:
+                    pat = pat.replace('{p}', prenom_cb[0].lower())
+                if nom_cb:
+                    pat = pat.replace('{n}', nom_cb[0].lower())
+                pat = pat.replace('prenom', prenom_cb.lower()).replace('prénom', prenom_cb.lower())
+                pat = pat.replace('nom', nom_cb.lower())
+                patterns_cb = [pat]
+            else:
+                patterns_cb = [email_format_cb]
+        else:
+            patterns_cb = [
+                f"{prenom_cb.lower()}.{nom_cb.lower()}@{domain_cb}",
+                f"{prenom_cb[0].lower()}{nom_cb.lower()}@{domain_cb}",
+                f"{nom_cb.lower()}.{prenom_cb.lower()}@{domain_cb}",
+                f"{prenom_cb.lower()}{nom_cb.lower()}@{domain_cb}",
+                f"{prenom_cb.lower()}-{nom_cb.lower()}@{domain_cb}",
+                f"{nom_cb.lower()}{prenom_cb[0].lower()}@{domain_cb}",
+                f"{prenom_cb[0].lower()}.{nom_cb.lower()}@{domain_cb}",
+                f"{nom_cb.lower()}.{prenom_cb[0].lower()}@{domain_cb}"
+            ]
+
+        st.session_state["perm_result"] = list(dict.fromkeys(patterns_cb))
+
+    # Show persistent Google link and format input
+    col_search, col_format = st.columns([1, 2])
+    with col_search:
+        if entreprise:
+            google_url = get_charika_search_url(entreprise)
+            st.markdown(f"<a href='{google_url}' target='_blank' style='font-size:16px;'>🔎 Rechercher sur Google</a>", unsafe_allow_html=True)
+    with col_format:
+        c_input, c_btn = st.columns([3, 1])
+        with c_input:
+            st.text_input("Format d'email trouvé:", key="perm_email_format", placeholder="exemple@domaine.ma", on_change=_perm_apply_format_callback)
+        with c_btn:
+            if st.button("Appliquer", key="perm_apply_btn"):
+                _perm_apply_format_callback()
+                st.success("✅ Format appliqué")
+
+    # Main generate button
     if st.button("🔮 Générer permutations", use_container_width=True):
-        if prenom and nom and entreprise:
+        if not (prenom and nom and entreprise):
+            st.warning("⚠️ Veuillez remplir tous les champs")
+        else:
             with st.spinner("⏳ Génération des permutations..."):
                 start_time = time.time()
-                permutations = []
-                detected = get_email_from_charika(entreprise) if source == "Charika.ma" else None
-                
-                if detected and source == "Charika.ma":
-                    st.info(f"📧 Format détecté sur Charika.ma : {detected}")
-                    domain = detected.split("@")[1]
-                elif source == "Charika.ma":
-                    # Email non détecté sur Charika
-                    st.error(f"❌ Format d'email non détecté sur Charika.ma pour '{entreprise}'")
+                domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"
 
-                    # Callback local pour appliquer le format d'email saisi et régénérer les permutations
-                    def _perm_apply_format_callback():
-                        prenom_cb = st.session_state.get("perm_prenom", "").strip()
-                        nom_cb = st.session_state.get("perm_nom", "").strip()
-                        entreprise_cb = st.session_state.get("perm_entreprise", "").strip()
-                        source_cb = st.session_state.get("perm_source", "Site officiel")
-                        email_format_cb = st.session_state.get("perm_email_format", "").strip()
-
-                        # Nécessite les champs de base
-                        if not (prenom_cb and nom_cb and entreprise_cb):
-                            return
-
-                        # Déterminer le domaine
-                        if email_format_cb and '@' in email_format_cb:
-                            domain_cb = email_format_cb.split('@', 1)[1]
-                        else:
-                            domain_cb = f"{entreprise_cb.lower().replace(' ', '').replace('-', '')}.ma"
-
-                        # Construire les patterns
-                        patterns_cb = []
-                        if source_cb == "Charika.ma" and email_format_cb and '@' in email_format_cb:
-                            ef = email_format_cb
-                            # Si le format contient des placeholders lisibles
-                            if ('prenom' in ef.lower() or 'prénom' in ef.lower() or 'nom' in ef.lower() or
-                                    '{p}' in ef or '{n}' in ef or '{prenom}' in ef.lower() or '{nom}' in ef.lower()):
-                                pattern = ef
-                                # Remplacements simples (supporte {prenom}, {nom}, {p}, {n} et mots clefs sans accolades)
-                                pattern = pattern.replace('{prenom}', prenom_cb.lower()).replace('{Prenom}', prenom_cb.lower())
-                                pattern = pattern.replace('{nom}', nom_cb.lower()).replace('{Nom}', nom_cb.lower())
-                                pattern = pattern.replace('{p}', prenom_cb[0].lower()).replace('{n}', nom_cb[0].lower())
-                                # aussi supporter mots-clés simples
-                                pattern = pattern.replace('prenom', prenom_cb.lower()).replace('prénom', prenom_cb.lower())
-                                pattern = pattern.replace('nom', nom_cb.lower())
-                                patterns_cb = [pattern]
-                            else:
-                                # si l'utilisateur a fourni un exemple d'email complet, on l'utilise tel quel
-                                patterns_cb = [email_format_cb]
-                        else:
-                            # Format standard avec les permutations habituelles
-                            patterns_cb = [
-                                f"{prenom_cb.lower()}.{nom_cb.lower()}@{domain_cb}",
-                                f"{prenom_cb[0].lower()}{nom_cb.lower()}@{domain_cb}",
-                                f"{nom_cb.lower()}.{prenom_cb.lower()}@{domain_cb}",
-                                f"{prenom_cb.lower()}{nom_cb.lower()}@{domain_cb}",
-                                f"{prenom_cb.lower()}-{nom_cb.lower()}@{domain_cb}",
-                                f"{nom_cb.lower()}{prenom_cb[0].lower()}@{domain_cb}",
-                                f"{prenom_cb[0].lower()}.{nom_cb.lower()}@{domain_cb}",
-                                f"{nom_cb.lower()}.{prenom_cb[0].lower()}@{domain_cb}"
-                            ]
-
-                        st.session_state["perm_result"] = list(dict.fromkeys(patterns_cb))
-
-                    # Ajout du bouton/lien Google et champ pour format d'email
-                    col_search, col_format = st.columns([1, 2])
-                    with col_search:
-                        google_url = get_charika_search_url(entreprise)
-                        st.markdown(f"<a href='{google_url}' target='_blank' style='font-size:16px;'>🔎 Rechercher sur Google</a>", unsafe_allow_html=True)
-
-                    with col_format:
-                        # Layout pour input + bouton appliquer
-                        c_input, c_btn = st.columns([3, 1])
-                        with c_input:
-                            email_format = st.text_input(
-                                "Format d'email trouvé:",
-                                key="perm_email_format",
-                                placeholder="exemple@domaine.ma",
-                                on_change=_perm_apply_format_callback
-                            )
-                        with c_btn:
-                            if st.button("Appliquer", key="perm_apply_btn"):
-                                # Appeler explicitement la même callback
-                                _perm_apply_format_callback()
-                                st.success("✅ Format appliqué")
-
-                        # Si un format est déjà présent dans l'état, afficher le domaine utilisé
-                        if st.session_state.get("perm_email_format") and '@' in st.session_state.get("perm_email_format"):
-                            domain = st.session_state.get("perm_email_format").split('@')[1]
-                            st.success(f"✅ Domaine utilisé: @{domain}")
-                        else:
-                            domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"
-                else:
-                    domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"
-                
-                # Génération des permutations
-                # Vérifier si un format d'email personnalisé a été saisi
-                if source == "Charika.ma" and st.session_state.get("perm_email_format") and '@' in st.session_state.get("perm_email_format"):
-                    email_format = st.session_state.get("perm_email_format")
-                    
-                    # Analyser le format pour créer un pattern
-                    if 'prenom' in email_format.lower() or 'prénom' in email_format.lower():
-                        # Si le format contient "prenom" ou "prénom"
-                        patterns = [email_format.replace('prenom', prenom.lower())
-                                   .replace('prénom', prenom.lower())
-                                   .replace('nom', nom.lower())
-                                   .replace('p', prenom[0].lower())
-                                   .replace('n', nom[0].lower())]
-                        st.info("💡 Format d'email personnalisé appliqué")
+                if source == "Charika.ma":
+                    detected = get_email_from_charika(entreprise)
+                    if detected:
+                        st.info(f"📧 Format détecté sur Charika.ma : {detected}")
+                        domain = detected.split("@", 1)[1]
                     else:
-                        # Format standard avec les permutations habituelles
-                        patterns = [
-                            f"{prenom.lower()}.{nom.lower()}@{domain}",
-                            f"{prenom[0].lower()}{nom.lower()}@{domain}",
-                            f"{nom.lower()}.{prenom.lower()}@{domain}",
-                            f"{prenom.lower()}{nom.lower()}@{domain}",
-                            f"{prenom.lower()}-{nom.lower()}@{domain}",
-                            f"{nom.lower()}{prenom[0].lower()}@{domain}",
-                            f"{prenom[0].lower()}.{nom.lower()}@{domain}",
-                            f"{nom.lower()}.{prenom[0].lower()}@{domain}"
-                        ]
+                        st.warning(f"⚠️ Aucun email détecté sur Charika.ma pour '{entreprise}'. Vous pouvez saisir un format manuellement ci-dessus.")
+
+                # If a custom format with domain/placeholders exists, apply it
+                if st.session_state.get("perm_email_format") and '@' in st.session_state.get("perm_email_format"):
+                    _perm_apply_format_callback()
                 else:
-                    # Format standard avec les permutations habituelles
                     patterns = [
                         f"{prenom.lower()}.{nom.lower()}@{domain}",
                         f"{prenom[0].lower()}{nom.lower()}@{domain}",
@@ -2477,19 +2435,17 @@ with tab7:
                         f"{prenom[0].lower()}.{nom.lower()}@{domain}",
                         f"{nom.lower()}.{prenom[0].lower()}@{domain}"
                     ]
-                
+                    st.session_state["perm_result"] = list(dict.fromkeys(patterns))
+
                 total_time = time.time() - start_time
-                st.session_state["perm_result"] = list(set(patterns))
-                st.success(f"✅ {len(patterns)} permutations générées en {total_time:.1f}s")
-        else:
-            st.warning("⚠️ Veuillez remplir tous les champs")
+                st.success(f"✅ {len(st.session_state.get('perm_result', []))} permutations générées en {total_time:.1f}s")
 
     if st.session_state.get("perm_result"):
         st.text_area("Résultats:", value="\n".join(st.session_state["perm_result"]), height=150)
         st.caption("🔍 Tester sur : [Hunter.io](https://hunter.io/) ou [NeverBounce](https://neverbounce.com/)")
 
 # -------------------- Tab 8: Bibliothèque --------------------
-with tab8:
+if selected_tab == "📚 Bibliothèque":
     st.header("📚 Bibliothèque des recherches")
     # Actualisation auto depuis Google Sheets
     entries_local = st.session_state.library_entries if st.session_state.library_entries else []
