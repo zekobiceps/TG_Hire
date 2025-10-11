@@ -8,6 +8,46 @@ import re
 import time
 from urllib.parse import quote
 from datetime import datetime
+import os
+import json
+import pandas as pd
+from collections import Counter
+
+# Définitions par défaut pour éviter les NameError si l'import utils échoue
+def get_tokens_gsheet_client():
+    """Défaut non bloquant : retourne None si le client Google Sheets n'est pas disponible."""
+    return None
+
+
+# Tentative d'import des helpers tokens (Google Sheets). Si absents, fournir des wrappers
+try:
+    # Prefer a module-level helper if present, fallback to utils
+    try:
+        # si un getter local spécifique existe dans un autre module, importer en priorité
+        from utils import get_tokens_gsheet_client as _utils_get_tokens_gsheet_client, save_tokens_to_gsheet
+        get_tokens_gsheet_client = _utils_get_tokens_gsheet_client
+    except Exception:
+        from utils import get_tokens_gsheet_client, save_tokens_to_gsheet
+except Exception:
+    def get_tokens_gsheet_client():
+        """Fallback minimal: retourne None si la connexion Google Sheets n'est pas configurée."""
+        return None
+
+    def save_tokens_to_gsheet(usage, function_name, user):
+        """Fallback minimal: journalise localement si Google Sheets indisponible."""
+        try:
+            entry = {
+                "timestamp": datetime.now().isoformat(),
+                "usage": int(usage or 0),
+                "function": function_name,
+                "user": user or "",
+            }
+            # append as newline-delimited JSON for simple local inspection
+            with open("tokens_log.ndjson", "a", encoding="utf-8") as f:
+                f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except Exception:
+            # silent fallback
+            pass
 
 def load_total_tokens_from_gsheet():
     """Charge le total cumulé des tokens depuis Google Sheets"""
@@ -191,7 +231,13 @@ def init_session_state():
     """Initialise les variables de session"""
     # Charger le total cumulé depuis Google Sheets au premier chargement
     if "tokens_loaded" not in st.session_state:
-        total_from_sheets = load_total_tokens_from_gsheet()
+        try:
+            total_from_sheets = load_total_tokens_from_gsheet()
+        except Exception as e:
+            # En production (Streamlit Cloud) il est possible que la fonction ne soit
+            # pas disponible ou l'appel provoque une NameError; on tombe proprement à 0.
+            st.warning(f"⚠️ Impossible de charger le total depuis Google Sheets, fallback à 0 : {e}")
+            total_from_sheets = 0
         st.session_state["tokens_loaded"] = True
         api_usage = {"current_session_tokens": 0, "used_tokens": total_from_sheets}
     else:
@@ -214,6 +260,15 @@ def init_session_state():
         "inmail_objet": "",
         "inmail_generated": False,
         "inmail_profil_data": {},
+        # Defaults to avoid NameError when UI variables are referenced before being set
+        "submitted": False,
+        "site_cible": "",
+        "poste_xray": "",
+        "mots_cles": "",
+        "localisation_xray": "",
+        "synonymes_or": "",
+        "file_type": None,
+        "exclusions_xray": "",
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -1296,31 +1351,39 @@ with tab1:
         with cols_actions[1]:
             # Placeholder pour les actions liées (ex: Sauvegarder)
             pass
-    if submitted:
+    if st.session_state.get("submitted"):
         with st.spinner("⏳ Génération en cours..."):
             start_time = time.time()
+            # Read inputs from session_state safely
+            site_cible_val = st.session_state.get("site_cible", "")
+            poste_xray_val = st.session_state.get("poste_xray", "")
+            mots_cles_val = st.session_state.get("mots_cles", "")
+            localisation_xray_val = st.session_state.get("localisation_xray", "")
+            synonymes_or_val = st.session_state.get("synonymes_or", "")
+            file_type_val = st.session_state.get("file_type", None)
+            exclusions_xray_val = st.session_state.get("exclusions_xray", "")
+
             # Logic for X-Ray query generation
-            # pass synonymes_or and file_type to enhance the query
-            xray_query = generate_xray_query(site_cible, poste_xray, mots_cles, localisation_xray, synonymes_or, file_type)
+            xray_query = generate_xray_query(site_cible_val, poste_xray_val, mots_cles_val, localisation_xray_val, synonymes_or_val, file_type_val)
 
             # Add exclusions if any
-            if exclusions_xray:
-                exclusion_terms = _split_terms(exclusions_xray)
+            if exclusions_xray_val:
+                exclusion_terms = _split_terms(exclusions_xray_val)
                 if exclusion_terms:
                     xray_query += " -" + " -".join(exclusion_terms)
 
             st.session_state["xray_query"] = xray_query
             st.session_state["xray_snapshot"] = {
-                "site": site_cible,
-                "poste": poste_xray,
-                "mots_cles": mots_cles,
-                "localisation": localisation_xray,
-                "exclusions": exclusions_xray,
-                "synonymes_or": synonymes_or,
-                "file_type": file_type
+                "site": site_cible_val,
+                "poste": poste_xray_val,
+                "mots_cles": mots_cles_val,
+                "localisation": localisation_xray_val,
+                "exclusions": exclusions_xray_val,
+                "synonymes_or": synonymes_or_val,
+                "file_type": file_type_val
             }
             # Inform user if they asked for LinkedIn + filetype:pdf (contradiction)
-            if file_type and file_type.strip().lower() == 'pdf' and site_cible == 'LinkedIn':
+            if file_type_val and isinstance(file_type_val, str) and file_type_val.strip().lower() == 'pdf' and site_cible_val == 'LinkedIn':
                 st.warning("""⚠️ **Attention**: Vous avez demandé des PDF sur LinkedIn. Cette combinaison donne généralement 0 résultat.
                 
 Les pages LinkedIn sont des pages web (HTML), pas des PDF. Une requête avec `site:linkedin.com` et `filetype:pdf` est contradictoire.
@@ -1343,11 +1406,11 @@ Cette requête trouve des CV PDF sur le web entier, pas seulement sur LinkedIn.
     params_changed_xray = False
     if snapx and query_value_xray:
         params_changed_xray = any([
-            snapx.get("site") != site_cible,
-            snapx.get("poste") != poste_xray,
-            snapx.get("mots_cles") != mots_cles,
-            snapx.get("localisation") != localisation_xray,
-            snapx.get("exclusions") != exclusions_xray,
+            snapx.get("site") != st.session_state.get("site_cible", ""),
+            snapx.get("poste") != st.session_state.get("poste_xray", ""),
+            snapx.get("mots_cles") != st.session_state.get("mots_cles", ""),
+            snapx.get("localisation") != st.session_state.get("localisation_xray", ""),
+            snapx.get("exclusions") != st.session_state.get("exclusions_xray", ""),
             snapx.get("synonymes_or", "") != st.session_state.get("xray_synonymes_or", ""),
             snapx.get("file_type", "") != st.session_state.get("xray_filetype", "")
         ])
@@ -1375,7 +1438,7 @@ Cette requête trouve des CV PDF sur le web entier, pas seulement sur LinkedIn.
                 entry = {
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "type": "X-Ray",
-                    "poste": poste_xray,
+                    "poste": st.session_state.get("poste_xray", ""),
                     "requete": st.session_state["xray_query"],
                     "utilisateur": st.session_state.get("user", ""),
                     "source": "X-Ray",
@@ -1393,9 +1456,9 @@ Cette requête trouve des CV PDF sur le web entier, pas seulement sur LinkedIn.
     if st.session_state.get("xray_query"):
         x_vars = generate_xray_variants(
             st.session_state["xray_query"],
-            poste_xray,
-            mots_cles,
-            localisation_xray,
+            st.session_state.get("poste_xray", ""),
+            st.session_state.get("mots_cles", ""),
+            st.session_state.get("localisation_xray", ""),
             st.session_state.get("xray_synonymes_or", ""),
             st.session_state.get("xray_filetype", None)
         )
@@ -1413,7 +1476,7 @@ Cette requête trouve des CV PDF sur le web entier, pas seulement sur LinkedIn.
                         entry = {
                             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                             "type": "X-Ray Variante",
-                            "poste": poste_xray,
+                            "poste": st.session_state.get("poste_xray", ""),
                             "requete": qv,
                             "utilisateur": st.session_state.get("user", ""),
                             "source": "X-Ray",

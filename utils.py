@@ -221,6 +221,72 @@ def get_briefs_gsheet_client():
         st.error(f"❌ Erreur de connexion/ouverture de Google Sheets: {e}")
         return None
 
+# -------------------- TOKENS Google Sheet (suivi consommation IA) --------------------
+TOKENS_SHEET_URL_KEY = "TOKENS_SHEET_URL"
+TOKENS_WORKSHEET_NAME = "Tokens"
+
+
+@st.cache_resource
+def get_tokens_gsheet_client():
+    """Retourne la worksheet pour le suivi des tokens si configurée.
+
+    Attends la présence de la clé de secret `TOKENS_SHEET_URL` (ou la variable d'env).
+    Retourne None si gspread n'est pas disponible ou si la config manque.
+    """
+    if not GSPREAD_AVAILABLE:
+        return None
+    try:
+        sheet_url = st.secrets.get(TOKENS_SHEET_URL_KEY) or os.environ.get(TOKENS_SHEET_URL_KEY)
+        if not sheet_url:
+            # Pas configuré ; caller fera fallback
+            return None
+        service_account_info = _build_service_account_info_from_st_secrets()
+        gc = gspread.service_account_from_dict(service_account_info)
+        spreadsheet = gc.open_by_url(sheet_url)
+        worksheet = spreadsheet.worksheet(TOKENS_WORKSHEET_NAME)
+        return worksheet
+    except KeyError as e:
+        st.error(f"❌ Clé de secret manquante pour Google Sheets (TOKENS): {e}")
+        return None
+    except Exception as e:
+        st.warning(f"⚠️ Impossible d'initialiser le client Tokens Google Sheets: {e}")
+        return None
+
+
+def save_tokens_to_gsheet(usage, function_name, user):
+    """Sauvegarde une ligne d'usage des tokens dans la feuille 'Tokens'.
+
+    Row format proposé : [timestamp, action, function, user, tokens_used, cumulative_total]
+    Si la feuille n'est pas configurée, retourne False.
+    """
+    try:
+        ws = get_tokens_gsheet_client()
+        if ws is None:
+            return False
+
+        records = ws.get_all_records()
+        cumulative = 0
+        # Trouver le dernier total si présent
+        for rec in reversed(records):
+            if rec.get("action") == "USAGE":
+                try:
+                    cumulative = int(rec.get("cumulative_total", 0))
+                except Exception:
+                    cumulative = 0
+                break
+            if rec.get("action") == "RESET TOTAL":
+                cumulative = 0
+                break
+
+        used = int(usage or 0)
+        new_total = cumulative + used
+        row = [datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "USAGE", function_name or "", user or "", used, new_total]
+        ws.append_row(row)
+        return True
+    except Exception as e:
+        st.warning(f"⚠️ Échec sauvegarde tokens (Google Sheets): {e}")
+        return False
+
 def save_brief_to_gsheet(brief_name, brief_data):
     """Sauvegarde (création / update) du brief dans Google Sheets avec normalisation champs."""
     worksheet = get_briefs_gsheet_client()
