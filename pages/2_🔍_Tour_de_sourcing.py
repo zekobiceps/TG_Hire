@@ -1082,8 +1082,8 @@ with st.sidebar:
     st.info("💡 Assistant IA pour le sourcing et recrutement")
 
 # -------------------- Onglets --------------------
-tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8, tab9 = st.tabs([
-    "🔍 Boolean", "🎯 X-Ray", "🔎 CSE LinkedIn", "🐶 Dogpile", 
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
+    "🔍 Boolean", "🎯 X-Ray", "🔎 CSE LinkedIn", 
     "🕷️ Web Scraper", "✉️ InMail", "🤖 Magicien", "📧 Permutateur", "📚 Bibliothèque"
 ])
 
@@ -1624,68 +1624,8 @@ with tab3:
             cse_url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
             st.link_button("🌐 Ouvrir sur CSE", cse_url, use_container_width=True)
 
-# -------------------- Tab 4: Dogpile --------------------
+# -------------------- Tab 4: Web Scraper - Analyse Concurrentielle --------------------
 with tab4:
-    st.header("🐶 Dogpile Search")
-    query = st.text_input("Requête Dogpile:", key="dogpile_query_input", placeholder="Ex: Python developer Casablanca")
-    if st.button("🔍 Rechercher", key="dogpile_search_btn", type="primary", use_container_width=True):
-        if query:
-            st.session_state["dogpile_query"] = query
-            st.session_state["dogpile_snapshot"] = query
-            st.success("✅ Requête enregistrée")
-            st.rerun()
-
-    # Affichage uniquement si une requête a été générée
-    if st.session_state.get("dogpile_query"):
-        # Affichage unifié avec détection de changement
-        snap_dogpile = st.session_state.get("dogpile_snapshot", "")
-        query_value_dogpile = st.session_state.get("dogpile_query", "")
-        
-        # Vérifier si les paramètres ont changé
-        params_changed_dogpile = False
-        if snap_dogpile and query_value_dogpile:
-            params_changed_dogpile = snap_dogpile != query
-        
-        # Label avec indication si obsolète
-        label_dogpile = "Requête Dogpile:"
-        if params_changed_dogpile:
-            label_dogpile += " ⚠️ (Requête obsolète - paramètres modifiés - Rechercher pour mettre à jour)"
-        
-        # Widget unifié
-        st.text_area(label_dogpile, value=query_value_dogpile, height=80)
-    
-    # Boutons et commentaires (seulement si requête existe)
-    if st.session_state.get("dogpile_query"):
-        # Zone commentaire
-        dogpile_commentaire = st.text_input("Commentaire (optionnel)", value=st.session_state.get("dogpile_commentaire", ""), key="dogpile_commentaire")
-        
-        # Boutons organisés : Copier, Sauvegarder, Ouvrir
-        cols_actions = st.columns([0.33, 0.33, 0.34])
-        with cols_actions[0]:
-            safe_dogpile = st.session_state.get('dogpile_query', '').replace('"', '&quot;')
-            st.markdown(f'<button data-copy="{safe_dogpile}">📋 Copier</button>', unsafe_allow_html=True)
-        with cols_actions[1]:
-            if st.button("💾 Sauvegarder", key="dogpile_save_btn", use_container_width=True):
-                entry = {
-                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
-                    "type": "Dogpile",
-                    "poste": "Recherche Dogpile",
-                    "requete": st.session_state["dogpile_query"],
-                    "utilisateur": st.session_state.get("user", ""),
-                    "source": "Dogpile",
-                    "commentaire": st.session_state.get("dogpile_commentaire", "")
-                }
-                st.session_state.library_entries.append(entry)
-                save_library_entries()
-                save_sourcing_entry_to_gsheet(entry)
-                st.success("✅ Sauvegardé")
-        with cols_actions[2]:
-            dogpile_url = f"http://www.dogpile.com/serp?q={quote(st.session_state['dogpile_query'])}"
-            st.link_button("🌐 Ouvrir sur Dogpile", dogpile_url, use_container_width=True)
-
-# -------------------- Tab 5: Web Scraper - Analyse Concurrentielle --------------------
-# -------------------- Tab 5: Web Scraper - Analyse Concurrentielle --------------------
-with tab5:
     st.header("🔍 Analyse Concurrentielle - Offres d'Emploi")
     
     # Configuration du scraping
@@ -2038,8 +1978,8 @@ with tab5:
         - Certains sites utilisent JavaScript pour charger le contenu, ce qui peut ne pas être compatible avec cette approche
         """)
 
-# -------------------- Tab 6: InMail --------------------
-with tab6:
+# -------------------- Tab 5: InMail --------------------
+with tab5:
     st.header("✉️ Générateur d'InMail Personnalisé")
 
     # --------- FONCTIONS UTILES ---------
@@ -2285,9 +2225,8 @@ Cordialement."""
                 st.success(f"✅ Modèle '{poste_accroche} - {entry['timestamp']}' sauvegardé")
 
 
-# -------------------- Tab 7: Magicien --------------------
-with tab7:
-    st.header("🤖 Magicien de sourcing")
+# -------------------- Tab 6: Magicien --------------------
+with tab6:
 
     questions_pretes = [
         "Quels sont les synonymes possibles pour le métier de",
@@ -2321,7 +2260,7 @@ with tab7:
             placeholder="Ex: " + option_choisie + " développeur web"
         )
 
-    mode_rapide_magicien = st.checkbox("⚡ Réponse concise", key="magicien_fast")
+    mode_rapide_magicien = st.checkbox("⚡ Réponse concise", key="magicien_fast", value=True)
     
     if st.button("✨ Poser la question à l'IA", type="primary", key="ask_magicien", use_container_width=True):
         if question_complete and question_complete.strip():
@@ -2369,8 +2308,8 @@ with tab7:
             st.success("✅ Historique vidé")
             st.rerun()
             
-# -------------------- Tab 8: Permutateur --------------------
-with tab8:
+# -------------------- Tab 7: Permutateur --------------------
+with tab7:
     st.header("📧 Permutateur Email")
 
     # Génération de noms marocains aléatoires
@@ -2444,8 +2383,8 @@ with tab8:
         st.text_area("Résultats:", value="\n".join(st.session_state["perm_result"]), height=150)
         st.caption("🔍 Tester sur : [Hunter.io](https://hunter.io/) ou [NeverBounce](https://neverbounce.com/)")
 
-# -------------------- Tab 9: Bibliothèque --------------------
-with tab9:
+# -------------------- Tab 8: Bibliothèque --------------------
+with tab8:
     st.header("📚 Bibliothèque des recherches")
     # Actualisation auto depuis Google Sheets
     entries_local = st.session_state.library_entries if st.session_state.library_entries else []

@@ -664,9 +664,9 @@ def get_ai_pre_redaction(fiche_data):
     except ImportError:
         raise ImportError("Le module 'openai' n'est pas installé. Veuillez l'installer avec 'pip install openai'.")
 
-    api_key = st.secrets.get("DEEPSEEK_API_KEY")
+    api_key = get_api_secret("DEEPSEEK_API_KEY", alt_names=["DEEPSEEK_KEY", "DEEPSEEK"], env_fallback=True)
     if not api_key:
-        raise ValueError("Clé API DeepSeek non trouvée dans st.secrets")
+        raise ValueError("Clé API DeepSeek non configurée")
 
     client = OpenAI(
         api_key=api_key,
@@ -701,9 +701,9 @@ def generate_ai_question(prompt, concise=False):
     except ImportError:
         raise ImportError("Le module 'openai' n'est pas installé. Veuillez l'installer avec 'pip install openai'.")
 
-    api_key = st.secrets.get("DEEPSEEK_API_KEY")
+    api_key = get_api_secret("DEEPSEEK_API_KEY", alt_names=["DEEPSEEK_KEY", "DEEPSEEK"], env_fallback=True)
     if not api_key:
-        raise ValueError("Clé API DeepSeek non trouvée dans st.secrets")
+        raise ValueError("Clé API DeepSeek non configurée")
 
     client = OpenAI(
         api_key=api_key,
@@ -783,9 +783,9 @@ def test_deepseek_connection():
     """Teste la connexion à l'API DeepSeek."""
     try:
         from openai import OpenAI
-        api_key = st.secrets.get("DEEPSEEK_API_KEY")
+        api_key = get_api_secret("DEEPSEEK_API_KEY", alt_names=["DEEPSEEK_KEY", "DEEPSEEK"], env_fallback=True)
         if not api_key:
-            st.error("Clé API DeepSeek non trouvée dans st.secrets")
+            st.error("Clé API DeepSeek non configurée")
             return False
         client = OpenAI(
             api_key=api_key,
