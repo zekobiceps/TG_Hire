@@ -1107,24 +1107,54 @@ def delete_brief_from_gsheet(brief_name: str) -> bool:
                 cell = worksheet.find(brief_name, in_column=1, case_sensitive=True)
                 if cell:
                     worksheet.delete_row(cell.row)
-                return True
+                    st.info(f"✅ Ligne supprimée dans Google Sheets (ligne {cell.row}).")
+                    return True
+                return False
             except Exception:
                 return False
 
-        # Trouver toutes les lignes où la valeur correspond exactement au nom
-        rows_to_delete = [i+1 for i, v in enumerate(col_values) if v == brief_name]
-        if not rows_to_delete:
-            # rien à supprimer
-            return True
+        # Normalisation simple: unicode normalize, strip, lower
+        import unicodedata
+        def _norm(s):
+            if s is None:
+                return ""
+            s2 = str(s)
+            try:
+                s2 = unicodedata.normalize('NFKC', s2)
+            except Exception:
+                pass
+            return s2.strip().lower()
 
+        target = _norm(brief_name)
+
+        # 1) recherche exacte (normalisée)
+        rows_to_delete = [i+1 for i, v in enumerate(col_values) if _norm(v) == target]
+
+        # 2) si aucun match exact, essayer une correspondance "contains" (moins stricte)
+        if not rows_to_delete:
+            rows_to_delete = [i+1 for i, v in enumerate(col_values) if target and target in _norm(v)]
+
+        if not rows_to_delete:
+            # rien à supprimer: informer et laisser caller décider
+            st.warning(f"Aucune ligne trouvée dans Google Sheets pour: '{brief_name}' (col A).")
+            return False
+
+        deleted = 0
         # Supprimer de la plus grande ligne vers la plus petite pour garder les indices valides
         for row in sorted(rows_to_delete, reverse=True):
             try:
                 worksheet.delete_row(row)
+                deleted += 1
             except Exception:
                 # si une suppression particulière échoue, continuer
                 continue
-        return True
+
+        if deleted:
+            st.info(f"✅ {deleted} ligne(s) supprimée(s) dans Google Sheets.")
+            return True
+        else:
+            st.warning("Aucune suppression effective réalisée (erreur lors des opérations delete_row).")
+            return False
     except Exception:
         return False
 
