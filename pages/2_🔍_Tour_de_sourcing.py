@@ -2354,17 +2354,72 @@ with tab7:
                 elif source == "Charika.ma":
                     # Email non détecté sur Charika
                     st.error(f"❌ Format d'email non détecté sur Charika.ma pour '{entreprise}'")
-                    
+
+                    # Callback local pour appliquer le format d'email saisi et régénérer les permutations
+                    def _perm_apply_format_callback():
+                        prenom_cb = st.session_state.get("perm_prenom", "").strip()
+                        nom_cb = st.session_state.get("perm_nom", "").strip()
+                        entreprise_cb = st.session_state.get("perm_entreprise", "").strip()
+                        source_cb = st.session_state.get("perm_source", "Site officiel")
+                        email_format_cb = st.session_state.get("perm_email_format", "").strip()
+
+                        # Nécessite les champs de base
+                        if not (prenom_cb and nom_cb and entreprise_cb):
+                            return
+
+                        # Déterminer le domaine
+                        if email_format_cb and '@' in email_format_cb:
+                            domain_cb = email_format_cb.split('@')[1]
+                        else:
+                            domain_cb = f"{entreprise_cb.lower().replace(' ', '').replace('-', '')}.ma"
+
+                        # Construire les patterns
+                        if source_cb == "Charika.ma" and email_format_cb and '@' in email_format_cb:
+                            # Si l'utilisateur a saisi un format contenant des mots-clés (prenom/nom/p/n)
+                            ef = email_format_cb
+                            if 'prenom' in ef.lower() or 'prénom' in ef.lower() or 'nom' in ef.lower() or 'p' in ef.lower() or 'n' in ef.lower():
+                                # Remplacements simples : prenom -> prenom, nom -> nom, p -> first initial, n -> last initial
+                                pattern = ef.replace('prenom', prenom_cb.lower())
+                                pattern = pattern.replace('prénom', prenom_cb.lower())
+                                pattern = pattern.replace('nom', nom_cb.lower())
+                                # p and n could be ambiguous; support single-letter placeholders
+                                pattern = pattern.replace('p', prenom_cb[0].lower()) if 'p' in ef else pattern
+                                pattern = pattern.replace('n', nom_cb[0].lower()) if 'n' in ef else pattern
+                                patterns_cb = [pattern]
+                            else:
+                                # si l'utilisateur a fourni un exemple d'email, on l'adapte
+                                patterns_cb = [email_format_cb]
+                        else:
+                            patterns_cb = [
+                                f"{prenom_cb.lower()}.{nom_cb.lower()}@{domain_cb}",
+                                f"{prenom_cb[0].lower()}{nom_cb.lower()}@{domain_cb}",
+                                f"{nom_cb.lower()}.{prenom_cb.lower()}@{domain_cb}",
+                                f"{prenom_cb.lower()}{nom_cb.lower()}@{domain_cb}",
+                                f"{prenom_cb.lower()}-{nom_cb.lower()}@{domain_cb}",
+                                f"{nom_cb.lower()}{prenom_cb[0].lower()}@{domain_cb}",
+                                f"{prenom_cb[0].lower()}.{nom_cb.lower()}@{domain_cb}",
+                                f"{nom_cb.lower()}.{prenom_cb[0].lower()}@{domain_cb}"
+                            ]
+
+                        st.session_state["perm_result"] = list(dict.fromkeys(patterns_cb))
+
                     # Ajout du bouton/lien Google et champ pour format d'email
                     col_search, col_format = st.columns([1, 2])
                     with col_search:
                         google_url = get_charika_search_url(entreprise)
                         st.markdown(f"<a href='{google_url}' target='_blank' style='font-size:16px;'>🔎 Rechercher sur Google</a>", unsafe_allow_html=True)
-                    
+
                     with col_format:
-                        email_format = st.text_input("Format d'email trouvé:", key="perm_email_format", placeholder="exemple@domaine.ma")
-                        if email_format and '@' in email_format:
-                            domain = email_format.split('@')[1]
+                        # Utiliser on_change pour déclencher la callback sur Enter / blur
+                        email_format = st.text_input(
+                            "Format d'email trouvé:",
+                            key="perm_email_format",
+                            placeholder="exemple@domaine.ma",
+                            on_change=_perm_apply_format_callback
+                        )
+                        # Si un format est déjà présent dans l'état, afficher le domaine utilisé
+                        if st.session_state.get("perm_email_format") and '@' in st.session_state.get("perm_email_format"):
+                            domain = st.session_state.get("perm_email_format").split('@')[1]
                             st.success(f"✅ Domaine utilisé: @{domain}")
                         else:
                             domain = f"{entreprise.lower().replace(' ', '').replace('-', '')}.ma"
