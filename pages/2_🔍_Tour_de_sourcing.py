@@ -291,10 +291,14 @@ def init_session_state():
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
-    """Sauvegarde les entrées de la bibliothèque en JSON"""
+    # fin init_session_state
+
+
+def save_library_entries():
+    """Sauvegarde les entrées de la bibliothèque dans le fichier JSON local."""
     try:
         with open(LIB_FILE, 'w', encoding='utf-8') as f:
-            json.dump(st.session_state.library_entries, f, ensure_ascii=False, indent=2)
+            json.dump(st.session_state.get('library_entries', []), f, ensure_ascii=False, indent=2)
     except Exception as e:
         st.warning(f"⚠️ Échec de sauvegarde bibliothèque: {e}")
 
@@ -2367,35 +2371,33 @@ if selected_tab == "📧 Permutateur":
                         if not (prenom_cb and nom_cb and entreprise_cb):
                             return
 
-                            if selected_tab == "🔎 CSE LinkedIn":
-                                st.header("🔎 CSE LinkedIn")
+                        # Déterminer le domaine
                         if email_format_cb and '@' in email_format_cb:
-                            domain_cb = email_format_cb.split('@')[1]
-                            if selected_tab == "🕷️ Web Scraper":
-                                st.header("🔍 Analyse Concurrentielle - Offres d'Emploi")
+                            domain_cb = email_format_cb.split('@', 1)[1]
+                        else:
                             domain_cb = f"{entreprise_cb.lower().replace(' ', '').replace('-', '')}.ma"
 
-                            if selected_tab == "✉️ InMail":
-                                st.header("📨 InMail Generator")
+                        # Construire les patterns
+                        patterns_cb = []
                         if source_cb == "Charika.ma" and email_format_cb and '@' in email_format_cb:
-                            # Si l'utilisateur a saisi un format contenant des mots-clés (prenom/nom/p/n)
-                            if selected_tab == "🤖 Assistant Sourcing":
-                                # Title intentionally removed per user's request; section kept
-                            if 'prenom' in ef.lower() or 'prénom' in ef.lower() or 'nom' in ef.lower() or 'p' in ef.lower() or 'n' in ef.lower():
-                                # Remplacements simples : prenom -> prenom, nom -> nom, p -> first initial, n -> last initial
-                            if selected_tab == "📧 Permutateur":
-                                st.header("📧 Permutateur Email")
-                                pattern = pattern.replace('prénom', prenom_cb.lower())
+                            ef = email_format_cb
+                            # Si le format contient des placeholders lisibles
+                            if ('prenom' in ef.lower() or 'prénom' in ef.lower() or 'nom' in ef.lower() or
+                                    '{p}' in ef or '{n}' in ef or '{prenom}' in ef.lower() or '{nom}' in ef.lower()):
+                                pattern = ef
+                                # Remplacements simples (supporte {prenom}, {nom}, {p}, {n} et mots clefs sans accolades)
+                                pattern = pattern.replace('{prenom}', prenom_cb.lower()).replace('{Prenom}', prenom_cb.lower())
+                                pattern = pattern.replace('{nom}', nom_cb.lower()).replace('{Nom}', nom_cb.lower())
+                                pattern = pattern.replace('{p}', prenom_cb[0].lower()).replace('{n}', nom_cb[0].lower())
+                                # aussi supporter mots-clés simples
+                                pattern = pattern.replace('prenom', prenom_cb.lower()).replace('prénom', prenom_cb.lower())
                                 pattern = pattern.replace('nom', nom_cb.lower())
-                            if selected_tab == "📚 Bibliothèque":
-                                st.header("📚 Bibliothèque des recherches")
-                                pattern = pattern.replace('p', prenom_cb[0].lower()) if 'p' in ef else pattern
-                                pattern = pattern.replace('n', nom_cb[0].lower()) if 'n' in ef else pattern
                                 patterns_cb = [pattern]
                             else:
-                                # si l'utilisateur a fourni un exemple d'email, on l'adapte
+                                # si l'utilisateur a fourni un exemple d'email complet, on l'utilise tel quel
                                 patterns_cb = [email_format_cb]
                         else:
+                            # Format standard avec les permutations habituelles
                             patterns_cb = [
                                 f"{prenom_cb.lower()}.{nom_cb.lower()}@{domain_cb}",
                                 f"{prenom_cb[0].lower()}{nom_cb.lower()}@{domain_cb}",
