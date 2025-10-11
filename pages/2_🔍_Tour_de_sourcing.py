@@ -1084,16 +1084,13 @@ with st.sidebar:
     st.info("💡 Assistant IA pour le sourcing et recrutement")
 
 # -------------------- Onglets --------------------
-# Utiliser un radio horizontal au lieu de st.tabs pour conserver l'onglet actif
-tab_options = [
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
     "🔍 Boolean", "🎯 X-Ray", "🔎 CSE LinkedIn",
     "🕷️ Web Scraper", "✉️ InMail", "🤖 Assistant Sourcing", "📧 Permutateur", "📚 Bibliothèque"
-]
-selected_tab = st.session_state.get("selected_tab", tab_options[0])
-selected_tab = st.radio("", tab_options, index=tab_options.index(selected_tab), horizontal=True, key="selected_tab")
+])
 
 # -------------------- Tab 1: Boolean Search --------------------
-if selected_tab == "🔍 Boolean":
+with tab1:
     st.header("🔍 Recherche Boolean")
     
     # Option fiche de poste pour l'IA
@@ -1429,7 +1426,7 @@ if selected_tab == "🔍 Boolean":
 
 
 # -------------------- Tab 2: X-Ray --------------------
-if selected_tab == "🎯 X-Ray":
+with tab2:
     st.header("🎯 X-Ray Google")
     # Regrouper les champs dans un formulaire pour éviter des reruns automatiques lors de la saisie
     with st.form(key="xray_form"):
@@ -1580,7 +1577,7 @@ Cette requête trouve des CV PDF sur le web entier, pas seulement sur LinkedIn.
             st.info("Aucune variante générée pour la requête actuelle.")
 
 # -------------------- Tab 3: CSE --------------------
-if selected_tab == "🔎 CSE LinkedIn":
+with tab3:
     st.header("🔎 CSE LinkedIn")
     col1, col2 = st.columns(2)
     with col1:
@@ -1630,7 +1627,7 @@ if selected_tab == "🔎 CSE LinkedIn":
             st.link_button("🌐 Ouvrir sur CSE", cse_url, use_container_width=True)
 
 # -------------------- Tab 4: Web Scraper - Analyse Concurrentielle --------------------
-if selected_tab == "🕷️ Web Scraper":
+with tab4:
     st.header("🔍 Analyse Concurrentielle - Offres d'Emploi")
     
     # Configuration du scraping
@@ -1984,7 +1981,7 @@ if selected_tab == "🕷️ Web Scraper":
         """)
 
 # -------------------- Tab 5: InMail --------------------
-if selected_tab == "✉️ InMail":
+with tab5:
     st.header("✉️ Générateur d'InMail Personnalisé")
 
     # --------- FONCTIONS UTILES ---------
@@ -2231,7 +2228,7 @@ Cordialement."""
 
 
 # -------------------- Tab 6: Assistant Sourcing --------------------
-if selected_tab == "🤖 Assistant Sourcing":
+with tab6:
     questions_pretes = [
         "Quels sont les synonymes possibles pour le métier de",
         "Quels outils ou logiciels sont liés au métier de", 
@@ -2313,7 +2310,7 @@ if selected_tab == "🤖 Assistant Sourcing":
             st.rerun()
             
 # -------------------- Tab 7: Permutateur --------------------
-if selected_tab == "📧 Permutateur":
+with tab7:
     st.header("📧 Permutateur Email")
 
     # Génération de noms marocains aléatoires
@@ -2492,7 +2489,7 @@ if selected_tab == "📧 Permutateur":
         st.caption("🔍 Tester sur : [Hunter.io](https://hunter.io/) ou [NeverBounce](https://neverbounce.com/)")
 
 # -------------------- Tab 8: Bibliothèque --------------------
-if selected_tab == "📚 Bibliothèque":
+with tab8:
     st.header("📚 Bibliothèque des recherches")
     # Actualisation auto depuis Google Sheets
     entries_local = st.session_state.library_entries if st.session_state.library_entries else []
