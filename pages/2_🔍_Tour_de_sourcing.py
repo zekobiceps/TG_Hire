@@ -409,8 +409,13 @@ def generate_xray_query(site_cible: str, poste: str, mots_cles: str, localisatio
     - Prend en charge un champ de synonymes (OR) et un filtre de type de fichier (ex: pdf)
     """
     site_map = {"LinkedIn": "site:linkedin.com/in", "GitHub": "site:github.com"}
+    # If user requests filetype:pdf while targeting LinkedIn profiles, this is contradictory
+    # (LinkedIn profile pages aren't PDFs). In that case we omit the site constraint and
+    # add sensible PDF exclusions to avoid job-posting noise.
     site = site_map.get(site_cible, "site:linkedin.com/in")
-    parts = [site]
+    parts = []
+    if not (file_type and file_type.strip().lower() == 'pdf' and site_cible == 'LinkedIn'):
+        parts.append(site)
     if poste:
         parts.append(f'"{poste}"')
     kws = _split_terms(mots_cles)
@@ -431,6 +436,12 @@ def generate_xray_query(site_cible: str, poste: str, mots_cles: str, localisatio
         file_type = file_type.strip().lower()
         if file_type and file_type != "aucun":
             parts.append(f"filetype:{file_type}")
+
+            # If we're searching for PDFs without a site constraint, add common exclusions
+            # to reduce job-ad noise when looking for CVs/PDF resumes.
+            if file_type == 'pdf' and (not parts or not parts[0].startswith('site:')):
+                parts.append('-intitle:"offre"')
+                parts.append('-inurl:"emploi"')
 
     return ' '.join(parts)
 
@@ -1437,6 +1448,10 @@ with tab2:
                 "synonymes_or": synonymes_or,
                 "file_type": file_type
             }
+            # Inform user if they asked for LinkedIn + filetype:pdf (contradiction)
+            if file_type and file_type.strip().lower() == 'pdf' and site_cible == 'LinkedIn':
+                st.info("Vous avez demandé des PDF et LinkedIn. Les profils LinkedIn ne sont pas des PDF.\n" \
+                        "L'application a donc omis la contrainte site:linkedin.com/in et ajouté des exclusions utiles (ex: -intitle:\"offre\", -inurl:\"emploi\").")
             total_time = time.time() - start_time
             st.success(f"✅ Requête X-Ray générée en {total_time:.1f}s")
 
