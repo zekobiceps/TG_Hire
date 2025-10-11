@@ -408,7 +408,9 @@ def generate_xray_query(site_cible: str, poste: str, mots_cles: str, localisatio
     - Groupes OR pour élargir la recherche
     - Prend en charge un champ de synonymes (OR) et un filtre de type de fichier (ex: pdf)
     """
-    site_map = {"LinkedIn": "site:linkedin.com/in", "GitHub": "site:github.com"}
+    # Use site:linkedin.com (wider) so queries that target CVs with phrases like "télécharger mon CV"
+    # can match documents hosted on linkedin.com (some users publish PDFs on linkedin.com or personal pages).
+    site_map = {"LinkedIn": "site:linkedin.com", "GitHub": "site:github.com"}
     # If user requests filetype:pdf while targeting LinkedIn profiles, this is contradictory
     # (LinkedIn profile pages aren't PDFs). In that case we omit the site constraint and
     # add sensible PDF exclusions to avoid job-posting noise.
@@ -1417,11 +1419,11 @@ with tab2:
             site_cible = st.selectbox("Site cible:", ["LinkedIn", "GitHub"], key="xray_site")
             poste_xray = st.text_input("Poste:", key="xray_poste", placeholder="Ex: Développeur Python")
             mots_cles = st.text_input("Mots-clés:", key="xray_mots_cles", placeholder="Ex: Django, Flask")
-            synonymes_or = st.text_input("Synonymes (OR):", key="xray_synonymes_or", placeholder="Ex: dev backend, backend developer")
+            synonymes_or = st.text_input("Synonymes:", key="xray_synonymes_or", placeholder="Ex: dev backend, backend developer")
         with col2:
             localisation_xray = st.text_input("Localisation:", key="xray_loc", placeholder="Ex: Casablanca")
             exclusions_xray = st.text_input("Mots à exclure:", key="xray_exclusions", placeholder="Ex: Stage, Junior")
-            file_type = st.selectbox("Type de fichier (optionnel):", ["aucun", "pdf", "docx"], index=0, key="xray_filetype")
+            file_type = st.selectbox("Recherche par fichier (optionnel):", ["aucun", "pdf", "docx"], index=0, key="xray_filetype")
 
         submitted = st.form_submit_button(label="🔍 Construire X-Ray")
 
