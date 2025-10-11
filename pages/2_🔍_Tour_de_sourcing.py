@@ -2363,8 +2363,6 @@ with tab7:
 
         if not domain_cb:
             domain_cb = f"{entreprise_cb.lower().replace(' ', '').replace('-', '')}.ma"
-        else:
-            domain_cb = f"{entreprise_cb.lower().replace(' ', '').replace('-', '')}.ma"
 
         patterns_cb = []
         if source_cb == "Charika.ma" and email_format_cb and domain_cb:
@@ -2412,20 +2410,28 @@ with tab7:
 
         st.session_state["perm_result"] = list(dict.fromkeys(patterns_cb))
 
-    # Show persistent Google link and format input
-    col_search, col_format = st.columns([1, 2])
-    with col_search:
-        if entreprise:
-            google_url = get_charika_search_url(entreprise)
-            st.markdown(f"<a href='{google_url}' target='_blank' style='font-size:16px;'>🔎 Rechercher sur Google</a>", unsafe_allow_html=True)
-    with col_format:
-        c_input, c_btn = st.columns([3, 1])
-        with c_input:
-            st.text_input("Format d'email trouvé:", key="perm_email_format", placeholder="exemple@domaine.ma", on_change=_perm_apply_format_callback)
-        with c_btn:
+    # Show Google link and format input ONLY when using Charika.ma as source
+    if source == "Charika.ma":
+        cols_row = st.columns([1, 3, 1, 1])
+        # Google link
+        with cols_row[0]:
+            if entreprise:
+                google_url = get_charika_search_url(entreprise)
+                st.markdown(f"<a href='{google_url}' target='_blank' style='font-size:14px;'>🔎 Rechercher sur Google</a>", unsafe_allow_html=True)
+        # Input for the found email format
+        with cols_row[1]:
+            st.text_input("Format d'email trouvé:", key="perm_email_format", placeholder="@domaine.ma (ex: @domaine.ma) ou exemple@domaine.ma", on_change=_perm_apply_format_callback)
+        # Apply button (compact)
+        with cols_row[2]:
             if st.button("Appliquer", key="perm_apply_btn"):
                 _perm_apply_format_callback()
-                st.success("✅ Format appliqué")
+                # set a small inline confirmation flag
+                st.session_state["perm_apply_msg"] = True
+        # Inline message area (keeps compact layout)
+        with cols_row[3]:
+            if st.session_state.get("perm_apply_msg"):
+                st.markdown("<span style='color:green;'>✅ Format appliqué</span>", unsafe_allow_html=True)
+                # keep the message for the session; user can clear by changing format or regenerating
 
     # Main generate button
     if st.button("🔮 Générer permutations", use_container_width=True):
