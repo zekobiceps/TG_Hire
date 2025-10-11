@@ -1098,20 +1098,12 @@ def delete_brief_from_gsheet(brief_name: str) -> bool:
             # Pas de client Sheets : considérer comme succès silencieux
             return True
 
-        # Récupérer toutes les valeurs de la colonne A (BRIEF_NAME)
+        # Méthode alternative : lire tous les enregistrements, filtrer puis réécrire la feuille.
         try:
-            col_values = worksheet.col_values(1)
-        except Exception:
-            # Si col_values échoue, retomber sur find (ancienne méthode)
-            try:
-                cell = worksheet.find(brief_name, in_column=1, case_sensitive=True)
-                if cell:
-                    worksheet.delete_row(cell.row)
-                    st.info(f"✅ Ligne supprimée dans Google Sheets (ligne {cell.row}).")
-                    return True
-                return False
-            except Exception:
-                return False
+            records = worksheet.get_all_records()
+        except Exception as e:
+            st.warning(f"Impossible de lire les enregistrements Google Sheets : {e}")
+            return False
 
         # Normalisation simple: unicode normalize, strip, lower
         import unicodedata
@@ -1127,33 +1119,37 @@ def delete_brief_from_gsheet(brief_name: str) -> bool:
 
         target = _norm(brief_name)
 
-        # 1) recherche exacte (normalisée)
-        rows_to_delete = [i+1 for i, v in enumerate(col_values) if _norm(v) == target]
+        # Filtrer les records à garder (ne PAS avoir target dans BRIEF_NAME normalisé)
+        kept = []
+        removed = 0
+        for rec in records:
+            bn = rec.get('BRIEF_NAME') or rec.get('BRIEF_NAME'.lower()) or ''
+            if target and (target == _norm(bn) or target in _norm(bn)):
+                removed += 1
+                continue
+            kept.append(rec)
 
-        # 2) si aucun match exact, essayer une correspondance "contains" (moins stricte)
-        if not rows_to_delete:
-            rows_to_delete = [i+1 for i, v in enumerate(col_values) if target and target in _norm(v)]
-
-        if not rows_to_delete:
-            # rien à supprimer: informer et laisser caller décider
+        if removed == 0:
             st.warning(f"Aucune ligne trouvée dans Google Sheets pour: '{brief_name}' (col A).")
             return False
 
-        deleted = 0
-        # Supprimer de la plus grande ligne vers la plus petite pour garder les indices valides
-        for row in sorted(rows_to_delete, reverse=True):
-            try:
-                worksheet.delete_row(row)
-                deleted += 1
-            except Exception:
-                # si une suppression particulière échoue, continuer
-                continue
-
-        if deleted:
-            st.info(f"✅ {deleted} ligne(s) supprimée(s) dans Google Sheets.")
+        # Réécrire la feuille : clear + update (conserver l'ordre des en-têtes BRIEFS_HEADERS)
+        try:
+            # Construire tableau de valeurs
+            rows = [BRIEFS_HEADERS]
+            for r in kept:
+                row = [r.get(h, '') for h in BRIEFS_HEADERS]
+                rows.append(row)
+            worksheet.clear()
+            if len(rows) > 1:
+                worksheet.update(rows)
+            else:
+                # si plus aucune ligne, écrire seulement l'entête
+                worksheet.update([BRIEFS_HEADERS])
+            st.info(f"✅ {removed} ligne(s) supprimée(s) dans Google Sheets.")
             return True
-        else:
-            st.warning("Aucune suppression effective réalisée (erreur lors des opérations delete_row).")
+        except Exception as e:
+            st.warning(f"Erreur lors de la réécriture de la feuille Google Sheets : {e}")
             return False
     except Exception:
         return False
