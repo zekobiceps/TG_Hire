@@ -15,6 +15,40 @@ st.set_page_config(
     layout="wide"
 )
 
+# Données pour le Kanban
+postes_data = [
+    # Colonne Sourcing
+    {"titre": "Ingénieur Achat", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.BOUZOUBAA", "recruteur": "Zakaria", "statut": "Sourcing"},
+    {"titre": "Directeur Achats Adjoint", "entite": "TGCC", "lieu": "Siège", "demandeur": "C.BENABDELLAH", "recruteur": "Zakaria", "statut": "Sourcing"},
+    {"titre": "INGENIEUR TRAVAUX", "entite": "TGCC", "lieu": "YAMED LOT B", "demandeur": "M.TAZI", "recruteur": "Zakaria", "statut": "Sourcing"},
+
+    # Colonne Shortlisté
+    {"titre": "CHEF DE PROJETS", "entite": "TGCC", "lieu": "DESSALMENT JORF", "demandeur": "M.FENNAN", "recruteur": "ZAKARIA", "statut": "Shortlisté"},
+    {"titre": "Planificateur", "entite": "TGCC", "lieu": "ASFI-B", "demandeur": "SOUFIANI", "recruteur": "Ghita", "statut": "Shortlisté"},
+    {"titre": "RESPONSABLE TRANS INTERCH", "entite": "TG PREFA", "lieu": "OUED SALEH", "demandeur": "FBOUZOUBAA", "recruteur": "Ghita", "statut": "Shortlisté"},
+
+    # Colonne Signature DRH
+    {"titre": "PROJETEUR DESSINATEUR", "entite": "TG WOOD", "lieu": "OUED SALEH", "demandeur": "S.MENJRA", "recruteur": "Zakaria", "statut": "Signature DRH"},
+    {"titre": "Projeteur", "entite": "TGCC", "lieu": "TSP Safi", "demandeur": "B.MORABET", "recruteur": "Zakaria", "statut": "Signature DRH"},
+    {"titre": "Consultant SAP", "entite": "TGCC", "lieu": "Siège", "demandeur": "O.KETTA", "recruteur": "Zakaria", "statut": "Signature DRH"},
+
+    # Colonne Clôture
+    {"titre": "Doc Controller", "entite": "TGEM", "lieu": "SIEGE", "demandeur": "A.SANKARI", "recruteur": "Zakaria", "statut": "Clôture"},
+    {"titre": "Ingénieur étude/qualité", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.MOUTANABI", "recruteur": "Zakaria", "statut": "Clôture"},
+    {"titre": "Responsable Cybersecurité", "entite": "TGCC", "lieu": "Siège", "demandeur": "Ghazi", "recruteur": "Zakaria", "statut": "Clôture"},
+    {"titre": "CHEF DE CHANTIER", "entite": "TGCC", "demandeur": "M.FENNAN", "recruteur": "Zakaria", "statut": "Clôture"},
+    {"titre": "Ing contrôle de la performance", "entite": "TGCC", "lieu": "Siège", "demandeur": "H.BARIGOU", "recruteur": "Ghita", "statut": "Clôture"},
+    {"titre": "Ingénieur Systèmes Réseaux", "entite": "TGCC", "lieu": "Siège", "demandeur": "M.JADDOR", "recruteur": "Ghita", "statut": "Clôture"},
+    {"titre": "Responsable étude de prix", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "S.Bennani Zitani", "recruteur": "Ghita", "statut": "Clôture"},
+    {"titre": "Responsable Travaux", "entite": "TGEM", "lieu": "Zone Rabat", "demandeur": "S.ACHIR", "recruteur": "Zakaria", "statut": "Clôture"},
+
+    # Colonne Désistement
+    {"titre": "Conducteur de Travaux", "entite": "TGCC", "lieu": "JORF LASFAR", "demandeur": "M.FENNAN", "recruteur": "Zakaria", "statut": "Désistement"},
+    {"titre": "Chef de Chantier", "entite": "TGCC", "lieu": "TOARC", "demandeur": "M.FENNAN", "recruteur": "Zakaria", "statut": "Désistement"},
+    {"titre": "Magasinier", "entite": "TG WOOD", "lieu": "Oulad Saleh", "demandeur": "K.TAZI", "recruteur": "Ghita", "statut": "Désistement", "commentaire": "Pas de retour du demandeur"}
+]
+
+
 def load_data_from_files(csv_file=None, excel_file=None):
     """Charger et préparer les données depuis les fichiers uploadés ou locaux"""
     df_integration = None
@@ -46,8 +80,9 @@ def load_data_from_files(csv_file=None, excel_file=None):
             # Nettoyer et préparer les données de recrutement
             # Convertir les dates
             date_columns = ['Date de réception de la demande aprés validation de la DRH',
-                           'Date d\'entrée effective du candidat', 
-                           'Date d\'annulation /dépriorisation de la demande']
+                           'Date d\'entrée effective du candidat',
+                           'Date d\'annulation /dépriorisation de la demande',
+                           'Date de la 1er réponse du demandeur à l\'équipe RH']
             
             for col in date_columns:
                 if col in df_recrutement.columns:
@@ -59,7 +94,7 @@ def load_data_from_files(csv_file=None, excel_file=None):
             # Vérification basique des colonnes critiques et message dans les logs
             required_cols = [
                 'Statut de la demande', 'Poste demandé', 'Direction concernée',
-                'Entité demandeuse', 'Modalité de recrutement', "Canal de publication de l'offre"
+                'Entité demandeuse', 'Modalité de recrutement'
             ]
             missing = [c for c in required_cols if c not in df_recrutement.columns]
             if missing:
@@ -114,7 +149,7 @@ def create_affectation_chart(df):
 
 def create_recrutements_clotures_tab(df_recrutement):
     """Onglet Recrutements Clôturés (Image 1)"""
-    st.header("🎯 Recrutements (État Clôture)")
+    st.header("🎯 Recrutement")
     
     # Filtrer seulement les recrutements clôturés
     df_cloture = df_recrutement[df_recrutement['Statut de la demande'] == 'Clôture'].copy()
@@ -131,7 +166,7 @@ def create_recrutements_clotures_tab(df_recrutement):
         df_cloture['Année'] = df_cloture['Date d\'entrée effective du candidat'].dt.year
         annees_dispo = sorted([y for y in df_cloture['Année'].dropna().unique() if not pd.isna(y)])
         if annees_dispo:
-            annee_select = st.sidebar.selectbox("Période de recrutement", ['Toutes'] + [int(a) for a in annees_dispo], index=1 if annees_dispo else 0)
+            annee_select = st.sidebar.selectbox("Période de recrutement", ['Toutes'] + [int(a) for a in annees_dispo], index=len(annees_dispo))
         else:
             annee_select = 'Toutes'
     else:
@@ -139,45 +174,50 @@ def create_recrutements_clotures_tab(df_recrutement):
     
     # Filtre par entité
     entites = ['Toutes'] + sorted(df_cloture['Entité demandeuse'].dropna().unique())
-    entite_select = st.sidebar.selectbox("Entité demandeuse", entites)
+    entite_select = st.sidebar.selectbox("Entité demandeuse", entites, key="rec_entite")
     
+    # Filtre par direction
+    directions = ['Toutes'] + sorted(df_cloture['Direction concernée'].dropna().unique())
+    direction_select = st.sidebar.selectbox("Direction concernée", directions, key="rec_direction")
+
     # Appliquer les filtres
     df_filtered = df_cloture.copy()
     if annee_select != 'Toutes':
         df_filtered = df_filtered[df_filtered['Année'] == annee_select]
     if entite_select != 'Toutes':
         df_filtered = df_filtered[df_filtered['Entité demandeuse'] == entite_select]
-    
+    if direction_select != 'Toutes':
+        df_filtered = df_filtered[df_filtered['Direction concernée'] == direction_select]
+
     # KPIs principaux
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("📊 Nombre de recrutements", len(df_filtered))
+        st.metric("Nombre de recrutements", len(df_filtered))
     with col2:
         postes_uniques = df_filtered['Poste demandé'].nunique()
-        st.metric("📝 Postes demandés", postes_uniques)
+        st.metric("Postes concernés", postes_uniques)
     with col3:
         directions_uniques = df_filtered['Direction concernée'].nunique()
-        st.metric("🏢 Directions concernées", directions_uniques)
+        st.metric("Nombre de Direction con...", directions_uniques)
     
     # Graphiques en ligne 1
-    col1, col2 = st.columns(2)
+    col1, col2 = st.columns([2,1])
     
     with col1:
         # Évolution des recrutements par mois (comme dans l'image 1)
         if 'Date d\'entrée effective du candidat' in df_filtered.columns:
-            df_filtered['Mois'] = df_filtered['Date d\'entrée effective du candidat'].dt.to_period('M')
-            monthly_data = df_filtered.groupby('Mois').size().reset_index(name='Count')
-            monthly_data['Mois_str'] = monthly_data['Mois'].astype(str)
+            df_filtered['Mois_Année'] = df_filtered['Date d\'entrée effective du candidat'].dt.strftime('%Y-%m')
+            monthly_data = df_filtered.groupby('Mois_Année').size().reset_index(name='Count')
             
             fig_evolution = px.bar(
                 monthly_data, 
-                x='Mois_str', 
+                x='Mois_Année', 
                 y='Count',
-                title="📈 Évolution des recrutements",
-                color='Count',
-                color_continuous_scale='Blues'
+                title="Évolution des recrutements",
+                text='Count'
             )
-            fig_evolution.update_layout(height=400, showlegend=False)
+            fig_evolution.update_traces(marker_color='#1f77b4', textposition='outside')
+            fig_evolution.update_layout(height=300, xaxis_title=None, yaxis_title=None)
             st.plotly_chart(fig_evolution, use_container_width=True)
     
     with col2:
@@ -185,107 +225,105 @@ def create_recrutements_clotures_tab(df_recrutement):
         if 'Modalité de recrutement' in df_filtered.columns:
             modalite_data = df_filtered['Modalité de recrutement'].value_counts()
             
-            # Créer des couleurs personnalisées
-            colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b']
-            
-            fig_modalite = px.pie(
+            fig_modalite = go.Figure(data=[go.Pie(
+                labels=modalite_data.index, 
                 values=modalite_data.values,
-                names=modalite_data.index,
-                title="🎯 Répartition par Modalité de recrutement",
-                color_discrete_sequence=colors
+                hole=.5
+            )])
+            fig_modalite.update_layout(
+                title="Répartition par Modalité de recrutement",
+                height=300,
+                legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5)
             )
-            fig_modalite.update_traces(textposition='inside', textinfo='percent+label')
-            fig_modalite.update_layout(height=400)
             st.plotly_chart(fig_modalite, use_container_width=True)
-    
+
     # Graphiques en ligne 2
     col3, col4 = st.columns(2)
     
     with col3:
-        # Canal de publication (comme graphique en donut dans l'image)
-        if 'Canal de publication de l\'offre' in df_filtered.columns:
-            canal_data = df_filtered['Canal de publication de l\'offre'].value_counts()
-            
-            fig_canal = go.Figure(data=[go.Pie(
-                labels=canal_data.index, 
-                values=canal_data.values,
-                hole=.5,
-                marker_colors=['#99999a', '#4CAF50']
-            )])
-            fig_canal.update_traces(textposition='inside', textinfo='percent+label')
-            fig_canal.update_layout(
-                title="📢 Répartition par Canal de publication de l'offre",
-                height=400
-            )
-            st.plotly_chart(fig_canal, use_container_width=True)
-    
-    with col4:
-        # Analyse candidats présélectionnés
-        col_candidats = 'Nb de candidats pré-selectionnés'
-        
-        if col_candidats in df_filtered.columns:
-            # Créer un graphique en jauge pour les candidats présélectionnés
-            total_candidats = df_filtered[col_candidats].fillna(0).sum()
-            nb_demandes = len(df_filtered)
-            
-            fig_candidats = go.Figure(go.Indicator(
-                mode = "gauge+number",
-                value = total_candidats,
-                title = {'text': f"Candidats présélectionnés<br>({nb_demandes} demandes)"},
-                domain = {'x': [0, 1], 'y': [0, 1]},
-                gauge = {
-                    'axis': {'range': [None, total_candidats * 1.2]},
-                    'bar': {'color': "green"},
-                    'steps': [
-                        {'range': [0, total_candidats * 0.5], 'color': "lightgray"},
-                        {'range': [total_candidats * 0.5, total_candidats], 'color': "gray"}
-                    ],
-                }
-            ))
-            fig_candidats.update_layout(height=400)
-            st.plotly_chart(fig_candidats, use_container_width=True)
+        # Comparaison par direction
+        direction_counts = df_filtered['Direction concernée'].value_counts().nlargest(10)
+        fig_direction = px.bar(
+            direction_counts,
+            y=direction_counts.index,
+            x=direction_counts.values,
+            orientation='h',
+            title="Comparaison par direction",
+            text=direction_counts.values
+        )
+        fig_direction.update_traces(marker_color='#ff7f0e', textposition='auto')
+        fig_direction.update_layout(height=300, xaxis_title=None, yaxis_title=None, yaxis={'categoryorder':'total ascending'})
+        st.plotly_chart(fig_direction, use_container_width=True)
 
-    # Délai moyen de recrutement (comme dans l'image)
-    st.subheader("⏱️ Délai moyen de recrutement")
-    
-    if 'Date de réception de la demande aprés validation de la DRH' in df_filtered.columns and 'Date d\'entrée effective du candidat' in df_filtered.columns:
-        # Calculer les délais
-        df_filtered['Délai_jours'] = (df_filtered['Date d\'entrée effective du candidat'] - 
-                                     df_filtered['Date de réception de la demande aprés validation de la DRH']).dt.days
+    with col4:
+        # Comparaison par poste
+        poste_counts = df_filtered['Poste demandé'].value_counts().nlargest(10)
+        fig_poste = px.bar(
+            poste_counts,
+            y=poste_counts.index,
+            x=poste_counts.values,
+            orientation='h',
+            title="Comparaison par poste",
+            text=poste_counts.values
+        )
+        fig_poste.update_traces(marker_color='#2ca02c', textposition='auto')
+        fig_poste.update_layout(height=300, xaxis_title=None, yaxis_title=None, yaxis={'categoryorder':'total ascending'})
+        st.plotly_chart(fig_poste, use_container_width=True)
+
+
+    # Ligne 3 - KPIs de délai et candidats
+    col5, col6 = st.columns(2)
+
+    with col5:
+        # Nombre de candidats présélectionnés
+        total_candidats = int(df_filtered['Nb de candidats pré-selectionnés'].sum())
+        fig_candidats = go.Figure(go.Indicator(
+            mode = "gauge+number",
+            value = total_candidats,
+            title = {'text': "Nombre de candidats présélectionnés"},
+            gauge = {'axis': {'range': [None, total_candidats * 2]},
+                     'bar': {'color': "green"},
+                    }))
+        fig_candidats.update_layout(height=300)
+        st.plotly_chart(fig_candidats, use_container_width=True)
+
+    with col6:
+        # Délai moyen de recrutement
+        date_reception_col = 'Date de réception de la demande aprés validation de la DRH'
+        date_reponse_col = 'Date de la 1er réponse du demandeur à l\'équipe RH'
         
-        delai_moyen = df_filtered['Délai_jours'].mean()
-        
-        if not pd.isna(delai_moyen):
-            # Créer un graphique de barre horizontale pour le délai
-            fig_delai = go.Figure(go.Bar(
-                x=[delai_moyen],
-                y=['Délai moyen'],
-                orientation='h',
-                marker_color='#1f77b4',
-                text=[f'{delai_moyen:.0f} jours'],
-                textposition='auto'
-            ))
-            fig_delai.update_layout(
-                title="⏱️ Délai moyen de recrutement",
-                xaxis_title="Jours",
-                height=200,
-                showlegend=False
-            )
-            st.plotly_chart(fig_delai, use_container_width=True)
+        if date_reception_col in df_filtered.columns and date_reponse_col in df_filtered.columns:
+            df_filtered['Duree de recrutement'] = (df_filtered[date_reponse_col] - df_filtered[date_reception_col]).dt.days
+            delai_moyen = df_filtered['Duree de recrutement'].mean()
+
+            if not pd.isna(delai_moyen):
+                fig_delai = go.Figure(go.Indicator(
+                    mode = "number",
+                    value = delai_moyen,
+                    title = {"text": "Délai moyen de recrutement (jours)"}
+                ))
+                fig_delai.update_layout(height=300)
+                st.plotly_chart(fig_delai, use_container_width=True)
+            else:
+                st.info("Le calcul du délai moyen de recrutement n'est pas disponible.")
+        else:
+            st.warning("Colonnes de date nécessaires pour le calcul du délai non trouvées.")
+
 
 def create_demandes_recrutement_tab(df_recrutement):
     """Onglet Demandes de Recrutement (Image 2)"""
-    st.header("📋 Demandes de Recrutement")
+    st.header("📋 Demandes")
     
     # Sidebar pour les filtres
     st.sidebar.subheader("🔧 Filtres - Demandes")
     
     # Filtre par période de demande
-    if 'Date de réception de la demande aprés validation de la DRH' in df_recrutement.columns:
-        df_recrutement['Année_demande'] = df_recrutement['Date de réception de la demande aprés validation de la DRH'].dt.year
+    date_col = 'Date de réception de la demande aprés validation de la DRH'
+    if date_col in df_recrutement.columns:
+        df_recrutement['Année_demande'] = df_recrutement[date_col].dt.year
         annees_demande = sorted([y for y in df_recrutement['Année_demande'].dropna().unique() if not pd.isna(y)])
         if annees_demande:
-            annee_demande_select = st.sidebar.selectbox("Période de la demande", ['Toutes'] + [int(a) for a in annees_demande])
+            annee_demande_select = st.sidebar.selectbox("Période de la demande", ['Toutes'] + [int(a) for a in annees_demande], index=len(annees_demande))
         else:
             annee_demande_select = 'Toutes'
     else:
@@ -296,127 +334,155 @@ def create_demandes_recrutement_tab(df_recrutement):
     if annee_demande_select != 'Toutes':
         df_filtered = df_filtered[df_filtered['Année_demande'] == annee_demande_select]
     
-    # KPI principal - Nombre de demandes (comme dans l'image 2)
-    col1, col2, col3 = st.columns([2, 1, 1])
-    with col1:
-        st.markdown(f"<h1 style='text-align: center; color: #1f77b4; font-size: 4em;'>{len(df_filtered)}</h1>", unsafe_allow_html=True)
-        st.markdown(f"<p style='text-align: center; font-size: 1.2em;'>Nombre de demandes</p>", unsafe_allow_html=True)
-    
+    # KPI principal - Nombre de demandes
+    st.metric("Nombre de demandes", len(df_filtered))
+
     # Graphiques principaux
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3 = st.columns([1,1,2])
     
     with col1:
-        # Répartition par statut de la demande (pie chart comme dans l'image 2)
+        # Répartition par statut de la demande
         statut_counts = df_filtered['Statut de la demande'].value_counts()
-        
-        # Couleurs personnalisées pour correspondre à l'image
-        color_map = {
-            'Clôture': '#1f77b4',      # Bleu
-            'Dépriorisé': '#2ca02c',   # Vert
-            'Annulé': '#ff7f0e',       # Orange
-            'En cours': '#d62728'       # Rouge
-        }
-        colors = [color_map.get(status, '#8c564b') for status in statut_counts.index]
-        
-        fig_statut = px.pie(
-            values=statut_counts.values,
-            names=statut_counts.index,
-            title="📊 Répartition par statut de la demande",
-            color_discrete_sequence=colors
+        fig_statut = go.Figure(data=[go.Pie(labels=statut_counts.index, values=statut_counts.values, hole=.5)])
+        fig_statut.update_layout(
+            title="Répartition par statut de la demande",
+            height=300,
+            legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5)
         )
-        fig_statut.update_traces(textposition='inside', textinfo='percent+label')
-        fig_statut.update_layout(height=400)
         st.plotly_chart(fig_statut, use_container_width=True)
     
     with col2:
-        # Comparaison par raison du recrutement (bar horizontal)
+        # Comparaison par raison du recrutement
         if 'Raison du recrutement' in df_filtered.columns:
             raison_counts = df_filtered['Raison du recrutement'].value_counts()
-            
-            try:
-                fig_raison = px.bar(
-                    x=raison_counts.values,
-                    y=raison_counts.index,
-                    orientation='h',
-                    title="🔄 Comparaison par raison du recrutement",
-                    color=raison_counts.values,
-                    color_continuous_scale='Greys'
-                )
-                fig_raison.update_layout(height=400, showlegend=False)
-            except Exception as e:
-                st.error(f"Erreur lors de la création du graphique des raisons: {e}")
-                fig_raison = None
-            if fig_raison is not None:
-                st.plotly_chart(fig_raison, use_container_width=True)
-            else:
-                st.info("Graphique 'Raison du recrutement' indisponible pour ces données.")
+            fig_raison = px.bar(
+                raison_counts,
+                x=raison_counts.values,
+                y=raison_counts.index,
+                orientation='h',
+                title="Comparaison par raison du recrutement",
+                text=raison_counts.values
+            )
+            fig_raison.update_traces(marker_color='grey', textposition='auto')
+            fig_raison.update_layout(height=300, xaxis_title=None, yaxis_title=None)
+            st.plotly_chart(fig_raison, use_container_width=True)
     
     with col3:
-        # Évolution des demandes par mois (bar chart comme dans l'image 2)
-        if 'Date de réception de la demande aprés validation de la DRH' in df_filtered.columns:
-            df_filtered['Mois'] = df_filtered['Date de réception de la demande aprés validation de la DRH'].dt.to_period('M')
-            monthly_demandes = df_filtered.groupby('Mois').size().reset_index(name='Count')
-            monthly_demandes['Mois_str'] = monthly_demandes['Mois'].astype(str)
+        # Évolution des demandes
+        if date_col in df_filtered.columns:
+            df_filtered['Mois_Année_Demande'] = df_filtered[date_col].dt.strftime('%Y-%m')
+            monthly_demandes = df_filtered.groupby('Mois_Année_Demande').size().reset_index(name='Count')
             
             fig_evolution_demandes = px.bar(
                 monthly_demandes, 
-                x='Mois_str', 
+                x='Mois_Année_Demande', 
                 y='Count',
-                title="📈 Évolution des demandes",
-                color='Count',
-                color_continuous_scale='Blues'
+                title="Évolution des demandes",
+                text='Count'
             )
-            fig_evolution_demandes.update_layout(height=400, showlegend=False)
-            try:
-                st.plotly_chart(fig_evolution_demandes, use_container_width=True)
-            except Exception as e:
-                st.error(f"Erreur lors de l'affichage du graphique d'évolution des demandes: {e}")
+            fig_evolution_demandes.update_traces(marker_color='#1f77b4', textposition='outside')
+            fig_evolution_demandes.update_layout(height=300, xaxis_title=None, yaxis_title=None)
+            st.plotly_chart(fig_evolution_demandes, use_container_width=True)
     
     # Deuxième ligne de graphiques
     col4, col5 = st.columns(2)
     
     with col4:
-        # Comparaison par direction (bar horizontal comme dans l'image 2)
-        direction_counts = df_filtered['Direction concernée'].value_counts().head(10)
-        
+        # Comparaison par direction
+        direction_counts = df_filtered['Direction concernée'].value_counts().nlargest(10)
         fig_direction = px.bar(
-            x=direction_counts.values,
+            direction_counts,
             y=direction_counts.index,
+            x=direction_counts.values,
             orientation='h',
-            title="🏢 Comparaison par direction",
-            color=direction_counts.values,
-            color_continuous_scale='Oranges'
+            title="Comparaison par direction",
+            text=direction_counts.values
         )
-        fig_direction.update_layout(height=500, showlegend=False)
-        try:
-            st.plotly_chart(fig_direction, use_container_width=True)
-        except Exception as e:
-            st.error(f"Erreur lors de l'affichage du graphique par direction: {e}")
+        fig_direction.update_traces(marker_color='#ff7f0e', textposition='auto')
+        fig_direction.update_layout(height=400, xaxis_title=None, yaxis_title=None, yaxis={'categoryorder':'total ascending'})
+        st.plotly_chart(fig_direction, use_container_width=True)
     
     with col5:
-        # Comparaison par poste (bar horizontal comme dans l'image 2)
-        poste_counts = df_filtered['Poste demandé'].value_counts().head(15)
-        
+        # Comparaison par poste
+        poste_counts = df_filtered['Poste demandé'].value_counts().nlargest(15)
         fig_poste = px.bar(
-            x=poste_counts.values,
+            poste_counts,
             y=poste_counts.index,
+            x=poste_counts.values,
             orientation='h',
-            title="👥 Comparaison par poste",
-            color=poste_counts.values,
-            color_continuous_scale='Greens'
+            title="Comparaison par poste",
+            text=poste_counts.values
         )
-        fig_poste.update_layout(height=500, showlegend=False)
-        try:
-            st.plotly_chart(fig_poste, use_container_width=True)
-        except Exception as e:
-            st.error(f"Erreur lors de l'affichage du graphique par poste: {e}")
+        fig_poste.update_traces(marker_color='#2ca02c', textposition='auto')
+        fig_poste.update_layout(height=400, xaxis_title=None, yaxis_title=None, yaxis={'categoryorder':'total ascending'})
+        st.plotly_chart(fig_poste, use_container_width=True)
+
+def create_weekly_report_tab():
+    """Onglet Reporting Hebdomadaire"""
+    st.header("📅 Reporting Hebdomadaire")
+
+    # 1. Section "Chiffres Clés"
+    st.subheader("Chiffres Clés de la semaine")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Postes en cours cette semaine", "14", delta="2")
+    col2.metric("Postes pourvus cette semaine", "5")
+    col3.metric("Nouveaux postes ouverts", "2")
+    col4.metric("Total postes ouverts avant la semaine", "18")
+
+    st.markdown("---")
+
+    # 2. Section "Pipeline de Recrutement (Kanban)"
+    st.subheader("Pipeline de Recrutement (Kanban)")
+
+    # Définir les colonnes du Kanban
+    statuts_kanban = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+    cols = st.columns(len(statuts_kanban))
+
+    # CSS pour styliser les cartes
+    st.markdown("""
+    <style>
+    .kanban-card {
+        border-radius: 5px;
+        background-color: #f0f2f6;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-left: 5px solid #1f77b4;
+    }
+    .kanban-card h4 {
+        margin-top: 0;
+        margin-bottom: 5px;
+        font-size: 1em;
+    }
+    .kanban-card p {
+        margin-bottom: 2px;
+        font-size: 0.9em;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    for i, statut in enumerate(statuts_kanban):
+        with cols[i]:
+            st.markdown(f"<h5>{statut}</h5>", unsafe_allow_html=True)
+            # Filtrer les postes pour la colonne actuelle
+            postes_in_col = [p for p in postes_data if p["statut"] == statut]
+            for poste in postes_in_col:
+                card_html = f"""
+                <div class="kanban-card">
+                    <h4><b>{poste['titre']}</b></h4>
+                    <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
+                    <p>👤 {poste.get('demandeur', 'N/A')}</p>
+                    <p>✍️ {poste.get('recruteur', 'N/A')}</p>
+                </div>
+                """
+                st.markdown(card_html, unsafe_allow_html=True)
+
 
 def main():
     st.title("📊 Tableau de Bord RH - Style Power BI")
     st.markdown("---")
     
     # Créer les onglets
-    tab1, tab2, tab3, tab4 = st.tabs(["📂 Upload Fichiers", "🎯 Recrutements (Clôture)", "📋 Demandes Recrutement", "📊 Intégrations"])
+    tabs = st.tabs(["📂 Upload", "📋 Demandes", "🎯 Recrutement", "📅 Hebdomadaire", "📊 Intégrations"])
     
     # Variables pour stocker les fichiers uploadés
     # Use session_state to persist upload/refresh state
@@ -429,7 +495,7 @@ def main():
     uploaded_csv = st.session_state.uploaded_csv
     uploaded_excel = st.session_state.uploaded_excel
     
-    with tab1:
+    with tabs[0]:
         st.header("📂 Upload des Fichiers de Données")
         st.markdown("Uploadez vos fichiers pour mettre à jour les graphiques en temps réel.")
         
@@ -503,22 +569,23 @@ def main():
     else:
         if has_uploaded or st.session_state.data_updated:
             st.sidebar.success("✅ Toutes les données sont chargées avec succès !")
+
+    with tabs[1]:
+        if df_recrutement is not None:
+            create_demandes_recrutement_tab(df_recrutement)
         else:
-            st.sidebar.info("ℹ️ Données chargées depuis les fichiers locaux de l'application. Uploadez vos fichiers pour remplacer ces données.")
-    
-    with tab2:
+            st.warning("📋 Aucune donnée de recrutement disponible. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
+
+    with tabs[2]:
         if df_recrutement is not None:
             create_recrutements_clotures_tab(df_recrutement)
         else:
             st.warning("📊 Aucune donnée de recrutement disponible. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
     
-    with tab3:
-        if df_recrutement is not None:
-            create_demandes_recrutement_tab(df_recrutement)
-        else:
-            st.warning("📋 Aucune donnée de recrutement disponible. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
-    
-    with tab4:
+    with tabs[3]:
+        create_weekly_report_tab()
+
+    with tabs[4]:
         # Onglet pour les données d'intégration (données CSV)
         if df_integration is not None:
             st.header("📊 Suivi des Intégrations")
