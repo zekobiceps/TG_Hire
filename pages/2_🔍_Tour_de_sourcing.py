@@ -2249,22 +2249,26 @@ with tab6:
         help="Sélectionnez une question prête ou choisissez 'Autre' pour taper votre propre question."
     )
     
-    # Zone de saisie unique selon le choix
-    if option_choisie == "Autre (tapez votre question)":
-        question_complete = st.text_input(
-            "Votre question :",
-            placeholder="Ex: Quelles sont les compétences clés pour un chef de projet BTP ?"
-        )
-    else:
-        question_complete = st.text_input(
-            "Complétez la question :",
-            value=option_choisie + " ",
-            placeholder="Ex: " + option_choisie + " développeur web"
-        )
+    # Zone de saisie unique selon le choix (dans un formulaire pour éviter des reruns globaux)
+    with st.form(key="magicien_form"):
+        if option_choisie == "Autre (tapez votre question)":
+            question_complete = st.text_input(
+                "Votre question :",
+                placeholder="Ex: Quelles sont les compétences clés pour un chef de projet BTP ?"
+            )
+        else:
+            question_complete = st.text_input(
+                "Complétez la question :",
+                value=option_choisie + " ",
+                placeholder="Ex: " + option_choisie + " développeur web"
+            )
 
-    mode_rapide_magicien = st.checkbox("⚡ Réponse concise", key="magicien_fast", value=True)
-    
-    if st.button("✨ Poser la question à l'IA", type="primary", key="ask_magicien", use_container_width=True):
+        mode_rapide_magicien = st.checkbox("⚡ Réponse concise", key="magicien_fast", value=True)
+
+        gen_submitted = st.form_submit_button("✨ Poser la question à l'IA")
+
+    # Traitement après soumission du formulaire (exécuté sans provoquer un changement d'onglet)
+    if gen_submitted:
         if question_complete and question_complete.strip():
             with st.spinner("⏳ Génération en cours..."):
                 start_time = time.time()
