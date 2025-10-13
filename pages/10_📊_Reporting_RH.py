@@ -53,21 +53,21 @@ def create_global_filters(df_recrutement, prefix=""):
     """Créer des filtres globaux réutilisables pour tous les onglets"""
     if df_recrutement is None or len(df_recrutement) == 0:
         return {}
-    
+
+    # Organiser les filtres dans deux colonnes dans la sidebar
     filters = {}
-    
-    # Filtre par entité demandeuse
+    left_col, right_col = st.sidebar.columns(2)
+
+    # Filtre par entité demandeuse (colonne gauche)
     entites = ['Toutes'] + sorted(df_recrutement['Entité demandeuse'].dropna().unique())
-    filters['entite'] = st.sidebar.selectbox("Entité demandeuse", entites, key=f"{prefix}_entite")
-    
-    # Filtre par direction concernée
+    with left_col:
+        filters['entite'] = st.selectbox("Entité demandeuse", entites, key=f"{prefix}_entite")
+
+    # Filtre par direction concernée (colonne droite)
     directions = ['Toutes'] + sorted(df_recrutement['Direction concernée'].dropna().unique())
-    filters['direction'] = st.sidebar.selectbox("Direction concernée", directions, key=f"{prefix}_direction")
-    
-    # Filtre par affectation
-    affectations = ['Toutes'] + sorted(df_recrutement['Affectation'].dropna().unique())
-    filters['affectation'] = st.sidebar.selectbox("Affectation", affectations, key=f"{prefix}_affectation")
-    
+    with right_col:
+        filters['direction'] = st.selectbox("Direction concernée", directions, key=f"{prefix}_direction")
+
     return filters
 
 def apply_global_filters(df, filters):
@@ -79,9 +79,6 @@ def apply_global_filters(df, filters):
     
     if filters.get('direction') != 'Toutes':
         df_filtered = df_filtered[df_filtered['Direction concernée'] == filters['direction']]
-        
-    if filters.get('affectation') != 'Toutes':
-        df_filtered = df_filtered[df_filtered['Affectation'] == filters['affectation']]
     
     return df_filtered
 
@@ -487,19 +484,11 @@ def create_integrations_tab(df_recrutement, global_filters):
     
     # Graphiques
     col1, col2 = st.columns(2)
-    
+
+    # Graphique par affectation supprimé sur demande. On laisse une zone d'information minimale.
     with col1:
-        # Répartition par affectation
-        affectation_counts = df_filtered['Affectation'].value_counts().nlargest(10)
-        fig_affectation = px.pie(
-            values=affectation_counts.values,
-            names=affectation_counts.index,
-            title="🏢 Répartition par Affectation"
-        )
-        fig_affectation.update_traces(textposition='inside', textinfo='percent+label')
-        fig_affectation.update_layout(height=400)
-        st.plotly_chart(fig_affectation, use_container_width=True)
-    
+        st.info("Graphique 'Répartition par Affectation' désactivé.")
+
     with col2:
         # Évolution des dates d'intégration prévues
         if date_integration_col in df_filtered.columns:
