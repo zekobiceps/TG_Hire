@@ -605,17 +605,92 @@ def create_demandes_recrutement_combined_tab(df_recrutement):
         create_recrutements_clotures_tab(df_recrutement, global_filters)
 
 
-def create_weekly_report_tab():
+def calculate_weekly_metrics(df_recrutement):
+    """Calcule les métriques hebdomadaires basées sur les vraies données"""
+    if df_recrutement is None or len(df_recrutement) == 0:
+        return {}
+    
+    # Obtenir la date actuelle et la semaine dernière
+    today = datetime.now()
+    start_of_week = today - timedelta(days=today.weekday())  # Lundi de cette semaine
+    start_of_last_week = start_of_week - timedelta(days=7)   # Lundi de la semaine dernière
+    
+    # Convertir les colonnes de dates
+    date_reception_col = "Date de réception de la demande après validation de la DRH"
+    date_integration_col = "Date d'intégration prévisionnelle"
+    candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
+    statut_col = "Statut de la demande"
+    entite_col = "Entité demandeuse"
+    
+    # Créer une copie pour les calculs
+    df = df_recrutement.copy()
+    
+    # Convertir les dates
+    df[date_reception_col] = pd.to_datetime(df[date_reception_col], errors='coerce')
+    df[date_integration_col] = pd.to_datetime(df[date_integration_col], errors='coerce')
+    
+    # Calculer les métriques par entité
+    entites = df[entite_col].dropna().unique()
+    metrics_by_entity = {}
+    
+    for entite in entites:
+        df_entite = df[df[entite_col] == entite]
+        
+        # 1. Postes ouverts avant début semaine (En cours la semaine dernière)
+        postes_avant = len(df_entite[
+            (df_entite[statut_col] == 'En cours') &
+            (df_entite[date_reception_col] < start_of_week)
+        ])
+        
+        # 2. Nouveaux postes ouverts cette semaine (Date réception cette semaine)
+        nouveaux_postes = len(df_entite[
+            (df_entite[date_reception_col] >= start_of_week) &
+            (df_entite[date_reception_col] <= today)
+        ])
+        
+        # 3. Postes pourvus cette semaine (Date intégration cette semaine)
+        postes_pourvus = len(df_entite[
+            (df_entite[date_integration_col] >= start_of_week) &
+            (df_entite[date_integration_col] <= today)
+        ])
+        
+        # 4. Postes en cours cette semaine (Statut "En cours" ET pas de candidat retenu)
+        postes_en_cours = len(df_entite[
+            (df_entite[statut_col] == 'En cours') &
+            (df_entite[candidat_col].isna() | (df_entite[candidat_col].str.strip() == ""))
+        ])
+        
+        metrics_by_entity[entite] = {
+            'avant': postes_avant,
+            'nouveaux': nouveaux_postes, 
+            'pourvus': postes_pourvus,
+            'en_cours': postes_en_cours
+        }
+    
+    return metrics_by_entity
+
+def create_weekly_report_tab(df_recrutement=None):
     """Onglet Reporting Hebdomadaire"""
     st.header("📅 Reporting Hebdomadaire")
+
+    # Calculer les métriques si les données sont disponibles
+    if df_recrutement is not None:
+        metrics = calculate_weekly_metrics(df_recrutement)
+        total_avant = sum(m['avant'] for m in metrics.values())
+        total_nouveaux = sum(m['nouveaux'] for m in metrics.values())
+        total_pourvus = sum(m['pourvus'] for m in metrics.values())
+        total_en_cours = sum(m['en_cours'] for m in metrics.values())
+    else:
+        metrics = {}
+        total_avant = total_nouveaux = total_pourvus = total_en_cours = 0
 
     # 1. Section "Chiffres Clés"
     st.subheader("Chiffres Clés de la semaine")
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Postes en cours cette semaine", "14", delta="2")
-    col2.metric("Postes pourvus cette semaine", "5")
-    col3.metric("Nouveaux postes ouverts", "2")
-    col4.metric("Total postes ouverts avant la semaine", "18")
+    col1.metric("Postes en cours cette semaine", total_en_cours)
+    col2.metric("Postes pourvus cette semaine", total_pourvus)
+    col3.metric("Nouveaux postes ouverts", total_nouveaux)
+    col4.metric("Total postes ouverts avant la semaine", total_avant)
 
     st.markdown("---")
 
@@ -671,69 +746,52 @@ def create_weekly_report_tab():
             </tr>
         </thead>
         <tbody>
+    """
+    
+    # Ajouter les lignes avec les vraies données
+    if metrics:
+        for entite, data in metrics.items():
+            table_html += f"""
             <tr>
-                <td class="entity-cell">TGCC</td>
-                <td>19</td>
-                <td>12</td>
-                <td>5</td>
-                <td>26</td>
+                <td class="entity-cell">{entite}</td>
+                <td>{data['avant'] if data['avant'] > 0 else '-'}</td>
+                <td>{data['nouveaux'] if data['nouveaux'] > 0 else '-'}</td>
+                <td>{data['pourvus'] if data['pourvus'] > 0 else '-'}</td>
+                <td>{data['en_cours'] if data['en_cours'] > 0 else '-'}</td>
             </tr>
-            <tr>
-                <td class="entity-cell">TG STONE</td>
-                <td>0</td>
-                <td>2</td>
-                <td>2</td>
-                <td>0</td>
-            </tr>
-            <tr>
-                <td class="entity-cell">TG LOGISTIQUE</td>
-                <td>-</td>
-                <td>1</td>
-                <td>-</td>
-                <td>1</td>
-            </tr>
-            <tr>
-                <td class="entity-cell">TGEM</td>
-                <td>0</td>
-                <td>2</td>
-                <td>0</td>
-                <td>2</td>
-            </tr>
-            <tr>
-                <td class="entity-cell">TG SCAN</td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
-            </tr>
-            <tr>
-                <td class="entity-cell">TG STEEL</td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
-            </tr>
-            <tr>
-                <td class="entity-cell">TG STONE</td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
-                <td>-</td>
-            </tr>
-            <tr>
-                <td class="entity-cell">TG STONE</td>
-                <td>2</td>
-                <td>1</td>
-                <td>0</td>
-                <td>3</td>
-            </tr>
-            <tr class="total-row">
-                <td class="entity-cell">Total</td>
-                <td>21</td>
-                <td>18</td>
-                <td>7</td>
-                <td>32</td>
-            </tr>
+            """
+    else:
+        # Données par défaut si pas de données Excel
+        table_html += """
+        <tr>
+            <td class="entity-cell">TGCC</td>
+            <td>19</td>
+            <td>12</td>
+            <td>5</td>
+            <td>26</td>
+        </tr>
+        <tr>
+            <td class="entity-cell">TGEM</td>
+            <td>2</td>
+            <td>2</td>
+            <td>0</td>
+            <td>4</td>
+        </tr>
+        """
+        total_avant = 21
+        total_nouveaux = 14
+        total_pourvus = 5
+        total_en_cours = 30
+    
+    # Ligne de total
+    table_html += f"""
+        <tr class="total-row">
+            <td class="entity-cell">Total</td>
+            <td>{total_avant}</td>
+            <td>{total_nouveaux}</td>
+            <td>{total_pourvus}</td>
+            <td>{total_en_cours}</td>
+        </tr>
         </tbody>
     </table>
     """
@@ -745,10 +803,6 @@ def create_weekly_report_tab():
 
     # 3. Section "Pipeline de Recrutement (Kanban)"
     st.subheader("Pipeline de Recrutement (Kanban)")
-
-    # Définir les colonnes du Kanban
-    statuts_kanban = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
-    cols = st.columns(len(statuts_kanban))
 
     # CSS pour styliser les cartes et colonnes Kanban avec lignes verticales complètes
     st.markdown("""
@@ -799,6 +853,37 @@ def create_weekly_report_tab():
     }
     </style>
     """, unsafe_allow_html=True)
+
+    # Définir les données d'exemple pour le Kanban (ou utiliser les vraies données si disponibles)
+    postes_data = [
+        {"statut": "Sourcing", "titre": "Ingénieur Achat", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.BOUZOUBAA", "recruteur": "Zakaria"},
+        {"statut": "Sourcing", "titre": "Directeur Achats Adjoint", "entite": "TGCC", "lieu": "Siège", "demandeur": "C.BENABDELLAH", "recruteur": "Zakaria"},
+        {"statut": "Sourcing", "titre": "INGENIEUR TRAVAUX", "entite": "TGCC", "lieu": "YAMED LOT B", "demandeur": "M.TAZI", "recruteur": "Zakaria"},
+        
+        {"statut": "Shortlisté", "titre": "CHEF DE PROJETS", "entite": "TGCC", "lieu": "DESSALEMENT JORF", "demandeur": "M.FENNAN", "recruteur": "ZAKARIA"},
+        {"statut": "Shortlisté", "titre": "Planificateur", "entite": "TGCC", "lieu": "ASFI-B", "demandeur": "SOUFIANI", "recruteur": "Ghita"},
+        {"statut": "Shortlisté", "titre": "RESPONSABLE TRANS INTERCH", "entite": "TG PREFA", "lieu": "OUED SALEH", "demandeur": "FBOUZOUBAA", "recruteur": "Ghita"},
+        
+        {"statut": "Signature DRH", "titre": "PROJETEUR DESSINATEUR", "entite": "TG WOOD", "lieu": "OUED SALEH", "demandeur": "S.MENJRA", "recruteur": "Zakaria"},
+        {"statut": "Signature DRH", "titre": "Projeteur", "entite": "TGCC", "lieu": "TSP Safi", "demandeur": "B.MORABET", "recruteur": "Zakaria"},
+        {"statut": "Signature DRH", "titre": "Consultant SAP", "entite": "TGCC", "lieu": "Siège", "demandeur": "O.KETTA", "recruteur": "Zakaria"},
+        
+        {"statut": "Clôture", "titre": "Doc Controller", "entite": "TGEM", "lieu": "SIEGE", "demandeur": "A.SANKARI", "recruteur": "Zakaria"},
+        {"statut": "Clôture", "titre": "Ingénieur étude/qualité", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.MOUTANABI", "recruteur": "Zakaria"},
+        {"statut": "Clôture", "titre": "Responsable Cybersecurité", "entite": "TGCC", "lieu": "Siège", "demandeur": "Ghazi", "recruteur": "Zakaria"},
+        {"statut": "Clôture", "titre": "CHEF DE CHANTIER", "entite": "TGCC", "lieu": "N/A", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},
+        {"statut": "Clôture", "titre": "Ing contrôle de la performance", "entite": "TGCC", "lieu": "Siège", "demandeur": "H.BARIGOU", "recruteur": "Ghita"},
+        {"statut": "Clôture", "titre": "Ingénieur Systèmes Réseaux", "entite": "TGCC", "lieu": "Siège", "demandeur": "M.JADDOR", "recruteur": "Ghita"},
+        {"statut": "Clôture", "titre": "Responsable étude de prix", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "S.Bennani Zitani", "recruteur": "Ghita"},
+        {"statut": "Clôture", "titre": "Responsable Travaux", "entite": "TGEM", "lieu": "Zone Rabat", "demandeur": "S.ACHIR", "recruteur": "Zakaria"},
+        
+        {"statut": "Désistement", "titre": "Conducteur de Travaux", "entite": "TGCC", "lieu": "JORF LASFAR", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},
+        {"statut": "Désistement", "titre": "Chef de Chantier", "entite": "TGCC", "lieu": "TOARC", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},
+        {"statut": "Désistement", "titre": "Magasinier", "entite": "TG WOOD", "lieu": "Oulad Saleh", "demandeur": "K.TAZI", "recruteur": "Ghita"},
+    ]
+    
+    # Définir les colonnes du Kanban
+    statuts_kanban = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
 
     # Créer le Kanban avec HTML complet pour les lignes verticales
     kanban_html = '<div class="kanban-container">'
@@ -932,7 +1017,7 @@ def main():
             st.warning("📊 Aucune donnée de recrutement disponible. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
     
     with tabs[2]:
-        create_weekly_report_tab()
+        create_weekly_report_tab(df_recrutement)
 
     with tabs[3]:
         # Onglet Intégrations basé sur les données Excel
