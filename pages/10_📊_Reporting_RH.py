@@ -786,16 +786,44 @@ def create_weekly_report_tab(df_recrutement=None):
         # Créer et afficher le DataFrame
         df_table = pd.DataFrame(table_data)
         
-        # Styliser le tableau
+        # Styliser le tableau avec couleur rouge et centrage
         st.markdown("""
         <style>
         .stDataFrame {
             font-size: 0.9em;
+            margin: 20px 0;
+        }
+        .stDataFrame table {
+            border-collapse: collapse !important;
+            width: 100% !important;
+            min-height: 300px !important;
         }
         .stDataFrame th {
             background-color: #8B0000 !important;
             color: white !important;
             font-weight: bold !important;
+            text-align: center !important;
+            padding: 12px 8px !important;
+            border: 1px solid white !important;
+        }
+        .stDataFrame td {
+            text-align: center !important;
+            padding: 10px 8px !important;
+            border: 1px solid #ddd !important;
+            background-color: #f9f9f9 !important;
+        }
+        .stDataFrame tr:last-child td {
+            background-color: #8B0000 !important;
+            color: white !important;
+            font-weight: bold !important;
+        }
+        .stDataFrame tr:first-child td:first-child {
+            text-align: left !important;
+            padding-left: 15px !important;
+        }
+        .stDataFrame tr:last-child td:first-child {
+            text-align: left !important;
+            padding-left: 15px !important;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -849,27 +877,31 @@ def create_weekly_report_tab(df_recrutement=None):
     # Créer les colonnes Streamlit
     cols = st.columns(len(statuts_kanban))
     
-    # CSS pour styliser les cartes
+    # CSS pour styliser les cartes (2 par ligne)
     st.markdown("""
     <style>
     .kanban-card {
         border-radius: 8px;
         background-color: #f0f2f6;
-        padding: 12px;
-        margin-bottom: 12px;
+        padding: 10px;
+        margin-bottom: 8px;
         border-left: 4px solid #1f77b4;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        min-height: 80px;
+        width: 100%;
     }
     .kanban-card h4 {
         margin-top: 0;
-        margin-bottom: 8px;
-        font-size: 1em;
+        margin-bottom: 6px;
+        font-size: 0.9em;
         color: #2c3e50;
+        line-height: 1.2;
     }
     .kanban-card p {
-        margin-bottom: 4px;
-        font-size: 0.85em;
+        margin-bottom: 3px;
+        font-size: 0.75em;
         color: #555;
+        line-height: 1.1;
     }
     .kanban-header {
         text-align: center;
@@ -894,17 +926,40 @@ def create_weekly_report_tab(df_recrutement=None):
             # Filtrer les postes pour cette colonne
             postes_in_col = [p for p in postes_data if p["statut"] == statut]
             
-            # Afficher chaque poste comme une carte
-            for poste in postes_in_col:
-                card_html = f"""
-                <div class="kanban-card">
-                    <h4><b>{poste['titre']}</b></h4>
-                    <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
-                    <p>👤 {poste.get('demandeur', 'N/A')}</p>
-                    <p>✍️ {poste.get('recruteur', 'N/A')}</p>
-                </div>
-                """
-                st.markdown(card_html, unsafe_allow_html=True)
+            # Afficher les cartes avec 2 par ligne
+            for idx in range(0, len(postes_in_col), 2):
+                # Créer une ligne avec 2 cartes maximum
+                card_cols = st.columns(2)
+                
+                # Première carte de la ligne
+                if idx < len(postes_in_col):
+                    poste = postes_in_col[idx]
+                    with card_cols[0]:
+                        card_html = f"""
+                        <div class="kanban-card">
+                            <h4><b>{poste['titre']}</b></h4>
+                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')} | 👤 {poste.get('demandeur', 'N/A')}</p>
+                            <p>✍️ {poste.get('recruteur', 'N/A')}</p>
+                        </div>
+                        """
+                        st.markdown(card_html, unsafe_allow_html=True)
+                
+                # Deuxième carte de la ligne (si elle existe)
+                if idx + 1 < len(postes_in_col):
+                    poste = postes_in_col[idx + 1]
+                    with card_cols[1]:
+                        card_html = f"""
+                        <div class="kanban-card">
+                            <h4><b>{poste['titre']}</b></h4>
+                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')} | 👤 {poste.get('demandeur', 'N/A')}</p>
+                            <p>✍️ {poste.get('recruteur', 'N/A')}</p>
+                        </div>
+                        """
+                        st.markdown(card_html, unsafe_allow_html=True)
+                else:
+                    # Colonne vide si nombre impair
+                    with card_cols[1]:
+                        st.empty()
 
 
 def main():
