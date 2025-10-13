@@ -783,60 +783,164 @@ def create_weekly_report_tab(df_recrutement=None):
             'Nb postes en cours cette semaine': f'**{total_en_cours}**'
         })
         
-        # Créer et afficher le DataFrame
-        df_table = pd.DataFrame(table_data)
-        
-        # Styliser le tableau avec couleur rouge et centrage
+        # Créer le tableau HTML personnalisé pour un contrôle total du style
         st.markdown("""
         <style>
-        .stDataFrame {
-            font-size: 0.9em;
+        .custom-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: Arial, sans-serif;
             margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
-        .stDataFrame table {
-            border-collapse: collapse !important;
-            width: 100% !important;
-            min-height: 300px !important;
-        }
-        .stDataFrame th {
-            background-color: #8B0000 !important;
+        .custom-table th {
+            background-color: #DC143C !important; /* Rouge vif */
             color: white !important;
             font-weight: bold !important;
+            text-align: center !important;
+            padding: 15px 8px !important;
+            border: 1px solid white !important;
+            font-size: 0.9em;
+        }
+        .custom-table td {
             text-align: center !important;
             padding: 12px 8px !important;
-            border: 1px solid white !important;
-        }
-        .stDataFrame td {
-            text-align: center !important;
-            padding: 10px 8px !important;
             border: 1px solid #ddd !important;
-            background-color: #f9f9f9 !important;
+            background-color: white !important;
+            font-size: 0.85em;
         }
-        .stDataFrame tr:last-child td {
-            background-color: #8B0000 !important;
+        .custom-table .entity-cell {
+            text-align: left !important;
+            padding-left: 15px !important;
+            font-weight: 500;
+        }
+        .custom-table .total-row {
+            background-color: #DC143C !important; /* Rouge vif */
             color: white !important;
             font-weight: bold !important;
         }
-        .stDataFrame tr:first-child td:first-child {
-            text-align: left !important;
-            padding-left: 15px !important;
-        }
-        .stDataFrame tr:last-child td:first-child {
+        .custom-table .total-row .entity-cell {
             text-align: left !important;
             padding-left: 15px !important;
         }
         </style>
         """, unsafe_allow_html=True)
         
-        st.dataframe(df_table, use_container_width=True, hide_index=True)
+        # Construire le tableau HTML
+        html_table = '<table class="custom-table"><thead><tr>'
+        html_table += '<th>Entité</th>'
+        html_table += '<th>Nb postes ouverts avant début semaine</th>'
+        html_table += '<th>Nb nouveaux postes ouverts cette semaine</th>'
+        html_table += '<th>Nb postes pourvus cette semaine</th>'
+        html_table += '<th>Nb postes en cours cette semaine</th>'
+        html_table += '</tr></thead><tbody>'
+        
+        # Ajouter les lignes de données
+        for i, row in enumerate(table_data[:-1]):  # Toutes sauf la dernière (total)
+            html_table += '<tr>'
+            html_table += f'<td class="entity-cell">{row["Entité"]}</td>'
+            html_table += f'<td>{row["Nb postes ouverts avant début semaine"]}</td>'
+            html_table += f'<td>{row["Nb nouveaux postes ouverts cette semaine"]}</td>'
+            html_table += f'<td>{row["Nb postes pourvus cette semaine"]}</td>'
+            html_table += f'<td>{row["Nb postes en cours cette semaine"]}</td>'
+            html_table += '</tr>'
+        
+        # Ajouter la ligne de total
+        total_row = table_data[-1]
+        html_table += '<tr class="total-row">'
+        html_table += f'<td class="entity-cell">{total_row["Entité"]}</td>'
+        html_table += f'<td>{total_row["Nb postes ouverts avant début semaine"]}</td>'
+        html_table += f'<td>{total_row["Nb nouveaux postes ouverts cette semaine"]}</td>'
+        html_table += f'<td>{total_row["Nb postes pourvus cette semaine"]}</td>'
+        html_table += f'<td>{total_row["Nb postes en cours cette semaine"]}</td>'
+        html_table += '</tr>'
+        
+        html_table += '</tbody></table>'
+        
+        # Afficher le tableau HTML
+        st.markdown(html_table, unsafe_allow_html=True)
     else:
-        # Tableau par défaut si pas de données
-        default_data = [
-            {'Entité': 'TGCC', 'Avant': 19, 'Nouveaux': 12, 'Pourvus': 5, 'En cours': 26},
-            {'Entité': 'TGEM', 'Avant': 2, 'Nouveaux': 2, 'Pourvus': 0, 'En cours': 4},
-            {'Entité': '**Total**', 'Avant': '**21**', 'Nouveaux': '**14**', 'Pourvus': '**5**', 'En cours': '**30**'}
-        ]
-        st.dataframe(pd.DataFrame(default_data), use_container_width=True, hide_index=True)
+        # Tableau par défaut si pas de données avec le même style
+        st.markdown("""
+        <style>
+        .custom-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: Arial, sans-serif;
+            margin: 20px 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .custom-table th {
+            background-color: #DC143C !important; /* Rouge vif */
+            color: white !important;
+            font-weight: bold !important;
+            text-align: center !important;
+            padding: 15px 8px !important;
+            border: 1px solid white !important;
+            font-size: 0.9em;
+        }
+        .custom-table td {
+            text-align: center !important;
+            padding: 12px 8px !important;
+            border: 1px solid #ddd !important;
+            background-color: white !important;
+            font-size: 0.85em;
+        }
+        .custom-table .entity-cell {
+            text-align: left !important;
+            padding-left: 15px !important;
+            font-weight: 500;
+        }
+        .custom-table .total-row {
+            background-color: #DC143C !important; /* Rouge vif */
+            color: white !important;
+            font-weight: bold !important;
+        }
+        .custom-table .total-row .entity-cell {
+            text-align: left !important;
+            padding-left: 15px !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        # Tableau par défaut HTML
+        default_html = """
+        <table class="custom-table">
+            <thead>
+                <tr>
+                    <th>Entité</th>
+                    <th>Nb postes ouverts avant début semaine</th>
+                    <th>Nb nouveaux postes ouverts cette semaine</th>
+                    <th>Nb postes pourvus cette semaine</th>
+                    <th>Nb postes en cours cette semaine</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="entity-cell">TGCC</td>
+                    <td>19</td>
+                    <td>12</td>
+                    <td>5</td>
+                    <td>26</td>
+                </tr>
+                <tr>
+                    <td class="entity-cell">TGEM</td>
+                    <td>2</td>
+                    <td>2</td>
+                    <td>0</td>
+                    <td>4</td>
+                </tr>
+                <tr class="total-row">
+                    <td class="entity-cell">Total</td>
+                    <td>21</td>
+                    <td>14</td>
+                    <td>5</td>
+                    <td>30</td>
+                </tr>
+            </tbody>
+        </table>
+        """
+        st.markdown(default_html, unsafe_allow_html=True)
 
     st.markdown("---")
 
