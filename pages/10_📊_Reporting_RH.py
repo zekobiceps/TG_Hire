@@ -49,6 +49,42 @@ postes_data = [
 ]
 
 
+def create_global_filters(df_recrutement, prefix=""):
+    """Créer des filtres globaux réutilisables pour tous les onglets"""
+    if df_recrutement is None or len(df_recrutement) == 0:
+        return {}
+    
+    filters = {}
+    
+    # Filtre par entité demandeuse
+    entites = ['Toutes'] + sorted(df_recrutement['Entité demandeuse'].dropna().unique())
+    filters['entite'] = st.sidebar.selectbox("Entité demandeuse", entites, key=f"{prefix}_entite")
+    
+    # Filtre par direction concernée
+    directions = ['Toutes'] + sorted(df_recrutement['Direction concernée'].dropna().unique())
+    filters['direction'] = st.sidebar.selectbox("Direction concernée", directions, key=f"{prefix}_direction")
+    
+    # Filtre par affectation
+    affectations = ['Toutes'] + sorted(df_recrutement['Affectation'].dropna().unique())
+    filters['affectation'] = st.sidebar.selectbox("Affectation", affectations, key=f"{prefix}_affectation")
+    
+    return filters
+
+def apply_global_filters(df, filters):
+    """Appliquer les filtres globaux aux données"""
+    df_filtered = df.copy()
+    
+    if filters.get('entite') != 'Toutes':
+        df_filtered = df_filtered[df_filtered['Entité demandeuse'] == filters['entite']]
+    
+    if filters.get('direction') != 'Toutes':
+        df_filtered = df_filtered[df_filtered['Direction concernée'] == filters['direction']]
+        
+    if filters.get('affectation') != 'Toutes':
+        df_filtered = df_filtered[df_filtered['Affectation'] == filters['affectation']]
+    
+    return df_filtered
+
 def load_data_from_files(csv_file=None, excel_file=None):
     """Charger et préparer les données depuis les fichiers uploadés ou locaux"""
     df_integration = None
@@ -147,8 +183,8 @@ def create_affectation_chart(df):
     
     return fig
 
-def create_recrutements_clotures_tab(df_recrutement):
-    """Onglet Recrutements Clôturés (Image 1)"""
+def create_recrutements_clotures_tab(df_recrutement, global_filters):
+    """Onglet Recrutements Clôturés avec style carte"""
     
     # Filtrer seulement les recrutements clôturés
     df_cloture = df_recrutement[df_recrutement['Statut de la demande'] == 'Clôture'].copy()
@@ -157,42 +193,21 @@ def create_recrutements_clotures_tab(df_recrutement):
         st.warning("Aucune donnée de recrutement clôturé disponible")
         return
     
-    # Filtres dans la sidebar
-    st.sidebar.subheader("🔧 Filtres - Recrutements")
-    
-    # Filtre par période
+    # Filtre par période (spécifique à cette section)
     if 'Date d\'entrée effective du candidat' in df_cloture.columns:
         df_cloture['Année'] = df_cloture['Date d\'entrée effective du candidat'].dt.year
         annees_dispo = sorted([y for y in df_cloture['Année'].dropna().unique() if not pd.isna(y)])
         if annees_dispo:
-            annee_select = st.sidebar.selectbox("Période de recrutement", ['Toutes'] + [int(a) for a in annees_dispo], index=len(annees_dispo))
+            annee_select = st.sidebar.selectbox("Période de recrutement", ['Toutes'] + [int(a) for a in annees_dispo], index=len(annees_dispo), key="rec_annee")
         else:
             annee_select = 'Toutes'
     else:
         annee_select = 'Toutes'
-    
-    # Filtre par entité demandeuse
-    entites = ['Toutes'] + sorted(df_cloture['Entité demandeuse'].dropna().unique())
-    entite_select = st.sidebar.selectbox("Entité demandeuse", entites, key="rec_entite")
-    
-    # Filtre par direction concernée
-    directions = ['Toutes'] + sorted(df_cloture['Direction concernée'].dropna().unique())
-    direction_select = st.sidebar.selectbox("Direction concernée", directions, key="rec_direction")
-    
-    # Filtre par affectation
-    affectations = ['Toutes'] + sorted(df_cloture['Affectation'].dropna().unique())
-    affectation_select = st.sidebar.selectbox("Affectation", affectations, key="rec_affectation")
 
-    # Appliquer les filtres
-    df_filtered = df_cloture.copy()
+    # Appliquer les filtres globaux + période
+    df_filtered = apply_global_filters(df_cloture, global_filters)
     if annee_select != 'Toutes':
         df_filtered = df_filtered[df_filtered['Année'] == annee_select]
-    if entite_select != 'Toutes':
-        df_filtered = df_filtered[df_filtered['Entité demandeuse'] == entite_select]
-    if direction_select != 'Toutes':
-        df_filtered = df_filtered[df_filtered['Direction concernée'] == direction_select]
-    if affectation_select != 'Toutes':
-        df_filtered = df_filtered[df_filtered['Affectation'] == affectation_select]
 
     # KPIs principaux
     col1, col2, col3 = st.columns(3)
@@ -226,19 +241,30 @@ def create_recrutements_clotures_tab(df_recrutement):
             st.plotly_chart(fig_evolution, use_container_width=True)
     
     with col2:
-        # Répartition par modalité de recrutement
+        # Répartition par modalité de recrutement (CORRECTION: légende déplacée à l'extérieur)
         if 'Modalité de recrutement' in df_filtered.columns:
             modalite_data = df_filtered['Modalité de recrutement'].value_counts()
             
             fig_modalite = go.Figure(data=[go.Pie(
                 labels=modalite_data.index, 
                 values=modalite_data.values,
-                hole=.5
+                hole=.5,
+                textposition='inside',
+                textinfo='percent'
             )])
             fig_modalite.update_layout(
                 title="Répartition par Modalité de recrutement",
                 height=300,
-                legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5)
+                # Légende positionnée à droite pour éviter le chevauchement
+                legend=dict(
+                    orientation="v", 
+                    yanchor="middle", 
+                    y=0.5, 
+                    xanchor="left", 
+                    x=1.05
+                ),
+                # Ajuster les marges pour faire de la place à la légende
+                margin=dict(l=20, r=150, t=50, b=20)
             )
             st.plotly_chart(fig_modalite, use_container_width=True)
 
@@ -314,47 +340,71 @@ def create_recrutements_clotures_tab(df_recrutement):
         else:
             st.warning("Colonnes de date nécessaires pour le calcul du délai non trouvées.")
 
+    # Section avec cartes des recrutements récents
+    st.markdown("---")
+    st.subheader("🎯 Recrutements Récents Clôturés")
+    
+    # Top 10 des recrutements les plus récents
+    if 'Date d\'entrée effective du candidat' in df_filtered.columns:
+        recrutements_recents = df_filtered.nlargest(6, 'Date d\'entrée effective du candidat')
+        
+        # Organiser en 2 colonnes
+        col_left, col_right = st.columns(2)
+        
+        for idx, (_, row) in enumerate(recrutements_recents.iterrows()):
+            target_col = col_left if idx % 2 == 0 else col_right
+            
+            with target_col:
+                # Couleur basée sur la modalité de recrutement
+                modalite = row.get('Modalité de recrutement', 'Autre')
+                color_map = {
+                    'Candidature spontannée': '#007bff',
+                    'Cooptation': '#28a745',
+                    'OFPPT': '#ffc107',
+                    'Sourcing': '#17a2b8',
+                    'Ex-stagiaire TGCC': '#6f42c1',
+                    'Annonce': '#fd7e14'
+                }
+                border_color = color_map.get(modalite, '#6c757d')
+                
+                date_col_entree = 'Date d\'entrée effective du candidat'
+                candidat_col_long = 'Nom Prénom du candidat retenu yant accepté la promesse d\'embauche'
+                
+                date_entree = row.get(date_col_entree, pd.NaT)
+                date_str = date_entree.strftime('%d/%m/%Y') if pd.notna(date_entree) else 'N/A'
+                
+                card_html = f"""
+                <div class="report-card" style="border-left-color: {border_color};">
+                    <h4>✅ {row.get('Poste demandé', 'N/A')}</h4>
+                    <p><strong>👤 Candidat:</strong> {row.get(candidat_col_long, 'N/A')}</p>
+                    <p><strong>🏢 Entité:</strong> {row.get('Entité demandeuse', 'N/A')}</p>
+                    <p><strong>📍 Affectation:</strong> {row.get('Affectation', 'N/A')}</p>
+                    <p><strong>📅 Date d'entrée:</strong> {date_str}</p>
+                    <span class="status-badge" style="background-color: {border_color};">{modalite}</span>
+                </div>
+                """
+                st.markdown(card_html, unsafe_allow_html=True)
 
-def create_demandes_recrutement_tab(df_recrutement):
-    """Onglet Demandes de Recrutement (Image 2)"""
+
+def create_demandes_recrutement_tab(df_recrutement, global_filters):
+    """Onglet Demandes de Recrutement avec style carte"""
     
-    # Filtres dans la sidebar
-    st.sidebar.subheader("🔧 Filtres - Demandes")
-    
-    # Filtre par période de demande
+    # Filtre par période de demande (spécifique à cette section)
     date_col = 'Date de réception de la demande aprés validation de la DRH'
     if date_col in df_recrutement.columns:
         df_recrutement['Année_demande'] = df_recrutement[date_col].dt.year
         annees_demande = sorted([y for y in df_recrutement['Année_demande'].dropna().unique() if not pd.isna(y)])
         if annees_demande:
-            annee_demande_select = st.sidebar.selectbox("Période de la demande", ['Toutes'] + [int(a) for a in annees_demande], index=len(annees_demande))
+            annee_demande_select = st.sidebar.selectbox("Période de la demande", ['Toutes'] + [int(a) for a in annees_demande], index=len(annees_demande), key="dem_annee")
         else:
             annee_demande_select = 'Toutes'
     else:
         annee_demande_select = 'Toutes'
     
-    # Filtre par entité demandeuse
-    entites_dem = ['Toutes'] + sorted(df_recrutement['Entité demandeuse'].dropna().unique())
-    entite_demande_select = st.sidebar.selectbox("Entité demandeuse", entites_dem, key="dem_entite")
-    
-    # Filtre par direction concernée
-    directions_dem = ['Toutes'] + sorted(df_recrutement['Direction concernée'].dropna().unique())
-    direction_demande_select = st.sidebar.selectbox("Direction concernée", directions_dem, key="dem_direction")
-    
-    # Filtre par affectation
-    affectations_dem = ['Toutes'] + sorted(df_recrutement['Affectation'].dropna().unique())
-    affectation_demande_select = st.sidebar.selectbox("Affectation", affectations_dem, key="dem_affectation")
-    
-    # Appliquer les filtres
-    df_filtered = df_recrutement.copy()
+    # Appliquer les filtres globaux + période
+    df_filtered = apply_global_filters(df_recrutement, global_filters)
     if annee_demande_select != 'Toutes':
         df_filtered = df_filtered[df_filtered['Année_demande'] == annee_demande_select]
-    if entite_demande_select != 'Toutes':
-        df_filtered = df_filtered[df_filtered['Entité demandeuse'] == entite_demande_select]
-    if direction_demande_select != 'Toutes':
-        df_filtered = df_filtered[df_filtered['Direction concernée'] == direction_demande_select]
-    if affectation_demande_select != 'Toutes':
-        df_filtered = df_filtered[df_filtered['Affectation'] == affectation_demande_select]
     
     # KPI principal - Nombre de demandes
     st.metric("Nombre de demandes", len(df_filtered))
@@ -439,7 +489,35 @@ def create_demandes_recrutement_tab(df_recrutement):
         fig_poste.update_layout(height=400, xaxis_title=None, yaxis_title=None, yaxis={'categoryorder':'total ascending'})
         st.plotly_chart(fig_poste, use_container_width=True)
 
-def create_integrations_tab(df_recrutement):
+    # Section avec cartes détaillées style Home.py
+    st.markdown("---")
+    st.subheader("📋 Détail des Demandes par Statut")
+    
+    # Organiser par statut avec cartes expandables
+    statuts = df_filtered['Statut de la demande'].value_counts()
+    
+    for statut, count in statuts.items():
+        with st.expander(f"📊 **{statut}** ({count} demandes)", expanded=False):
+            demandes_statut = df_filtered[df_filtered['Statut de la demande'] == statut].head(5)
+            
+            # Afficher les demandes sous forme de cartes
+            for idx, row in demandes_statut.iterrows():
+                card_html = f"""
+                <div class="report-card">
+                    <h4>🎯 {row.get('Poste demandé', 'N/A')}</h4>
+                    <p><strong>🏢 Entité:</strong> {row.get('Entité demandeuse', 'N/A')}</p>
+                    <p><strong>🎯 Direction:</strong> {row.get('Direction concernée', 'N/A')}</p>
+                    <p><strong>📍 Affectation:</strong> {row.get('Affectation', 'N/A')}</p>
+                    <p><strong>👤 Demandeur:</strong> {row.get('Nom Prénom du demandeur', 'N/A')}</p>
+                    <span class="status-badge">{statut}</span>
+                </div>
+                """
+                st.markdown(card_html, unsafe_allow_html=True)
+            
+            if len(demandes_statut) == 5 and count > 5:
+                st.info(f"... et {count - 5} autres demandes avec ce statut")
+
+def create_integrations_tab(df_recrutement, global_filters):
     """Onglet Intégrations basé sur les bonnes données"""
     st.header("📊 Intégrations")
     
@@ -458,29 +536,8 @@ def create_integrations_tab(df_recrutement):
         st.warning("Aucune intégration en cours trouvée")
         return
     
-    # Filtres dans la sidebar
-    st.sidebar.subheader("🔧 Filtres - Intégrations")
-    
-    # Filtre par entité demandeuse
-    entites_int = ['Toutes'] + sorted(df_integrations['Entité demandeuse'].dropna().unique())
-    entite_int_select = st.sidebar.selectbox("Entité demandeuse", entites_int, key="int_entite")
-    
-    # Filtre par direction concernée
-    directions_int = ['Toutes'] + sorted(df_integrations['Direction concernée'].dropna().unique())
-    direction_int_select = st.sidebar.selectbox("Direction concernée", directions_int, key="int_direction")
-    
-    # Filtre par affectation
-    affectations_int = ['Toutes'] + sorted(df_integrations['Affectation'].dropna().unique())
-    affectation_int_select = st.sidebar.selectbox("Affectation", affectations_int, key="int_affectation")
-    
-    # Appliquer les filtres
-    df_filtered = df_integrations.copy()
-    if entite_int_select != 'Toutes':
-        df_filtered = df_filtered[df_filtered['Entité demandeuse'] == entite_int_select]
-    if direction_int_select != 'Toutes':
-        df_filtered = df_filtered[df_filtered['Direction concernée'] == direction_int_select]
-    if affectation_int_select != 'Toutes':
-        df_filtered = df_filtered[df_filtered['Affectation'] == affectation_int_select]
+    # Appliquer les filtres globaux
+    df_filtered = apply_global_filters(df_integrations, global_filters)
     
     # KPIs d'intégration
     col1, col2, col3 = st.columns(3)
@@ -561,17 +618,58 @@ def create_integrations_tab(df_recrutement):
 
 
 def create_demandes_recrutement_combined_tab(df_recrutement):
-    """Onglet combiné Demandes et Recrutement avec sous-onglets"""
+    """Onglet combiné Demandes et Recrutement avec sous-onglets et style carte"""
     st.header("📊 Demandes & Recrutement")
+    
+    # CSS pour les cartes style Home.py
+    st.markdown("""
+    <style>
+    .report-card {
+        border-radius: 8px;
+        background-color: #f8f9fa;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-left: 4px solid #007bff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .report-card h4 {
+        margin-top: 0;
+        margin-bottom: 10px;
+        color: #2c3e50;
+        font-size: 1.1em;
+    }
+    .report-card p {
+        margin-bottom: 8px;
+        font-size: 0.9em;
+        color: #5a6c7d;
+    }
+    .report-card .status-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.8em;
+        font-weight: bold;
+        color: white;
+        background-color: #007bff;
+    }
+    .report-card .priority-high { background-color: #dc3545; }
+    .report-card .priority-medium { background-color: #ffc107; color: #212529; }
+    .report-card .priority-low { background-color: #28a745; }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Créer les filtres globaux une seule fois
+    st.sidebar.subheader("🔧 Filtres Globaux")
+    global_filters = create_global_filters(df_recrutement, "combined")
     
     # Créer les sous-onglets
     sub_tabs = st.tabs(["📋 Demandes", "🎯 Recrutement"])
     
     with sub_tabs[0]:
-        create_demandes_recrutement_tab(df_recrutement)
+        create_demandes_recrutement_tab(df_recrutement, global_filters)
     
     with sub_tabs[1]:
-        create_recrutements_clotures_tab(df_recrutement)
+        create_recrutements_clotures_tab(df_recrutement, global_filters)
 
 
 def create_weekly_report_tab():
@@ -622,16 +720,51 @@ def create_weekly_report_tab():
             st.markdown(f"<h5>{statut}</h5>", unsafe_allow_html=True)
             # Filtrer les postes pour la colonne actuelle
             postes_in_col = [p for p in postes_data if p["statut"] == statut]
-            for poste in postes_in_col:
-                card_html = f"""
-                <div class="kanban-card">
-                    <h4><b>{poste['titre']}</b></h4>
-                    <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
-                    <p>👤 {poste.get('demandeur', 'N/A')}</p>
-                    <p>✍️ {poste.get('recruteur', 'N/A')}</p>
-                </div>
-                """
-                st.markdown(card_html, unsafe_allow_html=True)
+            
+            # Organiser les cartes en paires (deux par ligne)
+            for idx in range(0, len(postes_in_col), 2):
+                # Prendre jusqu'à 2 cartes
+                batch = postes_in_col[idx:idx+2]
+                
+                if len(batch) == 2:
+                    # Deux cartes côte à côte
+                    card_col1, card_col2 = st.columns(2)
+                    
+                    with card_col1:
+                        poste = batch[0]
+                        card_html = f"""
+                        <div class="kanban-card">
+                            <h4><b>{poste['titre']}</b></h4>
+                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
+                            <p>👤 {poste.get('demandeur', 'N/A')}</p>
+                            <p>✍️ {poste.get('recruteur', 'N/A')}</p>
+                        </div>
+                        """
+                        st.markdown(card_html, unsafe_allow_html=True)
+                    
+                    with card_col2:
+                        poste = batch[1]
+                        card_html = f"""
+                        <div class="kanban-card">
+                            <h4><b>{poste['titre']}</b></h4>
+                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
+                            <p>👤 {poste.get('demandeur', 'N/A')}</p>
+                            <p>✍️ {poste.get('recruteur', 'N/A')}</p>
+                        </div>
+                        """
+                        st.markdown(card_html, unsafe_allow_html=True)
+                else:
+                    # Une seule carte
+                    poste = batch[0]
+                    card_html = f"""
+                    <div class="kanban-card">
+                        <h4><b>{poste['titre']}</b></h4>
+                        <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
+                        <p>👤 {poste.get('demandeur', 'N/A')}</p>
+                        <p>✍️ {poste.get('recruteur', 'N/A')}</p>
+                    </div>
+                    """
+                    st.markdown(card_html, unsafe_allow_html=True)
 
 
 def main():
@@ -739,7 +872,10 @@ def main():
     with tabs[3]:
         # Onglet Intégrations basé sur les données Excel
         if df_recrutement is not None:
-            create_integrations_tab(df_recrutement)
+            # Créer les filtres globaux pour les intégrations
+            st.sidebar.subheader("🔧 Filtres - Intégrations")
+            int_filters = create_global_filters(df_recrutement, "integrations")
+            create_integrations_tab(df_recrutement, int_filters)
         else:
             st.warning("📊 Aucune donnée disponible pour les intégrations. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
 
