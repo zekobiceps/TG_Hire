@@ -340,92 +340,6 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         else:
             st.warning("Colonnes de date nécessaires pour le calcul du délai non trouvées.")
 
-    # Section avec cartes des recrutements récents
-    st.markdown("---")
-    st.subheader("🎯 Recrutements Récents Clôturés")
-    
-    # Top recrutements récents avec alignement 2x2
-    if 'Date d\'entrée effective du candidat' in df_filtered.columns:
-        recrutements_recents = df_filtered.nlargest(6, 'Date d\'entrée effective du candidat')
-        recrutements_list = list(recrutements_recents.iterrows())
-        
-        # Organiser par paires (2 colonnes par ligne) comme les cartes Kanban
-        for idx in range(0, len(recrutements_list), 2):
-            # Toujours créer 2 colonnes pour maintenir l'alignement
-            rec_col1, rec_col2 = st.columns(2)
-            
-            # Première carte
-            if idx < len(recrutements_list):
-                with rec_col1:
-                    _, row = recrutements_list[idx]
-                    # Couleur basée sur la modalité de recrutement
-                    modalite = row.get('Modalité de recrutement', 'Autre')
-                    color_map = {
-                        'Candidature spontannée': '#007bff',
-                        'Cooptation': '#28a745',
-                        'OFPPT': '#ffc107',
-                        'Sourcing': '#17a2b8',
-                        'Ex-stagiaire TGCC': '#6f42c1',
-                        'Annonce': '#fd7e14'
-                    }
-                    border_color = color_map.get(modalite, '#6c757d')
-                    
-                    date_col_entree = 'Date d\'entrée effective du candidat'
-                    candidat_col_long = 'Nom Prénom du candidat retenu yant accepté la promesse d\'embauche'
-                    
-                    date_entree = row.get(date_col_entree, pd.NaT)
-                    date_str = date_entree.strftime('%d/%m/%Y') if pd.notna(date_entree) else 'N/A'
-                    
-                    card_html = f"""
-                    <div class="report-card" style="border-left-color: {border_color};">
-                        <h4>✅ {row.get('Poste demandé', 'N/A')}</h4>
-                        <p><strong>👤 Candidat:</strong> {row.get(candidat_col_long, 'N/A')}</p>
-                        <p><strong>🏢 Entité:</strong> {row.get('Entité demandeuse', 'N/A')}</p>
-                        <p><strong>📍 Affectation:</strong> {row.get('Affectation', 'N/A')}</p>
-                        <p><strong>📅 Date d'entrée:</strong> {date_str}</p>
-                        <span class="status-badge" style="background-color: {border_color};">{modalite}</span>
-                    </div>
-                    """
-                    st.markdown(card_html, unsafe_allow_html=True)
-            
-            # Deuxième carte (si elle existe)
-            if idx + 1 < len(recrutements_list):
-                with rec_col2:
-                    _, row = recrutements_list[idx + 1]
-                    # Couleur basée sur la modalité de recrutement
-                    modalite = row.get('Modalité de recrutement', 'Autre')
-                    color_map = {
-                        'Candidature spontannée': '#007bff',
-                        'Cooptation': '#28a745',
-                        'OFPPT': '#ffc107',
-                        'Sourcing': '#17a2b8',
-                        'Ex-stagiaire TGCC': '#6f42c1',
-                        'Annonce': '#fd7e14'
-                    }
-                    border_color = color_map.get(modalite, '#6c757d')
-                    
-                    date_col_entree = 'Date d\'entrée effective du candidat'
-                    candidat_col_long = 'Nom Prénom du candidat retenu yant accepté la promesse d\'embauche'
-                    
-                    date_entree = row.get(date_col_entree, pd.NaT)
-                    date_str = date_entree.strftime('%d/%m/%Y') if pd.notna(date_entree) else 'N/A'
-                    
-                    card_html = f"""
-                    <div class="report-card" style="border-left-color: {border_color};">
-                        <h4>✅ {row.get('Poste demandé', 'N/A')}</h4>
-                        <p><strong>👤 Candidat:</strong> {row.get(candidat_col_long, 'N/A')}</p>
-                        <p><strong>🏢 Entité:</strong> {row.get('Entité demandeuse', 'N/A')}</p>
-                        <p><strong>📍 Affectation:</strong> {row.get('Affectation', 'N/A')}</p>
-                        <p><strong>📅 Date d'entrée:</strong> {date_str}</p>
-                        <span class="status-badge" style="background-color: {border_color};">{modalite}</span>
-                    </div>
-                    """
-                    st.markdown(card_html, unsafe_allow_html=True)
-            else:
-                # Colonne vide pour maintenir l'alignement
-                with rec_col2:
-                    st.empty()
-
 
 def create_demandes_recrutement_tab(df_recrutement, global_filters):
     """Onglet Demandes de Recrutement avec style carte"""
@@ -712,15 +626,35 @@ def create_weekly_report_tab():
     statuts_kanban = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
     cols = st.columns(len(statuts_kanban))
 
-    # CSS pour styliser les cartes
+    # CSS pour styliser les cartes et colonnes Kanban
     st.markdown("""
     <style>
+    .kanban-column {
+        border-right: 2px solid #e0e0e0;
+        padding-right: 10px;
+        margin-right: 10px;
+    }
+    .kanban-column:last-child {
+        border-right: none;
+    }
+    .kanban-header {
+        text-align: center;
+        font-weight: bold;
+        font-size: 1.2em;
+        color: #2c3e50;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        border: 1px solid #dee2e6;
+    }
     .kanban-card {
         border-radius: 5px;
         background-color: #f0f2f6;
         padding: 10px;
         margin-bottom: 10px;
         border-left: 5px solid #1f77b4;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
     .kanban-card h4 {
         margin-top: 0;
@@ -736,7 +670,9 @@ def create_weekly_report_tab():
 
     for i, statut in enumerate(statuts_kanban):
         with cols[i]:
-            st.markdown(f"<h5>{statut}</h5>", unsafe_allow_html=True)
+            # Titre centré avec style dans une div
+            st.markdown(f'<div class="kanban-column"><div class="kanban-header">{statut}</div>', unsafe_allow_html=True)
+            
             # Filtrer les postes pour la colonne actuelle
             postes_in_col = [p for p in postes_data if p["statut"] == statut]
             
@@ -776,6 +712,107 @@ def create_weekly_report_tab():
                     # Colonne vide pour maintenir l'alignement
                     with card_col2:
                         st.empty()
+            
+            # Fermer la div kanban-column
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # 3. Tableau des besoins en cours par entité
+    st.subheader("📊 Besoins en Cours par Entité")
+    
+    # Créer le tableau basé sur les données de l'image
+    besoins_data = {
+        'Entité': ['TGCC', 'TG STONE', 'TG LOGISTIQUE', 'TGEM', 'TG SCAN', 'TG STEEL', 'TG STONE', 'TG STONE', 'Total'],
+        'Nb postes ouverts avant début semaine': [19, 0, '-', 0, '-', '-', '-', 2, 21],
+        'Nb nouveaux postes ouverts cette semaine': [12, 2, 1, 2, '-', '-', '-', 1, 18],
+        'Nb postes pourvus cette semaine': [5, 2, '-', 0, '-', '-', '-', 0, 7],
+        'Nb postes en cours cette semaine': [26, 0, 1, 2, '-', '-', '-', 3, 32]
+    }
+    
+    # Créer le DataFrame
+    df_besoins = pd.DataFrame(besoins_data)
+    
+    # CSS pour styliser le tableau comme dans l'image
+    st.markdown("""
+    <style>
+    .besoins-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-family: Arial, sans-serif;
+        font-size: 0.9em;
+    }
+    .besoins-table th {
+        background-color: #8B0000;
+        color: white;
+        padding: 8px;
+        text-align: center;
+        border: 1px solid white;
+        font-weight: bold;
+        font-size: 0.8em;
+    }
+    .besoins-table td {
+        padding: 8px;
+        text-align: center;
+        border: 1px solid #ddd;
+        background-color: #f9f9f9;
+    }
+    .besoins-table .total-row {
+        background-color: #8B0000 !important;
+        color: white !important;
+        font-weight: bold;
+    }
+    .besoins-table .entity-cell {
+        text-align: left;
+        padding-left: 15px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Construire le HTML du tableau
+    table_html = """
+    <table class="besoins-table">
+        <thead>
+            <tr>
+                <th>Entité</th>
+                <th>Nb postes ouverts avant début semaine</th>
+                <th>Nb nouveaux postes ouverts cette semaine</th>
+                <th>Nb postes pourvus cette semaine</th>
+                <th>Nb postes en cours cette semaine</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+    
+    # Ajouter les lignes de données
+    for idx, row in df_besoins.iterrows():
+        if row['Entité'] == 'Total':
+            # Ligne Total avec style spécial
+            table_html += f"""
+            <tr class="total-row">
+                <td class="entity-cell">{row['Entité']}</td>
+                <td>{row['Nb postes ouverts avant début semaine']}</td>
+                <td>{row['Nb nouveaux postes ouverts cette semaine']}</td>
+                <td>{row['Nb postes pourvus cette semaine']}</td>
+                <td>{row['Nb postes en cours cette semaine']}</td>
+            </tr>
+            """
+        else:
+            # Lignes normales
+            table_html += f"""
+            <tr>
+                <td class="entity-cell">{row['Entité']}</td>
+                <td>{row['Nb postes ouverts avant début semaine']}</td>
+                <td>{row['Nb nouveaux postes ouverts cette semaine']}</td>
+                <td>{row['Nb postes pourvus cette semaine']}</td>
+                <td>{row['Nb postes en cours cette semaine']}</td>
+            </tr>
+            """
+    
+    table_html += "</tbody></table>"
+    
+    # Afficher le tableau HTML
+    st.markdown(table_html, unsafe_allow_html=True)
 
 
 def main():
