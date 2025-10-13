@@ -761,162 +761,59 @@ def create_weekly_report_tab(df_recrutement=None):
     # 2. Tableau des besoins en cours par entité (AVANT le Kanban)
     st.subheader("📊 Besoins en Cours par Entité")
     
-    # CSS pour styliser le tableau comme dans l'image
-    st.markdown("""
-    <style>
-    .besoins-table {
-        width: 100%;
-        border-collapse: collapse;
-        font-family: Arial, sans-serif;
-        font-size: 0.9em;
-    }
-    .besoins-table th {
-        background-color: #8B0000;
-        color: white;
-        padding: 8px;
-        text-align: center;
-        border: 1px solid white;
-        font-weight: bold;
-        font-size: 0.8em;
-    }
-    .besoins-table td {
-        padding: 8px;
-        text-align: center;
-        border: 1px solid #ddd;
-        background-color: #f9f9f9;
-    }
-    .besoins-table .total-row {
-        background-color: #8B0000 !important;
-        color: white !important;
-        font-weight: bold;
-    }
-    .besoins-table .entity-cell {
-        text-align: left;
-        padding-left: 15px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    # Construire le HTML du tableau avec les vraies données
-    table_html = """
-    <table class="besoins-table">
-        <thead>
-            <tr>
-                <th>Entité</th>
-                <th>Nb postes ouverts avant début semaine</th>
-                <th>Nb nouveaux postes ouverts cette semaine</th>
-                <th>Nb postes pourvus cette semaine</th>
-                <th>Nb postes en cours cette semaine</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
-    
-    # Ajouter les lignes avec les vraies données
-    if metrics:
+    # Créer le tableau avec des colonnes Streamlit natives
+    if metrics and len(metrics) > 0:
+        # Préparer les données pour le DataFrame
+        table_data = []
         for entite, data in metrics.items():
-            table_html += f"""
-            <tr>
-                <td class="entity-cell">{entite}</td>
-                <td>{data['avant'] if data['avant'] > 0 else '-'}</td>
-                <td>{data['nouveaux'] if data['nouveaux'] > 0 else '-'}</td>
-                <td>{data['pourvus'] if data['pourvus'] > 0 else '-'}</td>
-                <td>{data['en_cours'] if data['en_cours'] > 0 else '-'}</td>
-            </tr>
-            """
+            table_data.append({
+                'Entité': entite,
+                'Nb postes ouverts avant début semaine': data['avant'] if data['avant'] > 0 else '-',
+                'Nb nouveaux postes ouverts cette semaine': data['nouveaux'] if data['nouveaux'] > 0 else '-',
+                'Nb postes pourvus cette semaine': data['pourvus'] if data['pourvus'] > 0 else '-',
+                'Nb postes en cours cette semaine': data['en_cours'] if data['en_cours'] > 0 else '-'
+            })
+        
+        # Ajouter la ligne de total
+        table_data.append({
+            'Entité': '**Total**',
+            'Nb postes ouverts avant début semaine': f'**{total_avant}**',
+            'Nb nouveaux postes ouverts cette semaine': f'**{total_nouveaux}**',
+            'Nb postes pourvus cette semaine': f'**{total_pourvus}**',
+            'Nb postes en cours cette semaine': f'**{total_en_cours}**'
+        })
+        
+        # Créer et afficher le DataFrame
+        df_table = pd.DataFrame(table_data)
+        
+        # Styliser le tableau
+        st.markdown("""
+        <style>
+        .stDataFrame {
+            font-size: 0.9em;
+        }
+        .stDataFrame th {
+            background-color: #8B0000 !important;
+            color: white !important;
+            font-weight: bold !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+        
+        st.dataframe(df_table, use_container_width=True, hide_index=True)
     else:
-        # Données par défaut si pas de données Excel
-        table_html += """
-        <tr>
-            <td class="entity-cell">TGCC</td>
-            <td>19</td>
-            <td>12</td>
-            <td>5</td>
-            <td>26</td>
-        </tr>
-        <tr>
-            <td class="entity-cell">TGEM</td>
-            <td>2</td>
-            <td>2</td>
-            <td>0</td>
-            <td>4</td>
-        </tr>
-        """
-        total_avant = 21
-        total_nouveaux = 14
-        total_pourvus = 5
-        total_en_cours = 30
-    
-    # Ligne de total
-    table_html += f"""
-        <tr class="total-row">
-            <td class="entity-cell">Total</td>
-            <td>{total_avant}</td>
-            <td>{total_nouveaux}</td>
-            <td>{total_pourvus}</td>
-            <td>{total_en_cours}</td>
-        </tr>
-        </tbody>
-    </table>
-    """
-    
-    # Afficher le tableau HTML
-    st.markdown(table_html, unsafe_allow_html=True)
+        # Tableau par défaut si pas de données
+        default_data = [
+            {'Entité': 'TGCC', 'Avant': 19, 'Nouveaux': 12, 'Pourvus': 5, 'En cours': 26},
+            {'Entité': 'TGEM', 'Avant': 2, 'Nouveaux': 2, 'Pourvus': 0, 'En cours': 4},
+            {'Entité': '**Total**', 'Avant': '**21**', 'Nouveaux': '**14**', 'Pourvus': '**5**', 'En cours': '**30**'}
+        ]
+        st.dataframe(pd.DataFrame(default_data), use_container_width=True, hide_index=True)
 
     st.markdown("---")
 
     # 3. Section "Pipeline de Recrutement (Kanban)"
     st.subheader("Pipeline de Recrutement (Kanban)")
-
-    # CSS pour styliser les cartes et colonnes Kanban avec lignes verticales complètes
-    st.markdown("""
-    <style>
-    .kanban-container {
-        display: flex;
-        width: 100%;
-    }
-    .kanban-column {
-        flex: 1;
-        border-right: 2px solid #dee2e6;
-        padding-right: 15px;
-        margin-right: 15px;
-        min-height: 500px;
-    }
-    .kanban-column:last-child {
-        border-right: none;
-        margin-right: 0;
-        padding-right: 0;
-    }
-    .kanban-header {
-        text-align: center;
-        font-weight: bold;
-        font-size: 1.1em;
-        color: #2c3e50;
-        padding: 10px;
-        background-color: #f8f9fa;
-        border-radius: 8px;
-        margin-bottom: 15px;
-        border: 1px solid #dee2e6;
-    }
-    .kanban-card {
-        border-radius: 5px;
-        background-color: #f0f2f6;
-        padding: 10px;
-        margin-bottom: 10px;
-        border-left: 5px solid #1f77b4;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-    .kanban-card h4 {
-        margin-top: 0;
-        margin-bottom: 5px;
-        font-size: 1em;
-    }
-    .kanban-card p {
-        margin-bottom: 2px;
-        font-size: 0.9em;
-    }
-    </style>
-    """, unsafe_allow_html=True)
 
     # Définir les données d'exemple pour le Kanban (ou utiliser les vraies données si disponibles)
     postes_data = [
@@ -948,37 +845,66 @@ def create_weekly_report_tab(df_recrutement=None):
     
     # Définir les colonnes du Kanban
     statuts_kanban = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
-
-    # Créer le Kanban avec HTML complet pour les lignes verticales
-    kanban_html = '<div class="kanban-container">'
     
+    # Créer les colonnes Streamlit
+    cols = st.columns(len(statuts_kanban))
+    
+    # CSS pour styliser les cartes
+    st.markdown("""
+    <style>
+    .kanban-card {
+        border-radius: 8px;
+        background-color: #f0f2f6;
+        padding: 12px;
+        margin-bottom: 12px;
+        border-left: 4px solid #1f77b4;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .kanban-card h4 {
+        margin-top: 0;
+        margin-bottom: 8px;
+        font-size: 1em;
+        color: #2c3e50;
+    }
+    .kanban-card p {
+        margin-bottom: 4px;
+        font-size: 0.85em;
+        color: #555;
+    }
+    .kanban-header {
+        text-align: center;
+        font-weight: bold;
+        font-size: 1.1em;
+        color: #2c3e50;
+        padding: 10px;
+        background-color: #e8f4fd;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        border: 1px solid #bee5eb;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Remplir chaque colonne avec les postes correspondants
     for i, statut in enumerate(statuts_kanban):
-        # Ouvrir la colonne
-        kanban_html += f'<div class="kanban-column">'
-        kanban_html += f'<div class="kanban-header">{statut}</div>'
-        
-        # Filtrer les postes pour la colonne actuelle
-        postes_in_col = [p for p in postes_data if p["statut"] == statut]
-        
-        # Ajouter les cartes à la colonne HTML
-        for poste in postes_in_col:
-            kanban_html += f"""
-            <div class="kanban-card">
-                <h4><b>{poste['titre']}</b></h4>
-                <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
-                <p>👤 {poste.get('demandeur', 'N/A')}</p>
-                <p>✍️ {poste.get('recruteur', 'N/A')}</p>
-            </div>
-            """
-        
-        # Fermer la colonne
-        kanban_html += '</div>'
-    
-    # Fermer le container
-    kanban_html += '</div>'
-    
-    # Afficher le Kanban complet
-    st.markdown(kanban_html, unsafe_allow_html=True)
+        with cols[i]:
+            # En-tête de colonne
+            st.markdown(f'<div class="kanban-header">{statut}</div>', unsafe_allow_html=True)
+            
+            # Filtrer les postes pour cette colonne
+            postes_in_col = [p for p in postes_data if p["statut"] == statut]
+            
+            # Afficher chaque poste comme une carte
+            for poste in postes_in_col:
+                card_html = f"""
+                <div class="kanban-card">
+                    <h4><b>{poste['titre']}</b></h4>
+                    <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
+                    <p>👤 {poste.get('demandeur', 'N/A')}</p>
+                    <p>✍️ {poste.get('recruteur', 'N/A')}</p>
+                </div>
+                """
+                st.markdown(card_html, unsafe_allow_html=True)
 
 
 def main():
