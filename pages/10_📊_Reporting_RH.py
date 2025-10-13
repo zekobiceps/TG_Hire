@@ -83,14 +83,13 @@ def apply_global_filters(df, filters):
     
     if filters.get('direction') != 'Toutes':
         df_filtered = df_filtered[df_filtered['Direction concernée'] == filters['direction']]
-    
     return df_filtered
+
 
 def load_data_from_files(csv_file=None, excel_file=None):
     """Charger et préparer les données depuis les fichiers uploadés ou locaux"""
     df_integration = None
     df_recrutement = None
-    
     try:
         # Charger le CSV (données d'intégration)
         if csv_file is not None:
@@ -100,10 +99,10 @@ def load_data_from_files(csv_file=None, excel_file=None):
             local_csv = '2025-10-09T20-31_export.csv'
             if os.path.exists(local_csv):
                 df_integration = pd.read_csv(local_csv)
-        
+
         if df_integration is not None and 'Date Intégration' in df_integration.columns:
             df_integration['Date Intégration'] = pd.to_datetime(df_integration['Date Intégration'])
-        
+
         # Charger l'Excel (données de recrutement)
         # Si une synchronisation Google Sheets a été réalisée, utiliser ce DataFrame
         try:
@@ -118,7 +117,7 @@ def load_data_from_files(csv_file=None, excel_file=None):
                     df_recrutement = pd.read_excel(local_excel, sheet_name=0)
         except Exception as e:
             st.error(f"Erreur lors du chargement des données de recrutement: {e}")
-        
+
         if df_recrutement is not None:
             # Nettoyer et préparer les données de recrutement
             # Convertir les dates
