@@ -835,8 +835,18 @@ def create_weekly_report_tab(df_recrutement=None):
             font-weight: bold !important;
         }
         .custom-table .total-row td {
+            background-color: #DC143C !important; /* Assurer le fond rouge sur chaque cellule */
+            color: white !important; /* Assurer le texte blanc */
             font-size: 0.8em !important;
             font-weight: bold !important;
+            border: 1px solid #DC143C !important; /* Bordures rouges */
+        }
+        .custom-table .total-row .entity-cell {
+            text-align: left !important;
+            padding-left: 10px !important;
+            font-weight: bold !important;
+            background-color: #DC143C !important; /* Fond rouge pour la cellule entité */
+            color: white !important; /* Texte blanc pour la cellule entité */
         }
         </style>
         """, unsafe_allow_html=True)
@@ -930,8 +940,18 @@ def create_weekly_report_tab(df_recrutement=None):
             font-weight: bold !important;
         }
         .custom-table .total-row td {
+            background-color: #DC143C !important; /* Assurer le fond rouge sur chaque cellule */
+            color: white !important; /* Assurer le texte blanc */
             font-size: 0.8em !important;
             font-weight: bold !important;
+            border: 1px solid #DC143C !important; /* Bordures rouges */
+        }
+        .custom-table .total-row .entity-cell {
+            text-align: left !important;
+            padding-left: 10px !important;
+            font-weight: bold !important;
+            background-color: #DC143C !important; /* Fond rouge pour la cellule entité */
+            color: white !important; /* Texte blanc pour la cellule entité */
         }
         </style>
         """, unsafe_allow_html=True)
