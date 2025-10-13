@@ -8,6 +8,8 @@ from datetime import datetime, timedelta
 import warnings
 import os
 warnings.filterwarnings('ignore')
+import re
+from io import BytesIO
 
 st.set_page_config(
     page_title="📊 Reporting RH Complet",
@@ -101,13 +103,19 @@ def load_data_from_files(csv_file=None, excel_file=None):
             df_integration['Date Intégration'] = pd.to_datetime(df_integration['Date Intégration'])
         
         # Charger l'Excel (données de recrutement)
-        if excel_file is not None:
-            df_recrutement = pd.read_excel(excel_file, sheet_name=0)
-        else:
-            # Fallback vers fichier local s'il existe
-            local_excel = 'Recrutement global PBI All  google sheet (5).xlsx'
-            if os.path.exists(local_excel):
-                df_recrutement = pd.read_excel(local_excel, sheet_name=0)
+        # Si une synchronisation Google Sheets a été réalisée, utiliser ce DataFrame
+        try:
+            if 'synced_recrutement_df' in st.session_state and st.session_state.synced_recrutement_df is not None:
+                df_recrutement = st.session_state.synced_recrutement_df.copy()
+            elif excel_file is not None:
+                df_recrutement = pd.read_excel(excel_file, sheet_name=0)
+            else:
+                # Fallback vers fichier local s'il existe
+                local_excel = 'Recrutement global PBI All  google sheet (5).xlsx'
+                if os.path.exists(local_excel):
+                    df_recrutement = pd.read_excel(local_excel, sheet_name=0)
+        except Exception as e:
+            st.error(f"Erreur lors du chargement des données de recrutement: {e}")
         
         if df_recrutement is not None:
             # Nettoyer et préparer les données de recrutement
@@ -195,7 +203,12 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         df_cloture['Année'] = df_cloture['Date d\'entrée effective du candidat'].dt.year
         annees_dispo = sorted([y for y in df_cloture['Année'].dropna().unique() if not pd.isna(y)])
         if annees_dispo:
-            annee_select = st.sidebar.selectbox("Période de recrutement", ['Toutes'] + [int(a) for a in annees_dispo], index=len(annees_dispo), key="rec_annee")
+            col_left, col_right = st.sidebar.columns(2)
+            with col_left:
+                annee_select = st.selectbox("Période de recrutement", ['Toutes'] + [int(a) for a in annees_dispo], index=len(annees_dispo), key="rec_annee")
+            with col_right:
+                # placeholder pour filtre additionnel de période
+                st.markdown("<div style='padding-top:6px; color:#666; font-size:0.9em'></div>", unsafe_allow_html=True)
         else:
             annee_select = 'Toutes'
     else:
@@ -347,7 +360,12 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         df_recrutement['Année_demande'] = df_recrutement[date_col].dt.year
         annees_demande = sorted([y for y in df_recrutement['Année_demande'].dropna().unique() if not pd.isna(y)])
         if annees_demande:
-            annee_demande_select = st.sidebar.selectbox("Période de la demande", ['Toutes'] + [int(a) for a in annees_demande], index=len(annees_demande), key="dem_annee")
+            col_left, col_right = st.sidebar.columns(2)
+            with col_left:
+                annee_demande_select = st.selectbox("Période de la demande", ['Toutes'] + [int(a) for a in annees_demande], index=len(annees_demande), key="dem_annee")
+            with col_right:
+                # placeholder pour un filtre complémentaire (ex: trimestre)
+                st.markdown("<div style='padding-top:6px; color:#666; font-size:0.9em'></div>", unsafe_allow_html=True)
         else:
             annee_demande_select = 'Toutes'
     else:
@@ -1121,11 +1139,8 @@ def main():
     # Use session_state to persist upload/refresh state
     if 'data_updated' not in st.session_state:
         st.session_state.data_updated = False
-    if 'uploaded_csv' not in st.session_state:
-        st.session_state.uploaded_csv = None
     if 'uploaded_excel' not in st.session_state:
         st.session_state.uploaded_excel = None
-    uploaded_csv = st.session_state.uploaded_csv
     uploaded_excel = st.session_state.uploaded_excel
     
     with tabs[0]:
@@ -1133,31 +1148,44 @@ def main():
         st.markdown("Uploadez vos fichiers pour mettre à jour les graphiques en temps réel.")
         
         col1, col2 = st.columns(2)
-        
+
         with col1:
-            st.subheader("📄 Fichier CSV - Données d'Intégration")
-            uploaded_csv = st.file_uploader(
-                "Choisir le fichier CSV d'intégration",
-                type=['csv'],
-                help="Fichier contenant les données d'intégration des candidats",
-                key="csv_uploader"
-            )
-            
-            if uploaded_csv is not None:
-                st.success(f"✅ Fichier CSV chargé: {uploaded_csv.name}")
-                # Aperçu des données
+            st.subheader("� Synchroniser depuis Google Sheets")
+            st.markdown("Indiquez le lien vers votre Google Sheet ou laissez le lien par défaut, puis cliquez sur '🔁 Synchroniser depuis Google Sheets'.")
+            default_sheet = "https://docs.google.com/spreadsheets/d/1hvghSMjcbdY8yNZOWqALBpgMdLWB5CxVJCDwEm6JULI/edit?gid=785271056#gid=785271056"
+            gs_url = st.text_input("URL Google Sheet", value=default_sheet, key="gsheet_url")
+            if 'synced_recrutement_df' not in st.session_state:
+                st.session_state.synced_recrutement_df = None
+
+            if st.button("🔁 Synchroniser depuis Google Sheets"):
+                # Construire l'URL d'export CSV à partir du lien fourni
+                # Extraire l'ID et le gid
                 try:
-                    preview_csv = pd.read_csv(uploaded_csv)
-                    st.write("**Aperçu des données CSV:**")
-                    st.write(f"- Lignes: {len(preview_csv)}")
-                    st.write(f"- Colonnes: {len(preview_csv.columns)}")
-                    st.dataframe(preview_csv.head(3), use_container_width=True)
-                    # Reset file pointer for later use
-                    uploaded_csv.seek(0)
-                    st.session_state.uploaded_csv = uploaded_csv
+                    m = re.search(r"/d/([a-zA-Z0-9-_]+)", gs_url)
+                    gid_m = re.search(r"[?&]gid=(\d+)", gs_url)
+                    if not m:
+                        st.error("Impossible d'extraire l'ID du Google Sheet depuis l'URL fournie.")
+                    else:
+                        sheet_id = m.group(1)
+                        gid_val = gid_m.group(1) if gid_m else '0'
+                        export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid_val}"
+                        st.info("Téléchargement en cours... cela peut prendre quelques secondes.")
+                        try:
+                            df_synced = pd.read_csv(export_url)
+                            st.session_state.synced_recrutement_df = df_synced
+                            st.session_state.data_updated = True
+                            st.success("✅ Synchronisation Google Sheets réussie. Les onglets ont été mis à jour.")
+                        except Exception as e:
+                            st.error(f"Erreur lors du téléchargement depuis Google Sheets: {e}")
                 except Exception as e:
-                    st.error(f"Erreur lors de la lecture du CSV: {e}")
-        
+                    st.error(f"Erreur lors du traitement de l'URL Google Sheets: {e}")
+
+            if st.session_state.get('synced_recrutement_df') is not None:
+                st.write("**Aperçu des données synchronisées :**")
+                st.write(f"- Lignes: {len(st.session_state.synced_recrutement_df)}")
+                st.write(f"- Colonnes: {len(st.session_state.synced_recrutement_df.columns)}")
+                st.dataframe(st.session_state.synced_recrutement_df.head(3), use_container_width=True)
+
         with col2:
             st.subheader("📊 Fichier Excel - Données de Recrutement")
             uploaded_excel = st.file_uploader(
@@ -1188,11 +1216,11 @@ def main():
             st.success("Données mises à jour ! Consultez les autres onglets.")
     
     # Charger les données (avec fichiers uploadés ou fichiers locaux)
-    df_integration, df_recrutement = load_data_from_files(uploaded_csv, uploaded_excel)
+    df_integration, df_recrutement = load_data_from_files(None, uploaded_excel)
     
     # Message d'information sur les données chargées
     # Only show a success if the user uploaded files or explicitly refreshed
-    has_uploaded = (st.session_state.uploaded_csv is not None) or (st.session_state.uploaded_excel is not None)
+    has_uploaded = (st.session_state.uploaded_excel is not None) or (st.session_state.get('synced_recrutement_df') is not None)
     if df_recrutement is None and df_integration is None:
         st.sidebar.warning("⚠️ Aucune donnée disponible. Veuillez uploader vos fichiers dans l'onglet 'Upload Fichiers'.")
     elif df_recrutement is None:
