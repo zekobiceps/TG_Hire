@@ -619,119 +619,8 @@ def create_weekly_report_tab():
 
     st.markdown("---")
 
-    # 2. Section "Pipeline de Recrutement (Kanban)"
-    st.subheader("Pipeline de Recrutement (Kanban)")
-
-    # Définir les colonnes du Kanban
-    statuts_kanban = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
-    cols = st.columns(len(statuts_kanban))
-
-    # CSS pour styliser les cartes et colonnes Kanban
-    st.markdown("""
-    <style>
-    .kanban-column {
-        border-right: 2px solid #e0e0e0;
-        padding-right: 10px;
-        margin-right: 10px;
-    }
-    .kanban-column:last-child {
-        border-right: none;
-    }
-    .kanban-header {
-        text-align: center;
-        font-weight: bold;
-        font-size: 1.2em;
-        color: #2c3e50;
-        padding: 10px;
-        background-color: #f8f9fa;
-        border-radius: 8px;
-        margin-bottom: 15px;
-        border: 1px solid #dee2e6;
-    }
-    .kanban-card {
-        border-radius: 5px;
-        background-color: #f0f2f6;
-        padding: 10px;
-        margin-bottom: 10px;
-        border-left: 5px solid #1f77b4;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-    .kanban-card h4 {
-        margin-top: 0;
-        margin-bottom: 5px;
-        font-size: 1em;
-    }
-    .kanban-card p {
-        margin-bottom: 2px;
-        font-size: 0.9em;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    for i, statut in enumerate(statuts_kanban):
-        with cols[i]:
-            # Titre centré avec style dans une div
-            st.markdown(f'<div class="kanban-column"><div class="kanban-header">{statut}</div>', unsafe_allow_html=True)
-            
-            # Filtrer les postes pour la colonne actuelle
-            postes_in_col = [p for p in postes_data if p["statut"] == statut]
-            
-            # Organiser TOUJOURS en paires (2 colonnes par ligne), même avec 1 carte
-            for idx in range(0, len(postes_in_col), 2):
-                # Toujours créer 2 colonnes
-                card_col1, card_col2 = st.columns(2)
-                
-                # Première carte
-                if idx < len(postes_in_col):
-                    with card_col1:
-                        poste = postes_in_col[idx]
-                        card_html = f"""
-                        <div class="kanban-card">
-                            <h4><b>{poste['titre']}</b></h4>
-                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
-                            <p>👤 {poste.get('demandeur', 'N/A')}</p>
-                            <p>✍️ {poste.get('recruteur', 'N/A')}</p>
-                        </div>
-                        """
-                        st.markdown(card_html, unsafe_allow_html=True)
-                
-                # Deuxième carte (si elle existe)
-                if idx + 1 < len(postes_in_col):
-                    with card_col2:
-                        poste = postes_in_col[idx + 1]
-                        card_html = f"""
-                        <div class="kanban-card">
-                            <h4><b>{poste['titre']}</b></h4>
-                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
-                            <p>👤 {poste.get('demandeur', 'N/A')}</p>
-                            <p>✍️ {poste.get('recruteur', 'N/A')}</p>
-                        </div>
-                        """
-                        st.markdown(card_html, unsafe_allow_html=True)
-                else:
-                    # Colonne vide pour maintenir l'alignement
-                    with card_col2:
-                        st.empty()
-            
-            # Fermer la div kanban-column
-            st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    # 3. Tableau des besoins en cours par entité
+    # 2. Tableau des besoins en cours par entité (AVANT le Kanban)
     st.subheader("📊 Besoins en Cours par Entité")
-    
-    # Créer le tableau basé sur les données de l'image
-    besoins_data = {
-        'Entité': ['TGCC', 'TG STONE', 'TG LOGISTIQUE', 'TGEM', 'TG SCAN', 'TG STEEL', 'TG STONE', 'TG STONE', 'Total'],
-        'Nb postes ouverts avant début semaine': [19, 0, '-', 0, '-', '-', '-', 2, 21],
-        'Nb nouveaux postes ouverts cette semaine': [12, 2, 1, 2, '-', '-', '-', 1, 18],
-        'Nb postes pourvus cette semaine': [5, 2, '-', 0, '-', '-', '-', 0, 7],
-        'Nb postes en cours cette semaine': [26, 0, 1, 2, '-', '-', '-', 3, 32]
-    }
-    
-    # Créer le DataFrame
-    df_besoins = pd.DataFrame(besoins_data)
     
     # CSS pour styliser le tableau comme dans l'image
     st.markdown("""
@@ -769,7 +658,7 @@ def create_weekly_report_tab():
     </style>
     """, unsafe_allow_html=True)
     
-    # Construire le HTML du tableau
+    # Construire le HTML du tableau avec les vraies données
     table_html = """
     <table class="besoins-table">
         <thead>
@@ -782,37 +671,165 @@ def create_weekly_report_tab():
             </tr>
         </thead>
         <tbody>
-    """
-    
-    # Ajouter les lignes de données
-    for idx, row in df_besoins.iterrows():
-        if row['Entité'] == 'Total':
-            # Ligne Total avec style spécial
-            table_html += f"""
-            <tr class="total-row">
-                <td class="entity-cell">{row['Entité']}</td>
-                <td>{row['Nb postes ouverts avant début semaine']}</td>
-                <td>{row['Nb nouveaux postes ouverts cette semaine']}</td>
-                <td>{row['Nb postes pourvus cette semaine']}</td>
-                <td>{row['Nb postes en cours cette semaine']}</td>
-            </tr>
-            """
-        else:
-            # Lignes normales
-            table_html += f"""
             <tr>
-                <td class="entity-cell">{row['Entité']}</td>
-                <td>{row['Nb postes ouverts avant début semaine']}</td>
-                <td>{row['Nb nouveaux postes ouverts cette semaine']}</td>
-                <td>{row['Nb postes pourvus cette semaine']}</td>
-                <td>{row['Nb postes en cours cette semaine']}</td>
+                <td class="entity-cell">TGCC</td>
+                <td>19</td>
+                <td>12</td>
+                <td>5</td>
+                <td>26</td>
             </tr>
-            """
-    
-    table_html += "</tbody></table>"
+            <tr>
+                <td class="entity-cell">TG STONE</td>
+                <td>0</td>
+                <td>2</td>
+                <td>2</td>
+                <td>0</td>
+            </tr>
+            <tr>
+                <td class="entity-cell">TG LOGISTIQUE</td>
+                <td>-</td>
+                <td>1</td>
+                <td>-</td>
+                <td>1</td>
+            </tr>
+            <tr>
+                <td class="entity-cell">TGEM</td>
+                <td>0</td>
+                <td>2</td>
+                <td>0</td>
+                <td>2</td>
+            </tr>
+            <tr>
+                <td class="entity-cell">TG SCAN</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td class="entity-cell">TG STEEL</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td class="entity-cell">TG STONE</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+                <td>-</td>
+            </tr>
+            <tr>
+                <td class="entity-cell">TG STONE</td>
+                <td>2</td>
+                <td>1</td>
+                <td>0</td>
+                <td>3</td>
+            </tr>
+            <tr class="total-row">
+                <td class="entity-cell">Total</td>
+                <td>21</td>
+                <td>18</td>
+                <td>7</td>
+                <td>32</td>
+            </tr>
+        </tbody>
+    </table>
+    """
     
     # Afficher le tableau HTML
     st.markdown(table_html, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # 3. Section "Pipeline de Recrutement (Kanban)"
+    st.subheader("Pipeline de Recrutement (Kanban)")
+
+    # Définir les colonnes du Kanban
+    statuts_kanban = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+    cols = st.columns(len(statuts_kanban))
+
+    # CSS pour styliser les cartes et colonnes Kanban avec lignes verticales complètes
+    st.markdown("""
+    <style>
+    .kanban-container {
+        display: flex;
+        width: 100%;
+    }
+    .kanban-column {
+        flex: 1;
+        border-right: 2px solid #dee2e6;
+        padding-right: 15px;
+        margin-right: 15px;
+        min-height: 500px;
+    }
+    .kanban-column:last-child {
+        border-right: none;
+        margin-right: 0;
+        padding-right: 0;
+    }
+    .kanban-header {
+        text-align: center;
+        font-weight: bold;
+        font-size: 1.1em;
+        color: #2c3e50;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        margin-bottom: 15px;
+        border: 1px solid #dee2e6;
+    }
+    .kanban-card {
+        border-radius: 5px;
+        background-color: #f0f2f6;
+        padding: 10px;
+        margin-bottom: 10px;
+        border-left: 5px solid #1f77b4;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    .kanban-card h4 {
+        margin-top: 0;
+        margin-bottom: 5px;
+        font-size: 1em;
+    }
+    .kanban-card p {
+        margin-bottom: 2px;
+        font-size: 0.9em;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Créer le Kanban avec HTML complet pour les lignes verticales
+    kanban_html = '<div class="kanban-container">'
+    
+    for i, statut in enumerate(statuts_kanban):
+        # Ouvrir la colonne
+        kanban_html += f'<div class="kanban-column">'
+        kanban_html += f'<div class="kanban-header">{statut}</div>'
+        
+        # Filtrer les postes pour la colonne actuelle
+        postes_in_col = [p for p in postes_data if p["statut"] == statut]
+        
+        # Ajouter les cartes à la colonne HTML
+        for poste in postes_in_col:
+            kanban_html += f"""
+            <div class="kanban-card">
+                <h4><b>{poste['titre']}</b></h4>
+                <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
+                <p>👤 {poste.get('demandeur', 'N/A')}</p>
+                <p>✍️ {poste.get('recruteur', 'N/A')}</p>
+            </div>
+            """
+        
+        # Fermer la colonne
+        kanban_html += '</div>'
+    
+    # Fermer le container
+    kanban_html += '</div>'
+    
+    # Afficher le Kanban complet
+    st.markdown(kanban_html, unsafe_allow_html=True)
 
 
 def main():
