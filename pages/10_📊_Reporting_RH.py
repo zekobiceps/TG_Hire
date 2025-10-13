@@ -10,6 +10,8 @@ import os
 warnings.filterwarnings('ignore')
 import re
 from io import BytesIO
+import json
+import gspread
 
 st.set_page_config(
     page_title="📊 Reporting RH Complet",
@@ -1176,7 +1178,25 @@ def main():
                             st.session_state.data_updated = True
                             st.success("✅ Synchronisation Google Sheets réussie. Les onglets ont été mis à jour.")
                         except Exception as e:
-                            st.error(f"Erreur lors du téléchargement depuis Google Sheets: {e}")
+                            # Si l'erreur est liée à l'autorisation, proposer l'upload d'une clé de compte de service
+                            err_str = str(e)
+                            st.error(f"Erreur lors du téléchargement depuis Google Sheets: {err_str}")
+                            if '401' in err_str or 'Unauthorized' in err_str or 'HTTP Error 401' in err_str:
+                                st.warning("La feuille Google semble privée. Vous pouvez fournir une clé de compte de service (JSON) pour vous authentifier.")
+                                service_file = st.file_uploader("Uploader la clé JSON du compte de service (optionnel)", type=['json'], key='gs_service_json')
+                                if service_file is not None:
+                                    try:
+                                        creds_json = json.load(service_file)
+                                        gc = gspread.service_account_from_dict(creds_json)
+                                        sh = gc.open_by_key(sheet_id)
+                                        worksheet = sh.get_worksheet_by_id(int(gid_val)) if gid_val else sh.sheet1
+                                        data = worksheet.get_all_records()
+                                        df_synced = pd.DataFrame(data)
+                                        st.session_state.synced_recrutement_df = df_synced
+                                        st.session_state.data_updated = True
+                                        st.success("✅ Synchronisation via compte de service réussie.")
+                                    except Exception as e2:
+                                        st.error(f"Échec de l'authentification via compte de service: {e2}")
                 except Exception as e:
                     st.error(f"Erreur lors du traitement de l'URL Google Sheets: {e}")
 
