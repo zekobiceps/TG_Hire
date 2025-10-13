@@ -783,35 +783,38 @@ def create_weekly_report_tab(df_recrutement=None):
             'Nb postes en cours cette semaine': f'**{total_en_cours}**'
         })
         
-        # Créer le tableau HTML personnalisé pour un contrôle total du style
+        # Créer le tableau HTML personnalisé compact
         st.markdown("""
         <style>
         .custom-table {
             width: 100%;
             border-collapse: collapse;
             font-family: Arial, sans-serif;
-            margin: 20px 0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin: 10px 0;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            max-width: 1200px;
         }
         .custom-table th {
             background-color: #DC143C !important; /* Rouge vif */
             color: white !important;
             font-weight: bold !important;
             text-align: center !important;
-            padding: 15px 8px !important;
+            padding: 8px 6px !important;
             border: 1px solid white !important;
-            font-size: 0.9em;
+            font-size: 0.8em;
+            line-height: 1.2;
         }
         .custom-table td {
             text-align: center !important;
-            padding: 12px 8px !important;
+            padding: 6px 4px !important;
             border: 1px solid #ddd !important;
             background-color: white !important;
-            font-size: 0.85em;
+            font-size: 0.75em;
+            line-height: 1.1;
         }
         .custom-table .entity-cell {
             text-align: left !important;
-            padding-left: 15px !important;
+            padding-left: 10px !important;
             font-weight: 500;
         }
         .custom-table .total-row {
@@ -821,22 +824,25 @@ def create_weekly_report_tab(df_recrutement=None):
         }
         .custom-table .total-row .entity-cell {
             text-align: left !important;
-            padding-left: 15px !important;
+            padding-left: 10px !important;
         }
         </style>
         """, unsafe_allow_html=True)
         
-        # Construire le tableau HTML
-        html_table = '<table class="custom-table"><thead><tr>'
+        # Construire le tableau HTML compact
+        html_table = '<table class="custom-table">'
+        html_table += '<thead><tr>'
         html_table += '<th>Entité</th>'
         html_table += '<th>Nb postes ouverts avant début semaine</th>'
         html_table += '<th>Nb nouveaux postes ouverts cette semaine</th>'
         html_table += '<th>Nb postes pourvus cette semaine</th>'
         html_table += '<th>Nb postes en cours cette semaine</th>'
-        html_table += '</tr></thead><tbody>'
+        html_table += '</tr></thead>'
+        html_table += '<tbody>'
         
-        # Ajouter les lignes de données
-        for i, row in enumerate(table_data[:-1]):  # Toutes sauf la dernière (total)
+        # Ajouter les lignes de données (filtrer les entités vides)
+        data_rows = [row for row in table_data[:-1] if row["Entité"] and row["Entité"].strip()]
+        for row in data_rows:
             html_table += '<tr>'
             html_table += f'<td class="entity-cell">{row["Entité"]}</td>'
             html_table += f'<td>{row["Nb postes ouverts avant début semaine"]}</td>'
@@ -848,47 +854,49 @@ def create_weekly_report_tab(df_recrutement=None):
         # Ajouter la ligne de total
         total_row = table_data[-1]
         html_table += '<tr class="total-row">'
-        html_table += f'<td class="entity-cell">{total_row["Entité"]}</td>'
-        html_table += f'<td>{total_row["Nb postes ouverts avant début semaine"]}</td>'
-        html_table += f'<td>{total_row["Nb nouveaux postes ouverts cette semaine"]}</td>'
-        html_table += f'<td>{total_row["Nb postes pourvus cette semaine"]}</td>'
-        html_table += f'<td>{total_row["Nb postes en cours cette semaine"]}</td>'
+        html_table += f'<td class="entity-cell">{total_row["Entité"].replace("**", "")}</td>'
+        html_table += f'<td>{total_row["Nb postes ouverts avant début semaine"].replace("**", "")}</td>'
+        html_table += f'<td>{total_row["Nb nouveaux postes ouverts cette semaine"].replace("**", "")}</td>'
+        html_table += f'<td>{total_row["Nb postes pourvus cette semaine"].replace("**", "")}</td>'
+        html_table += f'<td>{total_row["Nb postes en cours cette semaine"].replace("**", "")}</td>'
         html_table += '</tr>'
-        
         html_table += '</tbody></table>'
         
         # Afficher le tableau HTML
         st.markdown(html_table, unsafe_allow_html=True)
     else:
-        # Tableau par défaut si pas de données avec le même style
+        # Tableau par défaut compact avec le même style
         st.markdown("""
         <style>
         .custom-table {
             width: 100%;
             border-collapse: collapse;
             font-family: Arial, sans-serif;
-            margin: 20px 0;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin: 10px 0;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            max-width: 1200px;
         }
         .custom-table th {
             background-color: #DC143C !important; /* Rouge vif */
             color: white !important;
             font-weight: bold !important;
             text-align: center !important;
-            padding: 15px 8px !important;
+            padding: 8px 6px !important;
             border: 1px solid white !important;
-            font-size: 0.9em;
+            font-size: 0.8em;
+            line-height: 1.2;
         }
         .custom-table td {
             text-align: center !important;
-            padding: 12px 8px !important;
+            padding: 6px 4px !important;
             border: 1px solid #ddd !important;
             background-color: white !important;
-            font-size: 0.85em;
+            font-size: 0.75em;
+            line-height: 1.1;
         }
         .custom-table .entity-cell {
             text-align: left !important;
-            padding-left: 15px !important;
+            padding-left: 10px !important;
             font-weight: 500;
         }
         .custom-table .total-row {
@@ -898,12 +906,12 @@ def create_weekly_report_tab(df_recrutement=None):
         }
         .custom-table .total-row .entity-cell {
             text-align: left !important;
-            padding-left: 15px !important;
+            padding-left: 10px !important;
         }
         </style>
         """, unsafe_allow_html=True)
         
-        # Tableau par défaut HTML
+        # Tableau par défaut HTML compact
         default_html = """
         <table class="custom-table">
             <thead>
