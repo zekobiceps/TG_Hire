@@ -615,7 +615,7 @@ def calculate_weekly_metrics(df_recrutement):
     start_of_week = today - timedelta(days=today.weekday())  # Lundi de cette semaine
     start_of_last_week = start_of_week - timedelta(days=7)   # Lundi de la semaine dernière
     
-    # Convertir les colonnes de dates
+    # Définir les colonnes attendues avec des alternatives possibles
     date_reception_col = "Date de réception de la demande après validation de la DRH"
     date_integration_col = "Date d'intégration prévisionnelle"
     candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
@@ -625,40 +625,99 @@ def calculate_weekly_metrics(df_recrutement):
     # Créer une copie pour les calculs
     df = df_recrutement.copy()
     
-    # Convertir les dates
-    df[date_reception_col] = pd.to_datetime(df[date_reception_col], errors='coerce')
-    df[date_integration_col] = pd.to_datetime(df[date_integration_col], errors='coerce')
+    # Vérifier les colonnes disponibles
+    available_columns = df.columns.tolist()
+    
+    # Chercher les colonnes similaires si les noms exacts n'existent pas
+    def find_similar_column(target_col, available_cols):
+        """Trouve une colonne similaire dans la liste disponible"""
+        target_lower = target_col.lower()
+        for col in available_cols:
+            if col.lower() == target_lower:
+                return col
+        # Chercher des mots-clés
+        if "date" in target_lower and "réception" in target_lower:
+            for col in available_cols:
+                if "date" in col.lower() and ("réception" in col.lower() or "reception" in col.lower() or "demande" in col.lower()):
+                    return col
+        elif "date" in target_lower and "intégration" in target_lower:
+            for col in available_cols:
+                if "date" in col.lower() and ("intégration" in col.lower() or "integration" in col.lower() or "entrée" in col.lower()):
+                    return col
+        elif "candidat" in target_lower and "retenu" in target_lower:
+            for col in available_cols:
+                if ("candidat" in col.lower() and "retenu" in col.lower()) or ("nom" in col.lower() and "prénom" in col.lower()):
+                    return col
+        elif "statut" in target_lower:
+            for col in available_cols:
+                if "statut" in col.lower() or "status" in col.lower():
+                    return col
+        elif "entité" in target_lower:
+            for col in available_cols:
+                if "entité" in col.lower() or "entite" in col.lower():
+                    return col
+        return None
+    
+    # Trouver les colonnes réelles
+    real_date_reception_col = find_similar_column(date_reception_col, available_columns)
+    real_date_integration_col = find_similar_column(date_integration_col, available_columns)
+    real_candidat_col = find_similar_column(candidat_col, available_columns)
+    real_statut_col = find_similar_column(statut_col, available_columns)
+    real_entite_col = find_similar_column(entite_col, available_columns)
+    
+    # Si les colonnes essentielles n'existent pas, retourner vide
+    if not real_entite_col:
+        st.warning(f"⚠️ Colonne 'Entité' non trouvée. Colonnes disponibles: {', '.join(available_columns[:5])}...")
+        return {}
+    
+    if not real_statut_col:
+        st.warning(f"⚠️ Colonne 'Statut' non trouvée. Colonnes disponibles: {', '.join(available_columns[:5])}...")
+        return {}
+    
+    # Convertir les dates si les colonnes existent
+    if real_date_reception_col:
+        df[real_date_reception_col] = pd.to_datetime(df[real_date_reception_col], errors='coerce')
+    if real_date_integration_col:
+        df[real_date_integration_col] = pd.to_datetime(df[real_date_integration_col], errors='coerce')
     
     # Calculer les métriques par entité
-    entites = df[entite_col].dropna().unique()
+    entites = df[real_entite_col].dropna().unique()
     metrics_by_entity = {}
     
     for entite in entites:
-        df_entite = df[df[entite_col] == entite]
+        df_entite = df[df[real_entite_col] == entite]
         
         # 1. Postes ouverts avant début semaine (En cours la semaine dernière)
-        postes_avant = len(df_entite[
-            (df_entite[statut_col] == 'En cours') &
-            (df_entite[date_reception_col] < start_of_week)
-        ])
+        postes_avant = 0
+        if real_date_reception_col:
+            postes_avant = len(df_entite[
+                (df_entite[real_statut_col] == 'En cours') &
+                (df_entite[real_date_reception_col] < start_of_week)
+            ])
         
         # 2. Nouveaux postes ouverts cette semaine (Date réception cette semaine)
-        nouveaux_postes = len(df_entite[
-            (df_entite[date_reception_col] >= start_of_week) &
-            (df_entite[date_reception_col] <= today)
-        ])
+        nouveaux_postes = 0
+        if real_date_reception_col:
+            nouveaux_postes = len(df_entite[
+                (df_entite[real_date_reception_col] >= start_of_week) &
+                (df_entite[real_date_reception_col] <= today)
+            ])
         
         # 3. Postes pourvus cette semaine (Date intégration cette semaine)
-        postes_pourvus = len(df_entite[
-            (df_entite[date_integration_col] >= start_of_week) &
-            (df_entite[date_integration_col] <= today)
-        ])
+        postes_pourvus = 0
+        if real_date_integration_col:
+            postes_pourvus = len(df_entite[
+                (df_entite[real_date_integration_col] >= start_of_week) &
+                (df_entite[real_date_integration_col] <= today)
+            ])
         
         # 4. Postes en cours cette semaine (Statut "En cours" ET pas de candidat retenu)
-        postes_en_cours = len(df_entite[
-            (df_entite[statut_col] == 'En cours') &
-            (df_entite[candidat_col].isna() | (df_entite[candidat_col].str.strip() == ""))
-        ])
+        postes_en_cours = len(df_entite[df_entite[real_statut_col] == 'En cours'])
+        if real_candidat_col:
+            postes_en_cours = len(df_entite[
+                (df_entite[real_statut_col] == 'En cours') &
+                (df_entite[real_candidat_col].isna() | (df_entite[real_candidat_col].astype(str).str.strip() == ""))
+            ])
         
         metrics_by_entity[entite] = {
             'avant': postes_avant,
@@ -675,11 +734,16 @@ def create_weekly_report_tab(df_recrutement=None):
 
     # Calculer les métriques si les données sont disponibles
     if df_recrutement is not None:
-        metrics = calculate_weekly_metrics(df_recrutement)
-        total_avant = sum(m['avant'] for m in metrics.values())
-        total_nouveaux = sum(m['nouveaux'] for m in metrics.values())
-        total_pourvus = sum(m['pourvus'] for m in metrics.values())
-        total_en_cours = sum(m['en_cours'] for m in metrics.values())
+        try:
+            metrics = calculate_weekly_metrics(df_recrutement)
+            total_avant = sum(m['avant'] for m in metrics.values())
+            total_nouveaux = sum(m['nouveaux'] for m in metrics.values())
+            total_pourvus = sum(m['pourvus'] for m in metrics.values())
+            total_en_cours = sum(m['en_cours'] for m in metrics.values())
+        except Exception as e:
+            st.error(f"⚠️ Erreur lors du calcul des métriques: {str(e)}")
+            metrics = {}
+            total_avant = total_nouveaux = total_pourvus = total_en_cours = 0
     else:
         metrics = {}
         total_avant = total_nouveaux = total_pourvus = total_en_cours = 0
