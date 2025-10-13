@@ -149,7 +149,6 @@ def create_affectation_chart(df):
 
 def create_recrutements_clotures_tab(df_recrutement):
     """Onglet Recrutements Clôturés (Image 1)"""
-    st.header("🎯 Recrutement")
     
     # Filtrer seulement les recrutements clôturés
     df_cloture = df_recrutement[df_recrutement['Statut de la demande'] == 'Clôture'].copy()
@@ -158,7 +157,7 @@ def create_recrutements_clotures_tab(df_recrutement):
         st.warning("Aucune donnée de recrutement clôturé disponible")
         return
     
-    # Sidebar pour les filtres spécifiques
+    # Filtres dans la sidebar
     st.sidebar.subheader("🔧 Filtres - Recrutements")
     
     # Filtre par période
@@ -172,13 +171,17 @@ def create_recrutements_clotures_tab(df_recrutement):
     else:
         annee_select = 'Toutes'
     
-    # Filtre par entité
+    # Filtre par entité demandeuse
     entites = ['Toutes'] + sorted(df_cloture['Entité demandeuse'].dropna().unique())
     entite_select = st.sidebar.selectbox("Entité demandeuse", entites, key="rec_entite")
     
-    # Filtre par direction
+    # Filtre par direction concernée
     directions = ['Toutes'] + sorted(df_cloture['Direction concernée'].dropna().unique())
     direction_select = st.sidebar.selectbox("Direction concernée", directions, key="rec_direction")
+    
+    # Filtre par affectation
+    affectations = ['Toutes'] + sorted(df_cloture['Affectation'].dropna().unique())
+    affectation_select = st.sidebar.selectbox("Affectation", affectations, key="rec_affectation")
 
     # Appliquer les filtres
     df_filtered = df_cloture.copy()
@@ -188,6 +191,8 @@ def create_recrutements_clotures_tab(df_recrutement):
         df_filtered = df_filtered[df_filtered['Entité demandeuse'] == entite_select]
     if direction_select != 'Toutes':
         df_filtered = df_filtered[df_filtered['Direction concernée'] == direction_select]
+    if affectation_select != 'Toutes':
+        df_filtered = df_filtered[df_filtered['Affectation'] == affectation_select]
 
     # KPIs principaux
     col1, col2, col3 = st.columns(3)
@@ -312,9 +317,8 @@ def create_recrutements_clotures_tab(df_recrutement):
 
 def create_demandes_recrutement_tab(df_recrutement):
     """Onglet Demandes de Recrutement (Image 2)"""
-    st.header("📋 Demandes")
     
-    # Sidebar pour les filtres
+    # Filtres dans la sidebar
     st.sidebar.subheader("🔧 Filtres - Demandes")
     
     # Filtre par période de demande
@@ -329,10 +333,28 @@ def create_demandes_recrutement_tab(df_recrutement):
     else:
         annee_demande_select = 'Toutes'
     
-    # Appliquer le filtre
+    # Filtre par entité demandeuse
+    entites_dem = ['Toutes'] + sorted(df_recrutement['Entité demandeuse'].dropna().unique())
+    entite_demande_select = st.sidebar.selectbox("Entité demandeuse", entites_dem, key="dem_entite")
+    
+    # Filtre par direction concernée
+    directions_dem = ['Toutes'] + sorted(df_recrutement['Direction concernée'].dropna().unique())
+    direction_demande_select = st.sidebar.selectbox("Direction concernée", directions_dem, key="dem_direction")
+    
+    # Filtre par affectation
+    affectations_dem = ['Toutes'] + sorted(df_recrutement['Affectation'].dropna().unique())
+    affectation_demande_select = st.sidebar.selectbox("Affectation", affectations_dem, key="dem_affectation")
+    
+    # Appliquer les filtres
     df_filtered = df_recrutement.copy()
     if annee_demande_select != 'Toutes':
         df_filtered = df_filtered[df_filtered['Année_demande'] == annee_demande_select]
+    if entite_demande_select != 'Toutes':
+        df_filtered = df_filtered[df_filtered['Entité demandeuse'] == entite_demande_select]
+    if direction_demande_select != 'Toutes':
+        df_filtered = df_filtered[df_filtered['Direction concernée'] == direction_demande_select]
+    if affectation_demande_select != 'Toutes':
+        df_filtered = df_filtered[df_filtered['Affectation'] == affectation_demande_select]
     
     # KPI principal - Nombre de demandes
     st.metric("Nombre de demandes", len(df_filtered))
@@ -417,6 +439,141 @@ def create_demandes_recrutement_tab(df_recrutement):
         fig_poste.update_layout(height=400, xaxis_title=None, yaxis_title=None, yaxis={'categoryorder':'total ascending'})
         st.plotly_chart(fig_poste, use_container_width=True)
 
+def create_integrations_tab(df_recrutement):
+    """Onglet Intégrations basé sur les bonnes données"""
+    st.header("📊 Intégrations")
+    
+    # Filtrer les données : Statut "En cours" ET candidat ayant accepté (nom présent)
+    candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
+    date_integration_col = "Date d'entrée prévisionnelle"
+    
+    # Critères : Statut "En cours" ET candidat avec nom
+    df_integrations = df_recrutement[
+        (df_recrutement['Statut de la demande'] == 'En cours') &
+        (df_recrutement[candidat_col].notna()) &
+        (df_recrutement[candidat_col].str.strip() != "")
+    ].copy()
+    
+    if len(df_integrations) == 0:
+        st.warning("Aucune intégration en cours trouvée")
+        return
+    
+    # Filtres dans la sidebar
+    st.sidebar.subheader("🔧 Filtres - Intégrations")
+    
+    # Filtre par entité demandeuse
+    entites_int = ['Toutes'] + sorted(df_integrations['Entité demandeuse'].dropna().unique())
+    entite_int_select = st.sidebar.selectbox("Entité demandeuse", entites_int, key="int_entite")
+    
+    # Filtre par direction concernée
+    directions_int = ['Toutes'] + sorted(df_integrations['Direction concernée'].dropna().unique())
+    direction_int_select = st.sidebar.selectbox("Direction concernée", directions_int, key="int_direction")
+    
+    # Filtre par affectation
+    affectations_int = ['Toutes'] + sorted(df_integrations['Affectation'].dropna().unique())
+    affectation_int_select = st.sidebar.selectbox("Affectation", affectations_int, key="int_affectation")
+    
+    # Appliquer les filtres
+    df_filtered = df_integrations.copy()
+    if entite_int_select != 'Toutes':
+        df_filtered = df_filtered[df_filtered['Entité demandeuse'] == entite_int_select]
+    if direction_int_select != 'Toutes':
+        df_filtered = df_filtered[df_filtered['Direction concernée'] == direction_int_select]
+    if affectation_int_select != 'Toutes':
+        df_filtered = df_filtered[df_filtered['Affectation'] == affectation_int_select]
+    
+    # KPIs d'intégration
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("👥 Intégrations en cours", len(df_filtered))
+    with col2:
+        # Intégrations avec date prévue
+        avec_date = len(df_filtered[df_filtered[date_integration_col].notna()])
+        st.metric("📅 Avec date prévue", avec_date)
+    with col3:
+        # Intégrations en retard (date prévue passée)
+        if date_integration_col in df_filtered.columns:
+            df_filtered[date_integration_col] = pd.to_datetime(df_filtered[date_integration_col], errors='coerce')
+            today = datetime.now()
+            en_retard = len(df_filtered[(df_filtered[date_integration_col].notna()) & 
+                                      (df_filtered[date_integration_col] < today)])
+            st.metric("⚠️ En retard", en_retard)
+        else:
+            st.metric("⚠️ En retard", "N/A")
+    
+    # Graphiques
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Répartition par affectation
+        affectation_counts = df_filtered['Affectation'].value_counts().nlargest(10)
+        fig_affectation = px.pie(
+            values=affectation_counts.values,
+            names=affectation_counts.index,
+            title="🏢 Répartition par Affectation"
+        )
+        fig_affectation.update_traces(textposition='inside', textinfo='percent+label')
+        fig_affectation.update_layout(height=400)
+        st.plotly_chart(fig_affectation, use_container_width=True)
+    
+    with col2:
+        # Évolution des dates d'intégration prévues
+        if date_integration_col in df_filtered.columns:
+            df_filtered['Mois_Integration'] = df_filtered[date_integration_col].dt.to_period('M')
+            monthly_integration = df_filtered.groupby('Mois_Integration').size().reset_index(name='Count')
+            monthly_integration['Mois_str'] = monthly_integration['Mois_Integration'].astype(str)
+            
+            fig_evolution_int = px.bar(
+                monthly_integration, 
+                x='Mois_str', 
+                y='Count',
+                title="📈 Évolution des Intégrations Prévues",
+                text='Count'
+            )
+            fig_evolution_int.update_traces(marker_color='#2ca02c', textposition='outside')
+            fig_evolution_int.update_layout(height=400, xaxis_title="Mois", yaxis_title="Nombre")
+            st.plotly_chart(fig_evolution_int, use_container_width=True)
+    
+    # Tableau détaillé des intégrations
+    st.subheader("📋 Détail des Intégrations en Cours")
+    colonnes_affichage = [
+        candidat_col, 
+        'Poste demandé ',
+        'Entité demandeuse',
+        'Direction concernée',
+        'Affectation',
+        date_integration_col
+    ]
+    # Filtrer les colonnes qui existent
+    colonnes_disponibles = [col for col in colonnes_affichage if col in df_filtered.columns]
+    
+    if colonnes_disponibles:
+        df_display = df_filtered[colonnes_disponibles].copy()
+        # Renommer pour affichage plus propre
+        df_display = df_display.rename(columns={
+            candidat_col: "Candidat",
+            'Poste demandé ': "Poste",
+            date_integration_col: "Date d'Intégration Prévue"
+        })
+        st.dataframe(df_display, use_container_width=True)
+    else:
+        st.warning("Colonnes d'affichage non disponibles")
+
+
+def create_demandes_recrutement_combined_tab(df_recrutement):
+    """Onglet combiné Demandes et Recrutement avec sous-onglets"""
+    st.header("📊 Demandes & Recrutement")
+    
+    # Créer les sous-onglets
+    sub_tabs = st.tabs(["📋 Demandes", "🎯 Recrutement"])
+    
+    with sub_tabs[0]:
+        create_demandes_recrutement_tab(df_recrutement)
+    
+    with sub_tabs[1]:
+        create_recrutements_clotures_tab(df_recrutement)
+
+
 def create_weekly_report_tab():
     """Onglet Reporting Hebdomadaire"""
     st.header("📅 Reporting Hebdomadaire")
@@ -481,8 +638,8 @@ def main():
     st.title("📊 Tableau de Bord RH - Style Power BI")
     st.markdown("---")
     
-    # Créer les onglets
-    tabs = st.tabs(["📂 Upload", "📋 Demandes", "🎯 Recrutement", "📅 Hebdomadaire", "📊 Intégrations"])
+    # Créer les onglets (Demandes et Recrutement regroupés)
+    tabs = st.tabs(["📂 Upload", "� Demandes & Recrutement", "📅 Hebdomadaire", "� Intégrations"])
     
     # Variables pour stocker les fichiers uploadés
     # Use session_state to persist upload/refresh state
@@ -572,60 +729,19 @@ def main():
 
     with tabs[1]:
         if df_recrutement is not None:
-            create_demandes_recrutement_tab(df_recrutement)
-        else:
-            st.warning("📋 Aucune donnée de recrutement disponible. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
-
-    with tabs[2]:
-        if df_recrutement is not None:
-            create_recrutements_clotures_tab(df_recrutement)
+            create_demandes_recrutement_combined_tab(df_recrutement)
         else:
             st.warning("📊 Aucune donnée de recrutement disponible. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
     
-    with tabs[3]:
+    with tabs[2]:
         create_weekly_report_tab()
 
-    with tabs[4]:
-        # Onglet pour les données d'intégration (données CSV)
-        if df_integration is not None:
-            st.header("📊 Suivi des Intégrations")
-            
-            # KPIs d'intégration
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("👥 Total Intégrations", len(df_integration))
-            with col2:
-                en_cours = len(df_integration[df_integration['Statut'] == 'En cours']) if 'Statut' in df_integration.columns else 0
-                st.metric("⏳ En Cours", en_cours)
-            with col3:
-                complet = len(df_integration[df_integration['Statut'] == 'Complet']) if 'Statut' in df_integration.columns else 0
-                st.metric("✅ Complet", complet)
-            with col4:
-                avg_docs = df_integration['Docs Manquants'].mean() if 'Docs Manquants' in df_integration.columns else 0
-                st.metric("📄 Docs Moy/Personne", f"{avg_docs:.1f}")
-            
-            # Graphiques d'intégration
-            if 'Date Intégration' in df_integration.columns and 'Statut' in df_integration.columns:
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    timeline_fig = create_integration_timeline(df_integration)
-                    st.plotly_chart(timeline_fig, use_container_width=True)
-                
-                with col2:
-                    if 'Affectation' in df_integration.columns:
-                        affectation_fig = create_affectation_chart(df_integration)
-                        st.plotly_chart(affectation_fig, use_container_width=True)
-                    else:
-                        st.info("Colonne 'Affectation' non trouvée dans les données")
-            else:
-                st.info("Colonnes requises non trouvées pour les graphiques (Date Intégration, Statut)")
-            
-            # Tableau de données
-            st.subheader("📊 Données Détaillées - Intégrations")
-            st.dataframe(df_integration, use_container_width=True)
+    with tabs[3]:
+        # Onglet Intégrations basé sur les données Excel
+        if df_recrutement is not None:
+            create_integrations_tab(df_recrutement)
         else:
-            st.warning("📊 Aucune donnée d'intégration disponible. Veuillez uploader un fichier CSV dans l'onglet 'Upload Fichiers'.")
+            st.warning("📊 Aucune donnée disponible pour les intégrations. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
 
 if __name__ == "__main__":
     main()
