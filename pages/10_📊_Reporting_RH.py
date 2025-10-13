@@ -344,46 +344,87 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
     st.markdown("---")
     st.subheader("🎯 Recrutements Récents Clôturés")
     
-    # Top 10 des recrutements les plus récents
+    # Top recrutements récents avec alignement 2x2
     if 'Date d\'entrée effective du candidat' in df_filtered.columns:
         recrutements_recents = df_filtered.nlargest(6, 'Date d\'entrée effective du candidat')
+        recrutements_list = list(recrutements_recents.iterrows())
         
-        # Organiser en 2 colonnes
-        col_left, col_right = st.columns(2)
-        
-        for idx, (_, row) in enumerate(recrutements_recents.iterrows()):
-            target_col = col_left if idx % 2 == 0 else col_right
+        # Organiser par paires (2 colonnes par ligne) comme les cartes Kanban
+        for idx in range(0, len(recrutements_list), 2):
+            # Toujours créer 2 colonnes pour maintenir l'alignement
+            rec_col1, rec_col2 = st.columns(2)
             
-            with target_col:
-                # Couleur basée sur la modalité de recrutement
-                modalite = row.get('Modalité de recrutement', 'Autre')
-                color_map = {
-                    'Candidature spontannée': '#007bff',
-                    'Cooptation': '#28a745',
-                    'OFPPT': '#ffc107',
-                    'Sourcing': '#17a2b8',
-                    'Ex-stagiaire TGCC': '#6f42c1',
-                    'Annonce': '#fd7e14'
-                }
-                border_color = color_map.get(modalite, '#6c757d')
-                
-                date_col_entree = 'Date d\'entrée effective du candidat'
-                candidat_col_long = 'Nom Prénom du candidat retenu yant accepté la promesse d\'embauche'
-                
-                date_entree = row.get(date_col_entree, pd.NaT)
-                date_str = date_entree.strftime('%d/%m/%Y') if pd.notna(date_entree) else 'N/A'
-                
-                card_html = f"""
-                <div class="report-card" style="border-left-color: {border_color};">
-                    <h4>✅ {row.get('Poste demandé', 'N/A')}</h4>
-                    <p><strong>👤 Candidat:</strong> {row.get(candidat_col_long, 'N/A')}</p>
-                    <p><strong>🏢 Entité:</strong> {row.get('Entité demandeuse', 'N/A')}</p>
-                    <p><strong>📍 Affectation:</strong> {row.get('Affectation', 'N/A')}</p>
-                    <p><strong>📅 Date d'entrée:</strong> {date_str}</p>
-                    <span class="status-badge" style="background-color: {border_color};">{modalite}</span>
-                </div>
-                """
-                st.markdown(card_html, unsafe_allow_html=True)
+            # Première carte
+            if idx < len(recrutements_list):
+                with rec_col1:
+                    _, row = recrutements_list[idx]
+                    # Couleur basée sur la modalité de recrutement
+                    modalite = row.get('Modalité de recrutement', 'Autre')
+                    color_map = {
+                        'Candidature spontannée': '#007bff',
+                        'Cooptation': '#28a745',
+                        'OFPPT': '#ffc107',
+                        'Sourcing': '#17a2b8',
+                        'Ex-stagiaire TGCC': '#6f42c1',
+                        'Annonce': '#fd7e14'
+                    }
+                    border_color = color_map.get(modalite, '#6c757d')
+                    
+                    date_col_entree = 'Date d\'entrée effective du candidat'
+                    candidat_col_long = 'Nom Prénom du candidat retenu yant accepté la promesse d\'embauche'
+                    
+                    date_entree = row.get(date_col_entree, pd.NaT)
+                    date_str = date_entree.strftime('%d/%m/%Y') if pd.notna(date_entree) else 'N/A'
+                    
+                    card_html = f"""
+                    <div class="report-card" style="border-left-color: {border_color};">
+                        <h4>✅ {row.get('Poste demandé', 'N/A')}</h4>
+                        <p><strong>👤 Candidat:</strong> {row.get(candidat_col_long, 'N/A')}</p>
+                        <p><strong>🏢 Entité:</strong> {row.get('Entité demandeuse', 'N/A')}</p>
+                        <p><strong>📍 Affectation:</strong> {row.get('Affectation', 'N/A')}</p>
+                        <p><strong>📅 Date d'entrée:</strong> {date_str}</p>
+                        <span class="status-badge" style="background-color: {border_color};">{modalite}</span>
+                    </div>
+                    """
+                    st.markdown(card_html, unsafe_allow_html=True)
+            
+            # Deuxième carte (si elle existe)
+            if idx + 1 < len(recrutements_list):
+                with rec_col2:
+                    _, row = recrutements_list[idx + 1]
+                    # Couleur basée sur la modalité de recrutement
+                    modalite = row.get('Modalité de recrutement', 'Autre')
+                    color_map = {
+                        'Candidature spontannée': '#007bff',
+                        'Cooptation': '#28a745',
+                        'OFPPT': '#ffc107',
+                        'Sourcing': '#17a2b8',
+                        'Ex-stagiaire TGCC': '#6f42c1',
+                        'Annonce': '#fd7e14'
+                    }
+                    border_color = color_map.get(modalite, '#6c757d')
+                    
+                    date_col_entree = 'Date d\'entrée effective du candidat'
+                    candidat_col_long = 'Nom Prénom du candidat retenu yant accepté la promesse d\'embauche'
+                    
+                    date_entree = row.get(date_col_entree, pd.NaT)
+                    date_str = date_entree.strftime('%d/%m/%Y') if pd.notna(date_entree) else 'N/A'
+                    
+                    card_html = f"""
+                    <div class="report-card" style="border-left-color: {border_color};">
+                        <h4>✅ {row.get('Poste demandé', 'N/A')}</h4>
+                        <p><strong>👤 Candidat:</strong> {row.get(candidat_col_long, 'N/A')}</p>
+                        <p><strong>🏢 Entité:</strong> {row.get('Entité demandeuse', 'N/A')}</p>
+                        <p><strong>📍 Affectation:</strong> {row.get('Affectation', 'N/A')}</p>
+                        <p><strong>📅 Date d'entrée:</strong> {date_str}</p>
+                        <span class="status-badge" style="background-color: {border_color};">{modalite}</span>
+                    </div>
+                    """
+                    st.markdown(card_html, unsafe_allow_html=True)
+            else:
+                # Colonne vide pour maintenir l'alignement
+                with rec_col2:
+                    st.empty()
 
 
 def create_demandes_recrutement_tab(df_recrutement, global_filters):
@@ -489,34 +530,6 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         fig_poste.update_layout(height=400, xaxis_title=None, yaxis_title=None, yaxis={'categoryorder':'total ascending'})
         st.plotly_chart(fig_poste, use_container_width=True)
 
-    # Section avec cartes détaillées style Home.py
-    st.markdown("---")
-    st.subheader("📋 Détail des Demandes par Statut")
-    
-    # Organiser par statut avec cartes expandables
-    statuts = df_filtered['Statut de la demande'].value_counts()
-    
-    for statut, count in statuts.items():
-        with st.expander(f"📊 **{statut}** ({count} demandes)", expanded=False):
-            demandes_statut = df_filtered[df_filtered['Statut de la demande'] == statut].head(5)
-            
-            # Afficher les demandes sous forme de cartes
-            for idx, row in demandes_statut.iterrows():
-                card_html = f"""
-                <div class="report-card">
-                    <h4>🎯 {row.get('Poste demandé', 'N/A')}</h4>
-                    <p><strong>🏢 Entité:</strong> {row.get('Entité demandeuse', 'N/A')}</p>
-                    <p><strong>🎯 Direction:</strong> {row.get('Direction concernée', 'N/A')}</p>
-                    <p><strong>📍 Affectation:</strong> {row.get('Affectation', 'N/A')}</p>
-                    <p><strong>👤 Demandeur:</strong> {row.get('Nom Prénom du demandeur', 'N/A')}</p>
-                    <span class="status-badge">{statut}</span>
-                </div>
-                """
-                st.markdown(card_html, unsafe_allow_html=True)
-            
-            if len(demandes_statut) == 5 and count > 5:
-                st.info(f"... et {count - 5} autres demandes avec ce statut")
-
 def create_integrations_tab(df_recrutement, global_filters):
     """Onglet Intégrations basé sur les bonnes données"""
     st.header("📊 Intégrations")
@@ -606,19 +619,30 @@ def create_integrations_tab(df_recrutement, global_filters):
     
     if colonnes_disponibles:
         df_display = df_filtered[colonnes_disponibles].copy()
+        
+        # Formater la date pour enlever l'heure
+        if date_integration_col in df_display.columns:
+            df_display[date_integration_col] = pd.to_datetime(df_display[date_integration_col], errors='coerce').dt.strftime('%d/%m/%Y')
+            df_display[date_integration_col] = df_display[date_integration_col].fillna('N/A')
+        
         # Renommer pour affichage plus propre
         df_display = df_display.rename(columns={
             candidat_col: "Candidat",
             'Poste demandé ': "Poste",
             date_integration_col: "Date d'Intégration Prévue"
         })
-        st.dataframe(df_display, use_container_width=True)
+        
+        # Réinitialiser l'index pour enlever les numéros de ligne
+        df_display = df_display.reset_index(drop=True)
+        
+        # Afficher sans index (hide_index=True)
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
     else:
         st.warning("Colonnes d'affichage non disponibles")
 
 
 def create_demandes_recrutement_combined_tab(df_recrutement):
-    """Onglet combiné Demandes et Recrutement avec sous-onglets et style carte"""
+    """Onglet combiné Demandes et Recrutement avec cartes expandables comme Home.py"""
     st.header("📊 Demandes & Recrutement")
     
     # CSS pour les cartes style Home.py
@@ -652,9 +676,6 @@ def create_demandes_recrutement_combined_tab(df_recrutement):
         color: white;
         background-color: #007bff;
     }
-    .report-card .priority-high { background-color: #dc3545; }
-    .report-card .priority-medium { background-color: #ffc107; color: #212529; }
-    .report-card .priority-low { background-color: #28a745; }
     </style>
     """, unsafe_allow_html=True)
     
@@ -662,13 +683,11 @@ def create_demandes_recrutement_combined_tab(df_recrutement):
     st.sidebar.subheader("🔧 Filtres Globaux")
     global_filters = create_global_filters(df_recrutement, "combined")
     
-    # Créer les sous-onglets
-    sub_tabs = st.tabs(["📋 Demandes", "🎯 Recrutement"])
-    
-    with sub_tabs[0]:
+    # Créer deux cartes expandables principales (comme dans Home.py)
+    with st.expander("📋 **DEMANDES DE RECRUTEMENT**", expanded=False):
         create_demandes_recrutement_tab(df_recrutement, global_filters)
     
-    with sub_tabs[1]:
+    with st.expander("🎯 **RECRUTEMENTS CLÔTURÉS**", expanded=False):
         create_recrutements_clotures_tab(df_recrutement, global_filters)
 
 
@@ -721,17 +740,15 @@ def create_weekly_report_tab():
             # Filtrer les postes pour la colonne actuelle
             postes_in_col = [p for p in postes_data if p["statut"] == statut]
             
-            # Organiser les cartes en paires (deux par ligne)
+            # Organiser TOUJOURS en paires (2 colonnes par ligne), même avec 1 carte
             for idx in range(0, len(postes_in_col), 2):
-                # Prendre jusqu'à 2 cartes
-                batch = postes_in_col[idx:idx+2]
+                # Toujours créer 2 colonnes
+                card_col1, card_col2 = st.columns(2)
                 
-                if len(batch) == 2:
-                    # Deux cartes côte à côte
-                    card_col1, card_col2 = st.columns(2)
-                    
+                # Première carte
+                if idx < len(postes_in_col):
                     with card_col1:
-                        poste = batch[0]
+                        poste = postes_in_col[idx]
                         card_html = f"""
                         <div class="kanban-card">
                             <h4><b>{poste['titre']}</b></h4>
@@ -741,9 +758,11 @@ def create_weekly_report_tab():
                         </div>
                         """
                         st.markdown(card_html, unsafe_allow_html=True)
-                    
+                
+                # Deuxième carte (si elle existe)
+                if idx + 1 < len(postes_in_col):
                     with card_col2:
-                        poste = batch[1]
+                        poste = postes_in_col[idx + 1]
                         card_html = f"""
                         <div class="kanban-card">
                             <h4><b>{poste['titre']}</b></h4>
@@ -754,17 +773,9 @@ def create_weekly_report_tab():
                         """
                         st.markdown(card_html, unsafe_allow_html=True)
                 else:
-                    # Une seule carte
-                    poste = batch[0]
-                    card_html = f"""
-                    <div class="kanban-card">
-                        <h4><b>{poste['titre']}</b></h4>
-                        <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
-                        <p>👤 {poste.get('demandeur', 'N/A')}</p>
-                        <p>✍️ {poste.get('recruteur', 'N/A')}</p>
-                    </div>
-                    """
-                    st.markdown(card_html, unsafe_allow_html=True)
+                    # Colonne vide pour maintenir l'alignement
+                    with card_col2:
+                        st.empty()
 
 
 def main():
