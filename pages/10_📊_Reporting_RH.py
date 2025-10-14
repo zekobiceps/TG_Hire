@@ -87,6 +87,62 @@ def _parse_mixed_dates(series):
     return parsed
 
 
+def render_kpi_cards(recrutements, postes, directions, delai_display, delai_help=None):
+        """Render three KPI cards in a single responsive row using HTML/CSS.
+
+        - Left card: Nombre de recrutements (primary)
+        - Middle card: Postes concernés
+        - Right card: two stacked small cards for Directions and Délai moyen
+        """
+        css = """
+        <style>
+        .kpi-row{display:flex;gap:16px;flex-wrap:wrap;align-items:stretch}
+        .kpi-card{flex:1 1 0;background:#fff;border-radius:8px;padding:14px;box-shadow:0 2px 6px rgba(0,0,0,0.08);display:flex;flex-direction:column;justify-content:space-between}
+        .kpi-primary{background:linear-gradient(90deg,#4f8ef7,#6fc3ff);color:white}
+        .kpi-title{font-size:13px;color:rgba(0,0,0,0.6);margin-bottom:6px}
+        .kpi-value{font-size:28px;font-weight:700}
+        .kpi-sub{font-size:12px;color:rgba(0,0,0,0.55);margin-top:6px}
+        .kpi-small-row{display:flex;gap:12px}
+        .kpi-small{flex:1;background:#f7f9fc;border-radius:6px;padding:10px;text-align:center}
+        .kpi-small .label{font-size:12px;color:#333}
+        .kpi-small .val{font-size:18px;font-weight:700;margin-top:6px}
+        </style>
+        """
+
+        html = f"""
+        {css}
+        <div class='kpi-row'>
+            <div class='kpi-card kpi-primary' style='flex:2 1 0'>
+                <div>
+                    <div class='kpi-title'>Nombre de recrutements</div>
+                    <div class='kpi-value'>{recrutements:,}</div>
+                    <div class='kpi-sub'>Total des recrutements filtrés</div>
+                </div>
+            </div>
+            <div class='kpi-card' style='flex:1 1 0'>
+                <div>
+                    <div class='kpi-title'>Postes concernés</div>
+                    <div class='kpi-value'>{postes:,}</div>
+                    <div class='kpi-sub'>Nombre de postes uniques</div>
+                </div>
+            </div>
+            <div style='flex:1 1 0;display:flex;flex-direction:column;gap:12px'>
+                <div class='kpi-card kpi-small' style='background:#fff'>
+                    <div class='label'>Nombre de Directions concernées</div>
+                    <div class='val'>{directions:,}</div>
+                </div>
+                <div class='kpi-card kpi-small' style='background:#fff'>
+                    <div class='label'>Délai moyen recrutement (jours)</div>
+                    <div class='val'>{delai_display}</div>
+                    <div style='font-size:11px;color:#666;margin-top:6px'>{delai_help or ''}</div>
+                </div>
+            </div>
+        </div>
+        """
+
+        st.markdown(html, unsafe_allow_html=True)
+
+
 def compute_time_to_hire(df, start_cols=None, end_cols=None, status_col='Statut de la demande', status_value='Clôture', drop_negative=True):
     """Compute time-to-hire (in days) between a request date and an entry/closure date.
 
@@ -582,42 +638,32 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
     # Appliquer les filtres globaux
     df_filtered = apply_global_filters(df_cloture, global_filters)
 
-    # KPIs principaux — nouvelle mise en page : 3 colonnes où la 3ème contient
-    # deux métriques côte-à-côte (Directions + Délai moyen)
-    col1, col2, col3 = st.columns([1, 1, 2])
-    with col1:
-        st.metric("Nombre de recrutements", len(df_filtered))
-    with col2:
-        postes_uniques = df_filtered['Poste demandé'].nunique()
-        st.metric("Postes concernés", postes_uniques)
-    with col3:
-        # Deux métriques côte à côte : Directions et Délai moyen
-        sub1, sub2 = st.columns([1, 1])
-        with sub1:
-            directions_uniques = df_filtered['Direction concernée'].nunique()
-            st.metric("Nombre de Directions concernées", directions_uniques)
-        with sub2:
-            # Calcul du délai moyen de recrutement (jours)
-            date_reception_col = 'Date de réception de la demande aprés validation de la DRH'
-            date_retour_rh_col = 'Date du 1er retour equipe RH  au demandeur'
-            delai_display = "N/A"
-            delai_help = "Colonnes manquantes ou pas de durées valides"
-            if date_reception_col in df_filtered.columns and date_retour_rh_col in df_filtered.columns:
-                try:
-                    s = pd.to_datetime(df_filtered[date_reception_col], errors='coerce')
-                    e = pd.to_datetime(df_filtered[date_retour_rh_col], errors='coerce')
-                    mask = s.notna() & e.notna()
-                    if mask.sum() > 0:
-                        durees = (e[mask] - s[mask]).dt.days
-                        durees = durees[durees > 0]
-                        if len(durees) > 0:
-                            delai_moyen = round(durees.mean(), 1)
-                            delai_display = f"{delai_moyen}"
-                            delai_help = f"Moyenne calculée sur {len(durees)} demandes"
-                except Exception:
-                    pass
+    # Use the HTML KPI cards renderer for a more attractive layout
+    recrutements = len(df_filtered)
+    postes_uniques = df_filtered['Poste demandé'].nunique()
+    directions_uniques = df_filtered['Direction concernée'].nunique()
 
-            st.metric("Délai moyen recrutement (jours)", delai_display, help=delai_help)
+    # Compute delai display and help
+    date_reception_col = 'Date de réception de la demande aprés validation de la DRH'
+    date_retour_rh_col = 'Date du 1er retour equipe RH  au demandeur'
+    delai_display = "N/A"
+    delai_help = "Colonnes manquantes ou pas de durées valides"
+    if date_reception_col in df_filtered.columns and date_retour_rh_col in df_filtered.columns:
+        try:
+            s = pd.to_datetime(df_filtered[date_reception_col], errors='coerce')
+            e = pd.to_datetime(df_filtered[date_retour_rh_col], errors='coerce')
+            mask = s.notna() & e.notna()
+            if mask.sum() > 0:
+                durees = (e[mask] - s[mask]).dt.days
+                durees = durees[durees > 0]
+                if len(durees) > 0:
+                    delai_moyen = round(durees.mean(), 1)
+                    delai_display = f"{delai_moyen}"
+                    delai_help = f"Moyenne calculée sur {len(durees)} demandes"
+        except Exception:
+            pass
+
+    render_kpi_cards(recrutements, postes_uniques, directions_uniques, delai_display, delai_help)
     
     # Graphiques en ligne 1
     col1, col2 = st.columns([2,1])
