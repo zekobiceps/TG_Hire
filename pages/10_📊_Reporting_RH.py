@@ -1600,14 +1600,15 @@ def create_weekly_report_tab(df_recrutement=None):
                 'En cours (cette semaine)': vals.get('en_cours', 0)
             })
         df_table = pd.DataFrame(rows)
-        # Ajouter ligne total
-        df_table = df_table.append({
+        # Ajouter ligne total (utiliser pd.concat plutôt que DataFrame.append qui est déprécié)
+        total_row = pd.DataFrame([{
             'Entité': 'TOTAL',
             'Avant (semaine précédente)': total_avant,
             'Nouveaux (cette semaine)': total_nouveaux,
             'Pourvus (cette semaine)': total_pourvus,
             'En cours (cette semaine)': total_en_cours
-        }, ignore_index=True)
+        }])
+        df_table = pd.concat([df_table, total_row], ignore_index=True)
         st.dataframe(df_table, use_container_width=True)
     else:
         st.info("Aucune métrique hebdomadaire disponible — chargez un fichier Excel ou synchronisez depuis Google Sheets.")
