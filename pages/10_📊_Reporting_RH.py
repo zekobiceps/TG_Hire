@@ -782,10 +782,13 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         df_direction = df_direction.sort_values('Count', ascending=False)
         # Truncate long labels for readability, keep full label in customdata for hover
         df_direction['Label_trunc'] = df_direction['Direction'].apply(lambda s: _truncate_label(s, max_len=24))
+        # Ensure display label exists (truncated + small gap)
+        if 'Label_display' not in df_direction.columns:
+            df_direction['Label_display'] = df_direction['Label_trunc'] + '\u00A0\u00A0'
         fig_direction = px.bar(
             df_direction,
             x='Count',
-            y='Label_trunc',
+            y='Label_display',
             title="Comparaison par direction",
             text='Count',
             orientation='h',
@@ -820,7 +823,8 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         df_poste = poste_counts.rename_axis('Poste').reset_index(name='Count')
         df_poste = df_poste.sort_values('Count', ascending=False)
         df_poste['Label_trunc'] = df_poste['Poste'].apply(lambda s: _truncate_label(s, max_len=24))
-        df_poste['Label_display'] = df_poste['Label_trunc'] + '\u00A0\u00A0'
+        if 'Label_display' not in df_poste.columns:
+            df_poste['Label_display'] = df_poste['Label_trunc'] + '\u00A0\u00A0'
         fig_poste = px.bar(
             df_poste,
             x='Count',
