@@ -396,9 +396,23 @@ def render_plotly_scrollable(fig, max_height=500):
     """Renders a plotly figure inside a scrollable HTML div so the user can scroll when there are many bars."""
     try:
         # Use components.html so the plotly JS is executed correctly in Streamlit
-        html = fig.to_html(full_html=False, include_plotlyjs='cdn')
-        # components.html supports scrolling and executes scripts
-        components.html(html, height=max_height, scrolling=True)
+                # Ensure the title is left-aligned when rendering inside the small container
+                try:
+                        fig.update_layout(title_x=0, title=dict(xanchor='left', font=dict(size=14)))
+                except Exception:
+                        pass
+
+                html = fig.to_html(full_html=False, include_plotlyjs='cdn')
+                # Wrap the plot HTML in a left-aligned container so the chart isn't centered
+                wrapper = f"""
+                <div style='display:flex; justify-content:flex-start; align-items:flex-start;'>
+                    <div style='width:100%;'>
+                        {html}
+                    </div>
+                </div>
+                """
+                # components.html supports scrolling and executes scripts
+                components.html(wrapper, height=max_height, scrolling=True)
     except Exception:
         # Fallback to default renderer
         st.plotly_chart(fig, use_container_width=True)
@@ -530,6 +544,15 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             textangle=90,
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
+        try:
+            fig_direction.update_layout(title_x=0, title=dict(xanchor='left', font=dict(size=14)))
+        except Exception:
+            pass
+        # Standardize title styling (left aligned)
+        try:
+            fig_direction.update_layout(title_x=0, title=dict(xanchor='left', font=dict(size=14)))
+        except Exception:
+            pass
         # Largest at top: reverse the category array so descending values appear from top to bottom
         height_dir = max(300, 28 * len(df_direction))
         fig_direction.update_layout(
@@ -568,6 +591,14 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             textangle=90,
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
+        try:
+            fig_poste.update_layout(title_x=0, title=dict(xanchor='left', font=dict(size=14)))
+        except Exception:
+            pass
+        try:
+            fig_poste.update_layout(title_x=0, title=dict(xanchor='left', font=dict(size=14)))
+        except Exception:
+            pass
         height_poste = max(300, 28 * len(df_poste))
         fig_poste.update_layout(
             height=height_poste,
