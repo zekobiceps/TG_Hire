@@ -9,6 +9,7 @@ import warnings
 import os
 warnings.filterwarnings('ignore')
 import re
+import streamlit.components.v1 as components
 from io import BytesIO
 import json
 import gspread
@@ -380,9 +381,10 @@ def create_affectation_chart(df):
 def render_plotly_scrollable(fig, max_height=500):
     """Renders a plotly figure inside a scrollable HTML div so the user can scroll when there are many bars."""
     try:
+        # Use components.html so the plotly JS is executed correctly in Streamlit
         html = fig.to_html(full_html=False, include_plotlyjs='cdn')
-        wrapper = f'<div style="max-height:{max_height}px; overflow:auto;">{html}</div>'
-        st.markdown(wrapper, unsafe_allow_html=True)
+        # components.html supports scrolling and executes scripts
+        components.html(html, height=max_height, scrolling=True)
     except Exception:
         # Fallback to default renderer
         st.plotly_chart(fig, use_container_width=True)
