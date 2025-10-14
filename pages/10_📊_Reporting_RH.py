@@ -71,36 +71,24 @@ postes_data = [
 ]
 
 
-@st.cache_data(ttl=300)
-def get_filter_options(df_recrutement):
-    """Récupère les options de filtres de manière mise en cache"""
-    if df_recrutement is None or len(df_recrutement) == 0:
-        return {'entites': ['Toutes'], 'directions': ['Toutes']}
-    
-    entites = ['Toutes'] + sorted(df_recrutement['Entité demandeuse'].dropna().unique())
-    directions = ['Toutes'] + sorted(df_recrutement['Direction concernée'].dropna().unique())
-    
-    return {'entites': entites, 'directions': directions}
-
 def create_global_filters(df_recrutement, prefix=""):
     """Créer des filtres globaux réutilisables pour tous les onglets"""
     if df_recrutement is None or len(df_recrutement) == 0:
         return {}
 
-    # Récupérer les options de filtres de manière mise en cache
-    filter_options = get_filter_options(df_recrutement)
-    
     # Organiser les filtres dans deux colonnes dans la sidebar
     filters = {}
     left_col, right_col = st.sidebar.columns(2)
 
     # Filtre par entité demandeuse (colonne gauche)
+    entites = ['Toutes'] + sorted(df_recrutement['Entité demandeuse'].dropna().unique())
     with left_col:
-        filters['entite'] = st.selectbox("Entité demandeuse", filter_options['entites'], key=f"{prefix}_entite")
+        filters['entite'] = st.selectbox("Entité demandeuse", entites, key=f"{prefix}_entite")
 
     # Filtre par direction concernée (colonne droite)
+    directions = ['Toutes'] + sorted(df_recrutement['Direction concernée'].dropna().unique())
     with right_col:
-        filters['direction'] = st.selectbox("Direction concernée", filter_options['directions'], key=f"{prefix}_direction")
+        filters['direction'] = st.selectbox("Direction concernée", directions, key=f"{prefix}_direction")
 
     return filters
 
@@ -138,11 +126,9 @@ def get_gsheet_client():
         return None
 
 
-@st.cache_data(ttl=300, show_spinner="Chargement des données Google Sheets...")
 def load_data_from_google_sheets(sheet_url):
     """
     Charger les données depuis Google Sheets avec authentification automatique via les secrets.
-    Cache les données pendant 5 minutes pour éviter les rechargements inutiles.
     """
     try:
         # Extraire l'ID de la feuille et le GID depuis l'URL
@@ -196,88 +182,6 @@ def load_data_from_google_sheets(sheet_url):
         raise e
 
 
-def normalize_column_names(df):
-    """Normaliser et corriger les noms des colonnes"""
-    if df is None or len(df) == 0:
-        return df
-    
-    # Mapping des variations de noms de colonnes vers les noms standards
-    column_mapping = {
-        # Variations pour "Poste demandé"
-        'poste demandé': 'Poste demandé',
-        'poste_demande': 'Poste demandé',
-        'poste': 'Poste demandé',
-        'titre du poste': 'Poste demandé',
-        'intitulé du poste': 'Poste demandé',
-        
-        # Variations pour "Statut de la demande"
-        'statut de la demande': 'Statut de la demande',
-        'statut_demande': 'Statut de la demande',
-        'statut': 'Statut de la demande',
-        'etat': 'Statut de la demande',
-        
-        # Variations pour "Direction concernée"
-        'direction concernée': 'Direction concernée',
-        'direction_concernee': 'Direction concernée',
-        'direction': 'Direction concernée',
-        
-        # Variations pour "Entité demandeuse"
-        'entité demandeuse': 'Entité demandeuse',
-        'entite_demandeuse': 'Entité demandeuse',
-        'entite': 'Entité demandeuse',
-        
-        # Variations pour les dates
-        'date de réception de la demande aprés validation de la drh': 'Date de réception de la demande aprés validation de la DRH',
-        'date reception demande': 'Date de réception de la demande aprés validation de la DRH',
-        'date d\'entrée effective du candidat': 'Date d\'entrée effective du candidat',
-        'date entree effective': 'Date d\'entrée effective du candidat'
-    }
-    
-    # Créer une copie du DataFrame pour éviter de modifier l'original
-    df_normalized = df.copy()
-    
-    # Nettoyer d'abord les noms de colonnes (espaces, casse)
-    df_normalized.columns = df_normalized.columns.str.strip().str.lower()
-    
-    # Appliquer le mapping
-    df_normalized.columns = [column_mapping.get(col, col) for col in df_normalized.columns]
-    
-    # Si on n'a toujours pas "Poste demandé", essayer de le deviner
-    if 'Poste demandé' not in df_normalized.columns:
-        for col in df_normalized.columns:
-            if any(keyword in col.lower() for keyword in ['poste', 'titre', 'intitulé', 'fonction']):
-                df_normalized = df_normalized.rename(columns={col: 'Poste demandé'})
-                break
-    
-    return df_normalized
-
-@st.cache_data(ttl=300)
-def process_recruitment_data(df):
-    """Traiter et nettoyer les données de recrutement de manière mise en cache"""
-    if df is None or len(df) == 0:
-        return None
-    
-    # D'abord normaliser les noms de colonnes
-    df = normalize_column_names(df)
-    
-    # Convertir les colonnes de dates si elles existent
-    date_columns = [
-        'Date de réception de la demande aprés validation de la DRH',
-        'Date d\'entrée effective du candidat',
-        'Date de publication',
-        'Date de clôture',
-        'Date de fin des candidatures'
-    ]
-    
-    for col in date_columns:
-        if col in df.columns:
-            try:
-                df[col] = pd.to_datetime(df[col], errors='coerce')
-            except:
-                pass
-    
-    return df
-
 def load_data_from_files(csv_file=None, excel_file=None):
     """Charger et préparer les données depuis les fichiers uploadés ou locaux"""
     df_integration = None
@@ -311,44 +215,31 @@ def load_data_from_files(csv_file=None, excel_file=None):
             st.error(f"Erreur lors du chargement des données de recrutement: {e}")
 
         if df_recrutement is not None:
-            # Utiliser la fonction de traitement mise en cache si les données ne viennent pas de session_state
-            if not ('synced_recrutement_df' in st.session_state and st.session_state.synced_recrutement_df is not None):
-                df_recrutement = process_recruitment_data(df_recrutement)
+            # Nettoyer et préparer les données de recrutement
+            # Convertir les dates
+            date_columns = ['Date de réception de la demande aprés validation de la DRH',
+                           'Date d\'entrée effective du candidat',
+                           'Date d\'annulation /dépriorisation de la demande',
+                           'Date de la 1er réponse du demandeur à l\'équipe RH']
             
-                # Nettoyer les colonnes avec des espaces
-                df_recrutement.columns = df_recrutement.columns.str.strip()
-                
-                # Nettoyer les colonnes numériques pour éviter les erreurs de type
-                numeric_columns = ['Nb de candidats pré-selectionnés']
-                for col in numeric_columns:
-                    if col in df_recrutement.columns:
-                        df_recrutement[col] = pd.to_numeric(df_recrutement[col], errors='coerce').fillna(0)
+            for col in date_columns:
+                if col in df_recrutement.columns:
+                    df_recrutement[col] = pd.to_datetime(df_recrutement[col], errors='coerce')
+            
+            # Nettoyer les colonnes avec des espaces
+            df_recrutement.columns = df_recrutement.columns.str.strip()
+            
+            # Nettoyer les colonnes numériques pour éviter les erreurs de type
+            numeric_columns = ['Nb de candidats pré-selectionnés']
+            for col in numeric_columns:
+                if col in df_recrutement.columns:
+                    df_recrutement[col] = pd.to_numeric(df_recrutement[col], errors='coerce').fillna(0)
 
-            # Vérification et diagnostic des colonnes critiques
+            # Vérification basique des colonnes critiques et message dans les logs
             required_cols = [
                 'Statut de la demande', 'Poste demandé', 'Direction concernée',
                 'Entité demandeuse', 'Modalité de recrutement'
             ]
-            
-            # Diagnostic des colonnes manquantes
-            missing_cols = [col for col in required_cols if col not in df_recrutement.columns]
-            if missing_cols:
-                st.error(f"❌ Colonnes attendues manquantes dans le fichier de recrutement: {missing_cols}")
-                st.info("🔍 **Colonnes disponibles dans le fichier :**")
-                col_info = pd.DataFrame({
-                    'Colonnes disponibles': df_recrutement.columns.tolist(),
-                    'Index': range(len(df_recrutement.columns))
-                })
-                st.dataframe(col_info, use_container_width=True)
-                
-                # Suggestion de colonnes similaires
-                st.info("💡 **Suggestions de correspondances :**")
-                for missing_col in missing_cols:
-                    similar_cols = [col for col in df_recrutement.columns if any(word in col.lower() for word in missing_col.lower().split())]
-                    if similar_cols:
-                        st.write(f"- Pour `{missing_col}`, colonnes similaires trouvées: {similar_cols}")
-                
-                return None, None  # Arrêter le traitement si des colonnes critiques manquent
             missing = [c for c in required_cols if c not in df_recrutement.columns]
             if missing:
                 # Log via st.warning but don't raise — keep app running
@@ -423,20 +314,11 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 # Filtre Période de la demande
                 date_demande_col = 'Date de réception de la demande aprés validation de la DRH'
                 if date_demande_col in df_cloture.columns:
-                    try:
-                        df_cloture_temp = df_cloture.copy()
-                        df_cloture_temp['Année_demande'] = df_cloture_temp[date_demande_col].dt.year
-                        annees_demande_dispo = sorted([y for y in df_cloture_temp['Année_demande'].dropna().unique() if not pd.isna(y)])
-                        if annees_demande_dispo:
-                            annee_demande_select = st.selectbox(
-                                "Période de la demande", 
-                                ['Toutes'] + [int(a) for a in annees_demande_dispo], 
-                                index=len(annees_demande_dispo), 
-                                key="nav_dem_annee"
-                            )
-                        else:
-                            st.markdown("<div style='padding-top:6px; color:#666; font-size:0.9em'></div>", unsafe_allow_html=True)
-                    except Exception as e:
+                    df_cloture['Année_demande'] = df_cloture[date_demande_col].dt.year
+                    annees_demande_dispo = sorted([y for y in df_cloture['Année_demande'].dropna().unique() if not pd.isna(y)])
+                    if annees_demande_dispo:
+                        annee_demande_select = st.selectbox("Période de la demande", ['Toutes'] + [int(a) for a in annees_demande_dispo], index=len(annees_demande_dispo), key="nav_dem_annee")
+                    else:
                         st.markdown("<div style='padding-top:6px; color:#666; font-size:0.9em'></div>", unsafe_allow_html=True)
                 else:
                     st.markdown("<div style='padding-top:6px; color:#666; font-size:0.9em'></div>", unsafe_allow_html=True)
@@ -459,7 +341,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         st.metric("Postes concernés", postes_uniques)
     with col3:
         directions_uniques = df_filtered['Direction concernée'].nunique()
-        st.metric("Directions concernées", directions_uniques)
+        st.metric("Nombre de Direction con...", directions_uniques)
     
     # Graphiques en ligne 1
     col1, col2 = st.columns([2,1])
@@ -482,12 +364,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 textposition='outside',
                 hovertemplate='%{y}<extra></extra>'
             )
-            fig_evolution.update_layout(
-                height=300, 
-                xaxis_title=None, 
-                yaxis_title=None,
-                xaxis=dict(tickmode='linear', dtick=1)
-            )
+            fig_evolution.update_layout(height=300, xaxis_title=None, yaxis_title=None)
             st.plotly_chart(fig_evolution, use_container_width=True)
     
     with col2:
@@ -534,15 +411,13 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         fig_direction.update_traces(
             marker_color='#ff7f0e', 
             textposition='inside',
-            textfont=dict(color='white', size=12),
             hovertemplate='%{y}<extra></extra>'
         )
         fig_direction.update_layout(
             height=300, 
             xaxis_title=None, 
             yaxis_title=None,
-            xaxis={'categoryorder':'total descending'},
-            xaxis_tickangle=-45
+            xaxis={'categoryorder':'total descending'}
         )
         st.plotly_chart(fig_direction, use_container_width=True)
 
@@ -559,15 +434,13 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         fig_poste.update_traces(
             marker_color='#2ca02c', 
             textposition='inside',
-            textfont=dict(color='white', size=12),
             hovertemplate='%{y}<extra></extra>'
         )
         fig_poste.update_layout(
             height=300, 
             xaxis_title=None, 
             yaxis_title=None,
-            xaxis={'categoryorder':'total descending'},
-            xaxis_tickangle=-45
+            xaxis={'categoryorder':'total descending'}
         )
         st.plotly_chart(fig_poste, use_container_width=True)
 
@@ -595,23 +468,18 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         st.plotly_chart(fig_candidats, use_container_width=True)
 
     with col6:
-        # Délai moyen de recrutement - Formule corrigée selon votre demande
+        # Délai moyen de recrutement
         date_reception_col = 'Date de réception de la demande aprés validation de la DRH'
-        date_retour_rh_col = 'Date du 1er retour equipe RH  au demandeur'
+        date_reponse_col = 'Date de la 1er réponse du demandeur à l\'équipe RH'
         
-        if date_reception_col in df_filtered.columns and date_retour_rh_col in df_filtered.columns:
-            # Convertir les colonnes en datetime si ce n'est pas déjà fait
-            df_filtered[date_reception_col] = pd.to_datetime(df_filtered[date_reception_col], errors='coerce')
-            df_filtered[date_retour_rh_col] = pd.to_datetime(df_filtered[date_retour_rh_col], errors='coerce')
-            
-            # Calcul : DATEDIFF([Date du 1er retour equipe RH au demandeur] - [Date de réception de la demande aprés validation de la DRH])
-            df_filtered['Duree de recrutement'] = (df_filtered[date_retour_rh_col] - df_filtered[date_reception_col]).dt.days
+        if date_reception_col in df_filtered.columns and date_reponse_col in df_filtered.columns:
+            df_filtered['Duree de recrutement'] = (df_filtered[date_reponse_col] - df_filtered[date_reception_col]).dt.days
             delai_moyen = df_filtered['Duree de recrutement'].mean()
 
             if not pd.isna(delai_moyen):
                 fig_delai = go.Figure(go.Indicator(
                     mode = "number",
-                    value = round(delai_moyen, 1),
+                    value = delai_moyen,
                     title = {"text": "Délai moyen de recrutement (jours)"}
                 ))
                 fig_delai.update_layout(height=300)
@@ -619,7 +487,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             else:
                 st.info("Le calcul du délai moyen de recrutement n'est pas disponible.")
         else:
-            st.warning(f"Colonnes nécessaires non trouvées: '{date_reception_col}' et '{date_retour_rh_col}'")
+            st.warning("Colonnes de date nécessaires pour le calcul du délai non trouvées.")
 
 
 def create_demandes_recrutement_tab(df_recrutement, global_filters):
@@ -630,17 +498,6 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
     
     # Colonne de date pour les calculs
     date_col = 'Date de réception de la demande aprés validation de la DRH'
-    
-    # Appliquer le filtre de période de demande si disponible
-    try:
-        if 'nav_dem_annee' in st.session_state and st.session_state['nav_dem_annee'] != 'Toutes':
-            if date_col in df_filtered.columns:
-                df_filtered_temp = df_filtered.copy()
-                df_filtered_temp['Année_demande_temp'] = df_filtered_temp[date_col].dt.year
-                df_filtered = df_filtered_temp[df_filtered_temp['Année_demande_temp'] == st.session_state['nav_dem_annee']]
-    except Exception as e:
-        # En cas d'erreur, continuer sans filtrage de période
-        pass
     
     # KPIs principaux - Indicateurs de demandes sur la même ligne
     col1, col2, col3, col4 = st.columns(4)
@@ -767,15 +624,13 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         fig_direction.update_traces(
             marker_color='#ff7f0e', 
             textposition='inside',
-            textfont=dict(color='white', size=12),
             hovertemplate='%{y}<extra></extra>'
         )
         fig_direction.update_layout(
             height=400, 
             xaxis_title=None, 
             yaxis_title=None,
-            xaxis={'categoryorder':'total descending'},
-            xaxis_tickangle=-45
+            xaxis={'categoryorder':'total descending'}
         )
         st.plotly_chart(fig_direction, use_container_width=True)
     
@@ -792,15 +647,13 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         fig_poste.update_traces(
             marker_color='#2ca02c', 
             textposition='inside',
-            textfont=dict(color='white', size=12),
             hovertemplate='%{y}<extra></extra>'
         )
         fig_poste.update_layout(
             height=400, 
             xaxis_title=None, 
             yaxis_title=None,
-            xaxis={'categoryorder':'total descending'},
-            xaxis_tickangle=-45
+            xaxis={'categoryorder':'total descending'}
         )
         st.plotly_chart(fig_poste, use_container_width=True)
 
@@ -848,39 +701,9 @@ def create_integrations_tab(df_recrutement, global_filters):
     # Graphiques
     col1, col2 = st.columns(2)
 
+    # Graphique par affectation supprimé sur demande. On laisse une zone d'information minimale.
     with col1:
-        # Répartition par Affectation - Réactivé
-        if 'Affectation' in df_filtered.columns:
-            affectation_counts = df_filtered['Affectation'].value_counts()
-            fig_affectation = px.pie(
-                values=affectation_counts.values,
-                names=affectation_counts.index,
-                title="📍 Répartition par Affectation",
-                hole=0.4
-            )
-            fig_affectation.update_layout(height=400)
-            st.plotly_chart(fig_affectation, use_container_width=True)
-        else:
-            # Essayer avec d'autres colonnes possibles
-            possible_cols = ['Lieu', 'Site', 'Entité demandeuse', 'Direction concernée']
-            affectation_col = None
-            for col in possible_cols:
-                if col in df_filtered.columns:
-                    affectation_col = col
-                    break
-            
-            if affectation_col:
-                affectation_counts = df_filtered[affectation_col].value_counts()
-                fig_affectation = px.pie(
-                    values=affectation_counts.values,
-                    names=affectation_counts.index,
-                    title=f"📍 Répartition par {affectation_col}",
-                    hole=0.4
-                )
-                fig_affectation.update_layout(height=400)
-                st.plotly_chart(fig_affectation, use_container_width=True)
-            else:
-                st.info("Colonne 'Affectation' non trouvée. Graphique non disponible.")
+        st.info("Graphique 'Répartition par Affectation' désactivé.")
 
     with col2:
         # Évolution des dates d'intégration prévues
@@ -1002,8 +825,8 @@ def calculate_weekly_metrics(df_recrutement):
     start_of_last_week = start_of_week - timedelta(days=7)   # Lundi de la semaine dernière
     
     # Définir les colonnes attendues avec des alternatives possibles
-    date_reception_col = "Date de réception de la demande aprés validation de la DRH"  # Corrigé avec l'accent
-    date_integration_col = "Date d'entrée prévisionnelle"  # Corrigé selon vos données
+    date_reception_col = "Date de réception de la demande après validation de la DRH"
+    date_integration_col = "Date d'intégration prévisionnelle"
     candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
     statut_col = "Statut de la demande"
     entite_col = "Entité demandeuse"
@@ -1538,65 +1361,40 @@ def main():
                         help="Synchroniser les données depuis Google Sheets",
                         use_container_width=True):
                 
-                with st.spinner("Synchronisation en cours..."):
-                    try:
-                        # Utiliser la fonction de connexion automatique (comme dans Home.py)
-                        df_synced = load_data_from_google_sheets(gs_url)
+                try:
+                    # Utiliser la fonction de connexion automatique (comme dans Home.py)
+                    df_synced = load_data_from_google_sheets(gs_url)
+                    
+                    if df_synced is not None and len(df_synced) > 0:
+                        st.session_state.synced_recrutement_df = df_synced
+                        st.session_state.data_updated = True
+                        nb_lignes = len(df_synced)
+                        nb_colonnes = len(df_synced.columns)
+                        st.success(f"✅ Synchronisation Google Sheets réussie ! Les onglets ont été mis à jour. ({nb_lignes} lignes, {nb_colonnes} colonnes)")
+                    else:
+                        st.warning("⚠️ Aucune donnée trouvée dans la feuille Google Sheets.")
                         
-                        if df_synced is not None and len(df_synced) > 0:
-                            # Afficher d'abord les colonnes brutes pour diagnostic
-                            st.info("🔍 **Colonnes détectées dans Google Sheets :**")
-                            st.write(f"Colonnes brutes: {list(df_synced.columns)}")
-                            
-                            # Traiter les données avec la fonction mise en cache
-                            df_processed = process_recruitment_data(df_synced)
-                            
-                            if df_processed is not None:
-                                st.info("✅ **Colonnes après normalisation :**")
-                                st.write(f"Colonnes finales: {list(df_processed.columns)}")
-                                
-                                # Vérifier les colonnes critiques
-                                required_cols = ['Statut de la demande', 'Poste demandé', 'Direction concernée', 'Entité demandeuse']
-                                missing_cols = [col for col in required_cols if col not in df_processed.columns]
-                                
-                                if missing_cols:
-                                    st.error(f"❌ Colonnes critiques manquantes après normalisation: {missing_cols}")
-                                else:
-                                    st.session_state.synced_recrutement_df = df_processed
-                                    st.session_state.data_updated = True
-                                    # Nettoyer le cache des options de filtres pour forcer la mise à jour
-                                    get_filter_options.clear()
-                                    nb_lignes = len(df_processed)
-                                    nb_colonnes = len(df_processed.columns)
-                                    st.success(f"✅ Synchronisation Google Sheets réussie ! Les onglets ont été mis à jour. ({nb_lignes} lignes, {nb_colonnes} colonnes)")
-                                    # Éviter le rechargement immédiat complet
-                                    st.rerun()
-                            else:
-                                st.error("❌ Erreur lors du traitement des données synchronisées")
-                        else:
-                            st.warning("⚠️ Aucune donnée trouvée dans la feuille Google Sheets.")
-                            
-                    except Exception as e:
-                        err_str = str(e)
-                        st.error(f"Erreur lors de la synchronisation: {err_str}")
-                        
-                        if '401' in err_str or 'Unauthorized' in err_str or 'HTTP Error 401' in err_str:
-                            st.error("❌ **Feuille Google privée** - Vérifiez que:")
-                            st.markdown("""
-                            1. La feuille est partagée avec: `your-service-account@your-project.iam.gserviceaccount.com`
-                            2. Les secrets Streamlit sont correctement configurés
-                            3. L'URL de la feuille est correcte
-                            """)
-                        elif 'secrets' in err_str.lower():
-                            st.error("❌ **Configuration des secrets manquante**")
-                            st.markdown("""
-                            Assurez-vous que les secrets suivants sont configurés:
-                            - `GCP_TYPE`, `GCP_PROJECT_ID`, `GCP_PRIVATE_KEY_ID`
-                            - `GCP_PRIVATE_KEY`, `GCP_CLIENT_EMAIL`, `GCP_CLIENT_ID`
-                            - `GCP_AUTH_URI`, `GCP_TOKEN_URI`, etc.
-                            """)
-                        else:
-                            st.error(f"Erreur technique: {err_str}")
+                except Exception as e:
+                    err_str = str(e)
+                    st.error(f"Erreur lors de la synchronisation: {err_str}")
+                    
+                    if '401' in err_str or 'Unauthorized' in err_str or 'HTTP Error 401' in err_str:
+                        st.error("❌ **Feuille Google privée** - Vérifiez que:")
+                        st.markdown("""
+                        1. La feuille est partagée avec: `your-service-account@your-project.iam.gserviceaccount.com`
+                        2. Les secrets Streamlit sont correctement configurés
+                        3. L'URL de la feuille est correcte
+                        """)
+                    elif 'secrets' in err_str.lower():
+                        st.error("❌ **Configuration des secrets manquante**")
+                        st.markdown("""
+                        Assurez-vous que les secrets suivants sont configurés:
+                        - `GCP_TYPE`, `GCP_PROJECT_ID`, `GCP_PRIVATE_KEY_ID`
+                        - `GCP_PRIVATE_KEY`, `GCP_CLIENT_EMAIL`, `GCP_CLIENT_ID`
+                        - `GCP_AUTH_URI`, `GCP_TOKEN_URI`, etc.
+                        """)
+                    else:
+                        st.error(f"Erreur technique: {err_str}")
 
         with col2:
             st.subheader("📊 Fichier Excel - Données de Recrutement")
