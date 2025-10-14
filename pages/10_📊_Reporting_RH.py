@@ -211,6 +211,12 @@ def load_data_from_files(csv_file=None, excel_file=None):
             
             # Nettoyer les colonnes avec des espaces
             df_recrutement.columns = df_recrutement.columns.str.strip()
+            
+            # Nettoyer les colonnes numériques pour éviter les erreurs de type
+            numeric_columns = ['Nb de candidats pré-selectionnés']
+            for col in numeric_columns:
+                if col in df_recrutement.columns:
+                    df_recrutement[col] = pd.to_numeric(df_recrutement[col], errors='coerce').fillna(0)
 
             # Vérification basique des colonnes critiques et message dans les logs
             required_cols = [
@@ -396,13 +402,19 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
     col5, col6 = st.columns(2)
 
     with col5:
-        # Nombre de candidats présélectionnés
-        total_candidats = int(df_filtered['Nb de candidats pré-selectionnés'].sum())
+        # Nombre de candidats présélectionnés - avec conversion sécurisée
+        try:
+            # Convertir les valeurs en numérique, remplacer les erreurs par 0
+            candidats_series = pd.to_numeric(df_filtered['Nb de candidats pré-selectionnés'], errors='coerce').fillna(0)
+            total_candidats = int(candidats_series.sum())
+        except (KeyError, ValueError):
+            total_candidats = 0
+            
         fig_candidats = go.Figure(go.Indicator(
             mode = "gauge+number",
             value = total_candidats,
             title = {'text': "Nombre de candidats présélectionnés"},
-            gauge = {'axis': {'range': [None, total_candidats * 2]},
+            gauge = {'axis': {'range': [None, max(total_candidats * 2, 100)]},
                      'bar': {'color': "green"},
                     }))
         fig_candidats.update_layout(height=300)

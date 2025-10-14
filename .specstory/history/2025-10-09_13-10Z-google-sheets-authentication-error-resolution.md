@@ -72,7 +72,7 @@ Le code est maintenant **committed et pushé** avec une authentification Google 
 
 ---
 
-_**User (2025-10-14 14:19Z)**_
+_**User (2025-10-14 14:21Z)**_
 
 je veux pas uploadé un fichier json que se connecter directement à la feuille pour récupérer les données, sur la page Home.py j'ai la même logique pour afficher le tableau kanban
 
@@ -80,7 +80,105 @@ je veux pas uploadé un fichier json que se connecter directement à la feuille 
 
 _**Assistant (copilot/claude-sonnet-4)**_
 
-Je comprends ! Vous voulez une connexion directe sans avoir à uploader un fichier JSON à chaque fois. Regardons d'abord comment c'est implémenté dans `Home.py` pour reproduire la même logique. 
+Je comprends ! Vous voulez une connexion directe sans avoir à uploader un fichier JSON à chaque fois. Regardons d'abord comment c'est implémenté dans `Home.py` pour reproduire la même logique. Parfait ! Je vois que dans `Home.py`, vous utilisez `st.secrets` pour stocker les credentials du service account. C'est une approche bien plus propre. Cherchons la logique pour les données de recrutement : Je vois le principe. Maintenant, regardons s'il y a une logique spécifique pour charger les données de recrutement depuis Google Sheets dans `Home.py`. Je vais chercher les URLs des sheets de recrutement : Je vais maintenant adapter la logique de `Home.py` pour votre page de reporting. Je vais créer une fonction similaire qui utilise les secrets Streamlit pour l'authentification automatique : 
+```
+
+```
+Je vais corriger cette erreur et adapter la logique pour utiliser les secrets Streamlit comme dans `Home.py` : 
+```
+
+```
+Maintenant, simplifions l'interface utilisateur pour qu'elle se connecte automatiquement sans upload de fichier : 
+```
+
+```
+Vérifions que le code est syntaxiquement correct : Parfait ! Maintenant commitons et pushons les changements : ✅ **Parfait ! Authentification automatique implémentée !**
+
+## 🔄 **Ce qui a été modifié :**
+
+### **Avant :**
+- Upload manuel d'un fichier JSON à chaque synchronisation
+- Interface complexe avec gestion d'erreurs pour l'upload
+- Processus en deux étapes : upload du fichier → synchronisation
+
+### **Après :**
+- **Connexion automatique** comme dans `Home.py`
+- Utilisation des **secrets Streamlit** (même logique que votre tableau Kanban)
+- **Interface simplifiée** : juste l'URL + bouton "Synchroniser"
+- **Authentification transparente** via `get_gsheet_client()`
+
+## 🛠️ **Fonctionnement :**
+
+1. **Secrets Streamlit** : Utilise automatiquement vos credentials configurés
+2. **Cache efficace** : `@st.cache_resource` évite les reconnexions inutiles
+3. **Fallback intelligent** : Si l'auth échoue, essaie l'export CSV public
+4. **Gestion d'erreurs** : Messages clairs pour diagnostiquer les problèmes
+
+## ✨ **Maintenant vous pouvez :**
+
+- **Saisir simplement l'URL** de votre Google Sheet
+- **Cliquer sur "Synchroniser"** → connexion automatique
+- **Pas besoin d'upload** de fichier JSON à chaque fois
+- **Même expérience** que votre page d'accueil avec le Kanban
+
+Le système utilise exactement la même logique d'authentification que votre `Home.py` ! 🚀
+
+---
+
+_**User (2025-10-14 14:25Z)**_
+
+ca marche j'ai réeçu un message de réussite en vert mais j'ai reçu également cette erreur : TypeError: This app has encountered an error. The original error message is redacted to prevent data leaks. Full error details have been recorded in the logs (if you're on Streamlit Cloud, click on 'Manage app' in the lower right of your app).
+Traceback:
+File "/mount/src/tg_hire/pages/10_📊_Reporting_RH.py", line 1348, in <module>
+    main()
+    ~~~~^^
+File "/mount/src/tg_hire/pages/10_📊_Reporting_RH.py", line 1330, in main
+    create_demandes_recrutement_combined_tab(df_recrutement)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^
+File "/mount/src/tg_hire/pages/10_📊_Reporting_RH.py", line 692, in create_demandes_recrutement_combined_tab
+    create_recrutements_clotures_tab(df_recrutement, global_filters)
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/mount/src/tg_hire/pages/10_📊_Reporting_RH.py", line 400, in create_recrutements_clotures_tab
+    total_candidats = int(df_filtered['Nb de candidats pré-selectionnés'].sum())
+                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+File "/home/adminuser/venv/lib/python3.13/site-packages/pandas/core/series.py", line 6549, in sum
+    return NDFrame.sum(self, axis, skipna, numeric_only, min_count, **kwargs)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/adminuser/venv/lib/python3.13/site-packages/pandas/core/generic.py", line 12571, in sum
+    return self._min_count_stat_function(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        "sum", nanops.nansum, axis, skipna, numeric_only, min_count, **kwargs
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+File "/home/adminuser/venv/lib/python3.13/site-packages/pandas/core/generic.py", line 12554, in _min_count_stat_function
+    return self._reduce(
+           ~~~~~~~~~~~~^
+        func,
+        ^^^^^
+    ...<4 lines>...
+        min_count=min_count,
+        ^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+File "/home/adminuser/venv/lib/python3.13/site-packages/pandas/core/series.py", line 6478, in _reduce
+    return op(delegate, skipna=skipna, **kwds)
+File "/home/adminuser/venv/lib/python3.13/site-packages/pandas/core/nanops.py", line 85, in _f
+    return f(*args, **kwargs)
+File "/home/adminuser/venv/lib/python3.13/site-packages/pandas/core/nanops.py", line 404, in new_func
+    result = func(values, axis=axis, skipna=skipna, mask=mask, **kwargs)
+File "/home/adminuser/venv/lib/python3.13/site-packages/pandas/core/nanops.py", line 477, in newfunc
+    return func(values, axis=axis, **kwargs)
+File "/home/adminuser/venv/lib/python3.13/site-packages/pandas/core/nanops.py", line 646, in nansum
+    the_sum = values.sum(axis, dtype=dtype_sum)
+File "/home/adminuser/venv/lib/python3.13/site-packages/numpy/_core/_methods.py", line 51, in _sum
+    return umr_sum(a, axis, dtype, out, keepdims, initial, where)
+
+---
+
+_**Assistant (copilot/claude-sonnet-4)**_
+
+
 
 ---
 
