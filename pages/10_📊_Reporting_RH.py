@@ -794,13 +794,13 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         )
         # Dynamic height so long lists become scrollable on the page
         height_dir = max(300, 28 * len(df_direction))
-        # Ensure largest values appear on top by reversing the category array
-        category_array_dir = list(df_direction['Direction'][::-1])
+        # Ensure largest values appear on top by reversing the truncated label array
+        category_array_dir = list(df_direction['Label_trunc'][::-1])
         fig_direction.update_layout(
             height=height_dir,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=180, t=40, b=30, r=20),
+            margin=dict(l=240, t=40, b=30, r=20),
             yaxis=dict(automargin=True, tickfont=dict(size=11), categoryorder='array', categoryarray=category_array_dir)
         )
         # Render inside the column so the two charts are on the same row and the component width matches the column
@@ -830,12 +830,12 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         height_poste = max(300, 28 * len(df_poste))
-        category_array_poste = list(df_poste['Poste'][::-1])
+        category_array_poste = list(df_poste['Label_trunc'][::-1])
         fig_poste.update_layout(
             height=height_poste,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=180, t=40, b=30, r=20),
+            margin=dict(l=240, t=40, b=30, r=20),
             yaxis=dict(automargin=True, tickfont=dict(size=11), categoryorder='array', categoryarray=category_array_poste)
         )
         render_plotly_scrollable(fig_poste, max_height=320)
