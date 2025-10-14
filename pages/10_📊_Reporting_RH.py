@@ -88,11 +88,13 @@ def _parse_mixed_dates(series):
 
 
 def render_kpi_cards(recrutements, postes, directions, delai_display, delai_help=None):
-        """Render a single-row set of KPI cards (inline, bordered with colored left stripe).
+    """Render a single-row set of KPI cards (inline, bordered with colored left stripe).
 
-        Cards: [Nombre de recrutements] [Postes concernés] [Directions concernées] [Délai moyen]
-        """
-        css = """
+    Cards: [Nombre de recrutements] [Postes concernés] [Directions concernées] [Délai moyen]
+    Returns an HTML string ready to be inserted with st.markdown(..., unsafe_allow_html=True)
+    """
+
+    css = """
 <style>
 .kpi-row{display:flex;gap:12px;flex-wrap:nowrap;align-items:stretch;margin-bottom:12px}
 .kpi-card{flex:1 1 0;background:#fff;border-radius:6px;padding:12px;display:flex;flex-direction:column;justify-content:center;border:1px solid #e6eef6}
@@ -107,7 +109,7 @@ def render_kpi_cards(recrutements, postes, directions, delai_display, delai_help
 </style>
 """
 
-        html = f"""
+    html = f"""
 {css}
 <div class='kpi-row'>
     <div class='kpi-card kpi-accent' style='flex:2'>
@@ -119,114 +121,18 @@ def render_kpi_cards(recrutements, postes, directions, delai_display, delai_help
         <div class='value'>{postes:,}</div>
     </div>
     <div class='kpi-card kpi-orange'>
-        <div class='title'>Nombre de Directions concernées</div>
+        <div class='title'>Directions concernées</div>
         <div class='value'>{directions:,}</div>
     </div>
     <div class='kpi-card kpi-purple'>
-        <div class='title'>Délai moyen recrutement (jours)</div>
+        <div class='title'>Délai moyen (jours)</div>
         <div class='value'>{delai_display}</div>
+        <div class='kpi-help'>{delai_help or ''}</div>
     </div>
 </div>
 """
 
-        st.markdown(html, unsafe_allow_html=True)
-
-
-def render_kpi_row_generic(items):
-    """Render a single-row set of KPI cards from a list of items.
-
-    items: list of dicts {"title": str, "value": str/int, "color": "accent|green|orange|purple"}
-    """
-    css = """
-<style>
-.kpi-row{display:flex;gap:12px;flex-wrap:nowrap;align-items:stretch;margin-bottom:12px}
-.kpi-card{flex:1 1 0;background:#fff;border-radius:6px;padding:12px;display:flex;flex-direction:column;justify-content:center;border:1px solid #e6eef6}
-.kpi-card .title{font-size:12px;color:#2c3e50;margin-bottom:6px}
-.kpi-card .value{font-size:22px;font-weight:700;color:#172b4d}
-.kpi-accent{border-left:6px solid #1f77b4}
-.kpi-green{border-left-color:#2ca02c}
-.kpi-orange{border-left-color:#ff7f0e}
-.kpi-purple{border-left-color:#6f42c1}
-@media(max-width:800px){.kpi-row{flex-direction:column}}
-</style>
-"""
-
-    # Default color classes map
-    color_map = {
-        'accent': 'kpi-accent',
-        'green': 'kpi-green',
-        'orange': 'kpi-orange',
-        'purple': 'kpi-purple'
-    }
-
-    html = css + "\n<div class='kpi-row'>\n"
-    for idx, it in enumerate(items):
-        cls = color_map.get(it.get('color', 'accent'), 'kpi-accent')
-        flex_style = "style='flex:2'" if idx == 0 else ''
-        html += f"    <div class='kpi-card {cls}' {flex_style}>\n"
-        html += f"        <div class='title'>{it.get('title','')}</div>\n"
-        value = it.get('value','')
-        # format numbers with thousands separator when possible
-        try:
-            if isinstance(value, (int, float)):
-                value_str = f"{int(value):,}" if float(value).is_integer() else f"{value:,}"
-            else:
-                value_str = str(value)
-        except Exception:
-            value_str = str(value)
-        html += f"        <div class='value'>{value_str}</div>\n"
-        html += "    </div>\n"
-    html += "</div>"
-
-    st.markdown(html, unsafe_allow_html=True)
-
-
-def compute_time_to_hire(df, start_cols=None, end_cols=None, status_col='Statut de la demande', status_value='Clôture', drop_negative=True):
-    """Compute time-to-hire (in days) between a request date and an entry/closure date.
-
-    The function is robust to different column names: it searches for the first
-    available column from start_cols and end_cols lists. By default it targets
-    the project's typical columns.
-
-    Returns a dict with:
-      - start_col, end_col: the columns used
-      - overall: dict(mean, median, std, count)
-      - by_direction: DataFrame with aggregated stats per 'Direction concernée'
-      - by_poste: DataFrame with aggregated stats per 'Poste demandé'
-      - df: filtered DataFrame used for calculations (with time_to_hire_days)
-    
-    Example:
-      stats = compute_time_to_hire(df_recrutement)
-      st.write(stats['overall'])
-      st.dataframe(stats['by_direction'])
-    """
-    if start_cols is None:
-        start_cols = [
-            'Date de réception de la demande aprés validation de la DRH',
-            'Date de réception de la demande après validation de la DRH',
-            'Date de réception de la demande'
-        ]
-    if end_cols is None:
-        end_cols = [
-            "Date d'entrée effective du candidat",
-            "Date d'entrée prévisionnelle",
-            "Date d'entrée effective",
-            'Date de clôture'
-        ]
-
-    # Find first available start and end column
-    start_col = next((c for c in start_cols if c in df.columns), None)
-    end_col = next((c for c in end_cols if c in df.columns), None)
-
-    if start_col is None or end_col is None:
-        return {
-            'start_col': start_col,
-            'end_col': end_col,
-            'overall': None,
-            'by_direction': None,
-            'by_poste': None,
-            'df': pd.DataFrame()
-        }
+    return html
 
     df2 = df.copy()
     df2[start_col] = pd.to_datetime(df2[start_col], errors='coerce')
