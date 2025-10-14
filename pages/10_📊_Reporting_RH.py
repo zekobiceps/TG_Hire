@@ -701,7 +701,16 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         except Exception:
             pass
 
-    render_kpi_cards(recrutements, postes_uniques, directions_uniques, delai_display, delai_help)
+    # Revert to simple metrics (no bordered-card styling) in the Recrutements Clôturés section
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Nombre de recrutements", recrutements)
+    with col2:
+        st.metric("Postes concernés", postes_uniques)
+    with col3:
+        st.metric("Nombre de Directions concernées", directions_uniques)
+    with col4:
+        st.metric("Délai moyen recrutement (jours)", delai_display)
     
     # Graphiques en ligne 1
     col1, col2 = st.columns([2,1])
@@ -1611,12 +1620,12 @@ def create_weekly_report_tab(df_recrutement=None):
         html_table += f'<td>{total_row["Nb postes en cours cette semaine"].replace("**", "")}</td>'
         html_table += '</tr>'
         html_table += '</tbody></table></div>'
-        
-    # Afficher le tableau HTML centralisé
-    st.markdown(html_table, unsafe_allow_html=True)
-        
-    # Tableau par défaut HTML compact et centralisé
-    default_html = """
+
+        # Afficher le tableau HTML centralisé (si des metrics existent)
+        st.markdown(html_table, unsafe_allow_html=True)
+    else:
+        # Tableau par défaut HTML compact et centralisé (affiché uniquement si aucune donnée réelle)
+        default_html = """
 <div class="table-container">
     <table class="custom-table">
         <thead>
@@ -1654,7 +1663,7 @@ def create_weekly_report_tab(df_recrutement=None):
     </table>
 </div>
 """
-    st.markdown(default_html, unsafe_allow_html=True)
+        st.markdown(default_html, unsafe_allow_html=True)
 
     st.markdown("---")
 
