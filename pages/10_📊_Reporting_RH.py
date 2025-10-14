@@ -508,6 +508,9 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         df_direction = df_direction.sort_values('Count', ascending=False)
         # Truncate long labels for readability, keep full label in customdata for hover
         df_direction['Label_trunc'] = df_direction['Direction'].apply(lambda s: _truncate_label(s, max_len=24))
+        # Ensure a display label exists (truncated + small gap) to be used for axis and ordering
+        if 'Label_display' not in df_direction.columns:
+            df_direction['Label_display'] = df_direction['Label_trunc'] + '\u00A0\u00A0'
         # Add two non-breaking spaces to create visual gap between label and bar
         df_direction['Label_display'] = df_direction['Label_trunc'] + '\u00A0\u00A0'
         fig_direction = px.bar(
@@ -545,6 +548,8 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         df_poste = poste_counts.rename_axis('Poste').reset_index(name='Count')
         df_poste = df_poste.sort_values('Count', ascending=False)
         df_poste['Label_trunc'] = df_poste['Poste'].apply(lambda s: _truncate_label(s, max_len=24))
+        if 'Label_display' not in df_poste.columns:
+            df_poste['Label_display'] = df_poste['Label_trunc'] + '\u00A0\u00A0'
         df_poste['Label_display'] = df_poste['Label_trunc'] + '\u00A0\u00A0'
         fig_poste = px.bar(
             df_poste,
