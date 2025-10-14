@@ -1438,7 +1438,12 @@ def calculate_weekly_metrics(df_recrutement):
     else:
         real_date_integration_col = None
     if real_accept_col and real_accept_col in df.columns:
-        df[real_accept_col] = pd.to_datetime(df[real_accept_col], errors='coerce')
+        # Use robust mixed-date parser (handles Excel serials and mixed formats)
+        try:
+            df[real_accept_col] = _parse_mixed_dates(df[real_accept_col])
+        except Exception:
+            # Last-resort fallback
+            df[real_accept_col] = pd.to_datetime(df[real_accept_col], errors='coerce')
     else:
         real_accept_col = None
 
