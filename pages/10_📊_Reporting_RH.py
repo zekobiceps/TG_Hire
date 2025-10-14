@@ -39,6 +39,97 @@ def _truncate_label(label: str, max_len: int = 20) -> str:
 TITLE_FONT = dict(family="Arial, sans-serif", size=16, color="#111111", )
 
 
+def compute_time_to_hire(df, start_cols=None, end_cols=None, status_col='Statut de la demande', status_value='Clôture', drop_negative=True):
+    """Compute time-to-hire (in days) between a request date and an entry/closure date.
+
+    The function is robust to different column names: it searches for the first
+    available column from start_cols and end_cols lists. By default it targets
+    the project's typical columns.
+
+    Returns a dict with:
+      - start_col, end_col: the columns used
+      - overall: dict(mean, median, std, count)
+      - by_direction: DataFrame with aggregated stats per 'Direction concernée'
+      - by_poste: DataFrame with aggregated stats per 'Poste demandé'
+      - df: filtered DataFrame used for calculations (with time_to_hire_days)
+    
+    Example:
+      stats = compute_time_to_hire(df_recrutement)
+      st.write(stats['overall'])
+      st.dataframe(stats['by_direction'])
+    """
+    if start_cols is None:
+        start_cols = [
+            'Date de réception de la demande aprés validation de la DRH',
+            'Date de réception de la demande après validation de la DRH',
+            'Date de réception de la demande'
+        ]
+    if end_cols is None:
+        end_cols = [
+            "Date d'entrée effective du candidat",
+            "Date d'entrée prévisionnelle",
+            "Date d'entrée effective",
+            'Date de clôture'
+        ]
+
+    # Find first available start and end column
+    start_col = next((c for c in start_cols if c in df.columns), None)
+    end_col = next((c for c in end_cols if c in df.columns), None)
+
+    if start_col is None or end_col is None:
+        return {
+            'start_col': start_col,
+            'end_col': end_col,
+            'overall': None,
+            'by_direction': None,
+            'by_poste': None,
+            'df': pd.DataFrame()
+        }
+
+    df2 = df.copy()
+    df2[start_col] = pd.to_datetime(df2[start_col], errors='coerce')
+    df2[end_col] = pd.to_datetime(df2[end_col], errors='coerce')
+
+    # Optionally filter to a specific status (e.g., 'Clôture') if the column exists
+    if status_col in df2.columns and status_value is not None:
+        df2 = df2[df2[status_col] == status_value].copy()
+
+    # Compute delta in days
+    df2['time_to_hire_days'] = (df2[end_col] - df2[start_col]).dt.days
+
+    if drop_negative:
+        df2 = df2[df2['time_to_hire_days'].notna() & (df2['time_to_hire_days'] >= 0)].copy()
+    else:
+        df2 = df2[df2['time_to_hire_days'].notna()].copy()
+
+    if df2.empty:
+        overall = None
+    else:
+        overall = {
+            'mean': float(df2['time_to_hire_days'].mean()),
+            'median': float(df2['time_to_hire_days'].median()),
+            'std': float(df2['time_to_hire_days'].std()),
+            'count': int(df2['time_to_hire_days'].count())
+        }
+
+    # Grouped aggregates
+    by_direction = None
+    by_poste = None
+    if 'Direction concernée' in df2.columns:
+        by_direction = df2.groupby('Direction concernée')['time_to_hire_days'].agg(['count', 'mean', 'median', 'std']).reset_index().sort_values('mean')
+    if 'Poste demandé' in df2.columns:
+        by_poste = df2.groupby('Poste demandé')['time_to_hire_days'].agg(['count', 'mean', 'median', 'std']).reset_index().sort_values('mean')
+
+    return {
+        'start_col': start_col,
+        'end_col': end_col,
+        'overall': overall,
+        'by_direction': by_direction,
+        'by_poste': by_poste,
+        'df': df2
+    }
+
+
 # CSS pour styliser le bouton Google Sheets en rouge vif
 st.markdown("""
 <style>
