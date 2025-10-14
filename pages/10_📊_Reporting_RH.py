@@ -1587,31 +1587,264 @@ def create_weekly_report_tab(df_recrutement=None):
 
     st.markdown("---")
 
-    # Tableau récapitulatif par entité
+    # Tableau récapitulatif par entité (HTML personnalisé, rendu centralisé)
     st.subheader("📊 Besoins en Cours par Entité")
-    if metrics:
-        rows = []
-        for ent, vals in metrics.items():
-            rows.append({
-                'Entité': ent,
-                'Avant (semaine précédente)': vals.get('avant', 0),
-                'Nouveaux (cette semaine)': vals.get('nouveaux', 0),
-                'Pourvus (cette semaine)': vals.get('pourvus', 0),
-                'En cours (cette semaine)': vals.get('en_cours', 0)
+    if metrics and len(metrics) > 0:
+        # Préparer les données pour le HTML
+        table_data = []
+        for entite, data in metrics.items():
+            table_data.append({
+                'Entité': entite,
+                'Nb postes ouverts avant début semaine': data['avant'] if data['avant'] > 0 else '-',
+                'Nb nouveaux postes ouverts cette semaine': data['nouveaux'] if data['nouveaux'] > 0 else '-',
+                'Nb postes pourvus cette semaine': data['pourvus'] if data['pourvus'] > 0 else '-',
+                'Nb postes en cours cette semaine': data['en_cours'] if data['en_cours'] > 0 else '-'
             })
-        df_table = pd.DataFrame(rows)
-        # Ajouter ligne total (utiliser pd.concat plutôt que DataFrame.append qui est déprécié)
-        total_row = pd.DataFrame([{
-            'Entité': 'TOTAL',
-            'Avant (semaine précédente)': total_avant,
-            'Nouveaux (cette semaine)': total_nouveaux,
-            'Pourvus (cette semaine)': total_pourvus,
-            'En cours (cette semaine)': total_en_cours
-        }])
-        df_table = pd.concat([df_table, total_row], ignore_index=True)
-        st.dataframe(df_table, use_container_width=True)
+
+        # Ajouter la ligne de total
+        table_data.append({
+            'Entité': '**Total**',
+            'Nb postes ouverts avant début semaine': f'**{total_avant}**',
+            'Nb nouveaux postes ouverts cette semaine': f'**{total_nouveaux}**',
+            'Nb postes pourvus cette semaine': f'**{total_pourvus}**',
+            'Nb postes en cours cette semaine': f'**{total_en_cours}**'
+        })
+
+        # HTML + CSS (repris de la version précédente)
+        st.markdown("""
+        <style>
+        .table-container {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            margin: 15px 0;
+        }
+        .custom-table {
+            border-collapse: collapse;
+            font-family: Arial, sans-serif;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        .custom-table th {
+            background-color: #DC143C !important; /* Rouge vif */
+            color: white !important;
+            font-weight: bold !important;
+            text-align: center !important;
+            padding: 8px 6px !important;
+            border: 1px solid white !important;
+            font-size: 0.8em;
+            line-height: 1.2;
+        }
+        .custom-table td {
+            text-align: center !important;
+            padding: 6px 4px !important;
+            border: 1px solid #ddd !important;
+            background-color: white !important;
+            font-size: 0.75em;
+            line-height: 1.1;
+        }
+        .custom-table .entity-cell {
+            text-align: left !important;
+            padding-left: 10px !important;
+            font-weight: 500;
+            min-width: 120px;
+        }
+        .custom-table .total-row {
+            background-color: #DC143C !important; /* Rouge vif */
+            color: white !important;
+            font-weight: bold !important;
+            border-top: 2px solid #DC143C !important;
+        }
+        .custom-table .total-row .entity-cell {
+            text-align: left !important;
+            padding-left: 10px !important;
+            font-weight: bold !important;
+        }
+        .custom-table .total-row td {
+            background-color: #DC143C !important; /* Assurer le fond rouge sur chaque cellule */
+            color: white !important; /* Assurer le texte blanc */
+            font-size: 0.8em !important;
+            font-weight: bold !important;
+            border: 1px solid #DC143C !important; /* Bordures rouges */
+        }
+        .custom-table .total-row .entity-cell {
+            text-align: left !important;
+            padding-left: 10px !important;
+            font-weight: bold !important;
+            background-color: #DC143C !important; /* Fond rouge pour la cellule entité */
+            color: white !important; /* Texte blanc pour la cellule entité */
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # Construire le tableau HTML
+        html_table = '<div class="table-container">'
+        html_table += '<table class="custom-table">'
+        html_table += '<thead><tr>'
+        html_table += '<th>Entité</th>'
+        html_table += '<th>Nb postes ouverts avant début semaine</th>'
+        html_table += '<th>Nb nouveaux postes ouverts cette semaine</th>'
+        html_table += '<th>Nb postes pourvus cette semaine</th>'
+        html_table += '<th>Nb postes en cours cette semaine</th>'
+        html_table += '</tr></thead>'
+        html_table += '<tbody>'
+
+        # Ajouter les lignes de données (toutes sauf la dernière qui est TOTAL)
+        data_rows = [row for row in table_data[:-1] if row["Entité"] and row["Entité"].strip()]
+        for row in data_rows:
+            html_table += '<tr>'
+            html_table += f'<td class="entity-cell">{row["Entité"]}</td>'
+            html_table += f'<td>{row["Nb postes ouverts avant début semaine"]}</td>'
+            html_table += f'<td>{row["Nb nouveaux postes ouverts cette semaine"]}</td>'
+            html_table += f'<td>{row["Nb postes pourvus cette semaine"]}</td>'
+            html_table += f'<td>{row["Nb postes en cours cette semaine"]}</td>'
+            html_table += '</tr>'
+
+        # Ligne TOTAL (la dernière)
+        total_row = table_data[-1]
+        html_table += '<tr class="total-row">'
+        html_table += f'<td class="entity-cell">TOTAL</td>'
+        html_table += f'<td>{total_row["Nb postes ouverts avant début semaine"].replace("**", "")}</td>'
+        html_table += f'<td>{total_row["Nb nouveaux postes ouverts cette semaine"].replace("**", "")}</td>'
+        html_table += f'<td>{total_row["Nb postes pourvus cette semaine"].replace("**", "")}</td>'
+        html_table += f'<td>{total_row["Nb postes en cours cette semaine"].replace("**", "")}</td>'
+        html_table += '</tr>'
+        html_table += '</tbody></table></div>'
+
+        st.markdown(html_table, unsafe_allow_html=True)
     else:
-        st.info("Aucune métrique hebdomadaire disponible — chargez un fichier Excel ou synchronisez depuis Google Sheets.")
+        # Affichage par défaut si pas de metrics
+        default_html = """
+<div class="table-container">
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Entité</th>
+                <th>Nb postes ouverts avant début semaine</th>
+                <th>Nb nouveaux postes ouverts cette semaine</th>
+                <th>Nb postes pourvus cette semaine</th>
+                <th>Nb postes en cours cette semaine</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="entity-cell">TGCC</td>
+                <td>19</td>
+                <td>12</td>
+                <td>5</td>
+                <td>26</td>
+            </tr>
+            <tr>
+                <td class="entity-cell">TGEM</td>
+                <td>2</td>
+                <td>2</td>
+                <td>0</td>
+                <td>4</td>
+            </tr>
+            <tr class="total-row">
+                <td class="entity-cell">TOTAL</td>
+                <td>21</td>
+                <td>14</td>
+                <td>5</td>
+                <td>30</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+"""
+        st.markdown(default_html, unsafe_allow_html=True)
+
+    # Section Debug (expandable): montrer les lignes et pourquoi elles sont comptées
+    with st.expander("🔍 Debug - Détails des lignes (ouvrir/fermer)", expanded=False):
+        try:
+            # Re-créer un DataFrame debug à partir des colonnes détectées dans calculate_weekly_metrics
+            # Réutiliser la logique de détection des colonnes
+            df_debug = df_recrutement.copy() if df_recrutement is not None else pd.DataFrame()
+            if not df_debug.empty:
+                # Attempt to find the columns used earlier
+                cols = df_debug.columns.tolist()
+                # heuristiques similaires
+                def find_col_like(keywords):
+                    for k in keywords:
+                        for c in cols:
+                            if k in c.lower():
+                                return c
+                    return None
+
+                col_entite = find_col_like(['entité', 'entite', 'entité demandeuse', 'entite demandeuse']) or 'Entité demandeuse' if 'Entité demandeuse' in cols else None
+                col_statut = find_col_like(['statut', 'status'])
+                col_candidat = find_col_like(['nom', 'candidat', 'retenu'])
+                col_accept = find_col_like(['acceptation', "date d'acceptation", 'date d accept'])
+                col_reception = find_col_like(['réception', 'reception', 'date de réception', 'date de reception'])
+
+                # Create debug columns
+                rd = st.session_state.get('reporting_date', None)
+                if rd is None:
+                    today = datetime.now()
+                else:
+                    today = rd if isinstance(rd, datetime) else datetime.combine(rd, datetime.min.time())
+                start_of_week = today - timedelta(days=today.weekday())
+
+                debug_rows = []
+                for idx, r in df_debug.iterrows():
+                    ent = r.get(col_entite, '') if col_entite in df_debug.columns else r.get('Entité demandeuse', '')
+                    statut_raw = r.get(col_statut, '') if col_statut in df_debug.columns else r.get('Statut de la demande', '')
+                    candidat_raw = r.get(col_candidat, '') if col_candidat in df_debug.columns else r.get("Nom Prénom du candidat retenu yant accepté la promesse d'embauche", '')
+                    accept_raw = r.get(col_accept, '') if col_accept in df_debug.columns else None
+                    reception_raw = r.get(col_reception, '') if col_reception in df_debug.columns else None
+
+                    # normalize flags
+                    is_candidate = pd.notna(candidat_raw) and str(candidat_raw).strip() != ''
+                    # parse accept date robustly if present
+                    accept_dt = None
+                    if accept_raw is not None and pd.notna(accept_raw):
+                        try:
+                            accept_dt = _parse_mixed_dates(pd.Series([accept_raw]))[0]
+                        except Exception:
+                            try:
+                                accept_dt = pd.to_datetime(accept_raw, errors='coerce')
+                            except:
+                                accept_dt = None
+
+                    has_accept_this_week = False
+                    if accept_dt is not None and not pd.isna(accept_dt):
+                        has_accept_this_week = (accept_dt >= start_of_week) and (accept_dt <= today)
+
+                    import unicodedata as _unicodedata
+                    def _local_norm(x):
+                        if pd.isna(x):
+                            return ''
+                        s = str(x)
+                        s = _unicodedata.normalize('NFKD', s)
+                        s = ''.join(ch for ch in s if not _unicodedata.combining(ch))
+                        return s.lower()
+
+                    status_en_cours = ('en cours' in _local_norm(statut_raw)) or ('encours' in _local_norm(statut_raw))
+
+                    counted_as_pourvu = bool(is_candidate and status_en_cours and has_accept_this_week)
+
+                    debug_rows.append({
+                        'index': idx,
+                        'Entité': ent,
+                        'Statut_raw': statut_raw,
+                        'Candidat_raw': candidat_raw,
+                        'Accept_date_parsed': accept_dt,
+                        'Has_accept_this_week': has_accept_this_week,
+                        'Status_en_cours': status_en_cours,
+                        'Counted_as_pourvu': counted_as_pourvu
+                    })
+
+                df_debug_display = pd.DataFrame(debug_rows)
+                # format dates for readability
+                if 'Accept_date_parsed' in df_debug_display.columns:
+                    df_debug_display['Accept_date_parsed'] = df_debug_display['Accept_date_parsed'].dt.strftime('%d/%m/%Y').fillna('')
+
+                st.dataframe(df_debug_display, use_container_width=True)
+            else:
+                st.info('Aucune donnée pour le debug.')
+        except Exception as e:
+            st.error(f"Erreur lors de la génération du debug: {e}")
 
     st.markdown("---")
 
