@@ -362,7 +362,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         st.metric("Postes concernés", postes_uniques)
     with col3:
         directions_uniques = df_filtered['Direction concernée'].nunique()
-        st.metric("Nombre de Direction con...", directions_uniques)
+        st.metric("Nombre de Directions concernées", directions_uniques)
     
     # Graphiques en ligne 1
     col1, col2 = st.columns([2,1])
@@ -717,6 +717,20 @@ def create_integrations_tab(df_recrutement, global_filters):
     candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
     date_integration_col = "Date d'entrée prévisionnelle"
     
+    # Diagnostic des données disponibles
+    total_en_cours = len(df_recrutement[df_recrutement['Statut de la demande'] == 'En cours'])
+    avec_candidat = len(df_recrutement[
+        (df_recrutement['Statut de la demande'] == 'En cours') &
+        (df_recrutement[candidat_col].notna()) &
+        (df_recrutement[candidat_col].str.strip() != "")
+    ])
+    avec_date_prevue = len(df_recrutement[
+        (df_recrutement['Statut de la demande'] == 'En cours') &
+        (df_recrutement[candidat_col].notna()) &
+        (df_recrutement[candidat_col].str.strip() != "") &
+        (df_recrutement[date_integration_col].notna())
+    ])
+    
     # Critères : Statut "En cours" ET candidat avec nom
     df_integrations = df_recrutement[
         (df_recrutement['Statut de la demande'] == 'En cours') &
@@ -724,8 +738,13 @@ def create_integrations_tab(df_recrutement, global_filters):
         (df_recrutement[candidat_col].str.strip() != "")
     ].copy()
     
+    # Message de diagnostic
+    if total_en_cours > 0:
+        st.info(f"📊 Diagnostic: {total_en_cours} demandes 'En cours' • {avec_candidat} avec candidat nommé • {avec_date_prevue} avec date d'entrée prévue")
+    
     if len(df_integrations) == 0:
         st.warning("Aucune intégration en cours trouvée")
+        st.info("Vérifiez que les demandes ont le statut 'En cours' ET un nom de candidat dans la colonne correspondante.")
         return
     
     # Appliquer les filtres globaux
@@ -800,10 +819,31 @@ def create_integrations_tab(df_recrutement, global_filters):
     if colonnes_disponibles:
         df_display = df_filtered[colonnes_disponibles].copy()
         
-        # Formater la date pour enlever l'heure
+        # Formater la date pour enlever l'heure et s'assurer du bon format DD/MM/YYYY
         if date_integration_col in df_display.columns:
-            df_display[date_integration_col] = pd.to_datetime(df_display[date_integration_col], errors='coerce').dt.strftime('%d/%m/%Y')
-            df_display[date_integration_col] = df_display[date_integration_col].fillna('N/A')
+            # Essayer d'abord le format DD/MM/YYYY puis MM/DD/YYYY si nécessaire
+            def format_date_safely(date_str):
+                if pd.isna(date_str) or date_str == '' or date_str == 'N/A':
+                    return 'N/A'
+                try:
+                    # Essayer format DD/MM/YYYY d'abord (format souhaité)
+                    if isinstance(date_str, str) and '/' in date_str and len(date_str.split('/')) == 3:
+                        day, month, year = date_str.split('/')
+                        if len(day) <= 2 and len(month) <= 2 and len(year) == 4:
+                            parsed_date = pd.to_datetime(f"{day}/{month}/{year}", format='%d/%m/%Y', errors='coerce')
+                            if pd.notna(parsed_date):
+                                return parsed_date.strftime('%d/%m/%Y')
+                    
+                    # Fallback: laisser pandas deviner puis reformater
+                    parsed_date = pd.to_datetime(date_str, errors='coerce')
+                    if pd.notna(parsed_date):
+                        return parsed_date.strftime('%d/%m/%Y')
+                    else:
+                        return 'N/A'
+                except:
+                    return 'N/A'
+            
+            df_display[date_integration_col] = df_display[date_integration_col].apply(format_date_safely)
         
         # Renommer pour affichage plus propre
         df_display = df_display.rename(columns={
@@ -1463,13 +1503,10 @@ def main():
             )
             
             if uploaded_excel is not None:
-                st.success(f"✅ Fichier Excel chargé: {uploaded_excel.name}")
                 # Aperçu des données
                 try:
                     preview_excel = pd.read_excel(uploaded_excel, sheet_name=0)
-                    st.write("**Aperçu des données Excel:**")
-                    st.write(f"- Lignes: {len(preview_excel)}")
-                    st.write(f"- Colonnes: {len(preview_excel.columns)}")
+                    st.success(f"✅ Fichier Excel chargé: {uploaded_excel.name} - {len(preview_excel)} lignes, {len(preview_excel.columns)} colonnes")
                     st.dataframe(preview_excel.head(3), use_container_width=True)
                     # Reset file pointer for later use
                     uploaded_excel.seek(0)
