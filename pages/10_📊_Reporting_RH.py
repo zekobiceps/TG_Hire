@@ -90,6 +90,45 @@ def create_global_filters(df_recrutement, prefix=""):
     with right_col:
         filters['direction'] = st.selectbox("Direction concernée", directions, key=f"{prefix}_direction")
 
+    # Ajouter les filtres de période
+    st.sidebar.markdown("---")
+    left_col2, right_col2 = st.sidebar.columns(2)
+    
+    # Filtre Période de recrutement (basé sur Date d'entrée effective)
+    with left_col2:
+        if 'Date d\'entrée effective du candidat' in df_recrutement.columns:
+            df_recrutement['Année_Recrutement'] = df_recrutement['Date d\'entrée effective du candidat'].dt.year
+            annees_rec = sorted([y for y in df_recrutement['Année_Recrutement'].dropna().unique() if not pd.isna(y)])
+            if annees_rec:
+                filters['periode_recrutement'] = st.selectbox(
+                    "Période de recrutement", 
+                    ['Toutes'] + [int(a) for a in annees_rec], 
+                    index=len(annees_rec), 
+                    key=f"{prefix}_periode_rec"
+                )
+            else:
+                filters['periode_recrutement'] = 'Toutes'
+        else:
+            filters['periode_recrutement'] = 'Toutes'
+    
+    # Filtre Période de la demande (basé sur Date de réception de la demande)
+    with right_col2:
+        date_demande_col = 'Date de réception de la demande aprés validation de la DRH'
+        if date_demande_col in df_recrutement.columns:
+            df_recrutement['Année_Demande'] = df_recrutement[date_demande_col].dt.year
+            annees_dem = sorted([y for y in df_recrutement['Année_Demande'].dropna().unique() if not pd.isna(y)])
+            if annees_dem:
+                filters['periode_demande'] = st.selectbox(
+                    "Période de la demande", 
+                    ['Toutes'] + [int(a) for a in annees_dem], 
+                    index=len(annees_dem), 
+                    key=f"{prefix}_periode_dem"
+                )
+            else:
+                filters['periode_demande'] = 'Toutes'
+        else:
+            filters['periode_demande'] = 'Toutes'
+
     return filters
 
 def apply_global_filters(df, filters):
@@ -101,6 +140,15 @@ def apply_global_filters(df, filters):
     
     if filters.get('direction') != 'Toutes':
         df_filtered = df_filtered[df_filtered['Direction concernée'] == filters['direction']]
+    
+    # Appliquer le filtre période de recrutement
+    if filters.get('periode_recrutement') != 'Toutes' and 'Année_Recrutement' in df_filtered.columns:
+        df_filtered = df_filtered[df_filtered['Année_Recrutement'] == filters['periode_recrutement']]
+    
+    # Appliquer le filtre période de la demande
+    if filters.get('periode_demande') != 'Toutes' and 'Année_Demande' in df_filtered.columns:
+        df_filtered = df_filtered[df_filtered['Année_Demande'] == filters['periode_demande']]
+    
     return df_filtered
 
 
@@ -302,35 +350,8 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         st.warning("Aucune donnée de recrutement clôturé disponible")
         return
     
-    # Filtre par période (spécifique à cette section)
-    if 'Date d\'entrée effective du candidat' in df_cloture.columns:
-        df_cloture['Année'] = df_cloture['Date d\'entrée effective du candidat'].dt.year
-        annees_dispo = sorted([y for y in df_cloture['Année'].dropna().unique() if not pd.isna(y)])
-        if annees_dispo:
-            col_left, col_right = st.sidebar.columns(2)
-            with col_left:
-                annee_select = st.selectbox("Période de recrutement", ['Toutes'] + [int(a) for a in annees_dispo], index=len(annees_dispo), key="rec_annee")
-            with col_right:
-                # Filtre Période de la demande
-                date_demande_col = 'Date de réception de la demande aprés validation de la DRH'
-                if date_demande_col in df_cloture.columns:
-                    df_cloture['Année_demande'] = df_cloture[date_demande_col].dt.year
-                    annees_demande_dispo = sorted([y for y in df_cloture['Année_demande'].dropna().unique() if not pd.isna(y)])
-                    if annees_demande_dispo:
-                        annee_demande_select = st.selectbox("Période de la demande", ['Toutes'] + [int(a) for a in annees_demande_dispo], index=len(annees_demande_dispo), key="nav_dem_annee")
-                    else:
-                        st.markdown("<div style='padding-top:6px; color:#666; font-size:0.9em'></div>", unsafe_allow_html=True)
-                else:
-                    st.markdown("<div style='padding-top:6px; color:#666; font-size:0.9em'></div>", unsafe_allow_html=True)
-        else:
-            annee_select = 'Toutes'
-    else:
-        annee_select = 'Toutes'
-
-    # Appliquer les filtres globaux + période
+    # Appliquer les filtres globaux
     df_filtered = apply_global_filters(df_cloture, global_filters)
-    if annee_select != 'Toutes':
-        df_filtered = df_filtered[df_filtered['Année'] == annee_select]
 
     # KPIs principaux
     col1, col2, col3 = st.columns(3)
@@ -364,7 +385,17 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 textposition='outside',
                 hovertemplate='%{y}<extra></extra>'
             )
-            fig_evolution.update_layout(height=300, xaxis_title=None, yaxis_title=None)
+            fig_evolution.update_layout(
+                height=300, 
+                xaxis_title=None, 
+                yaxis_title=None,
+                xaxis=dict(
+                    tickmode='array',
+                    tickvals=monthly_data['Mois_Année'],
+                    ticktext=monthly_data['Mois_Année'],
+                    tickangle=45
+                )
+            )
             st.plotly_chart(fig_evolution, use_container_width=True)
     
     with col2:

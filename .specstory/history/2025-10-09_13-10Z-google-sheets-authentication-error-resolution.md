@@ -473,7 +473,7 @@ Toutes vos demandes ont été implémentées et **committées/pushées** avec su
 
 ---
 
-_**User (2025-10-14 16:20Z)**_
+_**User (2025-10-14 16:23Z)**_
 
 pour comparaison par poste laisse l'affiche verticale mais les valeurs au sein des bar verticale car il y a plusieurs postes  et pareil pour les directions et sa concerne les sections demande et recrutement 
 
@@ -485,6 +485,103 @@ commit & push
 _**Assistant (copilot/claude-sonnet-4)**_
 
 Je vais appliquer ces modifications. D'abord, vérifions la structure actuelle des graphiques et du titre hebdomadaire. Maintenant, commençons par modifier le titre du reporting hebdomadaire : Laissez-moi chercher la ligne exacte : 
+```
+
+```
+Maintenant, cherchons les graphiques de comparaison par poste et par direction pour modifier l'affichage des valeurs à l'intérieur des barres. Je vais d'abord regarder la section des demandes : Maintenant regardons la section des recrutements clôturés pour identifier les graphiques similaires : Parfait ! Maintenant je vais modifier les 4 graphiques (2 dans la section demandes et 2 dans la section recrutements clôturés) pour changer `textposition='auto'` en `textposition='inside'` afin d'afficher les valeurs à l'intérieur des barres verticales.
+
+1. **Section DEMANDES DE RECRUTEMENT - Graphique par direction :** Je vais être plus spécifique en incluant plus de contexte. Commençons par la section demandes : 
+```
+
+```
+2. **Section DEMANDES DE RECRUTEMENT - Graphique par poste :** 
+```
+
+```
+3. **Section RECRUTEMENTS CLÔTURÉS - Graphique par direction :** 
+```
+
+```
+4. **Section RECRUTEMENTS CLÔTURÉS - Graphique par poste :** 
+```
+
+```
+Vérifions que le code est syntaxiquement correct : Parfait ! Maintenant commitons et pushons les changements : ✅ **Modifications appliquées et déployées !**
+
+## 📊 **Résumé des changements :**
+
+### 📈 **Amélioration de l'affichage des valeurs dans les graphiques :**
+
+**Graphiques modifiés :**
+- ✅ **Comparaison par poste** (sections Demandes & Recrutements clôturés)
+- ✅ **Comparaison par direction** (sections Demandes & Recrutements clôturés)
+
+**Changement technique :**
+```python
+# Avant
+textposition='auto'
+
+# Après  
+textposition='inside'
+```
+
+**Résultat visuel :**
+- **Orientation** : Reste verticale ✅
+- **Valeurs** : Maintenant affichées **à l'intérieur** des barres verticales ✅
+- **Lisibilité** : Amélioration pour les graphiques avec plusieurs postes/directions ✅
+
+### 📅 **Amélioration du titre du reporting hebdomadaire :**
+
+**Changement :**
+```python
+# Avant
+st.header("📅 Reporting Hebdomadaire")
+
+# Après
+st.header("📅 Reporting Hebdomadaire : Chiffres Clés de la semaine")
+```
+
+### 🎯 **Avantages :**
+- ✅ **Meilleure visibilité** des valeurs avec plusieurs catégories
+- ✅ **Layout vertical conservé** comme demandé
+- ✅ **Titre plus descriptif** et professionnel
+- ✅ **Cohérence visuelle** maintenue
+
+### 📍 **Sections impactées :**
+1. **📋 DEMANDES DE RECRUTEMENT :**
+   - Comparaison par direction → valeurs inside
+   - Comparaison par poste → valeurs inside
+
+2. **🎯 RECRUTEMENTS CLÔTURÉS :**
+   - Comparaison par direction → valeurs inside  
+   - Comparaison par poste → valeurs inside
+
+3. **📅 REPORTING HEBDOMADAIRE :**
+   - Titre enrichi avec ": Chiffres Clés de la semaine"
+
+Toutes les modifications sont **committées** et **pushées** avec succès ! 🚀
+
+---
+
+_**User (2025-10-14 16:28Z)**_
+
+- pour le graphique évolutions des recrutements il faut toujours laisser le nom de chaque bar du mois car j'ai remarqué qu'il affiche un moi et le deuxième moi il affiche la bar mais il n'affiche pas en bas le mois
+- dans les fltres globaux quand je change "période de la demande" il ne change pas les graphique de la section demandes de recrutement
+
+
+---
+
+_**Assistant (copilot/claude-sonnet-4)**_
+
+Je vais examiner et corriger ces deux problèmes. Commençons par identifier les problèmes. Je vois le premier problème. Pour le graphique d'évolution des recrutements, il faut améliorer l'affichage des étiquettes des mois. Maintenant regardons le deuxième problème concernant les filtres globaux. Je vois le problème ! Le filtre "Période de la demande" est créé dans la fonction `create_recrutements_clotures_tab` mais il n'est pas utilisé dans la fonction `create_demandes_recrutement_tab`. Il faut le rendre global et l'appliquer aux deux sections.
+
+Commençons par corriger le premier problème - l'affichage des étiquettes de mois dans le graphique d'évolution : 
+```
+
+```
+Maintenant, abordons le deuxième problème plus complexe. Il faut que le filtre "Période de la demande" soit disponible globalement et appliqué aux bonnes sections. 
+
+Regardons d'abord comment la fonction `create_demandes_recrutement_tab` est appelée : Je dois créer le filtre "Période de la demande" de manière globale et l'inclure dans `global_filters`. Regardons d'abord la fonction `create_demandes_recrutement_combined_tab` qui appelle les deux sous-fonctions : 
 
 ---
 
