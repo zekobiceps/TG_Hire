@@ -516,7 +516,8 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             yaxis_title=None,
             yaxis=dict(categoryorder='array', categoryarray=list(df_direction['Direction'][::-1]))
         )
-        render_plotly_scrollable(fig_direction, max_height=height_dir)
+        # Use a compact default visible area (320px) and allow scrolling to see rest
+        render_plotly_scrollable(fig_direction, max_height=320)
 
     with col4:
         # Comparaison par poste
@@ -546,7 +547,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             yaxis_title=None,
             yaxis=dict(categoryorder='array', categoryarray=list(df_poste['Poste'][::-1]))
         )
-        render_plotly_scrollable(fig_poste, max_height=height_poste)
+        render_plotly_scrollable(fig_poste, max_height=320)
 
 
     # Ligne 3 - KPIs de délai et candidats
@@ -776,7 +777,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             yaxis_title=None,
             yaxis=dict(categoryorder='array', categoryarray=df_direction['Direction'])
         )
-        render_plotly_scrollable(fig_direction, max_height=height_dir)
+    render_plotly_scrollable(fig_direction, max_height=320)
     
     with col5:
         # Comparaison par poste
@@ -806,7 +807,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             yaxis_title=None,
             yaxis=dict(categoryorder='array', categoryarray=df_poste['Poste'])
         )
-        render_plotly_scrollable(fig_poste, max_height=height_poste)
+    render_plotly_scrollable(fig_poste, max_height=320)
 
 def create_integrations_tab(df_recrutement, global_filters):
     """Onglet Intégrations basé sur les bonnes données"""
