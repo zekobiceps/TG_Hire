@@ -1774,7 +1774,12 @@ def create_weekly_report_tab(df_recrutement=None):
 
                 col_entite = find_col_like(['entité', 'entite', 'entité demandeuse', 'entite demandeuse']) or 'Entité demandeuse' if 'Entité demandeuse' in cols else None
                 col_statut = find_col_like(['statut', 'status'])
-                col_candidat = find_col_like(['nom', 'candidat', 'retenu'])
+                # Use the exact candidate column name required by the user
+                exact_candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
+                if exact_candidat_col in cols:
+                    col_candidat = exact_candidat_col
+                else:
+                    col_candidat = None
                 col_accept = find_col_like(['acceptation', "date d'acceptation", 'date d accept'])
                 col_reception = find_col_like(['réception', 'reception', 'date de réception', 'date de reception'])
 
@@ -1839,8 +1844,15 @@ def create_weekly_report_tab(df_recrutement=None):
                 # format dates for readability
                 if 'Accept_date_parsed' in df_debug_display.columns:
                     df_debug_display['Accept_date_parsed'] = df_debug_display['Accept_date_parsed'].dt.strftime('%d/%m/%Y').fillna('')
-
-                st.dataframe(df_debug_display, use_container_width=True)
+                # Filter: ne montrer que les lignes où la colonne candidate spécifiée est remplie
+                if col_candidat is None:
+                    st.warning(f"Colonne candidate exacte non trouvée: '{exact_candidat_col}'. Aucune ligne filtrée.")
+                    st.dataframe(df_debug_display, use_container_width=True)
+                else:
+                    # show only rows where Candidat_raw is non-empty
+                    df_filtered = df_debug_display[df_debug_display['Candidat_raw'].notna() & (df_debug_display['Candidat_raw'].astype(str).str.strip() != '')]
+                    st.info(f"Affichage des lignes où '{exact_candidat_col}' est rempli: {len(df_filtered)} lignes")
+                    st.dataframe(df_filtered, use_container_width=True)
             else:
                 st.info('Aucune donnée pour le debug.')
         except Exception as e:
