@@ -539,12 +539,12 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         try:
-            fig_direction.update_layout(title=dict(x=0.5, xanchor='center', font=dict(size=12)))
+            fig_direction.update_layout(title=dict(text="Comparaison par direction", x=0, xanchor='left', font=dict(size=18)))
         except Exception:
             pass
         # Standardize title styling (left aligned)
         try:
-            fig_direction.update_layout(title=dict(x=0.5, xanchor='center', font=dict(size=12)))
+            fig_direction.update_layout(title=dict(text="Comparaison par direction", x=0, xanchor='left', font=dict(size=18)))
         except Exception:
             pass
         # Largest at top: reverse the category array so descending values appear from top to bottom
@@ -586,11 +586,11 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         try:
-            fig_poste.update_layout(title=dict(x=0.5, xanchor='center', font=dict(size=12)))
+            fig_poste.update_layout(title=dict(text="Comparaison par poste", x=0, xanchor='left', font=dict(size=18)))
         except Exception:
             pass
         try:
-            fig_poste.update_layout(title=dict(x=0.5, xanchor='center', font=dict(size=12)))
+            fig_poste.update_layout(title=dict(text="Comparaison par poste", x=0, xanchor='left', font=dict(size=18)))
         except Exception:
             pass
         height_poste = max(300, 28 * len(df_poste))
@@ -737,7 +737,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         statut_counts = df_filtered['Statut de la demande'].value_counts()
         fig_statut = go.Figure(data=[go.Pie(labels=statut_counts.index, values=statut_counts.values, hole=.5)])
         fig_statut.update_layout(
-            title=dict(text="Répartition par statut de la demande", x=0.5, xanchor='center', font=dict(size=12)),
+            title="Répartition par statut de la demande",
             height=300,
             legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5)
         )
