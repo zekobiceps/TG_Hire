@@ -531,7 +531,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             height=height_dir,
             xaxis_title=None,
             yaxis_title=None,
-            yaxis=dict(categoryorder='array', categoryarray=list(df_direction['Direction'][::-1]))
+            yaxis=dict(categoryorder='array', categoryarray=list(df_direction['Label_trunc'][::-1]))
         )
         # Use a compact default visible area (320px) and allow scrolling to see rest
         render_plotly_scrollable(fig_direction, max_height=320)
@@ -564,7 +564,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             height=height_poste,
             xaxis_title=None,
             yaxis_title=None,
-            yaxis=dict(categoryorder='array', categoryarray=list(df_poste['Poste'][::-1]))
+            yaxis=dict(categoryorder='array', categoryarray=list(df_poste['Label_trunc'][::-1]))
         )
         render_plotly_scrollable(fig_poste, max_height=320)
 
