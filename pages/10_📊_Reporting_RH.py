@@ -1490,7 +1490,16 @@ def create_weekly_report_tab(df_recrutement=None):
         {"title": "Nouveaux postes ouverts", "value": total_nouveaux, "color": "orange"},
         {"title": "Total postes ouverts avant la semaine", "value": total_avant, "color": "purple"}
     ]
-    render_kpi_row_generic(items)
+    # Use simple Streamlit metrics (no bordered-card styling)
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("Postes en cours cette semaine", total_en_cours)
+    with col2:
+        st.metric("Postes pourvus cette semaine", total_pourvus)
+    with col3:
+        st.metric("Nouveaux postes ouverts", total_nouveaux)
+    with col4:
+        st.metric("Total postes ouverts avant la semaine", total_avant)
 
     st.markdown("---")
 
