@@ -1495,18 +1495,27 @@ def calculate_weekly_metrics(df_recrutement):
             nouveaux_postes = 0
 
         # 3. Nb postes pourvus cette semaine
+        # Règle métier: un poste est considéré pourvu cette semaine seulement si:
+        #  - il a le statut 'En cours' (normalisé), ET
+        #  - la date d'acceptation du candidat est dans la semaine de production (start_of_week..today)
         postes_pourvus = 0
-        if real_candidat_col and real_accept_col and real_candidat_col in df_entite.columns and real_accept_col in df_entite.columns:
+        # préparer un masque de statut 'En cours' si la colonne statut existe
+        mask_status_en_cours = None
+        if real_statut_col and real_statut_col in df_entite.columns:
+            mask_status_en_cours = df_entite[real_statut_col].fillna("").astype(str).apply(lambda s: 'en cours' in _norm(s) or 'encours' in _norm(s))
+
+        if real_candidat_col and real_accept_col and real_candidat_col in df_entite.columns and real_accept_col in df_entite.columns and mask_status_en_cours is not None:
             mask_accept_this_week = (df_entite[real_accept_col] >= start_of_week) & (df_entite[real_accept_col] <= today)
             mask_has_name = df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '')
-            postes_pourvus = int( df_entite[ mask_accept_this_week & mask_has_name ].shape[0] )
+            postes_pourvus = int( df_entite[ mask_accept_this_week & mask_has_name & mask_status_en_cours ].shape[0] )
         else:
-            # fallback: try using integration date as proxy for pourvus this week
-            if real_date_integration_col and real_candidat_col and real_date_integration_col in df_entite.columns and real_candidat_col in df_entite.columns:
+            # fallback: try using integration date as proxy for pourvus this week, but still require statut 'En cours'
+            if real_date_integration_col and real_candidat_col and real_date_integration_col in df_entite.columns and real_candidat_col in df_entite.columns and mask_status_en_cours is not None:
                 mask_integration_this_week = (df_entite[real_date_integration_col] >= start_of_week) & (df_entite[real_date_integration_col] <= today)
                 mask_has_name = df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '')
-                postes_pourvus = int( df_entite[ mask_integration_this_week & mask_has_name ].shape[0] )
+                postes_pourvus = int( df_entite[ mask_integration_this_week & mask_has_name & mask_status_en_cours ].shape[0] )
             else:
+                # If we cannot reliably determine status or dates, default to 0 (avoid double-counting)
                 postes_pourvus = 0
 
         # 4. Nb postes en cours cette semaine (cumulatif)
