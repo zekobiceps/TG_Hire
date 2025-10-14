@@ -499,18 +499,21 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         st.plotly_chart(fig_candidats, use_container_width=True)
 
     with col6:
-        # Délai moyen de recrutement
+        # Délai moyen de recrutement - Calcul corrigé selon la formule demandée
         date_reception_col = 'Date de réception de la demande aprés validation de la DRH'
-        date_reponse_col = 'Date de la 1er réponse du demandeur à l\'équipe RH'
+        date_retour_rh_col = 'Date du 1er retour equipe RH  au demandeur'
         
-        if date_reception_col in df_filtered.columns and date_reponse_col in df_filtered.columns:
-            df_filtered['Duree de recrutement'] = (df_filtered[date_reponse_col] - df_filtered[date_reception_col]).dt.days
-            delai_moyen = df_filtered['Duree de recrutement'].mean()
+        if date_reception_col in df_filtered.columns and date_retour_rh_col in df_filtered.columns:
+            # Calcul : DATEDIFF([Date de réception],[Date du 1er retour equipe RH],day)
+            df_filtered['Duree de recrutement'] = (df_filtered[date_retour_rh_col] - df_filtered[date_reception_col]).dt.days
+            # Filtrer les valeurs positives uniquement (retour après réception)
+            durees_valides = df_filtered['Duree de recrutement'][df_filtered['Duree de recrutement'] > 0]
+            delai_moyen = durees_valides.mean()
 
-            if not pd.isna(delai_moyen):
+            if not pd.isna(delai_moyen) and len(durees_valides) > 0:
                 fig_delai = go.Figure(go.Indicator(
                     mode = "number",
-                    value = delai_moyen,
+                    value = round(delai_moyen, 1),
                     title = {"text": "Délai moyen de recrutement (jours)"}
                 ))
                 fig_delai.update_layout(height=300)
@@ -518,7 +521,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             else:
                 st.info("Le calcul du délai moyen de recrutement n'est pas disponible.")
         else:
-            st.warning("Colonnes de date nécessaires pour le calcul du délai non trouvées.")
+            st.warning(f"Colonnes nécessaires non trouvées: '{date_reception_col}' et/ou '{date_retour_rh_col}'")
 
 
 def create_demandes_recrutement_tab(df_recrutement, global_filters):
@@ -732,9 +735,14 @@ def create_integrations_tab(df_recrutement, global_filters):
     # Graphiques
     col1, col2 = st.columns(2)
 
-    # Graphique par affectation supprimé sur demande. On laisse une zone d'information minimale.
+    # Graphique par affectation réactivé
     with col1:
-        st.info("Graphique 'Répartition par Affectation' désactivé.")
+        if 'Affectation' in df_filtered.columns:
+            # Utiliser la fonction existante create_affectation_chart
+            fig_affectation = create_affectation_chart(df_filtered)
+            st.plotly_chart(fig_affectation, use_container_width=True)
+        else:
+            st.warning("Colonne 'Affectation' non trouvée dans les données.")
 
     with col2:
         # Évolution des dates d'intégration prévues
