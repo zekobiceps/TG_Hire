@@ -1468,14 +1468,10 @@ def calculate_weekly_metrics(df_recrutement):
         # Logique: postes qui étaient encore actifs (non pourvus) à la fin de la semaine dernière
         postes_avant = 0
         if real_date_reception_col and real_date_reception_col in df_entite.columns:
-            # ouverts avant ou égal à la fin de la semaine dernière
+            # ouverts avant ou égal à la fin de la semaine dernière (basé uniquement sur la date de réception)
             opened_before = df_entite[ df_entite[real_date_reception_col] <= last_week_end ].copy()
         else:
             opened_before = df_entite.copy()
-
-            # Exclure explicitement les demandes fermées/annulées/dépriorisées qui ne doivent pas compter
-            if real_statut_col and real_statut_col in opened_before.columns:
-                opened_before = opened_before[ ~opened_before[real_statut_col].astype(str).apply(lambda x: any(k in _norm(x) for k in closed_keywords)) ]
 
             if real_accept_col and real_accept_col in opened_before.columns:
                 # considérer pourvus uniquement si acceptance date <= last_week_end
@@ -1493,8 +1489,7 @@ def calculate_weekly_metrics(df_recrutement):
         if real_date_reception_col and real_date_reception_col in df_entite.columns:
             # compter uniquement les nouvelles demandes actives (exclure les statuts fermés)
             tmp_new = df_entite[ (df_entite[real_date_reception_col] >= start_of_week) & (df_entite[real_date_reception_col] <= today) ].copy()
-            if real_statut_col and real_statut_col in tmp_new.columns:
-                tmp_new = tmp_new[ ~tmp_new[real_statut_col].astype(str).apply(lambda x: any(k in _norm(x) for k in closed_keywords)) ]
+            # conserver toutes les nouvelles demandes basées sur la date de réception (pas d'exclusion par statut)
             nouveaux_postes = int(tmp_new.shape[0])
         else:
             nouveaux_postes = 0
@@ -1518,10 +1513,8 @@ def calculate_weekly_metrics(df_recrutement):
         total_opened_until_now = 0
         total_pourvus_until_now = 0
         if real_date_reception_col and real_date_reception_col in df_entite.columns:
-            opened_until_now = df_entite[ df_entite[real_date_reception_col] <= today ].copy()
-            if real_statut_col and real_statut_col in opened_until_now.columns:
-                opened_until_now = opened_until_now[ ~opened_until_now[real_statut_col].astype(str).apply(lambda x: any(k in _norm(x) for k in closed_keywords)) ]
-            total_opened_until_now = int(opened_until_now.shape[0])
+            # total ouvert jusqu'à aujourd'hui basé uniquement sur la date de réception
+            total_opened_until_now = int( df_entite[ df_entite[real_date_reception_col] <= today ].shape[0] )
         if real_candidat_col and real_accept_col:
             if real_accept_col in df_entite.columns and real_candidat_col in df_entite.columns:
                 total_pourvus_until_now = int( df_entite[ df_entite[real_accept_col].notna() & (df_entite[real_accept_col] <= today) & df_entite[real_candidat_col].notna() ].shape[0] )
