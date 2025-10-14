@@ -71,24 +71,36 @@ postes_data = [
 ]
 
 
+@st.cache_data(ttl=300)
+def get_filter_options(df_recrutement):
+    """Récupère les options de filtres de manière mise en cache"""
+    if df_recrutement is None or len(df_recrutement) == 0:
+        return {'entites': ['Toutes'], 'directions': ['Toutes']}
+    
+    entites = ['Toutes'] + sorted(df_recrutement['Entité demandeuse'].dropna().unique())
+    directions = ['Toutes'] + sorted(df_recrutement['Direction concernée'].dropna().unique())
+    
+    return {'entites': entites, 'directions': directions}
+
 def create_global_filters(df_recrutement, prefix=""):
     """Créer des filtres globaux réutilisables pour tous les onglets"""
     if df_recrutement is None or len(df_recrutement) == 0:
         return {}
 
+    # Récupérer les options de filtres de manière mise en cache
+    filter_options = get_filter_options(df_recrutement)
+    
     # Organiser les filtres dans deux colonnes dans la sidebar
     filters = {}
     left_col, right_col = st.sidebar.columns(2)
 
     # Filtre par entité demandeuse (colonne gauche)
-    entites = ['Toutes'] + sorted(df_recrutement['Entité demandeuse'].dropna().unique())
     with left_col:
-        filters['entite'] = st.selectbox("Entité demandeuse", entites, key=f"{prefix}_entite")
+        filters['entite'] = st.selectbox("Entité demandeuse", filter_options['entites'], key=f"{prefix}_entite")
 
     # Filtre par direction concernée (colonne droite)
-    directions = ['Toutes'] + sorted(df_recrutement['Direction concernée'].dropna().unique())
     with right_col:
-        filters['direction'] = st.selectbox("Direction concernée", directions, key=f"{prefix}_direction")
+        filters['direction'] = st.selectbox("Direction concernée", filter_options['directions'], key=f"{prefix}_direction")
 
     return filters
 
@@ -126,9 +138,11 @@ def get_gsheet_client():
         return None
 
 
+@st.cache_data(ttl=300, show_spinner="Chargement des données Google Sheets...")
 def load_data_from_google_sheets(sheet_url):
     """
     Charger les données depuis Google Sheets avec authentification automatique via les secrets.
+    Cache les données pendant 5 minutes pour éviter les rechargements inutiles.
     """
     try:
         # Extraire l'ID de la feuille et le GID depuis l'URL
@@ -182,6 +196,30 @@ def load_data_from_google_sheets(sheet_url):
         raise e
 
 
+@st.cache_data(ttl=300)
+def process_recruitment_data(df):
+    """Traiter et nettoyer les données de recrutement de manière mise en cache"""
+    if df is None or len(df) == 0:
+        return None
+    
+    # Convertir les colonnes de dates si elles existent
+    date_columns = [
+        'Date de réception de la demande aprés validation de la DRH',
+        'Date d\'entrée effective du candidat',
+        'Date de publication',
+        'Date de clôture',
+        'Date de fin des candidatures'
+    ]
+    
+    for col in date_columns:
+        if col in df.columns:
+            try:
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+            except:
+                pass
+    
+    return df
+
 def load_data_from_files(csv_file=None, excel_file=None):
     """Charger et préparer les données depuis les fichiers uploadés ou locaux"""
     df_integration = None
@@ -215,25 +253,18 @@ def load_data_from_files(csv_file=None, excel_file=None):
             st.error(f"Erreur lors du chargement des données de recrutement: {e}")
 
         if df_recrutement is not None:
-            # Nettoyer et préparer les données de recrutement
-            # Convertir les dates
-            date_columns = ['Date de réception de la demande aprés validation de la DRH',
-                           'Date d\'entrée effective du candidat',
-                           'Date d\'annulation /dépriorisation de la demande',
-                           'Date de la 1er réponse du demandeur à l\'équipe RH']
+            # Utiliser la fonction de traitement mise en cache si les données ne viennent pas de session_state
+            if not ('synced_recrutement_df' in st.session_state and st.session_state.synced_recrutement_df is not None):
+                df_recrutement = process_recruitment_data(df_recrutement)
             
-            for col in date_columns:
-                if col in df_recrutement.columns:
-                    df_recrutement[col] = pd.to_datetime(df_recrutement[col], errors='coerce')
-            
-            # Nettoyer les colonnes avec des espaces
-            df_recrutement.columns = df_recrutement.columns.str.strip()
-            
-            # Nettoyer les colonnes numériques pour éviter les erreurs de type
-            numeric_columns = ['Nb de candidats pré-selectionnés']
-            for col in numeric_columns:
-                if col in df_recrutement.columns:
-                    df_recrutement[col] = pd.to_numeric(df_recrutement[col], errors='coerce').fillna(0)
+                # Nettoyer les colonnes avec des espaces
+                df_recrutement.columns = df_recrutement.columns.str.strip()
+                
+                # Nettoyer les colonnes numériques pour éviter les erreurs de type
+                numeric_columns = ['Nb de candidats pré-selectionnés']
+                for col in numeric_columns:
+                    if col in df_recrutement.columns:
+                        df_recrutement[col] = pd.to_numeric(df_recrutement[col], errors='coerce').fillna(0)
 
             # Vérification basique des colonnes critiques et message dans les logs
             required_cols = [
@@ -1429,40 +1460,47 @@ def main():
                         help="Synchroniser les données depuis Google Sheets",
                         use_container_width=True):
                 
-                try:
-                    # Utiliser la fonction de connexion automatique (comme dans Home.py)
-                    df_synced = load_data_from_google_sheets(gs_url)
-                    
-                    if df_synced is not None and len(df_synced) > 0:
-                        st.session_state.synced_recrutement_df = df_synced
-                        st.session_state.data_updated = True
-                        nb_lignes = len(df_synced)
-                        nb_colonnes = len(df_synced.columns)
-                        st.success(f"✅ Synchronisation Google Sheets réussie ! Les onglets ont été mis à jour. ({nb_lignes} lignes, {nb_colonnes} colonnes)")
-                    else:
-                        st.warning("⚠️ Aucune donnée trouvée dans la feuille Google Sheets.")
+                with st.spinner("Synchronisation en cours..."):
+                    try:
+                        # Utiliser la fonction de connexion automatique (comme dans Home.py)
+                        df_synced = load_data_from_google_sheets(gs_url)
                         
-                except Exception as e:
-                    err_str = str(e)
-                    st.error(f"Erreur lors de la synchronisation: {err_str}")
-                    
-                    if '401' in err_str or 'Unauthorized' in err_str or 'HTTP Error 401' in err_str:
-                        st.error("❌ **Feuille Google privée** - Vérifiez que:")
-                        st.markdown("""
-                        1. La feuille est partagée avec: `your-service-account@your-project.iam.gserviceaccount.com`
-                        2. Les secrets Streamlit sont correctement configurés
-                        3. L'URL de la feuille est correcte
-                        """)
-                    elif 'secrets' in err_str.lower():
-                        st.error("❌ **Configuration des secrets manquante**")
-                        st.markdown("""
-                        Assurez-vous que les secrets suivants sont configurés:
-                        - `GCP_TYPE`, `GCP_PROJECT_ID`, `GCP_PRIVATE_KEY_ID`
-                        - `GCP_PRIVATE_KEY`, `GCP_CLIENT_EMAIL`, `GCP_CLIENT_ID`
-                        - `GCP_AUTH_URI`, `GCP_TOKEN_URI`, etc.
-                        """)
-                    else:
-                        st.error(f"Erreur technique: {err_str}")
+                        if df_synced is not None and len(df_synced) > 0:
+                            # Traiter les données avec la fonction mise en cache
+                            df_processed = process_recruitment_data(df_synced)
+                            st.session_state.synced_recrutement_df = df_processed
+                            st.session_state.data_updated = True
+                            # Nettoyer le cache des options de filtres pour forcer la mise à jour
+                            get_filter_options.clear()
+                            nb_lignes = len(df_processed)
+                            nb_colonnes = len(df_processed.columns)
+                            st.success(f"✅ Synchronisation Google Sheets réussie ! Les onglets ont été mis à jour. ({nb_lignes} lignes, {nb_colonnes} colonnes)")
+                            # Éviter le rechargement immédiat complet
+                            st.rerun()
+                        else:
+                            st.warning("⚠️ Aucune donnée trouvée dans la feuille Google Sheets.")
+                            
+                    except Exception as e:
+                        err_str = str(e)
+                        st.error(f"Erreur lors de la synchronisation: {err_str}")
+                        
+                        if '401' in err_str or 'Unauthorized' in err_str or 'HTTP Error 401' in err_str:
+                            st.error("❌ **Feuille Google privée** - Vérifiez que:")
+                            st.markdown("""
+                            1. La feuille est partagée avec: `your-service-account@your-project.iam.gserviceaccount.com`
+                            2. Les secrets Streamlit sont correctement configurés
+                            3. L'URL de la feuille est correcte
+                            """)
+                        elif 'secrets' in err_str.lower():
+                            st.error("❌ **Configuration des secrets manquante**")
+                            st.markdown("""
+                            Assurez-vous que les secrets suivants sont configurés:
+                            - `GCP_TYPE`, `GCP_PROJECT_ID`, `GCP_PRIVATE_KEY_ID`
+                            - `GCP_PRIVATE_KEY`, `GCP_CLIENT_EMAIL`, `GCP_CLIENT_ID`
+                            - `GCP_AUTH_URI`, `GCP_TOKEN_URI`, etc.
+                            """)
+                        else:
+                            st.error(f"Erreur technique: {err_str}")
 
         with col2:
             st.subheader("📊 Fichier Excel - Données de Recrutement")
