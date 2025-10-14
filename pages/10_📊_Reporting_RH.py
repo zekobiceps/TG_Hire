@@ -406,33 +406,39 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
     with col1:
         # Évolution des recrutements par mois (comme dans l'image 1)
         if 'Date d\'entrée effective du candidat' in df_filtered.columns:
-            df_filtered['Mois_Année'] = df_filtered['Date d\'entrée effective du candidat'].dt.strftime('%Y-%m')
-            monthly_data = df_filtered.groupby('Mois_Année').size().reset_index(name='Count')
-            
-            fig_evolution = px.bar(
-                monthly_data, 
-                x='Mois_Année', 
-                y='Count',
-                title="Évolution des recrutements",
-                text='Count'
-            )
-            fig_evolution.update_traces(
-                marker_color='#1f77b4', 
-                textposition='outside',
-                hovertemplate='%{y}<extra></extra>'
-            )
-            fig_evolution.update_layout(
-                height=300, 
-                xaxis_title=None, 
-                yaxis_title=None,
-                xaxis=dict(
-                    tickmode='array',
-                    tickvals=monthly_data['Mois_Année'],
-                    ticktext=monthly_data['Mois_Année'],
-                    tickangle=45
+            # Générer une série complète de mois entre la plus petite et la plus grande date
+            df_filtered['Mois_Année'] = df_filtered['Date d\'entrée effective du candidat'].dt.to_period('M').dt.to_timestamp()
+            monthly_data = df_filtered.groupby('Mois_Année').size().rename('Count')
+            if not monthly_data.empty:
+                all_months = pd.date_range(start=monthly_data.index.min(), end=monthly_data.index.max(), freq='MS')
+                monthly_data = monthly_data.reindex(all_months, fill_value=0)
+                monthly_data = monthly_data.reset_index().rename(columns={'index': 'Mois_Année'})
+                monthly_data['Mois_Année'] = monthly_data['Mois_Année'].dt.strftime('%b %Y')
+
+                fig_evolution = px.bar(
+                    monthly_data,
+                    x='Mois_Année',
+                    y='Count',
+                    title="Évolution des recrutements",
+                    text='Count'
                 )
-            )
-            st.plotly_chart(fig_evolution, use_container_width=True)
+                fig_evolution.update_traces(
+                    marker_color='#1f77b4',
+                    textposition='outside',
+                    hovertemplate='%{y}<extra></extra>'
+                )
+                fig_evolution.update_layout(
+                    height=300,
+                    xaxis_title=None,
+                    yaxis_title=None,
+                    xaxis=dict(
+                        tickmode='array',
+                        tickvals=monthly_data['Mois_Année'],
+                        ticktext=monthly_data['Mois_Année'],
+                        tickangle=45
+                    )
+                )
+                st.plotly_chart(fig_evolution, use_container_width=True)
     
     with col2:
         # Répartition par modalité de recrutement (CORRECTION: légende déplacée à l'extérieur)
@@ -685,23 +691,29 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
     with col3:
         # Évolution des demandes
         if date_col in df_filtered.columns:
-            df_filtered['Mois_Année_Demande'] = df_filtered[date_col].dt.strftime('%Y-%m')
-            monthly_demandes = df_filtered.groupby('Mois_Année_Demande').size().reset_index(name='Count')
-            
-            fig_evolution_demandes = px.bar(
-                monthly_demandes, 
-                x='Mois_Année_Demande', 
-                y='Count',
-                title="Évolution des demandes",
-                text='Count'
-            )
-            fig_evolution_demandes.update_traces(
-                marker_color='#1f77b4', 
-                textposition='outside',
-                hovertemplate='%{y}<extra></extra>'
-            )
-            fig_evolution_demandes.update_layout(height=300, xaxis_title=None, yaxis_title=None)
-            st.plotly_chart(fig_evolution_demandes, use_container_width=True)
+            # Générer une série complète de mois entre la plus petite et la plus grande date de demande
+            df_filtered['Mois_Année_Demande'] = df_filtered[date_col].dt.to_period('M').dt.to_timestamp()
+            monthly_demandes = df_filtered.groupby('Mois_Année_Demande').size().rename('Count')
+            if not monthly_demandes.empty:
+                all_months = pd.date_range(start=monthly_demandes.index.min(), end=monthly_demandes.index.max(), freq='MS')
+                monthly_demandes = monthly_demandes.reindex(all_months, fill_value=0)
+                monthly_demandes = monthly_demandes.reset_index().rename(columns={'index': 'Mois_Année_Demande'})
+                monthly_demandes['Mois_Année_Demande'] = monthly_demandes['Mois_Année_Demande'].dt.strftime('%b %Y')
+
+                fig_evolution_demandes = px.bar(
+                    monthly_demandes,
+                    x='Mois_Année_Demande',
+                    y='Count',
+                    title="Évolution des demandes",
+                    text='Count'
+                )
+                fig_evolution_demandes.update_traces(
+                    marker_color='#1f77b4',
+                    textposition='outside',
+                    hovertemplate='%{y}<extra></extra>'
+                )
+                fig_evolution_demandes.update_layout(height=300, xaxis_title=None, yaxis_title=None)
+                st.plotly_chart(fig_evolution_demandes, use_container_width=True)
     
     # Deuxième ligne de graphiques
     col4, col5 = st.columns(2)
@@ -710,13 +722,14 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         # Comparaison par direction
         direction_counts = df_filtered['Direction concernée'].value_counts().nlargest(10)
         df_direction = direction_counts.rename_axis('Direction').reset_index(name='Count')
+        # Horizontal bar for better readability when labels are long
         fig_direction = px.bar(
             df_direction,
-            x='Direction',
-            y='Count',
+            x='Count',
+            y='Direction',
             title="Comparaison par direction",
             text='Count',
-            orientation='v'
+            orientation='h'
         )
         fig_direction.update_traces(
             marker_color='#ff7f0e', 
@@ -737,11 +750,11 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         df_poste = poste_counts.rename_axis('Poste').reset_index(name='Count')
         fig_poste = px.bar(
             df_poste,
-            x='Poste',
-            y='Count',
+            x='Count',
+            y='Poste',
             title="Comparaison par poste",
             text='Count',
-            orientation='v'
+            orientation='h'
         )
         fig_poste.update_traces(
             marker_color='#2ca02c', 
