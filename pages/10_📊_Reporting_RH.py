@@ -508,10 +508,12 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         df_direction = df_direction.sort_values('Count', ascending=False)
         # Truncate long labels for readability, keep full label in customdata for hover
         df_direction['Label_trunc'] = df_direction['Direction'].apply(lambda s: _truncate_label(s, max_len=24))
+        # Add two non-breaking spaces to create visual gap between label and bar
+        df_direction['Label_display'] = df_direction['Label_trunc'] + '\u00A0\u00A0'
         fig_direction = px.bar(
             df_direction,
             x='Count',
-            y='Label_trunc',
+            y='Label_display',
             title="Comparaison par direction",
             text='Count',
             orientation='h',
@@ -532,7 +534,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             xaxis_title=None,
             yaxis_title=None,
             margin=dict(l=240, t=40, b=30, r=20),
-            yaxis=dict(automargin=True, tickfont=dict(size=11), categoryorder='array', categoryarray=list(df_direction['Label_trunc'][::-1]))
+            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_direction['Label_display'][::-1]))
         )
         # Use a compact default visible area (320px) and allow scrolling to see rest
         render_plotly_scrollable(fig_direction, max_height=320)
@@ -543,10 +545,11 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         df_poste = poste_counts.rename_axis('Poste').reset_index(name='Count')
         df_poste = df_poste.sort_values('Count', ascending=False)
         df_poste['Label_trunc'] = df_poste['Poste'].apply(lambda s: _truncate_label(s, max_len=24))
+        df_poste['Label_display'] = df_poste['Label_trunc'] + '\u00A0\u00A0'
         fig_poste = px.bar(
             df_poste,
             x='Count',
-            y='Label_trunc',
+            y='Label_display',
             title="Comparaison par poste",
             text='Count',
             orientation='h',
@@ -566,7 +569,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             xaxis_title=None,
             yaxis_title=None,
             margin=dict(l=240, t=40, b=30, r=20),
-            yaxis=dict(automargin=True, tickfont=dict(size=11), categoryorder='array', categoryarray=list(df_poste['Label_trunc'][::-1]))
+            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_poste['Label_display'][::-1]))
         )
         render_plotly_scrollable(fig_poste, max_height=320)
 
@@ -795,13 +798,13 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         # Dynamic height so long lists become scrollable on the page
         height_dir = max(300, 28 * len(df_direction))
         # Ensure largest values appear on top by reversing the truncated label array
-        category_array_dir = list(df_direction['Label_trunc'][::-1])
+        category_array_dir = list(df_direction['Label_display'][::-1])
         fig_direction.update_layout(
             height=height_dir,
             xaxis_title=None,
             yaxis_title=None,
             margin=dict(l=240, t=40, b=30, r=20),
-            yaxis=dict(automargin=True, tickfont=dict(size=11), categoryorder='array', categoryarray=category_array_dir)
+            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_dir)
         )
         # Render inside the column so the two charts are on the same row and the component width matches the column
         render_plotly_scrollable(fig_direction, max_height=320)
@@ -812,10 +815,11 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         df_poste = poste_counts.rename_axis('Poste').reset_index(name='Count')
         df_poste = df_poste.sort_values('Count', ascending=False)
         df_poste['Label_trunc'] = df_poste['Poste'].apply(lambda s: _truncate_label(s, max_len=24))
+        df_poste['Label_display'] = df_poste['Label_trunc'] + '\u00A0\u00A0'
         fig_poste = px.bar(
             df_poste,
             x='Count',
-            y='Label_trunc',
+            y='Label_display',
             title="Comparaison par poste",
             text='Count',
             orientation='h',
@@ -830,13 +834,13 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         height_poste = max(300, 28 * len(df_poste))
-        category_array_poste = list(df_poste['Label_trunc'][::-1])
+        category_array_poste = list(df_poste['Label_display'][::-1])
         fig_poste.update_layout(
             height=height_poste,
             xaxis_title=None,
             yaxis_title=None,
             margin=dict(l=240, t=40, b=30, r=20),
-            yaxis=dict(automargin=True, tickfont=dict(size=11), categoryorder='array', categoryarray=category_array_poste)
+            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_poste)
         )
         render_plotly_scrollable(fig_poste, max_height=320)
 
