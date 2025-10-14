@@ -1394,6 +1394,27 @@ def calculate_weekly_metrics(df_recrutement):
     # Trouver les colonnes réelles
     real_date_reception_col = find_similar_column(date_reception_col, available_columns)
     real_date_integration_col = find_similar_column(date_integration_col, available_columns)
+    # chercher une colonne d'acceptation du candidat (date d'acceptation de la promesse)
+    possible_accept_cols = [
+        "Date d'acceptation",
+        "Date d'acceptation du candidat",
+        "Date d'acceptation de la promesse",
+        "Date d'acceptation promesse",
+        "Date d'accept",
+        "Date d'acceptation de la promesse d'embauche",
+        "Date d'acceptation de la promesse d embauche",
+        "Date d'acceptation du candidat",
+        'Date d\'acceptation',
+    ]
+    real_accept_col = find_similar_column('Date d\'acceptation du candidat', available_columns)
+    # fallback to integration date if no explicit acceptance date
+    if real_accept_col is None:
+        # try some common alternatives
+        for alt in ['Date d\'acceptation', 'Date d\'acceptation de la promesse', "Date d'accept"]:
+            c = find_similar_column(alt, available_columns)
+            if c:
+                real_accept_col = c
+                break
     real_candidat_col = find_similar_column(candidat_col, available_columns)
     real_statut_col = find_similar_column(statut_col, available_columns)
     real_entite_col = find_similar_column(entite_col, available_columns)
@@ -1412,6 +1433,8 @@ def calculate_weekly_metrics(df_recrutement):
         df[real_date_reception_col] = pd.to_datetime(df[real_date_reception_col], errors='coerce')
     if real_date_integration_col:
         df[real_date_integration_col] = pd.to_datetime(df[real_date_integration_col], errors='coerce')
+    if real_accept_col:
+        df[real_accept_col] = pd.to_datetime(df[real_accept_col], errors='coerce')
     
     # Calculer les métriques par entité
     entites = df[real_entite_col].dropna().unique()
@@ -1419,38 +1442,60 @@ def calculate_weekly_metrics(df_recrutement):
     
     for entite in entites:
         df_entite = df[df[real_entite_col] == entite]
-        
-        # 1. Postes ouverts avant début semaine (En cours la semaine dernière)
+        # Définitions temporelles
+        last_week_end = start_of_week - timedelta(seconds=1)
+
+        # 1. Nb postes ouverts avant début semaine
+        # Logique: postes qui étaient encore actifs (non pourvus) à la fin de la semaine dernière
         postes_avant = 0
         if real_date_reception_col:
-            postes_avant = len(df_entite[
-                (df_entite[real_statut_col] == 'En cours') &
-                (df_entite[real_date_reception_col] < start_of_week)
-            ])
-        
-        # 2. Nouveaux postes ouverts cette semaine (Date réception cette semaine)
+            # ouverts avant ou égal à la fin de la semaine dernière
+            opened_before = df_entite[ df_entite[real_date_reception_col] <= last_week_end ]
+            if real_accept_col:
+                # considérer pourvus uniquement si acceptance date <= last_week_end
+                not_yet_pourvus = opened_before[ opened_before[real_accept_col].isna() | (opened_before[real_accept_col] > last_week_end) ]
+            else:
+                # si pas de date d'acceptation, utiliser l'absence de nom candidat comme proxy
+                if real_candidat_col:
+                    not_yet_pourvus = opened_before[ opened_before[real_candidat_col].isna() | (opened_before[real_candidat_col].astype(str).str.strip() == '') ]
+                else:
+                    not_yet_pourvus = opened_before
+            postes_avant = len(not_yet_pourvus)
+
+        # 2. Nb nouveaux postes ouverts cette semaine (date de réception dans la semaine courante)
         nouveaux_postes = 0
         if real_date_reception_col:
-            nouveaux_postes = len(df_entite[
-                (df_entite[real_date_reception_col] >= start_of_week) &
-                (df_entite[real_date_reception_col] <= today)
-            ])
-        
-        # 3. Postes pourvus cette semaine (Date intégration cette semaine)
+            nouveaux_postes = int( df_entite[ (df_entite[real_date_reception_col] >= start_of_week) & (df_entite[real_date_reception_col] <= today) ].shape[0] )
+
+        # 3. Nb postes pourvus cette semaine
         postes_pourvus = 0
-        if real_date_integration_col:
-            postes_pourvus = len(df_entite[
-                (df_entite[real_date_integration_col] >= start_of_week) &
-                (df_entite[real_date_integration_col] <= today)
-            ])
-        
-        # 4. Postes en cours cette semaine (Statut "En cours" ET pas de candidat retenu)
-        postes_en_cours = len(df_entite[df_entite[real_statut_col] == 'En cours'])
-        if real_candidat_col:
-            postes_en_cours = len(df_entite[
-                (df_entite[real_statut_col] == 'En cours') &
-                (df_entite[real_candidat_col].isna() | (df_entite[real_candidat_col].astype(str).str.strip() == ""))
-            ])
+        if real_candidat_col and real_accept_col:
+            mask_accept_this_week = (df_entite[real_accept_col] >= start_of_week) & (df_entite[real_accept_col] <= today)
+            mask_has_name = df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '')
+            postes_pourvus = int( df_entite[ mask_accept_this_week & mask_has_name ].shape[0] )
+        else:
+            # fallback: try using integration date as proxy for pourvus this week
+            if real_date_integration_col and real_candidat_col:
+                mask_integration_this_week = (df_entite[real_date_integration_col] >= start_of_week) & (df_entite[real_date_integration_col] <= today)
+                mask_has_name = df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '')
+                postes_pourvus = int( df_entite[ mask_integration_this_week & mask_has_name ].shape[0] )
+            else:
+                postes_pourvus = 0
+
+        # 4. Nb postes en cours cette semaine (cumulatif)
+        total_opened_until_now = 0
+        total_pourvus_until_now = 0
+        if real_date_reception_col:
+            total_opened_until_now = int( df_entite[ df_entite[real_date_reception_col] <= today ].shape[0] )
+        if real_candidat_col and real_accept_col:
+            total_pourvus_until_now = int( df_entite[ df_entite[real_accept_col].notna() & (df_entite[real_accept_col] <= today) & df_entite[real_candidat_col].notna() ].shape[0] )
+        elif real_candidat_col:
+            # fallback: any row with candidate name counts as pourvu
+            total_pourvus_until_now = int( df_entite[ df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '') ].shape[0] )
+
+        postes_en_cours = total_opened_until_now - total_pourvus_until_now
+        if postes_en_cours < 0:
+            postes_en_cours = 0
         
         metrics_by_entity[entite] = {
             'avant': postes_avant,
