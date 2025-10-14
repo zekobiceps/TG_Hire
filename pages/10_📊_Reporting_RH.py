@@ -12,6 +12,7 @@ import re
 from io import BytesIO
 import json
 import gspread
+from google.oauth2.service_account import Credentials
 
 st.set_page_config(
     page_title="📊 Reporting RH Complet",
@@ -84,6 +85,80 @@ def apply_global_filters(df, filters):
     if filters.get('direction') != 'Toutes':
         df_filtered = df_filtered[df_filtered['Direction concernée'] == filters['direction']]
     return df_filtered
+
+
+def authenticate_google_sheets(service_account_json):
+    """
+    Authentifier avec Google Sheets en utilisant un service account.
+    Basé sur les bonnes pratiques du tutoriel d'Adil Moujahid.
+    """
+    try:
+        # Définir les scopes nécessaires pour Google Sheets et Google Drive
+        scope = [
+            'https://spreadsheets.google.com/feeds',
+            'https://www.googleapis.com/auth/drive',
+            'https://www.googleapis.com/auth/spreadsheets'
+        ]
+        
+        # Créer les credentials depuis le JSON du service account
+        if isinstance(service_account_json, dict):
+            credentials = Credentials.from_service_account_info(service_account_json, scopes=scope)
+        else:
+            credentials = Credentials.from_service_account_file(service_account_json, scopes=scope)
+        
+        # Autoriser gspread avec les credentials
+        gc = gspread.authorize(credentials)
+        return gc
+        
+    except Exception as e:
+        st.error(f"Erreur lors de l'authentification Google Sheets: {e}")
+        return None
+
+
+def load_data_from_google_sheets(sheet_url, service_account_json=None):
+    """
+    Charger les données depuis Google Sheets avec authentification par service account.
+    """
+    try:
+        # Extraire l'ID de la feuille et le GID depuis l'URL
+        sheet_id_match = re.search(r"/d/([a-zA-Z0-9-_]+)", sheet_url)
+        gid_match = re.search(r"[?&]gid=(\d+)", sheet_url)
+        
+        if not sheet_id_match:
+            raise ValueError("Impossible d'extraire l'ID du Google Sheet depuis l'URL")
+        
+        sheet_id = sheet_id_match.group(1)
+        gid = gid_match.group(1) if gid_match else '0'
+        
+        # Si un service account est fourni, utiliser l'authentification
+        if service_account_json:
+            gc = authenticate_google_sheets(service_account_json)
+            if gc is None:
+                return None
+                
+            # Ouvrir la feuille par ID
+            sh = gc.open_by_key(sheet_id)
+            
+            # Sélectionner la worksheet par GID
+            try:
+                worksheet = sh.get_worksheet_by_id(int(gid))
+            except:
+                worksheet = sh.sheet1  # Fallback vers la première feuille
+            
+            # Récupérer toutes les données
+            data = worksheet.get_all_records()
+            df = pd.DataFrame(data)
+            
+            return df
+            
+        else:
+            # Essayer la méthode d'export CSV public
+            export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+            df = pd.read_csv(export_url)
+            return df
+            
+    except Exception as e:
+        raise e
 
 
 def load_data_from_files(csv_file=None, excel_file=None):
@@ -1158,44 +1233,56 @@ def main():
             if 'synced_recrutement_df' not in st.session_state:
                 st.session_state.synced_recrutement_df = None
 
+            # Interface pour uploader la clé de service account
+            service_file = st.file_uploader(
+                "Clé JSON du compte de service (optionnel)", 
+                type=['json'], 
+                key='gs_service_json',
+                help="Uploadez votre clé de service account Google Cloud pour accéder aux feuilles privées"
+            )
+            
             if st.button("🔁 Synchroniser depuis Google Sheets"):
-                # Construire l'URL d'export CSV à partir du lien fourni
-                # Extraire l'ID et le gid
+                st.info("Téléchargement en cours... cela peut prendre quelques secondes.")
+                
                 try:
-                    m = re.search(r"/d/([a-zA-Z0-9-_]+)", gs_url)
-                    gid_m = re.search(r"[?&]gid=(\d+)", gs_url)
-                    if not m:
-                        st.error("Impossible d'extraire l'ID du Google Sheet depuis l'URL fournie.")
-                    else:
-                        sheet_id = m.group(1)
-                        gid_val = gid_m.group(1) if gid_m else '0'
-                        export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid_val}"
-                        st.info("Téléchargement en cours... cela peut prendre quelques secondes.")
-                        try:
-                            df_synced = pd.read_csv(export_url)
-                            st.session_state.synced_recrutement_df = df_synced
-                            st.session_state.data_updated = True
+                    # Préparer les credentials du service account si fournis
+                    service_account_json = None
+                    if service_file is not None:
+                        service_account_json = json.load(service_file)
+                        service_file.seek(0)  # Reset file pointer
+                    
+                    # Utiliser notre nouvelle fonction améliorée
+                    df_synced = load_data_from_google_sheets(gs_url, service_account_json)
+                    
+                    if df_synced is not None:
+                        st.session_state.synced_recrutement_df = df_synced
+                        st.session_state.data_updated = True
+                        if service_account_json:
+                            st.success("✅ Synchronisation via service account réussie. Les onglets ont été mis à jour.")
+                        else:
                             st.success("✅ Synchronisation Google Sheets réussie. Les onglets ont été mis à jour.")
-                        except Exception as e:
-                            # Si l'erreur est liée à l'autorisation, proposer l'upload d'une clé de compte de service
-                            err_str = str(e)
-                            st.error(f"Erreur lors du téléchargement depuis Google Sheets: {err_str}")
-                            if '401' in err_str or 'Unauthorized' in err_str or 'HTTP Error 401' in err_str:
-                                st.warning("La feuille Google semble privée. Vous pouvez fournir une clé de compte de service (JSON) pour vous authentifier.")
-                                service_file = st.file_uploader("Uploader la clé JSON du compte de service (optionnel)", type=['json'], key='gs_service_json')
-                                if service_file is not None:
-                                    try:
-                                        creds_json = json.load(service_file)
-                                        gc = gspread.service_account_from_dict(creds_json)
-                                        sh = gc.open_by_key(sheet_id)
-                                        worksheet = sh.get_worksheet_by_id(int(gid_val)) if gid_val else sh.sheet1
-                                        data = worksheet.get_all_records()
-                                        df_synced = pd.DataFrame(data)
-                                        st.session_state.synced_recrutement_df = df_synced
-                                        st.session_state.data_updated = True
-                                        st.success("✅ Synchronisation via compte de service réussie.")
-                                    except Exception as e2:
-                                        st.error(f"Échec de l'authentification via compte de service: {e2}")
+                    else:
+                        st.error("Échec de la synchronisation.")
+                        
+                except Exception as e:
+                    err_str = str(e)
+                    st.error(f"Erreur lors du téléchargement depuis Google Sheets: {err_str}")
+                    
+                    if '401' in err_str or 'Unauthorized' in err_str or 'HTTP Error 401' in err_str:
+                        st.warning("⚠️ **Feuille Google privée détectée**")
+                        st.markdown("""
+                        **Pour résoudre ce problème:**
+                        1. Créez un compte de service dans Google Cloud Console
+                        2. Activez les APIs Google Sheets et Google Drive  
+                        3. Téléchargez la clé JSON du service account
+                        4. Partagez votre Google Sheet avec l'email du service account
+                        5. Uploadez la clé JSON ci-dessus et réessayez
+                        
+                        📖 [Guide détaillé](https://adilmoujahid.com/posts/2020/04/stocks-analysis-covid19-coronavirus-python/)
+                        """)
+                    else:
+                        st.error(f"Erreur technique: {err_str}")
+                        
                 except Exception as e:
                     st.error(f"Erreur lors du traitement de l'URL Google Sheets: {e}")
 
