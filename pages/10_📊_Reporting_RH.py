@@ -811,7 +811,6 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
 
     # ... KPI row now includes Délai moyen de recrutement (moved up)
 
-
 def create_demandes_recrutement_tab(df_recrutement, global_filters):
     """Onglet Demandes de Recrutement avec style carte"""
     
@@ -1664,101 +1663,169 @@ def create_weekly_report_tab(df_recrutement=None):
     # Section Debug (expandable): montrer les lignes et pourquoi elles sont comptées
     with st.expander("🔍 Debug - Détails des lignes (ouvrir/fermer)", expanded=False):
         try:
-            # Re-créer un DataFrame debug à partir des colonnes détectées dans calculate_weekly_metrics
-            # Réutiliser la logique de détection des colonnes
             df_debug = df_recrutement.copy() if df_recrutement is not None else pd.DataFrame()
             if not df_debug.empty:
-                # Attempt to find the columns used earlier
                 cols = df_debug.columns.tolist()
-                # heuristiques similaires
-                def find_col_like(keywords):
-                    for k in keywords:
-                        for c in cols:
-                            if k in c.lower():
-                                return c
+
+                def find_similar_column(target_col, available_cols):
+                    target_lower = target_col.lower()
+                    for col in available_cols:
+                        if col.lower() == target_lower:
+                            return col
+                    if "date" in target_lower and "réception" in target_lower:
+                        for col in available_cols:
+                            if "date" in col.lower() and ("réception" in col.lower() or "reception" in col.lower() or "demande" in col.lower()):
+                                return col
+                    if "date" in target_lower and "intégration" in target_lower:
+                        for col in available_cols:
+                            if "date" in col.lower() and ("intégration" in col.lower() or "integration" in col.lower() or "entrée" in col.lower()):
+                                return col
+                    if "candidat" in target_lower and "retenu" in target_lower:
+                        for col in available_cols:
+                            if ("candidat" in col.lower() and "retenu" in col.lower()) or ("nom" in col.lower() and "prénom" in col.lower()):
+                                return col
+                    if "statut" in target_lower:
+                        for col in available_cols:
+                            if "statut" in col.lower() or "status" in col.lower():
+                                return col
+                    if "entité" in target_lower or "entite" in target_lower:
+                        for col in available_cols:
+                            if "entité" in col.lower() or "entite" in col.lower():
+                                return col
                     return None
 
-                col_entite = find_col_like(['entité', 'entite', 'entité demandeuse', 'entite demandeuse']) or 'Entité demandeuse' if 'Entité demandeuse' in cols else None
-                col_statut = find_col_like(['statut', 'status'])
-                # Use the exact candidate column name required by the user
-                exact_candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
-                if exact_candidat_col in cols:
-                    col_candidat = exact_candidat_col
-                else:
-                    col_candidat = None
-                col_accept = find_col_like(['acceptation', "date d'acceptation", 'date d accept'])
-                col_reception = find_col_like(['réception', 'reception', 'date de réception', 'date de reception'])
+                date_reception_col = "Date de réception de la demande après validation de la DRH"
+                date_integration_col = "Date d'intégration prévisionnelle"
+                candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
 
-                # Create debug columns
+                real_date_reception_col = find_similar_column(date_reception_col, cols)
+                real_date_integration_col = find_similar_column(date_integration_col, cols)
+                real_accept_col = None
+                for alt in ['Date d\'acceptation du candidat','Date d\'acceptation','Date d\'acceptation de la promesse',"Date d'accept"]:
+                    c = find_similar_column(alt, cols)
+                    if c:
+                        real_accept_col = c
+                        break
+                real_candidat_col = candidat_col if candidat_col in cols else find_similar_column(candidat_col, cols)
+                real_statut_col = find_similar_column('Statut de la demande', cols)
+                real_entite_col = find_similar_column('Entité demandeuse', cols) or find_similar_column('Entité', cols)
+
                 rd = st.session_state.get('reporting_date', None)
                 if rd is None:
                     today = datetime.now()
                 else:
                     today = rd if isinstance(rd, datetime) else datetime.combine(rd, datetime.min.time())
                 start_of_week = today - timedelta(days=today.weekday())
+                start_of_last_week = start_of_week - timedelta(days=7)
 
-                debug_rows = []
-                for idx, r in df_debug.iterrows():
-                    ent = r.get(col_entite, '') if col_entite in df_debug.columns else r.get('Entité demandeuse', '')
-                    statut_raw = r.get(col_statut, '') if col_statut in df_debug.columns else r.get('Statut de la demande', '')
-                    candidat_raw = r.get(col_candidat, '') if col_candidat in df_debug.columns else r.get("Nom Prénom du candidat retenu yant accepté la promesse d'embauche", '')
-                    accept_raw = r.get(col_accept, '') if col_accept in df_debug.columns else None
-                    reception_raw = r.get(col_reception, '') if col_reception in df_debug.columns else None
+                if real_date_reception_col and real_date_reception_col in df_debug.columns:
+                    df_debug[real_date_reception_col] = pd.to_datetime(df_debug[real_date_reception_col], errors='coerce')
+                if real_date_integration_col and real_date_integration_col in df_debug.columns:
+                    df_debug[real_date_integration_col] = pd.to_datetime(df_debug[real_date_integration_col], errors='coerce')
+                if real_accept_col and real_accept_col in df_debug.columns:
+                    try:
+                        df_debug[real_accept_col] = _parse_mixed_dates(df_debug[real_accept_col])
+                    except Exception:
+                        df_debug[real_accept_col] = pd.to_datetime(df_debug[real_accept_col], errors='coerce')
 
-                    # normalize flags
-                    is_candidate = pd.notna(candidat_raw) and str(candidat_raw).strip() != ''
-                    # parse accept date robustly if present
-                    accept_dt = None
-                    if accept_raw is not None and pd.notna(accept_raw):
+                import unicodedata as _unicodedata
+                def _local_norm(x):
+                    if pd.isna(x):
+                        return ''
+                    s = str(x)
+                    s = _unicodedata.normalize('NFKD', s)
+                    s = ''.join(ch for ch in s if not _unicodedata.combining(ch))
+                    return s.lower()
+
+                mask_last_week = pd.Series(False, index=df_debug.index)
+                mask_this_week = pd.Series(False, index=df_debug.index)
+                mask_status_en_cours = pd.Series(False, index=df_debug.index)
+                mask_has_name = pd.Series(False, index=df_debug.index)
+                mask_accept_this_week = pd.Series(False, index=df_debug.index)
+                mask_integration_this_week = pd.Series(False, index=df_debug.index)
+                mask_reception_le_today = pd.Series(True, index=df_debug.index)
+
+                if real_date_reception_col and real_date_reception_col in df_debug.columns:
+                    mask_last_week = (df_debug[real_date_reception_col] >= start_of_last_week) & (df_debug[real_date_reception_col] < start_of_week)
+                    mask_this_week = (df_debug[real_date_reception_col] >= start_of_week) & (df_debug[real_date_reception_col] <= today)
+                    mask_reception_le_today = df_debug[real_date_reception_col].notna() & (df_debug[real_date_reception_col] <= today)
+
+                if real_statut_col and real_statut_col in df_debug.columns:
+                    mask_status_en_cours = df_debug[real_statut_col].fillna("").astype(str).apply(lambda s: ('en cours' in _local_norm(s)) or ('encours' in _local_norm(s)))
+
+                if real_candidat_col and real_candidat_col in df_debug.columns:
+                    mask_has_name = df_debug[real_candidat_col].notna() & (df_debug[real_candidat_col].astype(str).str.strip() != '')
+
+                if real_accept_col and real_accept_col in df_debug.columns:
+                    mask_accept_this_week = (df_debug[real_accept_col] >= start_of_week) & (df_debug[real_accept_col] <= today)
+
+                if real_date_integration_col and real_date_integration_col in df_debug.columns:
+                    mask_integration_this_week = (df_debug[real_date_integration_col] >= start_of_week) & (df_debug[real_date_integration_col] <= today)
+
+                contributes_avant = mask_last_week
+                contributes_nouveaux = mask_this_week
+                contributes_pourvus = (mask_has_name & mask_status_en_cours & mask_accept_this_week) | (mask_has_name & mask_status_en_cours & mask_integration_this_week)
+                contributes_en_cours = mask_status_en_cours & mask_reception_le_today
+
+                any_contrib = contributes_avant | contributes_nouveaux | contributes_pourvus | contributes_en_cours
+
+                df_selected = df_debug[any_contrib].copy()
+
+                display_cols = []
+                if real_entite_col and real_entite_col in df_selected.columns:
+                    display_cols.append(real_entite_col)
+                if real_candidat_col and real_candidat_col in df_selected.columns:
+                    display_cols.append(real_candidat_col)
+                if real_statut_col and real_statut_col in df_selected.columns:
+                    display_cols.append(real_statut_col)
+                if real_date_reception_col and real_date_reception_col in df_selected.columns:
+                    display_cols.append(real_date_reception_col)
+                if real_accept_col and real_accept_col in df_selected.columns:
+                    display_cols.append(real_accept_col)
+
+                df_out = df_selected[display_cols].copy() if display_cols else df_selected.copy()
+                df_out['contrib_avant'] = contributes_avant.loc[df_out.index]
+                df_out['contrib_nouveaux'] = contributes_nouveaux.loc[df_out.index]
+                df_out['contrib_pourvus'] = contributes_pourvus.loc[df_out.index]
+                df_out['contrib_en_cours'] = contributes_en_cours.loc[df_out.index]
+
+                for dc in [real_date_reception_col, real_accept_col, real_date_integration_col]:
+                    if dc and dc in df_out.columns:
                         try:
-                            accept_dt = _parse_mixed_dates(pd.Series([accept_raw]))[0]
+                            df_out[dc] = pd.to_datetime(df_out[dc], errors='coerce').dt.strftime('%d/%m/%Y')
                         except Exception:
-                            try:
-                                accept_dt = pd.to_datetime(accept_raw, errors='coerce')
-                            except:
-                                accept_dt = None
+                            pass
 
-                    has_accept_this_week = False
-                    if accept_dt is not None and not pd.isna(accept_dt):
-                        has_accept_this_week = (accept_dt >= start_of_week) and (accept_dt <= today)
+                # Allow user to choose display mode: KPI contributors or all rows with statut 'En cours'
+                display_mode = st.radio("Mode d'affichage:", ["Contributeurs KPI", "Toutes lignes statut 'En cours'"], index=0)
 
-                    import unicodedata as _unicodedata
-                    def _local_norm(x):
-                        if pd.isna(x):
-                            return ''
-                        s = str(x)
-                        s = _unicodedata.normalize('NFKD', s)
-                        s = ''.join(ch for ch in s if not _unicodedata.combining(ch))
-                        return s.lower()
+                if display_mode == "Toutes lignes statut 'En cours'":
+                    if real_statut_col and real_statut_col in df_debug.columns:
+                        df_status = df_debug[mask_status_en_cours].copy()
+                        # show requested columns if available
+                        desired_cols = [
+                            'Poste demandé', 'Raison du recrutement', 'Entité demandeuse',
+                            'Direction concernée', 'Affectation', 'Nom Prénom du demandeur'
+                        ]
+                        available_show = [c for c in desired_cols if c in df_status.columns]
+                        if not available_show:
+                            # fallback to show key columns we detected earlier
+                            available_show = []
+                            if real_entite_col and real_entite_col in df_status.columns:
+                                available_show.append(real_entite_col)
+                            if real_candidat_col and real_candidat_col in df_status.columns:
+                                available_show.append(real_candidat_col)
+                            if real_statut_col and real_statut_col in df_status.columns:
+                                available_show.append(real_statut_col)
 
-                    status_en_cours = ('en cours' in _local_norm(statut_raw)) or ('encours' in _local_norm(statut_raw))
-
-                    counted_as_pourvu = bool(is_candidate and status_en_cours and has_accept_this_week)
-
-                    debug_rows.append({
-                        'index': idx,
-                        'Entité': ent,
-                        'Statut_raw': statut_raw,
-                        'Candidat_raw': candidat_raw,
-                        'Accept_date_parsed': accept_dt,
-                        'Has_accept_this_week': has_accept_this_week,
-                        'Status_en_cours': status_en_cours,
-                        'Counted_as_pourvu': counted_as_pourvu
-                    })
-
-                df_debug_display = pd.DataFrame(debug_rows)
-                # format dates for readability
-                if 'Accept_date_parsed' in df_debug_display.columns:
-                    df_debug_display['Accept_date_parsed'] = df_debug_display['Accept_date_parsed'].dt.strftime('%d/%m/%Y').fillna('')
-                # Filter: ne montrer que les lignes où la colonne candidate spécifiée est remplie
-                if col_candidat is None:
-                    st.warning(f"Colonne candidate exacte non trouvée: '{exact_candidat_col}'. Aucune ligne filtrée.")
-                    st.dataframe(df_debug_display, use_container_width=True)
+                        df_out_status = df_status[available_show].copy() if available_show else df_status.copy()
+                        st.info(f"Lignes avec statut 'En cours' détectées: {len(df_out_status)}")
+                        st.dataframe(df_out_status.reset_index(drop=True), use_container_width=True)
+                    else:
+                        st.warning("Colonne de statut introuvable — impossible de lister les lignes 'En cours'.")
                 else:
-                    # show only rows where Candidat_raw is non-empty
-                    df_filtered = df_debug_display[df_debug_display['Candidat_raw'].notna() & (df_debug_display['Candidat_raw'].astype(str).str.strip() != '')]
-                    st.info(f"Affichage des lignes où '{exact_candidat_col}' est rempli: {len(df_filtered)} lignes")
-                    st.dataframe(df_filtered, use_container_width=True)
+                    st.info(f"Lignes contribuant aux KPI (avant/nouveaux/pourvus/en_cours): {len(df_out)} lignes")
+                    st.dataframe(df_out.reset_index(drop=True), use_container_width=True)
             else:
                 st.info('Aucune donnée pour le debug.')
         except Exception as e:
