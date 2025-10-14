@@ -267,6 +267,7 @@ def create_integration_timeline(df):
         color_discrete_map={'En cours': '#ff6b6b', 'Complet': '#51cf66'}
     )
     
+    fig.update_traces(hovertemplate='%{y}<extra></extra>')
     fig.update_layout(
         xaxis_title="Mois",
         yaxis_title="Nombre d'intégrations",
@@ -358,7 +359,11 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 title="Évolution des recrutements",
                 text='Count'
             )
-            fig_evolution.update_traces(marker_color='#1f77b4', textposition='outside')
+            fig_evolution.update_traces(
+                marker_color='#1f77b4', 
+                textposition='outside',
+                hovertemplate='%{y}<extra></extra>'
+            )
             fig_evolution.update_layout(height=300, xaxis_title=None, yaxis_title=None)
             st.plotly_chart(fig_evolution, use_container_width=True)
     
@@ -398,14 +403,22 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         direction_counts = df_filtered['Direction concernée'].value_counts().nlargest(10)
         fig_direction = px.bar(
             direction_counts,
-            y=direction_counts.index,
-            x=direction_counts.values,
-            orientation='h',
+            x=direction_counts.index,
+            y=direction_counts.values,
             title="Comparaison par direction",
             text=direction_counts.values
         )
-        fig_direction.update_traces(marker_color='#ff7f0e', textposition='auto')
-        fig_direction.update_layout(height=300, xaxis_title=None, yaxis_title=None, yaxis={'categoryorder':'total ascending'})
+        fig_direction.update_traces(
+            marker_color='#ff7f0e', 
+            textposition='auto',
+            hovertemplate='%{y}<extra></extra>'
+        )
+        fig_direction.update_layout(
+            height=300, 
+            xaxis_title=None, 
+            yaxis_title=None,
+            xaxis={'categoryorder':'total descending'}
+        )
         st.plotly_chart(fig_direction, use_container_width=True)
 
     with col4:
@@ -413,14 +426,22 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         poste_counts = df_filtered['Poste demandé'].value_counts().nlargest(10)
         fig_poste = px.bar(
             poste_counts,
-            y=poste_counts.index,
-            x=poste_counts.values,
-            orientation='h',
+            x=poste_counts.index,
+            y=poste_counts.values,
             title="Comparaison par poste",
             text=poste_counts.values
         )
-        fig_poste.update_traces(marker_color='#2ca02c', textposition='auto')
-        fig_poste.update_layout(height=300, xaxis_title=None, yaxis_title=None, yaxis={'categoryorder':'total ascending'})
+        fig_poste.update_traces(
+            marker_color='#2ca02c', 
+            textposition='auto',
+            hovertemplate='%{y}<extra></extra>'
+        )
+        fig_poste.update_layout(
+            height=300, 
+            xaxis_title=None, 
+            yaxis_title=None,
+            xaxis={'categoryorder':'total descending'}
+        )
         st.plotly_chart(fig_poste, use_container_width=True)
 
 
@@ -493,7 +514,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             st.metric(
                 "Nouvelles Demandes (ce mois-ci)", 
                 nouvelles_demandes,
-                help="Le nombre de demandes reçues durant le mois en cours. Indique la vélocité et la charge de travail entrante."
+                help="Le nombre de demandes reçues durant le mois en cours."
             )
         else:
             st.metric("Nouvelles Demandes (ce mois-ci)", "N/A")
@@ -507,7 +528,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             st.metric(
                 "Demandes Annulées/Dépriorisées", 
                 demandes_annulees,
-                help="Le nombre de demandes qui ont été stoppées. Essentiel pour comprendre la 'fuite' dans votre pipeline."
+                help="Le nombre de demandes qui ont été stoppées. 'fuite' du pipeline."
             )
         else:
             st.metric("Demandes Annulées/Dépriorisées", "N/A")
@@ -548,14 +569,22 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             raison_counts = df_filtered['Raison du recrutement'].value_counts()
             fig_raison = px.bar(
                 raison_counts,
-                x=raison_counts.values,
-                y=raison_counts.index,
-                orientation='h',
+                x=raison_counts.index,
+                y=raison_counts.values,
                 title="Comparaison par raison du recrutement",
                 text=raison_counts.values
             )
-            fig_raison.update_traces(marker_color='grey', textposition='auto')
-            fig_raison.update_layout(height=300, xaxis_title=None, yaxis_title=None)
+            fig_raison.update_traces(
+                marker_color='grey', 
+                textposition='auto',
+                hovertemplate='%{y}<extra></extra>'
+            )
+            fig_raison.update_layout(
+                height=300, 
+                xaxis_title=None, 
+                yaxis_title=None,
+                xaxis={'categoryorder':'total descending'}
+            )
             st.plotly_chart(fig_raison, use_container_width=True)
     
     with col3:
@@ -571,7 +600,11 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
                 title="Évolution des demandes",
                 text='Count'
             )
-            fig_evolution_demandes.update_traces(marker_color='#1f77b4', textposition='outside')
+            fig_evolution_demandes.update_traces(
+                marker_color='#1f77b4', 
+                textposition='outside',
+                hovertemplate='%{y}<extra></extra>'
+            )
             fig_evolution_demandes.update_layout(height=300, xaxis_title=None, yaxis_title=None)
             st.plotly_chart(fig_evolution_demandes, use_container_width=True)
     
@@ -583,14 +616,22 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         direction_counts = df_filtered['Direction concernée'].value_counts().nlargest(10)
         fig_direction = px.bar(
             direction_counts,
-            y=direction_counts.index,
-            x=direction_counts.values,
-            orientation='h',
+            x=direction_counts.index,
+            y=direction_counts.values,
             title="Comparaison par direction",
             text=direction_counts.values
         )
-        fig_direction.update_traces(marker_color='#ff7f0e', textposition='auto')
-        fig_direction.update_layout(height=400, xaxis_title=None, yaxis_title=None, yaxis={'categoryorder':'total ascending'})
+        fig_direction.update_traces(
+            marker_color='#ff7f0e', 
+            textposition='auto',
+            hovertemplate='%{y}<extra></extra>'
+        )
+        fig_direction.update_layout(
+            height=400, 
+            xaxis_title=None, 
+            yaxis_title=None,
+            xaxis={'categoryorder':'total descending'}
+        )
         st.plotly_chart(fig_direction, use_container_width=True)
     
     with col5:
@@ -598,14 +639,22 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         poste_counts = df_filtered['Poste demandé'].value_counts().nlargest(15)
         fig_poste = px.bar(
             poste_counts,
-            y=poste_counts.index,
-            x=poste_counts.values,
-            orientation='h',
+            x=poste_counts.index,
+            y=poste_counts.values,
             title="Comparaison par poste",
             text=poste_counts.values
         )
-        fig_poste.update_traces(marker_color='#2ca02c', textposition='auto')
-        fig_poste.update_layout(height=400, xaxis_title=None, yaxis_title=None, yaxis={'categoryorder':'total ascending'})
+        fig_poste.update_traces(
+            marker_color='#2ca02c', 
+            textposition='auto',
+            hovertemplate='%{y}<extra></extra>'
+        )
+        fig_poste.update_layout(
+            height=400, 
+            xaxis_title=None, 
+            yaxis_title=None,
+            xaxis={'categoryorder':'total descending'}
+        )
         st.plotly_chart(fig_poste, use_container_width=True)
 
 def create_integrations_tab(df_recrutement, global_filters):
@@ -670,7 +719,11 @@ def create_integrations_tab(df_recrutement, global_filters):
                 title="📈 Évolution des Intégrations Prévues",
                 text='Count'
             )
-            fig_evolution_int.update_traces(marker_color='#2ca02c', textposition='outside')
+            fig_evolution_int.update_traces(
+                marker_color='#2ca02c', 
+                textposition='outside',
+                hovertemplate='%{y}<extra></extra>'
+            )
             fig_evolution_int.update_layout(height=400, xaxis_title="Mois", yaxis_title="Nombre")
             st.plotly_chart(fig_evolution_int, use_container_width=True)
     
