@@ -113,27 +113,72 @@ def render_kpi_cards(recrutements, postes, directions, delai_display, delai_help
     <div class='kpi-card kpi-accent' style='flex:2'>
         <div class='title'>Nombre de recrutements</div>
         <div class='value'>{recrutements:,}</div>
-        <div class='kpi-help'>Total des recrutements filtrés</div>
     </div>
     <div class='kpi-card kpi-green'>
-            <div class='title'>Postes concernés</div>
-            <div class='value'>{postes:,}</div>
-            <div class='kpi-help'>Postes uniques</div>
-        </div>
-        <div class='kpi-card kpi-orange'>
-            <div class='title'>Nombre de Directions concernées</div>
-            <div class='value'>{directions:,}</div>
-            <div class='kpi-help'>Directions uniques</div>
-        </div>
-        <div class='kpi-card kpi-purple'>
-            <div class='title'>Délai moyen recrutement (jours)</div>
-            <div class='value'>{delai_display}</div>
-            <div class='kpi-help'>{delai_help or ''}</div>
-        </div>
+        <div class='title'>Postes concernés</div>
+        <div class='value'>{postes:,}</div>
+    </div>
+    <div class='kpi-card kpi-orange'>
+        <div class='title'>Nombre de Directions concernées</div>
+        <div class='value'>{directions:,}</div>
+    </div>
+    <div class='kpi-card kpi-purple'>
+        <div class='title'>Délai moyen recrutement (jours)</div>
+        <div class='value'>{delai_display}</div>
+    </div>
 </div>
 """
 
         st.markdown(html, unsafe_allow_html=True)
+
+
+def render_kpi_row_generic(items):
+    """Render a single-row set of KPI cards from a list of items.
+
+    items: list of dicts {"title": str, "value": str/int, "color": "accent|green|orange|purple"}
+    """
+    css = """
+<style>
+.kpi-row{display:flex;gap:12px;flex-wrap:nowrap;align-items:stretch;margin-bottom:12px}
+.kpi-card{flex:1 1 0;background:#fff;border-radius:6px;padding:12px;display:flex;flex-direction:column;justify-content:center;border:1px solid #e6eef6}
+.kpi-card .title{font-size:12px;color:#2c3e50;margin-bottom:6px}
+.kpi-card .value{font-size:22px;font-weight:700;color:#172b4d}
+.kpi-accent{border-left:6px solid #1f77b4}
+.kpi-green{border-left-color:#2ca02c}
+.kpi-orange{border-left-color:#ff7f0e}
+.kpi-purple{border-left-color:#6f42c1}
+@media(max-width:800px){.kpi-row{flex-direction:column}}
+</style>
+"""
+
+    # Default color classes map
+    color_map = {
+        'accent': 'kpi-accent',
+        'green': 'kpi-green',
+        'orange': 'kpi-orange',
+        'purple': 'kpi-purple'
+    }
+
+    html = css + "\n<div class='kpi-row'>\n"
+    for idx, it in enumerate(items):
+        cls = color_map.get(it.get('color', 'accent'), 'kpi-accent')
+        flex_style = "style='flex:2'" if idx == 0 else ''
+        html += f"    <div class='kpi-card {cls}' {flex_style}>\n"
+        html += f"        <div class='title'>{it.get('title','')}</div>\n"
+        value = it.get('value','')
+        # format numbers with thousands separator when possible
+        try:
+            if isinstance(value, (int, float)):
+                value_str = f"{int(value):,}" if float(value).is_integer() else f"{value:,}"
+            else:
+                value_str = str(value)
+        except Exception:
+            value_str = str(value)
+        html += f"        <div class='value'>{value_str}</div>\n"
+        html += "    </div>\n"
+    html += "</div>"
+
+    st.markdown(html, unsafe_allow_html=True)
 
 
 def compute_time_to_hire(df, start_cols=None, end_cols=None, status_col='Statut de la demande', status_value='Clôture', drop_negative=True):
@@ -1429,11 +1474,14 @@ def create_weekly_report_tab(df_recrutement=None):
 
     # 1. Section "Chiffres Clés"
     st.subheader("Chiffres Clés de la semaine")
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Postes en cours cette semaine", total_en_cours)
-    col2.metric("Postes pourvus cette semaine", total_pourvus)
-    col3.metric("Nouveaux postes ouverts", total_nouveaux)
-    col4.metric("Total postes ouverts avant la semaine", total_avant)
+    # Use the same bordered KPI row styling here for consistency
+    items = [
+        {"title": "Postes en cours cette semaine", "value": total_en_cours, "color": "accent"},
+        {"title": "Postes pourvus cette semaine", "value": total_pourvus, "color": "green"},
+        {"title": "Nouveaux postes ouverts", "value": total_nouveaux, "color": "orange"},
+        {"title": "Total postes ouverts avant la semaine", "value": total_avant, "color": "purple"}
+    ]
+    render_kpi_row_generic(items)
 
     st.markdown("---")
 
