@@ -504,21 +504,39 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         date_retour_rh_col = 'Date du 1er retour equipe RH  au demandeur'
         
         if date_reception_col in df_filtered.columns and date_retour_rh_col in df_filtered.columns:
-            # Calcul : DATEDIFF([Date de réception],[Date du 1er retour equipe RH],day)
-            df_filtered['Duree de recrutement'] = (df_filtered[date_retour_rh_col] - df_filtered[date_reception_col]).dt.days
-            # Filtrer les valeurs positives uniquement (retour après réception)
-            durees_valides = df_filtered['Duree de recrutement'][df_filtered['Duree de recrutement'] > 0]
-            delai_moyen = durees_valides.mean()
-
-            if not pd.isna(delai_moyen) and len(durees_valides) > 0:
-                fig_delai = go.Figure(go.Indicator(
-                    mode = "number",
-                    value = round(delai_moyen, 1),
-                    title = {"text": "Délai moyen de recrutement (jours)"}
-                ))
-                fig_delai.update_layout(height=300)
-                st.plotly_chart(fig_delai, use_container_width=True)
-            else:
+            try:
+                # Conversion sécurisée des colonnes en datetime
+                df_filtered[date_reception_col] = pd.to_datetime(df_filtered[date_reception_col], errors='coerce')
+                df_filtered[date_retour_rh_col] = pd.to_datetime(df_filtered[date_retour_rh_col], errors='coerce')
+                
+                # Vérifier qu'il y a des dates valides
+                dates_reception_valides = df_filtered[date_reception_col].notna()
+                dates_retour_valides = df_filtered[date_retour_rh_col].notna()
+                dates_completes = dates_reception_valides & dates_retour_valides
+                
+                if dates_completes.sum() > 0:
+                    # Calcul : DATEDIFF([Date de réception],[Date du 1er retour equipe RH],day)
+                    df_filtered['Duree de recrutement'] = (df_filtered[date_retour_rh_col] - df_filtered[date_reception_col]).dt.days
+                    # Filtrer les valeurs positives uniquement (retour après réception)
+                    durees_valides = df_filtered['Duree de recrutement'][
+                        (df_filtered['Duree de recrutement'] > 0) & df_filtered['Duree de recrutement'].notna()
+                    ]
+                    
+                    if len(durees_valides) > 0:
+                        delai_moyen = durees_valides.mean()
+                        fig_delai = go.Figure(go.Indicator(
+                            mode = "number",
+                            value = round(delai_moyen, 1),
+                            title = {"text": "Délai moyen de recrutement (jours)"}
+                        ))
+                        fig_delai.update_layout(height=300)
+                        st.plotly_chart(fig_delai, use_container_width=True)
+                    else:
+                        st.info("Aucune durée de recrutement valide trouvée pour le calcul.")
+                else:
+                    st.info("Aucune date valide trouvée pour calculer le délai de recrutement.")
+            except Exception as e:
+                st.error(f"Erreur lors du calcul du délai de recrutement: {e}")
                 st.info("Le calcul du délai moyen de recrutement n'est pas disponible.")
         else:
             st.warning(f"Colonnes nécessaires non trouvées: '{date_reception_col}' et/ou '{date_retour_rh_col}'")
