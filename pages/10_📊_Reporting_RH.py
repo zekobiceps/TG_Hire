@@ -35,6 +35,10 @@ def _truncate_label(label: str, max_len: int = 20) -> str:
     return label[: max_len - 4].rstrip() + '....'
 
 
+# Shared title font used for all main charts so typography is consistent
+TITLE_FONT = dict(family="Arial, sans-serif", size=16, color="#111111", )
+
+
 # CSS pour styliser le bouton Google Sheets en rouge vif
 st.markdown("""
 <style>
@@ -397,14 +401,25 @@ def render_plotly_scrollable(fig, max_height=500):
     try:
         # Use components.html so the plotly JS is executed correctly in Streamlit
         html = fig.to_html(full_html=False, include_plotlyjs='cdn')
+        # Inject a small CSS block that targets Plotly's title classes inside the
+        # generated HTML so we can enforce consistent font and left alignment
+        injected_css = """
+<style>
+/* Ensure the plotly SVG title (gtitle) uses our TITLE_FONT and is left-aligned */
+.plotly .gtitle, .plotly .gtitle text { font-family: Arial, sans-serif !important; font-size: 16px !important; fill: #111111 !important; }
+.plotly .gtitle { text-anchor: start !important; }
+/* Force the plot container to align left inside the Streamlit component */
+.streamlit-plotly-wrapper{ display:flex; justify-content:flex-start; }
+</style>
+"""
+
         # Wrap the plot HTML in a left-aligned container so the chart isn't centered
         wrapper = f"""
-        <div style='display:flex; justify-content:flex-start; align-items:flex-start;'>
-          <div style='width:100%;'>
-            {html}
-          </div>
-        </div>
-        """
+<div class='streamlit-plotly-wrapper' style='width:100%;'>
+  {injected_css}
+  {html}
+</div>
+"""
         # components.html supports scrolling and executes scripts
         components.html(wrapper, height=max_height, scrolling=True)
     except Exception:
@@ -539,12 +554,12 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         try:
-            fig_direction.update_layout(title=dict(text="Comparaison par direction", x=0, xanchor='left', font=dict(size=18)))
+            fig_direction.update_layout(title=dict(text="Comparaison par direction", x=0, xanchor='left', font=TITLE_FONT))
         except Exception:
             pass
         # Standardize title styling (left aligned)
         try:
-            fig_direction.update_layout(title=dict(text="Comparaison par direction", x=0, xanchor='left', font=dict(size=18)))
+            fig_direction.update_layout(title=dict(text="Comparaison par direction", x=0, xanchor='left', font=TITLE_FONT))
         except Exception:
             pass
         # Largest at top: reverse the category array so descending values appear from top to bottom
@@ -586,11 +601,11 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         try:
-            fig_poste.update_layout(title=dict(text="Comparaison par poste", x=0, xanchor='left', font=dict(size=18)))
+            fig_poste.update_layout(title=dict(text="Comparaison par poste", x=0, xanchor='left', font=TITLE_FONT))
         except Exception:
             pass
         try:
-            fig_poste.update_layout(title=dict(text="Comparaison par poste", x=0, xanchor='left', font=dict(size=18)))
+            fig_poste.update_layout(title=dict(text="Comparaison par poste", x=0, xanchor='left', font=TITLE_FONT))
         except Exception:
             pass
         height_poste = max(300, 28 * len(df_poste))
@@ -737,7 +752,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         statut_counts = df_filtered['Statut de la demande'].value_counts()
         fig_statut = go.Figure(data=[go.Pie(labels=statut_counts.index, values=statut_counts.values, hole=.5)])
         fig_statut.update_layout(
-            title="Répartition par statut de la demande",
+            title=dict(text="Répartition par statut de la demande", x=0, xanchor='left', font=TITLE_FONT),
             height=300,
             legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5)
         )
@@ -765,7 +780,8 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
                 height=300, 
                 xaxis_title=None, 
                 yaxis_title=None,
-                xaxis={'categoryorder':'total descending'}
+                xaxis={'categoryorder':'total descending'},
+                title=dict(text="Comparaison par raison du recrutement", x=0, xanchor='left', font=TITLE_FONT)
             )
             st.plotly_chart(fig_raison, use_container_width=True)
     
@@ -837,7 +853,8 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             xaxis_title=None,
             yaxis_title=None,
             margin=dict(l=160, t=40, b=30, r=20),
-            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_dir)
+            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_dir),
+            title=dict(text="Comparaison par direction", x=0, xanchor='left', font=TITLE_FONT)
         )
         # Render inside the column so the two charts are on the same row and the component width matches the column
         render_plotly_scrollable(fig_direction, max_height=320)
@@ -874,7 +891,8 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             xaxis_title=None,
             yaxis_title=None,
             margin=dict(l=160, t=40, b=30, r=20),
-            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_poste)
+            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_poste),
+            title=dict(text="Comparaison par poste", x=0, xanchor='left', font=TITLE_FONT)
         )
         render_plotly_scrollable(fig_poste, max_height=320)
 
