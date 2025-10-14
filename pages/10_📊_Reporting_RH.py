@@ -771,13 +771,17 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         )
         # Dynamic height so long lists become scrollable on the page
         height_dir = max(300, 28 * len(df_direction))
+        # Ensure largest values appear on top by reversing the category array
+        category_array_dir = list(df_direction['Direction'][::-1])
         fig_direction.update_layout(
             height=height_dir,
             xaxis_title=None,
             yaxis_title=None,
-            yaxis=dict(categoryorder='array', categoryarray=df_direction['Direction'])
+            margin=dict(l=180, t=40, b=30, r=20),
+            yaxis=dict(automargin=True, tickfont=dict(size=11), categoryorder='array', categoryarray=category_array_dir)
         )
-    render_plotly_scrollable(fig_direction, max_height=320)
+        # Render inside the column so the two charts are on the same row and the component width matches the column
+        render_plotly_scrollable(fig_direction, max_height=320)
     
     with col5:
         # Comparaison par poste
@@ -801,13 +805,15 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             hovertemplate='%{x}<extra></extra>'
         )
         height_poste = max(300, 28 * len(df_poste))
+        category_array_poste = list(df_poste['Poste'][::-1])
         fig_poste.update_layout(
             height=height_poste,
             xaxis_title=None,
             yaxis_title=None,
-            yaxis=dict(categoryorder='array', categoryarray=df_poste['Poste'])
+            margin=dict(l=180, t=40, b=30, r=20),
+            yaxis=dict(automargin=True, tickfont=dict(size=11), categoryorder='array', categoryarray=category_array_poste)
         )
-    render_plotly_scrollable(fig_poste, max_height=320)
+        render_plotly_scrollable(fig_poste, max_height=320)
 
 def create_integrations_tab(df_recrutement, global_filters):
     """Onglet Intégrations basé sur les bonnes données"""
