@@ -21,6 +21,20 @@ st.set_page_config(
     layout="wide"
 )
 
+
+def _truncate_label(label: str, max_len: int = 20) -> str:
+    """Truncate long labels to a max length and append ellipsis.
+
+    Returns a truncated string (if needed). Keep a plain truncation without
+    changing accents/characters. Default max_len=20 (adjustable).
+    """
+    if not isinstance(label, str):
+        return label
+    if len(label) <= max_len:
+        return label
+    return label[: max_len - 4].rstrip() + '....'
+
+
 # CSS pour styliser le bouton Google Sheets en rouge vif
 st.markdown("""
 <style>
@@ -492,13 +506,16 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         # Convert Series to DataFrame for plotly express compatibility
         df_direction = direction_counts.rename_axis('Direction').reset_index(name='Count')
         df_direction = df_direction.sort_values('Count', ascending=False)
+        # Truncate long labels for readability, keep full label in customdata for hover
+        df_direction['Label_trunc'] = df_direction['Direction'].apply(lambda s: _truncate_label(s, max_len=24))
         fig_direction = px.bar(
             df_direction,
             x='Count',
-            y='Direction',
+            y='Label_trunc',
             title="Comparaison par direction",
             text='Count',
-            orientation='h'
+            orientation='h',
+            custom_data=['Direction']
         )
         fig_direction.update_traces(
             marker_color='#ff7f0e',
@@ -506,7 +523,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             texttemplate='%{x}',
             textfont=dict(size=11),
             textangle=90,
-            hovertemplate='%{x}<extra></extra>'
+            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         # Largest at top: reverse the category array so descending values appear from top to bottom
         height_dir = max(300, 28 * len(df_direction))
@@ -524,13 +541,15 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         poste_counts = df_filtered['Poste demandé'].value_counts()
         df_poste = poste_counts.rename_axis('Poste').reset_index(name='Count')
         df_poste = df_poste.sort_values('Count', ascending=False)
+        df_poste['Label_trunc'] = df_poste['Poste'].apply(lambda s: _truncate_label(s, max_len=24))
         fig_poste = px.bar(
             df_poste,
             x='Count',
-            y='Poste',
+            y='Label_trunc',
             title="Comparaison par poste",
             text='Count',
-            orientation='h'
+            orientation='h',
+            custom_data=['Poste']
         )
         fig_poste.update_traces(
             marker_color='#2ca02c',
@@ -538,7 +557,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             texttemplate='%{x}',
             textfont=dict(size=11),
             textangle=90,
-            hovertemplate='%{x}<extra></extra>'
+            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         height_poste = max(300, 28 * len(df_poste))
         fig_poste.update_layout(
@@ -751,23 +770,25 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         direction_counts = df_filtered['Direction concernée'].value_counts()
         df_direction = direction_counts.rename_axis('Direction').reset_index(name='Count')
         df_direction = df_direction.sort_values('Count', ascending=False)
-        # Horizontal bar for better readability when labels are long
+        # Truncate long labels for readability, keep full label in customdata for hover
+        df_direction['Label_trunc'] = df_direction['Direction'].apply(lambda s: _truncate_label(s, max_len=24))
         fig_direction = px.bar(
             df_direction,
             x='Count',
-            y='Direction',
+            y='Label_trunc',
             title="Comparaison par direction",
             text='Count',
-            orientation='h'
+            orientation='h',
+            custom_data=['Direction']
         )
-        # Show values inside bars vertically
+        # Show values inside bars and full label on hover
         fig_direction.update_traces(
             marker_color='#ff7f0e',
             textposition='inside',
             texttemplate='%{x}',
             textfont=dict(size=11),
             textangle=90,
-            hovertemplate='%{x}<extra></extra>'
+            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         # Dynamic height so long lists become scrollable on the page
         height_dir = max(300, 28 * len(df_direction))
@@ -788,13 +809,15 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         poste_counts = df_filtered['Poste demandé'].value_counts()
         df_poste = poste_counts.rename_axis('Poste').reset_index(name='Count')
         df_poste = df_poste.sort_values('Count', ascending=False)
+        df_poste['Label_trunc'] = df_poste['Poste'].apply(lambda s: _truncate_label(s, max_len=24))
         fig_poste = px.bar(
             df_poste,
             x='Count',
-            y='Poste',
+            y='Label_trunc',
             title="Comparaison par poste",
             text='Count',
-            orientation='h'
+            orientation='h',
+            custom_data=['Poste']
         )
         fig_poste.update_traces(
             marker_color='#2ca02c',
@@ -802,7 +825,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             texttemplate='%{x}',
             textfont=dict(size=11),
             textangle=90,
-            hovertemplate='%{x}<extra></extra>'
+            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         height_poste = max(300, 28 * len(df_poste))
         category_array_poste = list(df_poste['Poste'][::-1])
