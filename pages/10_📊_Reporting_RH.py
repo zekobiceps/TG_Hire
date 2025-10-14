@@ -12,7 +12,7 @@ import re
 from io import BytesIO
 import json
 import gspread
-from google.oauth2.service_account import Credentials
+from google.oauth2 import service_account
 
 st.set_page_config(
     page_title="📊 Reporting RH Complet",
@@ -87,37 +87,31 @@ def apply_global_filters(df, filters):
     return df_filtered
 
 
-def authenticate_google_sheets(service_account_json):
-    """
-    Authentifier avec Google Sheets en utilisant un service account.
-    Basé sur les bonnes pratiques du tutoriel d'Adil Moujahid.
-    """
+@st.cache_resource
+def get_gsheet_client():
+    """Crée et retourne un client gspread authentifié en utilisant les secrets Streamlit."""
     try:
-        # Définir les scopes nécessaires pour Google Sheets et Google Drive
-        scope = [
-            'https://spreadsheets.google.com/feeds',
-            'https://www.googleapis.com/auth/drive',
-            'https://www.googleapis.com/auth/spreadsheets'
-        ]
-        
-        # Créer les credentials depuis le JSON du service account
-        if isinstance(service_account_json, dict):
-            credentials = Credentials.from_service_account_info(service_account_json, scopes=scope)
-        else:
-            credentials = Credentials.from_service_account_file(service_account_json, scopes=scope)
-        
-        # Autoriser gspread avec les credentials
-        gc = gspread.authorize(credentials)
-        return gc
-        
+        service_account_info = {
+            "type": st.secrets["GCP_TYPE"],
+            "project_id": st.secrets["GCP_PROJECT_ID"],
+            "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
+            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n').strip(),
+            "client_email": st.secrets["GCP_CLIENT_EMAIL"],
+            "client_id": st.secrets["GCP_CLIENT_ID"],
+            "auth_uri": st.secrets["GCP_AUTH_URI"],
+            "token_uri": st.secrets["GCP_TOKEN_URI"],
+            "auth_provider_x509_cert_url": st.secrets["GCP_AUTH_PROVIDER_CERT_URL"],
+            "client_x509_cert_url": st.secrets["GCP_CLIENT_CERT_URL"]
+        }
+        return gspread.service_account_from_dict(service_account_info)
     except Exception as e:
-        st.error(f"Erreur lors de l'authentification Google Sheets: {e}")
+        st.error(f"❌ Erreur de connexion à Google Sheets. Vérifiez vos secrets. Détails: {e}")
         return None
 
 
-def load_data_from_google_sheets(sheet_url, service_account_json=None):
+def load_data_from_google_sheets(sheet_url):
     """
-    Charger les données depuis Google Sheets avec authentification par service account.
+    Charger les données depuis Google Sheets avec authentification automatique via les secrets.
     """
     try:
         # Extraire l'ID de la feuille et le GID depuis l'URL
@@ -130,34 +124,44 @@ def load_data_from_google_sheets(sheet_url, service_account_json=None):
         sheet_id = sheet_id_match.group(1)
         gid = gid_match.group(1) if gid_match else '0'
         
-        # Si un service account est fourni, utiliser l'authentification
-        if service_account_json:
-            gc = authenticate_google_sheets(service_account_json)
-            if gc is None:
-                return None
-                
-            # Ouvrir la feuille par ID
-            sh = gc.open_by_key(sheet_id)
-            
-            # Sélectionner la worksheet par GID
-            try:
-                worksheet = sh.get_worksheet_by_id(int(gid))
-            except:
-                worksheet = sh.sheet1  # Fallback vers la première feuille
-            
-            # Récupérer toutes les données
-            data = worksheet.get_all_records()
-            df = pd.DataFrame(data)
-            
-            return df
-            
-        else:
-            # Essayer la méthode d'export CSV public
+        # Utiliser le client authentifié avec les secrets
+        gc = get_gsheet_client()
+        if gc is None:
+            # Fallback vers l'export CSV public si l'authentification échoue
             export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
             df = pd.read_csv(export_url)
             return df
-            
+        
+        # Ouvrir la feuille par ID
+        sh = gc.open_by_key(sheet_id)
+        
+        # Sélectionner la worksheet par GID
+        try:
+            worksheet = sh.get_worksheet_by_id(int(gid))
+        except:
+            worksheet = sh.sheet1  # Fallback vers la première feuille
+        
+        # Récupérer toutes les données
+        data = worksheet.get_all_records()
+        df = pd.DataFrame(data)
+        
+        return df
+        
     except Exception as e:
+        # Si l'authentification échoue, essayer l'export CSV public
+        try:
+            sheet_id_match = re.search(r"/d/([a-zA-Z0-9-_]+)", sheet_url)
+            gid_match = re.search(r"[?&]gid=(\d+)", sheet_url)
+            
+            if sheet_id_match:
+                sheet_id = sheet_id_match.group(1)
+                gid = gid_match.group(1) if gid_match else '0'
+                export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+                df = pd.read_csv(export_url)
+                return df
+        except:
+            pass
+        
         raise e
 
 
@@ -1226,65 +1230,49 @@ def main():
         col1, col2 = st.columns(2)
 
         with col1:
-            st.subheader("� Synchroniser depuis Google Sheets")
-            st.markdown("Indiquez le lien vers votre Google Sheet ou laissez le lien par défaut, puis cliquez sur '🔁 Synchroniser depuis Google Sheets'.")
+            st.subheader("🔗 Synchroniser depuis Google Sheets")
+            st.markdown("Indiquez le lien vers votre Google Sheet ou laissez le lien par défaut, puis cliquez sur '🔁 Synchroniser'.")
             default_sheet = "https://docs.google.com/spreadsheets/d/1hvghSMjcbdY8yNZOWqALBpgMdLWB5CxVJCDwEm6JULI/edit?gid=785271056#gid=785271056"
             gs_url = st.text_input("URL Google Sheet", value=default_sheet, key="gsheet_url")
+            
             if 'synced_recrutement_df' not in st.session_state:
                 st.session_state.synced_recrutement_df = None
-
-            # Interface pour uploader la clé de service account
-            service_file = st.file_uploader(
-                "Clé JSON du compte de service (optionnel)", 
-                type=['json'], 
-                key='gs_service_json',
-                help="Uploadez votre clé de service account Google Cloud pour accéder aux feuilles privées"
-            )
             
             if st.button("🔁 Synchroniser depuis Google Sheets"):
                 st.info("Téléchargement en cours... cela peut prendre quelques secondes.")
                 
                 try:
-                    # Préparer les credentials du service account si fournis
-                    service_account_json = None
-                    if service_file is not None:
-                        service_account_json = json.load(service_file)
-                        service_file.seek(0)  # Reset file pointer
+                    # Utiliser la fonction de connexion automatique (comme dans Home.py)
+                    df_synced = load_data_from_google_sheets(gs_url)
                     
-                    # Utiliser notre nouvelle fonction améliorée
-                    df_synced = load_data_from_google_sheets(gs_url, service_account_json)
-                    
-                    if df_synced is not None:
+                    if df_synced is not None and len(df_synced) > 0:
                         st.session_state.synced_recrutement_df = df_synced
                         st.session_state.data_updated = True
-                        if service_account_json:
-                            st.success("✅ Synchronisation via service account réussie. Les onglets ont été mis à jour.")
-                        else:
-                            st.success("✅ Synchronisation Google Sheets réussie. Les onglets ont été mis à jour.")
+                        st.success("✅ Synchronisation Google Sheets réussie ! Les onglets ont été mis à jour.")
                     else:
-                        st.error("Échec de la synchronisation.")
+                        st.warning("⚠️ Aucune donnée trouvée dans la feuille Google Sheets.")
                         
                 except Exception as e:
                     err_str = str(e)
-                    st.error(f"Erreur lors du téléchargement depuis Google Sheets: {err_str}")
+                    st.error(f"Erreur lors de la synchronisation: {err_str}")
                     
                     if '401' in err_str or 'Unauthorized' in err_str or 'HTTP Error 401' in err_str:
-                        st.warning("⚠️ **Feuille Google privée détectée**")
+                        st.error("❌ **Feuille Google privée** - Vérifiez que:")
                         st.markdown("""
-                        **Pour résoudre ce problème:**
-                        1. Créez un compte de service dans Google Cloud Console
-                        2. Activez les APIs Google Sheets et Google Drive  
-                        3. Téléchargez la clé JSON du service account
-                        4. Partagez votre Google Sheet avec l'email du service account
-                        5. Uploadez la clé JSON ci-dessus et réessayez
-                        
-                        📖 [Guide détaillé](https://adilmoujahid.com/posts/2020/04/stocks-analysis-covid19-coronavirus-python/)
+                        1. La feuille est partagée avec: `your-service-account@your-project.iam.gserviceaccount.com`
+                        2. Les secrets Streamlit sont correctement configurés
+                        3. L'URL de la feuille est correcte
+                        """)
+                    elif 'secrets' in err_str.lower():
+                        st.error("❌ **Configuration des secrets manquante**")
+                        st.markdown("""
+                        Assurez-vous que les secrets suivants sont configurés:
+                        - `GCP_TYPE`, `GCP_PROJECT_ID`, `GCP_PRIVATE_KEY_ID`
+                        - `GCP_PRIVATE_KEY`, `GCP_CLIENT_EMAIL`, `GCP_CLIENT_ID`
+                        - `GCP_AUTH_URI`, `GCP_TOKEN_URI`, etc.
                         """)
                     else:
                         st.error(f"Erreur technique: {err_str}")
-                        
-                except Exception as e:
-                    st.error(f"Erreur lors du traitement de l'URL Google Sheets: {e}")
 
             if st.session_state.get('synced_recrutement_df') is not None:
                 st.write("**Aperçu des données synchronisées :**")
