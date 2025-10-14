@@ -71,6 +71,31 @@ postes_data = [
 ]
 
 
+def create_integration_filters(df_recrutement, prefix=""):
+    """Créer des filtres spécifiques pour les intégrations (sans les périodes)"""
+    if df_recrutement is None or len(df_recrutement) == 0:
+        return {}
+
+    # Organiser les filtres dans deux colonnes dans la sidebar
+    filters = {}
+    left_col, right_col = st.sidebar.columns(2)
+
+    # Filtre par entité demandeuse (colonne gauche)
+    entites = ['Toutes'] + sorted(df_recrutement['Entité demandeuse'].dropna().unique())
+    with left_col:
+        filters['entite'] = st.selectbox("Entité demandeuse", entites, key=f"{prefix}_entite")
+
+    # Filtre par direction concernée (colonne droite)
+    directions = ['Toutes'] + sorted(df_recrutement['Direction concernée'].dropna().unique())
+    with right_col:
+        filters['direction'] = st.selectbox("Direction concernée", directions, key=f"{prefix}_direction")
+
+    # Pas de filtres de période pour les intégrations
+    filters['periode_recrutement'] = 'Toutes'
+    filters['periode_demande'] = 'Toutes'
+
+    return filters
+
 def create_global_filters(df_recrutement, prefix=""):
     """Créer des filtres globaux réutilisables pour tous les onglets"""
     if df_recrutement is None or len(df_recrutement) == 0:
@@ -90,8 +115,7 @@ def create_global_filters(df_recrutement, prefix=""):
     with right_col:
         filters['direction'] = st.selectbox("Direction concernée", directions, key=f"{prefix}_direction")
 
-    # Ajouter les filtres de période
-    st.sidebar.markdown("---")
+    # Ajouter les filtres de période (sans ligne de séparation)
     left_col2, right_col2 = st.sidebar.columns(2)
     
     # Filtre Période de recrutement (basé sur Date d'entrée effective)
@@ -786,7 +810,8 @@ def create_integrations_tab(df_recrutement, global_filters):
         if date_integration_col in df_filtered.columns:
             df_filtered['Mois_Integration'] = df_filtered[date_integration_col].dt.to_period('M')
             monthly_integration = df_filtered.groupby('Mois_Integration').size().reset_index(name='Count')
-            monthly_integration['Mois_str'] = monthly_integration['Mois_Integration'].astype(str)
+            # Convertir en nom de mois seulement (ex: "Janvier", "Février")
+            monthly_integration['Mois_str'] = monthly_integration['Mois_Integration'].dt.strftime('%B').str.capitalize()
             
             fig_evolution_int = px.bar(
                 monthly_integration, 
@@ -1544,9 +1569,9 @@ def main():
     with tabs[3]:
         # Onglet Intégrations basé sur les données Excel
         if df_recrutement is not None:
-            # Créer les filtres globaux pour les intégrations
+            # Créer les filtres spécifiques pour les intégrations (sans période)
             st.sidebar.subheader("🔧 Filtres - Intégrations")
-            int_filters = create_global_filters(df_recrutement, "integrations")
+            int_filters = create_integration_filters(df_recrutement, "integrations")
             create_integrations_tab(df_recrutement, int_filters)
         else:
             st.warning("📊 Aucune donnée disponible pour les intégrations. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
