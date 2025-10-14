@@ -39,6 +39,54 @@ def _truncate_label(label: str, max_len: int = 20) -> str:
 TITLE_FONT = dict(family="Arial, sans-serif", size=16, color="#111111", )
 
 
+def _parse_mixed_dates(series):
+    """Parse a pandas Series that may contain mixed date representations.
+
+    Strategy:
+      1. If values are numeric (Excel serial), convert using Excel epoch.
+      2. Try pd.to_datetime(..., dayfirst=True) to favor dd/mm/YYYY formats.
+      3. Fallback to pd.to_datetime(..., errors='coerce') for other formats.
+
+    Returns a datetime64[ns] Series with NaT for unparseable values.
+    """
+    s = series.copy()
+    # If numeric (float/int), treat as Excel serial date (days since 1899-12-30)
+    if pd.api.types.is_numeric_dtype(s):
+        try:
+            # Excel serial to datetime
+            origin = pd.Timestamp('1899-12-30')
+            return pd.to_timedelta(s.fillna(0).astype(float), unit='D') + origin
+        except Exception:
+            # fallback to generic parser
+            return pd.to_datetime(s, errors='coerce')
+
+    # If object dtype but mostly numeric strings, try to coerce to numeric first
+    # (handles cases where Google Sheets exports numbers as strings)
+    try:
+        coerced = pd.to_numeric(s.dropna().unique(), errors='coerce')
+        if len(coerced) > 0 and not pd.isna(coerced).all():
+            # At least some numeric-like values -> attempt serial conversion per-element
+            def _maybe_excel(x):
+                try:
+                    xf = float(x)
+                    return pd.Timestamp('1899-12-30') + pd.Timedelta(days=xf)
+                except Exception:
+                    return pd.NaT
+            return s.apply(lambda v: _maybe_excel(v) if pd.notna(v) and str(v).strip().replace('.','',1).isdigit() else pd.NaT).combine_first(pd.to_datetime(s, dayfirst=True, errors='coerce'))
+    except Exception:
+        pass
+
+    # First try dayfirst (common with French date formats)
+    parsed = pd.to_datetime(s, dayfirst=True, errors='coerce')
+    # If many values are NaT, try a more permissive parse
+    if parsed.isna().sum() > len(parsed) * 0.25:
+        parsed_alt = pd.to_datetime(s, errors='coerce')
+        # combine: prefer parsed (dayfirst) then parsed_alt
+        parsed = parsed.combine_first(parsed_alt)
+
+    return parsed
+
+
 def compute_time_to_hire(df, start_cols=None, end_cols=None, status_col='Statut de la demande', status_value='Clôture', drop_negative=True):
     """Compute time-to-hire (in days) between a request date and an entry/closure date.
 
@@ -418,7 +466,11 @@ def load_data_from_files(csv_file=None, excel_file=None):
             
             for col in date_columns:
                 if col in df_recrutement.columns:
-                    df_recrutement[col] = pd.to_datetime(df_recrutement[col], errors='coerce')
+                    try:
+                        df_recrutement[col] = _parse_mixed_dates(df_recrutement[col])
+                    except Exception:
+                        # fallback
+                        df_recrutement[col] = pd.to_datetime(df_recrutement[col], errors='coerce')
             
             # Nettoyer les colonnes avec des espaces
             df_recrutement.columns = df_recrutement.columns.str.strip()
