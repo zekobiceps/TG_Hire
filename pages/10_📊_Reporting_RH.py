@@ -20,6 +20,23 @@ st.set_page_config(
     layout="wide"
 )
 
+# CSS pour styliser le bouton Google Sheets en rouge vif
+st.markdown("""
+<style>
+.stButton > button[title="Synchroniser les données depuis Google Sheets"] {
+    background-color: #FF4B4B !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 5px !important;
+    font-weight: bold !important;
+}
+.stButton > button[title="Synchroniser les données depuis Google Sheets"]:hover {
+    background-color: #FF3333 !important;
+    color: white !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # Données pour le Kanban
 postes_data = [
     # Colonne Sourcing
@@ -1225,7 +1242,7 @@ def main():
     st.markdown("---")
     
     # Créer les onglets (Demandes et Recrutement regroupés)
-    tabs = st.tabs(["📂 Upload", "� Demandes & Recrutement", "📅 Hebdomadaire", "� Intégrations"])
+    tabs = st.tabs(["📂 Upload", "🗂️ Demandes & Recrutement", "📅 Hebdomadaire", "🤝 Intégrations"])
     
     # Variables pour stocker les fichiers uploadés
     # Use session_state to persist upload/refresh state
@@ -1236,9 +1253,6 @@ def main():
     uploaded_excel = st.session_state.uploaded_excel
     
     with tabs[0]:
-        st.header("📂 Upload des Fichiers de Données")
-        st.markdown("Uploadez vos fichiers pour mettre à jour les graphiques en temps réel.")
-        
         col1, col2 = st.columns(2)
 
         with col1:
@@ -1250,8 +1264,9 @@ def main():
             if 'synced_recrutement_df' not in st.session_state:
                 st.session_state.synced_recrutement_df = None
             
-            if st.button("🔁 Synchroniser depuis Google Sheets"):
-                st.info("Téléchargement en cours... cela peut prendre quelques secondes.")
+            if st.button("🔁 Synchroniser depuis Google Sheets", 
+                        help="Synchroniser les données depuis Google Sheets",
+                        use_container_width=True):
                 
                 try:
                     # Utiliser la fonction de connexion automatique (comme dans Home.py)
@@ -1260,7 +1275,9 @@ def main():
                     if df_synced is not None and len(df_synced) > 0:
                         st.session_state.synced_recrutement_df = df_synced
                         st.session_state.data_updated = True
-                        st.success("✅ Synchronisation Google Sheets réussie ! Les onglets ont été mis à jour.")
+                        nb_lignes = len(df_synced)
+                        nb_colonnes = len(df_synced.columns)
+                        st.success(f"✅ Synchronisation Google Sheets réussie ! Les onglets ont été mis à jour. ({nb_lignes} lignes, {nb_colonnes} colonnes)")
                     else:
                         st.warning("⚠️ Aucune donnée trouvée dans la feuille Google Sheets.")
                         
@@ -1286,12 +1303,6 @@ def main():
                     else:
                         st.error(f"Erreur technique: {err_str}")
 
-            if st.session_state.get('synced_recrutement_df') is not None:
-                st.write("**Aperçu des données synchronisées :**")
-                st.write(f"- Lignes: {len(st.session_state.synced_recrutement_df)}")
-                st.write(f"- Colonnes: {len(st.session_state.synced_recrutement_df.columns)}")
-                st.dataframe(st.session_state.synced_recrutement_df.head(3), use_container_width=True)
-
         with col2:
             st.subheader("📊 Fichier Excel - Données de Recrutement")
             uploaded_excel = st.file_uploader(
@@ -1316,8 +1327,9 @@ def main():
                 except Exception as e:
                     st.error(f"Erreur lors de la lecture de l'Excel: {e}")
         
-        # Bouton pour actualiser les données
-        if st.button("🔄 Actualiser les Graphiques", type="primary"):
+        # Bouton pour actualiser les données - s'étale sur les deux colonnes
+        st.markdown("---")
+        if st.button("🔄 Actualiser les Graphiques", type="primary", use_container_width=True):
             st.session_state.data_updated = True
             st.success("Données mises à jour ! Consultez les autres onglets.")
     
@@ -1325,7 +1337,6 @@ def main():
     df_integration, df_recrutement = load_data_from_files(None, uploaded_excel)
     
     # Message d'information sur les données chargées
-    # Only show a success if the user uploaded files or explicitly refreshed
     has_uploaded = (st.session_state.uploaded_excel is not None) or (st.session_state.get('synced_recrutement_df') is not None)
     if df_recrutement is None and df_integration is None:
         st.sidebar.warning("⚠️ Aucune donnée disponible. Veuillez uploader vos fichiers dans l'onglet 'Upload Fichiers'.")
@@ -1333,9 +1344,6 @@ def main():
         st.sidebar.warning("⚠️ Données de recrutement non disponibles. Seules les données d'intégration sont chargées.")
     elif df_integration is None:
         st.sidebar.warning("⚠️ Données d'intégration non disponibles. Seules les données de recrutement sont chargées.")
-    else:
-        if has_uploaded or st.session_state.data_updated:
-            st.sidebar.success("✅ Toutes les données sont chargées avec succès !")
 
     with tabs[1]:
         if df_recrutement is not None:

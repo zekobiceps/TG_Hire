@@ -125,7 +125,7 @@ Le système utilise exactement la même logique d'authentification que votre `Ho
 
 ---
 
-_**User (2025-10-14 14:25Z)**_
+_**User (2025-10-14 14:27Z)**_
 
 ca marche j'ai réeçu un message de réussite en vert mais j'ai reçu également cette erreur : TypeError: This app has encountered an error. The original error message is redacted to prevent data leaks. Full error details have been recorded in the logs (if you're on Streamlit Cloud, click on 'Manage app' in the lower right of your app).
 Traceback:
@@ -178,7 +178,71 @@ File "/home/adminuser/venv/lib/python3.13/site-packages/numpy/_core/_methods.py"
 
 _**Assistant (copilot/claude-sonnet-4)**_
 
+Je vois le problème ! L'erreur se produit quand le code essaie de faire la somme de la colonne `'Nb de candidats pré-selectionnés'`, mais cette colonne contient probablement des valeurs non-numériques (comme des chaînes vides, "N/A", ou autres textes).
 
+Regardons d'abord la fonction qui pose problème : Le problème est que la colonne contient des valeurs non-numériques. Je vais corriger cela en ajoutant une conversion sécurisée : 
+```
+
+```
+Maintenant, cherchons s'il y a d'autres endroits dans le code où ce type d'erreur pourrait se produire avec des colonnes numériques : Cherchons également d'autres opérations numériques qui pourraient poser problème : Regardons la ligne 424 qui calcule la durée moyenne : Ce code semble déjà être protégé. Cherchons d'autres occurrences potentiellement problématiques : Vérifions maintenant s'il y a d'autres erreurs potentielles avec les dates. Cherchons les colonnes de dates qui pourraient causer des problèmes : Les conversions de dates semblent déjà protégées avec `errors='coerce'`. Maintenant, ajoutons une protection générale au niveau de la fonction de traitement des données pour éviter ce type d'erreurs : Ajoutons une fonction de nettoyage des données numériques pour éviter ce type d'erreurs : 
+```
+
+```
+Maintenant, testons que le code est correct : Parfait ! Commitons et pushons la correction : ✅ **Erreur TypeError corrigée !**
+
+## 🐛 **Problème résolu :**
+
+### **Cause de l'erreur :**
+- La colonne `'Nb de candidats pré-selectionnés'` contenait des valeurs non-numériques (texte vide, "N/A", etc.)
+- Quand le code tentait `df_filtered['Nb de candidats pré-selectionnés'].sum()`, pandas ne pouvait pas additionner du texte
+- Erreur `TypeError` dans la fonction `nansum` de NumPy
+
+### **Solutions implémentées :**
+
+1. **Conversion sécurisée au moment du calcul :**
+   ```python
+   candidats_series = pd.to_numeric(df_filtered['Nb de candidats pré-selectionnés'], errors='coerce').fillna(0)
+   total_candidats = int(candidats_series.sum())
+   ```
+
+2. **Nettoyage préventif des données :**
+   ```python
+   numeric_columns = ['Nb de candidats pré-selectionnés']
+   for col in numeric_columns:
+       if col in df_recrutement.columns:
+           df_recrutement[col] = pd.to_numeric(df_recrutement[col], errors='coerce').fillna(0)
+   ```
+
+3. **Protection avec try-catch :**
+   - Gestion d'erreur si la colonne n'existe pas
+   - Valeur par défaut de 0 en cas de problème
+
+### **Résultat :**
+- ✅ **Plus d'erreur TypeError**
+- ✅ **Valeurs non-numériques converties automatiquement en 0**
+- ✅ **Interface utilisateur stable** même avec des données "sales"
+- ✅ **Graphiques fonctionnels** avec des valeurs cohérentes
+
+Votre application devrait maintenant fonctionner parfaitement sans erreurs, même si les données Google Sheets contiennent des valeurs non-numériques ! 🚀
+
+---
+
+_**User (2025-10-14 14:38Z)**_
+
+- enlève ce message du menu naviguation "✅ Toutes les données sont chargées avec succès !"
+-enlève le tableau qui s'affiche en bas de "Aperçu des données sychonisées"
+- le nombre des lignes et des colonnes merci de le mettre dans le mêmem essage de confiramtion "✅ Synchronisation Google Sheets réussie ! Les onglets ont été mis à jour."  et enlève le message "Téléchargement en cours... cela peut prendre quelques secondes." dès affichage du message de sucees
+-enlève ses messages : 📂 Upload des Fichiers de Données
+Uploadez vos fichiers pour mettre à jour les graphiques en temps réel.
+-le button sychroniser depuis google sheets merci de le mettre en rouge vifs
+- le button actualiser les graphiques il doit s'étaler sur l'ensemble des deux colonnes sychronisergoogle sheet et la colonne fichier excel
+patch complet commit & push
+
+---
+
+_**Assistant (copilot/claude-sonnet-4)**_
+
+Je vais d'abord vérifier les modifications manuelles que vous avez apportées au fichier, puis appliquer toutes vos demandes. 
 
 ---
 
