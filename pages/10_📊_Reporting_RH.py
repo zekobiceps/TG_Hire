@@ -1428,13 +1428,19 @@ def calculate_weekly_metrics(df_recrutement):
         st.warning(f"⚠️ Colonne 'Statut' non trouvée. Colonnes disponibles: {', '.join(available_columns[:5])}...")
         return {}
     
-    # Convertir les dates si les colonnes existent
-    if real_date_reception_col:
+    # Convertir les dates si les colonnes existent (gardes robustes)
+    if real_date_reception_col and real_date_reception_col in df.columns:
         df[real_date_reception_col] = pd.to_datetime(df[real_date_reception_col], errors='coerce')
-    if real_date_integration_col:
+    else:
+        real_date_reception_col = None
+    if real_date_integration_col and real_date_integration_col in df.columns:
         df[real_date_integration_col] = pd.to_datetime(df[real_date_integration_col], errors='coerce')
-    if real_accept_col:
+    else:
+        real_date_integration_col = None
+    if real_accept_col and real_accept_col in df.columns:
         df[real_accept_col] = pd.to_datetime(df[real_accept_col], errors='coerce')
+    else:
+        real_accept_col = None
     
     # Calculer les métriques par entité
     entites = df[real_entite_col].dropna().unique()
@@ -1449,9 +1455,11 @@ def calculate_weekly_metrics(df_recrutement):
         # 1. Nb postes ouverts avant début semaine
         # Logique: postes qui étaient encore actifs (non pourvus) à la fin de la semaine dernière
         postes_avant = 0
-        if real_date_reception_col:
+        if real_date_reception_col and real_date_reception_col in df_entite.columns:
             # ouverts avant ou égal à la fin de la semaine dernière
             opened_before = df_entite[ df_entite[real_date_reception_col] <= last_week_end ].copy()
+        else:
+            opened_before = df_entite.copy()
 
             # Exclure explicitement les demandes fermées/annulées/dépriorisées qui ne doivent pas compter
             import unicodedata
@@ -1467,12 +1475,12 @@ def calculate_weekly_metrics(df_recrutement):
             if real_statut_col and real_statut_col in opened_before.columns:
                 opened_before = opened_before[ ~opened_before[real_statut_col].astype(str).apply(lambda x: any(k in _norm(x) for k in closed_keywords)) ]
 
-            if real_accept_col:
+            if real_accept_col and real_accept_col in opened_before.columns:
                 # considérer pourvus uniquement si acceptance date <= last_week_end
                 not_yet_pourvus = opened_before[ opened_before[real_accept_col].isna() | (opened_before[real_accept_col] > last_week_end) ]
             else:
                 # si pas de date d'acceptation, utiliser l'absence de nom candidat comme proxy
-                if real_candidat_col:
+                if real_candidat_col and real_candidat_col in opened_before.columns:
                     not_yet_pourvus = opened_before[ opened_before[real_candidat_col].isna() | (opened_before[real_candidat_col].astype(str).str.strip() == '') ]
                 else:
                     not_yet_pourvus = opened_before
@@ -1480,18 +1488,20 @@ def calculate_weekly_metrics(df_recrutement):
 
         # 2. Nb nouveaux postes ouverts cette semaine (date de réception dans la semaine courante)
         nouveaux_postes = 0
-        if real_date_reception_col:
+        if real_date_reception_col and real_date_reception_col in df_entite.columns:
             nouveaux_postes = int( df_entite[ (df_entite[real_date_reception_col] >= start_of_week) & (df_entite[real_date_reception_col] <= today) ].shape[0] )
+        else:
+            nouveaux_postes = 0
 
         # 3. Nb postes pourvus cette semaine
         postes_pourvus = 0
-        if real_candidat_col and real_accept_col:
+        if real_candidat_col and real_accept_col and real_candidat_col in df_entite.columns and real_accept_col in df_entite.columns:
             mask_accept_this_week = (df_entite[real_accept_col] >= start_of_week) & (df_entite[real_accept_col] <= today)
             mask_has_name = df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '')
             postes_pourvus = int( df_entite[ mask_accept_this_week & mask_has_name ].shape[0] )
         else:
             # fallback: try using integration date as proxy for pourvus this week
-            if real_date_integration_col and real_candidat_col:
+            if real_date_integration_col and real_candidat_col and real_date_integration_col in df_entite.columns and real_candidat_col in df_entite.columns:
                 mask_integration_this_week = (df_entite[real_date_integration_col] >= start_of_week) & (df_entite[real_date_integration_col] <= today)
                 mask_has_name = df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '')
                 postes_pourvus = int( df_entite[ mask_integration_this_week & mask_has_name ].shape[0] )
@@ -1501,11 +1511,12 @@ def calculate_weekly_metrics(df_recrutement):
         # 4. Nb postes en cours cette semaine (cumulatif)
         total_opened_until_now = 0
         total_pourvus_until_now = 0
-        if real_date_reception_col:
+        if real_date_reception_col and real_date_reception_col in df_entite.columns:
             total_opened_until_now = int( df_entite[ df_entite[real_date_reception_col] <= today ].shape[0] )
         if real_candidat_col and real_accept_col:
-            total_pourvus_until_now = int( df_entite[ df_entite[real_accept_col].notna() & (df_entite[real_accept_col] <= today) & df_entite[real_candidat_col].notna() ].shape[0] )
-        elif real_candidat_col:
+            if real_accept_col in df_entite.columns and real_candidat_col in df_entite.columns:
+                total_pourvus_until_now = int( df_entite[ df_entite[real_accept_col].notna() & (df_entite[real_accept_col] <= today) & df_entite[real_candidat_col].notna() ].shape[0] )
+        elif real_candidat_col and real_candidat_col in df_entite.columns:
             # fallback: any row with candidate name counts as pourvu
             total_pourvus_until_now = int( df_entite[ df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '') ].shape[0] )
 
