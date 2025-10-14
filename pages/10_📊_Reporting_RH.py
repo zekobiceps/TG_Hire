@@ -134,24 +134,6 @@ def render_kpi_cards(recrutements, postes, directions, delai_display, delai_help
 """
 
         st.markdown(html, unsafe_allow_html=True)
-                    <div class='title'>Postes concernés</div>
-                    <div class='value'>{postes:,}</div>
-                    <div class='kpi-help'>Postes uniques</div>
-                </div>
-                <div class='kpi-card kpi-orange'>
-                    <div class='title'>Nombre de Directions concernées</div>
-                    <div class='value'>{directions:,}</div>
-                    <div class='kpi-help'>Directions uniques</div>
-                </div>
-                <div class='kpi-card kpi-purple'>
-                    <div class='title'>Délai moyen recrutement (jours)</div>
-                    <div class='value'>{delai_display}</div>
-                    <div class='kpi-help'>{delai_help or ''}</div>
-                </div>
-            </div>
-            """
-
-            st.markdown(html, unsafe_allow_html=True)
 
 
 def compute_time_to_hire(df, start_cols=None, end_cols=None, status_col='Statut de la demande', status_value='Clôture', drop_negative=True):
@@ -1582,100 +1564,49 @@ def create_weekly_report_tab(df_recrutement=None):
         html_table += '</tr>'
         html_table += '</tbody></table></div>'
         
-        # Afficher le tableau HTML centralisé
-        st.markdown(html, unsafe_allow_html=True)
-        .custom-table th {
-            background-color: #DC143C !important; /* Rouge vif */
-            color: white !important;
-            font-weight: bold !important;
-            text-align: center !important;
-            padding: 8px 6px !important;
-            border: 1px solid white !important;
-            font-size: 0.8em;
-            line-height: 1.2;
-        }
-        .custom-table td {
-            text-align: center !important;
-            padding: 6px 4px !important;
-            border: 1px solid #ddd !important;
-            background-color: white !important;
-            font-size: 0.75em;
-            line-height: 1.1;
-        }
-        .custom-table .entity-cell {
-            text-align: left !important;
-            padding-left: 10px !important;
-            font-weight: 500;
-            min-width: 120px;
-        }
-        .custom-table .total-row {
-            background-color: #DC143C !important; /* Rouge vif */
-            color: white !important;
-            font-weight: bold !important;
-            border-top: 2px solid #DC143C !important;
-        }
-        .custom-table .total-row .entity-cell {
-            text-align: left !important;
-            padding-left: 10px !important;
-            font-weight: bold !important;
-        }
-        .custom-table .total-row td {
-            background-color: #DC143C !important; /* Assurer le fond rouge sur chaque cellule */
-            color: white !important; /* Assurer le texte blanc */
-            font-size: 0.8em !important;
-            font-weight: bold !important;
-            border: 1px solid #DC143C !important; /* Bordures rouges */
-        }
-        .custom-table .total-row .entity-cell {
-            text-align: left !important;
-            padding-left: 10px !important;
-            font-weight: bold !important;
-            background-color: #DC143C !important; /* Fond rouge pour la cellule entité */
-            color: white !important; /* Texte blanc pour la cellule entité */
-        }
-        </style>
-        """, unsafe_allow_html=True)
+    # Afficher le tableau HTML centralisé
+    st.markdown(html_table, unsafe_allow_html=True)
         
-        # Tableau par défaut HTML compact et centralisé
-        default_html = """
-        <div class="table-container">
-            <table class="custom-table">
-                <thead>
-                    <tr>
-                        <th>Entité</th>
-                        <th>Nb postes ouverts avant début semaine</th>
-                        <th>Nb nouveaux postes ouverts cette semaine</th>
-                        <th>Nb postes pourvus cette semaine</th>
-                        <th>Nb postes en cours cette semaine</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td class="entity-cell">TGCC</td>
-                        <td>19</td>
-                        <td>12</td>
-                        <td>5</td>
-                        <td>26</td>
-                    </tr>
-                    <tr>
-                        <td class="entity-cell">TGEM</td>
-                        <td>2</td>
-                        <td>2</td>
-                        <td>0</td>
-                        <td>4</td>
-                    </tr>
-                    <tr class="total-row">
-                        <td class="entity-cell">TOTAL</td>
-                        <td>21</td>
-                        <td>14</td>
-                        <td>5</td>
-                        <td>30</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        """
-        st.markdown(default_html, unsafe_allow_html=True)
+    # Tableau par défaut HTML compact et centralisé
+    default_html = """
+<div class="table-container">
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th>Entité</th>
+                <th>Nb postes ouverts avant début semaine</th>
+                <th>Nb nouveaux postes ouverts cette semaine</th>
+                <th>Nb postes pourvus cette semaine</th>
+                <th>Nb postes en cours cette semaine</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="entity-cell">TGCC</td>
+                <td>19</td>
+                <td>12</td>
+                <td>5</td>
+                <td>26</td>
+            </tr>
+            <tr>
+                <td class="entity-cell">TGEM</td>
+                <td>2</td>
+                <td>2</td>
+                <td>0</td>
+                <td>4</td>
+            </tr>
+            <tr class="total-row">
+                <td class="entity-cell">TOTAL</td>
+                <td>21</td>
+                <td>14</td>
+                <td>5</td>
+                <td>30</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+"""
+    st.markdown(default_html, unsafe_allow_html=True)
 
     st.markdown("---")
 
