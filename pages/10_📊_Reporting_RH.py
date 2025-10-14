@@ -553,7 +553,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             height=height_dir,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=240, t=40, b=30, r=20),
+            margin=dict(l=160, t=40, b=30, r=20),
             yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_direction['Label_display'][::-1]))
         )
         # Use a compact default visible area (320px) and allow scrolling to see rest
@@ -598,7 +598,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             height=height_poste,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=240, t=40, b=30, r=20),
+            margin=dict(l=160, t=40, b=30, r=20),
             yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_poste['Label_display'][::-1]))
         )
         render_plotly_scrollable(fig_poste, max_height=320)
@@ -737,7 +737,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         statut_counts = df_filtered['Statut de la demande'].value_counts()
         fig_statut = go.Figure(data=[go.Pie(labels=statut_counts.index, values=statut_counts.values, hole=.5)])
         fig_statut.update_layout(
-            title="Répartition par statut de la demande",
+            title=dict(text="Répartition par statut de la demande", x=0.5, xanchor='center', font=dict(size=12)),
             height=300,
             legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5)
         )
@@ -836,7 +836,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             height=height_dir,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=240, t=40, b=30, r=20),
+            margin=dict(l=160, t=40, b=30, r=20),
             yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_dir)
         )
         # Render inside the column so the two charts are on the same row and the component width matches the column
@@ -873,7 +873,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             height=height_poste,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=240, t=40, b=30, r=20),
+            margin=dict(l=160, t=40, b=30, r=20),
             yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_poste)
         )
         render_plotly_scrollable(fig_poste, max_height=320)
