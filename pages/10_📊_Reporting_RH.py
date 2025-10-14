@@ -1170,7 +1170,14 @@ def create_integrations_tab(df_recrutement, global_filters):
         # Intégrations en retard (date prévue passée)
         if date_integration_col in df_filtered.columns:
             df_filtered[date_integration_col] = pd.to_datetime(df_filtered[date_integration_col], errors='coerce')
-            today = datetime.now()
+            reporting_date = st.session_state.get('reporting_date', None)
+            if reporting_date is None:
+                today = datetime.now()
+            else:
+                if isinstance(reporting_date, datetime):
+                    today = reporting_date
+                else:
+                    today = datetime.combine(reporting_date, datetime.min.time())
             en_retard = len(df_filtered[(df_filtered[date_integration_col].notna()) & 
                                       (df_filtered[date_integration_col] < today)])
             st.metric("⚠️ En retard", en_retard)
@@ -1343,8 +1350,15 @@ def calculate_weekly_metrics(df_recrutement):
     if df_recrutement is None or len(df_recrutement) == 0:
         return {}
     
-    # Obtenir la date actuelle et la semaine dernière
-    today = datetime.now()
+    # Obtenir la date de reporting (utiliser st.session_state si défini)
+    reporting_date = st.session_state.get('reporting_date', None)
+    if reporting_date is None:
+        today = datetime.now()
+    else:
+        if isinstance(reporting_date, datetime):
+            today = reporting_date
+        else:
+            today = datetime.combine(reporting_date, datetime.min.time())
     start_of_week = today - timedelta(days=today.weekday())  # Lundi de cette semaine
     start_of_last_week = start_of_week - timedelta(days=7)   # Lundi de la semaine dernière
     
@@ -1538,35 +1552,29 @@ def calculate_weekly_metrics(df_recrutement):
     return metrics_by_entity
 
 def create_weekly_report_tab(df_recrutement=None):
-    """Onglet Reporting Hebdomadaire"""
+    """Onglet Reporting Hebdomadaire (simplifié)
+
+    Cette version affiche les KPI calculés par calculate_weekly_metrics
+    en respectant la `st.session_state['reporting_date']` si fournie.
+    """
     st.header("📅 Reporting Hebdomadaire : Chiffres Clés de la semaine")
 
-    # Calculer les métriques si les données sont disponibles
-    if df_recrutement is not None:
+    # Calculer les métriques
+    if df_recrutement is not None and len(df_recrutement) > 0:
         try:
             metrics = calculate_weekly_metrics(df_recrutement)
-            total_avant = sum(m['avant'] for m in metrics.values())
-            total_nouveaux = sum(m['nouveaux'] for m in metrics.values())
-            total_pourvus = sum(m['pourvus'] for m in metrics.values())
-            total_en_cours = sum(m['en_cours'] for m in metrics.values())
         except Exception as e:
-            st.error(f"⚠️ Erreur lors du calcul des métriques: {str(e)}")
+            st.error(f"⚠️ Erreur lors du calcul des métriques: {e}")
             metrics = {}
-            total_avant = total_nouveaux = total_pourvus = total_en_cours = 0
     else:
         metrics = {}
-        total_avant = total_nouveaux = total_pourvus = total_en_cours = 0
 
-    # 1. Section "Chiffres Clés"
-    st.subheader("Chiffres Clés de la semaine")
-    # Use the same bordered KPI row styling here for consistency
-    items = [
-        {"title": "Postes en cours cette semaine", "value": total_en_cours, "color": "accent"},
-        {"title": "Postes pourvus cette semaine", "value": total_pourvus, "color": "green"},
-        {"title": "Nouveaux postes ouverts", "value": total_nouveaux, "color": "orange"},
-        {"title": "Total postes ouverts avant la semaine", "value": total_avant, "color": "purple"}
-    ]
-    # Use simple Streamlit metrics (no bordered-card styling)
+    total_avant = sum(m.get('avant', 0) for m in metrics.values())
+    total_nouveaux = sum(m.get('nouveaux', 0) for m in metrics.values())
+    total_pourvus = sum(m.get('pourvus', 0) for m in metrics.values())
+    total_en_cours = sum(m.get('en_cours', 0) for m in metrics.values())
+
+    # KPI cards (simple)
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Postes en cours cette semaine", total_en_cours)
@@ -1579,176 +1587,30 @@ def create_weekly_report_tab(df_recrutement=None):
 
     st.markdown("---")
 
-    # 2. Tableau des besoins en cours par entité (AVANT le Kanban)
+    # Tableau récapitulatif par entité
     st.subheader("📊 Besoins en Cours par Entité")
-    
-    # Créer le tableau avec des colonnes Streamlit natives
-    if metrics and len(metrics) > 0:
-        # Préparer les données pour le DataFrame
-        table_data = []
-        for entite, data in metrics.items():
-            table_data.append({
-                'Entité': entite,
-                'Nb postes ouverts avant début semaine': data['avant'] if data['avant'] > 0 else '-',
-                'Nb nouveaux postes ouverts cette semaine': data['nouveaux'] if data['nouveaux'] > 0 else '-',
-                'Nb postes pourvus cette semaine': data['pourvus'] if data['pourvus'] > 0 else '-',
-                'Nb postes en cours cette semaine': data['en_cours'] if data['en_cours'] > 0 else '-'
+    if metrics:
+        rows = []
+        for ent, vals in metrics.items():
+            rows.append({
+                'Entité': ent,
+                'Avant (semaine précédente)': vals.get('avant', 0),
+                'Nouveaux (cette semaine)': vals.get('nouveaux', 0),
+                'Pourvus (cette semaine)': vals.get('pourvus', 0),
+                'En cours (cette semaine)': vals.get('en_cours', 0)
             })
-        
-        # Ajouter la ligne de total
-        table_data.append({
-            'Entité': '**Total**',
-            'Nb postes ouverts avant début semaine': f'**{total_avant}**',
-            'Nb nouveaux postes ouverts cette semaine': f'**{total_nouveaux}**',
-            'Nb postes pourvus cette semaine': f'**{total_pourvus}**',
-            'Nb postes en cours cette semaine': f'**{total_en_cours}**'
-        })
-        
-        # Créer le tableau HTML personnalisé compact et centralisé
-        st.markdown("""
-        <style>
-        .table-container {
-            display: flex;
-            justify-content: center;
-            width: 100%;
-            margin: 15px 0;
-        }
-        .custom-table {
-            border-collapse: collapse;
-            font-family: Arial, sans-serif;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-            max-width: 900px;
-            margin: 0 auto;
-        }
-        .custom-table th {
-            background-color: #DC143C !important; /* Rouge vif */
-            color: white !important;
-            font-weight: bold !important;
-            text-align: center !important;
-            padding: 8px 6px !important;
-            border: 1px solid white !important;
-            font-size: 0.8em;
-            line-height: 1.2;
-        }
-        .custom-table td {
-            text-align: center !important;
-            padding: 6px 4px !important;
-            border: 1px solid #ddd !important;
-            background-color: white !important;
-            font-size: 0.75em;
-            line-height: 1.1;
-        }
-        .custom-table .entity-cell {
-            text-align: left !important;
-            padding-left: 10px !important;
-            font-weight: 500;
-            min-width: 120px;
-        }
-        .custom-table .total-row {
-            background-color: #DC143C !important; /* Rouge vif */
-            color: white !important;
-            font-weight: bold !important;
-            border-top: 2px solid #DC143C !important;
-        }
-        .custom-table .total-row .entity-cell {
-            text-align: left !important;
-            padding-left: 10px !important;
-            font-weight: bold !important;
-        }
-        .custom-table .total-row td {
-            background-color: #DC143C !important; /* Assurer le fond rouge sur chaque cellule */
-            color: white !important; /* Assurer le texte blanc */
-            font-size: 0.8em !important;
-            font-weight: bold !important;
-            border: 1px solid #DC143C !important; /* Bordures rouges */
-        }
-        .custom-table .total-row .entity-cell {
-            text-align: left !important;
-            padding-left: 10px !important;
-            font-weight: bold !important;
-            background-color: #DC143C !important; /* Fond rouge pour la cellule entité */
-            color: white !important; /* Texte blanc pour la cellule entité */
-        }
-        </style>
-        """, unsafe_allow_html=True)
-        
-        # Construire le tableau HTML compact et centralisé
-        html_table = '<div class="table-container">'
-        html_table += '<table class="custom-table">'
-        html_table += '<thead><tr>'
-        html_table += '<th>Entité</th>'
-        html_table += '<th>Nb postes ouverts avant début semaine</th>'
-        html_table += '<th>Nb nouveaux postes ouverts cette semaine</th>'
-        html_table += '<th>Nb postes pourvus cette semaine</th>'
-        html_table += '<th>Nb postes en cours cette semaine</th>'
-        html_table += '</tr></thead>'
-        html_table += '<tbody>'
-        
-        # Ajouter les lignes de données (filtrer les entités vides)
-        data_rows = [row for row in table_data[:-1] if row["Entité"] and row["Entité"].strip()]
-        for row in data_rows:
-            html_table += '<tr>'
-            html_table += f'<td class="entity-cell">{row["Entité"]}</td>'
-            html_table += f'<td>{row["Nb postes ouverts avant début semaine"]}</td>'
-            html_table += f'<td>{row["Nb nouveaux postes ouverts cette semaine"]}</td>'
-            html_table += f'<td>{row["Nb postes pourvus cette semaine"]}</td>'
-            html_table += f'<td>{row["Nb postes en cours cette semaine"]}</td>'
-            html_table += '</tr>'
-        
-        # Ajouter la ligne TOTAL dédiée (dernière ligne pour les totaux de chaque colonne)
-        total_row = table_data[-1]
-        html_table += '<tr class="total-row">'
-        html_table += f'<td class="entity-cell">TOTAL</td>'
-        html_table += f'<td>{total_row["Nb postes ouverts avant début semaine"].replace("**", "")}</td>'
-        html_table += f'<td>{total_row["Nb nouveaux postes ouverts cette semaine"].replace("**", "")}</td>'
-        html_table += f'<td>{total_row["Nb postes pourvus cette semaine"].replace("**", "")}</td>'
-        html_table += f'<td>{total_row["Nb postes en cours cette semaine"].replace("**", "")}</td>'
-        html_table += '</tr>'
-        html_table += '</tbody></table></div>'
-
-        # Afficher le tableau HTML centralisé (si des metrics existent)
-        st.markdown(html_table, unsafe_allow_html=True)
+        df_table = pd.DataFrame(rows)
+        # Ajouter ligne total
+        df_table = df_table.append({
+            'Entité': 'TOTAL',
+            'Avant (semaine précédente)': total_avant,
+            'Nouveaux (cette semaine)': total_nouveaux,
+            'Pourvus (cette semaine)': total_pourvus,
+            'En cours (cette semaine)': total_en_cours
+        }, ignore_index=True)
+        st.dataframe(df_table, use_container_width=True)
     else:
-        # Tableau par défaut HTML compact et centralisé (affiché uniquement si aucune donnée réelle)
-        default_html = """
-<div class="table-container">
-    <table class="custom-table">
-        <thead>
-            <tr>
-                <th>Entité</th>
-                <th>Nb postes ouverts avant début semaine</th>
-                <th>Nb nouveaux postes ouverts cette semaine</th>
-                <th>Nb postes pourvus cette semaine</th>
-                <th>Nb postes en cours cette semaine</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td class="entity-cell">TGCC</td>
-                <td>19</td>
-                <td>12</td>
-                <td>5</td>
-                <td>26</td>
-            </tr>
-            <tr>
-                <td class="entity-cell">TGEM</td>
-                <td>2</td>
-                <td>2</td>
-                <td>0</td>
-                <td>4</td>
-            </tr>
-            <tr class="total-row">
-                <td class="entity-cell">TOTAL</td>
-                <td>21</td>
-                <td>14</td>
-                <td>5</td>
-                <td>30</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
-"""
-        st.markdown(default_html, unsafe_allow_html=True)
+        st.info("Aucune métrique hebdomadaire disponible — chargez un fichier Excel ou synchronisez depuis Google Sheets.")
 
     st.markdown("---")
 
@@ -1949,6 +1811,14 @@ def create_weekly_report_tab(df_recrutement=None):
 def main():
     st.title("📊 Tableau de Bord RH - Style Power BI")
     st.markdown("---")
+    # Date de reporting : permet de fixer la date de référence pour tous les calculs
+    if 'reporting_date' not in st.session_state:
+        # default to today's date
+        st.session_state['reporting_date'] = datetime.now().date()
+
+    with st.sidebar:
+        st.subheader("🔧 Filtres - Hebdomadaire")
+        rd = st.date_input("Date de reporting (hebdomadaire)", value=st.session_state['reporting_date'], help="Date utilisée comme référence pour le reporting hebdomadaire", key='reporting_date')
     
     # Créer les onglets (Demandes et Recrutement regroupés)
     tabs = st.tabs(["📂 Upload", "🗂️ Demandes & Recrutement", "📅 Hebdomadaire", "🤝 Intégrations"])
@@ -1966,7 +1836,18 @@ def main():
 
         with col1:
             st.subheader("🔗 Synchroniser depuis Google Sheets")
-            st.markdown("Indiquez le lien vers votre Google Sheet ou laissez le lien par défaut, puis cliquez sur '🔁 Synchroniser'.")
+            # Respecter la date de reporting si fournie dans st.session_state
+            reporting_date = st.session_state.get('reporting_date', None)
+            if reporting_date is None:
+                today = datetime.now()
+            else:
+                # reporting_date is a date object from st.date_input; convert to datetime
+                if isinstance(reporting_date, datetime):
+                    today = reporting_date
+                else:
+                    today = datetime.combine(reporting_date, datetime.min.time())
+            start_of_month = today.replace(day=1)
+            # valeur par défaut du Google Sheet (identique à celle utilisée précédemment)
             default_sheet = "https://docs.google.com/spreadsheets/d/1hvghSMjcbdY8yNZOWqALBpgMdLWB5CxVJCDwEm6JULI/edit?gid=785271056#gid=785271056"
             gs_url = st.text_input("URL Google Sheet", value=default_sheet, key="gsheet_url")
             
