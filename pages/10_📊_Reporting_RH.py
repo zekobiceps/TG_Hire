@@ -499,17 +499,22 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             orientation='h'
         )
         fig_direction.update_traces(
-            marker_color='#ff7f0e', 
+            marker_color='#ff7f0e',
             textposition='inside',
-            hovertemplate='%{y}<extra></extra>'
+            texttemplate='%{x}',
+            textfont=dict(size=11),
+            textangle=90,
+            hovertemplate='%{x}<extra></extra>'
         )
+        # Largest at top: reverse the category array so descending values appear from top to bottom
+        height_dir = max(300, 28 * len(df_direction))
         fig_direction.update_layout(
-            height=300, 
-            xaxis_title=None, 
+            height=height_dir,
+            xaxis_title=None,
             yaxis_title=None,
-            xaxis={'categoryorder':'total descending'}
+            yaxis=dict(categoryorder='array', categoryarray=list(df_direction['Direction'][::-1]))
         )
-        st.plotly_chart(fig_direction, use_container_width=True)
+        render_plotly_scrollable(fig_direction, max_height=height_dir)
 
     with col4:
         # Comparaison par poste
@@ -537,9 +542,9 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             height=height_poste,
             xaxis_title=None,
             yaxis_title=None,
-            yaxis=dict(categoryorder='array', categoryarray=df_poste['Poste'])
+            yaxis=dict(categoryorder='array', categoryarray=list(df_poste['Poste'][::-1]))
         )
-        st.plotly_chart(fig_poste, use_container_width=True)
+        render_plotly_scrollable(fig_poste, max_height=height_poste)
 
 
     # Ligne 3 - KPIs de délai et candidats
