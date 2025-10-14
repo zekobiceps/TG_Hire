@@ -88,59 +88,70 @@ def _parse_mixed_dates(series):
 
 
 def render_kpi_cards(recrutements, postes, directions, delai_display, delai_help=None):
-        """Render three KPI cards in a single responsive row using HTML/CSS.
+        """Render a single-row set of KPI cards (inline, bordered with colored left stripe).
 
-        - Left card: Nombre de recrutements (primary)
-        - Middle card: Postes concernés
-        - Right card: two stacked small cards for Directions and Délai moyen
+        Cards: [Nombre de recrutements] [Postes concernés] [Directions concernées] [Délai moyen]
         """
         css = """
-        <style>
-        .kpi-row{display:flex;gap:16px;flex-wrap:wrap;align-items:stretch}
-        .kpi-card{flex:1 1 0;background:#fff;border-radius:8px;padding:14px;box-shadow:0 2px 6px rgba(0,0,0,0.08);display:flex;flex-direction:column;justify-content:space-between}
-        .kpi-primary{background:linear-gradient(90deg,#4f8ef7,#6fc3ff);color:white}
-        .kpi-title{font-size:13px;color:rgba(0,0,0,0.6);margin-bottom:6px}
-        .kpi-value{font-size:28px;font-weight:700}
-        .kpi-sub{font-size:12px;color:rgba(0,0,0,0.55);margin-top:6px}
-        .kpi-small-row{display:flex;gap:12px}
-        .kpi-small{flex:1;background:#f7f9fc;border-radius:6px;padding:10px;text-align:center}
-        .kpi-small .label{font-size:12px;color:#333}
-        .kpi-small .val{font-size:18px;font-weight:700;margin-top:6px}
-        </style>
-        """
+<style>
+.kpi-row{display:flex;gap:12px;flex-wrap:nowrap;align-items:stretch;margin-bottom:12px}
+.kpi-card{flex:1 1 0;background:#fff;border-radius:6px;padding:12px;display:flex;flex-direction:column;justify-content:center;border:1px solid #e6eef6}
+.kpi-card .title{font-size:12px;color:#2c3e50;margin-bottom:6px}
+.kpi-card .value{font-size:22px;font-weight:700;color:#172b4d}
+.kpi-accent{border-left:6px solid #1f77b4}
+.kpi-green{border-left-color:#2ca02c}
+.kpi-orange{border-left-color:#ff7f0e}
+.kpi-purple{border-left-color:#6f42c1}
+.kpi-help{font-size:11px;color:#555;margin-top:6px}
+@media(max-width:800px){.kpi-row{flex-direction:column}}
+</style>
+"""
 
         html = f"""
-        {css}
-        <div class='kpi-row'>
-            <div class='kpi-card kpi-primary' style='flex:2 1 0'>
-                <div>
-                    <div class='kpi-title'>Nombre de recrutements</div>
-                    <div class='kpi-value'>{recrutements:,}</div>
-                    <div class='kpi-sub'>Total des recrutements filtrés</div>
-                </div>
-            </div>
-            <div class='kpi-card' style='flex:1 1 0'>
-                <div>
-                    <div class='kpi-title'>Postes concernés</div>
-                    <div class='kpi-value'>{postes:,}</div>
-                    <div class='kpi-sub'>Nombre de postes uniques</div>
-                </div>
-            </div>
-            <div style='flex:1 1 0;display:flex;flex-direction:column;gap:12px'>
-                <div class='kpi-card kpi-small' style='background:#fff'>
-                    <div class='label'>Nombre de Directions concernées</div>
-                    <div class='val'>{directions:,}</div>
-                </div>
-                <div class='kpi-card kpi-small' style='background:#fff'>
-                    <div class='label'>Délai moyen recrutement (jours)</div>
-                    <div class='val'>{delai_display}</div>
-                    <div style='font-size:11px;color:#666;margin-top:6px'>{delai_help or ''}</div>
-                </div>
-            </div>
+{css}
+<div class='kpi-row'>
+    <div class='kpi-card kpi-accent' style='flex:2'>
+        <div class='title'>Nombre de recrutements</div>
+        <div class='value'>{recrutements:,}</div>
+        <div class='kpi-help'>Total des recrutements filtrés</div>
+    </div>
+    <div class='kpi-card kpi-green'>
+            <div class='title'>Postes concernés</div>
+            <div class='value'>{postes:,}</div>
+            <div class='kpi-help'>Postes uniques</div>
         </div>
-        """
+        <div class='kpi-card kpi-orange'>
+            <div class='title'>Nombre de Directions concernées</div>
+            <div class='value'>{directions:,}</div>
+            <div class='kpi-help'>Directions uniques</div>
+        </div>
+        <div class='kpi-card kpi-purple'>
+            <div class='title'>Délai moyen recrutement (jours)</div>
+            <div class='value'>{delai_display}</div>
+            <div class='kpi-help'>{delai_help or ''}</div>
+        </div>
+</div>
+"""
 
         st.markdown(html, unsafe_allow_html=True)
+                    <div class='title'>Postes concernés</div>
+                    <div class='value'>{postes:,}</div>
+                    <div class='kpi-help'>Postes uniques</div>
+                </div>
+                <div class='kpi-card kpi-orange'>
+                    <div class='title'>Nombre de Directions concernées</div>
+                    <div class='value'>{directions:,}</div>
+                    <div class='kpi-help'>Directions uniques</div>
+                </div>
+                <div class='kpi-card kpi-purple'>
+                    <div class='title'>Délai moyen recrutement (jours)</div>
+                    <div class='value'>{delai_display}</div>
+                    <div class='kpi-help'>{delai_help or ''}</div>
+                </div>
+            </div>
+            """
+
+            st.markdown(html, unsafe_allow_html=True)
 
 
 def compute_time_to_hire(df, start_cols=None, end_cols=None, status_col='Statut de la demande', status_value='Clôture', drop_negative=True):
@@ -1572,24 +1583,7 @@ def create_weekly_report_tab(df_recrutement=None):
         html_table += '</tbody></table></div>'
         
         # Afficher le tableau HTML centralisé
-        st.markdown(html_table, unsafe_allow_html=True)
-    else:
-        # Tableau par défaut compact centralisé avec le même style
-        st.markdown("""
-        <style>
-        .table-container {
-            display: flex;
-            justify-content: center;
-            width: 100%;
-            margin: 15px 0;
-        }
-        .custom-table {
-            border-collapse: collapse;
-            font-family: Arial, sans-serif;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-            max-width: 900px;
-            margin: 0 auto;
-        }
+        st.markdown(html, unsafe_allow_html=True)
         .custom-table th {
             background-color: #DC143C !important; /* Rouge vif */
             color: white !important;
