@@ -1679,33 +1679,105 @@ def create_weekly_report_tab(df_recrutement=None):
     # 3. Section "Pipeline de Recrutement (Kanban)"
     st.subheader("Pipeline de Recrutement (Kanban)")
 
-    # Définir les données d'exemple pour le Kanban (ou utiliser les vraies données si disponibles)
-    postes_data = [
-        {"statut": "Sourcing", "titre": "Ingénieur Achat", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.BOUZOUBAA", "recruteur": "Zakaria"},
-        {"statut": "Sourcing", "titre": "Directeur Achats Adjoint", "entite": "TGCC", "lieu": "Siège", "demandeur": "C.BENABDELLAH", "recruteur": "Zakaria"},
-        {"statut": "Sourcing", "titre": "INGENIEUR TRAVAUX", "entite": "TGCC", "lieu": "YAMED LOT B", "demandeur": "M.TAZI", "recruteur": "Zakaria"},
-        
-        {"statut": "Shortlisté", "titre": "CHEF DE PROJETS", "entite": "TGCC", "lieu": "DESSALEMENT JORF", "demandeur": "M.FENNAN", "recruteur": "ZAKARIA"},
-        {"statut": "Shortlisté", "titre": "Planificateur", "entite": "TGCC", "lieu": "ASFI-B", "demandeur": "SOUFIANI", "recruteur": "Ghita"},
-        {"statut": "Shortlisté", "titre": "RESPONSABLE TRANS INTERCH", "entite": "TG PREFA", "lieu": "OUED SALEH", "demandeur": "FBOUZOUBAA", "recruteur": "Ghita"},
-        
-        {"statut": "Signature DRH", "titre": "PROJETEUR DESSINATEUR", "entite": "TG WOOD", "lieu": "OUED SALEH", "demandeur": "S.MENJRA", "recruteur": "Zakaria"},
-        {"statut": "Signature DRH", "titre": "Projeteur", "entite": "TGCC", "lieu": "TSP Safi", "demandeur": "B.MORABET", "recruteur": "Zakaria"},
-        {"statut": "Signature DRH", "titre": "Consultant SAP", "entite": "TGCC", "lieu": "Siège", "demandeur": "O.KETTA", "recruteur": "Zakaria"},
-        
-        {"statut": "Clôture", "titre": "Doc Controller", "entite": "TGEM", "lieu": "SIEGE", "demandeur": "A.SANKARI", "recruteur": "Zakaria"},
-        {"statut": "Clôture", "titre": "Ingénieur étude/qualité", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.MOUTANABI", "recruteur": "Zakaria"},
-        {"statut": "Clôture", "titre": "Responsable Cybersecurité", "entite": "TGCC", "lieu": "Siège", "demandeur": "Ghazi", "recruteur": "Zakaria"},
-        {"statut": "Clôture", "titre": "CHEF DE CHANTIER", "entite": "TGCC", "lieu": "N/A", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},
-        {"statut": "Clôture", "titre": "Ing contrôle de la performance", "entite": "TGCC", "lieu": "Siège", "demandeur": "H.BARIGOU", "recruteur": "Ghita"},
-        {"statut": "Clôture", "titre": "Ingénieur Systèmes Réseaux", "entite": "TGCC", "lieu": "Siège", "demandeur": "M.JADDOR", "recruteur": "Ghita"},
-        {"statut": "Clôture", "titre": "Responsable étude de prix", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "S.Bennani Zitani", "recruteur": "Ghita"},
-        {"statut": "Clôture", "titre": "Responsable Travaux", "entite": "TGEM", "lieu": "Zone Rabat", "demandeur": "S.ACHIR", "recruteur": "Zakaria"},
-        
-        {"statut": "Désistement", "titre": "Conducteur de Travaux", "entite": "TGCC", "lieu": "JORF LASFAR", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},
-        {"statut": "Désistement", "titre": "Chef de Chantier", "entite": "TGCC", "lieu": "TOARC", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},
-        {"statut": "Désistement", "titre": "Magasinier", "entite": "TG WOOD", "lieu": "Oulad Saleh", "demandeur": "K.TAZI", "recruteur": "Ghita"},
-    ]
+    # Construire les données du Kanban à partir du fichier importé (préférence aux données réelles)
+    # Détection heuristique des colonnes utiles
+    def _find_col(cols, keywords):
+        for k in keywords:
+            for c in cols:
+                if k in c.lower():
+                    return c
+        return None
+
+    cols = df_recrutement.columns.tolist() if df_recrutement is not None else []
+    statut_col = _find_col(cols, ['statut', 'status'])
+    poste_col = _find_col(cols, ['poste', 'title', 'post'])
+    entite_col = _find_col(cols, ['entité', 'entite', 'entité demandeuse', 'entite demandeuse', 'entité'])
+    lieu_col = _find_col(cols, ['lieu', 'affectation', 'site'])
+    demandeur_col = _find_col(cols, ['demandeur', 'requester'])
+    recruteur_col = _find_col(cols, ['recruteur', 'recruiter'])
+
+    import unicodedata
+    def _normalize(text):
+        if text is None:
+            return ''
+        s = str(text)
+        s = unicodedata.normalize('NFKD', s)
+        s = ''.join(ch for ch in s if not unicodedata.combining(ch))
+        return s.lower().strip()
+
+    # Carte statuts canoniques demandés par l'utilisateur (ordre affichage)
+    statuts_kanban = ["Désistement","Sourcing","Shortlisté","Signature DRH","Clôture","Dépriorisé"]
+
+    # Mapping de formes possibles -> statut canonique
+    status_map = {
+        'desistement': 'Désistement',
+        'desisté': 'Désistement',
+        'sourcing': 'Sourcing',
+        'shortlist': 'Shortlisté',
+        'shortlisté': 'Shortlisté',
+        'shortlisté': 'Shortlisté',
+        'signature drh': 'Signature DRH',
+        'signature': 'Signature DRH',
+        'cloture': 'Clôture',
+        'clôture': 'Clôture',
+        'dépriorisé': 'Dépriorisé',
+        'depriorise': 'Dépriorisé',
+    }
+
+    postes_data = []
+    if statut_col and df_recrutement is not None:
+        for _, r in df_recrutement.iterrows():
+            raw = r.get(statut_col)
+            if pd.isna(raw):
+                continue
+            norm = _normalize(raw)
+            canon = None
+            # find mapping by substring
+            for key, val in status_map.items():
+                if key in norm:
+                    canon = val
+                    break
+            # default fallback: keep original raw string capitalized
+            if canon is None:
+                # if the normalized text closely matches any canonical target, pick it
+                for tgt in statuts_kanban:
+                    if _normalize(tgt) == norm:
+                        canon = tgt
+                        break
+            if canon is None:
+                # unrecognized statuses go into 'Sourcing' by default
+                canon = 'Sourcing'
+
+            titre = r.get(poste_col, '') if poste_col else r.get('Poste demandé', '')
+            postes_data.append({
+                'statut': canon,
+                'titre': titre or '',
+                'entite': r.get(entite_col, '') if entite_col else r.get('Entité demandeuse', ''),
+                'lieu': r.get(lieu_col, '') if lieu_col else '',
+                'demandeur': r.get(demandeur_col, '') if demandeur_col else '',
+                'recruteur': r.get(recruteur_col, '') if recruteur_col else ''
+            })
+
+    # Fallback sample data if no real rows found
+    if not postes_data:
+        postes_data = [
+            {"statut": "Sourcing", "titre": "Ingénieur Achat", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.BOUZOUBAA", "recruteur": "Zakaria"},
+            {"statut": "Sourcing", "titre": "Directeur Achats Adjoint", "entite": "TGCC", "lieu": "Siège", "demandeur": "C.BENABDELLAH", "recruteur": "Zakaria"},
+            {"statut": "Sourcing", "titre": "INGENIEUR TRAVAUX", "entite": "TGCC", "lieu": "YAMED LOT B", "demandeur": "M.TAZI", "recruteur": "Zakaria"},
+            {"statut": "Shortlisté", "titre": "CHEF DE PROJETS", "entite": "TGCC", "lieu": "DESSALEMENT JORF", "demandeur": "M.FENNAN", "recruteur": "ZAKARIA"},
+            {"statut": "Shortlisté", "titre": "Planificateur", "entite": "TGCC", "lieu": "ASFI-B", "demandeur": "SOUFIANI", "recruteur": "Ghita"},
+            {"statut": "Shortlisté", "titre": "RESPONSABLE TRANS INTERCH", "entite": "TG PREFA", "lieu": "OUED SALEH", "demandeur": "FBOUZOUBAA", "recruteur": "Ghita"},
+            {"statut": "Signature DRH", "titre": "PROJETEUR DESSINATEUR", "entite": "TG WOOD", "lieu": "OUED SALEH", "demandeur": "S.MENJRA", "recruteur": "Zakaria"},
+            {"statut": "Signature DRH", "titre": "Projeteur", "entite": "TGCC", "lieu": "TSP Safi", "demandeur": "B.MORABET", "recruteur": "Zakaria"},
+            {"statut": "Signature DRH", "titre": "Consultant SAP", "entite": "TGCC", "lieu": "Siège", "demandeur": "O.KETTA", "recruteur": "Zakaria"},
+            {"statut": "Clôture", "titre": "Doc Controller", "entite": "TGEM", "lieu": "SIEGE", "demandeur": "A.SANKARI", "recruteur": "Zakaria"},
+            {"statut": "Clôture", "titre": "Ingénieur étude/qualité", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.MOUTANABI", "recruteur": "Zakaria"},
+            {"statut": "Clôture", "titre": "Responsable Cybersecurité", "entite": "TGCC", "lieu": "Siège", "demandeur": "Ghazi", "recruteur": "Zakaria"},
+            {"statut": "Clôture", "titre": "CHEF DE CHANTIER", "entite": "TGCC", "lieu": "N/A", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},
+            {"statut": "Désistement", "titre": "Conducteur de Travaux", "entite": "TGCC", "lieu": "JORF LASFAR", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},
+            {"statut": "Désistement", "titre": "Chef de Chantier", "entite": "TGCC", "lieu": "TOARC", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},
+            {"statut": "Désistement", "titre": "Magasinier", "entite": "TG WOOD", "lieu": "Oulad Saleh", "demandeur": "K.TAZI", "recruteur": "Ghita"},
+        ]
     
     # Définir les colonnes du Kanban
     statuts_kanban = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
