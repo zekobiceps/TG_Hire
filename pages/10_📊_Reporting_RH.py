@@ -456,12 +456,15 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
     with col3:
         # Comparaison par direction
         direction_counts = df_filtered['Direction concernée'].value_counts().nlargest(10)
+        # Convert Series to DataFrame for plotly express compatibility
+        df_direction = direction_counts.rename_axis('Direction').reset_index(name='Count')
         fig_direction = px.bar(
-            direction_counts,
-            x=direction_counts.index,
-            y=direction_counts.values,
+            df_direction,
+            x='Direction',
+            y='Count',
             title="Comparaison par direction",
-            text=direction_counts.values
+            text='Count',
+            orientation='v'
         )
         fig_direction.update_traces(
             marker_color='#ff7f0e', 
@@ -479,12 +482,14 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
     with col4:
         # Comparaison par poste
         poste_counts = df_filtered['Poste demandé'].value_counts().nlargest(10)
+        df_poste = poste_counts.rename_axis('Poste').reset_index(name='Count')
         fig_poste = px.bar(
-            poste_counts,
-            x=poste_counts.index,
-            y=poste_counts.values,
+            df_poste,
+            x='Poste',
+            y='Count',
             title="Comparaison par poste",
-            text=poste_counts.values
+            text='Count',
+            orientation='v'
         )
         fig_poste.update_traces(
             marker_color='#2ca02c', 
@@ -643,12 +648,14 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         # Comparaison par raison du recrutement
         if 'Raison du recrutement' in df_filtered.columns:
             raison_counts = df_filtered['Raison du recrutement'].value_counts()
+            df_raison = raison_counts.rename_axis('Raison').reset_index(name='Count')
             fig_raison = px.bar(
-                raison_counts,
-                x=raison_counts.index,
-                y=raison_counts.values,
+                df_raison,
+                x='Raison',
+                y='Count',
                 title="Comparaison par raison du recrutement",
-                text=raison_counts.values
+                text='Count',
+                orientation='v'
             )
             fig_raison.update_traces(
                 marker_color='grey', 
@@ -690,12 +697,14 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
     with col4:
         # Comparaison par direction
         direction_counts = df_filtered['Direction concernée'].value_counts().nlargest(10)
+        df_direction = direction_counts.rename_axis('Direction').reset_index(name='Count')
         fig_direction = px.bar(
-            direction_counts,
-            x=direction_counts.index,
-            y=direction_counts.values,
+            df_direction,
+            x='Direction',
+            y='Count',
             title="Comparaison par direction",
-            text=direction_counts.values
+            text='Count',
+            orientation='v'
         )
         fig_direction.update_traces(
             marker_color='#ff7f0e', 
@@ -713,12 +722,14 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
     with col5:
         # Comparaison par poste
         poste_counts = df_filtered['Poste demandé'].value_counts().nlargest(15)
+        df_poste = poste_counts.rename_axis('Poste').reset_index(name='Count')
         fig_poste = px.bar(
-            poste_counts,
-            x=poste_counts.index,
-            y=poste_counts.values,
+            df_poste,
+            x='Poste',
+            y='Count',
             title="Comparaison par poste",
-            text=poste_counts.values
+            text='Count',
+            orientation='v'
         )
         fig_poste.update_traces(
             marker_color='#2ca02c', 
