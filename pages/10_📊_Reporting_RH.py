@@ -947,12 +947,27 @@ def create_demandes_recrutement_combined_tab(df_recrutement):
     </style>
     """, unsafe_allow_html=True)
     
-    # Créer deux jeux de filtres globaux séparés :
-    # - filtres pour la section DEMANDES (inclut Période de la demande)
-    # - filtres pour la section RECRUTEMENTS CLÔTURÉS (inclut Période de recrutement)
+    # Créer un seul jeu de filtres (4 contrôles): Entité, Direction, Période de la demande, Période de recrutement
     st.sidebar.subheader("🔧 Filtres Globaux")
-    filters_demandes = create_global_filters(df_recrutement, "combined_demandes", include_periode_recrutement=False, include_periode_demande=True)
-    filters_clotures = create_global_filters(df_recrutement, "combined_clotures", include_periode_recrutement=True, include_periode_demande=False)
+    shared_filters = create_global_filters(df_recrutement, "combined", include_periode_recrutement=True, include_periode_demande=True)
+
+    # Dériver deux jeux de filtres à partir des filtres partagés pour que chaque section
+    # n'applique que la période qui lui est pertinente.
+    filters_demandes = {
+        'entite': shared_filters.get('entite', 'Toutes'),
+        'direction': shared_filters.get('direction', 'Toutes'),
+        'periode_demande': shared_filters.get('periode_demande', 'Toutes'),
+        # Ne pas filtrer par période de recrutement dans la section Demandes
+        'periode_recrutement': 'Toutes'
+    }
+
+    filters_clotures = {
+        'entite': shared_filters.get('entite', 'Toutes'),
+        'direction': shared_filters.get('direction', 'Toutes'),
+        'periode_recrutement': shared_filters.get('periode_recrutement', 'Toutes'),
+        # Ne pas filtrer par période de demande dans la section Clôtures
+        'periode_demande': 'Toutes'
+    }
 
     # Créer deux cartes expandables principales (comme dans Home.py)
     with st.expander("📋 **DEMANDES DE RECRUTEMENT**", expanded=False):
