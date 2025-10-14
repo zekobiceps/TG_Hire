@@ -486,7 +486,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
     
     with col3:
         # Comparaison par direction
-        direction_counts = df_filtered['Direction concernée'].value_counts().nlargest(10)
+        direction_counts = df_filtered['Direction concernée'].value_counts()
         # Convert Series to DataFrame for plotly express compatibility
         df_direction = direction_counts.rename_axis('Direction').reset_index(name='Count')
         df_direction = df_direction.sort_values('Count', ascending=False)
@@ -518,7 +518,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
 
     with col4:
         # Comparaison par poste
-        poste_counts = df_filtered['Poste demandé'].value_counts().nlargest(10)
+        poste_counts = df_filtered['Poste demandé'].value_counts()
         df_poste = poste_counts.rename_axis('Poste').reset_index(name='Count')
         df_poste = df_poste.sort_values('Count', ascending=False)
         fig_poste = px.bar(
@@ -745,7 +745,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
     
     with col4:
         # Comparaison par direction
-        direction_counts = df_filtered['Direction concernée'].value_counts().nlargest(10)
+        direction_counts = df_filtered['Direction concernée'].value_counts()
         df_direction = direction_counts.rename_axis('Direction').reset_index(name='Count')
         df_direction = df_direction.sort_values('Count', ascending=False)
         # Horizontal bar for better readability when labels are long
@@ -774,11 +774,11 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             yaxis_title=None,
             yaxis=dict(categoryorder='array', categoryarray=df_direction['Direction'])
         )
-        st.plotly_chart(fig_direction, use_container_width=True)
+        render_plotly_scrollable(fig_direction, max_height=height_dir)
     
     with col5:
         # Comparaison par poste
-        poste_counts = df_filtered['Poste demandé'].value_counts().nlargest(15)
+        poste_counts = df_filtered['Poste demandé'].value_counts()
         df_poste = poste_counts.rename_axis('Poste').reset_index(name='Count')
         df_poste = df_poste.sort_values('Count', ascending=False)
         fig_poste = px.bar(
@@ -804,7 +804,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             yaxis_title=None,
             yaxis=dict(categoryorder='array', categoryarray=df_poste['Poste'])
         )
-        st.plotly_chart(fig_poste, use_container_width=True)
+        render_plotly_scrollable(fig_poste, max_height=height_poste)
 
 def create_integrations_tab(df_recrutement, global_filters):
     """Onglet Intégrations basé sur les bonnes données"""
