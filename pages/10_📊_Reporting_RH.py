@@ -310,8 +310,17 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             with col_left:
                 annee_select = st.selectbox("Période de recrutement", ['Toutes'] + [int(a) for a in annees_dispo], index=len(annees_dispo), key="rec_annee")
             with col_right:
-                # placeholder pour filtre additionnel de période
-                st.markdown("<div style='padding-top:6px; color:#666; font-size:0.9em'></div>", unsafe_allow_html=True)
+                # Filtre Période de la demande
+                date_demande_col = 'Date de réception de la demande aprés validation de la DRH'
+                if date_demande_col in df_cloture.columns:
+                    df_cloture['Année_demande'] = df_cloture[date_demande_col].dt.year
+                    annees_demande_dispo = sorted([y for y in df_cloture['Année_demande'].dropna().unique() if not pd.isna(y)])
+                    if annees_demande_dispo:
+                        annee_demande_select = st.selectbox("Période de la demande", ['Toutes'] + [int(a) for a in annees_demande_dispo], index=len(annees_demande_dispo), key="nav_dem_annee")
+                    else:
+                        st.markdown("<div style='padding-top:6px; color:#666; font-size:0.9em'></div>", unsafe_allow_html=True)
+                else:
+                    st.markdown("<div style='padding-top:6px; color:#666; font-size:0.9em'></div>", unsafe_allow_html=True)
         else:
             annee_select = 'Toutes'
     else:
@@ -463,32 +472,63 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
 def create_demandes_recrutement_tab(df_recrutement, global_filters):
     """Onglet Demandes de Recrutement avec style carte"""
     
-    # Filtre par période de demande (spécifique à cette section)
-    date_col = 'Date de réception de la demande aprés validation de la DRH'
-    if date_col in df_recrutement.columns:
-        df_recrutement['Année_demande'] = df_recrutement[date_col].dt.year
-        annees_demande = sorted([y for y in df_recrutement['Année_demande'].dropna().unique() if not pd.isna(y)])
-        if annees_demande:
-            col_left, col_right = st.sidebar.columns(2)
-            with col_left:
-                annee_demande_select = st.selectbox("Période de la demande", ['Toutes'] + [int(a) for a in annees_demande], index=len(annees_demande), key="dem_annee")
-            with col_right:
-                # placeholder pour un filtre complémentaire (ex: trimestre)
-                st.markdown("<div style='padding-top:6px; color:#666; font-size:0.9em'></div>", unsafe_allow_html=True)
-        else:
-            annee_demande_select = 'Toutes'
-    else:
-        annee_demande_select = 'Toutes'
-    
-    # Appliquer les filtres globaux + période
+    # Appliquer les filtres globaux
     df_filtered = apply_global_filters(df_recrutement, global_filters)
-    if annee_demande_select != 'Toutes':
-        df_filtered = df_filtered[df_filtered['Année_demande'] == annee_demande_select]
     
-    # KPI principal - Nombre de demandes
-    st.metric("Nombre de demandes", len(df_filtered))
+    # Colonne de date pour les calculs
+    date_col = 'Date de réception de la demande aprés validation de la DRH'
+    
+    # KPIs principaux - Indicateurs de demandes sur la même ligne
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("Nombre de demandes", len(df_filtered))
+    
+    with col2:
+        # Nouvelles Demandes (ce mois-ci)
+        today = datetime.now()
+        start_of_month = today.replace(day=1)
+        if date_col in df_filtered.columns:
+            nouvelles_demandes = len(df_filtered[df_filtered[date_col] >= start_of_month])
+            st.metric(
+                "Nouvelles Demandes (ce mois-ci)", 
+                nouvelles_demandes,
+                help="Le nombre de demandes reçues durant le mois en cours. Indique la vélocité et la charge de travail entrante."
+            )
+        else:
+            st.metric("Nouvelles Demandes (ce mois-ci)", "N/A")
+    
+    with col3:
+        # Demandes Annulées / Dépriorisées
+        if 'Statut de la demande' in df_filtered.columns:
+            demandes_annulees = len(df_filtered[
+                df_filtered['Statut de la demande'].str.contains('annul|déprioris|Annul|Déprioris|ANNUL|DÉPRIORIS', case=False, na=False)
+            ])
+            st.metric(
+                "Demandes Annulées/Dépriorisées", 
+                demandes_annulees,
+                help="Le nombre de demandes qui ont été stoppées. Essentiel pour comprendre la 'fuite' dans votre pipeline."
+            )
+        else:
+            st.metric("Demandes Annulées/Dépriorisées", "N/A")
+    
+    with col4:
+        # Taux d'annulation
+        if 'Statut de la demande' in df_filtered.columns and len(df_filtered) > 0:
+            demandes_annulees = len(df_filtered[
+                df_filtered['Statut de la demande'].str.contains('annul|déprioris|Annul|Déprioris|ANNUL|DÉPRIORIS', case=False, na=False)
+            ])
+            taux_annulation = round((demandes_annulees / len(df_filtered)) * 100, 1)
+            st.metric(
+                "Taux d'annulation", 
+                f"{taux_annulation}%",
+                help="Pourcentage de demandes annulées ou dépriorisées par rapport au total."
+            )
+        else:
+            st.metric("Taux d'annulation", "N/A")
 
     # Graphiques principaux
+    st.markdown("---")
     col1, col2, col3 = st.columns([1,1,2])
     
     with col1:
