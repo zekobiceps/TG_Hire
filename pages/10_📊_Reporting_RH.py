@@ -196,11 +196,69 @@ def load_data_from_google_sheets(sheet_url):
         raise e
 
 
+def normalize_column_names(df):
+    """Normaliser et corriger les noms des colonnes"""
+    if df is None or len(df) == 0:
+        return df
+    
+    # Mapping des variations de noms de colonnes vers les noms standards
+    column_mapping = {
+        # Variations pour "Poste demandé"
+        'poste demandé': 'Poste demandé',
+        'poste_demande': 'Poste demandé',
+        'poste': 'Poste demandé',
+        'titre du poste': 'Poste demandé',
+        'intitulé du poste': 'Poste demandé',
+        
+        # Variations pour "Statut de la demande"
+        'statut de la demande': 'Statut de la demande',
+        'statut_demande': 'Statut de la demande',
+        'statut': 'Statut de la demande',
+        'etat': 'Statut de la demande',
+        
+        # Variations pour "Direction concernée"
+        'direction concernée': 'Direction concernée',
+        'direction_concernee': 'Direction concernée',
+        'direction': 'Direction concernée',
+        
+        # Variations pour "Entité demandeuse"
+        'entité demandeuse': 'Entité demandeuse',
+        'entite_demandeuse': 'Entité demandeuse',
+        'entite': 'Entité demandeuse',
+        
+        # Variations pour les dates
+        'date de réception de la demande aprés validation de la drh': 'Date de réception de la demande aprés validation de la DRH',
+        'date reception demande': 'Date de réception de la demande aprés validation de la DRH',
+        'date d\'entrée effective du candidat': 'Date d\'entrée effective du candidat',
+        'date entree effective': 'Date d\'entrée effective du candidat'
+    }
+    
+    # Créer une copie du DataFrame pour éviter de modifier l'original
+    df_normalized = df.copy()
+    
+    # Nettoyer d'abord les noms de colonnes (espaces, casse)
+    df_normalized.columns = df_normalized.columns.str.strip().str.lower()
+    
+    # Appliquer le mapping
+    df_normalized.columns = [column_mapping.get(col, col) for col in df_normalized.columns]
+    
+    # Si on n'a toujours pas "Poste demandé", essayer de le deviner
+    if 'Poste demandé' not in df_normalized.columns:
+        for col in df_normalized.columns:
+            if any(keyword in col.lower() for keyword in ['poste', 'titre', 'intitulé', 'fonction']):
+                df_normalized = df_normalized.rename(columns={col: 'Poste demandé'})
+                break
+    
+    return df_normalized
+
 @st.cache_data(ttl=300)
 def process_recruitment_data(df):
     """Traiter et nettoyer les données de recrutement de manière mise en cache"""
     if df is None or len(df) == 0:
         return None
+    
+    # D'abord normaliser les noms de colonnes
+    df = normalize_column_names(df)
     
     # Convertir les colonnes de dates si elles existent
     date_columns = [
@@ -266,11 +324,31 @@ def load_data_from_files(csv_file=None, excel_file=None):
                     if col in df_recrutement.columns:
                         df_recrutement[col] = pd.to_numeric(df_recrutement[col], errors='coerce').fillna(0)
 
-            # Vérification basique des colonnes critiques et message dans les logs
+            # Vérification et diagnostic des colonnes critiques
             required_cols = [
                 'Statut de la demande', 'Poste demandé', 'Direction concernée',
                 'Entité demandeuse', 'Modalité de recrutement'
             ]
+            
+            # Diagnostic des colonnes manquantes
+            missing_cols = [col for col in required_cols if col not in df_recrutement.columns]
+            if missing_cols:
+                st.error(f"❌ Colonnes attendues manquantes dans le fichier de recrutement: {missing_cols}")
+                st.info("🔍 **Colonnes disponibles dans le fichier :**")
+                col_info = pd.DataFrame({
+                    'Colonnes disponibles': df_recrutement.columns.tolist(),
+                    'Index': range(len(df_recrutement.columns))
+                })
+                st.dataframe(col_info, use_container_width=True)
+                
+                # Suggestion de colonnes similaires
+                st.info("💡 **Suggestions de correspondances :**")
+                for missing_col in missing_cols:
+                    similar_cols = [col for col in df_recrutement.columns if any(word in col.lower() for word in missing_col.lower().split())]
+                    if similar_cols:
+                        st.write(f"- Pour `{missing_col}`, colonnes similaires trouvées: {similar_cols}")
+                
+                return None, None  # Arrêter le traitement si des colonnes critiques manquent
             missing = [c for c in required_cols if c not in df_recrutement.columns]
             if missing:
                 # Log via st.warning but don't raise — keep app running
@@ -1466,17 +1544,35 @@ def main():
                         df_synced = load_data_from_google_sheets(gs_url)
                         
                         if df_synced is not None and len(df_synced) > 0:
+                            # Afficher d'abord les colonnes brutes pour diagnostic
+                            st.info("🔍 **Colonnes détectées dans Google Sheets :**")
+                            st.write(f"Colonnes brutes: {list(df_synced.columns)}")
+                            
                             # Traiter les données avec la fonction mise en cache
                             df_processed = process_recruitment_data(df_synced)
-                            st.session_state.synced_recrutement_df = df_processed
-                            st.session_state.data_updated = True
-                            # Nettoyer le cache des options de filtres pour forcer la mise à jour
-                            get_filter_options.clear()
-                            nb_lignes = len(df_processed)
-                            nb_colonnes = len(df_processed.columns)
-                            st.success(f"✅ Synchronisation Google Sheets réussie ! Les onglets ont été mis à jour. ({nb_lignes} lignes, {nb_colonnes} colonnes)")
-                            # Éviter le rechargement immédiat complet
-                            st.rerun()
+                            
+                            if df_processed is not None:
+                                st.info("✅ **Colonnes après normalisation :**")
+                                st.write(f"Colonnes finales: {list(df_processed.columns)}")
+                                
+                                # Vérifier les colonnes critiques
+                                required_cols = ['Statut de la demande', 'Poste demandé', 'Direction concernée', 'Entité demandeuse']
+                                missing_cols = [col for col in required_cols if col not in df_processed.columns]
+                                
+                                if missing_cols:
+                                    st.error(f"❌ Colonnes critiques manquantes après normalisation: {missing_cols}")
+                                else:
+                                    st.session_state.synced_recrutement_df = df_processed
+                                    st.session_state.data_updated = True
+                                    # Nettoyer le cache des options de filtres pour forcer la mise à jour
+                                    get_filter_options.clear()
+                                    nb_lignes = len(df_processed)
+                                    nb_colonnes = len(df_processed.columns)
+                                    st.success(f"✅ Synchronisation Google Sheets réussie ! Les onglets ont été mis à jour. ({nb_lignes} lignes, {nb_colonnes} colonnes)")
+                                    # Éviter le rechargement immédiat complet
+                                    st.rerun()
+                            else:
+                                st.error("❌ Erreur lors du traitement des données synchronisées")
                         else:
                             st.warning("⚠️ Aucune donnée trouvée dans la feuille Google Sheets.")
                             
