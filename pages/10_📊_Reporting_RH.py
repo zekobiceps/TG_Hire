@@ -314,18 +314,23 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 # Filtre Période de la demande
                 date_demande_col = 'Date de réception de la demande aprés validation de la DRH'
                 if date_demande_col in df_cloture.columns:
-                    df_cloture['Année_demande'] = df_cloture[date_demande_col].dt.year
-                    annees_demande_dispo = sorted([y for y in df_cloture['Année_demande'].dropna().unique() if not pd.isna(y)])
-                    if annees_demande_dispo:
-                        annee_demande_select = st.selectbox("Période de la demande", ['Toutes'] + [int(a) for a in annees_demande_dispo], index=len(annees_demande_dispo), key="nav_dem_annee")
-                        # Stocker dans session state pour utilisation globale
-                        st.session_state['periode_demande_filter'] = annee_demande_select
-                    else:
+                    try:
+                        df_cloture_temp = df_cloture.copy()
+                        df_cloture_temp['Année_demande'] = df_cloture_temp[date_demande_col].dt.year
+                        annees_demande_dispo = sorted([y for y in df_cloture_temp['Année_demande'].dropna().unique() if not pd.isna(y)])
+                        if annees_demande_dispo:
+                            annee_demande_select = st.selectbox(
+                                "Période de la demande", 
+                                ['Toutes'] + [int(a) for a in annees_demande_dispo], 
+                                index=len(annees_demande_dispo), 
+                                key="nav_dem_annee"
+                            )
+                        else:
+                            st.markdown("<div style='padding-top:6px; color:#666; font-size:0.9em'></div>", unsafe_allow_html=True)
+                    except Exception as e:
                         st.markdown("<div style='padding-top:6px; color:#666; font-size:0.9em'></div>", unsafe_allow_html=True)
-                        st.session_state['periode_demande_filter'] = 'Toutes'
                 else:
                     st.markdown("<div style='padding-top:6px; color:#666; font-size:0.9em'></div>", unsafe_allow_html=True)
-                    st.session_state['periode_demande_filter'] = 'Toutes'
         else:
             annee_select = 'Toutes'
     else:
@@ -518,10 +523,15 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
     date_col = 'Date de réception de la demande aprés validation de la DRH'
     
     # Appliquer le filtre de période de demande si disponible
-    if 'periode_demande_filter' in st.session_state and st.session_state['periode_demande_filter'] != 'Toutes':
-        if date_col in df_filtered.columns:
-            df_filtered['Année_demande_temp'] = df_filtered[date_col].dt.year
-            df_filtered = df_filtered[df_filtered['Année_demande_temp'] == st.session_state['periode_demande_filter']]
+    try:
+        if 'nav_dem_annee' in st.session_state and st.session_state['nav_dem_annee'] != 'Toutes':
+            if date_col in df_filtered.columns:
+                df_filtered_temp = df_filtered.copy()
+                df_filtered_temp['Année_demande_temp'] = df_filtered_temp[date_col].dt.year
+                df_filtered = df_filtered_temp[df_filtered_temp['Année_demande_temp'] == st.session_state['nav_dem_annee']]
+    except Exception as e:
+        # En cas d'erreur, continuer sans filtrage de période
+        pass
     
     # KPIs principaux - Indicateurs de demandes sur la même ligne
     col1, col2, col3, col4 = st.columns(4)
