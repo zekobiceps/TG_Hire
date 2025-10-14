@@ -1441,6 +1441,18 @@ def calculate_weekly_metrics(df_recrutement):
         df[real_accept_col] = pd.to_datetime(df[real_accept_col], errors='coerce')
     else:
         real_accept_col = None
+
+    # Normalisation et mots-clés de statuts fermés (utiles dans plusieurs blocs)
+    import unicodedata
+    def _norm(s):
+        if pd.isna(s):
+            return ''
+        ss = str(s)
+        ss = unicodedata.normalize('NFKD', ss)
+        ss = ''.join(ch for ch in ss if not unicodedata.combining(ch))
+        return ss.lower()
+
+    closed_keywords = ['cloture', 'clôture', 'annule', 'annulé', 'depriorise', 'dépriorisé', 'desistement', 'désistement', 'annul', 'reject', 'rejett']
     
     # Calculer les métriques par entité
     entites = df[real_entite_col].dropna().unique()
@@ -1462,16 +1474,6 @@ def calculate_weekly_metrics(df_recrutement):
             opened_before = df_entite.copy()
 
             # Exclure explicitement les demandes fermées/annulées/dépriorisées qui ne doivent pas compter
-            import unicodedata
-            def _norm(s):
-                if pd.isna(s):
-                    return ''
-                ss = str(s)
-                ss = unicodedata.normalize('NFKD', ss)
-                ss = ''.join(ch for ch in ss if not unicodedata.combining(ch))
-                return ss.lower()
-
-            closed_keywords = ['cloture', 'clôture', 'annule', 'annulé', 'depriorise', 'dépriorisé', 'desistement', 'désistement', 'annul', 'reject', 'rejett']
             if real_statut_col and real_statut_col in opened_before.columns:
                 opened_before = opened_before[ ~opened_before[real_statut_col].astype(str).apply(lambda x: any(k in _norm(x) for k in closed_keywords)) ]
 
@@ -1489,7 +1491,11 @@ def calculate_weekly_metrics(df_recrutement):
         # 2. Nb nouveaux postes ouverts cette semaine (date de réception dans la semaine courante)
         nouveaux_postes = 0
         if real_date_reception_col and real_date_reception_col in df_entite.columns:
-            nouveaux_postes = int( df_entite[ (df_entite[real_date_reception_col] >= start_of_week) & (df_entite[real_date_reception_col] <= today) ].shape[0] )
+            # compter uniquement les nouvelles demandes actives (exclure les statuts fermés)
+            tmp_new = df_entite[ (df_entite[real_date_reception_col] >= start_of_week) & (df_entite[real_date_reception_col] <= today) ].copy()
+            if real_statut_col and real_statut_col in tmp_new.columns:
+                tmp_new = tmp_new[ ~tmp_new[real_statut_col].astype(str).apply(lambda x: any(k in _norm(x) for k in closed_keywords)) ]
+            nouveaux_postes = int(tmp_new.shape[0])
         else:
             nouveaux_postes = 0
 
@@ -1512,7 +1518,10 @@ def calculate_weekly_metrics(df_recrutement):
         total_opened_until_now = 0
         total_pourvus_until_now = 0
         if real_date_reception_col and real_date_reception_col in df_entite.columns:
-            total_opened_until_now = int( df_entite[ df_entite[real_date_reception_col] <= today ].shape[0] )
+            opened_until_now = df_entite[ df_entite[real_date_reception_col] <= today ].copy()
+            if real_statut_col and real_statut_col in opened_until_now.columns:
+                opened_until_now = opened_until_now[ ~opened_until_now[real_statut_col].astype(str).apply(lambda x: any(k in _norm(x) for k in closed_keywords)) ]
+            total_opened_until_now = int(opened_until_now.shape[0])
         if real_candidat_col and real_accept_col:
             if real_accept_col in df_entite.columns and real_candidat_col in df_entite.columns:
                 total_pourvus_until_now = int( df_entite[ df_entite[real_accept_col].notna() & (df_entite[real_accept_col] <= today) & df_entite[real_candidat_col].notna() ].shape[0] )
