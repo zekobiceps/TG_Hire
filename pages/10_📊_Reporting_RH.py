@@ -1466,36 +1466,23 @@ def calculate_weekly_metrics(df_recrutement):
     for entite in entites:
         df_entite = df[df[real_entite_col] == entite]
         # Définitions temporelles (commencer la semaine à 00:00:00 du lundi)
-        start_of_week = datetime(today.year, today.month, today.day) - timedelta(days=today.weekday())
+        # Reuse top-level start_of_week and start_of_last_week (they are set above)
+        last_week_start = start_of_last_week
         last_week_end = start_of_week - timedelta(seconds=1)
 
-        # 1. Nb postes ouverts avant début semaine
-        # Logique: postes qui étaient encore actifs (non pourvus) à la fin de la semaine dernière
+        # 1. Nb postes ouverts avant début semaine = postes ouverts DURANT la semaine précédente
         postes_avant = 0
         if real_date_reception_col and real_date_reception_col in df_entite.columns:
-            # ouverts avant ou égal à la fin de la semaine dernière (basé uniquement sur la date de réception)
-            opened_before = df_entite[ df_entite[real_date_reception_col] <= last_week_end ].copy()
+            mask_last_week = (df_entite[real_date_reception_col] >= last_week_start) & (df_entite[real_date_reception_col] < start_of_week)
+            postes_avant = int(df_entite[mask_last_week].shape[0])
         else:
-            opened_before = df_entite.copy()
-
-            if real_accept_col and real_accept_col in opened_before.columns:
-                # considérer pourvus uniquement si acceptance date <= last_week_end
-                not_yet_pourvus = opened_before[ opened_before[real_accept_col].isna() | (opened_before[real_accept_col] > last_week_end) ]
-            else:
-                # si pas de date d'acceptation, utiliser l'absence de nom candidat comme proxy
-                if real_candidat_col and real_candidat_col in opened_before.columns:
-                    not_yet_pourvus = opened_before[ opened_before[real_candidat_col].isna() | (opened_before[real_candidat_col].astype(str).str.strip() == '') ]
-                else:
-                    not_yet_pourvus = opened_before
-            postes_avant = len(not_yet_pourvus)
+            postes_avant = 0
 
         # 2. Nb nouveaux postes ouverts cette semaine (date de réception dans la semaine courante)
         nouveaux_postes = 0
         if real_date_reception_col and real_date_reception_col in df_entite.columns:
-            # compter uniquement les nouvelles demandes actives (exclure les statuts fermés)
-            tmp_new = df_entite[ (df_entite[real_date_reception_col] >= start_of_week) & (df_entite[real_date_reception_col] <= today) ].copy()
-            # conserver toutes les nouvelles demandes basées sur la date de réception (pas d'exclusion par statut)
-            nouveaux_postes = int(tmp_new.shape[0])
+            mask_this_week = (df_entite[real_date_reception_col] >= start_of_week) & (df_entite[real_date_reception_col] <= today)
+            nouveaux_postes = int(df_entite[mask_this_week].shape[0])
         else:
             nouveaux_postes = 0
 
@@ -1523,22 +1510,23 @@ def calculate_weekly_metrics(df_recrutement):
                 # If we cannot reliably determine status or dates, default to 0 (avoid double-counting)
                 postes_pourvus = 0
 
-        # 4. Nb postes en cours cette semaine (cumulatif)
-        total_opened_until_now = 0
-        total_pourvus_until_now = 0
-        if real_date_reception_col and real_date_reception_col in df_entite.columns:
-            # total ouvert jusqu'à aujourd'hui basé uniquement sur la date de réception
-            total_opened_until_now = int( df_entite[ df_entite[real_date_reception_col] <= today ].shape[0] )
-        if real_candidat_col and real_accept_col:
-            if real_accept_col in df_entite.columns and real_candidat_col in df_entite.columns:
-                total_pourvus_until_now = int( df_entite[ df_entite[real_accept_col].notna() & (df_entite[real_accept_col] <= today) & df_entite[real_candidat_col].notna() ].shape[0] )
-        elif real_candidat_col and real_candidat_col in df_entite.columns:
-            # fallback: any row with candidate name counts as pourvu
-            total_pourvus_until_now = int( df_entite[ df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '') ].shape[0] )
-
-        postes_en_cours = total_opened_until_now - total_pourvus_until_now
-        if postes_en_cours < 0:
-            postes_en_cours = 0
+        # 4. Nb postes en cours cette semaine: compter directement les lignes dont la colonne statut indique 'En cours'
+        postes_en_cours = 0
+        if mask_status_en_cours is not None:
+            try:
+                if real_date_reception_col and real_date_reception_col in df_entite.columns:
+                    # limiter aux postes dont la date de réception est antérieure ou égale à today
+                    mask_reception_le_today = df_entite[real_date_reception_col].notna() & (df_entite[real_date_reception_col] <= today)
+                    postes_en_cours = int(df_entite[ mask_status_en_cours & mask_reception_le_today ].shape[0])
+                else:
+                    postes_en_cours = int(df_entite[ mask_status_en_cours ].shape[0])
+            except Exception:
+                postes_en_cours = int(df_entite[ mask_status_en_cours ].shape[0])
+        else:
+            # fallback: use difference rule when statut non disponible
+            postes_en_cours = nouveaux_postes - postes_pourvus
+            if postes_en_cours < 0:
+                postes_en_cours = 0
         
         metrics_by_entity[entite] = {
             'avant': postes_avant,
