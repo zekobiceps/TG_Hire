@@ -372,7 +372,7 @@ Toutes les modifications sont **committées** et **pushées** ! Votre dashboard 
 
 ---
 
-_**User (2025-10-14 15:11Z)**_
+_**User (2025-10-14 15:18Z)**_
 
 -sur les graphiques des comparaison par direction et par poste les valeurs au sein des graphiques sont horizental, je veux qu'il soit verticale
 -Quand je met le curseur je trouve x=108
@@ -385,7 +385,114 @@ je veux avoir uniquement la valeur qui est "108" et pareil pour le graphique de 
 
 _**Assistant (copilot/claude-sonnet-4)**_
 
-Je vais d'abord examiner les modifications manuelles que vous avez apportées au fichier, puis corriger les graphiques selon vos demandes. 
+Je vais d'abord examiner les modifications manuelles que vous avez apportées au fichier, puis corriger les graphiques selon vos demandes. Maintenant, cherchons les graphiques en question pour les corriger. Commençons par identifier les graphiques horizontaux dans la section des demandes de recrutement : Regardons ces graphiques pour les corriger : Maintenant, regardons la section des recrutements clôturés : Je vais maintenant corriger tous ces graphiques pour :
+1. Les passer de horizontal à vertical
+2. Personnaliser le hovertemplate pour n'afficher que la valeur
+
+Commençons par la section des demandes de recrutement : 
+```
+
+```
+Maintenant, corrigeons le graphique de comparaison par raison du recrutement : 
+```
+
+```
+Maintenant, corrigeons la section des recrutements clôturés : 
+```
+
+```
+Il nous reste à trouver le graphique d'évolution. Regardons d'abord s'il y en a d'autres : Regardons le graphique d'évolution des demandes : Je vois que le graphique d'évolution des demandes est déjà vertical, mais il faut améliorer son hovertemplate. Regardons aussi le graphique d'évolution des recrutements : Maintenant, améliorons ces graphiques d'évolution pour avoir un meilleur hovertemplate : 
+```
+
+```
+
+```
+
+```
+Cherchons s'il y a d'autres graphiques à corriger dans la section intégrations : Améliorons aussi ce graphique d'évolution des intégrations : 
+```
+
+```
+Vérifions qu'il n'y a pas d'autres graphiques à corriger. Cherchons dans le graphique d'évolution des intégrations par mois qui était mentionné plus tôt : Ce graphique semble déjà être vertical, mais améliorons son hovertemplate aussi : 
+```
+
+```
+Vérifions que le code est syntaxiquement correct : Parfait ! Maintenant commitons et pushons les changements : ✅ **Modifications appliquées et déployées !**
+
+## 📊 **Résumé des améliorations :**
+
+### 🔄 **Orientation des graphiques (Horizontal → Vertical) :**
+- ✅ **Comparaison par direction** (sections Demandes & Recrutements clôturés)
+- ✅ **Comparaison par poste** (sections Demandes & Recrutements clôturés)
+- ✅ **Comparaison par raison du recrutement** (section Demandes)
+
+### ✨ **Amélioration des infobulles au survol :**
+
+#### **Avant :**
+```
+x=108
+Poste demandé = ANIMATEUR HSE
+text=108
+```
+
+#### **Après :**
+```
+108
+```
+
+### 🎯 **Graphiques corrigés dans toutes les sections :**
+
+1. **📋 DEMANDES DE RECRUTEMENT :**
+   - Comparaison par direction (vertical + hover propre)
+   - Comparaison par poste (vertical + hover propre)
+   - Comparaison par raison du recrutement (vertical + hover propre)
+   - Évolution des demandes (hover amélioré)
+
+2. **🎯 RECRUTEMENTS CLÔTURÉS :**
+   - Comparaison par direction (vertical + hover propre)
+   - Comparaison par poste (vertical + hover propre)
+   - Évolution des recrutements (hover amélioré)
+
+3. **📊 INTÉGRATIONS :**
+   - Évolution des intégrations prévues (hover amélioré)
+   - Timeline des intégrations par mois (hover amélioré)
+
+### 🔧 **Détails techniques :**
+- **Orientation** : `orientation='h'` → layout vertical standard
+- **Ordre** : `categoryorder='total ascending'` → `'total descending'`
+- **Hover** : `hovertemplate='%{y}<extra></extra>'` (valeur uniquement)
+- **Axes** : `x=categories, y=values` pour meilleure lisibilité
+
+### 🎨 **Avantages :**
+- ✅ **Meilleure lisibilité** des étiquettes
+- ✅ **Infobulles épurées** (juste la valeur)
+- ✅ **Cohérence visuelle** sur tous les graphiques
+- ✅ **Expérience utilisateur optimisée**
+
+Toutes vos demandes ont été implémentées et **committées/pushées** avec succès ! 🚀
+
+---
+
+_**User (2025-10-14 15:30Z)**_
+
+pour comparaison par poste laisse l'affiche verticale mais les valeurs au sein des bar verticale car il y a plusieurs postes  et pareil pour les directions et sa concerne les sections demande et recrutement 
+- pour le graphique évolutions des recrutements il faut toujours laisser le nom de chaque bar du mois car j'ai remarqué qu'il affiche un moi et le deuxième moi il affiche la bar mais il n'affiche pas en bas le mois
+- dans les fltres globaux quand je change "période de la demande" il ne change pas les graphique de la section demandes de recrutement
+- pour le reporting hebdomadaire je pense que tu te base sur une version ancienne sur le code alors que tu dois l'actualiser à partir du fichier ou la google sheet que je met dans upload
+-dans la section "recrutements clôturées et sur "Nombre de Direction con..." il doit afficher le texte entier car il affiche pour le moement que "Nombre de Direction con..."
+- pour délai moyen de recrutement assure toi qu'il fait pour le calcul "Duree de rectutement = DATEDIFF([Date de réception de la demande aprés validation de la DRH],[Date du 1er retour equipe RH  au demandeur],day)
+patch complet puis commit & push"
+- sur intégration il y a "Graphique 'Répartition par Affectation' désactivé." merci de le réactiver
+- dans hebdomadaire ajoute "Chiffres Clés de la semaine" dans le titre pour que ca devient : 📅 Reporting Hebdomadaire : Chiffres Clés de la semaine
+commit & push
+
+---
+
+_**Assistant (copilot/claude-sonnet-4)**_
+
+Je vais traiter toutes vos demandes une par une. Commençons par examiner et corriger chaque point.
+
+## 1. D'abord, corrigeons l'affichage des étiquettes sur les barres verticales pour les postes et directions 
 
 ---
 

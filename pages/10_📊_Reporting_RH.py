@@ -318,10 +318,14 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                     annees_demande_dispo = sorted([y for y in df_cloture['Année_demande'].dropna().unique() if not pd.isna(y)])
                     if annees_demande_dispo:
                         annee_demande_select = st.selectbox("Période de la demande", ['Toutes'] + [int(a) for a in annees_demande_dispo], index=len(annees_demande_dispo), key="nav_dem_annee")
+                        # Stocker dans session state pour utilisation globale
+                        st.session_state['periode_demande_filter'] = annee_demande_select
                     else:
                         st.markdown("<div style='padding-top:6px; color:#666; font-size:0.9em'></div>", unsafe_allow_html=True)
+                        st.session_state['periode_demande_filter'] = 'Toutes'
                 else:
                     st.markdown("<div style='padding-top:6px; color:#666; font-size:0.9em'></div>", unsafe_allow_html=True)
+                    st.session_state['periode_demande_filter'] = 'Toutes'
         else:
             annee_select = 'Toutes'
     else:
@@ -341,7 +345,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         st.metric("Postes concernés", postes_uniques)
     with col3:
         directions_uniques = df_filtered['Direction concernée'].nunique()
-        st.metric("Nombre de Direction con...", directions_uniques)
+        st.metric("Directions concernées", directions_uniques)
     
     # Graphiques en ligne 1
     col1, col2 = st.columns([2,1])
@@ -364,7 +368,12 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 textposition='outside',
                 hovertemplate='%{y}<extra></extra>'
             )
-            fig_evolution.update_layout(height=300, xaxis_title=None, yaxis_title=None)
+            fig_evolution.update_layout(
+                height=300, 
+                xaxis_title=None, 
+                yaxis_title=None,
+                xaxis=dict(tickmode='linear', dtick=1)
+            )
             st.plotly_chart(fig_evolution, use_container_width=True)
     
     with col2:
@@ -410,14 +419,16 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         )
         fig_direction.update_traces(
             marker_color='#ff7f0e', 
-            textposition='auto',
+            textposition='inside',
+            textfont=dict(color='white', size=12),
             hovertemplate='%{y}<extra></extra>'
         )
         fig_direction.update_layout(
             height=300, 
             xaxis_title=None, 
             yaxis_title=None,
-            xaxis={'categoryorder':'total descending'}
+            xaxis={'categoryorder':'total descending'},
+            xaxis_tickangle=-45
         )
         st.plotly_chart(fig_direction, use_container_width=True)
 
@@ -433,14 +444,16 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         )
         fig_poste.update_traces(
             marker_color='#2ca02c', 
-            textposition='auto',
+            textposition='inside',
+            textfont=dict(color='white', size=12),
             hovertemplate='%{y}<extra></extra>'
         )
         fig_poste.update_layout(
             height=300, 
             xaxis_title=None, 
             yaxis_title=None,
-            xaxis={'categoryorder':'total descending'}
+            xaxis={'categoryorder':'total descending'},
+            xaxis_tickangle=-45
         )
         st.plotly_chart(fig_poste, use_container_width=True)
 
@@ -468,18 +481,23 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         st.plotly_chart(fig_candidats, use_container_width=True)
 
     with col6:
-        # Délai moyen de recrutement
+        # Délai moyen de recrutement - Formule corrigée selon votre demande
         date_reception_col = 'Date de réception de la demande aprés validation de la DRH'
-        date_reponse_col = 'Date de la 1er réponse du demandeur à l\'équipe RH'
+        date_retour_rh_col = 'Date du 1er retour equipe RH  au demandeur'
         
-        if date_reception_col in df_filtered.columns and date_reponse_col in df_filtered.columns:
-            df_filtered['Duree de recrutement'] = (df_filtered[date_reponse_col] - df_filtered[date_reception_col]).dt.days
+        if date_reception_col in df_filtered.columns and date_retour_rh_col in df_filtered.columns:
+            # Convertir les colonnes en datetime si ce n'est pas déjà fait
+            df_filtered[date_reception_col] = pd.to_datetime(df_filtered[date_reception_col], errors='coerce')
+            df_filtered[date_retour_rh_col] = pd.to_datetime(df_filtered[date_retour_rh_col], errors='coerce')
+            
+            # Calcul : DATEDIFF([Date du 1er retour equipe RH au demandeur] - [Date de réception de la demande aprés validation de la DRH])
+            df_filtered['Duree de recrutement'] = (df_filtered[date_retour_rh_col] - df_filtered[date_reception_col]).dt.days
             delai_moyen = df_filtered['Duree de recrutement'].mean()
 
             if not pd.isna(delai_moyen):
                 fig_delai = go.Figure(go.Indicator(
                     mode = "number",
-                    value = delai_moyen,
+                    value = round(delai_moyen, 1),
                     title = {"text": "Délai moyen de recrutement (jours)"}
                 ))
                 fig_delai.update_layout(height=300)
@@ -487,7 +505,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             else:
                 st.info("Le calcul du délai moyen de recrutement n'est pas disponible.")
         else:
-            st.warning("Colonnes de date nécessaires pour le calcul du délai non trouvées.")
+            st.warning(f"Colonnes nécessaires non trouvées: '{date_reception_col}' et '{date_retour_rh_col}'")
 
 
 def create_demandes_recrutement_tab(df_recrutement, global_filters):
@@ -498,6 +516,12 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
     
     # Colonne de date pour les calculs
     date_col = 'Date de réception de la demande aprés validation de la DRH'
+    
+    # Appliquer le filtre de période de demande si disponible
+    if 'periode_demande_filter' in st.session_state and st.session_state['periode_demande_filter'] != 'Toutes':
+        if date_col in df_filtered.columns:
+            df_filtered['Année_demande_temp'] = df_filtered[date_col].dt.year
+            df_filtered = df_filtered[df_filtered['Année_demande_temp'] == st.session_state['periode_demande_filter']]
     
     # KPIs principaux - Indicateurs de demandes sur la même ligne
     col1, col2, col3, col4 = st.columns(4)
@@ -623,14 +647,16 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         )
         fig_direction.update_traces(
             marker_color='#ff7f0e', 
-            textposition='auto',
+            textposition='inside',
+            textfont=dict(color='white', size=12),
             hovertemplate='%{y}<extra></extra>'
         )
         fig_direction.update_layout(
             height=400, 
             xaxis_title=None, 
             yaxis_title=None,
-            xaxis={'categoryorder':'total descending'}
+            xaxis={'categoryorder':'total descending'},
+            xaxis_tickangle=-45
         )
         st.plotly_chart(fig_direction, use_container_width=True)
     
@@ -646,14 +672,16 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         )
         fig_poste.update_traces(
             marker_color='#2ca02c', 
-            textposition='auto',
+            textposition='inside',
+            textfont=dict(color='white', size=12),
             hovertemplate='%{y}<extra></extra>'
         )
         fig_poste.update_layout(
             height=400, 
             xaxis_title=None, 
             yaxis_title=None,
-            xaxis={'categoryorder':'total descending'}
+            xaxis={'categoryorder':'total descending'},
+            xaxis_tickangle=-45
         )
         st.plotly_chart(fig_poste, use_container_width=True)
 
@@ -701,9 +729,39 @@ def create_integrations_tab(df_recrutement, global_filters):
     # Graphiques
     col1, col2 = st.columns(2)
 
-    # Graphique par affectation supprimé sur demande. On laisse une zone d'information minimale.
     with col1:
-        st.info("Graphique 'Répartition par Affectation' désactivé.")
+        # Répartition par Affectation - Réactivé
+        if 'Affectation' in df_filtered.columns:
+            affectation_counts = df_filtered['Affectation'].value_counts()
+            fig_affectation = px.pie(
+                values=affectation_counts.values,
+                names=affectation_counts.index,
+                title="📍 Répartition par Affectation",
+                hole=0.4
+            )
+            fig_affectation.update_layout(height=400)
+            st.plotly_chart(fig_affectation, use_container_width=True)
+        else:
+            # Essayer avec d'autres colonnes possibles
+            possible_cols = ['Lieu', 'Site', 'Entité demandeuse', 'Direction concernée']
+            affectation_col = None
+            for col in possible_cols:
+                if col in df_filtered.columns:
+                    affectation_col = col
+                    break
+            
+            if affectation_col:
+                affectation_counts = df_filtered[affectation_col].value_counts()
+                fig_affectation = px.pie(
+                    values=affectation_counts.values,
+                    names=affectation_counts.index,
+                    title=f"📍 Répartition par {affectation_col}",
+                    hole=0.4
+                )
+                fig_affectation.update_layout(height=400)
+                st.plotly_chart(fig_affectation, use_container_width=True)
+            else:
+                st.info("Colonne 'Affectation' non trouvée. Graphique non disponible.")
 
     with col2:
         # Évolution des dates d'intégration prévues
@@ -825,8 +883,8 @@ def calculate_weekly_metrics(df_recrutement):
     start_of_last_week = start_of_week - timedelta(days=7)   # Lundi de la semaine dernière
     
     # Définir les colonnes attendues avec des alternatives possibles
-    date_reception_col = "Date de réception de la demande après validation de la DRH"
-    date_integration_col = "Date d'intégration prévisionnelle"
+    date_reception_col = "Date de réception de la demande aprés validation de la DRH"  # Corrigé avec l'accent
+    date_integration_col = "Date d'entrée prévisionnelle"  # Corrigé selon vos données
     candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
     statut_col = "Statut de la demande"
     entite_col = "Entité demandeuse"
@@ -939,7 +997,7 @@ def calculate_weekly_metrics(df_recrutement):
 
 def create_weekly_report_tab(df_recrutement=None):
     """Onglet Reporting Hebdomadaire"""
-    st.header("📅 Reporting Hebdomadaire")
+    st.header("📅 Reporting Hebdomadaire : Chiffres Clés de la semaine")
 
     # Calculer les métriques si les données sont disponibles
     if df_recrutement is not None:
