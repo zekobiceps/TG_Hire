@@ -1442,7 +1442,8 @@ def calculate_weekly_metrics(df_recrutement):
     
     for entite in entites:
         df_entite = df[df[real_entite_col] == entite]
-        # Définitions temporelles
+        # Définitions temporelles (commencer la semaine à 00:00:00 du lundi)
+        start_of_week = datetime(today.year, today.month, today.day) - timedelta(days=today.weekday())
         last_week_end = start_of_week - timedelta(seconds=1)
 
         # 1. Nb postes ouverts avant début semaine
@@ -1450,7 +1451,22 @@ def calculate_weekly_metrics(df_recrutement):
         postes_avant = 0
         if real_date_reception_col:
             # ouverts avant ou égal à la fin de la semaine dernière
-            opened_before = df_entite[ df_entite[real_date_reception_col] <= last_week_end ]
+            opened_before = df_entite[ df_entite[real_date_reception_col] <= last_week_end ].copy()
+
+            # Exclure explicitement les demandes fermées/annulées/dépriorisées qui ne doivent pas compter
+            import unicodedata
+            def _norm(s):
+                if pd.isna(s):
+                    return ''
+                ss = str(s)
+                ss = unicodedata.normalize('NFKD', ss)
+                ss = ''.join(ch for ch in ss if not unicodedata.combining(ch))
+                return ss.lower()
+
+            closed_keywords = ['cloture', 'clôture', 'annule', 'annulé', 'depriorise', 'dépriorisé', 'desistement', 'désistement', 'annul', 'reject', 'rejett']
+            if real_statut_col and real_statut_col in opened_before.columns:
+                opened_before = opened_before[ ~opened_before[real_statut_col].astype(str).apply(lambda x: any(k in _norm(x) for k in closed_keywords)) ]
+
             if real_accept_col:
                 # considérer pourvus uniquement si acceptance date <= last_week_end
                 not_yet_pourvus = opened_before[ opened_before[real_accept_col].isna() | (opened_before[real_accept_col] > last_week_end) ]
