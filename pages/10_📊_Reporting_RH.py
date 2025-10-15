@@ -1731,7 +1731,7 @@ def create_weekly_report_tab(df_recrutement=None):
         st.markdown(default_html, unsafe_allow_html=True)
 
     # Section Debug (expandable): montrer les lignes et pourquoi elles sont comptées
-    with st.expander("🔍 Debug - Détails des lignes (ouvrir/fermer)", expanded=False):
+    with st.expander("🔍 Debug - Détails des lignes", expanded=False):
         try:
             df_debug = df_recrutement.copy() if df_recrutement is not None else pd.DataFrame()
             if not df_debug.empty:
@@ -2236,7 +2236,7 @@ def create_weekly_report_tab(df_recrutement=None):
 
 
 def main():
-    st.title("📊 Tableau de Bord RH - Style Power BI")
+    st.title("📊 Tableau de Bord RH")
     st.markdown("---")
     # Date de reporting : permet de fixer la date de référence pour tous les calculs
     if 'reporting_date' not in st.session_state:
