@@ -207,22 +207,29 @@ with main_tabs[1]:
                         ai_col, ai_btn = st.columns([4,1])
                         with ai_col:
                             ai_prompt = st.text_input(f"Prompt IA {i+1}", key=f"ai_entretien_prompt_{i}", placeholder="Ex: question sourcing")
+                            ai_preview = st.session_state.get(f"ai_preview_entretien_{i}", "")
                         with ai_btn:
                             if st.button(f"💡 Générer", key=f"gen_entretien_ai_{i}"):
                                 if ai_prompt:
                                     try:
-                                        resp = generate_ai_question(ai_prompt, concise=True)
+                                        with st.spinner("Génération IA en cours..."):
+                                            resp = generate_ai_question(ai_prompt, concise=True)
                                         if 'Question:' in resp:
                                             q = resp.split('Question:')[-1].split('\n')[0].strip()
                                         else:
                                             q = resp.split('\n')[0].strip()
-                                        # injecte directement dans la zone de texte
-                                        st.session_state[f"q_entretien_config_{i}"] = q
-                                        st.session_state[f'ai_generated_entretien_{i}'] = q
-                                        st.success("Question générée et insérée")
-                                        st.rerun()
+                                        # stocke en preview (ne remplace pas automatiquement la consigne)
+                                        st.session_state[f"ai_preview_entretien_{i}"] = q
+                                        st.success("Génération terminée — voir l'aperçu ci-dessous")
                                     except Exception as e:
                                         st.error(f"Erreur IA: {e}")
+
+                        # Affiche l'aperçu et propose de copier manuellement dans la consigne
+                        if st.session_state.get(f"ai_preview_entretien_{i}"):
+                            st.text_area("Aperçu IA (copiez-collez ou utilisez le bouton 'Copier'):", st.session_state.get(f"ai_preview_entretien_{i}"), height=120)
+                            if st.button("Copier dans la consigne", key=f"apply_ai_entretien_{i}"):
+                                st.session_state[f"q_entretien_config_{i}"] = st.session_state.get(f"ai_preview_entretien_{i}")
+                                st.success("Texte IA copié dans la consigne")
 
             if st.button("💾 Sauvegarder Configuration Entretien", key="save_entretien_config"):
                 template["questions_entretien"] = questions_entretien
@@ -256,22 +263,27 @@ with main_tabs[1]:
                         ai_col, ai_btn = st.columns([4,1])
                         with ai_col:
                             ai_prompt = st.text_input(f"Prompt IA Cog {i+1}", key=f"ai_cog_prompt_{i}", placeholder="Ex: générer un cas logique")
+                            ai_preview = st.session_state.get(f"ai_preview_cog_{i}", "")
                         with ai_btn:
                             if st.button(f"💡 Générer", key=f"gen_cog_ai_{i}"):
                                 if ai_prompt:
                                     try:
-                                        resp = generate_ai_question(ai_prompt, concise=True)
+                                        with st.spinner("Génération IA en cours..."):
+                                            resp = generate_ai_question(ai_prompt, concise=True)
                                         if 'Question:' in resp:
                                             q = resp.split('Question:')[-1].split('\n')[0].strip()
                                         else:
                                             q = resp.split('\n')[0].strip()
-                                        # insère directement dans la case de la consigne
-                                        st.session_state[f"q_cog_{i}"] = q
-                                        st.session_state[f'ai_generated_cog_{i}'] = q
-                                        st.success("Question cognitive générée et insérée")
-                                        st.rerun()
+                                        st.session_state[f"ai_preview_cog_{i}"] = q
+                                        st.success("Génération terminée — voir l'aperçu ci-dessous")
                                     except Exception as e:
                                         st.error(f"Erreur IA: {e}")
+
+                        if st.session_state.get(f"ai_preview_cog_{i}"):
+                            st.text_area("Aperçu IA (copiez-collez ou utilisez le bouton 'Copier'):", st.session_state.get(f"ai_preview_cog_{i}"), height=120)
+                            if st.button("Copier dans la consigne", key=f"apply_ai_cog_{i}"):
+                                st.session_state[f"q_cog_{i}"] = st.session_state.get(f"ai_preview_cog_{i}")
+                                st.success("Texte IA copié dans la consigne")
 
             if st.button("💾 Sauvegarder Configuration Cognitif", key="save_cognitif_config"):
                 template["questions_cognitif"] = questions_cognitif
@@ -307,21 +319,27 @@ with main_tabs[1]:
                         ai_col, ai_btn = st.columns([4,1])
                         with ai_col:
                             ai_prompt = st.text_input(f"Prompt IA Tâche {i+1}", key=f"ai_task_prompt_{i}", placeholder="Ex: tâche sourcing")
+                            ai_preview = st.session_state.get(f"ai_preview_task_{i}", "")
                         with ai_btn:
                             if st.button(f"💡 Générer", key=f"gen_task_ai_{i}"):
                                 if ai_prompt:
                                     try:
-                                        resp = generate_ai_question(ai_prompt, concise=True)
+                                        with st.spinner("Génération IA en cours..."):
+                                            resp = generate_ai_question(ai_prompt, concise=True)
                                         if 'Question:' in resp:
                                             q = resp.split('Question:')[-1].split('\n')[0].strip()
                                         else:
                                             q = resp.split('\n')[0].strip()
-                                        st.session_state[f"tache_config_{i}"] = q
-                                        st.session_state[f'ai_generated_task_{i}'] = q
-                                        st.success("Tâche générée et insérée")
-                                        st.rerun()
+                                        st.session_state[f"ai_preview_task_{i}"] = q
+                                        st.success("Génération terminée — voir l'aperçu ci-dessous")
                                     except Exception as e:
                                         st.error(f"Erreur IA: {e}")
+
+                        if st.session_state.get(f"ai_preview_task_{i}"):
+                            st.text_area("Aperçu IA (copiez-collez ou utilisez le bouton 'Copier'):", st.session_state.get(f"ai_preview_task_{i}"), height=120)
+                            if st.button("Copier dans la consigne", key=f"apply_ai_task_{i}"):
+                                st.session_state[f"tache_config_{i}"] = st.session_state.get(f"ai_preview_task_{i}")
+                                st.success("Texte IA copié dans la consigne")
 
             if st.button("💾 Sauvegarder Configuration Échantillon", key="save_echantillon_config"):
                 template["taches_echantillon"] = taches_echantillon
