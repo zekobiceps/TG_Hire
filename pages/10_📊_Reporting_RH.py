@@ -1923,6 +1923,15 @@ def create_weekly_report_tab(df_recrutement=None):
                 df_out['contrib_pourvus'] = contributes_pourvus.loc[df_out.index]
                 df_out['contrib_en_cours'] = contributes_en_cours.loc[df_out.index]
 
+                # Ensure the candidate value is present in a predictable column named 'candidate_value'
+                try:
+                    if real_candidat_col and real_candidat_col in df_selected.columns:
+                        df_out['candidate_value'] = df_selected[real_candidat_col].fillna('').astype(str)
+                    else:
+                        df_out['candidate_value'] = ''
+                except Exception:
+                    df_out['candidate_value'] = ''
+
                 for dc in [real_date_reception_col, real_accept_col, real_date_integration_col]:
                     if dc and dc in df_out.columns:
                         try:
@@ -1966,6 +1975,16 @@ def create_weekly_report_tab(df_recrutement=None):
                     st.info(f"Lignes contribuant au KPI 'Postes en cours' : {len(df_out)} lignes")
                     # expose original DataFrame index to help trace rows between exports/UI
                     df_out_display = df_out.reset_index().rename(columns={'index': '_orig_index'})
+                    # ensure candidate_value is the 4th column (index 3) in the display
+                    if 'candidate_value' not in df_out_display.columns:
+                        df_out_display['candidate_value'] = ''
+                    # reorder to put candidate_value at position 3 if there are enough cols
+                    cols_order = list(df_out_display.columns)
+                    if 'candidate_value' in cols_order:
+                        cols_order = [c for c in cols_order if c != 'candidate_value']
+                        insert_at = 3 if len(cols_order) >= 3 else len(cols_order)
+                        cols_order.insert(insert_at, 'candidate_value')
+                        df_out_display = df_out_display[cols_order]
                     # also show a raw representation of the candidate column (if any) to detect invisible chars
                     if real_candidat_col and real_candidat_col in df_out.columns:
                         try:
