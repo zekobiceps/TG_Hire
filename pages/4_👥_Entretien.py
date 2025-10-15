@@ -133,6 +133,8 @@ with main_tabs[0]:
         col3, col4 = st.columns(2)
         with col3:
             test_poste = st.text_input("Poste associé", key="test_poste")
+        with col4:
+            test_date = st.date_input("Date de création", datetime.date.today(), key="test_date")
 
         if st.button("💾 Créer le test", type="primary"):
             if test_name:
@@ -141,7 +143,7 @@ with main_tabs[0]:
                                    "nom": test_name,
                     "categorie": test_category,
                     "poste": test_poste,
-                    "date_creation": datetime.date.today().strftime("%Y-%m-%d"),
+                    "date_creation": test_date.strftime("%Y-%m-%d"),
                     "questions_entretien": [],
                     "questions_cognitif": [],
                     "taches_echantillon": []
@@ -271,12 +273,9 @@ with main_tabs[1]:
                                     except Exception as e:
                                         st.error(f"Erreur IA: {e}")
 
-                        # Affiche l'aperçu et propose de copier manuellement dans la consigne
+                        # Affiche l'aperçu (copiez-collez manuellement si souhaité)
                         if st.session_state.get(f"ai_preview_entretien_{i}"):
-                            st.text_area("Aperçu IA (copiez-collez ou utilisez le bouton 'Copier'):", st.session_state.get(f"ai_preview_entretien_{i}"), height=120)
-                            if st.button("Copier dans la consigne", key=f"apply_ai_entretien_{i}"):
-                                st.session_state[f"q_entretien_config_{i}"] = st.session_state.get(f"ai_preview_entretien_{i}")
-                                st.success("Texte IA copié dans la consigne")
+                            st.text_area("Aperçu IA (copiez-collez manuellement si souhaité):", st.session_state.get(f"ai_preview_entretien_{i}"), height=160)
 
             if st.button("💾 Sauvegarder Configuration Entretien", key="save_entretien_config"):
                 template["questions_entretien"] = questions_entretien
@@ -309,7 +308,8 @@ with main_tabs[1]:
                         # AI prompt + generate button inside the expander (match Entretien layout)
                         ai_col, ai_btn = st.columns([4,1])
                         with ai_col:
-                            ai_prompt = st.text_input(f"Prompt IA Cog {i+1}", key=f"ai_cog_prompt_{i}", placeholder="Ex: générer un cas logique", value="")
+                            ex = st.selectbox(f"Exemples prompt IA Cog {i+1}", ["Choisir un exemple..."] + EX_PROMPTS_COGNITIF, key=f"ex_ai_cog_{i}")
+                            ai_prompt = st.text_input(f"Prompt IA Cog {i+1}", value=(ex if ex != "Choisir un exemple..." else ""), key=f"ai_cog_prompt_{i}", placeholder="Ex: générer un cas logique")
                             ai_preview = st.session_state.get(f"ai_preview_cog_{i}", "")
                         with ai_btn:
                             if st.button(f"💡 Générer", key=f"gen_cog_ai_{i}"):
@@ -327,10 +327,7 @@ with main_tabs[1]:
                                         st.error(f"Erreur IA: {e}")
 
                         if st.session_state.get(f"ai_preview_cog_{i}"):
-                            st.text_area("Aperçu IA (copiez-collez ou utilisez le bouton 'Copier'):", st.session_state.get(f"ai_preview_cog_{i}"), height=120)
-                            if st.button("Copier dans la consigne", key=f"apply_ai_cog_{i}"):
-                                st.session_state[f"q_cog_{i}"] = st.session_state.get(f"ai_preview_cog_{i}")
-                                st.success("Texte IA copié dans la consigne")
+                            st.text_area("Aperçu IA (copiez-collez manuellement si souhaité):", st.session_state.get(f"ai_preview_cog_{i}"), height=160)
 
             if st.button("💾 Sauvegarder Configuration Cognitif", key="save_cognitif_config"):
                 template["questions_cognitif"] = questions_cognitif
@@ -354,7 +351,7 @@ with main_tabs[1]:
                         existing_tache = template.get("taches_echantillon", [])
                         tache_data = existing_tache[i] if i < len(existing_tache) else {"texte": get_default_tache(i), "poids": 3}
 
-                        tache_text = st.text_area(f"Consigne de la tâche {i+1}", height=80,
+                        tache_text = st.text_area(f"Consigne de la tâche {i+1}", height=160,
                                                 value=tache_data["texte"],
                                                 key=f"tache_config_{i}")
                         poids_tache = st.slider(f"Poids (1-5) tâche {i+1}", 1, 5,
@@ -365,7 +362,8 @@ with main_tabs[1]:
                         # AI prompt + generate button inside the expander
                         ai_col, ai_btn = st.columns([4,1])
                         with ai_col:
-                            ai_prompt = st.text_input(f"Prompt IA Tâche {i+1}", key=f"ai_task_prompt_{i}", placeholder="Ex: tâche sourcing", value="")
+                            ex = st.selectbox(f"Exemples prompt IA Tâche {i+1}", ["Choisir un exemple..."] + EX_PROMPTS_TASK, key=f"ex_ai_task_{i}")
+                            ai_prompt = st.text_input(f"Prompt IA Tâche {i+1}", value=(ex if ex != "Choisir un exemple..." else ""), key=f"ai_task_prompt_{i}", placeholder="Ex: tâche sourcing")
                             ai_preview = st.session_state.get(f"ai_preview_task_{i}", "")
                         with ai_btn:
                             if st.button(f"💡 Générer", key=f"gen_task_ai_{i}"):
@@ -383,10 +381,7 @@ with main_tabs[1]:
                                         st.error(f"Erreur IA: {e}")
 
                         if st.session_state.get(f"ai_preview_task_{i}"):
-                            st.text_area("Aperçu IA (copiez-collez ou utilisez le bouton 'Copier'):", st.session_state.get(f"ai_preview_task_{i}"), height=120)
-                            if st.button("Copier dans la consigne", key=f"apply_ai_task_{i}"):
-                                st.session_state[f"tache_config_{i}"] = st.session_state.get(f"ai_preview_task_{i}")
-                                st.success("Texte IA copié dans la consigne")
+                            st.text_area("Aperçu IA (copiez-collez manuellement si souhaité):", st.session_state.get(f"ai_preview_task_{i}"), height=160)
 
             if st.button("💾 Sauvegarder Configuration Échantillon", key="save_echantillon_config"):
                 template["taches_echantillon"] = taches_echantillon
