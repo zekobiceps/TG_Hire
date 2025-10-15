@@ -1178,7 +1178,7 @@ with tab1:
                     submit_button = st.form_submit_button(
                         label="📤 Envoyer mon feedback",
                         type="primary",
-                        use_container_width=True
+                        width="stretch"
                     )
 
                 if submit_button:
@@ -1399,7 +1399,7 @@ with tab4:
                     yaxis={"title": ""},
                 )
 
-                st.plotly_chart(fig_scores, use_container_width=True)
+                st.plotly_chart(fig_scores, width="stretch")
 
         with col2:
             st.subheader("📊 Distribution des Évaluations")
@@ -1421,7 +1421,7 @@ with tab4:
                     legend=dict(font=dict(size=16))
                 )
 
-                st.plotly_chart(fig_evals, use_container_width=True)
+                st.plotly_chart(fig_evals, width="stretch")
 
         st.markdown("---")
 
@@ -1445,7 +1445,7 @@ with tab4:
                 "Fiabilité": st.column_config.TextColumn("Fiabilité", width="medium")
             },
             hide_index=True,
-            use_container_width=True
+            width="stretch"
         )
 
         # Insights et recommandations
@@ -1663,7 +1663,7 @@ with tab5:
             if not nc.empty:
                 st.markdown('---')
                 st.subheader('Non classés')
-                st.dataframe(nc[['file', 'text_snippet']], use_container_width=True)
+                st.dataframe(nc[['file', 'text_snippet']], width="stretch")
                 
                 # Bouton pour analyser les CV non classés avec DeepSeek
                 analyze_button = st.button('🔍 Analyser les CV non classés avec Intelligence Artificielle', type='secondary')
@@ -1786,7 +1786,7 @@ with tab5:
                                 
                                 # Afficher un aperçu du manifest
                                 with st.expander("📋 Aperçu du contenu du ZIP"):
-                                    st.dataframe(manifest_df, use_container_width=True)
+                                    st.dataframe(manifest_df, width="stretch")
                                 
                                 # Bouton de téléchargement du ZIP
                                 st.download_button(

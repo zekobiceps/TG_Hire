@@ -1158,7 +1158,7 @@ with tab1:
                     st.warning("💡 Collez manuellement le contenu dans l'onglet 'Coller le texte'")
         
         # Bouton d'analyse commun
-        if fiche_content and st.button("🤖 Analyser la fiche et pré-remplir", key="analyze_fiche", use_container_width=True):
+        if fiche_content and st.button("🤖 Analyser la fiche et pré-remplir", key="analyze_fiche", width="stretch"):
             with st.spinner("🔍 Analyse de la fiche en cours..."):
                 # Simulation d'analyse de fiche de poste
                 analyze_prompt = f"Analyse cette fiche de poste et extrait les éléments clés:\n{fiche_content}\n\nExtrait:\n1. Titre du poste\n2. 2-3 synonymes du poste\n3. 2-3 compétences obligatoires\n4. 2-3 compétences optionnelles\n5. Mots à exclure si mentionnés"
@@ -1205,7 +1205,7 @@ with tab1:
     if gen_mode == "Intelligence artificielle":
         st.caption("💡 L'IA enrichit les synonymes de façon conservatrice pour maximiser les résultats LinkedIn")
     
-    gen_btn = st.button("🔍 Générer", type="primary", key="boolean_generate_main", use_container_width=True)
+    gen_btn = st.button("🔍 Générer", type="primary", key="boolean_generate_main", width="stretch")
     if gen_btn:
         if gen_mode == "Algorithme":
             with st.spinner("⏳ Génération en cours..."):
@@ -1370,7 +1370,7 @@ with tab1:
             safe_boolean = st.session_state.get('boolean_query', '').replace('"', '&quot;')
             st.markdown(f'<button data-copy="{safe_boolean}">📋 Copier</button>', unsafe_allow_html=True)
         with cols_actions[1]:
-            if st.button("💾 Sauvegarder", key="boolean_save", use_container_width=True):
+            if st.button("💾 Sauvegarder", key="boolean_save", width="stretch"):
                 entry = {
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "type": "Boolean",
@@ -1386,7 +1386,7 @@ with tab1:
                 st.success("✅ Sauvegardé")
         with cols_actions[2]:
             url_linkedin = f"https://www.linkedin.com/search/results/people/?keywords={quote(st.session_state['boolean_query'])}"
-            st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, use_container_width=True)
+            st.link_button("🌐 Ouvrir sur LinkedIn", url_linkedin, width="stretch")
 
     # Variantes (seulement si requête existe)
     if st.session_state.get("boolean_query"):
@@ -1404,7 +1404,7 @@ with tab1:
                     safe_vq = vq.replace('"', '&quot;')
                     st.markdown(f'<button data-copy="{safe_vq}">📋 Copier</button>', unsafe_allow_html=True)
                 with cols_var[1]:
-                    if st.button(f"💾 Sauvegarder {idx+1}", key=f"bool_save_{idx}", use_container_width=True):
+                    if st.button(f"💾 Sauvegarder {idx+1}", key=f"bool_save_{idx}", width="stretch"):
                         entry = {
                             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                             "type": "Boolean",
@@ -1420,7 +1420,7 @@ with tab1:
                         st.success(f"✅ Variante {idx+1} sauvegardée")
                 with cols_var[2]:
                     url_var = f"https://www.linkedin.com/search/results/people/?keywords={quote(vq)}"
-                    st.link_button(f"🌐 LinkedIn {idx+1}", url_var, use_container_width=True)
+                    st.link_button(f"🌐 LinkedIn {idx+1}", url_var, width="stretch")
         else:
             st.info("Aucune variante générée pour la requête actuelle.")
 
@@ -1519,7 +1519,7 @@ Cette requête trouve des CV PDF sur le web entier, pas seulement sur LinkedIn.
             safe_xray = st.session_state.get('xray_query', '').replace('"', '&quot;')
             st.markdown(f'<button data-copy="{safe_xray}">📋 Copier</button>', unsafe_allow_html=True)
         with cols_actions[1]:
-            if st.button("💾 Sauvegarder", key="xray_save", use_container_width=True):
+            if st.button("💾 Sauvegarder", key="xray_save", width="stretch"):
                 entry = {
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "type": "X-Ray",
@@ -1535,7 +1535,7 @@ Cette requête trouve des CV PDF sur le web entier, pas seulement sur LinkedIn.
                 st.success("✅ Sauvegardé")
         with cols_actions[2]:
             url_xray = f"https://www.google.com/search?q={quote(st.session_state['xray_query'])}"
-            st.link_button("🌐 Ouvrir sur Google", url_xray, use_container_width=True)
+            st.link_button("🌐 Ouvrir sur Google", url_xray, width="stretch")
 
     # Variantes
     if st.session_state.get("xray_query"):
@@ -1557,7 +1557,7 @@ Cette requête trouve des CV PDF sur le web entier, pas seulement sur LinkedIn.
                     safe_qv = qv.replace('"', '&quot;')
                     st.markdown(f'<button data-copy="{safe_qv}">📋 Copier</button>', unsafe_allow_html=True)
                 with cols_var[1]:
-                    if st.button("💾 Sauvegarder", key=f"xray_save_var_{i}", use_container_width=True):
+                    if st.button("💾 Sauvegarder", key=f"xray_save_var_{i}", width="stretch"):
                         entry = {
                             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                             "type": "X-Ray Variante",
@@ -1573,7 +1573,7 @@ Cette requête trouve des CV PDF sur le web entier, pas seulement sur LinkedIn.
                         st.success("✅ Sauvegardé")
                 with cols_var[2]:
                     url_var = f"https://www.google.com/search?q={quote(qv)}"
-                    st.link_button("🌐 Ouvrir", url_var, use_container_width=True)
+                    st.link_button("🌐 Ouvrir", url_var, width="stretch")
         else:
             st.info("Aucune variante générée pour la requête actuelle.")
 
@@ -1609,7 +1609,7 @@ with tab3:
             safe_cse = st.session_state.get('cse_query', '').replace('"', '&quot;')
             st.markdown(f'<button data-copy="{safe_cse}">📋 Copier</button>', unsafe_allow_html=True)
         with cols_actions[1]:
-            if st.button("💾 Sauvegarder", key="cse_save", use_container_width=True):
+            if st.button("💾 Sauvegarder", key="cse_save", width="stretch"):
                 entry = {
                     "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
                     "type": "CSE",
@@ -1625,7 +1625,7 @@ with tab3:
                 st.success("✅ Sauvegardé")
         with cols_actions[2]:
             cse_url = f"https://cse.google.fr/cse?cx=004681564711251150295:d-_vw4klvjg&q={quote(st.session_state['cse_query'])}"
-            st.link_button("🌐 Ouvrir sur CSE", cse_url, use_container_width=True)
+            st.link_button("🌐 Ouvrir sur CSE", cse_url, width="stretch")
 
 # -------------------- Tab 4: Web Scraper - Analyse Concurrentielle --------------------
 with tab4:
@@ -2060,7 +2060,7 @@ with tab5:
         st.session_state["inmail_profil_data"].update(profil_data)
 
     # --------- GÉNÉRATION ---------
-    if st.button("✨ Générer", type="primary", use_container_width=True, key="btn_generate_inmail"):
+    if st.button("✨ Générer", type="primary", width="stretch", key="btn_generate_inmail"):
         donnees_profil = st.session_state.get("inmail_profil_data", profil_data)
         
         # Si Intelligence artificielle est sélectionnée, avertir de la limitation LinkedIn
@@ -2266,7 +2266,7 @@ with tab6:
         mode_rapide_magicien = st.checkbox("⚡ Réponse concise", key="magicien_fast", value=True)
 
         # Submit button must be inside the form
-        gen_submitted = st.form_submit_button("✨ Poser la question à l'IA", type="primary", use_container_width=True, key="ask_magicien")
+        gen_submitted = st.form_submit_button("✨ Poser la question à l'IA", type="primary", width="stretch", key="ask_magicien")
 
     # Traitement après soumission du formulaire (exécuté sans provoquer un changement d'onglet)
     if gen_submitted:
@@ -2439,7 +2439,7 @@ with tab7:
                 # keep the message for the session; user can clear by changing format or regenerating
 
     # Main generate button
-    if st.button("🔮 Générer permutations", use_container_width=True):
+    if st.button("🔮 Générer permutations", width="stretch"):
         if not (prenom and nom and entreprise):
             st.warning("⚠️ Veuillez remplir tous les champs")
         else:

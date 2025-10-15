@@ -372,7 +372,7 @@ with tab1:
             title="Répartition des Statuts",
             color_discrete_map={'Complet': '#28a745', 'En cours': '#ffc107'}
         )
-        st.plotly_chart(fig_pie, use_container_width=True)
+        st.plotly_chart(fig_pie, width="stretch")
     
     with col_chart2:
         # Graphique en barres - Par service
@@ -398,7 +398,7 @@ with tab1:
                         title="Statuts par Service",
                         color_discrete_map={'Complet': '#28a745', 'En cours': '#ffc107'}
                     )
-                    st.plotly_chart(fig_bar, use_container_width=True)
+                    st.plotly_chart(fig_bar, width="stretch")
                 except Exception as e:
                     st.error(f"Erreur affichage graphique par service: {e}")
     
@@ -459,7 +459,7 @@ with tab1:
         # Affichage avec formatage conditionnel
         st.dataframe(
             display_df,
-            use_container_width=True,
+            width="stretch",
             hide_index=True
         )
         
@@ -483,7 +483,7 @@ with tab1:
     col_action1, col_action2 = st.columns(2)
     
     with col_action1:
-        if st.button("💾 Sauvegarder dans Google Sheets", use_container_width=True):
+        if st.button("💾 Sauvegarder dans Google Sheets", width="stretch"):
             with st.spinner("Sauvegarde en cours..."):
                 if save_data():
                     st.success("✅ Données sauvegardées dans Google Sheets!")
@@ -491,7 +491,7 @@ with tab1:
                     st.cache_data.clear()
     
     with col_action2:
-        if st.button("� Recharger depuis Google Sheets", use_container_width=True):
+        if st.button("� Recharger depuis Google Sheets", width="stretch"):
             with st.spinner("Rechargement en cours..."):
                 # Vider le cache pour forcer le rechargement
                 st.cache_data.clear()
@@ -542,7 +542,7 @@ with tab2:
             missing_docs = [doc for doc in DOCUMENTS_RH if doc not in provided_docs]
             
             # Bouton de soumission
-            submitted = st.form_submit_button("➕ Ajouter le collaborateur", type="primary", use_container_width=True)
+            submitted = st.form_submit_button("➕ Ajouter le collaborateur", type="primary", width="stretch")
             
             if submitted:
                 if nom and prenom and email and poste and service:
@@ -642,7 +642,7 @@ with tab2:
                     new_missing_docs = [doc for doc in DOCUMENTS_RH if doc not in provided_docs]
                     
                     # Bouton de mise à jour
-                    update_submitted = st.form_submit_button("🔄 Mettre à jour", type="primary", use_container_width=True)
+                    update_submitted = st.form_submit_button("🔄 Mettre à jour", type="primary", width="stretch")
                     
                     if update_submitted:
                         # Déterminer le nouveau statut
@@ -703,7 +703,7 @@ with tab3:
         
         display_incomplete.columns = ['Nom', 'Prénom', 'Poste', 'Email', 'Date Intégration', 'Dernière Relance', 'Nb Relances', 'Docs Manquants']
         
-        st.dataframe(display_incomplete, use_container_width=True, hide_index=True)
+        st.dataframe(display_incomplete, width="stretch", hide_index=True)
         
         # Formulaire de relance
         st.subheader("📨 Envoyer une relance")
@@ -747,7 +747,7 @@ with tab3:
                 st.info(f"📅 Date limite dans l'email: {delay_date}")
                 
                 # Bouton d'envoi
-                send_button = st.form_submit_button("📧 Envoyer/Programmer la relance", type="primary", use_container_width=True)
+                send_button = st.form_submit_button("📧 Envoyer/Programmer la relance", type="primary", width="stretch")
                 
                 if send_button:
                     with st.spinner("📤 Traitement de la relance en cours..."):
@@ -823,7 +823,7 @@ with tab3:
             history_display = st.session_state.relance_history.copy()
             history_display = history_display.sort_values('Date', ascending=False)
             
-            st.dataframe(history_display, use_container_width=True, hide_index=True)
+            st.dataframe(history_display, width="stretch", hide_index=True)
             
             # Statistiques des relances
             col_stat1, col_stat2, col_stat3 = st.columns(3)
@@ -854,7 +854,7 @@ with tab3:
             scheduled_display = st.session_state.scheduled_relances.copy()
             scheduled_display = scheduled_display.sort_values('Date_programmee', ascending=True)
             
-            st.dataframe(scheduled_display, use_container_width=True, hide_index=True)
+            st.dataframe(scheduled_display, width="stretch", hide_index=True)
             
             # Option pour annuler une relance programmée
             if st.button("🗑️ Supprimer toutes les relances programmées", type="secondary"):

@@ -321,7 +321,7 @@ with col13_params:
     )
 
 # Bouton de génération
-if st.button("✨ Générer la lettre", type="primary", use_container_width=True):
+if st.button("✨ Générer la lettre", type="primary", width="stretch"):
     if not prenom or not nom or not poste:
         st.error("⚠️ Veuillez remplir au minimum : Prénom, Nom et Poste")
     else:
@@ -470,7 +470,7 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                             data=rtf_data,
                             file_name=f"lettre_{nom}_{datetime.now().strftime('%Y%m%d')}.rtf",
                             mime="application/rtf",
-                            use_container_width=True
+                            width="stretch"
                         )
                     with col_txt:
                         st.download_button(
@@ -478,7 +478,7 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                             data=st.session_state.lettre_modifiable,
                             file_name=f"lettre_{nom}_{datetime.now().strftime('%Y%m%d')}.txt",
                             mime="text/plain",
-                            use_container_width=True
+                            width="stretch"
                         )
                     with col_word:
                         rtf_data = generer_document_word(st.session_state.lettre_modifiable, photo_collaborateur)
@@ -488,12 +488,12 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                                 data=rtf_data,
                                 file_name=f"lettre_{nom}_{datetime.now().strftime('%Y%m%d')}.rtf",
                                 mime="application/rtf",
-                                use_container_width=True
+                                width="stretch"
                             )
 
                 with col14:
                     # Bouton pour génération PNG
-                    if st.button("🖼️ Générer PNG", use_container_width=True):
+                    if st.button("🖼️ Générer PNG", width="stretch"):
                         with st.spinner("🔄 Génération PNG en cours..."):
                             png_data = generer_lettre_png(st.session_state.lettre_modifiable, photo_collaborateur, nom)
                             if png_data:
@@ -503,7 +503,7 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                                     data=png_data,
                                     file_name=f"lettre_{nom}_{datetime.now().strftime('%Y%m%d')}.png",
                                     mime="image/png",
-                                    use_container_width=True,
+                                    width="stretch",
                                     key=f"download_png_{datetime.now().strftime('%H%M%S')}"
                                 )
                                 st.success("✅ PNG généré avec succès !")
@@ -513,7 +513,7 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                                 st.error("❌ Erreur lors de la génération PNG")
 
                 with col15:
-                    if st.button("🔄 Régénérer", use_container_width=True):
+                    if st.button("🔄 Régénérer", width="stretch"):
                         # Reset du contenu modifiable pour forcer une nouvelle génération
                         if "lettre_modifiable" in st.session_state:
                             del st.session_state.lettre_modifiable
@@ -522,7 +522,7 @@ if st.button("✨ Générer la lettre", type="primary", use_container_width=True
                         st.rerun()
 
                 with col16:
-                    if st.button("💾 Sauvegarder", use_container_width=True) or (sauvegarder_modele if 'sauvegarder_modele' in locals() else False):
+                    if st.button("💾 Sauvegarder", width="stretch") or (sauvegarder_modele if 'sauvegarder_modele' in locals() else False):
                         # Sauvegarder le modèle avec toutes les informations
                         modele_data = {
                             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

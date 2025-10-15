@@ -495,7 +495,7 @@ with tab1:
         
         # Aperçu des données
         st.subheader("📋 Aperçu des données")
-        st.dataframe(st.session_state.data.head(), use_container_width=True)
+        st.dataframe(st.session_state.data.head(), width="stretch")
         
         # Informations sur les colonnes
         with st.expander("ℹ️ Informations détaillées sur les colonnes"):
@@ -505,7 +505,7 @@ with tab1:
                 'Nulles': st.session_state.data.isnull().sum(),
                 'Uniques': [st.session_state.data[col].nunique() for col in st.session_state.data.columns]
             })
-            st.dataframe(col_info, use_container_width=True)
+            st.dataframe(col_info, width="stretch")
     else:
         st.info("👆 Veuillez importer un fichier ou utiliser les données d'exemple pour commencer.")
 
@@ -602,7 +602,7 @@ with tab2:
                 st.info("Aucune colonne Poste détectée")
         
         # Bouton de préparation
-        if st.button("🚀 Préparer les données automatiquement", type="primary", use_container_width=True):
+        if st.button("🚀 Préparer les données automatiquement", type="primary", width="stretch"):
             with st.spinner("Préparation en cours..."):
                 try:
                     df = st.session_state.data.copy()
@@ -665,7 +665,7 @@ with tab2:
                         fig = px.line(time_series, x='date', y='volume', 
                                     title=f"Série temporelle - {objective}")
                         fig.update_layout(height=400)
-                        st.plotly_chart(fig, use_container_width=True, key='prep_timeseries_fig')
+                        st.plotly_chart(fig, width="stretch", key='prep_timeseries_fig')
                     elif df.empty:
                         st.warning("⚠️ Aucune donnée ne correspond à vos filtres. La série temporelle est vide.")
                         st.session_state.time_series_data = None
@@ -722,7 +722,7 @@ with tab3:
             marker=dict(size=6)
         )
         
-        st.plotly_chart(fig_trend, use_container_width=True, key='vis_trend_fig')
+        st.plotly_chart(fig_trend, width="stretch", key='vis_trend_fig')
         
         # Statistiques de la série
         col1, col2, col3, col4 = st.columns(4)
@@ -770,12 +770,12 @@ with tab3:
                     coloraxis_showscale=False
                 )
                 
-                st.plotly_chart(fig_dir, use_container_width=True, key='vis_dir_fig')
+                st.plotly_chart(fig_dir, width="stretch", key='vis_dir_fig')
                 
                 # Tableau détaillé
                 with st.expander("📋 Détail par Direction"):
                     dir_counts['Pourcentage'] = (dir_counts['Nombre'] / dir_counts['Nombre'].sum() * 100).round(1)
-                    st.dataframe(dir_counts, use_container_width=True)
+                    st.dataframe(dir_counts, width="stretch")
             else:
                 st.info("Aucune colonne Direction détectée dans les données.")
         
@@ -814,14 +814,14 @@ with tab3:
                     coloraxis_showscale=False
                 )
                 
-                st.plotly_chart(fig_poste, use_container_width=True, key='vis_poste_fig')
+                st.plotly_chart(fig_poste, width="stretch", key='vis_poste_fig')
                 
                 # Tableau détaillé
                 with st.expander("📋 Détail par Poste"):
                     poste_df = poste_counts.reset_index()
                     poste_df.columns = ['Poste', 'Nombre']
                     poste_df['Pourcentage'] = (poste_df['Nombre'] / poste_df['Nombre'].sum() * 100).round(1)
-                    st.dataframe(poste_df, use_container_width=True)
+                    st.dataframe(poste_df, width="stretch")
             else:
                 st.info("Aucune colonne Poste détectée dans les données.")
         
@@ -852,7 +852,7 @@ with tab3:
                     color_continuous_scale='Viridis'
                 )
                 fig_year.update_layout(height=300, coloraxis_showscale=False)
-                st.plotly_chart(fig_year, use_container_width=True, key='vis_year_fig')
+                st.plotly_chart(fig_year, width="stretch", key='vis_year_fig')
         
         with col_temp2:
             # Par mois (moyenne)
@@ -870,7 +870,7 @@ with tab3:
                 color_continuous_scale='Plasma'
             )
             fig_month.update_layout(height=300, coloraxis_showscale=False)
-            st.plotly_chart(fig_month, use_container_width=True, key='vis_month_fig')
+            st.plotly_chart(fig_month, width="stretch", key='vis_month_fig')
 
 # ============================
 # ONGLET 4: MODÉLISATION & PRÉDICTION 
@@ -919,7 +919,7 @@ with tab4:
             )
         
         # Bouton de lancement
-        if st.button("🚀 Lancer la prédiction", type="primary", use_container_width=True):
+        if st.button("🚀 Lancer la prédiction", type="primary", width="stretch"):
             with st.spinner(f"🤖 Entraînement du modèle {model_type} en cours..."):
                 try:
                     # --- Étape 1: Évaluation du modèle pour le score MAPE ---
@@ -1101,9 +1101,9 @@ with tab4:
                 # Centrer le tableau en utilisant des colonnes
                 col1, col2, col3 = st.columns([1, 2, 1])
                 with col2:
-                    st.dataframe(display_forecast, use_container_width=True, key='display_forecast_table')
+                    st.dataframe(display_forecast, width="stretch", key='display_forecast_table')
 
-            st.plotly_chart(fig_global, use_container_width=True, key='model_global_fig')
+            st.plotly_chart(fig_global, width="stretch", key='model_global_fig')
 
             # --- Graphiques de prédiction par Direction et par Poste ---
             st.markdown("---")
@@ -1202,18 +1202,18 @@ with tab4:
                         )
                         fig_dir_pred.update_traces(textposition='inside', textinfo='percent+label+value')
                         fig_dir_pred.update_layout(height=400, showlegend=True)
-                        st.plotly_chart(fig_dir_pred, use_container_width=True, key='model_dir_fig')
+                        st.plotly_chart(fig_dir_pred, width="stretch", key='model_dir_fig')
 
                         with st.expander("📋 Détail mensuel des prédictions par Direction"):
                             if not dir_detailed.empty:
                                 # Organiser par Direction puis par date
                                 dir_display = dir_detailed.copy()
                                 dir_display = dir_display.sort_values(['Direction', 'date']).reset_index(drop=True)
-                                st.dataframe(dir_display[['Direction', 'date', 'predicted_volume']], use_container_width=True)
+                                st.dataframe(dir_display[['Direction', 'date', 'predicted_volume']], width="stretch")
                                 
                                 # Ajouter le résumé total
                                 st.subheader("📊 Résumé total par Direction")
-                                st.dataframe(dir_summary, use_container_width=True)
+                                st.dataframe(dir_summary, width="stretch")
 
                 with col_poste:
                     if not poste_summary.empty:
@@ -1226,18 +1226,18 @@ with tab4:
                         )
                         fig_poste_pred.update_traces(texttemplate='%{x}', textposition='outside')
                         fig_poste_pred.update_layout(height=400, showlegend=False)
-                        st.plotly_chart(fig_poste_pred, use_container_width=True, key='model_poste_fig')
+                        st.plotly_chart(fig_poste_pred, width="stretch", key='model_poste_fig')
 
                         with st.expander("📋 Détail mensuel des prédictions par Poste"):
                             if not poste_detailed.empty:
                                 # Organiser par Poste puis par date
                                 poste_display = poste_detailed.copy()
                                 poste_display = poste_display.sort_values(['Poste', 'date']).reset_index(drop=True)
-                                st.dataframe(poste_display[['Poste', 'date', 'predicted_volume']], use_container_width=True)
+                                st.dataframe(poste_display[['Poste', 'date', 'predicted_volume']], width="stretch")
                                 
                                 # Ajouter le résumé total
                                 st.subheader("📊 Résumé total par Poste")
-                                st.dataframe(poste_summary, use_container_width=True)
+                                st.dataframe(poste_summary, width="stretch")
 
             # --- Export unique: créer un fichier Excel multi-onglets (Global / Par_Direction / Par_Poste)
             try:

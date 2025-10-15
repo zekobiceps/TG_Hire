@@ -219,7 +219,7 @@ else:
 # (Bloc formulaire principal dupliqué supprimé - on conserve la première instance définie plus haut)
 
 # Bouton pour générer via IA (pleine largeur)
-generate_button = st.button("💡 Générer l'annonce via IA", type="primary", use_container_width=True, key="btn_generer_annonce")
+generate_button = st.button("💡 Générer l'annonce via IA", type="primary", width="stretch", key="btn_generer_annonce")
 
 # Génération IA avec spinner
 if generate_button:
@@ -387,7 +387,7 @@ contenu = st.text_area("Contenu de l'annonce (généré ou manuel)",
                        height=300, 
                        help="Contenu de l'annonce généré par l'IA ou saisi manuellement")
 
-if st.button("💾 Sauvegarder l'annonce", type="primary", use_container_width=True, key="btn_sauvegarder_annonce"):
+if st.button("💾 Sauvegarder l'annonce", type="primary", width="stretch", key="btn_sauvegarder_annonce"):
         if poste_final and entreprise and contenu and localisation_finale:
             # Préparer les données pour Google Sheets
             annonce_data = {

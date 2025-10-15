@@ -1248,7 +1248,7 @@ with tabs[3]:
             st.markdown("#### Actions")
             a1, a2 = st.columns([1,1])
             with a1:
-                if st.button("💾 Sauvegarder synthèse", type="primary", key="btn_save_synthese", use_container_width=True):
+                if st.button("💾 Sauvegarder synthèse", type="primary", key="btn_save_synthese", width="stretch"):
                     # Construire un dict complet à partir de la session (tous les onglets)
                     try:
                         name = st.session_state.current_brief_name
@@ -1291,7 +1291,7 @@ with tabs[3]:
                     except Exception as e:
                         st.error(f"Erreur lors de la sauvegarde de la synthèse : {e}")
             with a2:
-                if st.button("🗑️ Supprimer le brief", key="btn_delete_synthese", use_container_width=True):
+                if st.button("🗑️ Supprimer le brief", key="btn_delete_synthese", width="stretch"):
                     name = st.session_state.current_brief_name
                     st.session_state.saved_briefs.pop(name, None)
                     save_briefs()
@@ -1314,12 +1314,12 @@ with tabs[3]:
             pdf_buf = generate_custom_pdf(st.session_state.current_brief_name, bd, st.session_state.ksa_matrix if "ksa_matrix" in st.session_state else None)
             with e1:
                 if pdf_buf:
-                    st.download_button("⬇️ PDF", data=pdf_buf, file_name=f"{st.session_state.current_brief_name}.pdf", mime="application/pdf", use_container_width=True)
+                    st.download_button("⬇️ PDF", data=pdf_buf, file_name=f"{st.session_state.current_brief_name}.pdf", mime="application/pdf", width="stretch")
                 else:
                     st.info("PDF indisponible.")
             word_buf = generate_custom_word(st.session_state.current_brief_name, bd, st.session_state.ksa_matrix if "ksa_matrix" in st.session_state else None)
             with e2:
                 if word_buf:
-                    st.download_button("⬇️ Word", data=word_buf, file_name=f"{st.session_state.current_brief_name}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", use_container_width=True)
+                    st.download_button("⬇️ Word", data=word_buf, file_name=f"{st.session_state.current_brief_name}.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document", width="stretch")
                 else:
                     st.info("Word indisponible.")

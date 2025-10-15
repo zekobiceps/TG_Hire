@@ -603,7 +603,7 @@ with tab1:
             title="Répartition des Statuts",
             color_discrete_map={'Complet': '#28a745', 'En cours': '#ffc107'}
         )
-        st.plotly_chart(fig_pie, use_container_width=True)
+        st.plotly_chart(fig_pie, width="stretch")
     
     with col_chart2:
         # Graphique en barres - Par affectation
@@ -659,7 +659,7 @@ with tab1:
                         df_service = df_service.sort_values('En cours', ascending=False)
 
                     fig_bar.update_layout(xaxis_title='Affectation', uniformtext_minsize=8, uniformtext_mode='hide')
-                    st.plotly_chart(fig_bar, use_container_width=True)
+                    st.plotly_chart(fig_bar, width="stretch")
                 except Exception as e:
                     st.error(f"Erreur affichage graphique par service: {e}")
     
@@ -686,7 +686,7 @@ with tab1:
             # Nettoyer les libellés génériques
             fig_docs.update_traces(texttemplate='%{text}', textposition='outside')
             fig_docs.update_layout(xaxis_title='', yaxis_title='', uniformtext_minsize=8, uniformtext_mode='hide')
-            st.plotly_chart(fig_docs, use_container_width=True)
+            st.plotly_chart(fig_docs, width="stretch")
 
         # Déplacer le graphique 'Distribution des relances' dans la colonne de droite (col_doc2)
         with col_doc2:
@@ -711,7 +711,7 @@ with tab1:
                 yaxis_title='',
                 uniformtext_minsize=8, uniformtext_mode='hide'
             )
-            st.plotly_chart(fig_rel, use_container_width=True)
+            st.plotly_chart(fig_rel, width="stretch")
 
     col_filter1, col_filter2, col_filter3, col_filter4 = st.columns(4)
 
@@ -791,7 +791,7 @@ with tab1:
         # Affichage avec formatage conditionnel
         st.dataframe(
             display_df,
-            use_container_width=True,
+            width="stretch",
             hide_index=True
         )
         
@@ -831,7 +831,7 @@ with tab1:
         st.write("")
     
     with col_action2:
-        if st.button("🔄 Recharger depuis Google Sheets", use_container_width=True):
+        if st.button("🔄 Recharger depuis Google Sheets", width="stretch"):
             with st.spinner("Rechargement en cours..."):
                 # Vider le cache pour forcer le rechargement
                 st.cache_data.clear()
@@ -901,7 +901,7 @@ with tab2:
             missing_docs = [doc for doc in DOCUMENTS_RH if doc not in provided_docs]
             
             # Bouton de soumission
-            submitted = st.form_submit_button("➕ Ajouter le collaborateur", type="primary", use_container_width=True)
+            submitted = st.form_submit_button("➕ Ajouter le collaborateur", type="primary", width="stretch")
             
             if submitted:
                 if nom and prenom and email and poste and affectation:
@@ -1011,7 +1011,7 @@ with tab2:
                     new_missing_docs = [doc for doc in DOCUMENTS_RH if doc not in provided_docs]
                     
                     # Bouton de mise à jour
-                    update_submitted = st.form_submit_button("🔄 Mettre à jour", type="primary", use_container_width=True)
+                    update_submitted = st.form_submit_button("🔄 Mettre à jour", type="primary", width="stretch")
                     
                     if update_submitted:
                         # Déterminer le nouveau statut
@@ -1071,7 +1071,7 @@ with tab3:
         
         display_incomplete.columns = ['Nom', 'Prénom', 'Poste', 'Email', 'Date Intégration', 'Dernière Relance', 'Nb Relances', 'Docs Manquants']
         
-        st.dataframe(display_incomplete, use_container_width=True, hide_index=True)
+        st.dataframe(display_incomplete, width="stretch", hide_index=True)
         
         # Formulaire de relance
         st.subheader("📨 Envoyer une relance")
@@ -1166,7 +1166,7 @@ Cordialement"""
                     final_delay_date = delay_date_2weeks
                 
                 # Bouton d'envoi
-                send_button = st.form_submit_button("📧 Envoyer/Programmer la relance", type="primary", use_container_width=True)
+                send_button = st.form_submit_button("📧 Envoyer/Programmer la relance", type="primary", width="stretch")
                 
                 if send_button:
                     with st.spinner("📤 Traitement de la relance en cours..."):
@@ -1274,7 +1274,7 @@ Cordialement"""
                     except Exception:
                         return str(x)
                 history_display['Documents_relances'] = history_display['Documents_relances'].apply(_pretty_docs)
-            st.dataframe(history_display, use_container_width=True, hide_index=True)
+            st.dataframe(history_display, width="stretch", hide_index=True)
             
             # Statistiques des relances
             col_stat1, col_stat2, col_stat3 = st.columns(3)
@@ -1318,7 +1318,7 @@ Cordialement"""
                     except Exception:
                         return str(x)
                 scheduled_display['Documents_relances'] = scheduled_display['Documents_relances'].apply(_pretty_docs_sched)
-            st.dataframe(scheduled_display, use_container_width=True, hide_index=True)
+            st.dataframe(scheduled_display, width="stretch", hide_index=True)
 
             st.markdown("---")
             st.subheader("Gérer les relances programmées")
