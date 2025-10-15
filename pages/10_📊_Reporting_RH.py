@@ -1399,7 +1399,16 @@ def calculate_weekly_metrics(df_recrutement):
         postes_avant = 0
         if real_date_reception_col and real_date_reception_col in df_entite.columns:
             # 'avant' = toutes les demandes antérieures au début de la semaine précédente (previous_monday)
-            mask_avant = df_entite[real_date_reception_col] < previous_monday
+            # Exclure les demandes déjà clôturées/annulées pour éviter de compter de vieux dossiers fermés.
+            mask_date_avant = df_entite[real_date_reception_col] < previous_monday
+            mask_not_closed = None
+            if real_statut_col and real_statut_col in df_entite.columns:
+                mask_not_closed = ~df_entite[real_statut_col].fillna("").astype(str).apply(lambda s: any(k in _norm(s) for k in closed_keywords))
+            # Appliquer les deux masques si disponibles
+            if mask_not_closed is not None:
+                mask_avant = mask_date_avant & mask_not_closed
+            else:
+                mask_avant = mask_date_avant
             postes_avant = int(df_entite[mask_avant].shape[0])
         else:
             postes_avant = 0
