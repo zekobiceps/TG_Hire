@@ -1283,8 +1283,9 @@ def calculate_weekly_metrics(df_recrutement):
     # Créer une copie pour les calculs
     df = df_recrutement.copy()
 
-    # Flag provenant de l'UI: inclure ou non les demandes clôturées dans le compteur 'avant'
-    include_closed = st.session_state.get('reporting_include_closed', False)
+    # Toujours exclure les demandes clôturées/annulées du compteur 'avant'
+    # (la case UI a été supprimée : les demandes clôturées ne sont pas comptées)
+    include_closed = False
     
     # Vérifier les colonnes disponibles
     available_columns = df.columns.tolist()
@@ -1505,9 +1506,8 @@ def create_weekly_report_tab(df_recrutement=None):
     """
     st.header("📅 Reporting Hebdomadaire : Chiffres Clés de la semaine")
 
-    # Option: inclure les demandes clôturées dans le calcul 'avant'
-    include_closed = st.checkbox("Inclure les demandes clôturées dans 'avant'", value=False)
-    st.session_state['reporting_include_closed'] = include_closed
+    # Note: les demandes clôturées sont exclues du compteur 'avant' par défaut.
+    # La case pour inclure les demandes clôturées a été supprimée.
 
     # Calculer les métriques
     if df_recrutement is not None and len(df_recrutement) > 0:
@@ -1814,7 +1814,8 @@ def create_weekly_report_tab(df_recrutement=None):
                 contributes_avant = mask_last_week
                 contributes_nouveaux = mask_this_week
                 contributes_pourvus = (mask_has_name & mask_status_en_cours & mask_accept_this_week) | (mask_has_name & mask_status_en_cours & mask_integration_this_week)
-                contributes_en_cours = mask_status_en_cours & mask_reception_le_today
+                # contrib_en_cours: statut 'En cours' ET aucune promesse acceptée ET réception <= today
+                contributes_en_cours = mask_status_en_cours & (~mask_has_name) & mask_reception_le_today
 
                 any_contrib = contributes_avant | contributes_nouveaux | contributes_pourvus | contributes_en_cours
 

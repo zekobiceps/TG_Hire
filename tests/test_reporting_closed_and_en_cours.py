@@ -21,16 +21,10 @@ def test_exclude_closed_from_avant():
     df = make_df(rows)
     # set reporting date
     st.session_state['reporting_date'] = datetime(2025,10,15)
-    # default: reporting_include_closed False -> closed excluded
-    st.session_state['reporting_include_closed'] = False
+    # closed requests are excluded by default and permanently
     metrics = calculate_weekly_metrics(df)
     assert 'E1' in metrics
     assert metrics['E1']['avant'] == 1
-
-    # now include closed
-    st.session_state['reporting_include_closed'] = True
-    metrics2 = calculate_weekly_metrics(df)
-    assert metrics2['E1']['avant'] == 2
 
 
 def test_en_cours_without_candidate_counts_as_sourcing():
@@ -40,6 +34,6 @@ def test_en_cours_without_candidate_counts_as_sourcing():
     ]
     df = make_df(rows)
     st.session_state['reporting_date'] = datetime(2025,10,15)
-    st.session_state['reporting_include_closed'] = False
+    # closed exclusion is permanent
     metrics = calculate_weekly_metrics(df)
     assert metrics['E2']['en_cours'] == 1
