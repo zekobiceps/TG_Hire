@@ -1764,9 +1764,20 @@ def create_weekly_report_tab(df_recrutement=None):
                         for col in available_cols:
                             if "date" in col.lower() and ("intégration" in col.lower() or "integration" in col.lower() or "entrée" in col.lower()):
                                 return col
+                    # Prefer columns explicitly mentioning the candidate / promesse
+                    if "candidat" in target_lower or "promesse" in target_lower or "accept" in target_lower:
+                        for col in available_cols:
+                            lc = col.lower()
+                            if ("candidat" in lc and ("retenu" in lc or "accept" in lc or "promesse" in lc)) or ("accept" in lc and "candidat" in lc):
+                                return col
+                        # fallback to any column containing 'candidat'
+                        for col in available_cols:
+                            if 'candidat' in col.lower():
+                                return col
+                    # As a last resort, match generic 'nom'/'prénom' columns
                     if "candidat" in target_lower and "retenu" in target_lower:
                         for col in available_cols:
-                            if ("candidat" in col.lower() and "retenu" in col.lower()) or ("nom" in col.lower() and "prénom" in col.lower()):
+                            if ("nom" in col.lower() and "pr" in col.lower()) or ("nom" in col.lower() and "prenom" in col.lower()):
                                 return col
                     if "statut" in target_lower:
                         for col in available_cols:
@@ -1872,6 +1883,41 @@ def create_weekly_report_tab(df_recrutement=None):
                     display_cols.append(real_accept_col)
 
                 df_out = df_selected[display_cols].copy() if display_cols else df_selected.copy()
+                # mark if the row matches any SPECIAL_TITLE_FILTERS for its entity (useful for TGCC overrides)
+                # compute a boolean flag indicating whether the row's title matches
+                # any entry in the SPECIAL_TITLE_FILTERS for that entity.
+                # Use safe fallbacks if some variables are not present in this scope.
+                try:
+                    # try to access SPECIAL_TITLE_FILTERS from the module scope
+                    st_special_filters = globals().get('SPECIAL_TITLE_FILTERS', None)
+                    # if real_poste_col isn't defined in this block, try to discover a 'Poste' column
+                    rp = globals().get('real_poste_col', None)
+                    if not rp:
+                        # conservative search for a poste-like column name in df_selected
+                        for c in df_selected.columns:
+                            if 'poste' in c.lower() or 'title' in c.lower():
+                                rp = c
+                                break
+
+                    def _matches_special_title(row):
+                        ent = row.get(real_entite_col, '') if real_entite_col in row.index else (row.get('Entité demandeuse', '') or row.get('Entité', ''))
+                        titre = ''
+                        if rp and rp in row.index:
+                            titre = row.get(rp, '')
+                        else:
+                            titre = row.get('Poste demandé', '') or row.get('Poste demandé ', '') or ''
+
+                        if not ent or not st_special_filters:
+                            return False
+                        filter_list = st_special_filters.get(ent, [])
+                        if not filter_list:
+                            return False
+                        tnorm = str(titre).strip().upper()
+                        return any(tnorm == s for s in filter_list)
+
+                    df_out['special_title_match'] = df_selected.apply(_matches_special_title, axis=1)
+                except Exception:
+                    df_out['special_title_match'] = False
                 df_out['contrib_avant'] = contributes_avant.loc[df_out.index]
                 df_out['contrib_nouveaux'] = contributes_nouveaux.loc[df_out.index]
                 df_out['contrib_pourvus'] = contributes_pourvus.loc[df_out.index]
@@ -1918,7 +1964,16 @@ def create_weekly_report_tab(df_recrutement=None):
                         st.warning("Colonne de statut introuvable — impossible de lister les lignes 'En cours'.")
                 else:
                     st.info(f"Lignes contribuant au KPI 'Postes en cours' : {len(df_out)} lignes")
-                    st.dataframe(df_out.reset_index(drop=True), use_container_width=True)
+                    # expose original DataFrame index to help trace rows between exports/UI
+                    df_out_display = df_out.reset_index().rename(columns={'index': '_orig_index'})
+                    # also show a raw representation of the candidate column (if any) to detect invisible chars
+                    if real_candidat_col and real_candidat_col in df_out.columns:
+                        try:
+                            df_out_display['candidate_raw'] = df_out[real_candidat_col].apply(lambda x: repr(x))
+                        except Exception:
+                            # fallback silently if repr fails for any value
+                            df_out_display['candidate_raw'] = ''
+                    st.dataframe(df_out_display, use_container_width=True)
             else:
                 st.info('Aucune donnée pour le debug.')
         except Exception as e:
