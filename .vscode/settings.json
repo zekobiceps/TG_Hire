@@ -1,4 +1,7 @@
 {
-    "python-envs.pythonProjects": [],
-    "python-envs.defaultEnvManager": "ms-python.python:system"
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportMissingImports": "none",
+    "reportMissingModuleSource": "none"
+  },
+  "python.analysis.typeCheckingMode": "basic"
 }
