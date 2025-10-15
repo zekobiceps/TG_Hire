@@ -581,27 +581,27 @@ with tab1:
                 
             except Exception as e:
                 st.error(f"❌ Erreur lors de l'import: {str(e)}")
-        
-        # Sélection de l'objectif d'analyse (RÈGLE CRITIQUE)
-        if st.session_state.data is not None:
-            st.markdown("### 🎯 Choix de l'Objectif")
-            
-            analysis_objective = st.radio(
-                "Que souhaitez-vous analyser et prédire ?",
-                options=["Les Demandes de Recrutement", "Les Recrutements Effectifs"],
-                index=1,  # Par défaut: Recrutements Effectifs
-                help="Ce choix détermine automatiquement la colonne de date et les filtres appliqués."
-            )
-            
-            st.session_state.analysis_objective = analysis_objective
-            
-            if analysis_objective == "Les Demandes de Recrutement":
-                st.info("📝 **Analyse des demandes**: Basée sur la date de réception des demandes. "
-                       "Filtrage automatique sur les statuts pertinents.")
-            else:
-                st.info("👨‍💼 **Analyse des recrutements effectifs**: Basée sur la date d'entrée effective. "
-                       "Seuls les recrutements réalisés sont pris en compte.")
     
+    # Sélection de l'objectif d'analyse (RÈGLE CRITIQUE)
+    if st.session_state.data is not None:
+        st.markdown("### 🎯 Choix de l'Objectif")
+        
+        analysis_objective = st.radio(
+            "Que souhaitez-vous analyser et prédire ?",
+            options=["Les Demandes de Recrutement", "Les Recrutements Effectifs"],
+            index=1,  # Par défaut: Recrutements Effectifs
+            help="Ce choix détermine automatiquement la colonne de date et les filtres appliqués."
+        )
+        
+        st.session_state.analysis_objective = analysis_objective
+        
+        if analysis_objective == "Les Demandes de Recrutement":
+            st.info("📝 **Analyse des demandes**: Basée sur la date de réception des demandes. "
+                   "Filtrage automatique sur les statuts pertinents.")
+        else:
+            st.info("👨‍💼 **Analyse des recrutements effectifs**: Basée sur la date d'entrée effective. "
+                   "Seuls les recrutements réalisés sont pris en compte.")
+
     # Informations sur les données
     if st.session_state.data is not None:
         with col2:
