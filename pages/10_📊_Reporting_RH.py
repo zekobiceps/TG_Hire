@@ -1565,8 +1565,6 @@ def create_weekly_report_tab(df_recrutement=None):
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Postes en cours (sourcing)", total_en_cours)
-        st.caption(f"Total lignes statut 'En cours' (incl. candidats) : {total_en_cours_status}")
-        st.caption("Définition: statut = 'En cours' ET pas de candidat accepté (colonne Nom Prénom vide)")
     with col2:
         st.metric("Postes pourvus cette semaine", total_pourvus)
     with col3:
@@ -1851,10 +1849,13 @@ def create_weekly_report_tab(df_recrutement=None):
                 contributes_avant = mask_last_week
                 contributes_nouveaux = mask_this_week
                 contributes_pourvus = (mask_has_name & mask_status_en_cours & mask_accept_this_week) | (mask_has_name & mask_status_en_cours & mask_integration_this_week)
-                # contrib_en_cours: statut 'En cours' ET aucune promesse acceptée ET réception <= today
-                contributes_en_cours = mask_status_en_cours & (~mask_has_name) & mask_reception_le_today
+                # contrib_en_cours: statut 'En cours' ET aucune promesse acceptée
+                contributes_en_cours = mask_status_en_cours & (~mask_has_name)
 
-                any_contrib = contributes_avant | contributes_nouveaux | contributes_pourvus | contributes_en_cours
+                # For the debug view we want the contributors to exactly reflect the
+                # 'Besoins en Cours' table: show only the rows that match the
+                # en_cours definition (statut 'En cours' AND no candidate).
+                any_contrib = contributes_en_cours
 
                 df_selected = df_debug[any_contrib].copy()
 
@@ -1884,7 +1885,7 @@ def create_weekly_report_tab(df_recrutement=None):
                             pass
 
                 # Allow user to choose display mode: KPI contributors or all rows with statut 'En cours'
-                display_mode = st.radio("Mode d'affichage:", ["Contributeurs KPI", "Toutes lignes statut 'En cours'"], index=0)
+                display_mode = st.radio("Mode d'affichage:", ["Contributeurs 'Postes en cours'", "Toutes lignes statut 'En cours'"], index=0)
 
                 if display_mode == "Toutes lignes statut 'En cours'":
                     if real_statut_col and real_statut_col in df_debug.columns:
@@ -1916,7 +1917,7 @@ def create_weekly_report_tab(df_recrutement=None):
                     else:
                         st.warning("Colonne de statut introuvable — impossible de lister les lignes 'En cours'.")
                 else:
-                    st.info(f"Lignes contribuant aux KPI (avant/nouveaux/pourvus/en_cours): {len(df_out)} lignes")
+                    st.info(f"Lignes contribuant au KPI 'Postes en cours' : {len(df_out)} lignes")
                     st.dataframe(df_out.reset_index(drop=True), use_container_width=True)
             else:
                 st.info('Aucune donnée pour le debug.')
