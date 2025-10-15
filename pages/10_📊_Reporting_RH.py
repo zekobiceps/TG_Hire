@@ -467,7 +467,8 @@ def load_data_from_files(csv_file=None, excel_file=None):
             numeric_columns = ['Nb de candidats pré-selectionnés']
             for col in numeric_columns:
                 if col in df_recrutement.columns:
-                    df_recrutement[col] = pd.to_numeric(df_recrutement[col], errors='coerce').fillna(0)
+                    df_recrutement[col] = pd.to_numeric(df_recrutement[col], errors='coerce')
+                    df_recrutement[col] = df_recrutement[col].fillna(0)
 
             # Vérification basique des colonnes critiques et message dans les logs
             required_cols = [
@@ -937,7 +938,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         df_direction = df_direction.sort_values('Count', ascending=False)
         # Truncate long labels for readability, keep full label in customdata for hover
         df_direction['Label_trunc'] = df_direction['Direction'].apply(lambda s: _truncate_label(s, max_len=24))
-        # Ensure display label exists (truncated + small gap)
+        # Ensure display label exists (truncated + small gap) to be used for axis and ordering
         if 'Label_display' not in df_direction.columns:
             df_direction['Label_display'] = df_direction['Label_trunc'] + '\u00A0\u00A0'
         fig_direction = px.bar(
@@ -1756,7 +1757,7 @@ def create_weekly_report_tab(df_recrutement=None):
                     if "candidat" in target_lower or "promesse" in target_lower or "accept" in target_lower:
                         for col in available_cols:
                             lc = col.lower()
-                            if ("candidat" in lc and ("retenu" in lc or "accept" in lc or "promesse" in lc)) or ("accept" in lc and "candidat" in lc):
+                            if ("candidat" in lc and "retenu" in lc or "accept" in lc or "promesse" in lc) or ("accept" in lc and "candidat" in lc):
                                 return col
                         # fallback to any column containing 'candidat'
                         for col in available_cols:
@@ -1813,12 +1814,12 @@ def create_weekly_report_tab(df_recrutement=None):
 
                 import unicodedata as _unicodedata
                 def _local_norm(x):
-                    if pd.isna(x):
+                    if pd.isna(x) or x is None:
                         return ''
                     s = str(x)
                     s = _unicodedata.normalize('NFKD', s)
                     s = ''.join(ch for ch in s if not _unicodedata.combining(ch))
-                    return s.lower()
+                    return s.lower().strip()
 
                 mask_last_week = pd.Series(False, index=df_debug.index)
                 mask_this_week = pd.Series(False, index=df_debug.index)
@@ -1857,7 +1858,6 @@ def create_weekly_report_tab(df_recrutement=None):
                 any_contrib = contributes_en_cours
 
                 df_selected = df_debug[any_contrib].copy()
-                import pandas as pd  # local import to ensure name present in this scope for debug construction
 
                 display_cols = []
                 if real_entite_col and real_entite_col in df_selected.columns:
@@ -2009,9 +2009,8 @@ def create_weekly_report_tab(df_recrutement=None):
     demandeur_col = _find_col(cols, ['demandeur', 'requester'])
     recruteur_col = _find_col(cols, ['recruteur', 'recruiter'])
 
-    import unicodedata
-    def _normalize(text):
-        if text is None:
+    def _normalize_kanban(text):
+        if text is None or (isinstance(text, float) and np.isnan(text)):
             return ''
         s = str(text)
         s = unicodedata.normalize('NFKD', s)
@@ -2043,7 +2042,7 @@ def create_weekly_report_tab(df_recrutement=None):
             raw = r.get(statut_col)
             if pd.isna(raw):
                 continue
-            norm = _normalize(raw)
+            norm = _normalize_kanban(raw)
             canon = None
             # find mapping by substring
             for key, val in status_map.items():
@@ -2054,7 +2053,7 @@ def create_weekly_report_tab(df_recrutement=None):
             if canon is None:
                 # if the normalized text closely matches any canonical target, pick it
                 for tgt in statuts_kanban:
-                    if _normalize(tgt) == norm:
+                    if _normalize_kanban(tgt) == norm:
                         canon = tgt
                         break
             if canon is None:
