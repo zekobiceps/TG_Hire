@@ -52,18 +52,61 @@ def _parse_mixed_dates(series):
     s = series.copy()
     # If numeric (float/int), treat as Excel serial date (days since 1899-12-30)
     if pd.api.types.is_numeric_dtype(s):
-        try:
-            # Excel serial to datetime
-            origin = pd.Timestamp('1899-12-30')
-            return pd.to_timedelta(s.fillna(0).astype(float), unit='D') + origin
-        except Exception:
-            # fallback to generic parser
-            return pd.to_datetime(s, errors='coerce')
+                else:
+                    # Show contributors first (statut 'En cours' AND pas de candidat)
+                    contrib_count = len(df_out)
 
-    # If object dtype but mostly numeric strings, try to coerce to numeric first
-    # (handles cases where Google Sheets exports numbers as strings)
-    try:
-        coerced = pd.to_numeric(s.dropna().unique(), errors='coerce')
+                    # expose original DataFrame index to help trace rows between exports/UI
+                    df_out_display = df_out.reset_index().rename(columns={'index': '_orig_index'})
+                    # ensure candidate raw representation exists
+                    if real_candidat_col and real_candidat_col in df_selected.columns:
+                        try:
+                            df_out_display['candidate_raw'] = df_selected.loc[df_out.index, real_candidat_col].apply(lambda x: repr(x))
+                        except Exception:
+                            df_out_display['candidate_raw'] = ''
+                    else:
+                        df_out_display['candidate_raw'] = ''
+
+                    # Now append the rows that are 'En cours' but have a candidate (previously excluded)
+                    try:
+                        excluded_mask = mask_status_en_cours & mask_has_name
+                        df_excl = df_debug[excluded_mask].copy()
+                        if not df_excl.empty:
+                            # pick same display cols if present, else fallback to entite/statut
+                            df_excl_display = df_excl[[c for c in df_out.columns if c in df_excl.columns]].reset_index().rename(columns={'index': '_orig_index'})
+                        else:
+                            df_excl_display = pd.DataFrame(columns=df_out_display.columns)
+                    except Exception:
+                        df_excl_display = pd.DataFrame(columns=df_out_display.columns)
+
+                    # ensure candidate_value exists for both tables and is populated for excluded rows
+                    if 'candidate_value' not in df_out_display.columns:
+                        df_out_display['candidate_value'] = ''
+                    if 'candidate_value' not in df_excl_display.columns:
+                        if real_candidat_col and real_candidat_col in df_excl.columns:
+                            df_excl_display['candidate_value'] = df_excl[real_candidat_col].fillna('').astype(str).values
+                        else:
+                            df_excl_display['candidate_value'] = ''
+
+                    # set contrib flags for excluded rows (they don't contribute to KPI 'en_cours')
+                    for col_flag in ['contrib_avant', 'contrib_nouveaux', 'contrib_pourvus', 'contrib_en_cours']:
+                        if col_flag not in df_excl_display.columns:
+                            df_excl_display[col_flag] = False
+                    if 'contrib_en_cours' in df_excl_display.columns:
+                        df_excl_display['contrib_en_cours'] = False
+
+                    # align columns and concat: contributors first, then excluded-with-candidate
+                    # Make sure both DataFrames have same column order
+                    common_cols = [c for c in df_out_display.columns if c in df_excl_display.columns]
+                    # if df_excl_display has extra candidate columns, ensure they appear
+                    for c in df_excl_display.columns:
+                        if c not in common_cols:
+                            common_cols.append(c)
+
+                    df_combined = pd.concat([df_out_display.reindex(columns=common_cols), df_excl_display.reindex(columns=common_cols)], ignore_index=True, sort=False)
+
+                    st.info(f"Lignes contribuant au KPI 'Postes en cours' : {contrib_count} lignes — {len(df_excl_display)} lignes 'En cours' avec candidat (exclues)")
+                    st.dataframe(df_combined, use_container_width=True)
         if len(coerced) > 0 and not pd.isna(coerced).all():
             # At least some numeric-like values -> attempt serial conversion per-element
             def _maybe_excel(x):
@@ -1869,6 +1912,7 @@ def create_weekly_report_tab(df_recrutement=None):
                 any_contrib = contributes_en_cours
 
                 df_selected = df_debug[any_contrib].copy()
+                import pandas as pd  # local import to ensure name present in this scope for debug construction
 
                 display_cols = []
                 if real_entite_col and real_entite_col in df_selected.columns:
