@@ -1077,7 +1077,7 @@ def create_integrations_tab(df_recrutement, global_filters):
         # Plans d'intégration à préparer
         if plan_integration_col in df_filtered.columns:
             a_preparer = len(df_filtered[df_filtered[plan_integration_col].astype(str).str.lower() == 'oui'])
-            st.metric("� Plan d'intégration à préparer", a_preparer)
+            st.metric("📋 Plan d'intégration à préparer", a_preparer)
         else:
             st.metric("📋 Plan d'intégration à préparer", "N/A")
     with col3:
@@ -1139,7 +1139,6 @@ def create_integrations_tab(df_recrutement, global_filters):
         candidat_col, 
         'Poste demandé ',
         'Entité demandeuse',
-        'Direction concernée',
         'Affectation',
         date_integration_col,
         plan_integration_col
