@@ -2023,7 +2023,7 @@ def create_weekly_report_tab(df_recrutement=None):
     st.markdown("---")
 
     # 3. Section "Pipeline de Recrutement (Kanban)"
-    st.subheader("Pipeline de Recrutement (Kanban)")
+    # (Le nombre total sera ajouté après avoir collecté les données)
 
     # Construire les données du Kanban à partir du fichier importé (préférence aux données réelles)
     # Détection heuristique des colonnes utiles
@@ -2042,6 +2042,7 @@ def create_weekly_report_tab(df_recrutement=None):
     lieu_col = _find_col(cols, ['lieu', 'affectation', 'site'])
     demandeur_col = _find_col(cols, ['demandeur', 'requester'])
     recruteur_col = _find_col(cols, ['recruteur', 'recruiter'])
+    commentaire_col = _find_col(cols, ['commentaire', 'comment'])
 
     def _normalize_kanban(text):
         if text is None or (isinstance(text, float) and np.isnan(text)):
@@ -2107,8 +2108,13 @@ def create_weekly_report_tab(df_recrutement=None):
                 'entite': r.get(entite_col, '') if entite_col else r.get('Entité demandeuse', ''),
                 'lieu': r.get(lieu_col, '') if lieu_col else '',
                 'demandeur': r.get(demandeur_col, '') if demandeur_col else '',
-                'recruteur': r.get(recruteur_col, '') if recruteur_col else ''
+                'recruteur': r.get(recruteur_col, '') if recruteur_col else '',
+                'commentaire': r.get(commentaire_col, '') if commentaire_col else ''
             })
+    
+    # Afficher le titre avec le nombre total de cartes
+    total_cartes = len(postes_data)
+    st.subheader(f"Pipeline de Recrutement (Kanban) - Total: {total_cartes}")
     
     # Créer les colonnes Streamlit
     cols_streamlit = st.columns(len(statuts_kanban_display))
@@ -2171,12 +2177,15 @@ def create_weekly_report_tab(df_recrutement=None):
                 # Première carte de la ligne
                 if idx < len(postes_in_col):
                     poste = postes_in_col[idx]
+                    commentaire = poste.get('commentaire', '')
+                    commentaire_html = f"<p style='margin-top: 8px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
                     with card_cols[0]:
                         card_html = f"""
                         <div class="kanban-card">
                             <h4><b>{poste['titre']}</b></h4>
                             <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')} | 👤 {poste.get('demandeur', 'N/A')}</p>
                             <p>✍️ {poste.get('recruteur', 'N/A')}</p>
+                            {commentaire_html}
                         </div>
                         """
                         st.markdown(card_html, unsafe_allow_html=True)
@@ -2184,12 +2193,15 @@ def create_weekly_report_tab(df_recrutement=None):
                 # Deuxième carte de la ligne (si elle existe)
                 if idx + 1 < len(postes_in_col):
                     poste = postes_in_col[idx + 1]
+                    commentaire = poste.get('commentaire', '')
+                    commentaire_html = f"<p style='margin-top: 8px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
                     with card_cols[1]:
                         card_html = f"""
                         <div class="kanban-card">
                             <h4><b>{poste['titre']}</b></h4>
                             <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')} | 👤 {poste.get('demandeur', 'N/A')}</p>
                             <p>✍️ {poste.get('recruteur', 'N/A')}</p>
+                            {commentaire_html}
                         </div>
                         """
                         st.markdown(card_html, unsafe_allow_html=True)
