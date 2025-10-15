@@ -3,6 +3,7 @@ import pandas as pd
 import os
 import datetime
 import json
+from utils import generate_ai_question
 
 # Configuration de la page
 st.set_page_config(page_title="HR Eval Pro - Système d'Évaluation", layout="wide", page_icon="🚀")
@@ -85,23 +86,17 @@ with main_tabs[0]:
         col3, col4 = st.columns(2)
         with col3:
             test_poste = st.text_input("Poste associé", key="test_poste")
-        with col4:
-            test_difficulty = st.selectbox("Niveau de difficulté", ["Débutant", "Intermédiaire", "Avancé", "Expert"], key="test_difficulty")
-
-        test_description = st.text_area("Description du test", height=100, key="test_description")
 
         if st.button("💾 Créer le test", type="primary"):
             if test_name:
                 templates = load_test_templates()
                 templates[test_name] = {
-                    "nom": test_name,
+                                   "nom": test_name,
                     "categorie": test_category,
                     "poste": test_poste,
-                    "difficulte": test_difficulty,
-                    "description": test_description,
                     "date_creation": datetime.date.today().strftime("%Y-%m-%d"),
                     "questions_entretien": [],
-                    "question_cognitif": "",
+                    "questions_cognitif": [],
                     "taches_echantillon": []
                 }
                 save_test_templates(templates)
@@ -135,9 +130,8 @@ with main_tabs[0]:
                 st.subheader("Tests trouvés :")
                 for name, template in filtered_tests.items():
                     with st.expander(f"📋 {name} - {template.get('categorie', 'Autre')}"):
+                        # affiche uniquement les informations essentielles
                         st.write(f"**Poste :** {template.get('poste', 'N/A')}")
-                        st.write(f"**Difficulté :** {template.get('difficulte', 'N/A')}")
-                        st.write(f"**Description :** {template.get('description', 'Aucune description')}")
                         st.write(f"**Créé le :** {template.get('date_creation', 'N/A')}")
 
                         col_a, col_b = st.columns(2)
@@ -184,17 +178,43 @@ with main_tabs[1]:
 
                 questions_entretien = []
                 for i in range(nb_questions):
-                    with st.expander(f"Question {i+1}", expanded=(i==0)):
-                        existing_question = template.get("questions_entretien", [])
-                        question_data = existing_question[i] if i < len(existing_question) else {"texte": get_default_question_entretien(i), "poids": 33}
+                    # layout: main column + small AI chat column on right
+                    c_main, c_ai = st.columns([4,1])
+                    with c_main:
+                        with st.expander(f"Question {i+1}", expanded=(i==0)):
+                            existing_question = template.get("questions_entretien", [])
+                            question_data = existing_question[i] if i < len(existing_question) else {"texte": get_default_question_entretien(i), "poids": 3}
 
-                        question_text = st.text_area(f"Texte de la question {i+1}", height=80,
-                                                   value=question_data["texte"],
-                                                   key=f"q_entretien_config_{i}")
-                        poids_question = st.slider(f"Poids de la question {i+1} (%)", 0, 100,
-                                                 value=question_data["poids"],
-                                                 key=f"poids_entretien_config_{i}")
-                        questions_entretien.append({"texte": question_text, "poids": poids_question})
+                            question_text = st.text_area(f"Texte de la question {i+1}", height=80,
+                                                       value=question_data["texte"],
+                                                       key=f"q_entretien_config_{i}")
+                            poids_question = st.slider(f"Poids (1-5) question {i+1}", 1, 5,
+                                                     value=question_data["poids"],
+                                                     key=f"poids_entretien_config_{i}")
+                            questions_entretien.append({"texte": question_text, "poids": poids_question})
+                    with c_ai:
+                        st.caption("AI")
+                        ai_prompt = st.text_input(f"Prompt IA {i+1}", key=f"ai_entretien_prompt_{i}", placeholder="Ex: question sourcing")
+                        if st.button(f"� Générer", key=f"gen_entretien_ai_{i}"):
+                            if ai_prompt:
+                                try:
+                                    resp = generate_ai_question(ai_prompt, concise=True)
+                                    # extract question line
+                                    if 'Question:' in resp:
+                                        q = resp.split('Question:')[-1].split('\n')[0].strip()
+                                    else:
+                                        q = resp.split('\n')[0].strip()
+                                    st.session_state[f'ai_generated_entretien_{i}'] = q
+                                    st.success("Généré")
+                                except Exception as e:
+                                    st.error(f"Erreur IA: {e}")
+                        if st.session_state.get(f'ai_generated_entretien_{i}'):
+                            suggestion = st.session_state.get(f'ai_generated_entretien_{i}')
+                            st.write(suggestion)
+                            if st.button("Insérer", key=f"insert_ent_{i}"):
+                                st.session_state[f"q_entretien_config_{i}"] = suggestion
+                                st.success("Question insérée dans le champ")
+                                st.rerun()
 
                 if st.button("💾 Sauvegarder Configuration Entretien", key="save_entretien_config"):
                     template["questions_entretien"] = questions_entretien
@@ -205,12 +225,47 @@ with main_tabs[1]:
             with config_tabs[1]:
                 st.subheader("Configuration du Test Cognitif (20%)")
 
-                question_cognitif = st.text_area("Consigne du test cognitif", height=100,
-                                               value=template.get("question_cognitif", "Consigne : Vous recevez 5 CV pour un poste de 'Chef de Projet'. Classez-les du plus pertinent au moins pertinent, en justifiant chaque choix en une phrase."),
-                                               key="q_cognitif_config")
+                # possibilité d'ajouter plusieurs questions cognitives
+                nb_cog = st.number_input("Nombre de questions cognitives", min_value=1, max_value=10,
+                                         value=len(template.get("questions_cognitif", [])) or 1,
+                                         key="nb_cognitif_config")
+
+                questions_cognitif = []
+                for i in range(nb_cog):
+                    c_main, c_ai = st.columns([4,1])
+                    with c_main:
+                        with st.expander(f"Question cognitive {i+1}", expanded=(i==0)):
+                            existing = template.get("questions_cognitif", [])
+                            qdata = existing[i] if i < len(existing) else {"consigne": "", "poids": 3}
+                            consigne = st.text_area(f"Consigne {i+1}", height=80, value=qdata.get("consigne",""), key=f"q_cog_{i}")
+                            poids = st.slider(f"Poids (1-5) question cog {i+1}", 1,5, value=qdata.get("poids",3), key=f"poids_cog_{i}")
+                            auto_eval = st.selectbox(f"Type d'évaluation {i+1}", ["Note manuelle", "Grille (1-5) automatique"], key=f"type_eval_cog_{i}")
+                            questions_cognitif.append({"consigne": consigne, "poids": poids, "auto_eval": auto_eval})
+                    with c_ai:
+                        st.caption("AI")
+                        ai_prompt = st.text_input(f"Prompt IA Cog {i+1}", key=f"ai_cog_prompt_{i}", placeholder="Ex: générer un cas logique")
+                        if st.button(f"💡 Générer", key=f"gen_cog_ai_{i}"):
+                            if ai_prompt:
+                                try:
+                                    resp = generate_ai_question(ai_prompt, concise=True)
+                                    if 'Question:' in resp:
+                                        q = resp.split('Question:')[-1].split('\n')[0].strip()
+                                    else:
+                                        q = resp.split('\n')[0].strip()
+                                    st.session_state[f'ai_generated_cog_{i}'] = q
+                                    st.success("Généré")
+                                except Exception as e:
+                                    st.error(f"Erreur IA: {e}")
+                        if st.session_state.get(f'ai_generated_cog_{i}'):
+                            suggestion = st.session_state.get(f'ai_generated_cog_{i}')
+                            st.write(suggestion)
+                            if st.button("Insérer", key=f"insert_cog_{i}"):
+                                st.session_state[f"q_cog_{i}"] = suggestion
+                                st.success("Question cognitive insérée")
+                                st.rerun()
 
                 if st.button("💾 Sauvegarder Configuration Cognitif", key="save_cognitif_config"):
-                    template["question_cognitif"] = question_cognitif
+                    template["questions_cognitif"] = questions_cognitif
                     save_test_templates(templates)
                     st.success("Configuration du test cognitif sauvegardée !")
 
@@ -225,17 +280,41 @@ with main_tabs[1]:
 
                 taches_echantillon = []
                 for i in range(nb_taches):
-                    with st.expander(f"Tâche {i+1}", expanded=(i==0)):
-                        existing_tache = template.get("taches_echantillon", [])
-                        tache_data = existing_tache[i] if i < len(existing_tache) else {"texte": get_default_tache(i), "poids": 50}
+                    c_main, c_ai = st.columns([4,1])
+                    with c_main:
+                        with st.expander(f"Tâche {i+1}", expanded=(i==0)):
+                            existing_tache = template.get("taches_echantillon", [])
+                            tache_data = existing_tache[i] if i < len(existing_tache) else {"texte": get_default_tache(i), "poids": 3}
 
-                        tache_text = st.text_area(f"Consigne de la tâche {i+1}", height=80,
-                                                value=tache_data["texte"],
-                                                key=f"tache_config_{i}")
-                        poids_tache = st.slider(f"Poids de la tâche {i+1} (%)", 0, 100,
-                                              value=tache_data["poids"],
-                                              key=f"poids_tache_config_{i}")
-                        taches_echantillon.append({"texte": tache_text, "poids": poids_tache})
+                            tache_text = st.text_area(f"Consigne de la tâche {i+1}", height=80,
+                                                    value=tache_data["texte"],
+                                                    key=f"tache_config_{i}")
+                            poids_tache = st.slider(f"Poids (1-5) tâche {i+1}", 1, 5,
+                                                  value=tache_data["poids"],
+                                                  key=f"poids_tache_config_{i}")
+                            taches_echantillon.append({"texte": tache_text, "poids": poids_tache})
+                    with c_ai:
+                        st.caption("AI")
+                        ai_prompt = st.text_input(f"Prompt IA Tâche {i+1}", key=f"ai_task_prompt_{i}", placeholder="Ex: tâche sourcing")
+                        if st.button(f"💡 Générer", key=f"gen_task_ai_{i}"):
+                            if ai_prompt:
+                                try:
+                                    resp = generate_ai_question(ai_prompt, concise=True)
+                                    if 'Question:' in resp:
+                                        q = resp.split('Question:')[-1].split('\n')[0].strip()
+                                    else:
+                                        q = resp.split('\n')[0].strip()
+                                    st.session_state[f'ai_generated_task_{i}'] = q
+                                    st.success("Généré")
+                                except Exception as e:
+                                    st.error(f"Erreur IA: {e}")
+                        if st.session_state.get(f'ai_generated_task_{i}'):
+                            suggestion = st.session_state.get(f'ai_generated_task_{i}')
+                            st.write(suggestion)
+                            if st.button("Insérer", key=f"insert_task_{i}"):
+                                st.session_state[f"tache_config_{i}"] = suggestion
+                                st.success("Tâche insérée dans le champ")
+                                st.rerun()
 
                 if st.button("💾 Sauvegarder Configuration Échantillon", key="save_echantillon_config"):
                     template["taches_echantillon"] = taches_echantillon
