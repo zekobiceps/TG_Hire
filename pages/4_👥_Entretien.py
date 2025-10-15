@@ -46,6 +46,53 @@ def get_default_tache(index):
     ]
     return taches[index] if index < len(taches) else ""
 
+def get_default_question_cognitif(index):
+    """Exemples par défaut pour les questions cognitives."""
+    exemples = [
+        "Résoudre ce petit problème logique : 3 boules rouges et 2 bleues... expliquez la démarche.",
+        "Présentez un plan d'approche pour sourcer un profil rare en 48h.",
+        "Analysez ce cas : comment prioriseriez-vous 5 tâches concurrentes pour un recrutement urgent ?"
+    ]
+    return exemples[index] if index < len(exemples) else ""
+
+# Exemples de prompts IA pour chaque onglet (10 suggestions chacune)
+EX_PROMPTS_ENTRETIEN = [
+    "Propose une question d'entretien sur la gestion de priorités",
+    "Demande une situation où le candidat a géré un conflit",
+    "Question sur l'adaptation à un changement d'équipe",
+    "Question sur la relation avec les managers",
+    "Scénario comportemental sur l'échec et les leçons apprises",
+    "Question sur la prise d'initiative",
+    "Demander un exemple concret de sourcing créatif",
+    "Question sur gestion du temps et priorisation",
+    "Question sur motivation et objectifs carrière",
+    "Question sur communication en situation tendue"
+]
+EX_PROMPTS_COGNITIF = [
+    "Génère un mini-cas logique pour évaluer le raisonnement",
+    "Donne un problème numérique simple à expliquer",
+    "Scénario d'analyse de données simple à résoudre",
+    "Exercice de logique conditionnelle",
+    "Question de compréhension d'algorithme en une phrase",
+    "Cas pratique sur résolution de problème",
+    "Problème d'optimisation pour priorisation",
+    "Court test de raisonnement déductif",
+    "Énigme simple pour mesurer créativité",
+    "Exercice sur vérification d'hypothèses"
+]
+EX_PROMPTS_TASK = [
+    "Rédige un court message LinkedIn d'approche directe",
+    "Écris une requête booléenne pour 'Développeur Python' + Django -PHP",
+    "Prépare un brief de sourcing pour un profil commercial senior",
+    "Rédige un mail pour recontacter un candidat inactif",
+    "Crée une checklist d'entretien technique",
+    "Prépare une mise en situation de test pour un product owner",
+    "Donne une épreuve courte de rédaction pour un poste support",
+    "Formule un cas pratique pour tester l'esprit d'analyse",
+    "Rédige un scénario de test pour évaluer la réactivité",
+    "Propose une tâche de recherche de profils sur LinkedIn"
+]
+
 # Initialisation des variables de session
 if 'current_test_template' not in st.session_state:
     st.session_state.current_test_template = None
@@ -156,14 +203,14 @@ with main_tabs[1]:
 
     # Chargement du test courant (soit via Gestion -> Modifier, soit créer)
     templates = load_test_templates()
-    if not templates:
+    if not templates or 'current_test_template' not in st.session_state:
         st.warning("Aucun test n'existe encore. Créez d'abord un test dans l'onglet Gestion.")
         template = None
     else:
         if st.session_state.get('current_test_template'):
             sel_name = st.session_state.current_test_template
             template = templates.get(sel_name)
-            if not template:
+            if not template or 'questions_entretien' not in template:
                 st.error(f"Le test '{sel_name}' n'existe plus. Sélectionnez ou créez un autre test dans Gestion.")
                 template = None
         else:
@@ -172,7 +219,7 @@ with main_tabs[1]:
 
     # Affiche les sous-onglets uniquement si un template est chargé
     if template:
-        config_tabs = st.tabs(["⚙️ Entretien Structuré", "⚙️ Test Cognitif", "⚙️ Échantillon de Travail"])
+        config_tabs = st.tabs(["⚙️ Entretien Structuré", "⚙️ Test Cognitif", "⚙️ Échantillon de Travail", "⚙️ Autres Configurations"])
 
         # --- Configuration Entretien Structuré ---
         with config_tabs[0]:
@@ -206,7 +253,7 @@ with main_tabs[1]:
                         # AI prompt + generate button placed inside the expander (compact)
                         ai_col, ai_btn = st.columns([4,1])
                         with ai_col:
-                            ai_prompt = st.text_input(f"Prompt IA {i+1}", key=f"ai_entretien_prompt_{i}", placeholder="Ex: question sourcing")
+                            ai_prompt = st.text_input(f"Prompt IA {i+1}", key=f"ai_entretien_prompt_{i}", placeholder="Ex: question sourcing", value="")
                             ai_preview = st.session_state.get(f"ai_preview_entretien_{i}", "")
                         with ai_btn:
                             if st.button(f"💡 Générer", key=f"gen_entretien_ai_{i}"):
@@ -262,7 +309,7 @@ with main_tabs[1]:
                         # AI prompt + generate button inside the expander (match Entretien layout)
                         ai_col, ai_btn = st.columns([4,1])
                         with ai_col:
-                            ai_prompt = st.text_input(f"Prompt IA Cog {i+1}", key=f"ai_cog_prompt_{i}", placeholder="Ex: générer un cas logique")
+                            ai_prompt = st.text_input(f"Prompt IA Cog {i+1}", key=f"ai_cog_prompt_{i}", placeholder="Ex: générer un cas logique", value="")
                             ai_preview = st.session_state.get(f"ai_preview_cog_{i}", "")
                         with ai_btn:
                             if st.button(f"💡 Générer", key=f"gen_cog_ai_{i}"):
@@ -318,7 +365,7 @@ with main_tabs[1]:
                         # AI prompt + generate button inside the expander
                         ai_col, ai_btn = st.columns([4,1])
                         with ai_col:
-                            ai_prompt = st.text_input(f"Prompt IA Tâche {i+1}", key=f"ai_task_prompt_{i}", placeholder="Ex: tâche sourcing")
+                            ai_prompt = st.text_input(f"Prompt IA Tâche {i+1}", key=f"ai_task_prompt_{i}", placeholder="Ex: tâche sourcing", value="")
                             ai_preview = st.session_state.get(f"ai_preview_task_{i}", "")
                         with ai_btn:
                             if st.button(f"💡 Générer", key=f"gen_task_ai_{i}"):
