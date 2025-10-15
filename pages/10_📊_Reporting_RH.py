@@ -2073,7 +2073,7 @@ def main():
             "Date de reporting (hebdomadaire)",
             help="Date utilisée comme référence pour le reporting hebdomadaire",
             key='reporting_date',
-            format='%d/%m/%Y'
+            format='DD/MM/YYYY'
         )
     
     # Créer les onglets (Demandes et Recrutement regroupés)
