@@ -2045,7 +2045,8 @@ def main():
         rd = st.date_input(
             "Date de reporting (hebdomadaire)",
             help="Date utilisée comme référence pour le reporting hebdomadaire",
-            key='reporting_date'
+            key='reporting_date',
+            format='%d/%m/%Y'
         )
     
     # Créer les onglets (Demandes et Recrutement regroupés)
