@@ -1994,9 +1994,13 @@ def create_weekly_report_tab(df_recrutement=None):
                         if col in df_out_display.columns:
                             df_out_display[col] = df_out_display[col].astype(bool)
 
+                    # Ajouter les deux colonnes de date si elles existent
+                    extra_date_cols = ["Date d'acceptation du candidat", "Date de réception de la demande"]
+                    for col in extra_date_cols:
+                        if col in df_out_display.columns and col not in display_cols_final:
+                            display_cols_final.append(col)
                     # Filtrer pour n'afficher que les colonnes désirées
                     existing_display_cols = [c for c in display_cols_final if c in df_out_display.columns]
-                    
                     st.dataframe(df_out_display[existing_display_cols], use_container_width=True)
             else:
                 st.info('Aucune donnée pour le debug.')
@@ -2018,7 +2022,8 @@ def create_weekly_report_tab(df_recrutement=None):
         return None
 
     cols = df_recrutement.columns.tolist() if df_recrutement is not None else []
-    statut_col = _find_col(cols, ['statut', 'status'])
+    kanban_col = _find_col(cols, ['kanban'])
+    statut_col = kanban_col if kanban_col else _find_col(cols, ['statut', 'status'])
     poste_col = _find_col(cols, ['poste', 'title', 'post'])
     entite_col = _find_col(cols, ['entité', 'entite', 'entité demandeuse', 'entite demandeuse', 'entité'])
     lieu_col = _find_col(cols, ['lieu', 'affectation', 'site'])
