@@ -1936,42 +1936,44 @@ def create_weekly_report_tab(df_recrutement=None):
                 if display_mode == "Toutes lignes statut 'En cours'":
                     if real_statut_col and real_statut_col in df_debug.columns:
                         df_status = df_debug[mask_status_en_cours].copy()
+                        
+                        # Créer la colonne candidate_value avec la même logique que le mode contributeurs
+                        if real_candidat_col and real_candidat_col in df_status.columns:
+                            df_status['candidate_value'] = df_status[real_candidat_col].fillna('').astype(str)
+                        else:
+                            df_status['candidate_value'] = ''
+                        
+                        # Formater les dates en jj/mm/aaaa
+                        if real_date_reception_col and real_date_reception_col in df_status.columns:
+                            df_status[real_date_reception_col] = pd.to_datetime(df_status[real_date_reception_col], errors='coerce')
+                            df_status[real_date_reception_col] = df_status[real_date_reception_col].apply(
+                                lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else 'N/A'
+                            )
+                        if real_accept_col and real_accept_col in df_status.columns:
+                            df_status[real_accept_col] = pd.to_datetime(df_status[real_accept_col], errors='coerce')
+                            df_status[real_accept_col] = df_status[real_accept_col].apply(
+                                lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else 'N/A'
+                            )
+                        
                         # option: masquer par défaut les lignes où un candidat est déjà renseigné
                         show_with_candidate = st.checkbox("Afficher aussi les lignes avec candidat renseigné", value=False)
-                        if not show_with_candidate and real_candidat_col and real_candidat_col in df_status.columns:
-                            df_status = df_status[ ~ (df_status[real_candidat_col].notna() & (df_status[real_candidat_col].astype(str).str.strip() != '')) ].copy()
+                        if not show_with_candidate:
+                            df_status = df_status[~(df_status['candidate_value'].str.strip() != '')].copy()
 
-                        # show requested columns if available
+                        # Colonnes à afficher (sans demandeur, Direction concernée, Raison du recrutement)
                         desired_cols = [
-                            'Poste demandé', 'Raison du recrutement', 'Entité demandeuse',
-                            'Direction concernée', 'Affectation', 'Nom Prénom du demandeur',
-                            real_candidat_col,  # Ajout de la colonne du candidat
+                            'Poste demandé', 'Entité demandeuse', 'Affectation',
+                            'candidate_value',  # Colonne du candidat
                             real_date_reception_col,  # Date de réception de la demande
                             real_accept_col  # Date d'acceptation du candidat
                         ]
                         # Filtrer les colonnes qui sont réellement disponibles et non nulles
                         available_show = [c for c in desired_cols if c and c in df_status.columns]
                         
-                        # Si la case n'est pas cochée, on veut voir le demandeur, sinon le candidat
-                        if not show_with_candidate:
-                            if 'Nom Prénom du demandeur' not in available_show:
-                                # Assurons-nous que la colonne du demandeur est là si on ne montre pas les candidats
-                                requester_col = find_similar_column('Nom Prénom du demandeur', df_status.columns)
-                                if requester_col and requester_col not in available_show:
-                                    available_show.append(requester_col)
-                        else:
-                            # Si on montre les candidats, on peut retirer le demandeur si non souhaité
-                            if 'Nom Prénom du demandeur' in available_show and real_candidat_col in available_show:
-                                available_show.remove('Nom Prénom du demandeur')
-                        if not available_show:
-                            # fallback to show key columns we detected earlier
-                            available_show = []
-                            if real_entite_col and real_entite_col in df_status.columns:
-                                available_show.append(real_entite_col)
-                            if real_candidat_col and real_candidat_col in df_status.columns:
-                                available_show.append(real_candidat_col)
-                            if real_statut_col and real_statut_col in df_status.columns:
-                                available_show.append(real_statut_col)
+                        # Renommer candidate_value pour l'affichage
+                        if 'candidate_value' in available_show and real_candidat_col:
+                            df_status = df_status.rename(columns={'candidate_value': real_candidat_col})
+                            available_show = [real_candidat_col if c == 'candidate_value' else c for c in available_show]
 
                         df_out_status = df_status[available_show].copy() if available_show else df_status.copy()
                         st.info(f"Lignes avec statut 'En cours' détectées (après filtre candidat): {len(df_out_status)}")
@@ -2119,41 +2121,41 @@ def create_weekly_report_tab(df_recrutement=None):
     # Créer les colonnes Streamlit
     cols_streamlit = st.columns(len(statuts_kanban_display))
     
-    # CSS pour styliser les cartes (2 par ligne)
+    # CSS pour styliser les cartes (plus compactes pour afficher plus de cartes)
     st.markdown("""
     <style>
     .kanban-card {
-        border-radius: 8px;
+        border-radius: 6px;
         background-color: #f0f2f6;
-        padding: 10px;
-        margin-bottom: 8px;
-        border-left: 4px solid #1f77b4;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        min-height: 80px;
+        padding: 6px 8px;
+        margin-bottom: 4px;
+        border-left: 3px solid #1f77b4;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        min-height: 50px;
         width: 100%;
     }
     .kanban-card h4 {
         margin-top: 0;
-        margin-bottom: 6px;
-        font-size: 0.9em;
-        color: #2c3e50;
-        line-height: 1.2;
-    }
-    .kanban-card p {
         margin-bottom: 3px;
         font-size: 0.75em;
-        color: #555;
+        color: #2c3e50;
         line-height: 1.1;
+    }
+    .kanban-card p {
+        margin-bottom: 2px;
+        font-size: 0.65em;
+        color: #555;
+        line-height: 1.0;
     }
     .kanban-header {
         text-align: center;
         font-weight: bold;
-        font-size: 1.1em;
+        font-size: 1.0em;
         color: #2c3e50;
-        padding: 10px;
+        padding: 6px;
         background-color: #e8f4fd;
-        border-radius: 8px;
-        margin-bottom: 15px;
+        border-radius: 6px;
+        margin-bottom: 8px;
         border: 1px solid #bee5eb;
     }
     </style>

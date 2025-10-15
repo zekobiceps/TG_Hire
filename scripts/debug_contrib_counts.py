@@ -96,7 +96,7 @@ def diagnose():
     mask_reception_le_today = df[real_date_reception_col].notna() & (df[real_date_reception_col] <= today)
 
     # contrib mask (debug): should match pages logic after our fix
-    contrib_en_cours = mask_status_en_cours & (~mask_has_name.fillna(False)) & mask_reception_le_today
+    contrib_en_cours = mask_status_en_cours & (~mask_has_name.fillna(False) if mask_has_name is not None else True) & mask_reception_le_today
 
     # SPECIAL_TITLE_FILTERS (same as in reporting file)
     SPECIAL_TITLE_FILTERS = {
@@ -119,18 +119,10 @@ def diagnose():
             real_poste_col = c
             break
     rows = []
-    def _norm(s):
-        if pd.isna(s):
-            return ''
-        ss = str(s)
-        import unicodedata
-        ss = unicodedata.normalize('NFKD', ss)
-        ss = ''.join(ch for ch in ss if not unicodedata.combining(ch))
-        return ss.lower()
 
     for e in entites:
         dfe = df[df[real_entite_col] == e]
-        base_mask = mask_status_en_cours.loc[dfe.index] & (~mask_has_name.fillna(False).loc[dfe.index]) & mask_reception_le_today.loc[dfe.index]
+        base_mask = mask_status_en_cours.loc[dfe.index] & (~mask_has_name.fillna(False).loc[dfe.index] if mask_has_name is not None else True) & mask_reception_le_today.loc[dfe.index]
         en_cours_status = int(base_mask.sum())
         # apply special title filter if present
         if real_poste_col and real_poste_col in df.columns and e in SPECIAL_TITLE_FILTERS:
