@@ -10,10 +10,12 @@ import os
 warnings.filterwarnings('ignore')
 import re
 import streamlit.components.v1 as components
+import unicodedata
 from io import BytesIO
 import json
 import gspread
 from google.oauth2 import service_account
+import unicodedata
 
 st.set_page_config(
     page_title="📊 Reporting RH Complet",
@@ -982,6 +984,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         df_poste['Label_trunc'] = df_poste['Poste'].apply(lambda s: _truncate_label(s, max_len=24))
         if 'Label_display' not in df_poste.columns:
             df_poste['Label_display'] = df_poste['Label_trunc'] + '\u00A0\u00A0'
+        df_poste['Label_display'] = df_poste['Label_trunc'] + '\u00A0\u00A0'
         fig_poste = px.bar(
             df_poste,
             x='Count',
@@ -1368,15 +1371,6 @@ def calculate_weekly_metrics(df_recrutement):
         real_accept_col = None
 
     # Normalisation et mots-clés de statuts fermés (utiles dans plusieurs blocs)
-    import unicodedata
-    def _norm(s):
-        if pd.isna(s):
-            return ''
-        ss = str(s)
-        ss = unicodedata.normalize('NFKD', ss)
-        ss = ''.join(ch for ch in ss if not unicodedata.combining(ch))
-        return ss.lower()
-
     closed_keywords = ['cloture', 'clôture', 'annule', 'annulé', 'depriorise', 'dépriorisé', 'desistement', 'désistement', 'annul', 'reject', 'rejett']
     # Optional: entity-specific title inclusion lists. If an entity is present here,
     # only postes matching the provided list will be counted in 'en_cours' for that entity.
@@ -1757,7 +1751,7 @@ def create_weekly_report_tab(df_recrutement=None):
                     if "candidat" in target_lower or "promesse" in target_lower or "accept" in target_lower:
                         for col in available_cols:
                             lc = col.lower()
-                            if ("candidat" in lc and "retenu" in lc or "accept" in lc or "promesse" in lc) or ("accept" in lc and "candidat" in lc):
+                            if ("candidat" in lc and "retenu" in lc) or ("accept" in lc and "candidat" in lc) or ("promesse" in lc and "candidat" in lc):
                                 return col
                         # fallback to any column containing 'candidat'
                         for col in available_cols:
@@ -1812,13 +1806,12 @@ def create_weekly_report_tab(df_recrutement=None):
                     except Exception:
                         df_debug[real_accept_col] = pd.to_datetime(df_debug[real_accept_col], errors='coerce')
 
-                import unicodedata as _unicodedata
                 def _local_norm(x):
                     if pd.isna(x) or x is None:
                         return ''
                     s = str(x)
-                    s = _unicodedata.normalize('NFKD', s)
-                    s = ''.join(ch for ch in s if not _unicodedata.combining(ch))
+                    s = unicodedata.normalize('NFKD', s)
+                    s = ''.join(ch for ch in s if not unicodedata.combining(ch))
                     return s.lower().strip()
 
                 mask_last_week = pd.Series(False, index=df_debug.index)
@@ -2075,6 +2068,14 @@ def create_weekly_report_tab(df_recrutement=None):
         postes_data = [
             {"statut": "Sourcing", "titre": "Ingénieur Achat", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.BOUZOUBAA", "recruteur": "Zakaria"},
             {"statut": "Sourcing", "titre": "Directeur Achats Adjoint", "entite": "TGCC", "lieu": "Siège", "demandeur": "C.BENABDELLAH", "recruteur": "Zakaria"},
+            {"statut": "Sourcing", "titre": "INGENIEUR TRAVAUX", "entite": "TGCC", "lieu": "YAMED LOT B", "demandeur": "M.TAZI", "recruteur": "Zakaria"},
+            {"statut": "Shortlisté", "titre": "CHEF DE PROJETS", "entite": "TGCC", "lieu": "DESSALEMENT JORF", "demandeur": "M.FENNAN", "recruteur": "ZAKARIA"},
+            {"statut": "Shortlisté", "titre": "Planificateur", "entite": "TGCC", "lieu": "ASFI-B", "demandeur": "SOUFIANI", "recruteur": "Ghita"},
+            {"statut": "Shortlisté", "titre": "RESPONSABLE TRANS INTERCH", "entite": "TG PREFA", "lieu": "OUED SALEH", "demandeur": "FBOUZOUBAA", "recruteur": "Ghita"},
+            {"statut": "Signature DRH", "titre": "PROJETEUR DESSINATEUR", "entite": "TG WOOD", "lieu": "OUED SALEH", "demandeur": "S.MENJRA", "recruteur": "Zakaria"},
+            {"statut": "Signature DRH", "titre": "Projeteur", "entite": "TGCC", "lieu": "TSP Safi", "demandeur": "B.MORABET", "recruteur": "Zakaria"},
+            {"statut": "Signature DRH", "titre": "Consultant SAP", "entite": "TGCC", "lieu": "Siège", "demandeur": "O.KETTA", "recruteur": "Zakaria"},
+            {"statut": "Clôture", "titre": "Doc Controller", "entite": "TGEM", "lieu": "SIEGE", "demandeur": "A.SANKARI", "recruteur": "Zakaria"},
             {"statut": "Sourcing", "titre": "INGENIEUR TRAVAUX", "entite": "TGCC", "lieu": "YAMED LOT B", "demandeur": "M.TAZI", "recruteur": "Zakaria"},
             {"statut": "Shortlisté", "titre": "CHEF DE PROJETS", "entite": "TGCC", "lieu": "DESSALEMENT JORF", "demandeur": "M.FENNAN", "recruteur": "ZAKARIA"},
             {"statut": "Shortlisté", "titre": "Planificateur", "entite": "TGCC", "lieu": "ASFI-B", "demandeur": "SOUFIANI", "recruteur": "Ghita"},
