@@ -1347,6 +1347,8 @@ def calculate_weekly_metrics(df_recrutement):
     real_candidat_col = find_similar_column(candidat_col, available_columns)
     real_statut_col = find_similar_column(statut_col, available_columns)
     real_entite_col = find_similar_column(entite_col, available_columns)
+    # detect Poste demandé column (used for optional entity-specific title filters)
+    real_poste_col = find_similar_column('Poste demandé', available_columns) or find_similar_column('Poste', available_columns)
     
     # Si les colonnes essentielles n'existent pas, retourner vide
     if not real_entite_col:
@@ -1387,6 +1389,36 @@ def calculate_weekly_metrics(df_recrutement):
         return ss.lower()
 
     closed_keywords = ['cloture', 'clôture', 'annule', 'annulé', 'depriorise', 'dépriorisé', 'desistement', 'désistement', 'annul', 'reject', 'rejett']
+    # Optional: entity-specific title inclusion lists. If an entity is present here,
+    # only postes matching the provided list will be counted in 'en_cours' for that entity.
+    SPECIAL_TITLE_FILTERS = {
+        'TGCC': [
+            'CHEF DE PROJETS',
+            'INGENIEUR TRAVAUX',
+            'CONDUCTEUR TRAVAUX SENIOR (ou Ingénieur Junior)',
+            'CONDUCTEUR TRAVAUX',
+            'INGENIEUR TRAVAUX JUNIOR',
+            'RESPONSABLE QUALITE',
+            'CHEF DE CHANTIER',
+            'METREUR',
+            'RESPONSABLE HSE',
+            'SUPERVISEUR HSE',
+            'ANIMATEUR HSE',
+            'DIRECTEUR PROJETS',
+            'RESPONSABLE ADMINISTRATIF ET FINANCIER',
+            'RESPONSABLE MAINTENANCE',
+            'RESPONSABLE ENERGIE INDUSTRIELLE',
+            'RESPONSABLE CYBER SECURITE',
+            'RESPONSABLE VRD',
+            'RESPONSABLE ACCEUIL',
+            'RESPONSABLE ETUDES',
+            'TECHNICIEN SI',
+            'RESPONSABLE GED & ARCHIVAGE',
+            'ARCHIVISTE SENIOR',
+            'ARCHIVISTE JUNIOR',
+            'TOPOGRAPHE'
+        ]
+    }
     
     # Calculer les métriques par entité
     entites = df[real_entite_col].dropna().unique()
@@ -1486,6 +1518,28 @@ def calculate_weekly_metrics(df_recrutement):
                     postes_en_cours_status = int(df_entite[ mask_sourcing ].shape[0])
             except Exception:
                 postes_en_cours_status = int(df_entite[ mask_sourcing ].shape[0])
+
+            # If a special title filter exists for this entity, apply it (requires Poste demandé column)
+            if real_poste_col and real_poste_col in df_entite.columns and entite in SPECIAL_TITLE_FILTERS:
+                # normalize titles for comparison
+                # Build token set from provided allowed titles (split words, remove short tokens)
+                tokens = set()
+                for t in SPECIAL_TITLE_FILTERS.get(entite, []):
+                    for part in re.split(r"[^\w]+", t):
+                        p = _norm(part)
+                        if p and len(p) > 2:
+                            tokens.add(p)
+                def _title_matches_tokens(title):
+                    ns = _norm(title)
+                    return any(tok in ns for tok in tokens)
+                mask_title = df_entite[real_poste_col].fillna('').astype(str).apply(lambda s: _title_matches_tokens(s))
+                try:
+                    if real_date_reception_col and real_date_reception_col in df_entite.columns:
+                        postes_en_cours_status = int(df_entite[ mask_sourcing & mask_reception_le_today & mask_title ].shape[0])
+                    else:
+                        postes_en_cours_status = int(df_entite[ mask_sourcing & mask_title ].shape[0])
+                except Exception:
+                    postes_en_cours_status = int(df_entite[ mask_sourcing & mask_title ].shape[0])
 
             # Utiliser le comptage basé sur le statut 'En cours' et sans candidat accepté
             postes_en_cours = int(postes_en_cours_status)
