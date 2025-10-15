@@ -2036,7 +2036,7 @@ def create_weekly_report_tab(df_recrutement=None):
 
     cols = df_recrutement.columns.tolist() if df_recrutement is not None else []
     kanban_col = _find_col(cols, ['kanban'])
-    statut_col = kanban_col if kanban_col else _find_col(cols, ['statut', 'status'])
+    statut_demande_col = _find_col(cols, ['statut de la demande', 'statut demande'])
     poste_col = _find_col(cols, ['poste', 'title', 'post'])
     entite_col = _find_col(cols, ['entité', 'entite', 'entité demandeuse', 'entite demandeuse', 'entité'])
     lieu_col = _find_col(cols, ['lieu', 'affectation', 'site'])
@@ -2051,8 +2051,8 @@ def create_weekly_report_tab(df_recrutement=None):
         s = ''.join(ch for ch in s if not unicodedata.combining(ch))
         return s.lower().strip()
 
-    # Carte statuts canoniques demandés par l'utilisateur (ordre affichage)
-    statuts_kanban = ["Désistement","Sourcing","Shortlisté","Signature DRH","Clôture","Dépriorisé"]
+    # Statuts Kanban canoniques (ordre d'affichage)
+    statuts_kanban_display = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
 
     # Mapping de formes possibles -> statut canonique
     status_map = {
@@ -2061,7 +2061,7 @@ def create_weekly_report_tab(df_recrutement=None):
         'sourcing': 'Sourcing',
         'shortlist': 'Shortlisté',
         'shortlisté': 'Shortlisté',
-        'shortlisté': 'Shortlisté',
+        'shortliste': 'Shortlisté',
         'signature drh': 'Signature DRH',
         'signature': 'Signature DRH',
         'cloture': 'Clôture',
@@ -2071,28 +2071,34 @@ def create_weekly_report_tab(df_recrutement=None):
     }
 
     postes_data = []
-    if statut_col and df_recrutement is not None:
-        for _, r in df_recrutement.iterrows():
-            raw = r.get(statut_col)
-            if pd.isna(raw):
+    if df_recrutement is not None and kanban_col and statut_demande_col:
+        # Filtrer d'abord les lignes avec statut "En cours"
+        mask_en_cours = df_recrutement[statut_demande_col].apply(
+            lambda x: 'en cours' in _normalize_kanban(x) if pd.notna(x) else False
+        )
+        df_kanban = df_recrutement[mask_en_cours].copy()
+        
+        # Ensuite lire la colonne Kanban pour chaque ligne
+        for _, r in df_kanban.iterrows():
+            raw_kanban = r.get(kanban_col)
+            if pd.isna(raw_kanban):
                 continue
-            norm = _normalize_kanban(raw)
+            norm = _normalize_kanban(raw_kanban)
             canon = None
             # find mapping by substring
             for key, val in status_map.items():
                 if key in norm:
                     canon = val
                     break
-            # default fallback: keep original raw string capitalized
+            # default fallback: essayer de matcher directement
             if canon is None:
-                # if the normalized text closely matches any canonical target, pick it
-                for tgt in statuts_kanban:
+                for tgt in statuts_kanban_display:
                     if _normalize_kanban(tgt) == norm:
                         canon = tgt
                         break
+            # Si toujours pas de match, ignorer cette ligne
             if canon is None:
-                # unrecognized statuses go into 'Sourcing' by default
-                canon = 'Sourcing'
+                continue
 
             titre = r.get(poste_col, '') if poste_col else r.get('Poste demandé', '')
             postes_data.append({
@@ -2104,11 +2110,8 @@ def create_weekly_report_tab(df_recrutement=None):
                 'recruteur': r.get(recruteur_col, '') if recruteur_col else ''
             })
     
-    # Définir les colonnes du Kanban
-    statuts_kanban = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
-    
     # Créer les colonnes Streamlit
-    cols = st.columns(len(statuts_kanban))
+    cols_streamlit = st.columns(len(statuts_kanban_display))
     
     # CSS pour styliser les cartes (2 par ligne)
     st.markdown("""
@@ -2151,13 +2154,14 @@ def create_weekly_report_tab(df_recrutement=None):
     """, unsafe_allow_html=True)
     
     # Remplir chaque colonne avec les postes correspondants
-    for i, statut in enumerate(statuts_kanban):
-        with cols[i]:
-            # En-tête de colonne
-            st.markdown(f'<div class="kanban-header">{statut}</div>', unsafe_allow_html=True)
-            
+    for i, statut in enumerate(statuts_kanban_display):
+        with cols_streamlit[i]:
             # Filtrer les postes pour cette colonne
             postes_in_col = [p for p in postes_data if p["statut"] == statut]
+            nb_postes = len(postes_in_col)
+            
+            # En-tête de colonne avec le nombre de cartes
+            st.markdown(f'<div class="kanban-header">{statut} ({nb_postes})</div>', unsafe_allow_html=True)
             
             # Afficher les cartes avec 2 par ligne
             for idx in range(0, len(postes_in_col), 2):
