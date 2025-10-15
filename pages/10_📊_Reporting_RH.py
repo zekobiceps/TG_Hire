@@ -1282,6 +1282,9 @@ def calculate_weekly_metrics(df_recrutement):
     
     # Créer une copie pour les calculs
     df = df_recrutement.copy()
+
+    # Flag provenant de l'UI: inclure ou non les demandes clôturées dans le compteur 'avant'
+    include_closed = st.session_state.get('reporting_include_closed', False)
     
     # Vérifier les colonnes disponibles
     available_columns = df.columns.tolist()
@@ -1402,9 +1405,10 @@ def calculate_weekly_metrics(df_recrutement):
             # Exclure les demandes déjà clôturées/annulées pour éviter de compter de vieux dossiers fermés.
             mask_date_avant = df_entite[real_date_reception_col] < previous_monday
             mask_not_closed = None
-            if real_statut_col and real_statut_col in df_entite.columns:
+            if not include_closed and real_statut_col and real_statut_col in df_entite.columns:
+                # Si l'utilisateur a demandé d'exclure les fermés, construire le masque
                 mask_not_closed = ~df_entite[real_statut_col].fillna("").astype(str).apply(lambda s: any(k in _norm(s) for k in closed_keywords))
-            # Appliquer les deux masques si disponibles
+            # Appliquer les deux masques si disponibles (si include_closed True, on n'applique pas le filtre)
             if mask_not_closed is not None:
                 mask_avant = mask_date_avant & mask_not_closed
             else:
@@ -1451,29 +1455,44 @@ def calculate_weekly_metrics(df_recrutement):
             else:
                 postes_pourvus = 0
 
-        # 4. Nb postes en cours cette semaine: compter directement les lignes dont la colonne statut indique 'En cours'
-        postes_en_cours = 0
+        # 4. Nb postes en cours cette semaine
+        # Selon votre spécification :
+        #   Nb postes en cours = (Nb postes ouverts avant début semaine + Nb nouveaux postes ouverts cette semaine) - Nb postes pourvus cette semaine
+        postes_en_cours_formula = nouveaux_postes + postes_avant - postes_pourvus
+        if postes_en_cours_formula is None:
+            postes_en_cours_formula = 0
+        # Calcul additionnel: postes en cours (sourcing) = statut 'En cours' ET pas de candidat ayant accepté la promesse
+        postes_en_cours_status = 0
         if mask_status_en_cours is not None:
+            mask_has_name_local = None
+            if real_candidat_col and real_candidat_col in df_entite.columns:
+                mask_has_name_local = df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '')
+            # Exclure les lignes où un candidat a déjà accepté (promesse)
+            if mask_has_name_local is not None:
+                mask_sourcing = mask_status_en_cours & (~mask_has_name_local)
+            else:
+                mask_sourcing = mask_status_en_cours
+
             try:
                 if real_date_reception_col and real_date_reception_col in df_entite.columns:
-                    # limiter aux postes dont la date de réception est antérieure ou égale à today
                     mask_reception_le_today = df_entite[real_date_reception_col].notna() & (df_entite[real_date_reception_col] <= today)
-                    postes_en_cours = int(df_entite[ mask_status_en_cours & mask_reception_le_today ].shape[0])
+                    postes_en_cours_status = int(df_entite[ mask_sourcing & mask_reception_le_today ].shape[0])
                 else:
-                    postes_en_cours = int(df_entite[ mask_status_en_cours ].shape[0])
+                    postes_en_cours_status = int(df_entite[ mask_sourcing ].shape[0])
             except Exception:
-                postes_en_cours = int(df_entite[ mask_status_en_cours ].shape[0])
-        else:
-            # fallback: use difference rule when statut non disponible
-            postes_en_cours = nouveaux_postes - postes_pourvus
-            if postes_en_cours < 0:
-                postes_en_cours = 0
-        
+                postes_en_cours_status = int(df_entite[ mask_sourcing ].shape[0])
+
+            # Final: utiliser le comptage basé sur le statut 'En cours' et sans candidat accepté
+            # (c'est la définition métier demandée: postes en sourcing)
+            postes_en_cours = int(postes_en_cours_status)
+
         metrics_by_entity[entite] = {
             'avant': postes_avant,
-            'nouveaux': nouveaux_postes, 
+            'nouveaux': nouveaux_postes,
             'pourvus': postes_pourvus,
-            'en_cours': postes_en_cours
+            'en_cours': postes_en_cours,
+            # ajouter info additionnelle utile pour debug/UI
+            'en_cours_status_count': postes_en_cours_status
         }
     
     return metrics_by_entity
@@ -1486,6 +1505,10 @@ def create_weekly_report_tab(df_recrutement=None):
     """
     st.header("📅 Reporting Hebdomadaire : Chiffres Clés de la semaine")
 
+    # Option: inclure les demandes clôturées dans le calcul 'avant'
+    include_closed = st.checkbox("Inclure les demandes clôturées dans 'avant'", value=False)
+    st.session_state['reporting_include_closed'] = include_closed
+
     # Calculer les métriques
     if df_recrutement is not None and len(df_recrutement) > 0:
         try:
@@ -1496,10 +1519,14 @@ def create_weekly_report_tab(df_recrutement=None):
     else:
         metrics = {}
 
-    total_avant = sum(m.get('avant', 0) for m in metrics.values())
-    total_nouveaux = sum(m.get('nouveaux', 0) for m in metrics.values())
-    total_pourvus = sum(m.get('pourvus', 0) for m in metrics.values())
-    total_en_cours = sum(m.get('en_cours', 0) for m in metrics.values())
+    # Exclure certaines entités (Besix et DECO EXCELL) de l'affichage et des totaux
+    excluded_entities = set(['BESIX-TGCC', 'DECO EXCELL'])
+    metrics_included = {e: m for e, m in metrics.items() if e not in excluded_entities}
+
+    total_avant = sum(m.get('avant', 0) for m in metrics_included.values())
+    total_nouveaux = sum(m.get('nouveaux', 0) for m in metrics_included.values())
+    total_pourvus = sum(m.get('pourvus', 0) for m in metrics_included.values())
+    total_en_cours = sum(m.get('en_cours', 0) for m in metrics_included.values())
 
     # KPI cards (simple)
     col1, col2, col3, col4 = st.columns(4)
@@ -1519,7 +1546,7 @@ def create_weekly_report_tab(df_recrutement=None):
     if metrics and len(metrics) > 0:
         # Préparer les données pour le HTML
         table_data = []
-        for entite, data in metrics.items():
+        for entite, data in metrics_included.items():
             table_data.append({
                 'Entité': entite,
                 'Nb postes ouverts avant début semaine': data['avant'] if data['avant'] > 0 else '-',
