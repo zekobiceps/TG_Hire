@@ -252,21 +252,20 @@ with main_tabs[1]:
                             poids = st.slider(f"Évaluation (1-5)", 1,5, value=st.session_state.get(f"poids_cog_{i}", qdata.get("poids",3)), key=f"poids_cog_{i}")
                         questions_cognitif.append({"consigne": st.session_state.get(f"q_cog_{i}"), "poids": poids})
 
-                        # AI generate button inside expander — uses the consigne as prompt
+                        # AI prompt + generate button inside the expander (match Entretien layout)
                         ai_col, ai_btn = st.columns([4,1])
                         with ai_col:
-                            st.markdown("_Générer une proposition depuis la consigne ci-dessus_")
+                            ai_prompt = st.text_input(f"Prompt IA Cog {i+1}", key=f"ai_cog_prompt_{i}", placeholder="Ex: générer un cas logique")
                         with ai_btn:
                             if st.button(f"💡 Générer", key=f"gen_cog_ai_{i}"):
-                                prompt = st.session_state.get(f"q_cog_{i}", "")
-                                if prompt:
+                                if ai_prompt:
                                     try:
-                                        resp = generate_ai_question(prompt, concise=True)
+                                        resp = generate_ai_question(ai_prompt, concise=True)
                                         if 'Question:' in resp:
                                             q = resp.split('Question:')[-1].split('\n')[0].strip()
                                         else:
                                             q = resp.split('\n')[0].strip()
-                                        # insère directement dans la case de la question
+                                        # insère directement dans la case de la consigne
                                         st.session_state[f"q_cog_{i}"] = q
                                         st.session_state[f'ai_generated_cog_{i}'] = q
                                         st.success("Question cognitive générée et insérée")
