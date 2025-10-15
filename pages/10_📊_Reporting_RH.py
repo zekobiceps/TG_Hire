@@ -913,7 +913,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
                 xaxis={'categoryorder':'total descending'},
                 title=dict(text="Comparaison par raison du recrutement", x=0, xanchor='left', font=TITLE_FONT)
             )
-            st.plotly_chart(fig_raison, width="stretch")
+            st.plotly_chart(fig_raison, use_container_width=True)
     
     with col3:
         # Évolution des demandes
@@ -941,7 +941,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
                     hovertemplate='%{y}<extra></extra>'
                 )
                 fig_evolution_demandes.update_layout(height=360, margin=dict(t=60, b=30, l=20, r=20), xaxis_title=None, yaxis_title=None)
-                st.plotly_chart(fig_evolution_demandes, width="stretch")
+                st.plotly_chart(fig_evolution_demandes, use_container_width=True)
     
     # Deuxième ligne de graphiques
     col4, col5 = st.columns(2)
@@ -1102,7 +1102,7 @@ def create_integrations_tab(df_recrutement, global_filters):
         if 'Affectation' in df_filtered.columns:
             # Utiliser la fonction existante create_affectation_chart
             fig_affectation = create_affectation_chart(df_filtered)
-            st.plotly_chart(fig_affectation, width="stretch")
+            st.plotly_chart(fig_affectation, use_container_width=True)
         else:
             st.warning("Colonne 'Affectation' non trouvée dans les données.")
 
@@ -1127,7 +1127,7 @@ def create_integrations_tab(df_recrutement, global_filters):
                 hovertemplate='%{y}<extra></extra>'
             )
             fig_evolution_int.update_layout(height=400, xaxis_title="Mois", yaxis_title="Nombre")
-            st.plotly_chart(fig_evolution_int, width="stretch")
+            st.plotly_chart(fig_evolution_int, use_container_width=True)
     
     # Tableau détaillé des intégrations
     st.subheader("📋 Détail des Intégrations en Cours")
@@ -2320,7 +2320,7 @@ def main():
             
             if st.button("🔁 Synchroniser depuis Google Sheets", 
                         help="Synchroniser les données depuis Google Sheets",
-                        width="stretch"):
+                        use_container_width=True):
                 
                 try:
                     # Utiliser la fonction de connexion automatique (comme dans Home.py)
@@ -2380,7 +2380,7 @@ def main():
         
         # Bouton pour actualiser les données - s'étale sur les deux colonnes
         st.markdown("---")
-        if st.button("🔄 Actualiser les Graphiques", type="primary", width="stretch"):
+        if st.button("🔄 Actualiser les Graphiques", type="primary", use_container_width=True):
             st.session_state.data_updated = True
             st.success("Données mises à jour ! Consultez les autres onglets.")
     
