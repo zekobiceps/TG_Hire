@@ -1264,8 +1264,14 @@ def calculate_weekly_metrics(df_recrutement):
             today = reporting_date
         else:
             today = datetime.combine(reporting_date, datetime.min.time())
-    start_of_week = today - timedelta(days=today.weekday())  # Lundi de cette semaine
-    start_of_last_week = start_of_week - timedelta(days=7)   # Lundi de la semaine dernière
+    # start_of_week = Monday (00:00) of the reporting_date's week
+    start_of_week = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())  # Lundi de cette semaine à 00:00
+    # Définir la semaine précédente (Lundi -> Vendredi). Exemple: si reporting_date=2025-10-15 (mercredi),
+    # start_of_week = 2025-10-13 (lundi), previous_monday = 2025-10-06, previous_friday = 2025-10-10.
+    previous_monday = start_of_week - timedelta(days=7)   # Lundi de la semaine précédente (00:00)
+    previous_friday = start_of_week - timedelta(days=3)   # Vendredi de la semaine précédente (00:00)
+    # exclusive upper bound for inclusive-Friday semantics: < previous_friday + 1 day
+    previous_friday_exclusive = previous_friday + timedelta(days=1)
     
     # Définir les colonnes attendues avec des alternatives possibles
     date_reception_col = "Date de réception de la demande après validation de la DRH"
@@ -1384,49 +1390,56 @@ def calculate_weekly_metrics(df_recrutement):
     
     for entite in entites:
         df_entite = df[df[real_entite_col] == entite]
-        # Définitions temporelles (commencer la semaine à 00:00:00 du lundi)
-        # Reuse top-level start_of_week and start_of_last_week (they are set above)
-        last_week_start = start_of_last_week
-        last_week_end = start_of_week - timedelta(seconds=1)
+        # Définitions temporelles par entité (basées sur la semaine précédente Lundi->Vendredi)
+        # previous_monday / previous_friday_exclusive sont définis en haut de la fonction
 
-        # 1. Nb postes ouverts avant début semaine = postes ouverts DURANT la semaine précédente
+        # 1. Nb postes ouverts avant début semaine
+        # Doit compter toutes les lignes dont 'Date de réception ...' est STRICTEMENT antérieure
+        # au vendredi de la semaine précédente (i.e. < previous_friday)
         postes_avant = 0
         if real_date_reception_col and real_date_reception_col in df_entite.columns:
-            mask_last_week = (df_entite[real_date_reception_col] >= last_week_start) & (df_entite[real_date_reception_col] < start_of_week)
-            postes_avant = int(df_entite[mask_last_week].shape[0])
+            # 'avant' = toutes les demandes antérieures au début de la semaine précédente (previous_monday)
+            mask_avant = df_entite[real_date_reception_col] < previous_monday
+            postes_avant = int(df_entite[mask_avant].shape[0])
         else:
             postes_avant = 0
 
-        # 2. Nb nouveaux postes ouverts cette semaine (date de réception dans la semaine courante)
+        # 2. Nb nouveaux postes ouverts cette semaine = demandes validées par la DRH
+        # dans la semaine précédente (du lundi au vendredi inclus).
         nouveaux_postes = 0
         if real_date_reception_col and real_date_reception_col in df_entite.columns:
-            mask_this_week = (df_entite[real_date_reception_col] >= start_of_week) & (df_entite[real_date_reception_col] <= today)
-            nouveaux_postes = int(df_entite[mask_this_week].shape[0])
+            mask_nouveaux = (df_entite[real_date_reception_col] >= previous_monday) & (df_entite[real_date_reception_col] < previous_friday_exclusive)
+            nouveaux_postes = int(df_entite[mask_nouveaux].shape[0])
         else:
             nouveaux_postes = 0
 
-        # 3. Nb postes pourvus cette semaine
-        # Règle métier: un poste est considéré pourvu cette semaine seulement si:
-        #  - il a le statut 'En cours' (normalisé), ET
-        #  - la date d'acceptation du candidat est dans la semaine de production (start_of_week..today)
+        # 3. Nb postes pourvus cette semaine: compter les acceptations du candidat
+        # dont la date d'acceptation est dans la même fenêtre (previous_monday..previous_friday)
         postes_pourvus = 0
-        # préparer un masque de statut 'En cours' si la colonne statut existe
+        mask_has_name = None
+        if real_candidat_col and real_candidat_col in df_entite.columns:
+            mask_has_name = df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '')
+
+        # préparer un masque de statut 'En cours' si la colonne statut existe (réutilisé plus bas)
         mask_status_en_cours = None
         if real_statut_col and real_statut_col in df_entite.columns:
             mask_status_en_cours = df_entite[real_statut_col].fillna("").astype(str).apply(lambda s: 'en cours' in _norm(s) or 'encours' in _norm(s))
 
-        if real_candidat_col and real_accept_col and real_candidat_col in df_entite.columns and real_accept_col in df_entite.columns and mask_status_en_cours is not None:
-            mask_accept_this_week = (df_entite[real_accept_col] >= start_of_week) & (df_entite[real_accept_col] <= today)
-            mask_has_name = df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '')
-            postes_pourvus = int( df_entite[ mask_accept_this_week & mask_has_name & mask_status_en_cours ].shape[0] )
-        else:
-            # fallback: try using integration date as proxy for pourvus this week, but still require statut 'En cours'
-            if real_date_integration_col and real_candidat_col and real_date_integration_col in df_entite.columns and real_candidat_col in df_entite.columns and mask_status_en_cours is not None:
-                mask_integration_this_week = (df_entite[real_date_integration_col] >= start_of_week) & (df_entite[real_date_integration_col] <= today)
-                mask_has_name = df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '')
-                postes_pourvus = int( df_entite[ mask_integration_this_week & mask_has_name & mask_status_en_cours ].shape[0] )
+        if real_accept_col and real_accept_col in df_entite.columns:
+            mask_accept_prev_week = (df_entite[real_accept_col] >= previous_monday) & (df_entite[real_accept_col] < previous_friday_exclusive)
+            if mask_has_name is not None:
+                postes_pourvus = int(df_entite[mask_accept_prev_week & mask_has_name].shape[0])
             else:
-                # If we cannot reliably determine status or dates, default to 0 (avoid double-counting)
+                postes_pourvus = int(df_entite[mask_accept_prev_week].shape[0])
+        else:
+            # fallback: try using integration date as proxy for pourvus in the same window
+            if real_date_integration_col and real_date_integration_col in df_entite.columns:
+                mask_integ_prev_week = (df_entite[real_date_integration_col] >= previous_monday) & (df_entite[real_date_integration_col] < previous_friday_exclusive)
+                if mask_has_name is not None:
+                    postes_pourvus = int(df_entite[mask_integ_prev_week & mask_has_name].shape[0])
+                else:
+                    postes_pourvus = int(df_entite[mask_integ_prev_week].shape[0])
+            else:
                 postes_pourvus = 0
 
         # 4. Nb postes en cours cette semaine: compter directement les lignes dont la colonne statut indique 'En cours'
