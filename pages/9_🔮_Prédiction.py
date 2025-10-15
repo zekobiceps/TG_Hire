@@ -12,7 +12,86 @@ from statsmodels.tsa.statespace.sarimax import SARIMAX
 import warnings
 import io
 from sklearn.metrics import mean_absolute_percentage_error
+import re
+import gspread
+from google.oauth2 import service_account
 warnings.filterwarnings('ignore')
+
+# Fonctions Google Sheets
+def get_gsheet_client():
+    """Crée et retourne un client gspread authentifié en utilisant les secrets Streamlit."""
+    try:
+        service_account_info = {
+            "type": st.secrets["GCP_TYPE"],
+            "project_id": st.secrets["GCP_PROJECT_ID"],
+            "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
+            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n').strip(),
+            "client_email": st.secrets["GCP_CLIENT_EMAIL"],
+            "client_id": st.secrets["GCP_CLIENT_ID"],
+            "auth_uri": st.secrets["GCP_AUTH_URI"],
+            "token_uri": st.secrets["GCP_TOKEN_URI"],
+            "auth_provider_x509_cert_url": st.secrets["GCP_AUTH_PROVIDER_CERT_URL"],
+            "client_x509_cert_url": st.secrets["GCP_CLIENT_CERT_URL"]
+        }
+        return gspread.service_account_from_dict(service_account_info)
+    except Exception as e:
+        st.error(f"❌ Erreur de connexion à Google Sheets. Vérifiez vos secrets. Détails: {e}")
+        return None
+
+def load_data_from_google_sheets(sheet_url):
+    """
+    Charger les données depuis Google Sheets avec authentification automatique via les secrets.
+    """
+    try:
+        # Extraire l'ID de la feuille et le GID depuis l'URL
+        sheet_id_match = re.search(r"/d/([a-zA-Z0-9-_]+)", sheet_url)
+        gid_match = re.search(r"[?&]gid=(\d+)", sheet_url)
+
+        if not sheet_id_match:
+            raise ValueError("Impossible d'extraire l'ID du Google Sheet depuis l'URL")
+
+        sheet_id = sheet_id_match.group(1)
+        gid = gid_match.group(1) if gid_match else '0'
+
+        # Utiliser le client authentifié avec les secrets
+        gc = get_gsheet_client()
+        if gc is None:
+            # Fallback vers l'export CSV public si l'authentification échoue
+            export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+            df = pd.read_csv(export_url)
+            return df
+
+        # Ouvrir la feuille par ID
+        sh = gc.open_by_key(sheet_id)
+
+        # Sélectionner la worksheet par GID
+        try:
+            worksheet = sh.get_worksheet_by_id(int(gid))
+        except:
+            worksheet = sh.sheet1  # Fallback vers la première feuille
+
+        # Récupérer toutes les données
+        data = worksheet.get_all_records()
+        df = pd.DataFrame(data)
+
+        return df
+
+    except Exception as e:
+        # Si l'authentification échoue, essayer l'export CSV public
+        try:
+            sheet_id_match = re.search(r"/d/([a-zA-Z0-9-_]+)", sheet_url)
+            gid_match = re.search(r"[?&]gid=(\d+)", sheet_url)
+
+            if sheet_id_match:
+                sheet_id = sheet_id_match.group(1)
+                gid = gid_match.group(1) if gid_match else '0'
+                export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+                df = pd.read_csv(export_url)
+                return df
+        except:
+            pass
+
+        raise e
 
 # Configuration de la page
 st.set_page_config(
@@ -373,18 +452,64 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # ============================
 with tab1:
     st.header("📁 Import des Données")
-    st.markdown("Importez vos données de recrutement ou utilisez les données d'exemple pour commencer.")
-    
-    col1, col2 = st.columns([2, 1])
-    
+    st.markdown("Importez vos données de recrutement depuis Google Sheets ou Excel, ou utilisez les données d'exemple.")
+
+    col1, col2 = st.columns(2)
+
     with col1:
+        st.subheader("🔗 Google Sheets")
+        # URL par défaut du Google Sheet (identique à celle utilisée dans le reporting)
+        default_sheet = "https://docs.google.com/spreadsheets/d/1hvghSMjcbdY8yNZOWqALBpgMdLWB5CxVJCDwEm6JULI/edit?gid=785271056#gid=785271056"
+        gs_url = st.text_input("URL Google Sheet", value=default_sheet, key="gsheet_url_prediction")
+
+        if st.button("🔁 Charger depuis Google Sheets",
+                    help="Charger les données depuis Google Sheets",
+                    width='stretch'):
+
+            try:
+                # Utiliser la fonction de chargement Google Sheets
+                df_synced = load_data_from_google_sheets(gs_url)
+
+                if df_synced is not None and len(df_synced) > 0:
+                    st.session_state.data = df_synced
+                    nb_lignes = len(df_synced)
+                    nb_colonnes = len(df_synced.columns)
+                    st.success(f"✅ Chargement Google Sheets réussi ! ({nb_lignes} lignes, {nb_colonnes} colonnes)")
+                    st.dataframe(df_synced.head(3), width="stretch")
+                else:
+                    st.warning("⚠️ Aucune donnée trouvée dans la feuille Google Sheets.")
+
+            except Exception as e:
+                err_str = str(e)
+                st.error(f"Erreur lors du chargement: {err_str}")
+
+                if '401' in err_str or 'Unauthorized' in err_str or 'HTTP Error 401' in err_str:
+                    st.error("❌ **Feuille Google privée** - Vérifiez que:")
+                    st.markdown("""
+                    1. La feuille est partagée avec: `your-service-account@your-project.iam.gserviceaccount.com`
+                    2. Les secrets Streamlit sont correctement configurés
+                    3. L'URL de la feuille est correcte
+                    """)
+                elif 'secrets' in err_str.lower():
+                    st.error("❌ **Configuration des secrets manquante**")
+                    st.markdown("""
+                    Assurez-vous que les secrets suivants sont configurés:
+                    - `GCP_TYPE`, `GCP_PROJECT_ID`, `GCP_PRIVATE_KEY_ID`
+                    - `GCP_PRIVATE_KEY`, `GCP_CLIENT_EMAIL`, `GCP_CLIENT_ID`
+                    - `GCP_AUTH_URI`, `GCP_TOKEN_URI`, etc.
+                    """)
+                else:
+                    st.error(f"Erreur technique: {err_str}")
+
+    with col2:
+        st.subheader("📊 Fichier Excel/CSV")
         # Upload du fichier
         uploaded_file = st.file_uploader(
             "Choisissez votre fichier de données",
             type=['csv', 'xlsx', 'xls'],
             help="Formats supportés: CSV, Excel"
         )
-        
+
         # Option données d'exemple
         use_sample = st.checkbox("Utiliser des données d'exemple", value=False)
         
