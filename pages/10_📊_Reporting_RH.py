@@ -1457,12 +1457,16 @@ def calculate_weekly_metrics(df_recrutement):
                 postes_pourvus = 0
 
         # 4. Nb postes en cours cette semaine
-        # Selon votre spécification :
-        #   Nb postes en cours = (Nb postes ouverts avant début semaine + Nb nouveaux postes ouverts cette semaine) - Nb postes pourvus cette semaine
+        # Par défaut on calcule une formule de secours (nouveaux + avant - pourvus)
         postes_en_cours_formula = nouveaux_postes + postes_avant - postes_pourvus
         if postes_en_cours_formula is None:
             postes_en_cours_formula = 0
-        # Calcul additionnel: postes en cours (sourcing) = statut 'En cours' ET pas de candidat ayant accepté la promesse
+
+        # Si la colonne Statut existe, on suit la règle métier stricte demandée :
+        # "Postes en cours" = lignes avec statut 'En cours' ET sans valeur dans
+        # la colonne 'Nom Prénom du candidat retenu...' (donc pas d'acceptation).
+        # Si la colonne Statut est absente, on retombe sur la formule de secours.
+        postes_en_cours = int(postes_en_cours_formula)
         postes_en_cours_status = 0
         if mask_status_en_cours is not None:
             mask_has_name_local = None
@@ -1483,8 +1487,7 @@ def calculate_weekly_metrics(df_recrutement):
             except Exception:
                 postes_en_cours_status = int(df_entite[ mask_sourcing ].shape[0])
 
-            # Final: utiliser le comptage basé sur le statut 'En cours' et sans candidat accepté
-            # (c'est la définition métier demandée: postes en sourcing)
+            # Utiliser le comptage basé sur le statut 'En cours' et sans candidat accepté
             postes_en_cours = int(postes_en_cours_status)
 
         metrics_by_entity[entite] = {
@@ -1532,6 +1535,7 @@ def create_weekly_report_tab(df_recrutement=None):
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Postes en cours cette semaine", total_en_cours)
+        st.caption("Définition: statut = 'En cours' ET pas de candidat accepté (colonne Nom Prénom vide)")
     with col2:
         st.metric("Postes pourvus cette semaine", total_pourvus)
     with col3:
@@ -1852,6 +1856,11 @@ def create_weekly_report_tab(df_recrutement=None):
                 if display_mode == "Toutes lignes statut 'En cours'":
                     if real_statut_col and real_statut_col in df_debug.columns:
                         df_status = df_debug[mask_status_en_cours].copy()
+                        # option: masquer par défaut les lignes où un candidat est déjà renseigné
+                        show_with_candidate = st.checkbox("Afficher aussi les lignes avec candidat renseigné", value=False)
+                        if not show_with_candidate and real_candidat_col and real_candidat_col in df_status.columns:
+                            df_status = df_status[ ~ (df_status[real_candidat_col].notna() & (df_status[real_candidat_col].astype(str).str.strip() != '')) ].copy()
+
                         # show requested columns if available
                         desired_cols = [
                             'Poste demandé', 'Raison du recrutement', 'Entité demandeuse',
@@ -1869,7 +1878,7 @@ def create_weekly_report_tab(df_recrutement=None):
                                 available_show.append(real_statut_col)
 
                         df_out_status = df_status[available_show].copy() if available_show else df_status.copy()
-                        st.info(f"Lignes avec statut 'En cours' détectées: {len(df_out_status)}")
+                        st.info(f"Lignes avec statut 'En cours' détectées (après filtre candidat): {len(df_out_status)}")
                         st.dataframe(df_out_status.reset_index(drop=True), use_container_width=True)
                     else:
                         st.warning("Colonne de statut introuvable — impossible de lister les lignes 'En cours'.")
