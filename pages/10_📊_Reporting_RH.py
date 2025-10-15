@@ -1995,6 +1995,9 @@ def create_weekly_report_tab(df_recrutement=None):
                     
                     # Renommer candidate_value pour l'affichage si besoin
                     if 'candidate_value' in df_out_display.columns and real_candidat_col:
+                        # Si la colonne réelle existe déjà, la supprimer d'abord pour éviter les doublons
+                        if real_candidat_col in df_out_display.columns:
+                            df_out_display = df_out_display.drop(columns=[real_candidat_col])
                         df_out_display = df_out_display.rename(columns={'candidate_value': real_candidat_col})
                         # Mettre à jour display_cols_final avec le nouveau nom
                         display_cols_final = [real_candidat_col if col == 'candidate_value' else col for col in display_cols_final]
