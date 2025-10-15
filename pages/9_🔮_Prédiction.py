@@ -474,8 +474,25 @@ with tab1:
                     st.session_state.data = df_synced
                     nb_lignes = len(df_synced)
                     nb_colonnes = len(df_synced.columns)
-                    st.success(f"✅ Chargement Google Sheets réussi ! ({nb_lignes} lignes, {nb_colonnes} colonnes)")
-                    st.dataframe(df_synced.head(3), width="stretch")
+                    
+                    # Détecter la période des données
+                    periode = "période inconnue"
+                    date_cols = [col for col in df_synced.columns if 'date' in col.lower()]
+                    if date_cols:
+                        try:
+                            dates_values = pd.to_datetime(df_synced[date_cols[0]], errors='coerce')
+                            if not isinstance(dates_values, pd.Series):
+                                dates_values = pd.Series([dates_values])
+                            valid_dates = dates_values.dropna()
+                            if len(valid_dates) > 0:
+                                min_date = str(valid_dates.min())[:7]  # Format YYYY-MM
+                                max_date = str(valid_dates.max())[:7]  # Format YYYY-MM
+                                periode = f"{min_date} - {max_date}"
+                        except:
+                            pass
+                    
+                    st.success(f"✅ Chargement Google Sheets réussi ! ({nb_lignes} lignes, {nb_colonnes} colonnes, période: {periode})")
+                    # Tableau supprimé selon les demandes de l'utilisateur
                 else:
                     st.warning("⚠️ Aucune donnée trouvée dans la feuille Google Sheets.")
 
@@ -510,62 +527,9 @@ with tab1:
             help="Formats supportés: CSV, Excel"
         )
 
-        # Option données d'exemple
-        use_sample = st.checkbox("Utiliser des données d'exemple", value=False)
+        # Option données d'exemple supprimée selon les demandes de l'utilisateur
         
-        if use_sample:
-            st.info("📊 Génération des données d'exemple en cours...")
-            
-            # Générer des données d'exemple réalistes
-            np.random.seed(42)  # Pour la reproductibilité
-            date_range = pd.date_range(start='2020-01-01', end='2024-09-30', freq='D')
-            
-            directions = [
-                "Direction Technique", "Direction RH", "Direction Commerciale", 
-                "Direction Financière", "Direction Logistique", "Direction Marketing"
-            ]
-            
-            postes = [
-                "Ingénieur", "Technicien", "Chef de projet", "Responsable", 
-                "Assistant", "Analyste", "Développeur", "Gestionnaire", 
-                "Consultant", "Chargé de mission", "Directeur", "Manager"
-            ]
-            
-            n_samples = 1200
-            
-            # Générer des demandes
-            sample_data = pd.DataFrame({
-                'Date de réception de la demande aprés validation de la DRH': 
-                    np.random.choice(date_range, n_samples),
-                'Direction concernée': 
-                    np.random.choice(directions, n_samples, p=[0.25, 0.15, 0.20, 0.15, 0.15, 0.10]),
-                'Poste demandé': 
-                    np.random.choice(postes, n_samples),
-                'Statut de la demande': 
-                    np.random.choice(["Clôture", "En cours", "Dépriorisé", "Annulé"], 
-                                   n_samples, p=[0.60, 0.15, 0.15, 0.10])
-            })
-            
-            # Ajouter la date d'entrée effective pour les recrutements clôturés
-            sample_data['Date d\'entrée effective du candidat'] = pd.NaT
-            
-            for idx in sample_data.index:
-                statut = sample_data.at[idx, 'Statut de la demande']
-                if pd.notna(statut) and str(statut).strip() == "Clôture":
-                    demand_date = sample_data.at[idx, 'Date de réception de la demande aprés validation de la DRH']
-                    # Délai d'entrée entre 30 et 120 jours
-                    entry_delay = np.random.randint(30, 120)
-                    entry_date = demand_date + pd.Timedelta(days=entry_delay)
-                    
-                    # Ne pas dépasser la date actuelle
-                    current_time = pd.Timestamp.now()
-                    if pd.notna(entry_date) and isinstance(entry_date, pd.Timestamp) and entry_date <= current_time:
-                        sample_data.at[idx, 'Date d\'entrée effective du candidat'] = entry_date
-            
-            st.session_state.data = sample_data
-            st.success("✅ Données d'exemple générées avec succès!")
-            
-        elif uploaded_file is not None:
+        if uploaded_file is not None:
             try:
                 # Lecture robuste du fichier
                 if uploaded_file.name.endswith('.csv'):
@@ -604,40 +568,13 @@ with tab1:
 
     # Informations sur les données
     if st.session_state.data is not None:
-        with col2:
-            st.metric("📄 Lignes", st.session_state.data.shape[0])
-            st.metric("📊 Colonnes", st.session_state.data.shape[1])
-            
-            # Période des données
-            date_cols = [col for col in st.session_state.data.columns 
-                        if 'date' in col.lower()]
-            if date_cols:
-                try:
-                    dates_values = pd.to_datetime(st.session_state.data[date_cols[0]], errors='coerce')
-                    # Convertir en Series si ce n'est pas déjà le cas
-                    if not isinstance(dates_values, pd.Series):
-                        dates_values = pd.Series([dates_values])
-                    valid_dates = dates_values.dropna()
-                    if len(valid_dates) > 0:
-                        min_date = str(valid_dates.min())[:7]  # Format YYYY-MM
-                        max_date = str(valid_dates.max())[:7]  # Format YYYY-MM
-                        st.metric("📅 Période", f"{min_date} - {max_date}")
-                except:
-                    pass
+        # Métriques supprimées selon les demandes de l'utilisateur
         
         # Aperçu des données
         st.subheader("📋 Aperçu des données")
         st.dataframe(st.session_state.data.head(), width="stretch")
         
-        # Informations sur les colonnes
-        with st.expander("ℹ️ Informations détaillées sur les colonnes"):
-            col_info = pd.DataFrame({
-                'Type': st.session_state.data.dtypes,
-                'Non-nulles': st.session_state.data.count(),
-                'Nulles': st.session_state.data.isnull().sum(),
-                'Uniques': [st.session_state.data[col].nunique() for col in st.session_state.data.columns]
-            })
-            st.dataframe(col_info, width="stretch")
+        # Informations supprimées selon les demandes de l'utilisateur
     else:
         st.info("👆 Veuillez importer un fichier ou utiliser les données d'exemple pour commencer.")
 
