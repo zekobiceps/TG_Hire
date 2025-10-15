@@ -1845,12 +1845,12 @@ def create_weekly_report_tab(df_recrutement=None):
                 contributes_avant = mask_last_week
                 contributes_nouveaux = mask_this_week
                 contributes_pourvus = (mask_has_name & mask_status_en_cours & mask_accept_this_week) | (mask_has_name & mask_status_en_cours & mask_integration_this_week)
-                # contrib_en_cours: statut 'En cours' ET aucune promesse acceptée
-                contributes_en_cours = mask_status_en_cours & (~mask_has_name)
+                # contrib_en_cours: statut 'En cours'
+                contributes_en_cours = mask_status_en_cours
 
                 # For the debug view we want the contributors to exactly reflect the
                 # 'Besoins en Cours' table: show only the rows that match the
-                # en_cours definition (statut 'En cours' AND no candidate).
+                # en_cours definition (statut 'En cours').
                 any_contrib = contributes_en_cours
 
                 df_selected = df_debug[any_contrib].copy()
@@ -1940,9 +1940,23 @@ def create_weekly_report_tab(df_recrutement=None):
                         # show requested columns if available
                         desired_cols = [
                             'Poste demandé', 'Raison du recrutement', 'Entité demandeuse',
-                            'Direction concernée', 'Affectation', 'Nom Prénom du demandeur'
+                            'Direction concernée', 'Affectation', 'Nom Prénom du demandeur',
+                            real_candidat_col  # Ajout de la colonne du candidat
                         ]
-                        available_show = [c for c in desired_cols if c in df_status.columns]
+                        # Filtrer les colonnes qui sont réellement disponibles et non nulles
+                        available_show = [c for c in desired_cols if c and c in df_status.columns]
+                        
+                        # Si la case n'est pas cochée, on veut voir le demandeur, sinon le candidat
+                        if not show_with_candidate:
+                            if 'Nom Prénom du demandeur' not in available_show:
+                                # Assurons-nous que la colonne du demandeur est là si on ne montre pas les candidats
+                                requester_col = find_similar_column('Nom Prénom du demandeur', df_status.columns)
+                                if requester_col and requester_col not in available_show:
+                                    available_show.append(requester_col)
+                        else:
+                            # Si on montre les candidats, on peut retirer le demandeur si non souhaité
+                            if 'Nom Prénom du demandeur' in available_show and real_candidat_col in available_show:
+                                available_show.remove('Nom Prénom du demandeur')
                         if not available_show:
                             # fallback to show key columns we detected earlier
                             available_show = []
