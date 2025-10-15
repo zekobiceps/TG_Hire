@@ -1907,10 +1907,10 @@ def create_weekly_report_tab(df_recrutement=None):
                     df_out['special_title_match'] = df_selected.apply(_matches_special_title, axis=1)
                 except Exception:
                     df_out['special_title_match'] = False
-                df_out['contrib_avant'] = contributes_avant.loc[df_out.index].astype('bool')
-                df_out['contrib_nouveaux'] = contributes_nouveaux.loc[df_out.index].astype('bool')
-                df_out['contrib_pourvus'] = contributes_pourvus.loc[df_out.index].astype('bool')
-                df_out['contrib_en_cours'] = contributes_en_cours.loc[df_out.index].astype('bool')
+                df_out['contrib_avant'] = pd.Series(contributes_avant.loc[df_out.index], dtype='bool')
+                df_out['contrib_nouveaux'] = pd.Series(contributes_nouveaux.loc[df_out.index], dtype='bool')
+                df_out['contrib_pourvus'] = pd.Series(contributes_pourvus.loc[df_out.index], dtype='bool')
+                df_out['contrib_en_cours'] = pd.Series(contributes_en_cours.loc[df_out.index], dtype='bool')
 
                 # Ensure the candidate value is present in a predictable column named 'candidate_value'
                 try:
@@ -1945,7 +1945,9 @@ def create_weekly_report_tab(df_recrutement=None):
                         desired_cols = [
                             'Poste demandé', 'Raison du recrutement', 'Entité demandeuse',
                             'Direction concernée', 'Affectation', 'Nom Prénom du demandeur',
-                            real_candidat_col  # Ajout de la colonne du candidat
+                            real_candidat_col,  # Ajout de la colonne du candidat
+                            real_date_reception_col,  # Date de réception de la demande
+                            real_accept_col  # Date d'acceptation du candidat
                         ]
                         # Filtrer les colonnes qui sont réellement disponibles et non nulles
                         available_show = [c for c in desired_cols if c and c in df_status.columns]
@@ -1985,9 +1987,17 @@ def create_weekly_report_tab(df_recrutement=None):
                     # Ajouter les colonnes de base si elles existent
                     if real_entite_col in df_out.columns: display_cols_final.insert(1, real_entite_col)
                     if real_statut_col in df_out.columns: display_cols_final.insert(2, real_statut_col)
-                    if real_candidat_col in df_out.columns: display_cols_final.insert(3, real_candidat_col)
+                    # Utiliser 'candidate_value' au lieu de real_candidat_col directement
+                    if 'candidate_value' in df_out.columns: 
+                        display_cols_final.insert(3, 'candidate_value')
                     
                     df_out_display = df_out.reset_index().rename(columns={'index': '_orig_index'})
+                    
+                    # Renommer candidate_value pour l'affichage si besoin
+                    if 'candidate_value' in df_out_display.columns and real_candidat_col:
+                        df_out_display = df_out_display.rename(columns={'candidate_value': real_candidat_col})
+                        # Mettre à jour display_cols_final avec le nouveau nom
+                        display_cols_final = [real_candidat_col if col == 'candidate_value' else col for col in display_cols_final]
                     
                     # S'assurer que toutes les colonnes de contribution sont booléennes
                     for col in ['contrib_avant', 'contrib_nouveaux', 'contrib_pourvus', 'contrib_en_cours']:
@@ -2090,26 +2100,6 @@ def create_weekly_report_tab(df_recrutement=None):
                 'demandeur': r.get(demandeur_col, '') if demandeur_col else '',
                 'recruteur': r.get(recruteur_col, '') if recruteur_col else ''
             })
-
-    # Fallback sample data if no real rows found
-    if not postes_data:
-        postes_data = [
-            {"statut": "Sourcing", "titre": "Ingénieur Achat", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.BOUZOUBAA", "recruteur": "Zakaria"},
-            {"statut": "Sourcing", "titre": "Directeur Achats Adjoint", "entite": "TGCC", "lieu": "Siège", "demandeur": "C.BENABDELLAH", "recruteur": "Zakaria"},
-            {"statut": "Sourcing", "titre": "INGENIEUR TRAVAUX", "entite": "TGCC", "lieu": "YAMED LOT B", "demandeur": "M.TAZI", "recruteur": "Zakaria"},
-            {"statut": "Shortlisté", "titre": "CHEF DE PROJETS", "entite": "TGCC", "lieu": "DESSALEMENT JORF", "demandeur": "M.FENNAN", "recruteur": "ZAKARIA"},
-            {"statut": "Shortlisté", "titre": "Planificateur", "entite": "TGCC", "lieu": "ASFI-B", "demandeur": "SOUFIANI", "recruteur": "Ghita"},
-            {"statut": "Shortlisté", "titre": "RESPONSABLE TRANS INTERCH", "entite": "TG PREFA", "lieu": "OUED SALEH", "demandeur": "FBOUZOUBAA", "recruteur": "Ghita"},
-            {"statut": "Signature DRH", "titre": "PROJETEUR DESSINATEUR", "entite": "TG WOOD", "lieu": "OUED SALEH", "demandeur": "S.MENJRA", "recruteur": "Zakaria"},
-            {"statut": "Signature DRH", "titre": "Projeteur", "entite": "TGCC", "lieu": "TSP Safi", "demandeur": "B.MORABET", "recruteur": "Zakaria"},
-            {"statut": "Signature DRH", "titre": "Consultant SAP", "entite": "TGCC", "lieu": "Siège", "demandeur": "O.KETTA", "recruteur": "Zakaria"},
-            {"statut": "Clôture", "titre": "Ingénieur étude/qualité", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.MOUTANABI", "recruteur": "Zakaria"},
-            {"statut": "Clôture", "titre": "Responsable Cybersecurité", "entite": "TGCC", "lieu": "Siège", "demandeur": "Ghazi", "recruteur": "Zakaria"},
-            {"statut": "Clôture", "titre": "CHEF DE CHANTIER", "entite": "TGCC", "lieu": "N/A", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},
-            {"statut": "Désistement", "titre": "Conducteur de Travaux", "entite": "TGCC", "lieu": "JORF LASFAR", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},
-            {"statut": "Désistement", "titre": "Chef de Chantier", "entite": "TGCC", "lieu": "TOARC", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},
-            {"statut": "Désistement", "titre": "Magasinier", "entite": "TG WOOD", "lieu": "Oulad Saleh", "demandeur": "K.TAZI", "recruteur": "Ghita"},
-        ]
     
     # Définir les colonnes du Kanban
     statuts_kanban = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
