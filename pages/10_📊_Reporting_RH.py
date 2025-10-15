@@ -17,6 +17,19 @@ import gspread
 from google.oauth2 import service_account
 import unicodedata
 
+def _normalize_text(text):
+    """A global function to safely normalize text, handling None and NaN values."""
+    if text is None or (isinstance(text, float) and np.isnan(text)):
+        return ''
+    s = str(text)
+    s = unicodedata.normalize('NFKD', s)
+    s = ''.join(ch for ch in s if not unicodedata.combining(ch))
+    return s.lower().strip()
+
+def _norm(x):
+    """Robust text normalization for status/keywords matching."""
+    return _normalize_text(x)
+
 st.set_page_config(
     page_title="📊 Reporting RH Complet",
     page_icon="📊",
@@ -1136,24 +1149,14 @@ def create_integrations_tab(df_recrutement, global_filters):
         if date_integration_col in df_display.columns:
             # Essayer d'abord le format DD/MM/YYYY puis MM/DD/YYYY si nécessaire
             def format_date_safely(date_str):
-                if pd.isna(date_str) or date_str == '' or date_str == 'N/A':
+                if pd.isna(date_str) or date_str == '' or date_str == 'N/A' or date_str is pd.NaT:
                     return 'N/A'
-                try:
-                    # Essayer format DD/MM/YYYY d'abord (format souhaité)
-                    if isinstance(date_str, str) and '/' in date_str and len(date_str.split('/')) == 3:
-                        day, month, year = date_str.split('/')
-                        if len(day) <= 2 and len(month) <= 2 and len(year) == 4:
-                            parsed_date = pd.to_datetime(f"{day}/{month}/{year}", format='%d/%m/%Y', errors='coerce')
-                            if pd.notna(parsed_date):
-                                return parsed_date.strftime('%d/%m/%Y')
-                    
-                    # Fallback: laisser pandas deviner puis reformater
-                    parsed_date = pd.to_datetime(date_str, errors='coerce')
-                    if pd.notna(parsed_date):
-                        return parsed_date.strftime('%d/%m/%Y')
-                    else:
-                        return 'N/A'
-                except:
+                
+                parsed_date = pd.to_datetime(date_str, errors='coerce')
+                
+                if pd.notna(parsed_date):
+                    return parsed_date.strftime('%d/%m/%Y')
+                else:
                     return 'N/A'
             
             df_display[date_integration_col] = df_display[date_integration_col].apply(format_date_safely)
@@ -1917,7 +1920,9 @@ def create_weekly_report_tab(df_recrutement=None):
                 for dc in [real_date_reception_col, real_accept_col, real_date_integration_col]:
                     if dc and dc in df_out.columns:
                         try:
-                            df_out[dc] = pd.to_datetime(df_out[dc], errors='coerce').dt.strftime('%d/%m/%Y')
+                            # Safely format each date value in the column using .map
+                            df_out[dc] = pd.to_datetime(df_out[dc], errors='coerce')
+                            df_out[dc] = df_out[dc].map(lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) and hasattr(x, 'strftime') else 'N/A')
                         except Exception:
                             pass
 
@@ -2075,15 +2080,6 @@ def create_weekly_report_tab(df_recrutement=None):
             {"statut": "Signature DRH", "titre": "PROJETEUR DESSINATEUR", "entite": "TG WOOD", "lieu": "OUED SALEH", "demandeur": "S.MENJRA", "recruteur": "Zakaria"},
             {"statut": "Signature DRH", "titre": "Projeteur", "entite": "TGCC", "lieu": "TSP Safi", "demandeur": "B.MORABET", "recruteur": "Zakaria"},
             {"statut": "Signature DRH", "titre": "Consultant SAP", "entite": "TGCC", "lieu": "Siège", "demandeur": "O.KETTA", "recruteur": "Zakaria"},
-            {"statut": "Clôture", "titre": "Doc Controller", "entite": "TGEM", "lieu": "SIEGE", "demandeur": "A.SANKARI", "recruteur": "Zakaria"},
-            {"statut": "Sourcing", "titre": "INGENIEUR TRAVAUX", "entite": "TGCC", "lieu": "YAMED LOT B", "demandeur": "M.TAZI", "recruteur": "Zakaria"},
-            {"statut": "Shortlisté", "titre": "CHEF DE PROJETS", "entite": "TGCC", "lieu": "DESSALEMENT JORF", "demandeur": "M.FENNAN", "recruteur": "ZAKARIA"},
-            {"statut": "Shortlisté", "titre": "Planificateur", "entite": "TGCC", "lieu": "ASFI-B", "demandeur": "SOUFIANI", "recruteur": "Ghita"},
-            {"statut": "Shortlisté", "titre": "RESPONSABLE TRANS INTERCH", "entite": "TG PREFA", "lieu": "OUED SALEH", "demandeur": "FBOUZOUBAA", "recruteur": "Ghita"},
-            {"statut": "Signature DRH", "titre": "PROJETEUR DESSINATEUR", "entite": "TG WOOD", "lieu": "OUED SALEH", "demandeur": "S.MENJRA", "recruteur": "Zakaria"},
-            {"statut": "Signature DRH", "titre": "Projeteur", "entite": "TGCC", "lieu": "TSP Safi", "demandeur": "B.MORABET", "recruteur": "Zakaria"},
-            {"statut": "Signature DRH", "titre": "Consultant SAP", "entite": "TGCC", "lieu": "Siège", "demandeur": "O.KETTA", "recruteur": "Zakaria"},
-            {"statut": "Clôture", "titre": "Doc Controller", "entite": "TGEM", "lieu": "SIEGE", "demandeur": "A.SANKARI", "recruteur": "Zakaria"},
             {"statut": "Clôture", "titre": "Ingénieur étude/qualité", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.MOUTANABI", "recruteur": "Zakaria"},
             {"statut": "Clôture", "titre": "Responsable Cybersecurité", "entite": "TGCC", "lieu": "Siège", "demandeur": "Ghazi", "recruteur": "Zakaria"},
             {"statut": "Clôture", "titre": "CHEF DE CHANTIER", "entite": "TGCC", "lieu": "N/A", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},

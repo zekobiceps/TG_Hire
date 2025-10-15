@@ -98,12 +98,54 @@ def diagnose():
     # contrib mask (debug): should match pages logic after our fix
     contrib_en_cours = mask_status_en_cours & (~mask_has_name.fillna(False)) & mask_reception_le_today
 
+    # SPECIAL_TITLE_FILTERS (same as in reporting file)
+    SPECIAL_TITLE_FILTERS = {
+        'TGCC': [
+            'CHEF DE PROJETS', 'INGENIEUR TRAVAUX', 'CONDUCTEUR TRAVAUX SENIOR', 'CONDUCTEUR TRAVAUX',
+            'INGENIEUR TRAVAUX JUNIOR', 'RESPONSABLE QUALITE', 'CHEF DE CHANTIER', 'METREUR',
+            'RESPONSABLE HSE', 'SUPERVISEUR HSE', 'ANIMATEUR HSE', 'DIRECTEUR PROJETS',
+            'RESPONSABLE ADMINISTRATIF ET FINANCIER', 'RESPONSABLE MAINTENANCE', 'RESPONSABLE ENERGIE INDUSTRIELLE',
+            'RESPONSABLE CYBER SECURITE', 'RESPONSABLE VRD', 'RESPONSABLE ACCEUIL', 'RESPONSABLE ETUDES',
+            'TECHNICIEN SI', 'RESPONSABLE GED & ARCHIVAGE', 'ARCHIVISTE SENIOR', 'ARCHIVISTE JUNIOR', 'TOPOGRAPHE'
+        ]
+    }
+
     # compute per-entity
     entites = df[real_entite_col].dropna().unique()
+    # detect poste col
+    real_poste_col = None
+    for c in df.columns:
+        if 'poste' in c.lower() or 'post' in c.lower():
+            real_poste_col = c
+            break
     rows = []
+    def _norm(s):
+        if pd.isna(s):
+            return ''
+        ss = str(s)
+        import unicodedata
+        ss = unicodedata.normalize('NFKD', ss)
+        ss = ''.join(ch for ch in ss if not unicodedata.combining(ch))
+        return ss.lower()
+
     for e in entites:
         dfe = df[df[real_entite_col] == e]
-        en_cours_status = int((mask_status_en_cours.loc[dfe.index] & (~mask_has_name.fillna(False).loc[dfe.index]) & mask_reception_le_today.loc[dfe.index]).sum())
+        base_mask = mask_status_en_cours.loc[dfe.index] & (~mask_has_name.fillna(False).loc[dfe.index]) & mask_reception_le_today.loc[dfe.index]
+        en_cours_status = int(base_mask.sum())
+        # apply special title filter if present
+        if real_poste_col and real_poste_col in df.columns and e in SPECIAL_TITLE_FILTERS:
+            tokens = set()
+            for t in SPECIAL_TITLE_FILTERS.get(e, []):
+                for part in __import__('re').split(r"[^\w]+", t):
+                    p = _norm(part)
+                    if p and len(p) > 2:
+                        tokens.add(p)
+            def _title_matches_tokens(title):
+                ns = _norm(title)
+                return any(tok in ns for tok in tokens)
+            mask_title = df[real_poste_col].fillna('').astype(str).apply(lambda s: _title_matches_tokens(s))
+            en_cours_status = int((base_mask & mask_title.loc[dfe.index]).sum())
+
         contrib_count = int(contrib_en_cours.loc[dfe.index].sum())
         rows.append((e, en_cours_status, contrib_count))
 
