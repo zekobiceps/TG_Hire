@@ -2037,6 +2037,33 @@ def main():
 
     with st.sidebar:
         st.subheader("🔧 Filtres - Hebdomadaire")
+        # Ensure the session value is a plain date object Streamlit expects.
+        # Protect against cases where session_state may contain a str or pd.Timestamp
+        rd_val = st.session_state.get('reporting_date', None)
+        if rd_val is not None:
+            try:
+                # pandas Timestamp or datetime -> date
+                import pandas as _pd
+                if isinstance(rd_val, _pd.Timestamp):
+                    st.session_state['reporting_date'] = rd_val.date()
+                elif hasattr(rd_val, 'date') and not isinstance(rd_val, str):
+                    # datetime -> date (leave date as-is)
+                    try:
+                        st.session_state['reporting_date'] = rd_val.date()
+                    except Exception:
+                        pass
+                elif isinstance(rd_val, str):
+                    # try parsing common formats
+                    from dateutil import parser as _parser
+                    try:
+                        parsed = _parser.parse(rd_val)
+                        st.session_state['reporting_date'] = parsed.date()
+                    except Exception:
+                        # fallback: keep original (Streamlit will raise if invalid)
+                        pass
+            except Exception:
+                # If pandas isn't available or any unexpected issue, ignore and let Streamlit handle
+                pass
         # Do not pass both `value` and `key` for the same widget to avoid Streamlit's
         # warning: the widget was created with a default value but also had its
         # value set via the Session State API. Passing `key='reporting_date'`
