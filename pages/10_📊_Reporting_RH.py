@@ -1,19 +1,42 @@
-import streamlit as st
-import pandas as pd
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-import numpy as np
+try:
+    import streamlit as st
+except Exception:
+    st = None
+try:
+    import pandas as pd
+except Exception:
+    pd = None
+try:
+    import plotly.express as px
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+except Exception:
+    px = None
+    go = None
+    make_subplots = None
+try:
+    import numpy as np
+except Exception:
+    np = None
 from datetime import datetime, timedelta
 import warnings
 import os
 warnings.filterwarnings('ignore')
 import re
-import streamlit.components.v1 as components
+try:
+    import streamlit.components.v1 as components
+except Exception:
+    components = None
 from io import BytesIO
 import json
-import gspread
-from google.oauth2 import service_account
+try:
+    import gspread
+except Exception:
+    gspread = None
+try:
+    from google.oauth2 import service_account
+except Exception:
+    service_account = None
 
 st.set_page_config(
     page_title="📊 Reporting RH Complet",
@@ -50,81 +73,26 @@ def _parse_mixed_dates(series):
     Returns a datetime64[ns] Series with NaT for unparseable values.
     """
     s = series.copy()
-    # If numeric (float/int), treat as Excel serial date (days since 1899-12-30)
-    if pd.api.types.is_numeric_dtype(s):
-                else:
-                    # Show contributors first (statut 'En cours' AND pas de candidat)
-                    contrib_count = len(df_out)
-
-                    # expose original DataFrame index to help trace rows between exports/UI
-                    df_out_display = df_out.reset_index().rename(columns={'index': '_orig_index'})
-                    # ensure candidate raw representation exists
-                    if real_candidat_col and real_candidat_col in df_selected.columns:
-                        try:
-                            df_out_display['candidate_raw'] = df_selected.loc[df_out.index, real_candidat_col].apply(lambda x: repr(x))
-                        except Exception:
-                            df_out_display['candidate_raw'] = ''
-                    else:
-                        df_out_display['candidate_raw'] = ''
-
-                    # Now append the rows that are 'En cours' but have a candidate (previously excluded)
-                    try:
-                        excluded_mask = mask_status_en_cours & mask_has_name
-                        df_excl = df_debug[excluded_mask].copy()
-                        if not df_excl.empty:
-                            # pick same display cols if present, else fallback to entite/statut
-                            df_excl_display = df_excl[[c for c in df_out.columns if c in df_excl.columns]].reset_index().rename(columns={'index': '_orig_index'})
-                        else:
-                            df_excl_display = pd.DataFrame(columns=df_out_display.columns)
-                    except Exception:
-                        df_excl_display = pd.DataFrame(columns=df_out_display.columns)
-
-                    # ensure candidate_value exists for both tables and is populated for excluded rows
-                    if 'candidate_value' not in df_out_display.columns:
-                        df_out_display['candidate_value'] = ''
-                    if 'candidate_value' not in df_excl_display.columns:
-                        if real_candidat_col and real_candidat_col in df_excl.columns:
-                            df_excl_display['candidate_value'] = df_excl[real_candidat_col].fillna('').astype(str).values
-                        else:
-                            df_excl_display['candidate_value'] = ''
-
-                    # set contrib flags for excluded rows (they don't contribute to KPI 'en_cours')
-                    for col_flag in ['contrib_avant', 'contrib_nouveaux', 'contrib_pourvus', 'contrib_en_cours']:
-                        if col_flag not in df_excl_display.columns:
-                            df_excl_display[col_flag] = False
-                    if 'contrib_en_cours' in df_excl_display.columns:
-                        df_excl_display['contrib_en_cours'] = False
-
-                    # align columns and concat: contributors first, then excluded-with-candidate
-                    # Make sure both DataFrames have same column order
-                    common_cols = [c for c in df_out_display.columns if c in df_excl_display.columns]
-                    # if df_excl_display has extra candidate columns, ensure they appear
-                    for c in df_excl_display.columns:
-                        if c not in common_cols:
-                            common_cols.append(c)
-
-                    df_combined = pd.concat([df_out_display.reindex(columns=common_cols), df_excl_display.reindex(columns=common_cols)], ignore_index=True, sort=False)
-
-                    st.info(f"Lignes contribuant au KPI 'Postes en cours' : {contrib_count} lignes — {len(df_excl_display)} lignes 'En cours' avec candidat (exclues)")
-                    st.dataframe(df_combined, use_container_width=True)
-        if len(coerced) > 0 and not pd.isna(coerced).all():
-            # At least some numeric-like values -> attempt serial conversion per-element
+    try:
+        # If the series is numeric (Excel serials), convert per-element where it looks numeric
+        if pd.api.types.is_numeric_dtype(s):
             def _maybe_excel(x):
                 try:
                     xf = float(x)
                     return pd.Timestamp('1899-12-30') + pd.Timedelta(days=xf)
                 except Exception:
                     return pd.NaT
-            return s.apply(lambda v: _maybe_excel(v) if pd.notna(v) and str(v).strip().replace('.','',1).isdigit() else pd.NaT).combine_first(pd.to_datetime(s, dayfirst=True, errors='coerce'))
+
+            return s.apply(lambda v: _maybe_excel(v) if pd.notna(v) and str(v).strip().replace('.', '', 1).isdigit() else pd.NaT).combine_first(pd.to_datetime(s, dayfirst=True, errors='coerce'))
     except Exception:
+        # fall through to permissive parsing below
         pass
 
-    # First try dayfirst (common with French date formats)
+    # First try dayfirst parsing (dd/mm/YYYY common in French contexts)
     parsed = pd.to_datetime(s, dayfirst=True, errors='coerce')
-    # If many values are NaT, try a more permissive parse
+    # If many values still NaT, try fallback parsing
     if parsed.isna().sum() > len(parsed) * 0.25:
         parsed_alt = pd.to_datetime(s, errors='coerce')
-        # combine: prefer parsed (dayfirst) then parsed_alt
         parsed = parsed.combine_first(parsed_alt)
 
     return parsed
