@@ -350,170 +350,172 @@ with main_tabs[2]:
         with col4:
             date_entretien = st.date_input("Date de l'entretien", datetime.date.today(), key="date_entretien_eval")
 
-            # Étapes d'évaluation
-            evaluation_steps = ["1️⃣ Entretien Structuré", "2️⃣ Test Cognitif", "3️⃣ Échantillon de Travail", "4️⃣ Synthèse & Décision"]
+        # separation line between candidate info and evaluation steps
+        st.markdown("---")
 
-            # Navigation entre étapes
-            col_prev, col_current, col_next = st.columns([1, 2, 1])
-            with col_prev:
-                if st.session_state.evaluation_step > 0:
-                    if st.button("⬅️ Précédent", key="prev_step"):
-                        st.session_state.evaluation_step -= 1
-                        st.rerun()
+        # Étapes d'évaluation
+        evaluation_steps = ["1️⃣ Entretien Structuré", "2️⃣ Test Cognitif", "3️⃣ Échantillon de Travail", "4️⃣ Synthèse & Décision"]
 
-            with col_current:
-                current_step_name = evaluation_steps[st.session_state.evaluation_step]
-                st.markdown(f"### {current_step_name}")
+        # Navigation entre étapes (full width)
+        col_prev, col_current, col_next = st.columns([1, 2, 1])
+        with col_prev:
+            if st.session_state.evaluation_step > 0:
+                if st.button("⬅️ Précédent", key="prev_step"):
+                    st.session_state.evaluation_step -= 1
+                    st.rerun()
 
-            with col_next:
-                if st.session_state.evaluation_step < len(evaluation_steps) - 1:
-                    if st.button("Suivant ➡️", key="next_step"):
-                        st.session_state.evaluation_step += 1
-                        st.rerun()
+        with col_current:
+            current_step_name = evaluation_steps[st.session_state.evaluation_step]
+            st.markdown(f"### {current_step_name}")
 
-            # Contenu selon l'étape
-            if st.session_state.evaluation_step == 0:  # Entretien Structuré
-                st.subheader("Entretien Structuré")
-                questions_entretien = template.get("questions_entretien", [])
+        with col_next:
+            if st.session_state.evaluation_step < len(evaluation_steps) - 1:
+                if st.button("Suivant ➡️", key="next_step"):
+                    st.session_state.evaluation_step += 1
+                    st.rerun()
 
-                if questions_entretien:
-                    for i, question in enumerate(questions_entretien):
-                        st.markdown(f"**Question {i+1} :** {question['texte']}")
-                        notes_q = st.text_area(f"Notes Question {i+1} :", height=100, key=f"notes_q_eval_{i}")
-                        note_q = st.slider(f"Note Question {i+1}", 1, 5, 3, key=f"note_q_eval_{i}")
-                        st.session_state.evaluation_data[f"entretien_q{i}"] = {"notes": notes_q, "note": note_q}
+        # Contenu selon l'étape
+        if st.session_state.evaluation_step == 0:  # Entretien Structuré
+            st.subheader("Entretien Structuré")
+            questions_entretien = template.get("questions_entretien", [])
+
+            if questions_entretien:
+                for i, question in enumerate(questions_entretien):
+                    st.markdown(f"**Question {i+1} :** {question['texte']}")
+                    notes_q = st.text_area(f"Notes Question {i+1} :", height=100, key=f"notes_q_eval_{i}")
+                    note_q = st.slider(f"Note Question {i+1}", 1, 5, 3, key=f"note_q_eval_{i}")
+                    st.session_state.evaluation_data[f"entretien_q{i}"] = {"notes": notes_q, "note": note_q}
+            else:
+                st.warning("Aucune question d'entretien configurée pour ce test.")
+
+        elif st.session_state.evaluation_step == 1:  # Test Cognitif
+            st.subheader("Test Cognitif")
+            questions_cognitif = template.get("questions_cognitif", [])
+            if questions_cognitif:
+                for i, q in enumerate(questions_cognitif):
+                    st.markdown(f"**Question cognitive {i+1} :** {q.get('consigne','')}")
+                    col_q, col_s = st.columns([4,1])
+                    with col_q:
+                        reponse = st.text_area(f"Réponse {i+1}", height=120, key=f"reponse_cog_{i}")
+                    with col_s:
+                        note = st.slider(f"Éval (1-5)", 1,5,3, key=f"note_cog_{i}")
+                    st.session_state.evaluation_data[f"cognitif_q{i}"] = {"reponse": reponse, "note": note}
+            else:
+                st.warning("Aucune question cognitive configurée pour ce test.")
+
+        elif st.session_state.evaluation_step == 2:  # Échantillon de Travail
+            st.subheader("Échantillon de Travail")
+            taches_echantillon = template.get("taches_echantillon", [])
+
+            if taches_echantillon:
+                for i, tache in enumerate(taches_echantillon):
+                    st.markdown(f"**Tâche {i+1} :** {tache['texte']}")
+                    reponse_tache = st.text_area(f"Réponse du candidat à la tâche {i+1} :", height=100, key=f"reponse_tache_eval_{i}")
+                    note_tache = st.slider(f"Note Tâche {i+1}", 1, 5, 3, key=f"note_tache_eval_{i}")
+                    st.session_state.evaluation_data[f"echantillon_t{i}"] = {"reponse": reponse_tache, "note": note_tache}
+            else:
+                st.warning("Aucune tâche d'échantillon configurée pour ce test.")
+
+        elif st.session_state.evaluation_step == 3:  # Synthèse & Décision
+            st.subheader("Synthèse et Décision Finale")
+
+            # Calcul des scores
+            questions_entretien = template.get("questions_entretien", [])
+            taches_echantillon = template.get("taches_echantillon", [])
+
+            # --- Normalisation des poids (échelle 1-5 en pourcentage) ---
+            def normalize_weights(items):
+                # items is list of dicts with 'poids' keys
+                poids = [it.get('poids', 3) for it in items]
+                total = sum(poids) if sum(poids) > 0 else len(poids)
+                return [p / total for p in poids]
+
+            # Score entretien (moyenne pondérée, les poids sont normalisés)
+            score_entretien = 0
+            if questions_entretien:
+                normalized = normalize_weights(questions_entretien)
+                for i, question in enumerate(questions_entretien):
+                    eval_data = st.session_state.evaluation_data.get(f"entretien_q{i}", {"note": 3})
+                    score_entretien += eval_data["note"] * normalized[i]
+
+            # Score cognitif (moyenne pondérée si plusieurs questions)
+            score_cognitif = 0
+            questions_cognitif = template.get("questions_cognitif", [])
+            if questions_cognitif:
+                normalized_c = normalize_weights(questions_cognitif)
+                for i, _ in enumerate(questions_cognitif):
+                    eval_data = st.session_state.evaluation_data.get(f"cognitif_q{i}", {"note": 3})
+                    score_cognitif += eval_data["note"] * normalized_c[i]
+            else:
+                score_cognitif = 3
+
+            # Score échantillon (moyenne pondérée)
+            score_echantillon = 0
+            if taches_echantillon:
+                normalized_t = normalize_weights(taches_echantillon)
+                for i, tache in enumerate(taches_echantillon):
+                    eval_data = st.session_state.evaluation_data.get(f"echantillon_t{i}", {"note": 3})
+                    score_echantillon += eval_data["note"] * normalized_t[i]
+
+            # Score final pondéré: entretien 40%, cognitif 20%, échantillon 40%
+            score_final = (score_entretien * 0.4) + (score_cognitif * 0.2) + (score_echantillon * 0.4)
+
+            st.subheader(f"Score Final Pondéré : {score_final:.2f} / 5.0")
+            st.progress(score_final / 5)
+
+            # Avis du manager et du recruteur
+            col_manager, col_recruteur = st.columns(2)
+            with col_manager:
+                st.subheader("👔 Avis du Manager")
+                avis_manager = st.text_area("Commentaires du manager", height=100, key="avis_manager")
+                decision_manager = st.selectbox("Décision du manager",
+                                              ["", "À recruter", "À recruter (avec réserves)", "Ne pas recruter"],
+                                              key="decision_manager")
+
+            with col_recruteur:
+                st.subheader("🎯 Avis du Recruteur")
+                avis_recruteur = st.text_area("Commentaires du recruteur", height=100, key="avis_recruteur")
+                decision_recruteur = st.selectbox("Décision du recruteur",
+                                                ["", "À recruter", "À recruter (avec réserves)", "Ne pas recruter"],
+                                                key="decision_recruteur")
+
+            points_forts = st.text_area("Points forts observés", height=100, key="points_forts_final")
+            axes_amelioration = st.text_area("Axes d'amélioration potentiels", height=100, key="axes_amelioration_final")
+
+            if st.button("💾 Finaliser l'évaluation", type="primary"):
+                if nom_prenom and poste_candidat and decision_manager and decision_recruteur:
+                    file_path = 'evaluations_candidats.csv'
+                    df_existing = load_data(file_path)
+
+                    new_data = {
+                        'Date': [date_entretien.strftime("%Y-%m-%d")],
+                        'Nom et Prénom': [nom_prenom],
+                        'Poste': [poste_candidat],
+                        'Affectation': [affectation],
+                        'Test Utilisé': [st.session_state.get('current_test_template')],
+                        'Score Final': [round(score_final, 2)],
+                        'Score Entretien': [round(score_entretien, 2)],
+                        'Score Cognitif': [round(score_cognitif, 2)],
+                        'Score Échantillon': [round(score_echantillon, 2)],
+                        'Décision Manager': [decision_manager],
+                        'Décision Recruteur': [decision_recruteur],
+                        'Avis Manager': [avis_manager],
+                        'Avis Recruteur': [avis_recruteur],
+                        'Points Forts': [points_forts],
+                        'Axes Amélioration': [axes_amelioration]
+                    }
+                    df_new = pd.DataFrame(new_data)
+                    df_combined = pd.concat([df_existing, df_new], ignore_index=True)
+
+                    save_data(df_combined, file_path)
+                    st.success(f"Évaluation de {nom_prenom} finalisée et sauvegardée !")
+                    st.balloons()
+
+                    # Reset pour nouvelle évaluation
+                    st.session_state.evaluation_step = 0
+                    st.session_state.evaluation_data = {}
                 else:
-                    st.warning("Aucune question d'entretien configurée pour ce test.")
-
-            elif st.session_state.evaluation_step == 1:  # Test Cognitif
-                st.subheader("Test Cognitif")
-                questions_cognitif = template.get("questions_cognitif", [])
-                if questions_cognitif:
-                    for i, q in enumerate(questions_cognitif):
-                        st.markdown(f"**Question cognitive {i+1} :** {q.get('consigne','')}")
-                        col_q, col_s = st.columns([4,1])
-                        with col_q:
-                            reponse = st.text_area(f"Réponse {i+1}", height=120, key=f"reponse_cog_{i}")
-                        with col_s:
-                            note = st.slider(f"Éval (1-5)", 1,5,3, key=f"note_cog_{i}")
-                        st.session_state.evaluation_data[f"cognitif_q{i}"] = {"reponse": reponse, "note": note}
-                else:
-                    st.warning("Aucune question cognitive configurée pour ce test.")
-
-            elif st.session_state.evaluation_step == 2:  # Échantillon de Travail
-                st.subheader("Échantillon de Travail")
-                taches_echantillon = template.get("taches_echantillon", [])
-
-                if taches_echantillon:
-                    for i, tache in enumerate(taches_echantillon):
-                        st.markdown(f"**Tâche {i+1} :** {tache['texte']}")
-                        reponse_tache = st.text_area(f"Réponse du candidat à la tâche {i+1} :", height=100, key=f"reponse_tache_eval_{i}")
-                        note_tache = st.slider(f"Note Tâche {i+1}", 1, 5, 3, key=f"note_tache_eval_{i}")
-                        st.session_state.evaluation_data[f"echantillon_t{i}"] = {"reponse": reponse_tache, "note": note_tache}
-                else:
-                    st.warning("Aucune tâche d'échantillon configurée pour ce test.")
-
-            elif st.session_state.evaluation_step == 3:  # Synthèse & Décision
-                st.subheader("Synthèse et Décision Finale")
-
-                # Calcul des scores
-                questions_entretien = template.get("questions_entretien", [])
-                taches_echantillon = template.get("taches_echantillon", [])
-
-
-                # --- Normalisation des poids (échelle 1-5 en pourcentage) ---
-                def normalize_weights(items):
-                    # items is list of dicts with 'poids' keys
-                    poids = [it.get('poids', 3) for it in items]
-                    total = sum(poids) if sum(poids) > 0 else len(poids)
-                    return [p / total for p in poids]
-
-                # Score entretien (moyenne pondérée, les poids sont normalisés)
-                score_entretien = 0
-                if questions_entretien:
-                    normalized = normalize_weights(questions_entretien)
-                    for i, question in enumerate(questions_entretien):
-                        eval_data = st.session_state.evaluation_data.get(f"entretien_q{i}", {"note": 3})
-                        score_entretien += eval_data["note"] * normalized[i]
-
-                # Score cognitif (moyenne pondérée si plusieurs questions)
-                score_cognitif = 0
-                questions_cognitif = template.get("questions_cognitif", [])
-                if questions_cognitif:
-                    normalized_c = normalize_weights(questions_cognitif)
-                    for i, _ in enumerate(questions_cognitif):
-                        eval_data = st.session_state.evaluation_data.get(f"cognitif_q{i}", {"note": 3})
-                        score_cognitif += eval_data["note"] * normalized_c[i]
-                else:
-                    score_cognitif = 3
-
-                # Score échantillon (moyenne pondérée)
-                score_echantillon = 0
-                if taches_echantillon:
-                    normalized_t = normalize_weights(taches_echantillon)
-                    for i, tache in enumerate(taches_echantillon):
-                        eval_data = st.session_state.evaluation_data.get(f"echantillon_t{i}", {"note": 3})
-                        score_echantillon += eval_data["note"] * normalized_t[i]
-
-                # Score final pondéré: entretien 40%, cognitif 20%, échantillon 40%
-                score_final = (score_entretien * 0.4) + (score_cognitif * 0.2) + (score_echantillon * 0.4)
-
-                st.subheader(f"Score Final Pondéré : {score_final:.2f} / 5.0")
-                st.progress(score_final / 5)
-
-                # Avis du manager et du recruteur
-                col_manager, col_recruteur = st.columns(2)
-                with col_manager:
-                    st.subheader("👔 Avis du Manager")
-                    avis_manager = st.text_area("Commentaires du manager", height=100, key="avis_manager")
-                    decision_manager = st.selectbox("Décision du manager",
-                                                  ["", "À recruter", "À recruter (avec réserves)", "Ne pas recruter"],
-                                                  key="decision_manager")
-
-                with col_recruteur:
-                    st.subheader("🎯 Avis du Recruteur")
-                    avis_recruteur = st.text_area("Commentaires du recruteur", height=100, key="avis_recruteur")
-                    decision_recruteur = st.selectbox("Décision du recruteur",
-                                                    ["", "À recruter", "À recruter (avec réserves)", "Ne pas recruter"],
-                                                    key="decision_recruteur")
-
-                points_forts = st.text_area("Points forts observés", height=100, key="points_forts_final")
-                axes_amelioration = st.text_area("Axes d'amélioration potentiels", height=100, key="axes_amelioration_final")
-
-                if st.button("💾 Finaliser l'évaluation", type="primary"):
-                    if nom_prenom and poste_candidat and decision_manager and decision_recruteur:
-                        file_path = 'evaluations_candidats.csv'
-                        df_existing = load_data(file_path)
-
-                        new_data = {
-                            'Date': [date_entretien.strftime("%Y-%m-%d")],
-                            'Nom et Prénom': [nom_prenom],
-                            'Poste': [poste_candidat],
-                            'Affectation': [affectation],
-                            'Test Utilisé': [st.session_state.get('current_test_template')],
-                            'Score Final': [round(score_final, 2)],
-                            'Score Entretien': [round(score_entretien, 2)],
-                            'Score Cognitif': [round(score_cognitif, 2)],
-                            'Score Échantillon': [round(score_echantillon, 2)],
-                            'Décision Manager': [decision_manager],
-                            'Décision Recruteur': [decision_recruteur],
-                            'Avis Manager': [avis_manager],
-                            'Avis Recruteur': [avis_recruteur],
-                            'Points Forts': [points_forts],
-                            'Axes Amélioration': [axes_amelioration]
-                        }
-                        df_new = pd.DataFrame(new_data)
-                        df_combined = pd.concat([df_existing, df_new], ignore_index=True)
-
-                        save_data(df_combined, file_path)
-                        st.success(f"Évaluation de {nom_prenom} finalisée et sauvegardée !")
-                        st.balloons()
-
-                        # Reset pour nouvelle évaluation
-                        st.session_state.evaluation_step = 0
-                        st.session_state.evaluation_data = {}
-                    else:
-                        st.error("Veuillez renseigner toutes les informations obligatoires et les décisions.")
+                    st.error("Veuillez renseigner toutes les informations obligatoires et les décisions.")
     else:
         st.warning("Aucun test n'existe encore. Créez d'abord un test dans l'onglet Gestion.")
 
