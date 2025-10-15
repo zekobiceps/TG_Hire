@@ -1939,7 +1939,10 @@ def create_weekly_report_tab(df_recrutement=None):
                         
                         # Créer la colonne candidate_value avec la même logique que le mode contributeurs
                         if real_candidat_col and real_candidat_col in df_status.columns:
-                            df_status['candidate_value'] = df_status[real_candidat_col].fillna('').astype(str)
+                            # Supprimer la colonne existante pour éviter les doublons
+                            if real_candidat_col in df_status.columns:
+                                df_status = df_status.drop(columns=[real_candidat_col])
+                            df_status['candidate_value'] = df_debug.loc[df_status.index, real_candidat_col].fillna('').astype(str)
                         else:
                             df_status['candidate_value'] = ''
                         
@@ -2124,28 +2127,14 @@ def create_weekly_report_tab(df_recrutement=None):
     # CSS pour styliser les cartes (plus compactes pour afficher plus de cartes)
     st.markdown("""
     <style>
-    .kanban-card {
-        border-radius: 6px;
+    .kanban-card-mini {
+        border-radius: 4px;
         background-color: #f0f2f6;
-        padding: 6px 8px;
-        margin-bottom: 4px;
-        border-left: 3px solid #1f77b4;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        min-height: 50px;
-        width: 100%;
-    }
-    .kanban-card h4 {
-        margin-top: 0;
-        margin-bottom: 3px;
-        font-size: 0.75em;
-        color: #2c3e50;
-        line-height: 1.1;
-    }
-    .kanban-card p {
+        padding: 4px 6px;
         margin-bottom: 2px;
-        font-size: 0.65em;
-        color: #555;
-        line-height: 1.0;
+        border-left: 3px solid #1f77b4;
+        font-size: 0.7em;
+        color: #2c3e50;
     }
     .kanban-header {
         text-align: center;
@@ -2171,46 +2160,21 @@ def create_weekly_report_tab(df_recrutement=None):
             # En-tête de colonne avec le nombre de cartes
             st.markdown(f'<div class="kanban-header">{statut} ({nb_postes})</div>', unsafe_allow_html=True)
             
-            # Afficher les cartes avec 2 par ligne
-            for idx in range(0, len(postes_in_col), 2):
-                # Créer une ligne avec 2 cartes maximum
-                card_cols = st.columns(2)
+            # Afficher chaque carte avec un expander
+            for idx, poste in enumerate(postes_in_col):
+                titre = poste.get('titre', 'N/A')
+                entite = poste.get('entite', 'N/A')
                 
-                # Première carte de la ligne
-                if idx < len(postes_in_col):
-                    poste = postes_in_col[idx]
+                # Carte minimale cliquable
+                with st.expander(f"📋 {titre[:30]}{'...' if len(titre) > 30 else ''}", expanded=False):
+                    st.markdown(f"**Poste:** {titre}")
+                    st.markdown(f"**Entité:** {entite}")
+                    st.markdown(f"**Lieu:** {poste.get('lieu', 'N/A')}")
+                    st.markdown(f"**Demandeur:** {poste.get('demandeur', 'N/A')}")
+                    st.markdown(f"**Recruteur:** {poste.get('recruteur', 'N/A')}")
                     commentaire = poste.get('commentaire', '')
-                    commentaire_html = f"<p style='margin-top: 8px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
-                    with card_cols[0]:
-                        card_html = f"""
-                        <div class="kanban-card">
-                            <h4><b>{poste['titre']}</b></h4>
-                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')} | 👤 {poste.get('demandeur', 'N/A')}</p>
-                            <p>✍️ {poste.get('recruteur', 'N/A')}</p>
-                            {commentaire_html}
-                        </div>
-                        """
-                        st.markdown(card_html, unsafe_allow_html=True)
-                
-                # Deuxième carte de la ligne (si elle existe)
-                if idx + 1 < len(postes_in_col):
-                    poste = postes_in_col[idx + 1]
-                    commentaire = poste.get('commentaire', '')
-                    commentaire_html = f"<p style='margin-top: 8px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
-                    with card_cols[1]:
-                        card_html = f"""
-                        <div class="kanban-card">
-                            <h4><b>{poste['titre']}</b></h4>
-                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')} | 👤 {poste.get('demandeur', 'N/A')}</p>
-                            <p>✍️ {poste.get('recruteur', 'N/A')}</p>
-                            {commentaire_html}
-                        </div>
-                        """
-                        st.markdown(card_html, unsafe_allow_html=True)
-                else:
-                    # Colonne vide si nombre impair
-                    with card_cols[1]:
-                        st.empty()
+                    if commentaire and str(commentaire).strip():
+                        st.markdown(f"**� Commentaire:** *{commentaire}*")
 
 
 def main():
