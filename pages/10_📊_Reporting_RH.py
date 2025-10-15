@@ -1796,8 +1796,11 @@ def create_weekly_report_tab(df_recrutement=None):
                     today = datetime.now()
                 else:
                     today = rd if isinstance(rd, datetime) else datetime.combine(rd, datetime.min.time())
-                start_of_week = today - timedelta(days=today.weekday())
-                start_of_last_week = start_of_week - timedelta(days=7)
+                
+                # Re-create the same date ranges as in `calculate_weekly_metrics` for consistency
+                start_of_week = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
+                previous_monday = start_of_week - timedelta(days=7)
+                previous_friday_exclusive = (start_of_week - timedelta(days=3)) + timedelta(days=1) # Vendredi + 1 jour
 
                 if real_date_reception_col and real_date_reception_col in df_debug.columns:
                     df_debug[real_date_reception_col] = pd.to_datetime(df_debug[real_date_reception_col], errors='coerce')
@@ -1817,41 +1820,42 @@ def create_weekly_report_tab(df_recrutement=None):
                     s = ''.join(ch for ch in s if not unicodedata.combining(ch))
                     return s.lower().strip()
 
-                mask_last_week = pd.Series(False, index=df_debug.index)
-                mask_this_week = pd.Series(False, index=df_debug.index)
+                # Masks for contribution flags, aligned with `calculate_weekly_metrics`
+                mask_avant_semaine = pd.Series(False, index=df_debug.index)
+                mask_nouveaux_semaine = pd.Series(False, index=df_debug.index)
+                mask_pourvus_semaine = pd.Series(False, index=df_debug.index)
                 mask_status_en_cours = pd.Series(False, index=df_debug.index)
                 mask_has_name = pd.Series(False, index=df_debug.index)
-                mask_accept_this_week = pd.Series(False, index=df_debug.index)
-                mask_integration_this_week = pd.Series(False, index=df_debug.index)
-                mask_reception_le_today = pd.Series(True, index=df_debug.index)
+                closed_keywords = ['cloture', 'clôture', 'annule', 'annulé', 'depriorise', 'dépriorisé', 'desistement', 'désistement', 'annul', 'reject', 'rejett']
 
                 if real_date_reception_col and real_date_reception_col in df_debug.columns:
-                    mask_last_week = (df_debug[real_date_reception_col] >= start_of_last_week) & (df_debug[real_date_reception_col] < start_of_week)
-                    mask_this_week = (df_debug[real_date_reception_col] >= start_of_week) & (df_debug[real_date_reception_col] <= today)
-                    mask_reception_le_today = df_debug[real_date_reception_col].notna() & (df_debug[real_date_reception_col] <= today)
+                    # "Avant": reception date is before the start of the previous week
+                    mask_avant_semaine = df_debug[real_date_reception_col] < previous_monday
+                    # "Nouveaux": reception date is within the previous week (Mon-Fri)
+                    mask_nouveaux_semaine = (df_debug[real_date_reception_col] >= previous_monday) & (df_debug[real_date_reception_col] < previous_friday_exclusive)
 
                 if real_statut_col and real_statut_col in df_debug.columns:
                     mask_status_en_cours = df_debug[real_statut_col].fillna("").astype(str).apply(lambda s: ('en cours' in _local_norm(s)) or ('encours' in _local_norm(s)))
+                    mask_not_closed = ~df_debug[real_statut_col].fillna("").astype(str).apply(lambda s: any(k in _local_norm(s) for k in closed_keywords))
+                    mask_avant_semaine = mask_avant_semaine & mask_not_closed
+
 
                 if real_candidat_col and real_candidat_col in df_debug.columns:
                     mask_has_name = df_debug[real_candidat_col].notna() & (df_debug[real_candidat_col].astype(str).str.strip() != '')
 
                 if real_accept_col and real_accept_col in df_debug.columns:
-                    mask_accept_this_week = (df_debug[real_accept_col] >= start_of_week) & (df_debug[real_accept_col] <= today)
-
-                if real_date_integration_col and real_date_integration_col in df_debug.columns:
-                    mask_integration_this_week = (df_debug[real_date_integration_col] >= start_of_week) & (df_debug[real_date_integration_col] <= today)
-
-                contributes_avant = mask_last_week
-                contributes_nouveaux = mask_this_week
-                contributes_pourvus = (mask_has_name & mask_status_en_cours & mask_accept_this_week) | (mask_has_name & mask_status_en_cours & mask_integration_this_week)
+                    # "Pourvus": acceptance date is within the previous week (Mon-Fri)
+                    mask_pourvus_semaine = (df_debug[real_accept_col] >= previous_monday) & (df_debug[real_accept_col] < previous_friday_exclusive)
+                
+                contributes_avant = mask_avant_semaine
+                contributes_nouveaux = mask_nouveaux_semaine
+                contributes_pourvus = mask_pourvus_semaine & mask_has_name
                 # contrib_en_cours: statut 'En cours'
                 contributes_en_cours = mask_status_en_cours
 
                 # For the debug view we want the contributors to exactly reflect the
-                # 'Besoins en Cours' table: show only the rows that match the
-                # en_cours definition (statut 'En cours').
-                any_contrib = contributes_en_cours
+                # 'Besoins en Cours' table. We will show all rows that contribute to *any* of the KPIs.
+                any_contrib = contributes_avant | contributes_nouveaux | contributes_pourvus | contributes_en_cours
 
                 df_selected = df_debug[any_contrib].copy()
 
@@ -1903,10 +1907,10 @@ def create_weekly_report_tab(df_recrutement=None):
                     df_out['special_title_match'] = df_selected.apply(_matches_special_title, axis=1)
                 except Exception:
                     df_out['special_title_match'] = False
-                df_out['contrib_avant'] = contributes_avant.loc[df_out.index].astype(bool)
-                df_out['contrib_nouveaux'] = contributes_nouveaux.loc[df_out.index].astype(bool)
-                df_out['contrib_pourvus'] = contributes_pourvus.loc[df_out.index].astype(bool)
-                df_out['contrib_en_cours'] = contributes_en_cours.loc[df_out.index].astype(bool)
+                df_out['contrib_avant'] = contributes_avant.loc[df_out.index].astype('bool')
+                df_out['contrib_nouveaux'] = contributes_nouveaux.loc[df_out.index].astype('bool')
+                df_out['contrib_pourvus'] = contributes_pourvus.loc[df_out.index].astype('bool')
+                df_out['contrib_en_cours'] = contributes_en_cours.loc[df_out.index].astype('bool')
 
                 # Ensure the candidate value is present in a predictable column named 'candidate_value'
                 try:
