@@ -1979,7 +1979,7 @@ def create_weekly_report_tab(df_recrutement=None):
                         
                         # Renommer candidate_value pour l'affichage
                         if 'candidate_value' in available_show and real_candidat_col:
-                            df_status = df_status.rename(columns={'candidate_value': real_candidat_col})
+                            df_status = df_status.rename(columns={'candidate_value': real_candidat_col})  # type: ignore
                             available_show = [real_candidat_col if c == 'candidate_value' else c for c in available_show]
 
                         df_out_status = df_status[available_show].copy() if available_show else df_status.copy()
