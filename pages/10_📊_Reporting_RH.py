@@ -571,7 +571,7 @@ def render_plotly_scrollable(fig, max_height=500):
         components.html(wrapper, height=max_height, scrolling=True)
     except Exception:
         # Fallback to default renderer
-        st.plotly_chart(fig, width="stretch")
+        st.plotly_chart(fig, use_container_width=True)
 
 def create_recrutements_clotures_tab(df_recrutement, global_filters):
     """Onglet Recrutements Clôturés avec style carte"""
@@ -662,7 +662,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                         tickangle=45
                     )
                 )
-                st.plotly_chart(fig_evolution, width="stretch")
+                st.plotly_chart(fig_evolution, use_container_width=True)
     
     with col2:
         # Répartition par modalité de recrutement (CORRECTION: légende déplacée à l'extérieur)
@@ -690,7 +690,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 # Ajuster les marges pour faire de la place à la légende
                 margin=dict(l=20, r=150, t=50, b=20)
             )
-            st.plotly_chart(fig_modalite, width="stretch")
+            st.plotly_chart(fig_modalite, use_container_width=True)
 
     # Graphiques en ligne 2
     col3, col4 = st.columns(2)
@@ -811,7 +811,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                      'bar': {'color': "green"},
                     }))
         fig_candidats.update_layout(height=300)
-        st.plotly_chart(fig_candidats, width="stretch")
+        st.plotly_chart(fig_candidats, use_container_width=True)
 
     # ... KPI row now includes Délai moyen de recrutement (moved up)
 
@@ -886,7 +886,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             height=300,
             legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5)
         )
-        st.plotly_chart(fig_statut, width="stretch")
+        st.plotly_chart(fig_statut, use_container_width=True)
     
     with col2:
         # Comparaison par raison du recrutement
