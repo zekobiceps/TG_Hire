@@ -1501,48 +1501,22 @@ def calculate_weekly_metrics(df_recrutement):
         postes_en_cours = int(postes_en_cours_formula)
         postes_en_cours_status = 0
         if mask_status_en_cours is not None:
-            mask_has_name_local = None
-            if real_candidat_col and real_candidat_col in df_entite.columns:
-                mask_has_name_local = df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '')
-            # Exclure les lignes où un candidat a déjà accepté (promesse)
-            if mask_has_name_local is not None:
-                mask_sourcing = mask_status_en_cours & (~mask_has_name_local)
-            else:
-                mask_sourcing = mask_status_en_cours
+                mask_has_name_local = None
+                if real_candidat_col and real_candidat_col in df_entite.columns:
+                    mask_has_name_local = df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '')
 
-            try:
-                if real_date_reception_col and real_date_reception_col in df_entite.columns:
-                    mask_reception_le_today = df_entite[real_date_reception_col].notna() & (df_entite[real_date_reception_col] <= today)
-                    postes_en_cours_status = int(df_entite[ mask_sourcing & mask_reception_le_today ].shape[0])
+                # Règle stricte demandée : "Postes en cours" = statut 'En cours' ET sans candidat
+                if mask_has_name_local is not None:
+                    mask_sourcing = mask_status_en_cours & (~mask_has_name_local)
                 else:
-                    postes_en_cours_status = int(df_entite[ mask_sourcing ].shape[0])
-            except Exception:
-                postes_en_cours_status = int(df_entite[ mask_sourcing ].shape[0])
+                    mask_sourcing = mask_status_en_cours
 
-            # If a special title filter exists for this entity, apply it (requires Poste demandé column)
-            if real_poste_col and real_poste_col in df_entite.columns and entite in SPECIAL_TITLE_FILTERS:
-                # normalize titles for comparison
-                # Build token set from provided allowed titles (split words, remove short tokens)
-                tokens = set()
-                for t in SPECIAL_TITLE_FILTERS.get(entite, []):
-                    for part in re.split(r"[^\w]+", t):
-                        p = _norm(part)
-                        if p and len(p) > 2:
-                            tokens.add(p)
-                def _title_matches_tokens(title):
-                    ns = _norm(title)
-                    return any(tok in ns for tok in tokens)
-                mask_title = df_entite[real_poste_col].fillna('').astype(str).apply(lambda s: _title_matches_tokens(s))
-                try:
-                    if real_date_reception_col and real_date_reception_col in df_entite.columns:
-                        postes_en_cours_status = int(df_entite[ mask_sourcing & mask_reception_le_today & mask_title ].shape[0])
-                    else:
-                        postes_en_cours_status = int(df_entite[ mask_sourcing & mask_title ].shape[0])
-                except Exception:
-                    postes_en_cours_status = int(df_entite[ mask_sourcing & mask_title ].shape[0])
+                # Comptage simple et uniforme pour toutes les entités : ne pas appliquer
+                # de filtres additionnels (date de réception ou filtre d'intitulé).
+                postes_en_cours_status = int(df_entite[mask_sourcing].shape[0])
 
-            # Utiliser le comptage basé sur le statut 'En cours' et sans candidat accepté
-            postes_en_cours = int(postes_en_cours_status)
+                # Utiliser ce comptage comme valeur principale 'en_cours'
+                postes_en_cours = int(postes_en_cours_status)
 
         metrics_by_entity[entite] = {
             'avant': postes_avant,
