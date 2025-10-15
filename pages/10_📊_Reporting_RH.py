@@ -1034,6 +1034,7 @@ def create_integrations_tab(df_recrutement, global_filters):
     # Filtrer les données : Statut "En cours" ET candidat ayant accepté (nom présent)
     candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
     date_integration_col = "Date d'entrée prévisionnelle"
+    plan_integration_col = "Plan d'intégration à préparer"
     
     # Diagnostic des données disponibles
     total_en_cours = len(df_recrutement[df_recrutement['Statut de la demande'] == 'En cours'])
@@ -1073,9 +1074,12 @@ def create_integrations_tab(df_recrutement, global_filters):
     with col1:
         st.metric("👥 Intégrations en cours", len(df_filtered))
     with col2:
-        # Intégrations avec date prévue
-        avec_date = len(df_filtered[df_filtered[date_integration_col].notna()])
-        st.metric("📅 Avec date prévue", avec_date)
+        # Plans d'intégration à préparer
+        if plan_integration_col in df_filtered.columns:
+            a_preparer = len(df_filtered[df_filtered[plan_integration_col].astype(str).str.lower() == 'oui'])
+            st.metric("� Plan d'intégration à préparer", a_preparer)
+        else:
+            st.metric("📋 Plan d'intégration à préparer", "N/A")
     with col3:
         # Intégrations en retard (date prévue passée)
         if date_integration_col in df_filtered.columns:
@@ -1137,7 +1141,8 @@ def create_integrations_tab(df_recrutement, global_filters):
         'Entité demandeuse',
         'Direction concernée',
         'Affectation',
-        date_integration_col
+        date_integration_col,
+        plan_integration_col
     ]
     # Filtrer les colonnes qui existent
     colonnes_disponibles = [col for col in colonnes_affichage if col in df_filtered.columns]
@@ -1172,7 +1177,7 @@ def create_integrations_tab(df_recrutement, global_filters):
         df_display = df_display.reset_index(drop=True)
         
         # Afficher sans index (hide_index=True)
-        st.dataframe(df_display, width="stretch", hide_index=True)
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
     else:
         st.warning("Colonnes d'affichage non disponibles")
 
