@@ -1703,7 +1703,7 @@ def create_weekly_report_tab(df_recrutement=None):
         html_table += '<th>Nb postes ouverts avant début semaine</th>'
         html_table += '<th>Nb nouveaux postes ouverts cette semaine</th>'
         html_table += '<th>Nb postes pourvus cette semaine</th>'
-        html_table += '<th>Nb postes en cours cette semaine</th>'
+        html_table += '<th>Nb postes en cours cette semaine (sourcing)</th>'
         html_table += '</tr></thead>'
         html_table += '<tbody>'
 
@@ -1715,7 +1715,7 @@ def create_weekly_report_tab(df_recrutement=None):
             html_table += f'<td>{row["Nb postes ouverts avant début semaine"]}</td>'
             html_table += f'<td>{row["Nb nouveaux postes ouverts cette semaine"]}</td>'
             html_table += f'<td>{row["Nb postes pourvus cette semaine"]}</td>'
-            html_table += f'<td>{row["Nb postes en cours cette semaine"]}</td>'
+            html_table += f'<td>{row["Nb postes en cours cette semaine (sourcing)"]}</td>'
             html_table += '</tr>'
 
         # Ligne TOTAL (la dernière)
@@ -1725,7 +1725,7 @@ def create_weekly_report_tab(df_recrutement=None):
         html_table += f'<td>{total_row["Nb postes ouverts avant début semaine"].replace("**", "")}</td>'
         html_table += f'<td>{total_row["Nb nouveaux postes ouverts cette semaine"].replace("**", "")}</td>'
         html_table += f'<td>{total_row["Nb postes pourvus cette semaine"].replace("**", "")}</td>'
-        html_table += f'<td>{total_row["Nb postes en cours cette semaine"].replace("**", "")}</td>'
+        html_table += f'<td>{total_row["Nb postes en cours cette semaine (sourcing)"].replace("**", "")}</td>'
         html_table += '</tr>'
         html_table += '</tbody></table></div>'
 
