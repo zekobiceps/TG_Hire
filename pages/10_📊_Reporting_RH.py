@@ -1903,10 +1903,10 @@ def create_weekly_report_tab(df_recrutement=None):
                     df_out['special_title_match'] = df_selected.apply(_matches_special_title, axis=1)
                 except Exception:
                     df_out['special_title_match'] = False
-                df_out['contrib_avant'] = contributes_avant.loc[df_out.index]
-                df_out['contrib_nouveaux'] = contributes_nouveaux.loc[df_out.index]
-                df_out['contrib_pourvus'] = contributes_pourvus.loc[df_out.index]
-                df_out['contrib_en_cours'] = contributes_en_cours.loc[df_out.index]
+                df_out['contrib_avant'] = contributes_avant.loc[df_out.index].astype(bool)
+                df_out['contrib_nouveaux'] = contributes_nouveaux.loc[df_out.index].astype(bool)
+                df_out['contrib_pourvus'] = contributes_pourvus.loc[df_out.index].astype(bool)
+                df_out['contrib_en_cours'] = contributes_en_cours.loc[df_out.index].astype(bool)
 
                 # Ensure the candidate value is present in a predictable column named 'candidate_value'
                 try:
@@ -1974,26 +1974,26 @@ def create_weekly_report_tab(df_recrutement=None):
                         st.warning("Colonne de statut introuvable — impossible de lister les lignes 'En cours'.")
                 else:
                     st.info(f"Lignes contribuant au KPI 'Postes en cours' : {len(df_out)} lignes")
-                    # expose original DataFrame index to help trace rows between exports/UI
+                    # Colonnes à afficher dans le dataframe final
+                    display_cols_final = [
+                        '_orig_index', 'contrib_avant', 'contrib_nouveaux', 'contrib_pourvus', 'contrib_en_cours'
+                    ]
+                    # Ajouter les colonnes de base si elles existent
+                    if real_entite_col in df_out.columns: display_cols_final.insert(1, real_entite_col)
+                    if real_statut_col in df_out.columns: display_cols_final.insert(2, real_statut_col)
+                    if real_candidat_col in df_out.columns: display_cols_final.insert(3, real_candidat_col)
+                    
                     df_out_display = df_out.reset_index().rename(columns={'index': '_orig_index'})
-                    # ensure candidate_value is the 4th column (index 3) in the display
-                    if 'candidate_value' not in df_out_display.columns:
-                        df_out_display['candidate_value'] = ''
-                    # reorder to put candidate_value at position 3 if there are enough cols
-                    cols_order = list(df_out_display.columns)
-                    if 'candidate_value' in cols_order:
-                        cols_order = [c for c in cols_order if c != 'candidate_value']
-                        insert_at = 3 if len(cols_order) >= 3 else len(cols_order)
-                        cols_order.insert(insert_at, 'candidate_value')
-                        df_out_display = df_out_display[cols_order]
-                    # also show a raw representation of the candidate column (if any) to detect invisible chars
-                    if real_candidat_col and real_candidat_col in df_out.columns:
-                        try:
-                            df_out_display['candidate_raw'] = df_out[real_candidat_col].apply(lambda x: repr(x))
-                        except Exception:
-                            # fallback silently if repr fails for any value
-                            df_out_display['candidate_raw'] = ''
-                    st.dataframe(df_out_display, use_container_width=True)
+                    
+                    # S'assurer que toutes les colonnes de contribution sont booléennes
+                    for col in ['contrib_avant', 'contrib_nouveaux', 'contrib_pourvus', 'contrib_en_cours']:
+                        if col in df_out_display.columns:
+                            df_out_display[col] = df_out_display[col].astype(bool)
+
+                    # Filtrer pour n'afficher que les colonnes désirées
+                    existing_display_cols = [c for c in display_cols_final if c in df_out_display.columns]
+                    
+                    st.dataframe(df_out_display[existing_display_cols], use_container_width=True)
             else:
                 st.info('Aucune donnée pour le debug.')
         except Exception as e:

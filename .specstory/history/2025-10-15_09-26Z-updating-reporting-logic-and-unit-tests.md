@@ -7916,7 +7916,7 @@ Next, I will adjust the logic for the "Contributeurs 'Postes en cours'" view to 
 
 ---
 
-_**User (2025-10-15 14:09Z)**_
+_**User (2025-10-15 14:11Z)**_
 
 @agent Try Again
 
@@ -7924,7 +7924,57 @@ _**User (2025-10-15 14:09Z)**_
 
 _**Assistant (copilot/gemini-2.5-pro)**_
 
+Okay, I understand the issues. It seems there are two problems:
 
+1.  When you check "Afficher les lignes avec candidat renseigné", the table is showing the requester's name (`Nom prénom du demandeur`) instead of the candidate's name (`Nom Prénom candidat...`).
+2.  The "Contributeurs 'Postes en cours'" display mode is not showing all the rows you expect. It seems to be hiding rows that have a candidate name, but you want to see both.
+
+I will address both of these issues.
+
+First, I'll correct the logic for displaying the candidate's name in the debug section. Then, I'll adjust the filter for the "Contributeurs 'Postes en cours'" view to ensure it includes all relevant rows, regardless of whether a candidate is assigned. Okay, I understand the issues. Here is my plan to address them:
+
+1.  **Fix the incorrect column display**: I will modify the logic in the "Debug - Détails des lignes" section. When "Afficher aussi les lignes avec candidat renseigné" is checked, I will ensure the column `Nom Prénom du candidat retenu...` is displayed instead of `Nom Prénom du demandeur`.
+2.  **Correct the "Postes en cours" filter**: I will adjust the filter for the "Contributeurs 'Postes en cours'" display mode. It currently excludes rows with a candidate name. I will change it to include all rows with the status 'En cours', regardless of whether a candidate is listed, to match the expected total of 80 rows.
+3.  **Update Weekly Metrics**: I will update the `calculate_weekly_metrics` function to correctly count the total number of rows with the status 'En cours' for the summary table, ensuring the data is consistent across the application.
+
+I will start with the first point. 
+```
+
+```
+J'ai bien compris vos demandes. Voici les corrections que je vais apporter :
+
+1.  **Affichage du nom du candidat :** Je vais corriger la section de débogage pour que, lorsque vous cochez "Afficher aussi les lignes avec candidat renseigné", la colonne affichée soit bien "Nom Prénom candidat yant accépté la promesse d'embauche" et non plus "Nom prénom du demandeur".
+
+2.  **Logique des "Postes en cours" :** Je vais modifier la logique de filtrage. Le mode d'affichage "Contributeurs 'Postes en cours'" montrera désormais **toutes** les lignes ayant le statut "En cours", qu'un candidat soit renseigné ou non. Cela devrait correspondre aux 80 lignes que vous attendez. La métrique principale "Postes en cours (sourcing)" continuera de ne compter que les postes sans candidat pour rester cohérente.
+
+Je commence les modifications. I have made the following corrections based on your feedback:
+
+1.  **Affichage du Nom du Candidat :** In the debug section, when you check "Afficher aussi les lignes avec candidat renseigné," the table will now correctly display the column `"Nom Prénom du candidat retenu yant accepté la promesse d'embauche"` instead of the requester's name.
+
+2.  **Logique du Filtre 'Postes en cours' :**
+    *   The "Contributeurs 'Postes en cours'" view now correctly shows **all** items with the status 'En cours', regardless of whether a candidate name is present or not. This should resolve the issue of seeing only 66 lines instead of the expected 80.
+    *   The main KPI for `"Nb postes en cours cette semaine (sourcing)"` still correctly counts only the posts with status 'En cours' AND no candidate name, as per the original strict definition. However, the total count in the debug view is now more inclusive as requested.
+
+I have committed and pushed these changes. Please refresh the application and verify the behavior.
+
+---
+
+_**User (2025-10-15 14:19Z)**_
+
+ca marche je les vois maintenant, le soucis c'est que les cases à cocher dans les colonnes : contrib_avant, contrib_nouveaux,contrib_pourvus
+Enlève les clononnes : candidate_raw,special_title_match,candiadate_value
+
+---
+
+_**Assistant (copilot/gemini-2.5-pro)**_
+
+Of course. I will make those adjustments to the debug table.
+
+Here is the plan:
+1.  I will modify the code to render the boolean values in the `contrib_avant`, `contrib_nouveaux`, and `contrib_pourvus` columns as interactive checkboxes.
+2.  I will remove the `candidate_raw`, `special_title_match`, and `candidate_value` columns from the final display to simplify the view.
+
+I will now apply these changes. 
 
 ---
 
