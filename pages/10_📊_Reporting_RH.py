@@ -1584,11 +1584,14 @@ def create_weekly_report_tab(df_recrutement=None):
     total_nouveaux = sum(m.get('nouveaux', 0) for m in metrics_included.values())
     total_pourvus = sum(m.get('pourvus', 0) for m in metrics_included.values())
     total_en_cours = sum(m.get('en_cours', 0) for m in metrics_included.values())
+    # total lines with statut 'En cours' (may include those with candidate)
+    total_en_cours_status = sum(m.get('en_cours_status_count', 0) for m in metrics_included.values())
 
     # KPI cards (simple)
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Postes en cours cette semaine", total_en_cours)
+        st.metric("Postes en cours (sourcing)", total_en_cours)
+        st.caption(f"Total lignes statut 'En cours' (incl. candidats) : {total_en_cours_status}")
         st.caption("Définition: statut = 'En cours' ET pas de candidat accepté (colonne Nom Prénom vide)")
     with col2:
         st.metric("Postes pourvus cette semaine", total_pourvus)
@@ -1610,7 +1613,8 @@ def create_weekly_report_tab(df_recrutement=None):
                 'Nb postes ouverts avant début semaine': data['avant'] if data['avant'] > 0 else '-',
                 'Nb nouveaux postes ouverts cette semaine': data['nouveaux'] if data['nouveaux'] > 0 else '-',
                 'Nb postes pourvus cette semaine': data['pourvus'] if data['pourvus'] > 0 else '-',
-                'Nb postes en cours cette semaine': data['en_cours'] if data['en_cours'] > 0 else '-'
+                "Nb postes statut 'En cours' (total)": data.get('en_cours_status_count', 0) if data.get('en_cours_status_count', 0) > 0 else '-',
+                'Nb postes en cours cette semaine (sourcing)': data['en_cours'] if data['en_cours'] > 0 else '-'
             })
 
         # Ajouter la ligne de total
@@ -1619,7 +1623,8 @@ def create_weekly_report_tab(df_recrutement=None):
             'Nb postes ouverts avant début semaine': f'**{total_avant}**',
             'Nb nouveaux postes ouverts cette semaine': f'**{total_nouveaux}**',
             'Nb postes pourvus cette semaine': f'**{total_pourvus}**',
-            'Nb postes en cours cette semaine': f'**{total_en_cours}**'
+            "Nb postes statut 'En cours' (total)": f'**{total_en_cours_status}**',
+            'Nb postes en cours cette semaine (sourcing)': f'**{total_en_cours}**'
         })
 
         # HTML + CSS (repris de la version précédente)
