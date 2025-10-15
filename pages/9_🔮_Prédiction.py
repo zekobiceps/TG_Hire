@@ -550,15 +550,17 @@ with tab1:
             sample_data['Date d\'entrée effective du candidat'] = pd.NaT
             
             for idx in sample_data.index:
-                if sample_data.loc[idx, 'Statut de la demande'] == "Clôture":
-                    demand_date = sample_data.loc[idx, 'Date de réception de la demande aprés validation de la DRH']
+                statut = sample_data.at[idx, 'Statut de la demande']
+                if pd.notna(statut) and str(statut).strip() == "Clôture":
+                    demand_date = sample_data.at[idx, 'Date de réception de la demande aprés validation de la DRH']
                     # Délai d'entrée entre 30 et 120 jours
                     entry_delay = np.random.randint(30, 120)
                     entry_date = demand_date + pd.Timedelta(days=entry_delay)
                     
                     # Ne pas dépasser la date actuelle
-                    if entry_date <= pd.Timestamp.now():
-                        sample_data.loc[idx, 'Date d\'entrée effective du candidat'] = entry_date
+                    current_time = pd.Timestamp.now()
+                    if pd.notna(entry_date) and isinstance(entry_date, pd.Timestamp) and entry_date <= current_time:
+                        sample_data.at[idx, 'Date d\'entrée effective du candidat'] = entry_date
             
             st.session_state.data = sample_data
             st.success("✅ Données d'exemple générées avec succès!")
@@ -611,10 +613,15 @@ with tab1:
                         if 'date' in col.lower()]
             if date_cols:
                 try:
-                    dates = pd.to_datetime(st.session_state.data[date_cols[0]], errors='coerce')
-                    min_date = dates.min().strftime('%m/%Y')
-                    max_date = dates.max().strftime('%m/%Y')
-                    st.metric("📅 Période", f"{min_date} - {max_date}")
+                    dates_values = pd.to_datetime(st.session_state.data[date_cols[0]], errors='coerce')
+                    # Convertir en Series si ce n'est pas déjà le cas
+                    if not isinstance(dates_values, pd.Series):
+                        dates_values = pd.Series([dates_values])
+                    valid_dates = dates_values.dropna()
+                    if len(valid_dates) > 0:
+                        min_date = str(valid_dates.min())[:7]  # Format YYYY-MM
+                        max_date = str(valid_dates.max())[:7]  # Format YYYY-MM
+                        st.metric("📅 Période", f"{min_date} - {max_date}")
                 except:
                     pass
         
@@ -746,7 +753,7 @@ with tab2:
                     # Filtrage par période
                     if date_col and start_date and end_date:
                         df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
-                        df.dropna(subset=[date_col], inplace=True) # Important: drop rows that failed conversion
+                        df = df[df[date_col].notna()]  # Important: drop rows that failed conversion
                         mask = (df[date_col].dt.date >= start_date) & (df[date_col].dt.date <= end_date)
                         df = df[mask]
                         st.info(f"📅 Filtrage temporel appliqué: {start_date} à {end_date}")
@@ -913,7 +920,10 @@ with tab3:
                 
                 # Top 10 + Autres
                 top_10 = poste_counts.head(10)
-                others_count = poste_counts.iloc[10:].sum() if len(poste_counts) > 10 else 0
+                if len(poste_counts) > 10:
+                    others_count = poste_counts[10:].sum()
+                else:
+                    others_count = 0
                 
                 if others_count > 0:
                     top_10_with_others = pd.concat([top_10, pd.Series({'Autres': others_count})])
@@ -1102,7 +1112,8 @@ with tab4:
                         st.stop()
 
                     last_date = time_series['date'].max()
-                    future_predictions = final_forecast[final_forecast['ds'] > last_date].copy()
+                    if final_forecast is not None:
+                        future_predictions = final_forecast[final_forecast['ds'] > last_date].copy()
 
                     if future_predictions.empty:
                         st.warning("⚠️ Aucune prédiction future générée. Vérifiez la configuration du modèle.")
