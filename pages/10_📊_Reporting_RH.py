@@ -1,42 +1,19 @@
-try:
-    import streamlit as st
-except Exception:
-    st = None
-try:
-    import pandas as pd
-except Exception:
-    pd = None
-try:
-    import plotly.express as px
-    import plotly.graph_objects as go
-    from plotly.subplots import make_subplots
-except Exception:
-    px = None
-    go = None
-    make_subplots = None
-try:
-    import numpy as np
-except Exception:
-    np = None
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import numpy as np
 from datetime import datetime, timedelta
 import warnings
 import os
 warnings.filterwarnings('ignore')
 import re
-try:
-    import streamlit.components.v1 as components
-except Exception:
-    components = None
+import streamlit.components.v1 as components
 from io import BytesIO
 import json
-try:
-    import gspread
-except Exception:
-    gspread = None
-try:
-    from google.oauth2 import service_account
-except Exception:
-    service_account = None
+import gspread
+from google.oauth2 import service_account
 
 st.set_page_config(
     page_title="📊 Reporting RH Complet",
