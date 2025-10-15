@@ -2037,7 +2037,16 @@ def main():
 
     with st.sidebar:
         st.subheader("🔧 Filtres - Hebdomadaire")
-        rd = st.date_input("Date de reporting (hebdomadaire)", value=st.session_state['reporting_date'], help="Date utilisée comme référence pour le reporting hebdomadaire", key='reporting_date')
+        # Do not pass both `value` and `key` for the same widget to avoid Streamlit's
+        # warning: the widget was created with a default value but also had its
+        # value set via the Session State API. Passing `key='reporting_date'`
+        # is enough for Streamlit to initialize the widget from
+        # `st.session_state['reporting_date']`. Avoid providing `value=` here.
+        rd = st.date_input(
+            "Date de reporting (hebdomadaire)",
+            help="Date utilisée comme référence pour le reporting hebdomadaire",
+            key='reporting_date'
+        )
     
     # Créer les onglets (Demandes et Recrutement regroupés)
     tabs = st.tabs(["📂 Upload", "🗂️ Demandes & Recrutement", "📅 Hebdomadaire", "🤝 Intégrations"])
