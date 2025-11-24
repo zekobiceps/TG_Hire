@@ -332,7 +332,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
     with col6:
         # Délai moyen de recrutement
         date_reception_col = 'Date de réception de la demande aprés validation de la DRH'
-        date_reponse_col = 'Date de la 1er réponse du demandeur à l\'équipe RH'
+        date_reponse_col = 'Date du 1er retour equipe RH  au demandeur'
         
         if date_reception_col in df_filtered.columns and date_reponse_col in df_filtered.columns:
             df_filtered['Duree de recrutement'] = (df_filtered[date_reponse_col] - df_filtered[date_reception_col]).dt.days
