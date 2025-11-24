@@ -329,12 +329,21 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         fig_candidats.update_layout(height=300)
         st.plotly_chart(fig_candidats, use_container_width=True)
 
-    with col6:
+        with col6:
         # Délai moyen de recrutement
         date_reception_col = 'Date de réception de la demande aprés validation de la DRH'
-        date_reponse_col = 'Date de la 1er réponse du demandeur à l\'équipe RH'
+        
+        # --- MODIFICATION ICI ---
+        # On remplace l'ancienne colonne par celle que vous avez demandée
+        date_reponse_col = 'Date du 1er retour equipe RH  au demandeur' 
+        # ------------------------
         
         if date_reception_col in df_filtered.columns and date_reponse_col in df_filtered.columns:
+            # Convertir en datetime si ce n'est pas déjà fait
+            df_filtered[date_reception_col] = pd.to_datetime(df_filtered[date_reception_col], errors='coerce')
+            df_filtered[date_reponse_col] = pd.to_datetime(df_filtered[date_reponse_col], errors='coerce')
+            
+            # Calcul de la différence
             df_filtered['Duree de recrutement'] = (df_filtered[date_reponse_col] - df_filtered[date_reception_col]).dt.days
             delai_moyen = df_filtered['Duree de recrutement'].mean()
 
@@ -342,12 +351,12 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 fig_delai = go.Figure(go.Indicator(
                     mode = "number",
                     value = delai_moyen,
-                    title = {"text": "Délai moyen de recrutement (jours)"}
+                    title = {"text": "Délai moyen de réponse RH (jours)"} 
                 ))
                 fig_delai.update_layout(height=300)
                 st.plotly_chart(fig_delai, use_container_width=True)
             else:
-                st.info("Le calcul du délai moyen de recrutement n'est pas disponible.")
+                st.info("Le calcul du délai moyen n'est pas disponible (données de dates manquantes).")
         else:
             st.warning("Colonnes de date nécessaires pour le calcul du délai non trouvées.")
 
