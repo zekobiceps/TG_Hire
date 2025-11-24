@@ -8,10 +8,6 @@ from datetime import datetime, timedelta
 import warnings
 import os
 warnings.filterwarnings('ignore')
-import re
-from io import BytesIO
-import json
-import gspread
 
 st.set_page_config(
     page_title="📊 Reporting RH Complet",
@@ -53,43 +49,11 @@ postes_data = [
 ]
 
 
-def create_global_filters(df_recrutement, prefix=""):
-    """Créer des filtres globaux réutilisables pour tous les onglets"""
-    if df_recrutement is None or len(df_recrutement) == 0:
-        return {}
-
-    # Organiser les filtres dans deux colonnes dans la sidebar
-    filters = {}
-    left_col, right_col = st.sidebar.columns(2)
-
-    # Filtre par entité demandeuse (colonne gauche)
-    entites = ['Toutes'] + sorted(df_recrutement['Entité demandeuse'].dropna().unique())
-    with left_col:
-        filters['entite'] = st.selectbox("Entité demandeuse", entites, key=f"{prefix}_entite")
-
-    # Filtre par direction concernée (colonne droite)
-    directions = ['Toutes'] + sorted(df_recrutement['Direction concernée'].dropna().unique())
-    with right_col:
-        filters['direction'] = st.selectbox("Direction concernée", directions, key=f"{prefix}_direction")
-
-    return filters
-
-def apply_global_filters(df, filters):
-    """Appliquer les filtres globaux aux données"""
-    df_filtered = df.copy()
-    
-    if filters.get('entite') != 'Toutes':
-        df_filtered = df_filtered[df_filtered['Entité demandeuse'] == filters['entite']]
-    
-    if filters.get('direction') != 'Toutes':
-        df_filtered = df_filtered[df_filtered['Direction concernée'] == filters['direction']]
-    return df_filtered
-
-
 def load_data_from_files(csv_file=None, excel_file=None):
     """Charger et préparer les données depuis les fichiers uploadés ou locaux"""
     df_integration = None
     df_recrutement = None
+    
     try:
         # Charger le CSV (données d'intégration)
         if csv_file is not None:
@@ -99,25 +63,19 @@ def load_data_from_files(csv_file=None, excel_file=None):
             local_csv = '2025-10-09T20-31_export.csv'
             if os.path.exists(local_csv):
                 df_integration = pd.read_csv(local_csv)
-
+        
         if df_integration is not None and 'Date Intégration' in df_integration.columns:
             df_integration['Date Intégration'] = pd.to_datetime(df_integration['Date Intégration'])
-
+        
         # Charger l'Excel (données de recrutement)
-        # Si une synchronisation Google Sheets a été réalisée, utiliser ce DataFrame
-        try:
-            if 'synced_recrutement_df' in st.session_state and st.session_state.synced_recrutement_df is not None:
-                df_recrutement = st.session_state.synced_recrutement_df.copy()
-            elif excel_file is not None:
-                df_recrutement = pd.read_excel(excel_file, sheet_name=0)
-            else:
-                # Fallback vers fichier local s'il existe
-                local_excel = 'Recrutement global PBI All  google sheet (5).xlsx'
-                if os.path.exists(local_excel):
-                    df_recrutement = pd.read_excel(local_excel, sheet_name=0)
-        except Exception as e:
-            st.error(f"Erreur lors du chargement des données de recrutement: {e}")
-
+        if excel_file is not None:
+            df_recrutement = pd.read_excel(excel_file, sheet_name=0)
+        else:
+            # Fallback vers fichier local s'il existe
+            local_excel = 'Recrutement global PBI All  google sheet (5).xlsx'
+            if os.path.exists(local_excel):
+                df_recrutement = pd.read_excel(local_excel, sheet_name=0)
+        
         if df_recrutement is not None:
             # Nettoyer et préparer les données de recrutement
             # Convertir les dates
@@ -189,8 +147,9 @@ def create_affectation_chart(df):
     
     return fig
 
-def create_recrutements_clotures_tab(df_recrutement, global_filters):
-    """Onglet Recrutements Clôturés avec style carte"""
+def create_recrutements_clotures_tab(df_recrutement):
+    """Onglet Recrutements Clôturés (Image 1)"""
+    st.header("🎯 Recrutement")
     
     # Filtrer seulement les recrutements clôturés
     df_cloture = df_recrutement[df_recrutement['Statut de la demande'] == 'Clôture'].copy()
@@ -199,26 +158,36 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         st.warning("Aucune donnée de recrutement clôturé disponible")
         return
     
-    # Filtre par période (spécifique à cette section)
+    # Sidebar pour les filtres spécifiques
+    st.sidebar.subheader("🔧 Filtres - Recrutements")
+    
+    # Filtre par période
     if 'Date d\'entrée effective du candidat' in df_cloture.columns:
         df_cloture['Année'] = df_cloture['Date d\'entrée effective du candidat'].dt.year
         annees_dispo = sorted([y for y in df_cloture['Année'].dropna().unique() if not pd.isna(y)])
         if annees_dispo:
-            col_left, col_right = st.sidebar.columns(2)
-            with col_left:
-                annee_select = st.selectbox("Période de recrutement", ['Toutes'] + [int(a) for a in annees_dispo], index=len(annees_dispo), key="rec_annee")
-            with col_right:
-                # placeholder pour filtre additionnel de période
-                st.markdown("<div style='padding-top:6px; color:#666; font-size:0.9em'></div>", unsafe_allow_html=True)
+            annee_select = st.sidebar.selectbox("Période de recrutement", ['Toutes'] + [int(a) for a in annees_dispo], index=len(annees_dispo))
         else:
             annee_select = 'Toutes'
     else:
         annee_select = 'Toutes'
+    
+    # Filtre par entité
+    entites = ['Toutes'] + sorted(df_cloture['Entité demandeuse'].dropna().unique())
+    entite_select = st.sidebar.selectbox("Entité demandeuse", entites, key="rec_entite")
+    
+    # Filtre par direction
+    directions = ['Toutes'] + sorted(df_cloture['Direction concernée'].dropna().unique())
+    direction_select = st.sidebar.selectbox("Direction concernée", directions, key="rec_direction")
 
-    # Appliquer les filtres globaux + période
-    df_filtered = apply_global_filters(df_cloture, global_filters)
+    # Appliquer les filtres
+    df_filtered = df_cloture.copy()
     if annee_select != 'Toutes':
         df_filtered = df_filtered[df_filtered['Année'] == annee_select]
+    if entite_select != 'Toutes':
+        df_filtered = df_filtered[df_filtered['Entité demandeuse'] == entite_select]
+    if direction_select != 'Toutes':
+        df_filtered = df_filtered[df_filtered['Direction concernée'] == direction_select]
 
     # KPIs principaux
     col1, col2, col3 = st.columns(3)
@@ -252,30 +221,19 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             st.plotly_chart(fig_evolution, use_container_width=True)
     
     with col2:
-        # Répartition par modalité de recrutement (CORRECTION: légende déplacée à l'extérieur)
+        # Répartition par modalité de recrutement
         if 'Modalité de recrutement' in df_filtered.columns:
             modalite_data = df_filtered['Modalité de recrutement'].value_counts()
             
             fig_modalite = go.Figure(data=[go.Pie(
                 labels=modalite_data.index, 
                 values=modalite_data.values,
-                hole=.5,
-                textposition='inside',
-                textinfo='percent'
+                hole=.5
             )])
             fig_modalite.update_layout(
                 title="Répartition par Modalité de recrutement",
                 height=300,
-                # Légende positionnée à droite pour éviter le chevauchement
-                legend=dict(
-                    orientation="v", 
-                    yanchor="middle", 
-                    y=0.5, 
-                    xanchor="left", 
-                    x=1.05
-                ),
-                # Ajuster les marges pour faire de la place à la légende
-                margin=dict(l=20, r=150, t=50, b=20)
+                legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5)
             )
             st.plotly_chart(fig_modalite, use_container_width=True)
 
@@ -329,21 +287,12 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         fig_candidats.update_layout(height=300)
         st.plotly_chart(fig_candidats, use_container_width=True)
 
-        with col6:
+    with col6:
         # Délai moyen de recrutement
         date_reception_col = 'Date de réception de la demande aprés validation de la DRH'
-        
-        # --- MODIFICATION ICI ---
-        # On remplace l'ancienne colonne par celle que vous avez demandée
-        date_reponse_col = 'Date du 1er retour equipe RH  au demandeur' 
-        # ------------------------
+        date_reponse_col = 'Date de la 1er réponse du demandeur à l\'équipe RH'
         
         if date_reception_col in df_filtered.columns and date_reponse_col in df_filtered.columns:
-            # Convertir en datetime si ce n'est pas déjà fait
-            df_filtered[date_reception_col] = pd.to_datetime(df_filtered[date_reception_col], errors='coerce')
-            df_filtered[date_reponse_col] = pd.to_datetime(df_filtered[date_reponse_col], errors='coerce')
-            
-            # Calcul de la différence
             df_filtered['Duree de recrutement'] = (df_filtered[date_reponse_col] - df_filtered[date_reception_col]).dt.days
             delai_moyen = df_filtered['Duree de recrutement'].mean()
 
@@ -351,38 +300,37 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 fig_delai = go.Figure(go.Indicator(
                     mode = "number",
                     value = delai_moyen,
-                    title = {"text": "Délai moyen de réponse RH (jours)"} 
+                    title = {"text": "Délai moyen de recrutement (jours)"}
                 ))
                 fig_delai.update_layout(height=300)
                 st.plotly_chart(fig_delai, use_container_width=True)
             else:
-                st.info("Le calcul du délai moyen n'est pas disponible (données de dates manquantes).")
+                st.info("Le calcul du délai moyen de recrutement n'est pas disponible.")
         else:
             st.warning("Colonnes de date nécessaires pour le calcul du délai non trouvées.")
 
 
-def create_demandes_recrutement_tab(df_recrutement, global_filters):
-    """Onglet Demandes de Recrutement avec style carte"""
+def create_demandes_recrutement_tab(df_recrutement):
+    """Onglet Demandes de Recrutement (Image 2)"""
+    st.header("📋 Demandes")
     
-    # Filtre par période de demande (spécifique à cette section)
+    # Sidebar pour les filtres
+    st.sidebar.subheader("🔧 Filtres - Demandes")
+    
+    # Filtre par période de demande
     date_col = 'Date de réception de la demande aprés validation de la DRH'
     if date_col in df_recrutement.columns:
         df_recrutement['Année_demande'] = df_recrutement[date_col].dt.year
         annees_demande = sorted([y for y in df_recrutement['Année_demande'].dropna().unique() if not pd.isna(y)])
         if annees_demande:
-            col_left, col_right = st.sidebar.columns(2)
-            with col_left:
-                annee_demande_select = st.selectbox("Période de la demande", ['Toutes'] + [int(a) for a in annees_demande], index=len(annees_demande), key="dem_annee")
-            with col_right:
-                # placeholder pour un filtre complémentaire (ex: trimestre)
-                st.markdown("<div style='padding-top:6px; color:#666; font-size:0.9em'></div>", unsafe_allow_html=True)
+            annee_demande_select = st.sidebar.selectbox("Période de la demande", ['Toutes'] + [int(a) for a in annees_demande], index=len(annees_demande))
         else:
             annee_demande_select = 'Toutes'
     else:
         annee_demande_select = 'Toutes'
     
-    # Appliquer les filtres globaux + période
-    df_filtered = apply_global_filters(df_recrutement, global_filters)
+    # Appliquer le filtre
+    df_filtered = df_recrutement.copy()
     if annee_demande_select != 'Toutes':
         df_filtered = df_filtered[df_filtered['Année_demande'] == annee_demande_select]
     
@@ -469,688 +417,82 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         fig_poste.update_layout(height=400, xaxis_title=None, yaxis_title=None, yaxis={'categoryorder':'total ascending'})
         st.plotly_chart(fig_poste, use_container_width=True)
 
-def create_integrations_tab(df_recrutement, global_filters):
-    """Onglet Intégrations basé sur les bonnes données"""
-    st.header("📊 Intégrations")
-    
-    # Filtrer les données : Statut "En cours" ET candidat ayant accepté (nom présent)
-    candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
-    date_integration_col = "Date d'entrée prévisionnelle"
-    
-    # Critères : Statut "En cours" ET candidat avec nom
-    df_integrations = df_recrutement[
-        (df_recrutement['Statut de la demande'] == 'En cours') &
-        (df_recrutement[candidat_col].notna()) &
-        (df_recrutement[candidat_col].str.strip() != "")
-    ].copy()
-    
-    if len(df_integrations) == 0:
-        st.warning("Aucune intégration en cours trouvée")
-        return
-    
-    # Appliquer les filtres globaux
-    df_filtered = apply_global_filters(df_integrations, global_filters)
-    
-    # KPIs d'intégration
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("👥 Intégrations en cours", len(df_filtered))
-    with col2:
-        # Intégrations avec date prévue
-        avec_date = len(df_filtered[df_filtered[date_integration_col].notna()])
-        st.metric("📅 Avec date prévue", avec_date)
-    with col3:
-        # Intégrations en retard (date prévue passée)
-        if date_integration_col in df_filtered.columns:
-            df_filtered[date_integration_col] = pd.to_datetime(df_filtered[date_integration_col], errors='coerce')
-            today = datetime.now()
-            en_retard = len(df_filtered[(df_filtered[date_integration_col].notna()) & 
-                                      (df_filtered[date_integration_col] < today)])
-            st.metric("⚠️ En retard", en_retard)
-        else:
-            st.metric("⚠️ En retard", "N/A")
-    
-    # Graphiques
-    col1, col2 = st.columns(2)
-
-    # Graphique par affectation supprimé sur demande. On laisse une zone d'information minimale.
-    with col1:
-        st.info("Graphique 'Répartition par Affectation' désactivé.")
-
-    with col2:
-        # Évolution des dates d'intégration prévues
-        if date_integration_col in df_filtered.columns:
-            df_filtered['Mois_Integration'] = df_filtered[date_integration_col].dt.to_period('M')
-            monthly_integration = df_filtered.groupby('Mois_Integration').size().reset_index(name='Count')
-            monthly_integration['Mois_str'] = monthly_integration['Mois_Integration'].astype(str)
-            
-            fig_evolution_int = px.bar(
-                monthly_integration, 
-                x='Mois_str', 
-                y='Count',
-                title="📈 Évolution des Intégrations Prévues",
-                text='Count'
-            )
-            fig_evolution_int.update_traces(marker_color='#2ca02c', textposition='outside')
-            fig_evolution_int.update_layout(height=400, xaxis_title="Mois", yaxis_title="Nombre")
-            st.plotly_chart(fig_evolution_int, use_container_width=True)
-    
-    # Tableau détaillé des intégrations
-    st.subheader("📋 Détail des Intégrations en Cours")
-    colonnes_affichage = [
-        candidat_col, 
-        'Poste demandé ',
-        'Entité demandeuse',
-        'Direction concernée',
-        'Affectation',
-        date_integration_col
-    ]
-    # Filtrer les colonnes qui existent
-    colonnes_disponibles = [col for col in colonnes_affichage if col in df_filtered.columns]
-    
-    if colonnes_disponibles:
-        df_display = df_filtered[colonnes_disponibles].copy()
-        
-        # Formater la date pour enlever l'heure
-        if date_integration_col in df_display.columns:
-            df_display[date_integration_col] = pd.to_datetime(df_display[date_integration_col], errors='coerce').dt.strftime('%d/%m/%Y')
-            df_display[date_integration_col] = df_display[date_integration_col].fillna('N/A')
-        
-        # Renommer pour affichage plus propre
-        df_display = df_display.rename(columns={
-            candidat_col: "Candidat",
-            'Poste demandé ': "Poste",
-            date_integration_col: "Date d'Intégration Prévue"
-        })
-        
-        # Réinitialiser l'index pour enlever les numéros de ligne
-        df_display = df_display.reset_index(drop=True)
-        
-        # Afficher sans index (hide_index=True)
-        st.dataframe(df_display, use_container_width=True, hide_index=True)
-    else:
-        st.warning("Colonnes d'affichage non disponibles")
-
-
-def create_demandes_recrutement_combined_tab(df_recrutement):
-    """Onglet combiné Demandes et Recrutement avec cartes expandables comme Home.py"""
-    st.header("📊 Demandes & Recrutement")
-    
-    # CSS pour les cartes style Home.py
-    st.markdown("""
-    <style>
-    .report-card {
-        border-radius: 8px;
-        background-color: #f8f9fa;
-        padding: 15px;
-        margin-bottom: 15px;
-        border-left: 4px solid #007bff;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    .report-card h4 {
-        margin-top: 0;
-        margin-bottom: 10px;
-        color: #2c3e50;
-        font-size: 1.1em;
-    }
-    .report-card p {
-        margin-bottom: 8px;
-        font-size: 0.9em;
-        color: #5a6c7d;
-    }
-    .report-card .status-badge {
-        display: inline-block;
-        padding: 4px 8px;
-        border-radius: 12px;
-        font-size: 0.8em;
-        font-weight: bold;
-        color: white;
-        background-color: #007bff;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    # Créer les filtres globaux une seule fois
-    st.sidebar.subheader("🔧 Filtres Globaux")
-    global_filters = create_global_filters(df_recrutement, "combined")
-    
-    # Créer deux cartes expandables principales (comme dans Home.py)
-    with st.expander("📋 **DEMANDES DE RECRUTEMENT**", expanded=False):
-        create_demandes_recrutement_tab(df_recrutement, global_filters)
-    
-    with st.expander("🎯 **RECRUTEMENTS CLÔTURÉS**", expanded=False):
-        create_recrutements_clotures_tab(df_recrutement, global_filters)
-
-
-def calculate_weekly_metrics(df_recrutement):
-    """Calcule les métriques hebdomadaires basées sur les vraies données"""
-    if df_recrutement is None or len(df_recrutement) == 0:
-        return {}
-    
-    # Obtenir la date actuelle et la semaine dernière
-    today = datetime.now()
-    start_of_week = today - timedelta(days=today.weekday())  # Lundi de cette semaine
-    start_of_last_week = start_of_week - timedelta(days=7)   # Lundi de la semaine dernière
-    
-    # Définir les colonnes attendues avec des alternatives possibles
-    date_reception_col = "Date de réception de la demande après validation de la DRH"
-    date_integration_col = "Date d'intégration prévisionnelle"
-    candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
-    statut_col = "Statut de la demande"
-    entite_col = "Entité demandeuse"
-    
-    # Créer une copie pour les calculs
-    df = df_recrutement.copy()
-    
-    # Vérifier les colonnes disponibles
-    available_columns = df.columns.tolist()
-    
-    # Chercher les colonnes similaires si les noms exacts n'existent pas
-    def find_similar_column(target_col, available_cols):
-        """Trouve une colonne similaire dans la liste disponible"""
-        target_lower = target_col.lower()
-        for col in available_cols:
-            if col.lower() == target_lower:
-                return col
-        # Chercher des mots-clés
-        if "date" in target_lower and "réception" in target_lower:
-            for col in available_cols:
-                if "date" in col.lower() and ("réception" in col.lower() or "reception" in col.lower() or "demande" in col.lower()):
-                    return col
-        elif "date" in target_lower and "intégration" in target_lower:
-            for col in available_cols:
-                if "date" in col.lower() and ("intégration" in col.lower() or "integration" in col.lower() or "entrée" in col.lower()):
-                    return col
-        elif "candidat" in target_lower and "retenu" in target_lower:
-            for col in available_cols:
-                if ("candidat" in col.lower() and "retenu" in col.lower()) or ("nom" in col.lower() and "prénom" in col.lower()):
-                    return col
-        elif "statut" in target_lower:
-            for col in available_cols:
-                if "statut" in col.lower() or "status" in col.lower():
-                    return col
-        elif "entité" in target_lower:
-            for col in available_cols:
-                if "entité" in col.lower() or "entite" in col.lower():
-                    return col
-        return None
-    
-    # Trouver les colonnes réelles
-    real_date_reception_col = find_similar_column(date_reception_col, available_columns)
-    real_date_integration_col = find_similar_column(date_integration_col, available_columns)
-    real_candidat_col = find_similar_column(candidat_col, available_columns)
-    real_statut_col = find_similar_column(statut_col, available_columns)
-    real_entite_col = find_similar_column(entite_col, available_columns)
-    
-    # Si les colonnes essentielles n'existent pas, retourner vide
-    if not real_entite_col:
-        st.warning(f"⚠️ Colonne 'Entité' non trouvée. Colonnes disponibles: {', '.join(available_columns[:5])}...")
-        return {}
-    
-    if not real_statut_col:
-        st.warning(f"⚠️ Colonne 'Statut' non trouvée. Colonnes disponibles: {', '.join(available_columns[:5])}...")
-        return {}
-    
-    # Convertir les dates si les colonnes existent
-    if real_date_reception_col:
-        df[real_date_reception_col] = pd.to_datetime(df[real_date_reception_col], errors='coerce')
-    if real_date_integration_col:
-        df[real_date_integration_col] = pd.to_datetime(df[real_date_integration_col], errors='coerce')
-    
-    # Calculer les métriques par entité
-    entites = df[real_entite_col].dropna().unique()
-    metrics_by_entity = {}
-    
-    for entite in entites:
-        df_entite = df[df[real_entite_col] == entite]
-        
-        # 1. Postes ouverts avant début semaine (En cours la semaine dernière)
-        postes_avant = 0
-        if real_date_reception_col:
-            postes_avant = len(df_entite[
-                (df_entite[real_statut_col] == 'En cours') &
-                (df_entite[real_date_reception_col] < start_of_week)
-            ])
-        
-        # 2. Nouveaux postes ouverts cette semaine (Date réception cette semaine)
-        nouveaux_postes = 0
-        if real_date_reception_col:
-            nouveaux_postes = len(df_entite[
-                (df_entite[real_date_reception_col] >= start_of_week) &
-                (df_entite[real_date_reception_col] <= today)
-            ])
-        
-        # 3. Postes pourvus cette semaine (Date intégration cette semaine)
-        postes_pourvus = 0
-        if real_date_integration_col:
-            postes_pourvus = len(df_entite[
-                (df_entite[real_date_integration_col] >= start_of_week) &
-                (df_entite[real_date_integration_col] <= today)
-            ])
-        
-        # 4. Postes en cours cette semaine (Statut "En cours" ET pas de candidat retenu)
-        postes_en_cours = len(df_entite[df_entite[real_statut_col] == 'En cours'])
-        if real_candidat_col:
-            postes_en_cours = len(df_entite[
-                (df_entite[real_statut_col] == 'En cours') &
-                (df_entite[real_candidat_col].isna() | (df_entite[real_candidat_col].astype(str).str.strip() == ""))
-            ])
-        
-        metrics_by_entity[entite] = {
-            'avant': postes_avant,
-            'nouveaux': nouveaux_postes, 
-            'pourvus': postes_pourvus,
-            'en_cours': postes_en_cours
-        }
-    
-    return metrics_by_entity
-
-def create_weekly_report_tab(df_recrutement=None):
+def create_weekly_report_tab():
     """Onglet Reporting Hebdomadaire"""
     st.header("📅 Reporting Hebdomadaire")
-
-    # Calculer les métriques si les données sont disponibles
-    if df_recrutement is not None:
-        try:
-            metrics = calculate_weekly_metrics(df_recrutement)
-            total_avant = sum(m['avant'] for m in metrics.values())
-            total_nouveaux = sum(m['nouveaux'] for m in metrics.values())
-            total_pourvus = sum(m['pourvus'] for m in metrics.values())
-            total_en_cours = sum(m['en_cours'] for m in metrics.values())
-        except Exception as e:
-            st.error(f"⚠️ Erreur lors du calcul des métriques: {str(e)}")
-            metrics = {}
-            total_avant = total_nouveaux = total_pourvus = total_en_cours = 0
-    else:
-        metrics = {}
-        total_avant = total_nouveaux = total_pourvus = total_en_cours = 0
 
     # 1. Section "Chiffres Clés"
     st.subheader("Chiffres Clés de la semaine")
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Postes en cours cette semaine", total_en_cours)
-    col2.metric("Postes pourvus cette semaine", total_pourvus)
-    col3.metric("Nouveaux postes ouverts", total_nouveaux)
-    col4.metric("Total postes ouverts avant la semaine", total_avant)
+    col1.metric("Postes en cours cette semaine", "14", delta="2")
+    col2.metric("Postes pourvus cette semaine", "5")
+    col3.metric("Nouveaux postes ouverts", "2")
+    col4.metric("Total postes ouverts avant la semaine", "18")
 
     st.markdown("---")
 
-    # 2. Tableau des besoins en cours par entité (AVANT le Kanban)
-    st.subheader("📊 Besoins en Cours par Entité")
-    
-    # Créer le tableau avec des colonnes Streamlit natives
-    if metrics and len(metrics) > 0:
-        # Préparer les données pour le DataFrame
-        table_data = []
-        for entite, data in metrics.items():
-            table_data.append({
-                'Entité': entite,
-                'Nb postes ouverts avant début semaine': data['avant'] if data['avant'] > 0 else '-',
-                'Nb nouveaux postes ouverts cette semaine': data['nouveaux'] if data['nouveaux'] > 0 else '-',
-                'Nb postes pourvus cette semaine': data['pourvus'] if data['pourvus'] > 0 else '-',
-                'Nb postes en cours cette semaine': data['en_cours'] if data['en_cours'] > 0 else '-'
-            })
-        
-        # Ajouter la ligne de total
-        table_data.append({
-            'Entité': '**Total**',
-            'Nb postes ouverts avant début semaine': f'**{total_avant}**',
-            'Nb nouveaux postes ouverts cette semaine': f'**{total_nouveaux}**',
-            'Nb postes pourvus cette semaine': f'**{total_pourvus}**',
-            'Nb postes en cours cette semaine': f'**{total_en_cours}**'
-        })
-        
-        # Créer le tableau HTML personnalisé compact et centralisé
-        st.markdown("""
-        <style>
-        .table-container {
-            display: flex;
-            justify-content: center;
-            width: 100%;
-            margin: 15px 0;
-        }
-        .custom-table {
-            border-collapse: collapse;
-            font-family: Arial, sans-serif;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-            max-width: 900px;
-            margin: 0 auto;
-        }
-        .custom-table th {
-            background-color: #DC143C !important; /* Rouge vif */
-            color: white !important;
-            font-weight: bold !important;
-            text-align: center !important;
-            padding: 8px 6px !important;
-            border: 1px solid white !important;
-            font-size: 0.8em;
-            line-height: 1.2;
-        }
-        .custom-table td {
-            text-align: center !important;
-            padding: 6px 4px !important;
-            border: 1px solid #ddd !important;
-            background-color: white !important;
-            font-size: 0.75em;
-            line-height: 1.1;
-        }
-        .custom-table .entity-cell {
-            text-align: left !important;
-            padding-left: 10px !important;
-            font-weight: 500;
-            min-width: 120px;
-        }
-        .custom-table .total-row {
-            background-color: #DC143C !important; /* Rouge vif */
-            color: white !important;
-            font-weight: bold !important;
-            border-top: 2px solid #DC143C !important;
-        }
-        .custom-table .total-row .entity-cell {
-            text-align: left !important;
-            padding-left: 10px !important;
-            font-weight: bold !important;
-        }
-        .custom-table .total-row td {
-            background-color: #DC143C !important; /* Assurer le fond rouge sur chaque cellule */
-            color: white !important; /* Assurer le texte blanc */
-            font-size: 0.8em !important;
-            font-weight: bold !important;
-            border: 1px solid #DC143C !important; /* Bordures rouges */
-        }
-        .custom-table .total-row .entity-cell {
-            text-align: left !important;
-            padding-left: 10px !important;
-            font-weight: bold !important;
-            background-color: #DC143C !important; /* Fond rouge pour la cellule entité */
-            color: white !important; /* Texte blanc pour la cellule entité */
-        }
-        </style>
-        """, unsafe_allow_html=True)
-        
-        # Construire le tableau HTML compact et centralisé
-        html_table = '<div class="table-container">'
-        html_table += '<table class="custom-table">'
-        html_table += '<thead><tr>'
-        html_table += '<th>Entité</th>'
-        html_table += '<th>Nb postes ouverts avant début semaine</th>'
-        html_table += '<th>Nb nouveaux postes ouverts cette semaine</th>'
-        html_table += '<th>Nb postes pourvus cette semaine</th>'
-        html_table += '<th>Nb postes en cours cette semaine</th>'
-        html_table += '</tr></thead>'
-        html_table += '<tbody>'
-        
-        # Ajouter les lignes de données (filtrer les entités vides)
-        data_rows = [row for row in table_data[:-1] if row["Entité"] and row["Entité"].strip()]
-        for row in data_rows:
-            html_table += '<tr>'
-            html_table += f'<td class="entity-cell">{row["Entité"]}</td>'
-            html_table += f'<td>{row["Nb postes ouverts avant début semaine"]}</td>'
-            html_table += f'<td>{row["Nb nouveaux postes ouverts cette semaine"]}</td>'
-            html_table += f'<td>{row["Nb postes pourvus cette semaine"]}</td>'
-            html_table += f'<td>{row["Nb postes en cours cette semaine"]}</td>'
-            html_table += '</tr>'
-        
-        # Ajouter la ligne TOTAL dédiée (dernière ligne pour les totaux de chaque colonne)
-        total_row = table_data[-1]
-        html_table += '<tr class="total-row">'
-        html_table += f'<td class="entity-cell">TOTAL</td>'
-        html_table += f'<td>{total_row["Nb postes ouverts avant début semaine"].replace("**", "")}</td>'
-        html_table += f'<td>{total_row["Nb nouveaux postes ouverts cette semaine"].replace("**", "")}</td>'
-        html_table += f'<td>{total_row["Nb postes pourvus cette semaine"].replace("**", "")}</td>'
-        html_table += f'<td>{total_row["Nb postes en cours cette semaine"].replace("**", "")}</td>'
-        html_table += '</tr>'
-        html_table += '</tbody></table></div>'
-        
-        # Afficher le tableau HTML centralisé
-        st.markdown(html_table, unsafe_allow_html=True)
-    else:
-        # Tableau par défaut compact centralisé avec le même style
-        st.markdown("""
-        <style>
-        .table-container {
-            display: flex;
-            justify-content: center;
-            width: 100%;
-            margin: 15px 0;
-        }
-        .custom-table {
-            border-collapse: collapse;
-            font-family: Arial, sans-serif;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-            max-width: 900px;
-            margin: 0 auto;
-        }
-        .custom-table th {
-            background-color: #DC143C !important; /* Rouge vif */
-            color: white !important;
-            font-weight: bold !important;
-            text-align: center !important;
-            padding: 8px 6px !important;
-            border: 1px solid white !important;
-            font-size: 0.8em;
-            line-height: 1.2;
-        }
-        .custom-table td {
-            text-align: center !important;
-            padding: 6px 4px !important;
-            border: 1px solid #ddd !important;
-            background-color: white !important;
-            font-size: 0.75em;
-            line-height: 1.1;
-        }
-        .custom-table .entity-cell {
-            text-align: left !important;
-            padding-left: 10px !important;
-            font-weight: 500;
-            min-width: 120px;
-        }
-        .custom-table .total-row {
-            background-color: #DC143C !important; /* Rouge vif */
-            color: white !important;
-            font-weight: bold !important;
-            border-top: 2px solid #DC143C !important;
-        }
-        .custom-table .total-row .entity-cell {
-            text-align: left !important;
-            padding-left: 10px !important;
-            font-weight: bold !important;
-        }
-        .custom-table .total-row td {
-            background-color: #DC143C !important; /* Assurer le fond rouge sur chaque cellule */
-            color: white !important; /* Assurer le texte blanc */
-            font-size: 0.8em !important;
-            font-weight: bold !important;
-            border: 1px solid #DC143C !important; /* Bordures rouges */
-        }
-        .custom-table .total-row .entity-cell {
-            text-align: left !important;
-            padding-left: 10px !important;
-            font-weight: bold !important;
-            background-color: #DC143C !important; /* Fond rouge pour la cellule entité */
-            color: white !important; /* Texte blanc pour la cellule entité */
-        }
-        </style>
-        """, unsafe_allow_html=True)
-        
-        # Tableau par défaut HTML compact et centralisé
-        default_html = """
-        <div class="table-container">
-            <table class="custom-table">
-                <thead>
-                    <tr>
-                        <th>Entité</th>
-                        <th>Nb postes ouverts avant début semaine</th>
-                        <th>Nb nouveaux postes ouverts cette semaine</th>
-                        <th>Nb postes pourvus cette semaine</th>
-                        <th>Nb postes en cours cette semaine</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td class="entity-cell">TGCC</td>
-                        <td>19</td>
-                        <td>12</td>
-                        <td>5</td>
-                        <td>26</td>
-                    </tr>
-                    <tr>
-                        <td class="entity-cell">TGEM</td>
-                        <td>2</td>
-                        <td>2</td>
-                        <td>0</td>
-                        <td>4</td>
-                    </tr>
-                    <tr class="total-row">
-                        <td class="entity-cell">TOTAL</td>
-                        <td>21</td>
-                        <td>14</td>
-                        <td>5</td>
-                        <td>30</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        """
-        st.markdown(default_html, unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    # 3. Section "Pipeline de Recrutement (Kanban)"
+    # 2. Section "Pipeline de Recrutement (Kanban)"
     st.subheader("Pipeline de Recrutement (Kanban)")
 
-    # Définir les données d'exemple pour le Kanban (ou utiliser les vraies données si disponibles)
-    postes_data = [
-        {"statut": "Sourcing", "titre": "Ingénieur Achat", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.BOUZOUBAA", "recruteur": "Zakaria"},
-        {"statut": "Sourcing", "titre": "Directeur Achats Adjoint", "entite": "TGCC", "lieu": "Siège", "demandeur": "C.BENABDELLAH", "recruteur": "Zakaria"},
-        {"statut": "Sourcing", "titre": "INGENIEUR TRAVAUX", "entite": "TGCC", "lieu": "YAMED LOT B", "demandeur": "M.TAZI", "recruteur": "Zakaria"},
-        
-        {"statut": "Shortlisté", "titre": "CHEF DE PROJETS", "entite": "TGCC", "lieu": "DESSALEMENT JORF", "demandeur": "M.FENNAN", "recruteur": "ZAKARIA"},
-        {"statut": "Shortlisté", "titre": "Planificateur", "entite": "TGCC", "lieu": "ASFI-B", "demandeur": "SOUFIANI", "recruteur": "Ghita"},
-        {"statut": "Shortlisté", "titre": "RESPONSABLE TRANS INTERCH", "entite": "TG PREFA", "lieu": "OUED SALEH", "demandeur": "FBOUZOUBAA", "recruteur": "Ghita"},
-        
-        {"statut": "Signature DRH", "titre": "PROJETEUR DESSINATEUR", "entite": "TG WOOD", "lieu": "OUED SALEH", "demandeur": "S.MENJRA", "recruteur": "Zakaria"},
-        {"statut": "Signature DRH", "titre": "Projeteur", "entite": "TGCC", "lieu": "TSP Safi", "demandeur": "B.MORABET", "recruteur": "Zakaria"},
-        {"statut": "Signature DRH", "titre": "Consultant SAP", "entite": "TGCC", "lieu": "Siège", "demandeur": "O.KETTA", "recruteur": "Zakaria"},
-        
-        {"statut": "Clôture", "titre": "Doc Controller", "entite": "TGEM", "lieu": "SIEGE", "demandeur": "A.SANKARI", "recruteur": "Zakaria"},
-        {"statut": "Clôture", "titre": "Ingénieur étude/qualité", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.MOUTANABI", "recruteur": "Zakaria"},
-        {"statut": "Clôture", "titre": "Responsable Cybersecurité", "entite": "TGCC", "lieu": "Siège", "demandeur": "Ghazi", "recruteur": "Zakaria"},
-        {"statut": "Clôture", "titre": "CHEF DE CHANTIER", "entite": "TGCC", "lieu": "N/A", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},
-        {"statut": "Clôture", "titre": "Ing contrôle de la performance", "entite": "TGCC", "lieu": "Siège", "demandeur": "H.BARIGOU", "recruteur": "Ghita"},
-        {"statut": "Clôture", "titre": "Ingénieur Systèmes Réseaux", "entite": "TGCC", "lieu": "Siège", "demandeur": "M.JADDOR", "recruteur": "Ghita"},
-        {"statut": "Clôture", "titre": "Responsable étude de prix", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "S.Bennani Zitani", "recruteur": "Ghita"},
-        {"statut": "Clôture", "titre": "Responsable Travaux", "entite": "TGEM", "lieu": "Zone Rabat", "demandeur": "S.ACHIR", "recruteur": "Zakaria"},
-        
-        {"statut": "Désistement", "titre": "Conducteur de Travaux", "entite": "TGCC", "lieu": "JORF LASFAR", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},
-        {"statut": "Désistement", "titre": "Chef de Chantier", "entite": "TGCC", "lieu": "TOARC", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},
-        {"statut": "Désistement", "titre": "Magasinier", "entite": "TG WOOD", "lieu": "Oulad Saleh", "demandeur": "K.TAZI", "recruteur": "Ghita"},
-    ]
-    
     # Définir les colonnes du Kanban
     statuts_kanban = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
-    
-    # Créer les colonnes Streamlit
     cols = st.columns(len(statuts_kanban))
-    
-    # CSS pour styliser les cartes (2 par ligne)
+
+    # CSS pour styliser les cartes
     st.markdown("""
     <style>
     .kanban-card {
-        border-radius: 8px;
+        border-radius: 5px;
         background-color: #f0f2f6;
         padding: 10px;
-        margin-bottom: 8px;
-        border-left: 4px solid #1f77b4;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        min-height: 80px;
-        width: 100%;
+        margin-bottom: 10px;
+        border-left: 5px solid #1f77b4;
     }
     .kanban-card h4 {
         margin-top: 0;
-        margin-bottom: 6px;
-        font-size: 0.9em;
-        color: #2c3e50;
-        line-height: 1.2;
+        margin-bottom: 5px;
+        font-size: 1em;
     }
     .kanban-card p {
-        margin-bottom: 3px;
-        font-size: 0.75em;
-        color: #555;
-        line-height: 1.1;
-    }
-    .kanban-header {
-        text-align: center;
-        font-weight: bold;
-        font-size: 1.1em;
-        color: #2c3e50;
-        padding: 10px;
-        background-color: #e8f4fd;
-        border-radius: 8px;
-        margin-bottom: 15px;
-        border: 1px solid #bee5eb;
+        margin-bottom: 2px;
+        font-size: 0.9em;
     }
     </style>
     """, unsafe_allow_html=True)
-    
-    # Remplir chaque colonne avec les postes correspondants
+
     for i, statut in enumerate(statuts_kanban):
         with cols[i]:
-            # En-tête de colonne
-            st.markdown(f'<div class="kanban-header">{statut}</div>', unsafe_allow_html=True)
-            
-            # Filtrer les postes pour cette colonne
+            st.markdown(f"<h5>{statut}</h5>", unsafe_allow_html=True)
+            # Filtrer les postes pour la colonne actuelle
             postes_in_col = [p for p in postes_data if p["statut"] == statut]
-            
-            # Afficher les cartes avec 2 par ligne
-            for idx in range(0, len(postes_in_col), 2):
-                # Créer une ligne avec 2 cartes maximum
-                card_cols = st.columns(2)
-                
-                # Première carte de la ligne
-                if idx < len(postes_in_col):
-                    poste = postes_in_col[idx]
-                    with card_cols[0]:
-                        card_html = f"""
-                        <div class="kanban-card">
-                            <h4><b>{poste['titre']}</b></h4>
-                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')} | 👤 {poste.get('demandeur', 'N/A')}</p>
-                            <p>✍️ {poste.get('recruteur', 'N/A')}</p>
-                        </div>
-                        """
-                        st.markdown(card_html, unsafe_allow_html=True)
-                
-                # Deuxième carte de la ligne (si elle existe)
-                if idx + 1 < len(postes_in_col):
-                    poste = postes_in_col[idx + 1]
-                    with card_cols[1]:
-                        card_html = f"""
-                        <div class="kanban-card">
-                            <h4><b>{poste['titre']}</b></h4>
-                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')} | 👤 {poste.get('demandeur', 'N/A')}</p>
-                            <p>✍️ {poste.get('recruteur', 'N/A')}</p>
-                        </div>
-                        """
-                        st.markdown(card_html, unsafe_allow_html=True)
-                else:
-                    # Colonne vide si nombre impair
-                    with card_cols[1]:
-                        st.empty()
+            for poste in postes_in_col:
+                card_html = f"""
+                <div class="kanban-card">
+                    <h4><b>{poste['titre']}</b></h4>
+                    <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
+                    <p>👤 {poste.get('demandeur', 'N/A')}</p>
+                    <p>✍️ {poste.get('recruteur', 'N/A')}</p>
+                </div>
+                """
+                st.markdown(card_html, unsafe_allow_html=True)
 
 
 def main():
     st.title("📊 Tableau de Bord RH - Style Power BI")
     st.markdown("---")
     
-    # Créer les onglets (Demandes et Recrutement regroupés)
-    tabs = st.tabs(["📂 Upload", "� Demandes & Recrutement", "📅 Hebdomadaire", "� Intégrations"])
+    # Créer les onglets
+    tabs = st.tabs(["📂 Upload", "📋 Demandes", "🎯 Recrutement", "📅 Hebdomadaire", "📊 Intégrations"])
     
     # Variables pour stocker les fichiers uploadés
     # Use session_state to persist upload/refresh state
     if 'data_updated' not in st.session_state:
         st.session_state.data_updated = False
+    if 'uploaded_csv' not in st.session_state:
+        st.session_state.uploaded_csv = None
     if 'uploaded_excel' not in st.session_state:
         st.session_state.uploaded_excel = None
+    uploaded_csv = st.session_state.uploaded_csv
     uploaded_excel = st.session_state.uploaded_excel
     
     with tabs[0]:
@@ -1158,62 +500,31 @@ def main():
         st.markdown("Uploadez vos fichiers pour mettre à jour les graphiques en temps réel.")
         
         col1, col2 = st.columns(2)
-
+        
         with col1:
-            st.subheader("� Synchroniser depuis Google Sheets")
-            st.markdown("Indiquez le lien vers votre Google Sheet ou laissez le lien par défaut, puis cliquez sur '🔁 Synchroniser depuis Google Sheets'.")
-            default_sheet = "https://docs.google.com/spreadsheets/d/1hvghSMjcbdY8yNZOWqALBpgMdLWB5CxVJCDwEm6JULI/edit?gid=785271056#gid=785271056"
-            gs_url = st.text_input("URL Google Sheet", value=default_sheet, key="gsheet_url")
-            if 'synced_recrutement_df' not in st.session_state:
-                st.session_state.synced_recrutement_df = None
-
-            if st.button("🔁 Synchroniser depuis Google Sheets"):
-                # Construire l'URL d'export CSV à partir du lien fourni
-                # Extraire l'ID et le gid
+            st.subheader("📄 Fichier CSV - Données d'Intégration")
+            uploaded_csv = st.file_uploader(
+                "Choisir le fichier CSV d'intégration",
+                type=['csv'],
+                help="Fichier contenant les données d'intégration des candidats",
+                key="csv_uploader"
+            )
+            
+            if uploaded_csv is not None:
+                st.success(f"✅ Fichier CSV chargé: {uploaded_csv.name}")
+                # Aperçu des données
                 try:
-                    m = re.search(r"/d/([a-zA-Z0-9-_]+)", gs_url)
-                    gid_m = re.search(r"[?&]gid=(\d+)", gs_url)
-                    if not m:
-                        st.error("Impossible d'extraire l'ID du Google Sheet depuis l'URL fournie.")
-                    else:
-                        sheet_id = m.group(1)
-                        gid_val = gid_m.group(1) if gid_m else '0'
-                        export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid_val}"
-                        st.info("Téléchargement en cours... cela peut prendre quelques secondes.")
-                        try:
-                            df_synced = pd.read_csv(export_url)
-                            st.session_state.synced_recrutement_df = df_synced
-                            st.session_state.data_updated = True
-                            st.success("✅ Synchronisation Google Sheets réussie. Les onglets ont été mis à jour.")
-                        except Exception as e:
-                            # Si l'erreur est liée à l'autorisation, proposer l'upload d'une clé de compte de service
-                            err_str = str(e)
-                            st.error(f"Erreur lors du téléchargement depuis Google Sheets: {err_str}")
-                            if '401' in err_str or 'Unauthorized' in err_str or 'HTTP Error 401' in err_str:
-                                st.warning("La feuille Google semble privée. Vous pouvez fournir une clé de compte de service (JSON) pour vous authentifier.")
-                                service_file = st.file_uploader("Uploader la clé JSON du compte de service (optionnel)", type=['json'], key='gs_service_json')
-                                if service_file is not None:
-                                    try:
-                                        creds_json = json.load(service_file)
-                                        gc = gspread.service_account_from_dict(creds_json)
-                                        sh = gc.open_by_key(sheet_id)
-                                        worksheet = sh.get_worksheet_by_id(int(gid_val)) if gid_val else sh.sheet1
-                                        data = worksheet.get_all_records()
-                                        df_synced = pd.DataFrame(data)
-                                        st.session_state.synced_recrutement_df = df_synced
-                                        st.session_state.data_updated = True
-                                        st.success("✅ Synchronisation via compte de service réussie.")
-                                    except Exception as e2:
-                                        st.error(f"Échec de l'authentification via compte de service: {e2}")
+                    preview_csv = pd.read_csv(uploaded_csv)
+                    st.write("**Aperçu des données CSV:**")
+                    st.write(f"- Lignes: {len(preview_csv)}")
+                    st.write(f"- Colonnes: {len(preview_csv.columns)}")
+                    st.dataframe(preview_csv.head(3), use_container_width=True)
+                    # Reset file pointer for later use
+                    uploaded_csv.seek(0)
+                    st.session_state.uploaded_csv = uploaded_csv
                 except Exception as e:
-                    st.error(f"Erreur lors du traitement de l'URL Google Sheets: {e}")
-
-            if st.session_state.get('synced_recrutement_df') is not None:
-                st.write("**Aperçu des données synchronisées :**")
-                st.write(f"- Lignes: {len(st.session_state.synced_recrutement_df)}")
-                st.write(f"- Colonnes: {len(st.session_state.synced_recrutement_df.columns)}")
-                st.dataframe(st.session_state.synced_recrutement_df.head(3), use_container_width=True)
-
+                    st.error(f"Erreur lors de la lecture du CSV: {e}")
+        
         with col2:
             st.subheader("📊 Fichier Excel - Données de Recrutement")
             uploaded_excel = st.file_uploader(
@@ -1244,11 +555,11 @@ def main():
             st.success("Données mises à jour ! Consultez les autres onglets.")
     
     # Charger les données (avec fichiers uploadés ou fichiers locaux)
-    df_integration, df_recrutement = load_data_from_files(None, uploaded_excel)
+    df_integration, df_recrutement = load_data_from_files(uploaded_csv, uploaded_excel)
     
     # Message d'information sur les données chargées
     # Only show a success if the user uploaded files or explicitly refreshed
-    has_uploaded = (st.session_state.uploaded_excel is not None) or (st.session_state.get('synced_recrutement_df') is not None)
+    has_uploaded = (st.session_state.uploaded_csv is not None) or (st.session_state.uploaded_excel is not None)
     if df_recrutement is None and df_integration is None:
         st.sidebar.warning("⚠️ Aucune donnée disponible. Veuillez uploader vos fichiers dans l'onglet 'Upload Fichiers'.")
     elif df_recrutement is None:
@@ -1261,22 +572,60 @@ def main():
 
     with tabs[1]:
         if df_recrutement is not None:
-            create_demandes_recrutement_combined_tab(df_recrutement)
+            create_demandes_recrutement_tab(df_recrutement)
+        else:
+            st.warning("📋 Aucune donnée de recrutement disponible. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
+
+    with tabs[2]:
+        if df_recrutement is not None:
+            create_recrutements_clotures_tab(df_recrutement)
         else:
             st.warning("📊 Aucune donnée de recrutement disponible. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
     
-    with tabs[2]:
-        create_weekly_report_tab(df_recrutement)
-
     with tabs[3]:
-        # Onglet Intégrations basé sur les données Excel
-        if df_recrutement is not None:
-            # Créer les filtres globaux pour les intégrations
-            st.sidebar.subheader("🔧 Filtres - Intégrations")
-            int_filters = create_global_filters(df_recrutement, "integrations")
-            create_integrations_tab(df_recrutement, int_filters)
+        create_weekly_report_tab()
+
+    with tabs[4]:
+        # Onglet pour les données d'intégration (données CSV)
+        if df_integration is not None:
+            st.header("📊 Suivi des Intégrations")
+            
+            # KPIs d'intégration
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("👥 Total Intégrations", len(df_integration))
+            with col2:
+                en_cours = len(df_integration[df_integration['Statut'] == 'En cours']) if 'Statut' in df_integration.columns else 0
+                st.metric("⏳ En Cours", en_cours)
+            with col3:
+                complet = len(df_integration[df_integration['Statut'] == 'Complet']) if 'Statut' in df_integration.columns else 0
+                st.metric("✅ Complet", complet)
+            with col4:
+                avg_docs = df_integration['Docs Manquants'].mean() if 'Docs Manquants' in df_integration.columns else 0
+                st.metric("📄 Docs Moy/Personne", f"{avg_docs:.1f}")
+            
+            # Graphiques d'intégration
+            if 'Date Intégration' in df_integration.columns and 'Statut' in df_integration.columns:
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    timeline_fig = create_integration_timeline(df_integration)
+                    st.plotly_chart(timeline_fig, use_container_width=True)
+                
+                with col2:
+                    if 'Affectation' in df_integration.columns:
+                        affectation_fig = create_affectation_chart(df_integration)
+                        st.plotly_chart(affectation_fig, use_container_width=True)
+                    else:
+                        st.info("Colonne 'Affectation' non trouvée dans les données")
+            else:
+                st.info("Colonnes requises non trouvées pour les graphiques (Date Intégration, Statut)")
+            
+            # Tableau de données
+            st.subheader("📊 Données Détaillées - Intégrations")
+            st.dataframe(df_integration, use_container_width=True)
         else:
-            st.warning("📊 Aucune donnée disponible pour les intégrations. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
+            st.warning("📊 Aucune donnée d'intégration disponible. Veuillez uploader un fichier CSV dans l'onglet 'Upload Fichiers'.")
 
 if __name__ == "__main__":
     main()
