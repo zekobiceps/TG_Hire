@@ -465,7 +465,8 @@ def load_data_from_files(csv_file=None, excel_file=None):
             date_columns = ['Date de réception de la demande aprés validation de la DRH',
                            'Date d\'entrée effective du candidat',
                            'Date d\'annulation /dépriorisation de la demande',
-                           'Date de la 1er réponse du demandeur à l\'équipe RH']
+                           'Date de la 1er réponse du demandeur à l\'équipe RH',
+                           'Date du 1er retour equipe RH  au demandeur']
             
             for col in date_columns:
                 if col in df_recrutement.columns:
