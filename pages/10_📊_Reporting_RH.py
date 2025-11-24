@@ -7,11 +7,13 @@ import numpy as np
 from datetime import datetime, timedelta
 import warnings
 import os
-warnings.filterwarnings('ignore')
 import re
 from io import BytesIO
 import json
 import gspread
+from streamlit_gsheets import GSheetsConnection  # Assurez-vous d'avoir installé: pip install st-gsheets-connection
+
+warnings.filterwarnings('ignore')
 
 st.set_page_config(
     page_title="📊 Reporting RH Complet",
@@ -112,7 +114,7 @@ def load_data_from_files(csv_file=None, excel_file=None):
                 df_recrutement = pd.read_excel(excel_file, sheet_name=0)
             else:
                 # Fallback vers fichier local s'il existe
-                local_excel = 'Recrutement global PBI All  google sheet (5).xlsx'
+                local_excel = 'Recrutement global PBI All google sheet (5).xlsx'
                 if os.path.exists(local_excel):
                     df_recrutement = pd.read_excel(local_excel, sheet_name=0)
         except Exception as e:
@@ -124,7 +126,8 @@ def load_data_from_files(csv_file=None, excel_file=None):
             date_columns = ['Date de réception de la demande aprés validation de la DRH',
                            'Date d\'entrée effective du candidat',
                            'Date d\'annulation /dépriorisation de la demande',
-                           'Date de la 1er réponse du demandeur à l\'équipe RH']
+                           'Date de la 1er réponse du demandeur à l\'équipe RH',
+                           'Date du 1er retour equipe RH  au demandeur'] # Ajouté pour éviter l'erreur dans les KPIs
             
             for col in date_columns:
                 if col in df_recrutement.columns:
@@ -235,7 +238,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
     col1, col2 = st.columns([2,1])
     
     with col1:
-        # Évolution des recrutements par mois (comme dans l'image 1)
+        # Évolution des recrutements par mois
         if 'Date d\'entrée effective du candidat' in df_filtered.columns:
             df_filtered['Mois_Année'] = df_filtered['Date d\'entrée effective du candidat'].dt.strftime('%Y-%m')
             monthly_data = df_filtered.groupby('Mois_Année').size().reset_index(name='Count')
@@ -252,7 +255,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             st.plotly_chart(fig_evolution, use_container_width=True)
     
     with col2:
-        # Répartition par modalité de recrutement (CORRECTION: légende déplacée à l'extérieur)
+        # Répartition par modalité de recrutement
         if 'Modalité de recrutement' in df_filtered.columns:
             modalite_data = df_filtered['Modalité de recrutement'].value_counts()
             
@@ -266,7 +269,6 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             fig_modalite.update_layout(
                 title="Répartition par Modalité de recrutement",
                 height=300,
-                # Légende positionnée à droite pour éviter le chevauchement
                 legend=dict(
                     orientation="v", 
                     yanchor="middle", 
@@ -274,7 +276,6 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                     xanchor="left", 
                     x=1.05
                 ),
-                # Ajuster les marges pour faire de la place à la légende
                 margin=dict(l=20, r=150, t=50, b=20)
             )
             st.plotly_chart(fig_modalite, use_container_width=True)
@@ -318,25 +319,24 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
 
     with col5:
         # Nombre de candidats présélectionnés
-        total_candidats = int(df_filtered['Nb de candidats pré-selectionnés'].sum())
-        fig_candidats = go.Figure(go.Indicator(
-            mode = "gauge+number",
-            value = total_candidats,
-            title = {'text': "Nombre de candidats présélectionnés"},
-            gauge = {'axis': {'range': [None, total_candidats * 2]},
-                     'bar': {'color': "green"},
-                    }))
-        fig_candidats.update_layout(height=300)
-        st.plotly_chart(fig_candidats, use_container_width=True)
+        if 'Nb de candidats pré-selectionnés' in df_filtered.columns:
+            total_candidats = int(df_filtered['Nb de candidats pré-selectionnés'].sum())
+            fig_candidats = go.Figure(go.Indicator(
+                mode = "gauge+number",
+                value = total_candidats,
+                title = {'text': "Nombre de candidats présélectionnés"},
+                gauge = {'axis': {'range': [None, total_candidats * 2]},
+                        'bar': {'color': "green"},
+                        }))
+            fig_candidats.update_layout(height=300)
+            st.plotly_chart(fig_candidats, use_container_width=True)
+        else:
+            st.info("Colonne 'Nb de candidats pré-selectionnés' manquante")
 
-        with col6:
+    with col6:
         # Délai moyen de recrutement
         date_reception_col = 'Date de réception de la demande aprés validation de la DRH'
-        
-        # --- MODIFICATION ICI ---
-        # On remplace l'ancienne colonne par celle que vous avez demandée
         date_reponse_col = 'Date du 1er retour equipe RH  au demandeur' 
-        # ------------------------
         
         if date_reception_col in df_filtered.columns and date_reponse_col in df_filtered.columns:
             # Convertir en datetime si ce n'est pas déjà fait
@@ -477,6 +477,16 @@ def create_integrations_tab(df_recrutement, global_filters):
     candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
     date_integration_col = "Date d'entrée prévisionnelle"
     
+    # Vérifier si les colonnes existent
+    if candidat_col not in df_recrutement.columns:
+        # Essayer de trouver une colonne similaire si le nom exact a changé
+        cols_candidat = [c for c in df_recrutement.columns if "candidat" in c.lower() and "retenu" in c.lower()]
+        if cols_candidat:
+            candidat_col = cols_candidat[0]
+        else:
+            st.warning(f"Colonne candidat ('{candidat_col}') non trouvée.")
+            return
+
     # Critères : Statut "En cours" ET candidat avec nom
     df_integrations = df_recrutement[
         (df_recrutement['Statut de la demande'] == 'En cours') &
@@ -497,8 +507,12 @@ def create_integrations_tab(df_recrutement, global_filters):
         st.metric("👥 Intégrations en cours", len(df_filtered))
     with col2:
         # Intégrations avec date prévue
-        avec_date = len(df_filtered[df_filtered[date_integration_col].notna()])
-        st.metric("📅 Avec date prévue", avec_date)
+        if date_integration_col in df_filtered.columns:
+            avec_date = len(df_filtered[df_filtered[date_integration_col].notna()])
+            st.metric("📅 Avec date prévue", avec_date)
+        else:
+            st.metric("📅 Avec date prévue", "N/A")
+
     with col3:
         # Intégrations en retard (date prévue passée)
         if date_integration_col in df_filtered.columns:
@@ -1143,7 +1157,7 @@ def main():
     st.markdown("---")
     
     # Créer les onglets (Demandes et Recrutement regroupés)
-    tabs = st.tabs(["📂 Upload", "� Demandes & Recrutement", "📅 Hebdomadaire", "� Intégrations"])
+    tabs = st.tabs(["📂 Upload", "📋 Demandes & Recrutement", "📅 Hebdomadaire", "📊 Intégrations"])
     
     # Variables pour stocker les fichiers uploadés
     # Use session_state to persist upload/refresh state
@@ -1160,7 +1174,7 @@ def main():
         col1, col2 = st.columns(2)
 
         with col1:
-            st.subheader("� Synchroniser depuis Google Sheets")
+            st.subheader("🔁 Synchroniser depuis Google Sheets")
             st.markdown("Indiquez le lien vers votre Google Sheet ou laissez le lien par défaut, puis cliquez sur '🔁 Synchroniser depuis Google Sheets'.")
             default_sheet = "https://docs.google.com/spreadsheets/d/1hvghSMjcbdY8yNZOWqALBpgMdLWB5CxVJCDwEm6JULI/edit?gid=785271056#gid=785271056"
             gs_url = st.text_input("URL Google Sheet", value=default_sheet, key="gsheet_url")
@@ -1208,11 +1222,16 @@ def main():
                 except Exception as e:
                     st.error(f"Erreur lors du traitement de l'URL Google Sheets: {e}")
 
-            if st.session_state.get('synced_recrutement_df') is not None:
+            # On récupère d'abord l'objet dans une variable locale
+            synced_df = st.session_state.get('synced_recrutement_df')
+
+            # On vérifie cette variable locale
+            if synced_df is not None:
                 st.write("**Aperçu des données synchronisées :**")
-                st.write(f"- Lignes: {len(st.session_state.synced_recrutement_df)}")
-                st.write(f"- Colonnes: {len(st.session_state.synced_recrutement_df.columns)}")
-                st.dataframe(st.session_state.synced_recrutement_df.head(3), use_container_width=True)
+                # Ici, Pylance sait que 'synced_df' n'est pas None
+                st.write(f"- Lignes: {len(synced_df)}")
+                st.write(f"- Colonnes: {len(synced_df.columns)}")
+                st.dataframe(synced_df.head(3), use_container_width=True)
 
         with col2:
             st.subheader("📊 Fichier Excel - Données de Recrutement")
