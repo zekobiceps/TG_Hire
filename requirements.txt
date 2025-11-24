@@ -8,6 +8,7 @@ streamlit
 plotly
 altair
 pydeck
+st-gsheets-connection
 
 # Manipulation de données & fichiers
 pandas
