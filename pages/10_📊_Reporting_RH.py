@@ -10,25 +10,10 @@ import os
 warnings.filterwarnings('ignore')
 import re
 import streamlit.components.v1 as components
-import unicodedata
 from io import BytesIO
 import json
 import gspread
 from google.oauth2 import service_account
-import unicodedata
-
-def _normalize_text(text):
-    """A global function to safely normalize text, handling None and NaN values."""
-    if text is None or (isinstance(text, float) and np.isnan(text)):
-        return ''
-    s = str(text)
-    s = unicodedata.normalize('NFKD', s)
-    s = ''.join(ch for ch in s if not unicodedata.combining(ch))
-    return s.lower().strip()
-
-def _norm(x):
-    """Robust text normalization for status/keywords matching."""
-    return _normalize_text(x)
 
 st.set_page_config(
     page_title="📊 Reporting RH Complet",
@@ -65,26 +50,38 @@ def _parse_mixed_dates(series):
     Returns a datetime64[ns] Series with NaT for unparseable values.
     """
     s = series.copy()
+    # If numeric (float/int), treat as Excel serial date (days since 1899-12-30)
+    if pd.api.types.is_numeric_dtype(s):
+        try:
+            # Excel serial to datetime
+            origin = pd.Timestamp('1899-12-30')
+            return pd.to_timedelta(s.fillna(0).astype(float), unit='D') + origin
+        except Exception:
+            # fallback to generic parser
+            return pd.to_datetime(s, errors='coerce')
+
+    # If object dtype but mostly numeric strings, try to coerce to numeric first
+    # (handles cases where Google Sheets exports numbers as strings)
     try:
-        # If the series is numeric (Excel serials), convert per-element where it looks numeric
-        if pd.api.types.is_numeric_dtype(s):
+        coerced = pd.to_numeric(s.dropna().unique(), errors='coerce')
+        if len(coerced) > 0 and not pd.isna(coerced).all():
+            # At least some numeric-like values -> attempt serial conversion per-element
             def _maybe_excel(x):
                 try:
                     xf = float(x)
                     return pd.Timestamp('1899-12-30') + pd.Timedelta(days=xf)
                 except Exception:
                     return pd.NaT
-
-            return s.apply(lambda v: _maybe_excel(v) if pd.notna(v) and str(v).strip().replace('.', '', 1).isdigit() else pd.NaT).combine_first(pd.to_datetime(s, dayfirst=True, errors='coerce'))
+            return s.apply(lambda v: _maybe_excel(v) if pd.notna(v) and str(v).strip().replace('.','',1).isdigit() else pd.NaT).combine_first(pd.to_datetime(s, dayfirst=True, errors='coerce'))
     except Exception:
-        # fall through to permissive parsing below
         pass
 
-    # First try dayfirst parsing (dd/mm/YYYY common in French contexts)
+    # First try dayfirst (common with French date formats)
     parsed = pd.to_datetime(s, dayfirst=True, errors='coerce')
-    # If many values still NaT, try fallback parsing
+    # If many values are NaT, try a more permissive parse
     if parsed.isna().sum() > len(parsed) * 0.25:
         parsed_alt = pd.to_datetime(s, errors='coerce')
+        # combine: prefer parsed (dayfirst) then parsed_alt
         parsed = parsed.combine_first(parsed_alt)
 
     return parsed
@@ -465,8 +462,7 @@ def load_data_from_files(csv_file=None, excel_file=None):
             date_columns = ['Date de réception de la demande aprés validation de la DRH',
                            'Date d\'entrée effective du candidat',
                            'Date d\'annulation /dépriorisation de la demande',
-                           'Date de la 1er réponse du demandeur à l\'équipe RH',
-                           'Date du 1er retour equipe RH  au demandeur']
+                           'Date de la 1er réponse du demandeur à l\'équipe RH']
             
             for col in date_columns:
                 if col in df_recrutement.columns:
@@ -483,8 +479,7 @@ def load_data_from_files(csv_file=None, excel_file=None):
             numeric_columns = ['Nb de candidats pré-selectionnés']
             for col in numeric_columns:
                 if col in df_recrutement.columns:
-                    df_recrutement[col] = pd.to_numeric(df_recrutement[col], errors='coerce')
-                    df_recrutement[col] = df_recrutement[col].fillna(0)
+                    df_recrutement[col] = pd.to_numeric(df_recrutement[col], errors='coerce').fillna(0)
 
             # Vérification basique des colonnes critiques et message dans les logs
             required_cols = [
@@ -604,7 +599,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             mask = s.notna() & e.notna()
             if mask.sum() > 0:
                 durees = (s[mask] - e[mask]).dt.days
-                durees = durees[durees > 0]
+                durees = durees[durees >= 0]
                 if len(durees) > 0:
                     delai_moyen = round(durees.mean(), 1)
                     delai_display = f"{delai_moyen}"
@@ -954,7 +949,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         df_direction = df_direction.sort_values('Count', ascending=False)
         # Truncate long labels for readability, keep full label in customdata for hover
         df_direction['Label_trunc'] = df_direction['Direction'].apply(lambda s: _truncate_label(s, max_len=24))
-        # Ensure display label exists (truncated + small gap) to be used for axis and ordering
+        # Ensure display label exists (truncated + small gap)
         if 'Label_display' not in df_direction.columns:
             df_direction['Label_display'] = df_direction['Label_trunc'] + '\u00A0\u00A0'
         fig_direction = px.bar(
@@ -998,7 +993,6 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         df_poste['Label_trunc'] = df_poste['Poste'].apply(lambda s: _truncate_label(s, max_len=24))
         if 'Label_display' not in df_poste.columns:
             df_poste['Label_display'] = df_poste['Label_trunc'] + '\u00A0\u00A0'
-        df_poste['Label_display'] = df_poste['Label_trunc'] + '\u00A0\u00A0'
         fig_poste = px.bar(
             df_poste,
             x='Count',
@@ -1035,7 +1029,6 @@ def create_integrations_tab(df_recrutement, global_filters):
     # Filtrer les données : Statut "En cours" ET candidat ayant accepté (nom présent)
     candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
     date_integration_col = "Date d'entrée prévisionnelle"
-    plan_integration_col = "Plan d'intégration à préparer"
     
     # Diagnostic des données disponibles
     total_en_cours = len(df_recrutement[df_recrutement['Statut de la demande'] == 'En cours'])
@@ -1075,12 +1068,9 @@ def create_integrations_tab(df_recrutement, global_filters):
     with col1:
         st.metric("👥 Intégrations en cours", len(df_filtered))
     with col2:
-        # Plans d'intégration à préparer
-        if plan_integration_col in df_filtered.columns:
-            a_preparer = len(df_filtered[df_filtered[plan_integration_col].astype(str).str.lower() == 'oui'])
-            st.metric("📋 Plan d'intégration à préparer", a_preparer)
-        else:
-            st.metric("📋 Plan d'intégration à préparer", "N/A")
+        # Intégrations avec date prévue
+        avec_date = len(df_filtered[df_filtered[date_integration_col].notna()])
+        st.metric("📅 Avec date prévue", avec_date)
     with col3:
         # Intégrations en retard (date prévue passée)
         if date_integration_col in df_filtered.columns:
@@ -1140,9 +1130,9 @@ def create_integrations_tab(df_recrutement, global_filters):
         candidat_col, 
         'Poste demandé ',
         'Entité demandeuse',
+        'Direction concernée',
         'Affectation',
-        date_integration_col,
-        plan_integration_col
+        date_integration_col
     ]
     # Filtrer les colonnes qui existent
     colonnes_disponibles = [col for col in colonnes_affichage if col in df_filtered.columns]
@@ -1154,14 +1144,24 @@ def create_integrations_tab(df_recrutement, global_filters):
         if date_integration_col in df_display.columns:
             # Essayer d'abord le format DD/MM/YYYY puis MM/DD/YYYY si nécessaire
             def format_date_safely(date_str):
-                if pd.isna(date_str) or date_str == '' or date_str == 'N/A' or date_str is pd.NaT:
+                if pd.isna(date_str) or date_str == '' or date_str == 'N/A':
                     return 'N/A'
-                
-                parsed_date = pd.to_datetime(date_str, errors='coerce')
-                
-                if pd.notna(parsed_date):
-                    return parsed_date.strftime('%d/%m/%Y')
-                else:
+                try:
+                    # Essayer format DD/MM/YYYY d'abord (format souhaité)
+                    if isinstance(date_str, str) and '/' in date_str and len(date_str.split('/')) == 3:
+                        day, month, year = date_str.split('/')
+                        if len(day) <= 2 and len(month) <= 2 and len(year) == 4:
+                            parsed_date = pd.to_datetime(f"{day}/{month}/{year}", format='%d/%m/%Y', errors='coerce')
+                            if pd.notna(parsed_date):
+                                return parsed_date.strftime('%d/%m/%Y')
+                    
+                    # Fallback: laisser pandas deviner puis reformater
+                    parsed_date = pd.to_datetime(date_str, errors='coerce')
+                    if pd.notna(parsed_date):
+                        return parsed_date.strftime('%d/%m/%Y')
+                    else:
+                        return 'N/A'
+                except:
                     return 'N/A'
             
             df_display[date_integration_col] = df_display[date_integration_col].apply(format_date_safely)
@@ -1264,14 +1264,8 @@ def calculate_weekly_metrics(df_recrutement):
             today = reporting_date
         else:
             today = datetime.combine(reporting_date, datetime.min.time())
-    # start_of_week = Monday (00:00) of the reporting_date's week
-    start_of_week = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())  # Lundi de cette semaine à 00:00
-    # Définir la semaine précédente (Lundi -> Vendredi). Exemple: si reporting_date=2025-10-15 (mercredi),
-    # start_of_week = 2025-10-13 (lundi), previous_monday = 2025-10-06, previous_friday = 2025-10-10.
-    previous_monday = start_of_week - timedelta(days=7)   # Lundi de la semaine précédente (00:00)
-    previous_friday = start_of_week - timedelta(days=3)   # Vendredi de la semaine précédente (00:00)
-    # exclusive upper bound for inclusive-Friday semantics: < previous_friday + 1 day
-    previous_friday_exclusive = previous_friday + timedelta(days=1)
+    start_of_week = today - timedelta(days=today.weekday())  # Lundi de cette semaine
+    start_of_last_week = start_of_week - timedelta(days=7)   # Lundi de la semaine dernière
     
     # Définir les colonnes attendues avec des alternatives possibles
     date_reception_col = "Date de réception de la demande après validation de la DRH"
@@ -1282,10 +1276,6 @@ def calculate_weekly_metrics(df_recrutement):
     
     # Créer une copie pour les calculs
     df = df_recrutement.copy()
-
-    # Toujours exclure les demandes clôturées/annulées du compteur 'avant'
-    # (la case UI a été supprimée : les demandes clôturées ne sont pas comptées)
-    include_closed = False
     
     # Vérifier les colonnes disponibles
     available_columns = df.columns.tolist()
@@ -1347,8 +1337,6 @@ def calculate_weekly_metrics(df_recrutement):
     real_candidat_col = find_similar_column(candidat_col, available_columns)
     real_statut_col = find_similar_column(statut_col, available_columns)
     real_entite_col = find_similar_column(entite_col, available_columns)
-    # detect Poste demandé column (used for optional entity-specific title filters)
-    real_poste_col = find_similar_column('Poste demandé', available_columns) or find_similar_column('Poste', available_columns)
     
     # Si les colonnes essentielles n'existent pas, retourner vide
     if not real_entite_col:
@@ -1379,37 +1367,16 @@ def calculate_weekly_metrics(df_recrutement):
         real_accept_col = None
 
     # Normalisation et mots-clés de statuts fermés (utiles dans plusieurs blocs)
+    import unicodedata
+    def _norm(s):
+        if pd.isna(s):
+            return ''
+        ss = str(s)
+        ss = unicodedata.normalize('NFKD', ss)
+        ss = ''.join(ch for ch in ss if not unicodedata.combining(ch))
+        return ss.lower()
+
     closed_keywords = ['cloture', 'clôture', 'annule', 'annulé', 'depriorise', 'dépriorisé', 'desistement', 'désistement', 'annul', 'reject', 'rejett']
-    # Optional: entity-specific title inclusion lists. If an entity is present here,
-    # only postes matching the provided list will be counted in 'en_cours' for that entity.
-    SPECIAL_TITLE_FILTERS = {
-        'TGCC': [
-            'CHEF DE PROJETS',
-            'INGENIEUR TRAVAUX',
-            'CONDUCTEUR TRAVAUX SENIOR (ou Ingénieur Junior)',
-            'CONDUCTEUR TRAVAUX',
-            'INGENIEUR TRAVAUX JUNIOR',
-            'RESPONSABLE QUALITE',
-            'CHEF DE CHANTIER',
-            'METREUR',
-            'RESPONSABLE HSE',
-            'SUPERVISEUR HSE',
-            'ANIMATEUR HSE',
-            'DIRECTEUR PROJETS',
-            'RESPONSABLE ADMINISTRATIF ET FINANCIER',
-            'RESPONSABLE MAINTENANCE',
-            'RESPONSABLE ENERGIE INDUSTRIELLE',
-            'RESPONSABLE CYBER SECURITE',
-            'RESPONSABLE VRD',
-            'RESPONSABLE ACCEUIL',
-            'RESPONSABLE ETUDES',
-            'TECHNICIEN SI',
-            'RESPONSABLE GED & ARCHIVAGE',
-            'ARCHIVISTE SENIOR',
-            'ARCHIVISTE JUNIOR',
-            'TOPOGRAPHE'
-        ]
-    }
     
     # Calculer les métriques par entité
     entites = df[real_entite_col].dropna().unique()
@@ -1417,105 +1384,74 @@ def calculate_weekly_metrics(df_recrutement):
     
     for entite in entites:
         df_entite = df[df[real_entite_col] == entite]
-        # Définitions temporelles par entité (basées sur la semaine précédente Lundi->Vendredi)
-        # previous_monday / previous_friday_exclusive sont définis en haut de la fonction
+        # Définitions temporelles (commencer la semaine à 00:00:00 du lundi)
+        # Reuse top-level start_of_week and start_of_last_week (they are set above)
+        last_week_start = start_of_last_week
+        last_week_end = start_of_week - timedelta(seconds=1)
 
-        # 1. Nb postes ouverts avant début semaine
-        # Doit compter toutes les lignes dont 'Date de réception ...' est STRICTEMENT antérieure
-        # au vendredi de la semaine précédente (i.e. < previous_friday)
+        # 1. Nb postes ouverts avant début semaine = postes ouverts DURANT la semaine précédente
         postes_avant = 0
         if real_date_reception_col and real_date_reception_col in df_entite.columns:
-            # 'avant' = toutes les demandes antérieures au début de la semaine précédente (previous_monday)
-            # Exclure les demandes déjà clôturées/annulées pour éviter de compter de vieux dossiers fermés.
-            mask_date_avant = df_entite[real_date_reception_col] < previous_monday
-            mask_not_closed = None
-            if not include_closed and real_statut_col and real_statut_col in df_entite.columns:
-                # Si l'utilisateur a demandé d'exclure les fermés, construire le masque
-                mask_not_closed = ~df_entite[real_statut_col].fillna("").astype(str).apply(lambda s: any(k in _norm(s) for k in closed_keywords))
-            # Appliquer les deux masques si disponibles (si include_closed True, on n'applique pas le filtre)
-            if mask_not_closed is not None:
-                mask_avant = mask_date_avant & mask_not_closed
-            else:
-                mask_avant = mask_date_avant
-            postes_avant = int(df_entite[mask_avant].shape[0])
+            mask_last_week = (df_entite[real_date_reception_col] >= last_week_start) & (df_entite[real_date_reception_col] < start_of_week)
+            postes_avant = int(df_entite[mask_last_week].shape[0])
         else:
             postes_avant = 0
 
-        # 2. Nb nouveaux postes ouverts cette semaine = demandes validées par la DRH
-        # dans la semaine précédente (du lundi au vendredi inclus).
+        # 2. Nb nouveaux postes ouverts cette semaine (date de réception dans la semaine courante)
         nouveaux_postes = 0
         if real_date_reception_col and real_date_reception_col in df_entite.columns:
-            mask_nouveaux = (df_entite[real_date_reception_col] >= previous_monday) & (df_entite[real_date_reception_col] < previous_friday_exclusive)
-            nouveaux_postes = int(df_entite[mask_nouveaux].shape[0])
+            mask_this_week = (df_entite[real_date_reception_col] >= start_of_week) & (df_entite[real_date_reception_col] <= today)
+            nouveaux_postes = int(df_entite[mask_this_week].shape[0])
         else:
             nouveaux_postes = 0
 
-        # 3. Nb postes pourvus cette semaine: compter les acceptations du candidat
-        # dont la date d'acceptation est dans la même fenêtre (previous_monday..previous_friday)
+        # 3. Nb postes pourvus cette semaine
+        # Règle métier: un poste est considéré pourvu cette semaine seulement si:
+        #  - il a le statut 'En cours' (normalisé), ET
+        #  - la date d'acceptation du candidat est dans la semaine de production (start_of_week..today)
         postes_pourvus = 0
-        mask_has_name = None
-        if real_candidat_col and real_candidat_col in df_entite.columns:
-            mask_has_name = df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '')
-
-        # préparer un masque de statut 'En cours' si la colonne statut existe (réutilisé plus bas)
+        # préparer un masque de statut 'En cours' si la colonne statut existe
         mask_status_en_cours = None
         if real_statut_col and real_statut_col in df_entite.columns:
             mask_status_en_cours = df_entite[real_statut_col].fillna("").astype(str).apply(lambda s: 'en cours' in _norm(s) or 'encours' in _norm(s))
 
-        if real_accept_col and real_accept_col in df_entite.columns:
-            mask_accept_prev_week = (df_entite[real_accept_col] >= previous_monday) & (df_entite[real_accept_col] < previous_friday_exclusive)
-            if mask_has_name is not None:
-                postes_pourvus = int(df_entite[mask_accept_prev_week & mask_has_name].shape[0])
-            else:
-                postes_pourvus = int(df_entite[mask_accept_prev_week].shape[0])
+        if real_candidat_col and real_accept_col and real_candidat_col in df_entite.columns and real_accept_col in df_entite.columns and mask_status_en_cours is not None:
+            mask_accept_this_week = (df_entite[real_accept_col] >= start_of_week) & (df_entite[real_accept_col] <= today)
+            mask_has_name = df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '')
+            postes_pourvus = int( df_entite[ mask_accept_this_week & mask_has_name & mask_status_en_cours ].shape[0] )
         else:
-            # fallback: try using integration date as proxy for pourvus in the same window
-            if real_date_integration_col and real_date_integration_col in df_entite.columns:
-                mask_integ_prev_week = (df_entite[real_date_integration_col] >= previous_monday) & (df_entite[real_date_integration_col] < previous_friday_exclusive)
-                if mask_has_name is not None:
-                    postes_pourvus = int(df_entite[mask_integ_prev_week & mask_has_name].shape[0])
-                else:
-                    postes_pourvus = int(df_entite[mask_integ_prev_week].shape[0])
+            # fallback: try using integration date as proxy for pourvus this week, but still require statut 'En cours'
+            if real_date_integration_col and real_candidat_col and real_date_integration_col in df_entite.columns and real_candidat_col in df_entite.columns and mask_status_en_cours is not None:
+                mask_integration_this_week = (df_entite[real_date_integration_col] >= start_of_week) & (df_entite[real_date_integration_col] <= today)
+                mask_has_name = df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '')
+                postes_pourvus = int( df_entite[ mask_integration_this_week & mask_has_name & mask_status_en_cours ].shape[0] )
             else:
+                # If we cannot reliably determine status or dates, default to 0 (avoid double-counting)
                 postes_pourvus = 0
 
-        # 4. Nb postes en cours cette semaine
-        # Par défaut on calcule une formule de secours (nouveaux + avant - pourvus)
-        postes_en_cours_formula = nouveaux_postes + postes_avant - postes_pourvus
-        if postes_en_cours_formula is None:
-            postes_en_cours_formula = 0
-
-        # Si la colonne Statut existe, on suit la règle métier stricte demandée :
-        # "Postes en cours" = lignes avec statut 'En cours' ET sans valeur dans
-        # la colonne 'Nom Prénom du candidat retenu...' (donc pas d'acceptation).
-        # Si la colonne Statut est absente, on retombe sur la formule de secours.
-        postes_en_cours = int(postes_en_cours_formula)
-        postes_en_cours_status = 0
+        # 4. Nb postes en cours cette semaine: compter directement les lignes dont la colonne statut indique 'En cours'
+        postes_en_cours = 0
         if mask_status_en_cours is not None:
-                mask_has_name_local = None
-                if real_candidat_col and real_candidat_col in df_entite.columns:
-                    mask_has_name_local = df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '')
-
-                # Règle stricte demandée : "Postes en cours" = statut 'En cours' ET sans candidat
-                if mask_has_name_local is not None:
-                    mask_sourcing = mask_status_en_cours & (~mask_has_name_local)
+            try:
+                if real_date_reception_col and real_date_reception_col in df_entite.columns:
+                    # limiter aux postes dont la date de réception est antérieure ou égale à today
+                    mask_reception_le_today = df_entite[real_date_reception_col].notna() & (df_entite[real_date_reception_col] <= today)
+                    postes_en_cours = int(df_entite[ mask_status_en_cours & mask_reception_le_today ].shape[0])
                 else:
-                    mask_sourcing = mask_status_en_cours
-
-                # Comptage simple et uniforme pour toutes les entités : ne pas appliquer
-                # de filtres additionnels (date de réception ou filtre d'intitulé).
-                postes_en_cours_status = int(df_entite[mask_sourcing].shape[0])
-
-                # Utiliser ce comptage comme valeur principale 'en_cours'
-                postes_en_cours = int(postes_en_cours_status)
-
+                    postes_en_cours = int(df_entite[ mask_status_en_cours ].shape[0])
+            except Exception:
+                postes_en_cours = int(df_entite[ mask_status_en_cours ].shape[0])
+        else:
+            # fallback: use difference rule when statut non disponible
+            postes_en_cours = nouveaux_postes - postes_pourvus
+            if postes_en_cours < 0:
+                postes_en_cours = 0
+        
         metrics_by_entity[entite] = {
             'avant': postes_avant,
-            'nouveaux': nouveaux_postes,
+            'nouveaux': nouveaux_postes, 
             'pourvus': postes_pourvus,
-            'en_cours': postes_en_cours,
-            # ajouter info additionnelle utile pour debug/UI
-            'en_cours_status_count': postes_en_cours_status
+            'en_cours': postes_en_cours
         }
     
     return metrics_by_entity
@@ -1528,9 +1464,6 @@ def create_weekly_report_tab(df_recrutement=None):
     """
     st.header("📅 Reporting Hebdomadaire : Chiffres Clés de la semaine")
 
-    # Note: les demandes clôturées sont exclues du compteur 'avant' par défaut.
-    # La case pour inclure les demandes clôturées a été supprimée.
-
     # Calculer les métriques
     if df_recrutement is not None and len(df_recrutement) > 0:
         try:
@@ -1541,21 +1474,15 @@ def create_weekly_report_tab(df_recrutement=None):
     else:
         metrics = {}
 
-    # Exclure certaines entités (Besix et DECO EXCELL) de l'affichage et des totaux
-    excluded_entities = set(['BESIX-TGCC', 'DECO EXCELL'])
-    metrics_included = {e: m for e, m in metrics.items() if e not in excluded_entities}
-
-    total_avant = sum(m.get('avant', 0) for m in metrics_included.values())
-    total_nouveaux = sum(m.get('nouveaux', 0) for m in metrics_included.values())
-    total_pourvus = sum(m.get('pourvus', 0) for m in metrics_included.values())
-    total_en_cours = sum(m.get('en_cours', 0) for m in metrics_included.values())
-    # total lines with statut 'En cours' (may include those with candidate)
-    total_en_cours_status = sum(m.get('en_cours_status_count', 0) for m in metrics_included.values())
+    total_avant = sum(m.get('avant', 0) for m in metrics.values())
+    total_nouveaux = sum(m.get('nouveaux', 0) for m in metrics.values())
+    total_pourvus = sum(m.get('pourvus', 0) for m in metrics.values())
+    total_en_cours = sum(m.get('en_cours', 0) for m in metrics.values())
 
     # KPI cards (simple)
     col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Postes en cours (sourcing)", total_en_cours)
+        st.metric("Postes en cours cette semaine", total_en_cours)
     with col2:
         st.metric("Postes pourvus cette semaine", total_pourvus)
     with col3:
@@ -1570,14 +1497,13 @@ def create_weekly_report_tab(df_recrutement=None):
     if metrics and len(metrics) > 0:
         # Préparer les données pour le HTML
         table_data = []
-        for entite, data in metrics_included.items():
+        for entite, data in metrics.items():
             table_data.append({
                 'Entité': entite,
                 'Nb postes ouverts avant début semaine': data['avant'] if data['avant'] > 0 else '-',
                 'Nb nouveaux postes ouverts cette semaine': data['nouveaux'] if data['nouveaux'] > 0 else '-',
                 'Nb postes pourvus cette semaine': data['pourvus'] if data['pourvus'] > 0 else '-',
-                "Nb postes statut 'En cours' (total)": data.get('en_cours_status_count', 0) if data.get('en_cours_status_count', 0) > 0 else '-',
-                'Nb postes en cours cette semaine (sourcing)': data['en_cours'] if data['en_cours'] > 0 else '-'
+                'Nb postes en cours cette semaine': data['en_cours'] if data['en_cours'] > 0 else '-'
             })
 
         # Ajouter la ligne de total
@@ -1586,8 +1512,7 @@ def create_weekly_report_tab(df_recrutement=None):
             'Nb postes ouverts avant début semaine': f'**{total_avant}**',
             'Nb nouveaux postes ouverts cette semaine': f'**{total_nouveaux}**',
             'Nb postes pourvus cette semaine': f'**{total_pourvus}**',
-            "Nb postes statut 'En cours' (total)": f'**{total_en_cours_status}**',
-            'Nb postes en cours cette semaine (sourcing)': f'**{total_en_cours}**'
+            'Nb postes en cours cette semaine': f'**{total_en_cours}**'
         })
 
         # HTML + CSS (repris de la version précédente)
@@ -1666,7 +1591,7 @@ def create_weekly_report_tab(df_recrutement=None):
         html_table += '<th>Nb postes ouverts avant début semaine</th>'
         html_table += '<th>Nb nouveaux postes ouverts cette semaine</th>'
         html_table += '<th>Nb postes pourvus cette semaine</th>'
-        html_table += '<th>Nb postes en cours cette semaine (sourcing)</th>'
+        html_table += '<th>Nb postes en cours cette semaine</th>'
         html_table += '</tr></thead>'
         html_table += '<tbody>'
 
@@ -1678,7 +1603,7 @@ def create_weekly_report_tab(df_recrutement=None):
             html_table += f'<td>{row["Nb postes ouverts avant début semaine"]}</td>'
             html_table += f'<td>{row["Nb nouveaux postes ouverts cette semaine"]}</td>'
             html_table += f'<td>{row["Nb postes pourvus cette semaine"]}</td>'
-            html_table += f'<td>{row["Nb postes en cours cette semaine (sourcing)"]}</td>'
+            html_table += f'<td>{row["Nb postes en cours cette semaine"]}</td>'
             html_table += '</tr>'
 
         # Ligne TOTAL (la dernière)
@@ -1688,7 +1613,7 @@ def create_weekly_report_tab(df_recrutement=None):
         html_table += f'<td>{total_row["Nb postes ouverts avant début semaine"].replace("**", "")}</td>'
         html_table += f'<td>{total_row["Nb nouveaux postes ouverts cette semaine"].replace("**", "")}</td>'
         html_table += f'<td>{total_row["Nb postes pourvus cette semaine"].replace("**", "")}</td>'
-        html_table += f'<td>{total_row["Nb postes en cours cette semaine (sourcing)"].replace("**", "")}</td>'
+        html_table += f'<td>{total_row["Nb postes en cours cette semaine"].replace("**", "")}</td>'
         html_table += '</tr>'
         html_table += '</tbody></table></div>'
 
@@ -1736,7 +1661,7 @@ def create_weekly_report_tab(df_recrutement=None):
         st.markdown(default_html, unsafe_allow_html=True)
 
     # Section Debug (expandable): montrer les lignes et pourquoi elles sont comptées
-    with st.expander("🔍 Debug - Détails des lignes", expanded=False):
+    with st.expander("🔍 Debug - Détails des lignes (ouvrir/fermer)", expanded=False):
         try:
             df_debug = df_recrutement.copy() if df_recrutement is not None else pd.DataFrame()
             if not df_debug.empty:
@@ -1755,20 +1680,9 @@ def create_weekly_report_tab(df_recrutement=None):
                         for col in available_cols:
                             if "date" in col.lower() and ("intégration" in col.lower() or "integration" in col.lower() or "entrée" in col.lower()):
                                 return col
-                    # Prefer columns explicitly mentioning the candidate / promesse
-                    if "candidat" in target_lower or "promesse" in target_lower or "accept" in target_lower:
-                        for col in available_cols:
-                            lc = col.lower()
-                            if ("candidat" in lc and "retenu" in lc) or ("accept" in lc and "candidat" in lc) or ("promesse" in lc and "candidat" in lc):
-                                return col
-                        # fallback to any column containing 'candidat'
-                        for col in available_cols:
-                            if 'candidat' in col.lower():
-                                return col
-                    # As a last resort, match generic 'nom'/'prénom' columns
                     if "candidat" in target_lower and "retenu" in target_lower:
                         for col in available_cols:
-                            if ("nom" in col.lower() and "pr" in col.lower()) or ("nom" in col.lower() and "prenom" in col.lower()):
+                            if ("candidat" in col.lower() and "retenu" in col.lower()) or ("nom" in col.lower() and "prénom" in col.lower()):
                                 return col
                     if "statut" in target_lower:
                         for col in available_cols:
@@ -1801,11 +1715,8 @@ def create_weekly_report_tab(df_recrutement=None):
                     today = datetime.now()
                 else:
                     today = rd if isinstance(rd, datetime) else datetime.combine(rd, datetime.min.time())
-                
-                # Re-create the same date ranges as in `calculate_weekly_metrics` for consistency
-                start_of_week = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
-                previous_monday = start_of_week - timedelta(days=7)
-                previous_friday_exclusive = (start_of_week - timedelta(days=3)) + timedelta(days=1) # Vendredi + 1 jour
+                start_of_week = today - timedelta(days=today.weekday())
+                start_of_last_week = start_of_week - timedelta(days=7)
 
                 if real_date_reception_col and real_date_reception_col in df_debug.columns:
                     df_debug[real_date_reception_col] = pd.to_datetime(df_debug[real_date_reception_col], errors='coerce')
@@ -1817,49 +1728,45 @@ def create_weekly_report_tab(df_recrutement=None):
                     except Exception:
                         df_debug[real_accept_col] = pd.to_datetime(df_debug[real_accept_col], errors='coerce')
 
+                import unicodedata as _unicodedata
                 def _local_norm(x):
-                    if pd.isna(x) or x is None:
+                    if pd.isna(x):
                         return ''
                     s = str(x)
-                    s = unicodedata.normalize('NFKD', s)
-                    s = ''.join(ch for ch in s if not unicodedata.combining(ch))
-                    return s.lower().strip()
+                    s = _unicodedata.normalize('NFKD', s)
+                    s = ''.join(ch for ch in s if not _unicodedata.combining(ch))
+                    return s.lower()
 
-                # Masks for contribution flags, aligned with `calculate_weekly_metrics`
-                mask_avant_semaine = pd.Series(False, index=df_debug.index)
-                mask_nouveaux_semaine = pd.Series(False, index=df_debug.index)
-                mask_pourvus_semaine = pd.Series(False, index=df_debug.index)
+                mask_last_week = pd.Series(False, index=df_debug.index)
+                mask_this_week = pd.Series(False, index=df_debug.index)
                 mask_status_en_cours = pd.Series(False, index=df_debug.index)
                 mask_has_name = pd.Series(False, index=df_debug.index)
-                closed_keywords = ['cloture', 'clôture', 'annule', 'annulé', 'depriorise', 'dépriorisé', 'desistement', 'désistement', 'annul', 'reject', 'rejett']
+                mask_accept_this_week = pd.Series(False, index=df_debug.index)
+                mask_integration_this_week = pd.Series(False, index=df_debug.index)
+                mask_reception_le_today = pd.Series(True, index=df_debug.index)
 
                 if real_date_reception_col and real_date_reception_col in df_debug.columns:
-                    # "Avant": reception date is before the start of the previous week
-                    mask_avant_semaine = df_debug[real_date_reception_col] < previous_monday
-                    # "Nouveaux": reception date is within the previous week (Mon-Fri)
-                    mask_nouveaux_semaine = (df_debug[real_date_reception_col] >= previous_monday) & (df_debug[real_date_reception_col] < previous_friday_exclusive)
+                    mask_last_week = (df_debug[real_date_reception_col] >= start_of_last_week) & (df_debug[real_date_reception_col] < start_of_week)
+                    mask_this_week = (df_debug[real_date_reception_col] >= start_of_week) & (df_debug[real_date_reception_col] <= today)
+                    mask_reception_le_today = df_debug[real_date_reception_col].notna() & (df_debug[real_date_reception_col] <= today)
 
                 if real_statut_col and real_statut_col in df_debug.columns:
                     mask_status_en_cours = df_debug[real_statut_col].fillna("").astype(str).apply(lambda s: ('en cours' in _local_norm(s)) or ('encours' in _local_norm(s)))
-                    mask_not_closed = ~df_debug[real_statut_col].fillna("").astype(str).apply(lambda s: any(k in _local_norm(s) for k in closed_keywords))
-                    mask_avant_semaine = mask_avant_semaine & mask_not_closed
-
 
                 if real_candidat_col and real_candidat_col in df_debug.columns:
                     mask_has_name = df_debug[real_candidat_col].notna() & (df_debug[real_candidat_col].astype(str).str.strip() != '')
 
                 if real_accept_col and real_accept_col in df_debug.columns:
-                    # "Pourvus": acceptance date is within the previous week (Mon-Fri)
-                    mask_pourvus_semaine = (df_debug[real_accept_col] >= previous_monday) & (df_debug[real_accept_col] < previous_friday_exclusive)
-                
-                contributes_avant = mask_avant_semaine
-                contributes_nouveaux = mask_nouveaux_semaine
-                contributes_pourvus = mask_pourvus_semaine & mask_has_name
-                # contrib_en_cours: statut 'En cours'
-                contributes_en_cours = mask_status_en_cours
+                    mask_accept_this_week = (df_debug[real_accept_col] >= start_of_week) & (df_debug[real_accept_col] <= today)
 
-                # For the debug view we want the contributors to exactly reflect the
-                # 'Besoins en Cours' table. We will show all rows that contribute to *any* of the KPIs.
+                if real_date_integration_col and real_date_integration_col in df_debug.columns:
+                    mask_integration_this_week = (df_debug[real_date_integration_col] >= start_of_week) & (df_debug[real_date_integration_col] <= today)
+
+                contributes_avant = mask_last_week
+                contributes_nouveaux = mask_this_week
+                contributes_pourvus = (mask_has_name & mask_status_en_cours & mask_accept_this_week) | (mask_has_name & mask_status_en_cours & mask_integration_this_week)
+                contributes_en_cours = mask_status_en_cours & mask_reception_le_today
+
                 any_contrib = contributes_avant | contributes_nouveaux | contributes_pourvus | contributes_en_cours
 
                 df_selected = df_debug[any_contrib].copy()
@@ -1877,154 +1784,48 @@ def create_weekly_report_tab(df_recrutement=None):
                     display_cols.append(real_accept_col)
 
                 df_out = df_selected[display_cols].copy() if display_cols else df_selected.copy()
-                # mark if the row matches any SPECIAL_TITLE_FILTERS for its entity (useful for TGCC overrides)
-                # compute a boolean flag indicating whether the row's title matches
-                # any entry in the SPECIAL_TITLE_FILTERS for that entity.
-                # Use safe fallbacks if some variables are not present in this scope.
-                try:
-                    # try to access SPECIAL_TITLE_FILTERS from the module scope
-                    st_special_filters = globals().get('SPECIAL_TITLE_FILTERS', None)
-                    # if real_poste_col isn't defined in this block, try to discover a 'Poste' column
-                    rp = globals().get('real_poste_col', None)
-                    if not rp:
-                        # conservative search for a poste-like column name in df_selected
-                        for c in df_selected.columns:
-                            if 'poste' in c.lower() or 'title' in c.lower():
-                                rp = c
-                                break
-
-                    def _matches_special_title(row):
-                        ent = row.get(real_entite_col, '') if real_entite_col in row.index else (row.get('Entité demandeuse', '') or row.get('Entité', ''))
-                        titre = ''
-                        if rp and rp in row.index:
-                            titre = row.get(rp, '')
-                        else:
-                            titre = row.get('Poste demandé', '') or row.get('Poste demandé ', '') or ''
-
-                        if not ent or not st_special_filters:
-                            return False
-                        filter_list = st_special_filters.get(ent, [])
-                        if not filter_list:
-                            return False
-                        tnorm = str(titre).strip().upper()
-                        return any(tnorm == s for s in filter_list)
-
-                    df_out['special_title_match'] = df_selected.apply(_matches_special_title, axis=1)
-                except Exception:
-                    df_out['special_title_match'] = False
-                df_out['contrib_avant'] = pd.Series(contributes_avant.loc[df_out.index], dtype='bool')
-                df_out['contrib_nouveaux'] = pd.Series(contributes_nouveaux.loc[df_out.index], dtype='bool')
-                df_out['contrib_pourvus'] = pd.Series(contributes_pourvus.loc[df_out.index], dtype='bool')
-                df_out['contrib_en_cours'] = pd.Series(contributes_en_cours.loc[df_out.index], dtype='bool')
-
-                # Ensure the candidate value is present in a predictable column named 'candidate_value'
-                try:
-                    if real_candidat_col and real_candidat_col in df_selected.columns:
-                        df_out['candidate_value'] = df_selected[real_candidat_col].fillna('').astype(str)
-                    else:
-                        df_out['candidate_value'] = ''
-                except Exception:
-                    df_out['candidate_value'] = ''
+                df_out['contrib_avant'] = contributes_avant.loc[df_out.index]
+                df_out['contrib_nouveaux'] = contributes_nouveaux.loc[df_out.index]
+                df_out['contrib_pourvus'] = contributes_pourvus.loc[df_out.index]
+                df_out['contrib_en_cours'] = contributes_en_cours.loc[df_out.index]
 
                 for dc in [real_date_reception_col, real_accept_col, real_date_integration_col]:
                     if dc and dc in df_out.columns:
                         try:
-                            # Safely format each date value in the column using .map
-                            df_out[dc] = pd.to_datetime(df_out[dc], errors='coerce')
-                            df_out[dc] = df_out[dc].map(lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) and hasattr(x, 'strftime') else 'N/A')
+                            df_out[dc] = pd.to_datetime(df_out[dc], errors='coerce').dt.strftime('%d/%m/%Y')
                         except Exception:
                             pass
 
                 # Allow user to choose display mode: KPI contributors or all rows with statut 'En cours'
-                display_mode = st.radio("Mode d'affichage:", ["Contributeurs 'Postes en cours'", "Toutes lignes statut 'En cours'"], index=0)
+                display_mode = st.radio("Mode d'affichage:", ["Contributeurs KPI", "Toutes lignes statut 'En cours'"], index=0)
 
                 if display_mode == "Toutes lignes statut 'En cours'":
                     if real_statut_col and real_statut_col in df_debug.columns:
                         df_status = df_debug[mask_status_en_cours].copy()
-                        
-                        # Créer la colonne candidate_value avec la même logique que le mode contributeurs
-                        if real_candidat_col and real_candidat_col in df_status.columns:
-                            # Supprimer la colonne existante pour éviter les doublons
-                            if real_candidat_col in df_status.columns:
-                                df_status = df_status.drop(columns=[real_candidat_col])
-                            df_status['candidate_value'] = df_debug.loc[df_status.index, real_candidat_col].fillna('').astype(str)
-                        else:
-                            df_status['candidate_value'] = ''
-                        
-                        # Formater les dates en jj/mm/aaaa
-                        if real_date_reception_col and real_date_reception_col in df_status.columns:
-                            df_status[real_date_reception_col] = pd.to_datetime(df_status[real_date_reception_col], errors='coerce')
-                            df_status[real_date_reception_col] = df_status[real_date_reception_col].apply(
-                                lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else 'N/A'
-                            )
-                        if real_accept_col and real_accept_col in df_status.columns:
-                            df_status[real_accept_col] = pd.to_datetime(df_status[real_accept_col], errors='coerce')
-                            df_status[real_accept_col] = df_status[real_accept_col].apply(
-                                lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else 'N/A'
-                            )
-                        
-                        # option: masquer par défaut les lignes où un candidat est déjà renseigné
-                        show_with_candidate = st.checkbox("Afficher aussi les lignes avec candidat renseigné", value=False)
-                        if not show_with_candidate:
-                            df_status = df_status[~(df_status['candidate_value'].str.strip() != '')].copy()
-
-                        # Colonnes à afficher (sans demandeur, Direction concernée, Raison du recrutement)
+                        # show requested columns if available
                         desired_cols = [
-                            'Poste demandé', 'Entité demandeuse', 'Affectation',
-                            'candidate_value',  # Colonne du candidat
-                            real_date_reception_col,  # Date de réception de la demande
-                            real_accept_col  # Date d'acceptation du candidat
+                            'Poste demandé', 'Raison du recrutement', 'Entité demandeuse',
+                            'Direction concernée', 'Affectation', 'Nom Prénom du demandeur'
                         ]
-                        # Filtrer les colonnes qui sont réellement disponibles et non nulles
-                        available_show = [c for c in desired_cols if c and c in df_status.columns]
-                        
-                        # Renommer candidate_value pour l'affichage
-                        if 'candidate_value' in available_show and real_candidat_col:
-                            df_status = df_status.rename(columns={'candidate_value': real_candidat_col})  # type: ignore
-                            available_show = [real_candidat_col if c == 'candidate_value' else c for c in available_show]
+                        available_show = [c for c in desired_cols if c in df_status.columns]
+                        if not available_show:
+                            # fallback to show key columns we detected earlier
+                            available_show = []
+                            if real_entite_col and real_entite_col in df_status.columns:
+                                available_show.append(real_entite_col)
+                            if real_candidat_col and real_candidat_col in df_status.columns:
+                                available_show.append(real_candidat_col)
+                            if real_statut_col and real_statut_col in df_status.columns:
+                                available_show.append(real_statut_col)
 
                         df_out_status = df_status[available_show].copy() if available_show else df_status.copy()
-                        st.info(f"Lignes avec statut 'En cours' détectées (après filtre candidat): {len(df_out_status)}")
-                        st.dataframe(df_out_status.reset_index(drop=True), width="stretch")
+                        st.info(f"Lignes avec statut 'En cours' détectées: {len(df_out_status)}")
+                        st.dataframe(df_out_status.reset_index(drop=True), use_container_width=True)
                     else:
                         st.warning("Colonne de statut introuvable — impossible de lister les lignes 'En cours'.")
                 else:
-                    st.info(f"Lignes contribuant au KPI 'Postes en cours' : {len(df_out)} lignes")
-                    # Colonnes à afficher dans le dataframe final
-                    display_cols_final = [
-                        '_orig_index', 'contrib_avant', 'contrib_nouveaux', 'contrib_pourvus', 'contrib_en_cours'
-                    ]
-                    # Ajouter les colonnes de base si elles existent
-                    if real_entite_col in df_out.columns: display_cols_final.insert(1, real_entite_col)
-                    if real_statut_col in df_out.columns: display_cols_final.insert(2, real_statut_col)
-                    # Utiliser 'candidate_value' au lieu de real_candidat_col directement
-                    if 'candidate_value' in df_out.columns: 
-                        display_cols_final.insert(3, 'candidate_value')
-                    
-                    df_out_display = df_out.reset_index().rename(columns={'index': '_orig_index'})
-                    
-                    # Renommer candidate_value pour l'affichage si besoin
-                    if 'candidate_value' in df_out_display.columns and real_candidat_col:
-                        # Si la colonne réelle existe déjà, la supprimer d'abord pour éviter les doublons
-                        if real_candidat_col in df_out_display.columns:
-                            df_out_display = df_out_display.drop(columns=[real_candidat_col])
-                        df_out_display = df_out_display.rename(columns={'candidate_value': real_candidat_col})
-                        # Mettre à jour display_cols_final avec le nouveau nom
-                        display_cols_final = [real_candidat_col if col == 'candidate_value' else col for col in display_cols_final]
-                    
-                    # S'assurer que toutes les colonnes de contribution sont booléennes
-                    for col in ['contrib_avant', 'contrib_nouveaux', 'contrib_pourvus', 'contrib_en_cours']:
-                        if col in df_out_display.columns:
-                            df_out_display[col] = df_out_display[col].astype(bool)
-
-                    # Ajouter les deux colonnes de date si elles existent
-                    extra_date_cols = ["Date d'acceptation du candidat", "Date de réception de la demande"]
-                    for col in extra_date_cols:
-                        if col in df_out_display.columns and col not in display_cols_final:
-                            display_cols_final.append(col)
-                    # Filtrer pour n'afficher que les colonnes désirées
-                    existing_display_cols = [c for c in display_cols_final if c in df_out_display.columns]
-                    st.dataframe(df_out_display[existing_display_cols], width="stretch")
+                    st.info(f"Lignes contribuant aux KPI (avant/nouveaux/pourvus/en_cours): {len(df_out)} lignes")
+                    st.dataframe(df_out.reset_index(drop=True), use_container_width=True)
             else:
                 st.info('Aucune donnée pour le debug.')
         except Exception as e:
@@ -2033,7 +1834,7 @@ def create_weekly_report_tab(df_recrutement=None):
     st.markdown("---")
 
     # 3. Section "Pipeline de Recrutement (Kanban)"
-    # (Le nombre total sera ajouté après avoir collecté les données)
+    st.subheader("Pipeline de Recrutement (Kanban)")
 
     # Construire les données du Kanban à partir du fichier importé (préférence aux données réelles)
     # Détection heuristique des colonnes utiles
@@ -2045,25 +1846,24 @@ def create_weekly_report_tab(df_recrutement=None):
         return None
 
     cols = df_recrutement.columns.tolist() if df_recrutement is not None else []
-    kanban_col = _find_col(cols, ['kanban'])
-    statut_demande_col = _find_col(cols, ['statut de la demande', 'statut demande'])
+    statut_col = _find_col(cols, ['statut', 'status'])
     poste_col = _find_col(cols, ['poste', 'title', 'post'])
     entite_col = _find_col(cols, ['entité', 'entite', 'entité demandeuse', 'entite demandeuse', 'entité'])
     lieu_col = _find_col(cols, ['lieu', 'affectation', 'site'])
     demandeur_col = _find_col(cols, ['demandeur', 'requester'])
     recruteur_col = _find_col(cols, ['recruteur', 'recruiter'])
-    commentaire_col = _find_col(cols, ['commentaire', 'comment'])
 
-    def _normalize_kanban(text):
-        if text is None or (isinstance(text, float) and np.isnan(text)):
+    import unicodedata
+    def _normalize(text):
+        if text is None:
             return ''
         s = str(text)
         s = unicodedata.normalize('NFKD', s)
         s = ''.join(ch for ch in s if not unicodedata.combining(ch))
         return s.lower().strip()
 
-    # Statuts Kanban canoniques (ordre d'affichage)
-    statuts_kanban_display = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+    # Carte statuts canoniques demandés par l'utilisateur (ordre affichage)
+    statuts_kanban = ["Désistement","Sourcing","Shortlisté","Signature DRH","Clôture","Dépriorisé"]
 
     # Mapping de formes possibles -> statut canonique
     status_map = {
@@ -2072,7 +1872,7 @@ def create_weekly_report_tab(df_recrutement=None):
         'sourcing': 'Sourcing',
         'shortlist': 'Shortlisté',
         'shortlisté': 'Shortlisté',
-        'shortliste': 'Shortlisté',
+        'shortlisté': 'Shortlisté',
         'signature drh': 'Signature DRH',
         'signature': 'Signature DRH',
         'cloture': 'Clôture',
@@ -2082,34 +1882,28 @@ def create_weekly_report_tab(df_recrutement=None):
     }
 
     postes_data = []
-    if df_recrutement is not None and kanban_col and statut_demande_col:
-        # Filtrer d'abord les lignes avec statut "En cours"
-        mask_en_cours = df_recrutement[statut_demande_col].apply(
-            lambda x: 'en cours' in _normalize_kanban(x) if pd.notna(x) else False
-        )
-        df_kanban = df_recrutement[mask_en_cours].copy()
-        
-        # Ensuite lire la colonne Kanban pour chaque ligne
-        for _, r in df_kanban.iterrows():
-            raw_kanban = r.get(kanban_col)
-            if pd.isna(raw_kanban):
+    if statut_col and df_recrutement is not None:
+        for _, r in df_recrutement.iterrows():
+            raw = r.get(statut_col)
+            if pd.isna(raw):
                 continue
-            norm = _normalize_kanban(raw_kanban)
+            norm = _normalize(raw)
             canon = None
             # find mapping by substring
             for key, val in status_map.items():
                 if key in norm:
                     canon = val
                     break
-            # default fallback: essayer de matcher directement
+            # default fallback: keep original raw string capitalized
             if canon is None:
-                for tgt in statuts_kanban_display:
-                    if _normalize_kanban(tgt) == norm:
+                # if the normalized text closely matches any canonical target, pick it
+                for tgt in statuts_kanban:
+                    if _normalize(tgt) == norm:
                         canon = tgt
                         break
-            # Si toujours pas de match, ignorer cette ligne
             if canon is None:
-                continue
+                # unrecognized statuses go into 'Sourcing' by default
+                canon = 'Sourcing'
 
             titre = r.get(poste_col, '') if poste_col else r.get('Poste demandé', '')
             postes_data.append({
@@ -2118,85 +1912,99 @@ def create_weekly_report_tab(df_recrutement=None):
                 'entite': r.get(entite_col, '') if entite_col else r.get('Entité demandeuse', ''),
                 'lieu': r.get(lieu_col, '') if lieu_col else '',
                 'demandeur': r.get(demandeur_col, '') if demandeur_col else '',
-                'recruteur': r.get(recruteur_col, '') if recruteur_col else '',
-                'commentaire': r.get(commentaire_col, '') if commentaire_col else ''
+                'recruteur': r.get(recruteur_col, '') if recruteur_col else ''
             })
+
+    # Fallback sample data if no real rows found
+    if not postes_data:
+        postes_data = [
+            {"statut": "Sourcing", "titre": "Ingénieur Achat", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.BOUZOUBAA", "recruteur": "Zakaria"},
+            {"statut": "Sourcing", "titre": "Directeur Achats Adjoint", "entite": "TGCC", "lieu": "Siège", "demandeur": "C.BENABDELLAH", "recruteur": "Zakaria"},
+            {"statut": "Sourcing", "titre": "INGENIEUR TRAVAUX", "entite": "TGCC", "lieu": "YAMED LOT B", "demandeur": "M.TAZI", "recruteur": "Zakaria"},
+            {"statut": "Shortlisté", "titre": "CHEF DE PROJETS", "entite": "TGCC", "lieu": "DESSALEMENT JORF", "demandeur": "M.FENNAN", "recruteur": "ZAKARIA"},
+            {"statut": "Shortlisté", "titre": "Planificateur", "entite": "TGCC", "lieu": "ASFI-B", "demandeur": "SOUFIANI", "recruteur": "Ghita"},
+            {"statut": "Shortlisté", "titre": "RESPONSABLE TRANS INTERCH", "entite": "TG PREFA", "lieu": "OUED SALEH", "demandeur": "FBOUZOUBAA", "recruteur": "Ghita"},
+            {"statut": "Signature DRH", "titre": "PROJETEUR DESSINATEUR", "entite": "TG WOOD", "lieu": "OUED SALEH", "demandeur": "S.MENJRA", "recruteur": "Zakaria"},
+            {"statut": "Signature DRH", "titre": "Projeteur", "entite": "TGCC", "lieu": "TSP Safi", "demandeur": "B.MORABET", "recruteur": "Zakaria"},
+            {"statut": "Signature DRH", "titre": "Consultant SAP", "entite": "TGCC", "lieu": "Siège", "demandeur": "O.KETTA", "recruteur": "Zakaria"},
+            {"statut": "Clôture", "titre": "Doc Controller", "entite": "TGEM", "lieu": "SIEGE", "demandeur": "A.SANKARI", "recruteur": "Zakaria"},
+            {"statut": "Clôture", "titre": "Ingénieur étude/qualité", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.MOUTANABI", "recruteur": "Zakaria"},
+            {"statut": "Clôture", "titre": "Responsable Cybersecurité", "entite": "TGCC", "lieu": "Siège", "demandeur": "Ghazi", "recruteur": "Zakaria"},
+            {"statut": "Clôture", "titre": "CHEF DE CHANTIER", "entite": "TGCC", "lieu": "N/A", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},
+            {"statut": "Désistement", "titre": "Conducteur de Travaux", "entite": "TGCC", "lieu": "JORF LASFAR", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},
+            {"statut": "Désistement", "titre": "Chef de Chantier", "entite": "TGCC", "lieu": "TOARC", "demandeur": "M.FENNAN", "recruteur": "Zakaria"},
+            {"statut": "Désistement", "titre": "Magasinier", "entite": "TG WOOD", "lieu": "Oulad Saleh", "demandeur": "K.TAZI", "recruteur": "Ghita"},
+        ]
     
-    # Afficher le titre avec le nombre total de cartes
-    total_cartes = len(postes_data)
-    st.subheader(f"Pipeline de Recrutement (Kanban) - Total: {total_cartes}")
+    # Définir les colonnes du Kanban
+    statuts_kanban = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
     
     # Créer les colonnes Streamlit
-    cols_streamlit = st.columns(len(statuts_kanban_display))
+    cols = st.columns(len(statuts_kanban))
     
-    # CSS pour styliser les cartes (compactes, 3 par ligne)
+    # CSS pour styliser les cartes (2 par ligne)
     st.markdown("""
     <style>
     .kanban-card {
-        border-radius: 5px;
+        border-radius: 8px;
         background-color: #f0f2f6;
-        padding: 5px 7px;
-        margin-bottom: 3px;
-        border-left: 3px solid #1f77b4;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-        min-height: 45px;
+        padding: 10px;
+        margin-bottom: 8px;
+        border-left: 4px solid #1f77b4;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        min-height: 80px;
         width: 100%;
     }
     .kanban-card h4 {
         margin-top: 0;
-        margin-bottom: 2px;
-        font-size: 0.7em;
+        margin-bottom: 6px;
+        font-size: 0.9em;
         color: #2c3e50;
-        line-height: 1.05;
+        line-height: 1.2;
     }
     .kanban-card p {
-        margin-bottom: 1px;
-        font-size: 0.6em;
+        margin-bottom: 3px;
+        font-size: 0.75em;
         color: #555;
-        line-height: 0.95;
+        line-height: 1.1;
     }
     .kanban-header {
         text-align: center;
         font-weight: bold;
-        font-size: 1.0em;
+        font-size: 1.1em;
         color: #2c3e50;
-        padding: 6px;
+        padding: 10px;
         background-color: #e8f4fd;
-        border-radius: 6px;
-        margin-bottom: 8px;
+        border-radius: 8px;
+        margin-bottom: 15px;
         border: 1px solid #bee5eb;
     }
     </style>
     """, unsafe_allow_html=True)
     
     # Remplir chaque colonne avec les postes correspondants
-    for i, statut in enumerate(statuts_kanban_display):
-        with cols_streamlit[i]:
+    for i, statut in enumerate(statuts_kanban):
+        with cols[i]:
+            # En-tête de colonne
+            st.markdown(f'<div class="kanban-header">{statut}</div>', unsafe_allow_html=True)
+            
             # Filtrer les postes pour cette colonne
             postes_in_col = [p for p in postes_data if p["statut"] == statut]
-            nb_postes = len(postes_in_col)
             
-            # En-tête de colonne avec le nombre de cartes
-            st.markdown(f'<div class="kanban-header">{statut} ({nb_postes})</div>', unsafe_allow_html=True)
-            
-            # Afficher les cartes avec 3 par ligne
-            for idx in range(0, len(postes_in_col), 3):
-                # Créer une ligne avec 3 cartes maximum
-                card_cols = st.columns(3)
+            # Afficher les cartes avec 2 par ligne
+            for idx in range(0, len(postes_in_col), 2):
+                # Créer une ligne avec 2 cartes maximum
+                card_cols = st.columns(2)
                 
                 # Première carte de la ligne
                 if idx < len(postes_in_col):
                     poste = postes_in_col[idx]
-                    commentaire = poste.get('commentaire', '')
-                    commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
                     with card_cols[0]:
                         card_html = f"""
                         <div class="kanban-card">
                             <h4><b>{poste['titre']}</b></h4>
-                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
-                            <p>👤 {poste.get('demandeur', 'N/A')}</p>
+                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')} | 👤 {poste.get('demandeur', 'N/A')}</p>
                             <p>✍️ {poste.get('recruteur', 'N/A')}</p>
-                            {commentaire_html}
                         </div>
                         """
                         st.markdown(card_html, unsafe_allow_html=True)
@@ -2204,44 +2012,23 @@ def create_weekly_report_tab(df_recrutement=None):
                 # Deuxième carte de la ligne (si elle existe)
                 if idx + 1 < len(postes_in_col):
                     poste = postes_in_col[idx + 1]
-                    commentaire = poste.get('commentaire', '')
-                    commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
                     with card_cols[1]:
                         card_html = f"""
                         <div class="kanban-card">
                             <h4><b>{poste['titre']}</b></h4>
-                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
-                            <p>👤 {poste.get('demandeur', 'N/A')}</p>
+                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')} | 👤 {poste.get('demandeur', 'N/A')}</p>
                             <p>✍️ {poste.get('recruteur', 'N/A')}</p>
-                            {commentaire_html}
-                        </div>
-                        """
-                        st.markdown(card_html, unsafe_allow_html=True)
-                
-                # Troisième carte de la ligne (si elle existe)
-                if idx + 2 < len(postes_in_col):
-                    poste = postes_in_col[idx + 2]
-                    commentaire = poste.get('commentaire', '')
-                    commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
-                    with card_cols[2]:
-                        card_html = f"""
-                        <div class="kanban-card">
-                            <h4><b>{poste['titre']}</b></h4>
-                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
-                            <p>👤 {poste.get('demandeur', 'N/A')}</p>
-                            <p>✍️ {poste.get('recruteur', 'N/A')}</p>
-                            {commentaire_html}
                         </div>
                         """
                         st.markdown(card_html, unsafe_allow_html=True)
                 else:
-                    # Colonne vide si moins de 3 cartes
-                    with card_cols[2]:
+                    # Colonne vide si nombre impair
+                    with card_cols[1]:
                         st.empty()
 
 
 def main():
-    st.title("📊 Tableau de Bord RH")
+    st.title("📊 Tableau de Bord RH - Style Power BI")
     st.markdown("---")
     # Date de reporting : permet de fixer la date de référence pour tous les calculs
     if 'reporting_date' not in st.session_state:
@@ -2376,7 +2163,7 @@ def main():
                 try:
                     preview_excel = pd.read_excel(uploaded_excel, sheet_name=0)
                     st.success(f"✅ Fichier Excel chargé: {uploaded_excel.name} - {len(preview_excel)} lignes, {len(preview_excel.columns)} colonnes")
-                    st.dataframe(preview_excel.head(3), width="stretch")
+                    st.dataframe(preview_excel.head(3), use_container_width=True)
                     # Reset file pointer for later use
                     uploaded_excel.seek(0)
                     st.session_state.uploaded_excel = uploaded_excel
