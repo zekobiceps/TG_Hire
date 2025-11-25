@@ -598,10 +598,10 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             e = pd.to_datetime(df_filtered[date_retour_rh_col], errors='coerce')
             mask = s.notna() & e.notna()
             if mask.sum() > 0:
-                durees = (s[mask] - e[mask]).dt.days
-                durees = durees[durees >= 0]
+                durees = (e[mask] - s[mask]).dt.days
+                durees = durees[durees > 0]
                 if len(durees) > 0:
-                    delai_moyen = round(durees.mean(), 1)
+                    delai_moyen = round(durees.mean(), 2)
                     delai_display = f"{delai_moyen}"
                     delai_help = f"Moyenne calculée sur {len(durees)} demandes"
         except Exception:
