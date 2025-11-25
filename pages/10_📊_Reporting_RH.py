@@ -604,6 +604,11 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             mask = s.notna() & e.notna()
             if mask.sum() > 0:
                 durees = (s[mask] - e[mask]).dt.days
+                # Debug: afficher les 10 premières valeurs de délai
+                import streamlit as st
+                st.write('DEBUG - Dates réception:', s[mask].head(10))
+                st.write('DEBUG - Dates retour:', e[mask].head(10))
+                st.write('DEBUG - Délai calculé:', durees.head(10))
                 durees = durees[durees > 0]
                 if len(durees) > 0:
                     delai_moyen = round(durees.mean(), 2)
