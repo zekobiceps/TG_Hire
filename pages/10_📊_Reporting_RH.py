@@ -688,26 +688,8 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 # Légende positionnée à droite pour éviter le chevauchement
                 legend=dict(
                     orientation="v", 
-                    yanchor="middle", 
-                    try:
-                        # Filtrer sur les lignes où Statut de la demande contient 'clôture'
-                        df_cloture = df_filtered[df_filtered['Statut de la demande'].astype(str).str.lower().str.contains('clôture')].copy()
-                        s = pd.to_datetime(df_cloture[date_reception_col], format='%d/%m/%Y', errors='coerce')
-                        e = pd.to_datetime(df_cloture[date_retour_rh_col], format='%d/%m/%Y', errors='coerce')
-                        # Si parsing échoue, fallback sur pandas
-                        if s.isna().any() or e.isna().any():
-                            s = pd.to_datetime(df_cloture[date_reception_col], errors='coerce')
-                            e = pd.to_datetime(df_cloture[date_retour_rh_col], errors='coerce')
-                        mask = s.notna() & e.notna()
-                        if mask.sum() > 0:
-                            durees = (s[mask] - e[mask]).dt.days
-                            durees = durees[durees > 0]
-                            if len(durees) > 0:
-                                delai_moyen = round(durees.mean(), 2)
-                                delai_display = f"{delai_moyen}"
-                                delai_help = f"Moyenne calculée sur {len(durees)} demandes"
-                    except Exception:
-                        pass
+                    yanchor="middle"
+                )
         # Truncate long labels for readability, keep full label in customdata for hover
         df_direction['Label_trunc'] = df_direction['Direction'].apply(lambda s: _truncate_label(s, max_len=24))
         # Ensure a display label exists (truncated + small gap) to be used for axis and ordering
