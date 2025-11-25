@@ -594,8 +594,13 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
     delai_help = "Colonnes manquantes ou pas de durées valides"
     if date_reception_col in df_filtered.columns and date_retour_rh_col in df_filtered.columns:
         try:
-            s = pd.to_datetime(df_filtered[date_reception_col], errors='coerce')
-            e = pd.to_datetime(df_filtered[date_retour_rh_col], errors='coerce')
+            # Essayer de parser explicitement au format jour/mois/année
+            s = pd.to_datetime(df_filtered[date_reception_col], format='%d/%m/%Y', errors='coerce')
+            e = pd.to_datetime(df_filtered[date_retour_rh_col], format='%d/%m/%Y', errors='coerce')
+            # Si parsing échoue, fallback sur pandas
+            if s.isna().any() or e.isna().any():
+                s = pd.to_datetime(df_filtered[date_reception_col], errors='coerce')
+                e = pd.to_datetime(df_filtered[date_retour_rh_col], errors='coerce')
             mask = s.notna() & e.notna()
             if mask.sum() > 0:
                 durees = (s[mask] - e[mask]).dt.days
@@ -1152,12 +1157,12 @@ def create_integrations_tab(df_recrutement, global_filters):
                         day, month, year = date_str.split('/')
                         if len(day) <= 2 and len(month) <= 2 and len(year) == 4:
                             parsed_date = pd.to_datetime(f"{day}/{month}/{year}", format='%d/%m/%Y', errors='coerce')
-                            if pd.notna(parsed_date):
+                            if pd.notna(parsed_date) and hasattr(parsed_date, 'strftime'):
                                 return parsed_date.strftime('%d/%m/%Y')
                     
                     # Fallback: laisser pandas deviner puis reformater
                     parsed_date = pd.to_datetime(date_str, errors='coerce')
-                    if pd.notna(parsed_date):
+                    if pd.notna(parsed_date) and hasattr(parsed_date, 'strftime'):
                         return parsed_date.strftime('%d/%m/%Y')
                     else:
                         return 'N/A'
