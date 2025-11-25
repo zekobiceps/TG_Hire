@@ -10,6 +10,7 @@ import os
 warnings.filterwarnings('ignore')
 import re
 import streamlit.components.v1 as components
+from pandas import NaT
 from io import BytesIO
 import json
 import gspread
@@ -479,7 +480,9 @@ def load_data_from_files(csv_file=None, excel_file=None):
             numeric_columns = ['Nb de candidats pré-selectionnés']
             for col in numeric_columns:
                 if col in df_recrutement.columns:
-                    df_recrutement[col] = pd.to_numeric(df_recrutement[col], errors='coerce').fillna(0)
+                    df_recrutement[col] = pd.to_numeric(df_recrutement[col], errors='coerce')
+                    if isinstance(df_recrutement[col], pd.Series):
+                        df_recrutement[col] = df_recrutement[col].fillna(0)
 
             # Vérification basique des colonnes critiques et message dans les logs
             required_cols = [
@@ -576,6 +579,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
     df_cloture = df_recrutement[df_recrutement['Statut de la demande'] == 'Clôture'].copy()
     
     if len(df_cloture) == 0:
+        import streamlit as st
         st.warning("Aucune donnée de recrutement clôturé disponible")
         return
     
@@ -690,50 +694,8 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                     orientation="v", 
                     yanchor="middle"
                 )
-        # Truncate long labels for readability, keep full label in customdata for hover
-        df_direction['Label_trunc'] = df_direction['Direction'].apply(lambda s: _truncate_label(s, max_len=24))
-        # Ensure a display label exists (truncated + small gap) to be used for axis and ordering
-        if 'Label_display' not in df_direction.columns:
-            df_direction['Label_display'] = df_direction['Label_trunc'] + '\u00A0\u00A0'
-        # Add two non-breaking spaces to create visual gap between label and bar
-        df_direction['Label_display'] = df_direction['Label_trunc'] + '\u00A0\u00A0'
-        fig_direction = px.bar(
-            df_direction,
-            x='Count',
-            y='Label_display',
-            title="Comparaison par direction",
-            text='Count',
-            orientation='h',
-            custom_data=['Direction']
-        )
-        fig_direction.update_traces(
-            marker_color='#ff7f0e',
-            textposition='inside',
-            texttemplate='%{x}',
-            textfont=dict(size=11),
-            textangle=90,
-            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
-        )
-        try:
-            fig_direction.update_layout(title=dict(text="Comparaison par direction", x=0, xanchor='left', font=TITLE_FONT))
-        except Exception:
-            pass
-        # Standardize title styling (left aligned)
-        try:
-            fig_direction.update_layout(title=dict(text="Comparaison par direction", x=0, xanchor='left', font=TITLE_FONT))
-        except Exception:
-            pass
-        # Largest at top: reverse the category array so descending values appear from top to bottom
-        height_dir = max(300, 28 * len(df_direction))
-        fig_direction.update_layout(
-            height=height_dir,
-            xaxis_title=None,
-            yaxis_title=None,
-            margin=dict(l=160, t=40, b=30, r=20),
-            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_direction['Label_display'][::-1]))
-        )
-        # Use a compact default visible area (320px) and allow scrolling to see rest
-        render_plotly_scrollable(fig_direction, max_height=320)
+            )
+        # (Bloc direction supprimé car non défini ici)
 
     with col4:
         # Comparaison par poste
@@ -1145,12 +1107,12 @@ def create_integrations_tab(df_recrutement, global_filters):
                         day, month, year = date_str.split('/')
                         if len(day) <= 2 and len(month) <= 2 and len(year) == 4:
                             parsed_date = pd.to_datetime(f"{day}/{month}/{year}", format='%d/%m/%Y', errors='coerce')
-                            if pd.notna(parsed_date) and hasattr(parsed_date, 'strftime'):
+                            if pd.notna(parsed_date) and hasattr(parsed_date, 'strftime') and isinstance(parsed_date, pd.Timestamp):
                                 return parsed_date.strftime('%d/%m/%Y')
                     
                     # Fallback: laisser pandas deviner puis reformater
                     parsed_date = pd.to_datetime(date_str, errors='coerce')
-                    if pd.notna(parsed_date) and hasattr(parsed_date, 'strftime'):
+                    if pd.notna(parsed_date) and hasattr(parsed_date, 'strftime') and isinstance(parsed_date, pd.Timestamp):
                         return parsed_date.strftime('%d/%m/%Y')
                     else:
                         return 'N/A'
@@ -2201,4 +2163,4 @@ def main():
             st.warning("📊 Aucune donnée disponible pour les intégrations. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
 
 if __name__ == "__main__":
-    main()
+    pass
