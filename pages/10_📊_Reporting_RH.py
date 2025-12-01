@@ -1502,7 +1502,10 @@ def calculate_weekly_metrics(df_recrutement):
             if real_accept_col and real_accept_col in df_entite.columns:
                 mask_old_accept = (df_entite[real_accept_col] < previous_monday)
             # Règle stricte : "Postes en cours" = statut 'En cours' ET sans candidat ET pas d'acceptation ancienne
-            mask_sourcing = mask_status_en_cours & (~mask_has_name_local)
+            if mask_has_name_local is not None:
+                mask_sourcing = mask_status_en_cours & (~mask_has_name_local)
+            else:
+                mask_sourcing = mask_status_en_cours
             if mask_old_accept is not None:
                 mask_sourcing = mask_sourcing & (~mask_old_accept)
 
@@ -1566,22 +1569,10 @@ def create_weekly_report_tab(df_recrutement=None):
     st.markdown("---")
 
     # Tableau récapitulatif par entité (HTML personnalisé, rendu centralisé)
-    c1, c2 = st.columns([16,1])
-    with c1:
-        st.subheader("📊 Besoins en Cours par Entité")
-    with c2:
-        if st.button("?", help="Explication du calcul des colonnes", key="help_besoins_en_cours"):
-            st.info("""
-**Nb postes ouverts avant début semaine** : demandes dont la date de réception est antérieure au lundi de la semaine de reporting, et qui ne sont pas clôturées/annulées. Les lignes avec une date d'acceptation du candidat antérieure à la semaine précédente sont également exclues.
-
-**Nb nouveaux postes ouverts cette semaine** : demandes validées par la DRH entre le lundi et le vendredi de la semaine précédente.
-
-**Nb postes pourvus cette semaine** : postes pour lesquels un candidat a accepté (ou date d'intégration) dans la même fenêtre temporelle.
-
-**Nb postes en cours cette semaine (sourcing)** : calculé comme (nouveaux + avant - pourvus), ou plus précisément comme les lignes avec statut "En cours" et sans candidat retenu. Les lignes avec une date d'acceptation du candidat antérieure à la semaine précédente sont également exclues, même si le statut est "En cours".
-
-**Nb postes statut 'En cours' (total)** : nombre de lignes avec statut "En cours" (peut inclure celles avec candidat).
-            """)
+    st.markdown(
+        '<div style="display: flex; align-items: center;">'
+        '<span style="font-size: 1.25em; font-weight: 600;">📊 Besoins en Cours par Entité</span>'
+        '<span style="margin-left: 8px; cursor: pointer;" title="\n**Nb postes ouverts avant début semaine** : demandes dont la date de réception est antérieure au lundi de la semaine de reporting, et qui ne sont pas clôturées/annulées. Les lignes avec une date d\'acceptation du candidat antérieure à la semaine précédente sont également exclues.\n\n**Nb nouveaux postes ouverts cette semaine** : demandes validées par la DRH entre le lundi et le vendredi de la semaine précédente.\n\n**Nb postes pourvus cette semaine** : postes pour lesquels un candidat a accepté (ou date d\'intégration) dans la même fenêtre temporelle.\n\n**Nb postes en cours cette semaine (sourcing)** : calculé comme (nouveaux + avant - pourvus), ou plus précisément comme les lignes avec statut \"En cours\" et sans candidat retenu. Les lignes avec une date d\'acceptation du candidat antérieure à la semaine précédente sont également exclues, même si le statut est \"En cours\".\n\n**Nb postes statut \'En cours\' (total)** : nombre de lignes avec statut \"En cours\" (peut inclure celles avec candidat).\n"'>❓</span></div>', unsafe_allow_html=True)
     if metrics and len(metrics) > 0:
         # Préparer les données pour le HTML
         table_data = []
