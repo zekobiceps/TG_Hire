@@ -1572,7 +1572,9 @@ def create_weekly_report_tab(df_recrutement=None):
     st.markdown(
         '<div style="display: flex; align-items: center;">'
         '<span style="font-size: 1.25em; font-weight: 600;">📊 Besoins en Cours par Entité</span>'
-        '<span style="margin-left: 8px; cursor: pointer;" title="\n**Nb postes ouverts avant début semaine** : demandes dont la date de réception est antérieure au lundi de la semaine de reporting, et qui ne sont pas clôturées/annulées. Les lignes avec une date d\'acceptation du candidat antérieure à la semaine précédente sont également exclues.\n\n**Nb nouveaux postes ouverts cette semaine** : demandes validées par la DRH entre le lundi et le vendredi de la semaine précédente.\n\n**Nb postes pourvus cette semaine** : postes pour lesquels un candidat a accepté (ou date d\'intégration) dans la même fenêtre temporelle.\n\n**Nb postes en cours cette semaine (sourcing)** : calculé comme (nouveaux + avant - pourvus), ou plus précisément comme les lignes avec statut \"En cours\" et sans candidat retenu. Les lignes avec une date d\'acceptation du candidat antérieure à la semaine précédente sont également exclues, même si le statut est \"En cours\".\n\n**Nb postes statut \'En cours\' (total)** : nombre de lignes avec statut \"En cours\" (peut inclure celles avec candidat).\n"'>❓</span></div>', unsafe_allow_html=True)
+        '<span style="margin-left: 8px; cursor: pointer;" title="\n**Nb postes ouverts avant début semaine** : demandes dont la date de réception est antérieure au lundi de la semaine de reporting, et qui ne sont pas clôturées/annulées. Les lignes avec une date d\'acceptation du candidat antérieure à la semaine précédente sont également exclues.\n\n**Nb nouveaux postes ouverts cette semaine** : demandes validées par la DRH entre le lundi et le vendredi de la semaine précédente.\n\n**Nb postes pourvus cette semaine** : postes pour lesquels un candidat a accepté (ou date d\'intégration) dans la même fenêtre temporelle.\n\n**Nb postes en cours cette semaine (sourcing)** : calculé comme (nouveaux + avant - pourvus), ou plus précisément comme les lignes avec statut \"En cours\" et sans candidat retenu. Les lignes avec une date d\'acceptation du candidat antérieure à la semaine précédente sont également exclues, même si le statut est \"En cours\".\n\n**Nb postes statut \'En cours\' (total)** : nombre de lignes avec statut \"En cours\" (peut inclure celles avec candidat).\n">?</span></div>',
+        unsafe_allow_html=True
+    )
     if metrics and len(metrics) > 0:
         # Préparer les données pour le HTML
         table_data = []
@@ -1811,7 +1813,8 @@ def create_weekly_report_tab(df_recrutement=None):
                 # Re-create the same date ranges as in `calculate_weekly_metrics` for consistency
                 start_of_week = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
                 previous_monday = start_of_week - timedelta(days=7)
-                previous_friday_exclusive = (start_of_week - timedelta(days=3)) + timedelta(days=1) # Vendredi + 1 jour
+                previous_friday_exclusive = (start_of_week - timedelta(days=3))
+                previous_friday_exclusive = previous_friday_exclusive + timedelta(days=1)  # Vendredi + 1 jour
 
                 if real_date_reception_col and real_date_reception_col in df_debug.columns:
                     df_debug[real_date_reception_col] = pd.to_datetime(df_debug[real_date_reception_col], errors='coerce')
