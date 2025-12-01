@@ -340,12 +340,19 @@ def normalize_hr_database(df):
         df['Affectation'] = df['Service']
     # Nombre_relances en int
     if 'Nombre_relances' in df.columns:
-        df['Nombre_relances'] = pd.to_numeric(df['Nombre_relances'], errors='coerce').fillna(0).astype(int)
+        if isinstance(df['Nombre_relances'], pd.Series):
+            df['Nombre_relances'] = pd.to_numeric(df['Nombre_relances'], errors='coerce')
+            df['Nombre_relances'] = df['Nombre_relances'].fillna(0).astype(int)
+        else:
+            df['Nombre_relances'] = 0
     else:
         df['Nombre_relances'] = 0
     # Documents_manquants assurer string JSON
     if 'Documents_manquants' in df.columns:
-        df['Documents_manquants'] = df['Documents_manquants'].fillna('[]').astype(str)
+        if isinstance(df['Documents_manquants'], pd.Series):
+            df['Documents_manquants'] = df['Documents_manquants'].fillna('[]').astype(str)
+        else:
+            df['Documents_manquants'] = '[]'
     else:
         df['Documents_manquants'] = '[]'
     return df
@@ -438,29 +445,6 @@ def get_missing_documents_count(documents_json):
         return len(docs)
     except:
         return 0
-
-
-def normalize_hr_database(df):
-    """Normalise les colonnes et types du DataFrame HR pour éviter les problèmes
-    si l'en-tête de la feuille change entre 'Service' et 'Affectation'."""
-    if df is None or len(df) == 0:
-        return df
-    # Supporter à la fois 'Service' et 'Affectation'
-    if 'Affectation' in df.columns and 'Service' not in df.columns:
-        df['Service'] = df['Affectation']
-    if 'Service' in df.columns and 'Affectation' not in df.columns:
-        df['Affectation'] = df['Service']
-    # Nombre_relances en int
-    if 'Nombre_relances' in df.columns:
-        df['Nombre_relances'] = pd.to_numeric(df['Nombre_relances'], errors='coerce').fillna(0).astype(int)
-    else:
-        df['Nombre_relances'] = 0
-    # Documents_manquants assurer string JSON
-    if 'Documents_manquants' in df.columns:
-        df['Documents_manquants'] = df['Documents_manquants'].fillna('[]').astype(str)
-    else:
-        df['Documents_manquants'] = '[]'
-    return df
 
 def send_email_reminder(
     recipient_email,
@@ -652,7 +636,7 @@ with tab1:
                             df_service[stc] = 0
 
                     # Retirer les affectations où il n'y a aucune entrée
-                    df_service = df_service[df_service[['Complet', 'En cours']].sum(axis=1) > 0]
+                    df_service = df_service[df_service[['Complet', 'En cours']].sum(axis=0) > 0]
 
                     # Trier par nombre de dossiers 'En cours' décroissant pour montrer d'abord les chantiers les plus problématiques
                     if 'En cours' in df_service.columns:
@@ -972,14 +956,14 @@ with tab2:
                 collab_data = st.session_state.hr_database.iloc[selected_idx]
                 
                 # Afficher le statut actuel, et si complet ajouter le message de dossier complet sur la même ligne
-                if collab_data['Statut'] == 'Complet':
+                if isinstance(collab_data, pd.Series) and collab_data.get('Statut', None) == 'Complet':
                     st.info(f"📊 Statut actuel: **{collab_data['Statut']}** — ✅ Dossier complet - Aucun document manquant!")
                 else:
                     st.info(f"📊 Statut actuel: **{collab_data['Statut']}**")
                 
                 # Afficher les documents actuellement manquants
                 try:
-                    current_missing = json.loads(collab_data['Documents_manquants'])
+                    current_missing = json.loads(str(collab_data['Documents_manquants']))
                 except:
                     current_missing = []
                 

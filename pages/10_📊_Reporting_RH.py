@@ -2045,7 +2045,7 @@ def create_weekly_report_tab(df_recrutement=None):
         return None
 
     cols = df_recrutement.columns.tolist() if df_recrutement is not None else []
-    kanban_col = _find_col(cols, ['kanban'])
+    kanban_col = _find_col(cols, ['colonne tg hire', 'kanban'])
     statut_demande_col = _find_col(cols, ['statut de la demande', 'statut demande'])
     poste_col = _find_col(cols, ['poste', 'title', 'post'])
     entite_col = _find_col(cols, ['entité', 'entite', 'entité demandeuse', 'entite demandeuse', 'entité'])
@@ -2088,7 +2088,26 @@ def create_weekly_report_tab(df_recrutement=None):
             lambda x: 'en cours' in _normalize_kanban(x) if pd.notna(x) else False
         )
         df_kanban = df_recrutement[mask_en_cours].copy()
-        
+
+        # Remplir la colonne "Colonne TG Hire" avec le statut Kanban mappé
+        if 'Colonne TG Hire' in df_kanban.columns:
+            df_kanban['Colonne TG Hire'] = df_kanban['Colonne TG Hire'].astype(str)
+            for idx, r in df_kanban.iterrows():
+                raw_kanban = r.get('Colonne TG Hire')
+                norm = _normalize_kanban(raw_kanban)
+                canon = None
+                for key, val in status_map.items():
+                    if key in norm:
+                        canon = val
+                        break
+                if canon is None:
+                    for tgt in statuts_kanban_display:
+                        if _normalize_kanban(tgt) == norm:
+                            canon = tgt
+                            break
+                if canon is not None:
+                    df_kanban.at[idx, 'Colonne TG Hire'] = canon
+
         # Ensuite lire la colonne Kanban pour chaque ligne
         for _, r in df_kanban.iterrows():
             raw_kanban = r.get(kanban_col)
@@ -2096,18 +2115,15 @@ def create_weekly_report_tab(df_recrutement=None):
                 continue
             norm = _normalize_kanban(raw_kanban)
             canon = None
-            # find mapping by substring
             for key, val in status_map.items():
                 if key in norm:
                     canon = val
                     break
-            # default fallback: essayer de matcher directement
             if canon is None:
                 for tgt in statuts_kanban_display:
                     if _normalize_kanban(tgt) == norm:
                         canon = tgt
                         break
-            # Si toujours pas de match, ignorer cette ligne
             if canon is None:
                 continue
 

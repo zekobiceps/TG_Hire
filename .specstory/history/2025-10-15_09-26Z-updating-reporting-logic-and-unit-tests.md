@@ -9601,3 +9601,173 @@ Let me know if you need further changes or want to test the app!
 
 ---
 
+_**User (2025-12-01 09:17Z)**_
+
+j'ai renomé la colonne qui existe dans mon fichier que j'importe et qui se situe dans la colonne numéro "AH" par "Colonne TG Hire" dans cette colonne tu es censé récupérer les informations du "Pipeline de Recrutement (Kanban)"
+
+---
+
+_**Agent (model copilot/gpt-4.1)**_
+
+
+```
+
+```
+La logique Kanban utilise désormais la colonne renommée "Colonne TG Hire" pour détecter et remplir les statuts du Pipeline de Recrutement. Toutes les références sont à jour et la colonne est automatiquement remplie avec le statut mappé pour chaque ligne.
+
+Vous pouvez maintenant importer votre fichier et retrouver les informations du Kanban dans "Colonne TG Hire". Voulez-vous tester ou valider l'affichage ?
+
+---
+
+_**User (2025-12-01 09:21Z)**_
+
+" corrige ses erreur " [{
+	"resource": "/workspaces/TG_Hire/pages/11_📋_Suivi des Dossiers RH.py",
+	"owner": "Pylance5",
+	"code": {
+		"value": "reportRedeclaration",
+		"target": {
+			"$mid": 1,
+			"path": "/microsoft/pylance-release/blob/main/docs/diagnostics/reportRedeclaration.md",
+			"scheme": "https",
+			"authority": "github.com"
+		}
+	},
+	"severity": 8,
+	"message": "Function declaration \"normalize_hr_database\" is obscured by a declaration of the same name",
+	"source": "Pylance",
+	"startLineNumber": 325,
+	"startColumn": 5,
+	"endLineNumber": 325,
+	"endColumn": 26,
+	"relatedInformation": [
+		{
+			"startLineNumber": 443,
+			"startColumn": 5,
+			"endLineNumber": 443,
+			"endColumn": 26,
+			"message": "See function declaration",
+			"resource": "/workspaces/TG_Hire/pages/11_📋_Suivi des Dossiers RH.py"
+		}
+	],
+	"origin": "extHost2"
+},{
+	"resource": "/workspaces/TG_Hire/pages/11_📋_Suivi des Dossiers RH.py",
+	"owner": "Pylance5",
+	"code": {
+		"value": "reportAttributeAccessIssue",
+		"target": {
+			"$mid": 1,
+			"path": "/microsoft/pylance-release/blob/main/docs/diagnostics/reportAttributeAccessIssue.md",
+			"scheme": "https",
+			"authority": "github.com"
+		}
+	},
+	"severity": 8,
+	"message": "Cannot access attribute \"fillna\" for class \"float\"\n  Attribute \"fillna\" is unknown",
+	"source": "Pylance",
+	"startLineNumber": 343,
+	"startColumn": 87,
+	"endLineNumber": 343,
+	"endColumn": 93,
+	"origin": "extHost2"
+},{
+	"resource": "/workspaces/TG_Hire/pages/11_📋_Suivi des Dossiers RH.py",
+	"owner": "Pylance5",
+	"code": {
+		"value": "reportCallIssue",
+		"target": {
+			"$mid": 1,
+			"path": "/microsoft/pylance-release/blob/main/docs/diagnostics/reportCallIssue.md",
+			"scheme": "https",
+			"authority": "github.com"
+		}
+	},
+	"severity": 8,
+	"message": "No overloads for \"sum\" match the provided arguments",
+	"source": "Pylance",
+	"startLineNumber": 655,
+	"startColumn": 45,
+	"endLineNumber": 655,
+	"endColumn": 92,
+	"relatedInformation": [
+		{
+			"startLineNumber": 7284,
+			"startColumn": 9,
+			"endLineNumber": 7284,
+			"endColumn": 12,
+			"message": "Overload 3 is the closest match",
+			"resource": "/home/vscode/.vscode-remote/extensions/ms-python.vscode-pylance-2025.10.2/dist/bundled/stubs/pandas/core/series.pyi"
+		}
+	],
+	"origin": "extHost2"
+},{
+	"resource": "/workspaces/TG_Hire/pages/11_📋_Suivi des Dossiers RH.py",
+	"owner": "Pylance5",
+	"code": {
+		"value": "reportArgumentType",
+		"target": {
+			"$mid": 1,
+			"path": "/microsoft/pylance-release/blob/main/docs/diagnostics/reportArgumentType.md",
+			"scheme": "https",
+			"authority": "github.com"
+		}
+	},
+	"severity": 8,
+	"message": "Argument of type \"Literal[1]\" cannot be assigned to parameter \"axis\" of type \"AxisIndex | None\" in function \"sum\"\n  Type \"Literal[1]\" is not assignable to type \"AxisIndex | None\"\n    \"Literal[1]\" is not assignable to \"None\"\n    \"Literal[1]\" is not assignable to \"Literal['index']\"\n    \"Literal[1]\" is not assignable to type \"Literal[0]\"",
+	"source": "Pylance",
+	"startLineNumber": 655,
+	"startColumn": 90,
+	"endLineNumber": 655,
+	"endColumn": 91,
+	"origin": "extHost2"
+},{
+	"resource": "/workspaces/TG_Hire/pages/11_📋_Suivi des Dossiers RH.py",
+	"owner": "Pylance5",
+	"code": {
+		"value": "reportGeneralTypeIssues",
+		"target": {
+			"$mid": 1,
+			"path": "/microsoft/pylance-release/blob/main/docs/diagnostics/reportGeneralTypeIssues.md",
+			"scheme": "https",
+			"authority": "github.com"
+		}
+	},
+	"severity": 8,
+	"message": "Invalid conditional operand of type \"Unknown | Series[bool]\"\n  Method __bool__ for type \"Series[bool]\" returns type \"NoReturn\" rather than \"bool\"",
+	"source": "Pylance",
+	"startLineNumber": 975,
+	"startColumn": 20,
+	"endLineNumber": 975,
+	"endColumn": 54,
+	"origin": "extHost2"
+},{
+	"resource": "/workspaces/TG_Hire/pages/11_📋_Suivi des Dossiers RH.py",
+	"owner": "Pylance5",
+	"code": {
+		"value": "reportArgumentType",
+		"target": {
+			"$mid": 1,
+			"path": "/microsoft/pylance-release/blob/main/docs/diagnostics/reportArgumentType.md",
+			"scheme": "https",
+			"authority": "github.com"
+		}
+	},
+	"severity": 8,
+	"message": "Argument of type \"Unknown | Series[Any]\" cannot be assigned to parameter \"s\" of type \"str | bytes | bytearray\" in function \"loads\"\n  Type \"Unknown | Series[Any]\" is not assignable to type \"str | bytes | bytearray\"\n    Type \"Series[Any]\" is not assignable to type \"str | bytes | bytearray\"\n      \"Series[Any]\" is not assignable to \"str\"\n      \"Series[Any]\" is not assignable to \"bytes\"\n      \"Series[Any]\" is not assignable to \"bytearray\"",
+	"source": "Pylance",
+	"startLineNumber": 982,
+	"startColumn": 50,
+	"endLineNumber": 982,
+	"endColumn": 84,
+	"origin": "extHost2"
+}]"
+
+---
+
+_**Agent (model copilot/gpt-4.1)**_
+
+
+
+---
+
