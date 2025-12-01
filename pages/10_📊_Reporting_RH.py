@@ -2069,6 +2069,7 @@ def create_weekly_report_tab(df_recrutement=None):
     demandeur_col = _find_col(cols, ['demandeur', 'requester'])
     recruteur_col = _find_col(cols, ['recruteur', 'recruiter'])
     commentaire_col = _find_col(cols, ['commentaire', 'comment'])
+    accept_date_col = _find_col(cols, ["date d'acceptation du candidat", "date d'acceptation", "date d'acceptation de la promesse", "date d'acceptation promesse", "date d'accept"])  # robust search
 
     def _normalize_kanban(text):
         if text is None or (isinstance(text, float) and np.isnan(text)):
@@ -2121,6 +2122,8 @@ def create_weekly_report_tab(df_recrutement=None):
                 continue
 
             titre = r.get(poste_col, '') if poste_col else r.get('Poste demandé', '')
+            # Ajout de la date d'acceptation du candidat pour le filtrage "Clôture"
+            accept_date = r.get(accept_date_col) if accept_date_col else None
             postes_data.append({
                 'statut': canon,
                 'titre': titre or '',
@@ -2128,7 +2131,8 @@ def create_weekly_report_tab(df_recrutement=None):
                 'lieu': r.get(lieu_col, '') if lieu_col else '',
                 'demandeur': r.get(demandeur_col, '') if demandeur_col else '',
                 'recruteur': r.get(recruteur_col, '') if recruteur_col else '',
-                'commentaire': r.get(commentaire_col, '') if commentaire_col else ''
+                'commentaire': r.get(commentaire_col, '') if commentaire_col else '',
+                'date_acceptation': accept_date
             })
     
     # Afficher le titre avec le nombre total de cartes
