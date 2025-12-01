@@ -2062,8 +2062,7 @@ def create_weekly_report_tab(df_recrutement=None):
         return None
 
     cols = df_recrutement.columns.tolist() if df_recrutement is not None else []
-    kanban_col = _find_col(cols, ['colonne tg hire', 'kanban'])
-    statut_demande_col = _find_col(cols, ['statut de la demande', 'statut demande'])
+    kanban_col = 'Colonne TG Hire' if 'Colonne TG Hire' in cols else _find_col(cols, ['colonne tg hire'])
     poste_col = _find_col(cols, ['poste', 'title', 'post'])
     entite_col = _find_col(cols, ['entité', 'entite', 'entité demandeuse', 'entite demandeuse', 'entité'])
     lieu_col = _find_col(cols, ['lieu', 'affectation', 'site'])
@@ -2099,33 +2098,10 @@ def create_weekly_report_tab(df_recrutement=None):
     }
 
     postes_data = []
-    if df_recrutement is not None and kanban_col and statut_demande_col:
-        # Filtrer d'abord les lignes avec statut "En cours"
-        mask_en_cours = df_recrutement[statut_demande_col].apply(
-            lambda x: 'en cours' in _normalize_kanban(x) if pd.notna(x) else False
-        )
-        df_kanban = df_recrutement[mask_en_cours].copy()
-
-        # Remplir la colonne "Colonne TG Hire" avec le statut Kanban mappé
-        if 'Colonne TG Hire' in df_kanban.columns:
-            df_kanban['Colonne TG Hire'] = df_kanban['Colonne TG Hire'].astype(str)
-            for idx, r in df_kanban.iterrows():
-                raw_kanban = r.get('Colonne TG Hire')
-                norm = _normalize_kanban(raw_kanban)
-                canon = None
-                for key, val in status_map.items():
-                    if key in norm:
-                        canon = val
-                        break
-                if canon is None:
-                    for tgt in statuts_kanban_display:
-                        if _normalize_kanban(tgt) == norm:
-                            canon = tgt
-                            break
-                if canon is not None:
-                    df_kanban.at[idx, 'Colonne TG Hire'] = canon
-
-        # Ensuite lire la colonne Kanban pour chaque ligne
+    if df_recrutement is not None and kanban_col:
+        # Utiliser uniquement la colonne "Colonne TG Hire" pour le statut Kanban
+        df_kanban = df_recrutement[df_recrutement[kanban_col].notna()].copy()
+        df_kanban[kanban_col] = df_kanban[kanban_col].astype(str)
         for _, r in df_kanban.iterrows():
             raw_kanban = r.get(kanban_col)
             if pd.isna(raw_kanban):
