@@ -1425,18 +1425,19 @@ def calculate_weekly_metrics(df_recrutement):
         # au vendredi de la semaine précédente (i.e. < previous_friday)
         postes_avant = 0
         if real_date_reception_col and real_date_reception_col in df_entite.columns:
-            # 'avant' = toutes les demandes antérieures au début de la semaine précédente (previous_monday)
-            # Exclure les demandes déjà clôturées/annulées pour éviter de compter de vieux dossiers fermés.
             mask_date_avant = df_entite[real_date_reception_col] < previous_monday
             mask_not_closed = None
             if not include_closed and real_statut_col and real_statut_col in df_entite.columns:
-                # Si l'utilisateur a demandé d'exclure les fermés, construire le masque
                 mask_not_closed = ~df_entite[real_statut_col].fillna("").astype(str).apply(lambda s: any(k in _norm(s) for k in closed_keywords))
-            # Appliquer les deux masques si disponibles (si include_closed True, on n'applique pas le filtre)
+            # Exclure les lignes avec une date d'acceptation du candidat antérieure à la semaine précédente
+            mask_old_accept = None
+            if real_accept_col and real_accept_col in df_entite.columns:
+                mask_old_accept = (df_entite[real_accept_col] < previous_monday)
+            mask_avant = mask_date_avant
             if mask_not_closed is not None:
-                mask_avant = mask_date_avant & mask_not_closed
-            else:
-                mask_avant = mask_date_avant
+                mask_avant = mask_avant & mask_not_closed
+            if mask_old_accept is not None:
+                mask_avant = mask_avant & (~mask_old_accept)
             postes_avant = int(df_entite[mask_avant].shape[0])
         else:
             postes_avant = 0
@@ -1565,10 +1566,13 @@ def create_weekly_report_tab(df_recrutement=None):
     st.markdown("---")
 
     # Tableau récapitulatif par entité (HTML personnalisé, rendu centralisé)
-    st.subheader("📊 Besoins en Cours par Entité")
-    if st.button("❓ Help - Explication des colonnes", help="Afficher l'explication du calcul des colonnes"):
-        st.info("""
-**Nb postes ouverts avant début semaine** : demandes dont la date de réception est antérieure au lundi de la semaine de reporting, et qui ne sont pas clôturées/annulées.
+    c1, c2 = st.columns([16,1])
+    with c1:
+        st.subheader("📊 Besoins en Cours par Entité")
+    with c2:
+        if st.button("?", help="Explication du calcul des colonnes", key="help_besoins_en_cours"):
+            st.info("""
+**Nb postes ouverts avant début semaine** : demandes dont la date de réception est antérieure au lundi de la semaine de reporting, et qui ne sont pas clôturées/annulées. Les lignes avec une date d'acceptation du candidat antérieure à la semaine précédente sont également exclues.
 
 **Nb nouveaux postes ouverts cette semaine** : demandes validées par la DRH entre le lundi et le vendredi de la semaine précédente.
 
@@ -1577,7 +1581,7 @@ def create_weekly_report_tab(df_recrutement=None):
 **Nb postes en cours cette semaine (sourcing)** : calculé comme (nouveaux + avant - pourvus), ou plus précisément comme les lignes avec statut "En cours" et sans candidat retenu. Les lignes avec une date d'acceptation du candidat antérieure à la semaine précédente sont également exclues, même si le statut est "En cours".
 
 **Nb postes statut 'En cours' (total)** : nombre de lignes avec statut "En cours" (peut inclure celles avec candidat).
-        """)
+            """)
     if metrics and len(metrics) > 0:
         # Préparer les données pour le HTML
         table_data = []
