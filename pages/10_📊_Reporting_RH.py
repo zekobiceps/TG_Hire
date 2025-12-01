@@ -1572,7 +1572,7 @@ def create_weekly_report_tab(df_recrutement=None):
     st.markdown(
         '<div style="display: flex; align-items: center;">'
         '<span style="font-size: 1.25em; font-weight: 600;">📊 Besoins en Cours par Entité</span>'
-        '<span style="margin-left: 8px; cursor: pointer;" title="\n**Nb postes ouverts avant début semaine** : demandes dont la date de réception est antérieure au lundi de la semaine de reporting, et qui ne sont pas clôturées/annulées. Les lignes avec une date d\'acceptation du candidat antérieure à la semaine précédente sont également exclues.\n\n**Nb nouveaux postes ouverts cette semaine** : demandes validées par la DRH entre le lundi et le vendredi de la semaine précédente.\n\n**Nb postes pourvus cette semaine** : postes pour lesquels un candidat a accepté (ou date d\'intégration) dans la même fenêtre temporelle.\n\n**Nb postes en cours cette semaine (sourcing)** : calculé comme (nouveaux + avant - pourvus), ou plus précisément comme les lignes avec statut \"En cours\" et sans candidat retenu. Les lignes avec une date d\'acceptation du candidat antérieure à la semaine précédente sont également exclues, même si le statut est \"En cours\".\n\n**Nb postes statut \'En cours\' (total)** : nombre de lignes avec statut \"En cours\" (peut inclure celles avec candidat).\n">?</span></div>',
+        '<span style="margin-left: 8px; cursor: pointer;" title="">?</span></div>',
         unsafe_allow_html=True
     )
     if metrics and len(metrics) > 0:
@@ -1745,6 +1745,14 @@ def create_weekly_report_tab(df_recrutement=None):
 
     # Section Debug (expandable): montrer les lignes et pourquoi elles sont comptées
     with st.expander("🔍 Debug - Détails des lignes", expanded=False):
+        st.markdown("""
+        **Explication des KPI du tableau 'Besoins en Cours par Entité'**
+        - **Nb postes ouverts avant début semaine** : demandes dont la date de réception est antérieure au lundi de la semaine de reporting, et qui ne sont pas clôturées/annulées. Les lignes avec une date d'acceptation du candidat antérieure à la semaine précédente sont également exclues.
+        - **Nb nouveaux postes ouverts cette semaine** : demandes validées par la DRH entre le lundi et le vendredi de la semaine précédente.
+        - **Nb postes pourvus cette semaine** : postes pour lesquels un candidat a accepté (ou date d'intégration) dans la même fenêtre temporelle.
+        - **Nb postes en cours cette semaine (sourcing)** : calculé comme (nouveaux + avant - pourvus), ou plus précisément comme les lignes avec statut "En cours" et sans candidat retenu. Les lignes avec une date d'acceptation du candidat antérieure à la semaine précédente sont également exclues, même si le statut est "En cours".
+        - **Nb postes statut 'En cours' (total)** : nombre de lignes avec statut "En cours" (peut inclure celles avec candidat).
+        """)
         try:
             df_debug = df_recrutement.copy() if df_recrutement is not None else pd.DataFrame()
             if not df_debug.empty:
@@ -2198,18 +2206,39 @@ def create_weekly_report_tab(df_recrutement=None):
     for i, statut in enumerate(statuts_kanban_display):
         with cols_streamlit[i]:
             # Filtrer les postes pour cette colonne
-            postes_in_col = [p for p in postes_data if p["statut"] == statut]
+            if statut == "Clôture":
+                # Afficher uniquement ceux de la semaine du reporting
+                # On utilise la date d'acceptation du candidat pour filtrer
+                # Récupérer la date de reporting
+                reporting_date = st.session_state.get('reporting_date', None)
+                if reporting_date is None:
+                    today = datetime.now()
+                else:
+                    today = reporting_date if isinstance(reporting_date, datetime) else datetime.combine(reporting_date, datetime.min.time())
+                start_of_week = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
+                end_of_week = start_of_week + timedelta(days=4)  # Lundi à Vendredi inclus
+                # Filtrer les postes clôturés avec date d'acceptation dans la semaine du reporting
+                def in_reporting_week(poste):
+                    accept_date = poste.get('date_acceptation')
+                    if not accept_date:
+                        return False
+                    if isinstance(accept_date, str):
+                        try:
+                            accept_date = pd.to_datetime(accept_date, errors='coerce')
+                        except Exception:
+                            return False
+                    if not pd.notna(accept_date):
+                        return False
+                    return start_of_week <= accept_date <= end_of_week
+                postes_in_col = [p for p in postes_data if p["statut"] == statut and in_reporting_week(p)]
+            else:
+                postes_in_col = [p for p in postes_data if p["statut"] == statut]
             nb_postes = len(postes_in_col)
-            
             # En-tête de colonne avec le nombre de cartes
             st.markdown(f'<div class="kanban-header">{statut} ({nb_postes})</div>', unsafe_allow_html=True)
-            
             # Afficher les cartes avec 3 par ligne
             for idx in range(0, len(postes_in_col), 3):
-                # Créer une ligne avec 3 cartes maximum
                 card_cols = st.columns(3)
-                
-                # Première carte de la ligne
                 if idx < len(postes_in_col):
                     poste = postes_in_col[idx]
                     commentaire = poste.get('commentaire', '')
@@ -2225,8 +2254,6 @@ def create_weekly_report_tab(df_recrutement=None):
                         </div>
                         """
                         st.markdown(card_html, unsafe_allow_html=True)
-                
-                # Deuxième carte de la ligne (si elle existe)
                 if idx + 1 < len(postes_in_col):
                     poste = postes_in_col[idx + 1]
                     commentaire = poste.get('commentaire', '')
@@ -2242,8 +2269,6 @@ def create_weekly_report_tab(df_recrutement=None):
                         </div>
                         """
                         st.markdown(card_html, unsafe_allow_html=True)
-                
-                # Troisième carte de la ligne (si elle existe)
                 if idx + 2 < len(postes_in_col):
                     poste = postes_in_col[idx + 2]
                     commentaire = poste.get('commentaire', '')
@@ -2260,7 +2285,6 @@ def create_weekly_report_tab(df_recrutement=None):
                         """
                         st.markdown(card_html, unsafe_allow_html=True)
                 else:
-                    # Colonne vide si moins de 3 cartes
                     with card_cols[2]:
                         st.empty()
 
