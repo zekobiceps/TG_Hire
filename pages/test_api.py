@@ -1150,7 +1150,7 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
             with c_excl:
                 st.text_area("🚫 Critères d'exclusion", key="criteres_exclusion", height=260, value=brief_data.get("CRITERES_EXCLUSION", st.session_state.get("criteres_exclusion","")), placeholder="Ex: Moins de 3 ans d'expérience / Refus mobilité / Salaire hors budget")
             with c_proc:
-                st.text_area("✅ Etapes suivantes", key="processus_evaluation", height=420, value=st.session_state.get("processus_evaluation", brief_data.get("PROCESSUS_EVALUATION","")))
+                st.text_area("✅ Etapes suivantes", key="processus_evaluation", height=420, value=st.session_state.get("processus_evaluation", brief_data.get("PROCESSUS_EVALUATION","")), placeholder="Ex: Étapes du processus d'évaluation pour ce poste")
             # Sauvegarde auto (pas de bouton)
             brief_data["canaux_prioritaires"] = st.session_state.get("canaux_prioritaires", [])
             brief_data["CANAUX_PRIORITAIRES"] = json.dumps(brief_data["canaux_prioritaires"], ensure_ascii=False)
