@@ -673,8 +673,13 @@ with tabs[0]:
                 except Exception:
                     pass
                 refresh_saved_briefs()
-                st.success("✅ Modifications sauvegardées.")
-                st.rerun()
+                # Add a flag to prevent multiple reruns
+                if "brief_saved" not in st.session_state:
+                    st.session_state.brief_saved = False
+                if not st.session_state.brief_saved:
+                    st.success("✅ Modifications sauvegardées.")
+                    st.session_state.brief_saved = True
+                    st.rerun()
         else:
             # Mode création d'un nouveau brief
             if st.button("💾 Créer brief", type="primary", width="stretch", key="create_brief"):
