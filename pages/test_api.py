@@ -1378,13 +1378,39 @@ def fetch_data_with_rate_limit():
         except Exception as e:
             st.error(f"Erreur : {e}")
 
-# Example usage in Streamlit
-st.title("Gestion des appels API Google Sheets")
+def fetch_google_sheet_data_with_retry():
+    """Fetch data from Google Sheets with retry logic for rate limit errors."""
+    cached_data = load_cache()
+    if cached_data:
+        st.info("Données chargées depuis le cache.")
+        return cached_data
 
-if st.button("Charger les données avec cache"):
-    data = fetch_google_sheet_data()
+    max_attempts = 5  # Maximum number of retry attempts
+    retry_delay = 10  # Delay in seconds between retries
+
+    for attempt in range(max_attempts):
+        try:
+            st.info("Appel à l'API Google Sheets...")
+            # Simulate API call (replace with actual API logic)
+            data = {"example": "data"}  # Replace with actual data fetching logic
+            save_cache(data)
+            return data
+        except Exception as e:
+            error_message = str(e)
+            if "RATE_LIMIT_EXCEEDED" in error_message:
+                st.warning(f"Quota dépassé. Tentative {attempt + 1}/{max_attempts}. Réessai dans {retry_delay} secondes...")
+                time.sleep(retry_delay)  # Wait before retrying
+            else:
+                st.error(f"Erreur inattendue : {e}")
+                break
+
+    st.error("Impossible de charger les données après plusieurs tentatives.")
+    return None
+
+# Example usage in Streamlit
+st.title("Gestion des appels API Google Sheets avec Retry")
+
+if st.button("Charger les données avec gestion des erreurs"):
+    data = fetch_google_sheet_data_with_retry()
     if data:
         st.write(data)
-
-if st.button("Charger les données avec délai"):
-    fetch_data_with_rate_limit()
