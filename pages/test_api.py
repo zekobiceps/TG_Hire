@@ -867,7 +867,9 @@ with tabs[1]:
                 with st.expander(f"📋 {section['title']}", expanded=False):
                     for title, key, placeholder in section["fields"]:
                         sheet_key = key.upper()
-                        value = st.session_state.get(key, brief_data.get(sheet_key, ""))
+                        # Ensure value is a string, handle None
+                        raw_value = st.session_state.get(key, brief_data.get(sheet_key, ""))
+                        value = str(raw_value) if raw_value is not None else ""
                         st.text_area(
                             title,
                             value=value,
@@ -899,13 +901,15 @@ with tabs[1]:
                             bd[low.upper()] = v
                     st.session_state.saved_briefs[current] = bd
                     save_briefs()
-                    # Google Sheets save is async, doesn't block the UI
+                    
+                    # Google Sheets save
                     try:
                         save_brief_to_gsheet(current, bd)
-                    except Exception:
-                        pass
-                    st.success("Avant-brief sauvegardé.")
-                    st.rerun()
+                    except Exception as e:
+                        st.error(f"Erreur lors de la sauvegarde Google Sheets: {e}")
+                        
+                    st.success("Avant-brief sauvegardé avec succès.")
+
 
 # ================== REUNION DE BRIEF (MODIFS) ==================
 with tabs[2]:
@@ -1155,9 +1159,11 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                 st.session_state.processus_evaluation = default_steps
             c_excl, c_proc = st.columns([1,1.2])
             with c_excl:
-                st.text_area("🚫 Critères d'exclusion", key="criteres_exclusion", height=260, value=brief_data.get("CRITERES_EXCLUSION", st.session_state.get("criteres_exclusion","")), placeholder="Ex: Moins de 3 ans d'expérience / Refus mobilité / Salaire hors budget")
+                val_excl = brief_data.get("CRITERES_EXCLUSION", st.session_state.get("criteres_exclusion",""))
+                st.text_area("🚫 Critères d'exclusion", key="criteres_exclusion", height=260, value=str(val_excl) if val_excl is not None else "", placeholder="Ex: Moins de 3 ans d'expérience / Refus mobilité / Salaire hors budget")
             with c_proc:
-                st.text_area("✅ Etapes suivantes", key="processus_evaluation", height=420, value=st.session_state.get("processus_evaluation", brief_data.get("PROCESSUS_EVALUATION","")), placeholder="Ex: Étapes du processus d'évaluation pour ce poste")
+                val_proc = st.session_state.get("processus_evaluation", brief_data.get("PROCESSUS_EVALUATION",""))
+                st.text_area("✅ Etapes suivantes", key="processus_evaluation", height=420, value=str(val_proc) if val_proc is not None else "", placeholder="Ex: Étapes du processus d'évaluation pour ce poste")
             # Sauvegarde auto (pas de bouton)
             brief_data["canaux_prioritaires"] = st.session_state.get("canaux_prioritaires", [])
             brief_data["CANAUX_PRIORITAIRES"] = json.dumps(brief_data["canaux_prioritaires"], ensure_ascii=False)
@@ -1176,10 +1182,11 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
         # ----- Étape 4 (NOUVELLE) : Validation finale -----
         elif step == 4:
             st.markdown("### ✅ Étape 4 : Validation finale")
+            val_notes = brief_data.get("MANAGER_NOTES", st.session_state.get("manager_notes",""))
             st.text_area("🗒️ Notes / commentaires finaux du manager",
                          key="manager_notes",
                          height=200,
-                         value=brief_data.get("MANAGER_NOTES", st.session_state.get("manager_notes","")))
+                         value=str(val_notes) if val_notes is not None else "")
             if st.button("💾 Finaliser le brief", key="finalize_brief", type="primary"):
                 brief_data["MANAGER_NOTES"] = st.session_state.get("manager_notes","")
                 if "ksa_matrix" in st.session_state and not st.session_state.ksa_matrix.empty:
