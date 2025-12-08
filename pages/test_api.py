@@ -448,12 +448,12 @@ key_mapping = {
     "RAISON_OUVERTURE": "raison_ouverture",
     "IMPACT_STRATEGIQUE": "impact_strategique",
     "TACHES_PRINCIPALES": "taches_principales",
-    "MUST_HAVE_EXP": "must_have_experience",
-    "MUST_HAVE_DIP": "must_have_diplomes",
+    "MUST_HAVE_EXPERIENCE": "must_have_experience",
+    "MUST_HAVE_DIPLOMES": "must_have_diplomes",
     "MUST_HAVE_COMPETENCES": "must_have_competences",
     "MUST_HAVE_SOFTSKILLS": "must_have_softskills",
-    "NICE_TO_HAVE_EXP": "nice_to_have_experience",
-    "NICE_TO_HAVE_DIP": "nice_to_have_diplomes",
+    "NICE_TO_HAVE_EXPERIENCE": "nice_to_have_experience",
+    "NICE_TO_HAVE_DIPLOMES": "nice_to_have_diplomes",
     "NICE_TO_HAVE_COMPETENCES": "nice_to_have_competences",
     "RATTACHEMENT": "rattachement",
     "BUDGET": "budget",
@@ -500,12 +500,76 @@ sections = [
 # --- Bloc d'import automatique ---
 if st.session_state.import_brief_flag and st.session_state.brief_to_import:
     brief = load_briefs().get(st.session_state.brief_to_import, {})
+    
+    legacy_fallback = {
+        "MUST_HAVE_EXPERIENCE": "MUST_HAVE_EXP",
+        "MUST_HAVE_DIPLOMES": "MUST_HAVE_DIP",
+        "NICE_TO_HAVE_EXPERIENCE": "NICE_TO_HAVE_EXP",
+        "NICE_TO_HAVE_DIPLOMES": "NICE_TO_HAVE_DIP"
+    }
+
     for sheet_key, session_key in key_mapping.items():
-        st.session_state[session_key] = brief.get(sheet_key, "")
+        val = brief.get(sheet_key)
+        # Fallback legacy
+        if (val is None or val == "") and sheet_key in legacy_fallback:
+            val = brief.get(legacy_fallback[sheet_key])
+        
+        st.session_state[session_key] = val if val is not None else ""
+
     for section in sections:
         for title, field_key, _ in section["fields"]:
             unique_key = f"{section['title'].replace(' ', '_')}_{field_key}"
-            st.session_state[unique_key] = brief.get(key_mapping.get(field_key.upper(), field_key), "")
+            # Use key_mapping to find the sheet key, or default to field_key
+            # Note: key_mapping now has correct long keys
+            mapped_sheet_key = None
+            # Reverse lookup or direct usage? 
+            # key_mapping is SHEET_KEY -> session_key
+            # We want to find SHEET_KEY given field_key (session_key)
+            # But actually key_mapping keys ARE the sheet keys (uppercase usually)
+            
+            # The original code was:
+            # st.session_state[unique_key] = brief.get(key_mapping.get(field_key.upper(), field_key), "")
+            
+            target_sheet_key = field_key.upper()
+            # Check if this target_sheet_key exists in key_mapping (it should)
+            # If field_key is "must_have_experience", target is "MUST_HAVE_EXPERIENCE"
+            # key_mapping["MUST_HAVE_EXPERIENCE"] exists.
+            
+            # But wait, key_mapping.get(field_key.upper()) returns the SESSION key ("must_have_experience")
+            # The original code used key_mapping.get(...) as the key to look up in 'brief'.
+            # brief keys are UPPERCASE (SHEET KEYS).
+            # So key_mapping.get(...) returning a lowercase session key is WRONG if brief has uppercase keys.
+            
+            # Actually, let's look at key_mapping again.
+            # "MUST_HAVE_EXPERIENCE": "must_have_experience"
+            # key_mapping.get("MUST_HAVE_EXPERIENCE") -> "must_have_experience"
+            # brief.get("must_have_experience") -> Likely None (brief has UPPER keys)
+            
+            # So the original code was likely flawed or relying on brief having lowercase keys too?
+            # Or maybe key_mapping was inverted in my mind?
+            # key_mapping = { "SHEET_KEY": "session_key" }
+            
+            # Original code:
+            # st.session_state[unique_key] = brief.get(key_mapping.get(field_key.upper(), field_key), "")
+            
+            # If field_key="must_have_experience", upper="MUST_HAVE_EXPERIENCE".
+            # key_mapping.get("MUST_HAVE_EXPERIENCE") -> "must_have_experience".
+            # brief.get("must_have_experience") -> ???
+            
+            # If brief only has "MUST_HAVE_EXPERIENCE", then brief.get("must_have_experience") fails.
+            
+            # So I should fix this logic too.
+            # We want to get the value from brief.
+            # We know the sheet key is likely field_key.upper().
+            # And we have legacy fallbacks.
+            
+            s_key = field_key.upper()
+            val = brief.get(s_key)
+            if (val is None or val == "") and s_key in legacy_fallback:
+                val = brief.get(legacy_fallback[s_key])
+            
+            st.session_state[unique_key] = val if val is not None else ""
+
     st.session_state.current_brief_name = st.session_state.brief_to_import
     st.session_state.avant_brief_completed = True
     st.session_state.reunion_completed = True
