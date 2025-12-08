@@ -348,29 +348,49 @@ def save_briefs():
     try:
         with open("briefs/briefs.json", "w", encoding="utf-8") as f:
             json.dump(safe, f, ensure_ascii=False, indent=2)
+        # Invalider le cache de lecture pour forcer le rechargement au prochain appel
+        load_all_local_briefs.clear()
     except Exception as e:
         st.error(f"Erreur lors de la sauvegarde locale des briefs: {e}")
 
 def load_briefs():
-    """Charge tous les briefs depuis Google Sheets."""
+    """
+    Charge les briefs.
+    Stratégie :
+    1. Charger les briefs locaux (priorité haute car sauvegarde synchrone).
+    2. Charger les briefs Google Sheets (priorité basse ou pour récupérer les briefs d'autres utilisateurs).
+    3. Fusionner : Local écrase Sheets si conflit (car on suppose que Local est plus récent si la sync a échoué).
+    """
+    # 1. Charger Local
+    local_briefs = load_all_local_briefs()
+    
+    # 2. Charger Sheets
+    gs_briefs = {}
     try:
-        briefs = {}
         worksheet = get_briefs_gsheet_client()
         if worksheet:
             records = worksheet.get_all_records()
             for record in records:
                 brief_name = record.get("BRIEF_NAME")
                 if brief_name:
-                    briefs[brief_name] = record
+                    # Traitement KSA
                     if record.get("KSA_MATRIX_JSON"):
                         try:
                             record["ksa_matrix"] = pd.DataFrame.from_records(json.loads(record["KSA_MATRIX_JSON"]))
                         except Exception:
                             record["ksa_matrix"] = pd.DataFrame()
-        return briefs
+                    gs_briefs[brief_name] = record
     except Exception as e:
-        st.warning(f"Erreur lors du chargement des briefs depuis Google Sheets : {e}")
-        return {}
+        # Si erreur Sheets, on continue avec ce qu'on a
+        print(f"Warning load_briefs Sheets: {e}")
+
+    # 3. Fusion : On prend Sheets, et on met à jour avec Local
+    # Ainsi, si un brief existe dans les deux, Local gagne (car c'est notre "cache" d'écriture)
+    # Si un brief n'existe que dans Sheets (créé par qqn d'autre), on l'a.
+    merged_briefs = gs_briefs.copy()
+    merged_briefs.update(local_briefs)
+    
+    return merged_briefs
 
 def refresh_saved_briefs():
     """
