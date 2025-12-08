@@ -45,6 +45,103 @@ from utils import (
     save_ksa_matrix_to_current_brief   # <-- AJOUT
 )
 
+import time
+import traceback
+
+
+# Wrapper pour gérer les quotas Google Sheets et permettre retries + file d'attente
+def save_brief_gsheet_with_retry(name: str, brief_data: dict, max_attempts: int = 3) -> bool:
+    """Essaye d'appeler `save_brief_to_gsheet` avec quelques tentatives.
+    En cas d'épuisement de quota (RESOURCE_EXHAUSTED), on place la sauvegarde
+    dans une file d'attente persistée dans `st.session_state['gsheet_retry_queue']`.
+    Retourne True si la sauvegarde a réussi, False sinon (ou mise en file d'attente).
+    """
+    if 'gsheet_retry_queue' not in st.session_state:
+        st.session_state['gsheet_retry_queue'] = []
+
+    attempt = 0
+    last_exc = None
+    while attempt < max_attempts:
+        try:
+            res = save_brief_to_gsheet(name, brief_data)
+            # Certaines implémentations retournent True/False
+            if res is True or res is None:
+                return True
+            if res:
+                return True
+            # si res est False, on retente
+        except Exception as e:
+            last_exc = e
+            msg = str(e)
+            # détection basique d'un dépassement de quota
+            if 'RESOURCE_EXHAUSTED' in msg or 'quota' in msg.lower() or 'rate_limit' in msg.lower() or '429' in msg:
+                # enfile et arrête les retries agressifs
+                st.session_state['gsheet_retry_queue'].append({
+                    'name': name,
+                    'brief': brief_data,
+                    'error': msg,
+                    'when': datetime.utcnow().isoformat()
+                })
+                st.warning("Sauvegarde Google Sheets mise en file d'attente à cause d'un quota atteint. Je réessaierai automatiquement plus tard.")
+                return False
+            # sinon on réessaie après un délai exponentiel
+        attempt += 1
+        wait = 1 * (2 ** (attempt - 1))
+        time.sleep(wait)
+
+    # si on a quitté la boucle sans succès, enregister la tentative pour reprise humaine
+    st.session_state['gsheet_retry_queue'].append({
+        'name': name,
+        'brief': brief_data,
+        'error': str(last_exc) if last_exc else 'unknown',
+        'when': datetime.utcnow().isoformat()
+    })
+    st.error("Impossible de sauvegarder sur Google Sheets pour le moment. La sauvegarde a été mise en file d'attente.")
+    return False
+
+
+# Tentative de vidage de la file d'attente à chaque chargement (prudente : on stoppe si quota atteint)
+def flush_gsheet_retry_queue():
+    if 'gsheet_retry_queue' not in st.session_state:
+        return
+    queue = list(st.session_state.get('gsheet_retry_queue', []))
+    if not queue:
+        return
+    remaining = []
+    for item in queue:
+        try:
+            res = save_brief_to_gsheet(item['name'], item['brief'])
+            if not res:
+                remaining.append(item)
+        except Exception as e:
+            msg = str(e)
+            if 'RESOURCE_EXHAUSTED' in msg or 'quota' in msg.lower() or '429' in msg:
+                # si quota atteint, on abandonne le vidage pour l'instant
+                remaining.extend(queue[queue.index(item):])
+                break
+            remaining.append(item)
+    st.session_state['gsheet_retry_queue'] = remaining
+
+
+# Au chargement du module, on tente de flush la file d'attente
+try:
+    flush_gsheet_retry_queue()
+except Exception:
+    # ne pas casser l'app si flush échoue
+    pass
+
+
+# Helper safe rerun to support different Streamlit versions and satisfy type checkers
+def safe_rerun():
+    try:
+        # prefer experimental_rerun if available
+        if hasattr(st, "experimental_rerun"):
+            getattr(st, "experimental_rerun")()
+        elif hasattr(st, "rerun"):
+            getattr(st, "rerun")()
+    except Exception:
+        # swallow any errors to avoid breaking the app
+        pass
 # --- CSS pour augmenter la taille du texte des onglets ---
 st.markdown("""
     <style>
@@ -124,7 +221,15 @@ def generate_custom_pdf(brief_name:str, data:dict, ksa:pd.DataFrame|None)->Bytes
             y-=4
         if ksa is not None and isinstance(ksa,pd.DataFrame) and not ksa.empty:
             if y<140: c.showPage(); y=h-60
-            c.setFont('Helvetica-Bold',12); c.drawString(40,y,'Matrice KSA'); y-=20
+            c.setFont('Helvetica-Bold',12); c.drawString(40,y,'Matrice KSA'); y-=18
+            # Ajouter le score cible juste après le titre
+            try:
+                avg_score = round(ksa["Évaluation (1-5)"].astype(float).mean(), 2)
+                c.setFont('Helvetica-Bold', 11)
+                c.drawString(40, y, f"Score cible : {avg_score} / 5")
+                y -= 22
+            except Exception:
+                y -= 2
             cols=["Rubrique","Critère","Type de question","Évaluation (1-5)"]
             col_widths=[70,200,130,80]
             x0=40
@@ -734,7 +839,7 @@ with tabs[0]:
                 save_briefs()
                 # Google Sheets save is async, doesn't block the UI
                 try:
-                    save_brief_to_gsheet(current, bd)
+                    save_brief_gsheet_with_retry(current, bd)
                 except Exception:
                     pass  # Local save succeeded, Sheets is optional
                 refresh_saved_briefs()
@@ -804,7 +909,7 @@ with tabs[0]:
                     save_briefs()
                     # Google Sheets save is async, doesn't block the UI
                     try:
-                        save_brief_to_gsheet(new_brief_name, new_brief_data)
+                        save_brief_gsheet_with_retry(new_brief_name, new_brief_data)
                     except Exception:
                         pass
                     # Recalcule les stats immédiatement
@@ -997,7 +1102,7 @@ with tabs[1]:
                     
                     # Google Sheets save
                     try:
-                        save_brief_to_gsheet(current, bd)
+                        save_brief_gsheet_with_retry(current, bd)
                     except Exception as e:
                         st.error(f"Erreur lors de la sauvegarde Google Sheets: {e}")
                         
@@ -1013,14 +1118,29 @@ with tabs[2]:
         total_steps = 3
         if "reunion_step" not in st.session_state or not isinstance(st.session_state.reunion_step, int):
             st.session_state.reunion_step = 1
-        step = st.session_state.reunion_step
-        st.progress(int(((step-1)/(total_steps-1))*100), text=f"Étape {step}/{total_steps}")
-
+        
+        # Préparer les données du brief et commentaires manager
         brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
         try:
             manager_comments = json.loads(brief_data.get("MANAGER_COMMENTS_JSON","{}"))
         except Exception:
             manager_comments = {}
+
+        step = st.session_state.reunion_step
+        st.progress(int(((step-1)/(total_steps-1))*100), text=f"Étape {step}/{total_steps}")
+
+        # --- Navigation haute
+        nav_prev_top, nav_next_top = st.columns([1,1])
+        with nav_prev_top:
+            if step > 1:
+                if st.button("⬅️ Précédent", key=f"rb_prev_top_{step}"):
+                    st.session_state.reunion_step -= 1
+                    safe_rerun()
+        with nav_next_top:
+            if step < total_steps:
+                if st.button("Suivant ➡️", key=f"rb_next_top_{step}"):
+                    st.session_state.reunion_step += 1
+                    safe_rerun()
 
         # ----- Étape 1 -----
         if step == 1:
@@ -1058,7 +1178,7 @@ with tabs[2]:
                     new_com = {}
                     for i, row in edited_df.iterrows():
                         val = row["Commentaire manager"]
-                        orig = base_df.loc[i, "_key"]
+                        orig = base_df.at[i, "_key"]
                         if val:
                             new_com[orig] = val
                     brief_data["manager_comments"] = new_com
@@ -1067,7 +1187,7 @@ with tabs[2]:
                     save_briefs()
                     # Google Sheets save is async, doesn't block the UI
                     try:
-                        save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
+                        save_brief_gsheet_with_retry(st.session_state.current_brief_name, brief_data)
                     except Exception:
                         pass
                     st.success("Commentaires sauvegardés.")
@@ -1288,35 +1408,15 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                 save_briefs()
                 # Google Sheets save is mandatory here
                 try:
-                    if save_brief_to_gsheet(st.session_state.current_brief_name, brief_data):
+                    if save_brief_gsheet_with_retry(st.session_state.current_brief_name, brief_data):
                         st.success("Brief finalisé et sauvegardé sur Google Sheets.")
                         st.rerun()
                     else:
-                        st.error("Erreur lors de la sauvegarde sur Google Sheets. Veuillez réessayer.")
+                        st.error("Erreur lors de la sauvegarde sur Google Sheets. Si le quota est atteint, la sauvegarde a été mise en file d'attente.")
                 except Exception as e:
                     st.error(f"Erreur critique lors de la sauvegarde : {e}")
 
-        # ----- Navigation -----
-        nav_prev, nav_next = st.columns([1,1])
-        with nav_prev:
-            st.markdown("<div class='nav-small'>", unsafe_allow_html=True)
-            if step > 1 and st.button("⬅️ Précédent", key=f"rb_prev_{step}", width="stretch"):
-                st.session_state.reunion_step -= 1
-            st.markdown("</div>", unsafe_allow_html=True)
-        with nav_next:
-            st.markdown("<div class='nav-small'>", unsafe_allow_html=True)
-            if step < 3 and st.button("Suivant ➡️", key=f"rb_next_{step}", width="stretch"):
-                # Auto-save léger (local uniquement pour les étapes intermédiaires)
-                if step in (1,2):
-                    brief_data["CRITERES_EXCLUSION"] = st.session_state.get("criteres_exclusion","")
-                    brief_data["PROCESSUS_EVALUATION"] = st.session_state.get("processus_evaluation","")
-                    brief_data["MANAGER_NOTES"] = st.session_state.get("manager_notes","")
-                    if "ksa_matrix" in st.session_state:
-                        save_ksa_matrix_to_current_brief()
-                    st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
-                    save_briefs()
-                st.session_state.reunion_step += 1
-            st.markdown("</div>", unsafe_allow_html=True)
+        # Navigation gérée en haut de la section pour appliquer immédiatement le changement d'étape
 
 # ================== SYNTHÈSE (AJOUT Score moyen) ==================
 with tabs[3]:
@@ -1398,7 +1498,7 @@ with tabs[3]:
 
                         # Sauvegarde sur Google Sheets (async)
                         try:
-                            save_brief_to_gsheet(name, brief_data)
+                            save_brief_gsheet_with_retry(name, brief_data)
                         except Exception:
                             pass  # Local save succeeded, Sheets is optional
 
