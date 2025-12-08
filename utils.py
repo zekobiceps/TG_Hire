@@ -70,6 +70,8 @@ except ImportError:
     PDF_PRETTY_AVAILABLE = False
     class Dummy:
         def __init__(self, *args, **kwargs): pass
+        def __getitem__(self, item): return self
+        def build(self, *args, **kwargs): pass
     SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, getSampleStyleSheet, colors = [Dummy] * 7
     A4 = None
 

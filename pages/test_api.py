@@ -1168,7 +1168,7 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
             except Exception:
                 pass
 
-        # ----- Étape 4 (NOUVELLE) -----
+        # ----- Étape 4 (NOUVELLE) : Validation finale -----
         elif step == 4:
             st.markdown("### ✅ Étape 4 : Validation finale")
             st.text_area("🗒️ Notes / commentaires finaux du manager",
@@ -1182,13 +1182,15 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                 st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
                 st.session_state.reunion_completed = True
                 save_briefs()
-                # Google Sheets save is async, doesn't block the UI
+                # Google Sheets save is mandatory here
                 try:
-                    save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
-                except Exception:
-                    pass
-                st.success("Brief finalisé.")
-                st.rerun()
+                    if save_brief_to_gsheet(st.session_state.current_brief_name, brief_data):
+                        st.success("Brief finalisé et sauvegardé sur Google Sheets.")
+                        st.rerun()
+                    else:
+                        st.error("Erreur lors de la sauvegarde sur Google Sheets. Veuillez réessayer.")
+                except Exception as e:
+                    st.error(f"Erreur critique lors de la sauvegarde : {e}")
 
         # ----- Navigation -----
         nav_prev, nav_next = st.columns([1,1])
@@ -1200,8 +1202,8 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
             st.markdown("</div>", unsafe_allow_html=True)
         with nav_next:
             st.markdown("<div class='nav-small'>", unsafe_allow_html=True)
-            if step < total_steps and st.button("Suivant ➡️", key=f"rb_next_{step}", width="stretch"):
-                # Auto-save léger
+            if step < 4 and st.button("Suivant ➡️", key=f"rb_next_{step}", width="stretch"):
+                # Auto-save léger (local uniquement pour les étapes intermédiaires)
                 if step in (1,2,3):
                     brief_data["CRITERES_EXCLUSION"] = st.session_state.get("criteres_exclusion","")
                     brief_data["PROCESSUS_EVALUATION"] = st.session_state.get("processus_evaluation","")
@@ -1210,11 +1212,6 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                         save_ksa_matrix_to_current_brief()
                     st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
                     save_briefs()
-                    # Google Sheets save is async, doesn't block the UI
-                    try:
-                        save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
-                    except Exception:
-                        pass
                 st.session_state.reunion_step += 1
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)

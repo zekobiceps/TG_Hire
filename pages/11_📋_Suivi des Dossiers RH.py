@@ -1177,7 +1177,12 @@ Cordialement"""
                                 ].index[0]
                                 
                                 st.session_state.hr_database.loc[original_idx, 'Derniere_relance'] = datetime.now().strftime('%Y-%m-%d')
-                                st.session_state.hr_database.loc[original_idx, 'Nombre_relances'] += 1
+                                # Ensure Nombre_relances is treated as numeric before incrementing
+                                current_relances = st.session_state.hr_database.loc[original_idx, 'Nombre_relances']
+                                try:
+                                    st.session_state.hr_database.loc[original_idx, 'Nombre_relances'] = int(current_relances) + 1
+                                except (ValueError, TypeError):
+                                    st.session_state.hr_database.loc[original_idx, 'Nombre_relances'] = 1
                                 
                                 # Ajouter à l'historique
                                 nouvelle_relance = pd.DataFrame({
