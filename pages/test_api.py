@@ -409,6 +409,8 @@ Limiter à 4–7 critères forts. Une question = un critère avec cible claire.
                 with col_buttons[1]:
                     add_click = st.form_submit_button("➕ Ajouter le critère", width="stretch")
                 if gen_click:
+                    # Effacer la réponse précédente avant de générer une nouvelle
+                    st.session_state.ai_response = ""
                     if ai_prompt:
                         try:
                             ai_response = generate_ai_question(ai_prompt, concise=st.session_state.concise_checkbox)
@@ -1176,9 +1178,9 @@ with tabs[2]:
                 )
                 if st.button("💾 Enregistrer commentaires", key="save_mgr_step1"):
                     new_com = {}
-                    for i, row in edited_df.iterrows():
-                        val = row["Commentaire manager"]
-                        orig = base_df.at[i, "_key"]
+                    for i in range(len(edited_df)):
+                        val = edited_df.iloc[i]["Commentaire manager"]
+                        orig = base_df.iloc[i]["_key"]
                         if val:
                             new_com[orig] = val
                     brief_data["manager_comments"] = new_com
