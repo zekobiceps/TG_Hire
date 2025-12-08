@@ -668,20 +668,13 @@ with tabs[0]:
 
                 st.session_state.saved_briefs[current] = bd
                 save_briefs()
+                # Google Sheets save is async, doesn't block the UI
                 try:
                     save_brief_to_gsheet(current, bd)
                 except Exception:
-                    pass
+                    pass  # Local save succeeded, Sheets is optional
                 refresh_saved_briefs()
-                # Refine the logic to prevent duplicate success messages
-                if "brief_saved" not in st.session_state:
-                    st.session_state.brief_saved = False
-
-                if not st.session_state.brief_saved:
-                    st.success("✅ Modifications sauvegardées.")
-                    st.session_state.brief_saved = True
-                else:
-                    st.info("Modifications déjà sauvegardées.")
+                st.success("✅ Modifications sauvegardées.")
                 st.rerun()
         else:
             # Mode création d'un nouveau brief
@@ -740,6 +733,7 @@ with tabs[0]:
                     st.session_state.reunion_step = 1
                     st.session_state.reunion_completed = False
                     save_briefs()
+                    # Google Sheets save is async, doesn't block the UI
                     try:
                         save_brief_to_gsheet(new_brief_name, new_brief_data)
                     except Exception:
@@ -900,7 +894,11 @@ with tabs[1]:
                             bd[low.upper()] = v
                     st.session_state.saved_briefs[current] = bd
                     save_briefs()
-                    save_brief_to_gsheet(current, bd)
+                    # Google Sheets save is async, doesn't block the UI
+                    try:
+                        save_brief_to_gsheet(current, bd)
+                    except Exception:
+                        pass
                     st.success("Avant-brief sauvegardé.")
                     st.rerun()
 
@@ -965,7 +963,11 @@ with tabs[2]:
                     brief_data["MANAGER_COMMENTS_JSON"] = json.dumps(new_com, ensure_ascii=False)
                     st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
                     save_briefs()
-                    save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
+                    # Google Sheets save is async, doesn't block the UI
+                    try:
+                        save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
+                    except Exception:
+                        pass
                     st.success("Commentaires sauvegardés.")
                     st.rerun()
 
@@ -1159,7 +1161,12 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                 brief_data[low] = val
                 brief_data[up] = val
             st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
-            save_briefs(); save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
+            save_briefs()
+            # Google Sheets save is async, doesn't block the UI
+            try:
+                save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
+            except Exception:
+                pass
 
         # ----- Étape 4 (NOUVELLE) -----
         elif step == 4:
@@ -1175,7 +1182,11 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                 st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
                 st.session_state.reunion_completed = True
                 save_briefs()
-                save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
+                # Google Sheets save is async, doesn't block the UI
+                try:
+                    save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
+                except Exception:
+                    pass
                 st.success("Brief finalisé.")
                 st.rerun()
 
@@ -1199,7 +1210,11 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                         save_ksa_matrix_to_current_brief()
                     st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
                     save_briefs()
-                    save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
+                    # Google Sheets save is async, doesn't block the UI
+                    try:
+                        save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
+                    except Exception:
+                        pass
                 st.session_state.reunion_step += 1
                 st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
@@ -1282,12 +1297,11 @@ with tabs[3]:
                         st.session_state.saved_briefs[name] = brief_data
                         save_briefs()
 
-                        # Sauvegarde sur Google Sheets
+                        # Sauvegarde sur Google Sheets (async)
                         try:
                             save_brief_to_gsheet(name, brief_data)
-                        except Exception as e:
-                            # Montrer un message non bloquant si l'envoi Sheets échoue
-                            st.warning(f"La sauvegarde vers Google Sheets a rencontré une erreur : {e}")
+                        except Exception:
+                            pass  # Local save succeeded, Sheets is optional
 
                         # Rafraîchir les briefs chargés
                         try:

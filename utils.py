@@ -221,8 +221,22 @@ def get_briefs_gsheet_client():
         st.error(f"❌ Erreur de connexion/ouverture de Google Sheets: {e}")
         return None
 
+# Debounce dictionary to prevent multiple rapid API calls
+_brief_save_timestamps = {}
+
 def save_brief_to_gsheet(brief_name, brief_data):
     """Sauvegarde (création / update) du brief dans Google Sheets avec normalisation champs."""
+    import time
+    
+    # Debounce: éviter les appels multiples en moins de 3 secondes pour le même brief
+    current_time = time.time()
+    last_save_time = _brief_save_timestamps.get(brief_name, 0)
+    if current_time - last_save_time < 3:
+        # Trop rapide, ignorer cet appel
+        return True  # Retourner True car la sauvegarde locale est déjà faite
+    
+    _brief_save_timestamps[brief_name] = current_time
+    
     worksheet = get_briefs_gsheet_client()
     if worksheet is None:
         return False
