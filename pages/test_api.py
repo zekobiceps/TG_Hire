@@ -869,12 +869,17 @@ with tabs[1]:
                         sheet_key = key.upper()
                         
                         # Sanitize session_state to prevent TypeError in text_area
-                        if key in st.session_state and st.session_state[key] is None:
-                            st.session_state[key] = ""
+                        if key in st.session_state:
+                            if st.session_state[key] is None:
+                                st.session_state[key] = ""
+                            else:
+                                # Force string conversion for any non-string type in session_state
+                                st.session_state[key] = str(st.session_state[key])
 
                         # Ensure value is a string, handle None
                         raw_value = st.session_state.get(key, brief_data.get(sheet_key, ""))
                         value = str(raw_value) if raw_value is not None else ""
+                        
                         st.text_area(
                             title,
                             value=value,
