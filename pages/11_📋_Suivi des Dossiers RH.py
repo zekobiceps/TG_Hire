@@ -635,8 +635,8 @@ with tab1:
                         if stc not in df_service.columns:
                             df_service[stc] = 0
 
-                    # Retirer les affectations où il n'y a aucune entrée
-                    df_service = df_service[df_service[['Complet', 'En cours']].sum(axis=0) > 0]
+                    # Retirer les affectations où il n'y a aucune entrée (sum sur axis=1 pour sommer les colonnes par ligne)
+                    df_service = df_service[df_service[['Complet', 'En cours']].sum(axis=1) > 0]
 
                     # Trier par nombre de dossiers 'En cours' décroissant pour montrer d'abord les chantiers les plus problématiques
                     if 'En cours' in df_service.columns:
