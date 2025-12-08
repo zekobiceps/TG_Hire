@@ -1180,7 +1180,9 @@ Cordialement"""
                                 # Ensure Nombre_relances is treated as numeric before incrementing
                                 current_relances = st.session_state.hr_database.loc[original_idx, 'Nombre_relances']
                                 try:
-                                    st.session_state.hr_database.loc[original_idx, 'Nombre_relances'] = int(current_relances) + 1
+                                    # Convert to float first to handle potential float-like strings, then to int
+                                    val = float(current_relances) if current_relances is not None else 0
+                                    st.session_state.hr_database.loc[original_idx, 'Nombre_relances'] = int(val) + 1
                                 except (ValueError, TypeError):
                                     st.session_state.hr_database.loc[original_idx, 'Nombre_relances'] = 1
                                 

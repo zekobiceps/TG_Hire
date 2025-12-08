@@ -700,7 +700,12 @@ with tabs[0]:
                         st.session_state.manager_nom,
                         date_arg
                     )
-                    date_str = date_arg.strftime("%Y-%m-%d")
+                    
+                    date_str = ""
+                    if isinstance(date_arg, (date, datetime)):
+                        date_str = date_arg.strftime("%Y-%m-%d")
+                    else:
+                        date_str = str(date_arg)
 
                     new_brief_data = {}
                     base_pairs = {

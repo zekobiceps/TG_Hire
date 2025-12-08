@@ -73,7 +73,8 @@ except ImportError:
         def __getitem__(self, item): return self
         def build(self, *args, **kwargs): pass
     SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, getSampleStyleSheet, colors = [Dummy] * 7
-    A4 = None
+    # A4 must be a tuple or list to be iterable/subscriptable
+    A4 = (210*mm, 297*mm) if 'mm' in locals() else (595.27, 841.89)
 
 # === AJOUT COMPATIBILITÉ ANCIEN NOM ===
 PDF_AVAILABLE = PDF_PRETTY_AVAILABLE   # pour les fonctions existantes (export_brief_pdf)
@@ -1172,7 +1173,13 @@ def generate_automatic_brief_name(poste: str = None, manager: str = None, date_o
     from datetime import datetime, date
     # Fallback session_state
     if poste is None:
-        poste = st.session_state.get("poste_intitule", "Poste")
+        poste = str(st.session_state.get("poste_intitule", "Poste") or "Poste")
+    if manager is None:
+        manager = str(st.session_state.get("manager_nom", "Manager") or "Manager")
+    
+    # Ensure strings
+    poste = str(poste)
+    manager = str(manager)
     if manager is None:
         manager = st.session_state.get("manager_nom", "Manager")
     if date_obj is None:
@@ -1222,6 +1229,11 @@ def export_brief_pdf_pretty(brief_name: str, brief_data: dict, ksa_df):
     """
     if not PDF_PRETTY_AVAILABLE:
         return None
+    
+    # Ensure A4 is valid
+    if A4 is None:
+        return None
+        
     buf = BytesIO()
     c = canvas.Canvas(buf, pagesize=A4)
     W, H = A4
