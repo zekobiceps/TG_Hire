@@ -877,7 +877,26 @@ with tabs[1]:
                                 st.session_state[key] = str(st.session_state[key])
 
                         # Ensure value is a string, handle None
-                        raw_value = st.session_state.get(key, brief_data.get(sheet_key, ""))
+                        # Fallback strategy: 
+                        # 1. session_state[key]
+                        # 2. brief_data[key.upper()] (Standard)
+                        # 3. brief_data[key] (Lowercase fallback)
+                        # 4. brief_data[Legacy] (Old keys fallback)
+                        
+                        legacy_map = {
+                            "MUST_HAVE_EXPERIENCE": "MUST_HAVE_EXP",
+                            "MUST_HAVE_DIPLOMES": "MUST_HAVE_DIP",
+                            "NICE_TO_HAVE_EXPERIENCE": "NICE_TO_HAVE_EXP",
+                            "NICE_TO_HAVE_DIPLOMES": "NICE_TO_HAVE_DIP"
+                        }
+                        
+                        val_from_data = brief_data.get(sheet_key)
+                        if val_from_data is None or val_from_data == "":
+                            val_from_data = brief_data.get(key)
+                        if (val_from_data is None or val_from_data == "") and sheet_key in legacy_map:
+                            val_from_data = brief_data.get(legacy_map[sheet_key])
+                            
+                        raw_value = st.session_state.get(key, val_from_data if val_from_data is not None else "")
                         value = str(raw_value) if raw_value is not None else ""
                         
                         st.text_area(
