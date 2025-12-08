@@ -1010,7 +1010,7 @@ with tabs[2]:
     if not st.session_state.current_brief_name:
         st.info("Sélectionnez ou créez un brief.")
     else:
-        total_steps = 4
+        total_steps = 3
         if "reunion_step" not in st.session_state or not isinstance(st.session_state.reunion_step, int):
             st.session_state.reunion_step = 1
         step = st.session_state.reunion_step
@@ -1261,24 +1261,9 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                     st.session_state["processus_evaluation"] = ""
                 val_proc = st.session_state.get("processus_evaluation", brief_data.get("PROCESSUS_EVALUATION",""))
                 st.text_area("✅ Etapes suivantes", key="processus_evaluation", height=420, value=str(val_proc) if val_proc is not None else "", placeholder="Ex: Étapes du processus d'évaluation pour ce poste")
-            # Sauvegarde auto (pas de bouton)
-            brief_data["canaux_prioritaires"] = st.session_state.get("canaux_prioritaires", [])
-            brief_data["CANAUX_PRIORITAIRES"] = json.dumps(brief_data["canaux_prioritaires"], ensure_ascii=False)
-            for low, up in {"criteres_exclusion":"CRITERES_EXCLUSION","processus_evaluation":"PROCESSUS_EVALUATION"}.items():
-                val = st.session_state.get(low,"")
-                brief_data[low] = val
-                brief_data[up] = val
-            st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
-            save_briefs()
-            # Google Sheets save is async, doesn't block the UI
-            try:
-                save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
-            except Exception:
-                pass
-
-        # ----- Étape 4 (NOUVELLE) : Validation finale -----
-        elif step == 4:
-            st.markdown("### ✅ Étape 4 : Validation finale")
+            
+            # Notes / commentaires finaux du manager
+            st.markdown("---")
             if "manager_notes" in st.session_state and st.session_state["manager_notes"] is None:
                 st.session_state["manager_notes"] = ""
             val_notes = brief_data.get("MANAGER_NOTES", st.session_state.get("manager_notes",""))
@@ -1286,8 +1271,16 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                          key="manager_notes",
                          height=200,
                          value=str(val_notes) if val_notes is not None else "")
+            
+            # Bouton de finalisation
             if st.button("💾 Finaliser le brief", key="finalize_brief", type="primary"):
                 brief_data["MANAGER_NOTES"] = st.session_state.get("manager_notes","")
+                brief_data["canaux_prioritaires"] = st.session_state.get("canaux_prioritaires", [])
+                brief_data["CANAUX_PRIORITAIRES"] = json.dumps(brief_data["canaux_prioritaires"], ensure_ascii=False)
+                for low, up in {"criteres_exclusion":"CRITERES_EXCLUSION","processus_evaluation":"PROCESSUS_EVALUATION"}.items():
+                    val = st.session_state.get(low,"")
+                    brief_data[low] = val
+                    brief_data[up] = val
                 if "ksa_matrix" in st.session_state and not st.session_state.ksa_matrix.empty:
                     save_ksa_matrix_to_current_brief()
                 st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
@@ -1309,13 +1302,12 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
             st.markdown("<div class='nav-small'>", unsafe_allow_html=True)
             if step > 1 and st.button("⬅️ Précédent", key=f"rb_prev_{step}", width="stretch"):
                 st.session_state.reunion_step -= 1
-                st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
         with nav_next:
             st.markdown("<div class='nav-small'>", unsafe_allow_html=True)
-            if step < 4 and st.button("Suivant ➡️", key=f"rb_next_{step}", width="stretch"):
+            if step < 3 and st.button("Suivant ➡️", key=f"rb_next_{step}", width="stretch"):
                 # Auto-save léger (local uniquement pour les étapes intermédiaires)
-                if step in (1,2,3):
+                if step in (1,2):
                     brief_data["CRITERES_EXCLUSION"] = st.session_state.get("criteres_exclusion","")
                     brief_data["PROCESSUS_EVALUATION"] = st.session_state.get("processus_evaluation","")
                     brief_data["MANAGER_NOTES"] = st.session_state.get("manager_notes","")
@@ -1324,7 +1316,6 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                     st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
                     save_briefs()
                 st.session_state.reunion_step += 1
-                st.rerun()
             st.markdown("</div>", unsafe_allow_html=True)
 
 # ================== SYNTHÈSE (AJOUT Score moyen) ==================
