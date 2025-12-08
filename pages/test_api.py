@@ -867,6 +867,11 @@ with tabs[1]:
                 with st.expander(f"📋 {section['title']}", expanded=False):
                     for title, key, placeholder in section["fields"]:
                         sheet_key = key.upper()
+                        
+                        # Sanitize session_state to prevent TypeError in text_area
+                        if key in st.session_state and st.session_state[key] is None:
+                            st.session_state[key] = ""
+
                         # Ensure value is a string, handle None
                         raw_value = st.session_state.get(key, brief_data.get(sheet_key, ""))
                         value = str(raw_value) if raw_value is not None else ""
@@ -1159,9 +1164,13 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                 st.session_state.processus_evaluation = default_steps
             c_excl, c_proc = st.columns([1,1.2])
             with c_excl:
+                if "criteres_exclusion" in st.session_state and st.session_state["criteres_exclusion"] is None:
+                    st.session_state["criteres_exclusion"] = ""
                 val_excl = brief_data.get("CRITERES_EXCLUSION", st.session_state.get("criteres_exclusion",""))
                 st.text_area("🚫 Critères d'exclusion", key="criteres_exclusion", height=260, value=str(val_excl) if val_excl is not None else "", placeholder="Ex: Moins de 3 ans d'expérience / Refus mobilité / Salaire hors budget")
             with c_proc:
+                if "processus_evaluation" in st.session_state and st.session_state["processus_evaluation"] is None:
+                    st.session_state["processus_evaluation"] = ""
                 val_proc = st.session_state.get("processus_evaluation", brief_data.get("PROCESSUS_EVALUATION",""))
                 st.text_area("✅ Etapes suivantes", key="processus_evaluation", height=420, value=str(val_proc) if val_proc is not None else "", placeholder="Ex: Étapes du processus d'évaluation pour ce poste")
             # Sauvegarde auto (pas de bouton)
@@ -1182,6 +1191,8 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
         # ----- Étape 4 (NOUVELLE) : Validation finale -----
         elif step == 4:
             st.markdown("### ✅ Étape 4 : Validation finale")
+            if "manager_notes" in st.session_state and st.session_state["manager_notes"] is None:
+                st.session_state["manager_notes"] = ""
             val_notes = brief_data.get("MANAGER_NOTES", st.session_state.get("manager_notes",""))
             st.text_area("🗒️ Notes / commentaires finaux du manager",
                          key="manager_notes",
