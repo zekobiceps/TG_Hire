@@ -843,8 +843,8 @@ div[data-testid="stRadio"] > div {
     margin-bottom: 20px;
 }
 div[data-testid="stRadio"] label {
-    font-size: 14px !important;
-    font-weight: 400 !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
     cursor: pointer;
     padding: 10px 16px !important; /* Match Brief.py padding */
     border-radius: 0px;
