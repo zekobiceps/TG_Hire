@@ -546,6 +546,9 @@ try:
                     st.session_state.brief_phase = phase_map.get(phase_param, "🔄 Avant-brief")
                 else:
                     st.session_state.brief_phase = "🔄 Avant-brief"
+                
+                # Sync nav_radio with restored phase
+                st.session_state.nav_radio = st.session_state.brief_phase
 
                 # Restore step if present
                 step_param = params.get("step")
@@ -780,9 +783,8 @@ valid_phases = ["📁 Gestion", "🔄 Avant-brief", "✅ Réunion de brief", "�
 if st.session_state.brief_phase not in valid_phases:
     st.session_state.brief_phase = "📁 Gestion"
 
-# Sync nav_radio with brief_phase to prevent mismatch
-if "nav_radio" not in st.session_state or st.session_state.nav_radio != st.session_state.brief_phase:
-    st.session_state.nav_radio = st.session_state.brief_phase
+# We remove the aggressive sync block here to avoid overriding user clicks.
+# The st.radio widget will update 'nav_radio' automatically.
 
 selected_phase = st.radio(
     "Navigation",
@@ -835,24 +837,43 @@ st.markdown("""
 div[data-testid="stRadio"] > div {
     display: flex;
     justify-content: flex-start;
-    gap: 20px;
-    border-bottom: 1px solid #e0e0e0;
-    padding-bottom: 10px;
+    gap: 0px;
+    border-bottom: 1px solid #f0f2f6;
+    padding-bottom: 0px;
     margin-bottom: 20px;
 }
 div[data-testid="stRadio"] label {
-    font-size: 18px !important;
-    font-weight: 600 !important;
+    font-size: 14px !important;
+    font-weight: 400 !important;
     cursor: pointer;
-    padding: 5px 10px;
-    border-radius: 5px;
+    padding: 10px 20px;
+    border-radius: 0px;
+    margin: 0px;
+    background-color: transparent;
+    border-bottom: 2px solid transparent;
+    transition: color 0.2s, border-bottom-color 0.2s;
 }
 div[data-testid="stRadio"] label:hover {
-    background-color: #f0f2f6;
+    color: #FF4B4B;
+    background-color: transparent;
 }
-/* Highlight selected option - this is tricky with pure CSS on Streamlit radio, 
-   but the default radio style is acceptable for now. */
+/* Hide the radio circle */
+div[data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child {
+    display: none;
+}
+/* Selected state styling - we can't easily target the label based on the checked input in pure CSS 
+   without :has(), but we can try to approximate or rely on Streamlit's structure.
+   Streamlit puts the input inside the label or adjacent.
+   If we can't target it perfectly, the default radio behavior (bolding) might persist.
+*/
+div[data-testid="stRadio"] label[data-baseweb="radio"] {
+    /* This targets the label container */
+}
+</style>
+""", unsafe_allow_html=True)
 
+st.markdown("""
+<style>
 .stTextArea textarea {
     white-space: pre-wrap !important;
 }
@@ -879,7 +900,7 @@ div[data-baseweb="select"] > div {
     :root {
         --background-color: #0e1117;
         --text-color: #fafafa;
-        --border-color: #555555;
+        --border-color: #404040;
     }
 }
 </style>
