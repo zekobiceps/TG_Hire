@@ -1131,19 +1131,6 @@ with tabs[2]:
         step = st.session_state.reunion_step
         st.progress(int(((step-1)/(total_steps-1))*100), text=f"Étape {step}/{total_steps}")
 
-        # --- Navigation haute
-        nav_prev_top, nav_next_top = st.columns([1,1])
-        with nav_prev_top:
-            if step > 1:
-                if st.button("⬅️ Précédent", key=f"rb_prev_top_{step}"):
-                    st.session_state.reunion_step -= 1
-                    safe_rerun()
-        with nav_next_top:
-            if step < total_steps:
-                if st.button("Suivant ➡️", key=f"rb_next_top_{step}"):
-                    st.session_state.reunion_step += 1
-                    safe_rerun()
-
         # ----- Étape 1 -----
         if step == 1:
             st.markdown("### 📝 Étape 1 : Vue consolidée & commentaires manager")
@@ -1176,7 +1163,18 @@ with tabs[2]:
                     key="etape1_editor",
                     width="stretch"
                 )
-                if st.button("💾 Enregistrer commentaires", key="save_mgr_step1"):
+                
+                c_prev, c_save, c_next = st.columns([1,1,1])
+                with c_prev:
+                    st.button("⬅️ Précédent", disabled=True, key="prev_step1")
+                with c_save:
+                    save_clicked = st.button("💾 Enregistrer commentaires", key="save_mgr_step1")
+                with c_next:
+                    if st.button("Suivant ➡️", key="next_step1"):
+                        st.session_state.reunion_step += 1
+                        safe_rerun()
+
+                if save_clicked:
                     new_com = {}
                     for i in range(len(edited_df)):
                         val = edited_df.iloc[i]["Commentaire manager"]
@@ -1357,6 +1355,16 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
             else:
                 st.info("Aucun critère KSA pour l’instant.")
 
+            c_prev, c_next = st.columns([1,1])
+            with c_prev:
+                if st.button("⬅️ Précédent", key="prev_step2"):
+                    st.session_state.reunion_step -= 1
+                    safe_rerun()
+            with c_next:
+                if st.button("Suivant ➡️", key="next_step2"):
+                    st.session_state.reunion_step += 1
+                    safe_rerun()
+
         # ----- Étape 3 -----
         elif step == 3:
             st.markdown("### 🛠️ Étape 3 : Stratégie & Processus")
@@ -1395,7 +1403,15 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                          value=str(val_notes) if val_notes is not None else "")
             
             # Bouton de finalisation
-            if st.button("💾 Finaliser le brief", key="finalize_brief", type="primary"):
+            c_prev, c_fin = st.columns([1,1])
+            with c_prev:
+                if st.button("⬅️ Précédent", key="prev_step3"):
+                    st.session_state.reunion_step -= 1
+                    safe_rerun()
+            with c_fin:
+                finalize_clicked = st.button("💾 Finaliser le brief", key="finalize_brief", type="primary")
+
+            if finalize_clicked:
                 brief_data["MANAGER_NOTES"] = st.session_state.get("manager_notes","")
                 brief_data["canaux_prioritaires"] = st.session_state.get("canaux_prioritaires", [])
                 brief_data["CANAUX_PRIORITAIRES"] = json.dumps(brief_data["canaux_prioritaires"], ensure_ascii=False)
