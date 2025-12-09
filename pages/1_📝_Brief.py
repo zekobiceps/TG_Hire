@@ -45,6 +45,18 @@ from utils import (
     save_ksa_matrix_to_current_brief   # <-- AJOUT
 )
 
+# Must be the first Streamlit command
+st.set_page_config(
+    page_title="Brief de Calibration",
+    page_icon=None,
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Vérification de la connexion
+if not st.session_state.get("logged_in", False):
+    st.stop()
+
 import time
 import traceback
 
@@ -507,12 +519,76 @@ def delete_current_brief():
 
 # ---------------- INIT ----------------
 init_session_state()
-st.set_page_config(
-    page_title="Brief de Calibration",
-    page_icon=None,
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+
+# Sync URL params with session state (Persistence fix)
+try:
+    # Support for both st.query_params (new) and experimental (old)
+    params = st.query_params if hasattr(st, "query_params") else st.experimental_get_query_params()
+
+    # Restore from URL if session is empty/reset
+    if not st.session_state.current_brief_name:
+        brief_param = params.get("brief")
+        if brief_param:
+            if isinstance(brief_param, list):
+                brief_param = brief_param[0]
+            
+            if brief_param in st.session_state.saved_briefs:
+                st.session_state.current_brief_name = brief_param
+                
+                # Restore phase if present
+                phase_param = params.get("phase")
+                if phase_param:
+                    if isinstance(phase_param, list): phase_param = phase_param[0]
+                    # Map URL friendly names back to full tab names if needed, or store full names
+                    # Simple mapping:
+                    phase_map = {
+                        "gestion": "📁 Gestion",
+                        "avant_brief": "🔄 Avant-brief",
+                        "reunion": "✅ Réunion de brief",
+                        "synthese": "📝 Synthèse"
+                    }
+                    st.session_state.brief_phase = phase_map.get(phase_param, "🔄 Avant-brief")
+                else:
+                    st.session_state.brief_phase = "🔄 Avant-brief"
+                
+                # Sync nav_radio with restored phase
+                st.session_state.nav_radio = st.session_state.brief_phase
+
+                # Restore step if present
+                step_param = params.get("step")
+                if step_param:
+                    if isinstance(step_param, list): step_param = step_param[0]
+                    try:
+                        st.session_state.reunion_step = int(step_param)
+                    except:
+                        st.session_state.reunion_step = 1
+
+    # Update URL to match current state
+    if st.session_state.current_brief_name:
+        # Prepare params dict
+        new_params = {"brief": st.session_state.current_brief_name}
+        
+        # Map phase to URL friendly
+        current_phase = st.session_state.get("brief_phase", "")
+        phase_reverse_map = {
+            "📁 Gestion": "gestion",
+            "🔄 Avant-brief": "avant_brief",
+            "✅ Réunion de brief": "reunion",
+            "📝 Synthèse": "synthese"
+        }
+        if current_phase in phase_reverse_map:
+            new_params["phase"] = phase_reverse_map[current_phase]
+            
+        # Add step if in reunion
+        if current_phase == "✅ Réunion de brief":
+            new_params["step"] = str(st.session_state.get("reunion_step", 1))
+            
+        if hasattr(st, "query_params"):
+            st.query_params.update(new_params)
+        else:
+            st.experimental_set_query_params(**new_params)
+except Exception:
+    pass
 
 if "brief_phase" not in st.session_state:
     st.session_state.brief_phase = "📁 Gestion"
@@ -700,19 +776,107 @@ with st.sidebar:
 # ---------------- NAVIGATION PRINCIPALE ----------------
 st.title("Brief de Calibration")
 
-# Define tabs before using them
-tabs = st.tabs([
-    "📁 Gestion",
-    "🔄 Avant-brief",
-    "✅ Réunion de brief",
-    "📝 Synthèse"
-])
+# Use radio button for navigation to allow persistence
+# We hide the radio button style to make it look like tabs using CSS if needed, 
+# or just use horizontal radio for now.
+# To make it look like tabs, we can use the 'st.tabs' API but we can't control the active tab.
+# So we switch to st.radio with horizontal=True.
+
+# Ensure brief_phase is valid
+valid_phases = ["📁 Gestion", "🔄 Avant-brief", "✅ Réunion de brief", "📝 Synthèse"]
+if st.session_state.brief_phase not in valid_phases:
+    st.session_state.brief_phase = "📁 Gestion"
+
+# We remove the aggressive sync block here to avoid overriding user clicks.
+# The st.radio widget will update 'nav_radio' automatically.
+
+selected_phase = st.radio(
+    "Navigation",
+    valid_phases,
+    horizontal=True,
+    index=valid_phases.index(st.session_state.brief_phase),
+    key="nav_radio",
+    label_visibility="collapsed"
+)
+
+# Update session state if changed by user
+if selected_phase != st.session_state.brief_phase:
+    st.session_state.brief_phase = selected_phase
+    st.rerun()
+
+# Ensure URL is always up to date with current state
+try:
+    current_params = {
+        "phase": {
+            "📁 Gestion": "gestion",
+            "🔄 Avant-brief": "avant_brief",
+            "✅ Réunion de brief": "reunion",
+            "📝 Synthèse": "synthese"
+        }.get(st.session_state.brief_phase, "gestion")
+    }
+    
+    if st.session_state.current_brief_name:
+        current_params["brief"] = st.session_state.current_brief_name
+        
+    if st.session_state.brief_phase == "✅ Réunion de brief":
+        current_params["step"] = str(st.session_state.get("reunion_step", 1))
+        
+    if hasattr(st, "query_params"):
+        # Clear old params and set new ones to avoid accumulation if needed, 
+        # but update is usually fine. 
+        # For st.query_params (dict-like), we can just set items.
+        for k, v in current_params.items():
+            st.query_params[k] = v
+    else:
+        st.experimental_set_query_params(**current_params)
+except Exception:
+    pass
+
+# Create a container for the content
+content_container = st.container()
 
 st.markdown("""
 <style>
-div[data-testid="stTabs"] button p {
-    font-size: 18px;
+/* Style the radio button to look more like tabs */
+div[data-testid="stRadio"] > div {
+    display: flex;
+    justify-content: flex-start;
+    gap: 20px;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 0px;
+    margin-bottom: 20px;
 }
+div[data-testid="stRadio"] label {
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    cursor: pointer;
+    padding: 10px 16px !important; /* Match Brief.py padding */
+    border-radius: 0px;
+    margin: 0px;
+    background-color: transparent;
+    border-bottom: 2px solid transparent;
+    transition: color 0.2s, border-bottom-color 0.2s;
+}
+div[data-testid="stRadio"] label:hover {
+    color: #FF4B4B;
+    background-color: transparent; /* Keep transparent as per Brief.py usually */
+}
+/* Hide the radio circle */
+div[data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child {
+    display: none;
+}
+/* Selected state styling using :has() selector */
+div[data-testid="stRadio"] label:has(input:checked) {
+    background-color: transparent !important;
+    color: #FF4B4B !important;
+    border-bottom: 2px solid #FF4B4B !important;
+    font-weight: 600 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<style>
 .stTextArea textarea {
     white-space: pre-wrap !important;
 }
@@ -739,7 +903,7 @@ div[data-baseweb="select"] > div {
     :root {
         --background-color: #0e1117;
         --text-color: #fafafa;
-        --border-color: #555555;
+        --border-color: #404040;
     }
 }
 </style>
@@ -760,10 +924,11 @@ all_field_keys = [
 ]
 
 # ---------------- ONGLET GESTION ----------------
-with tabs[0]:
-    brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {}) if st.session_state.current_brief_name else {}
+if st.session_state.brief_phase == "📁 Gestion":
+    with content_container:
+        brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {}) if st.session_state.current_brief_name else {}
 
-    col_left, col_right = st.columns([2, 2])
+        col_left, col_right = st.columns([2, 2])
 
     # Bloc "Créer un brief"
     with col_left:
@@ -1004,8 +1169,7 @@ with tabs[0]:
             """, unsafe_allow_html=True)
 
 # ---------------- AVANT-BRIEF ----------------
-# Dans l'onglet Avant-brief (tabs[1])
-with tabs[1]:
+if st.session_state.brief_phase == "🔄 Avant-brief":
     brief_data = load_briefs().get(st.session_state.current_brief_name, {}) if st.session_state.current_brief_name else {}
 
     if not st.session_state.current_brief_name:
@@ -1112,7 +1276,7 @@ with tabs[1]:
 
 
 # ================== REUNION DE BRIEF (MODIFS) ==================
-with tabs[2]:
+if st.session_state.brief_phase == "✅ Réunion de brief":
     st.subheader("✅ Réunion de brief")
     if not st.session_state.current_brief_name:
         st.info("Sélectionnez ou créez un brief.")
@@ -1130,19 +1294,6 @@ with tabs[2]:
 
         step = st.session_state.reunion_step
         st.progress(int(((step-1)/(total_steps-1))*100), text=f"Étape {step}/{total_steps}")
-
-        # --- Navigation haute
-        nav_prev_top, nav_next_top = st.columns([1,1])
-        with nav_prev_top:
-            if step > 1:
-                if st.button("⬅️ Précédent", key=f"rb_prev_top_{step}"):
-                    st.session_state.reunion_step -= 1
-                    safe_rerun()
-        with nav_next_top:
-            if step < total_steps:
-                if st.button("Suivant ➡️", key=f"rb_next_top_{step}"):
-                    st.session_state.reunion_step += 1
-                    safe_rerun()
 
         # ----- Étape 1 -----
         if step == 1:
@@ -1176,7 +1327,18 @@ with tabs[2]:
                     key="etape1_editor",
                     width="stretch"
                 )
-                if st.button("💾 Enregistrer commentaires", key="save_mgr_step1"):
+                
+                c_prev, c_save, c_next = st.columns([1,1,1])
+                with c_prev:
+                    st.button("⬅️ Précédent", disabled=True, key="prev_step1")
+                with c_save:
+                    save_clicked = st.button("💾 Enregistrer commentaires", key="save_mgr_step1")
+                with c_next:
+                    if st.button("Suivant ➡️", key="next_step1"):
+                        st.session_state.reunion_step += 1
+                        safe_rerun()
+
+                if save_clicked:
                     new_com = {}
                     for i in range(len(edited_df)):
                         val = edited_df.iloc[i]["Commentaire manager"]
@@ -1357,6 +1519,16 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
             else:
                 st.info("Aucun critère KSA pour l’instant.")
 
+            c_prev, c_next = st.columns([1,1])
+            with c_prev:
+                if st.button("⬅️ Précédent", key="prev_step2"):
+                    st.session_state.reunion_step -= 1
+                    safe_rerun()
+            with c_next:
+                if st.button("Suivant ➡️", key="next_step2"):
+                    st.session_state.reunion_step += 1
+                    safe_rerun()
+
         # ----- Étape 3 -----
         elif step == 3:
             st.markdown("### 🛠️ Étape 3 : Stratégie & Processus")
@@ -1395,7 +1567,15 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                          value=str(val_notes) if val_notes is not None else "")
             
             # Bouton de finalisation
-            if st.button("💾 Finaliser le brief", key="finalize_brief", type="primary"):
+            c_prev, c_fin = st.columns([1,1])
+            with c_prev:
+                if st.button("⬅️ Précédent", key="prev_step3"):
+                    st.session_state.reunion_step -= 1
+                    safe_rerun()
+            with c_fin:
+                finalize_clicked = st.button("💾 Finaliser le brief", key="finalize_brief", type="primary")
+
+            if finalize_clicked:
                 brief_data["MANAGER_NOTES"] = st.session_state.get("manager_notes","")
                 brief_data["canaux_prioritaires"] = st.session_state.get("canaux_prioritaires", [])
                 brief_data["CANAUX_PRIORITAIRES"] = json.dumps(brief_data["canaux_prioritaires"], ensure_ascii=False)
@@ -1421,7 +1601,7 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
         # Navigation gérée en haut de la section pour appliquer immédiatement le changement d'étape
 
 # ================== SYNTHÈSE (AJOUT Score moyen) ==================
-with tabs[3]:
+if st.session_state.brief_phase == "📝 Synthèse":
     if not st.session_state.current_brief_name:
         st.info("Sélectionnez un brief.")
     elif not st.session_state.reunion_completed:

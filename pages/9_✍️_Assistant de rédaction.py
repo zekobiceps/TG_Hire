@@ -15,6 +15,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Vérification de la connexion
+if not st.session_state.get("logged_in", False):
+    st.stop()
+
 # Configuration pour l'appel à l'IA DeepSeek
 SYSTEM_PROMPT = """
 Tu es un expert en rédaction de lettres officielles pour les entreprises du BTP au Maroc.

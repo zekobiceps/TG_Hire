@@ -53,6 +53,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Vérification de la connexion
+if not st.session_state.get("logged_in", False):
+    st.stop()
+
 import time
 import traceback
 

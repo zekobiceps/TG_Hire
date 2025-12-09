@@ -46,6 +46,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Vérification de la connexion
+if not st.session_state.get("logged_in", False):
+    st.stop()
+
 # Initialisation des variables de session
 if "cv_analysis_feedback" not in st.session_state:
     st.session_state.cv_analysis_feedback = False

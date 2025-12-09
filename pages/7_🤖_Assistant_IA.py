@@ -42,6 +42,10 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# Vérification de la connexion
+if not st.session_state.get("logged_in", False):
+    st.stop()
+
 # -------------------- CONFIGURATION DES APIS --------------------
 SYSTEM_PROMPT = """
 Tu es 'TG-Hire Assistant', un expert IA spécialisé dans le recrutement pour le secteur du BTP (Bâtiment et Travaux Publics) au Maroc.

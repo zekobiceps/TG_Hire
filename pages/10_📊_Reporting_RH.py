@@ -36,6 +36,10 @@ st.set_page_config(
     layout="wide"
 )
 
+# Vérification de la connexion
+if not st.session_state.get("logged_in", False):
+    st.stop()
+
 
 def _truncate_label(label: str, max_len: int = 20) -> str:
     """Truncate long labels to a max length and append ellipsis.

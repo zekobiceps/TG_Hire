@@ -8,6 +8,10 @@ from utils import generate_ai_question
 # Configuration de la page
 st.set_page_config(page_title="HR Eval Pro - Système d'Évaluation", layout="wide", page_icon="🚀")
 
+# Vérification de la connexion
+if not st.session_state.get("logged_in", False):
+    st.stop()
+
 # Fonctions de base
 def load_data(file_path):
     if os.path.exists(file_path):
