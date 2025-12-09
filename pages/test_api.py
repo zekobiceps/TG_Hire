@@ -518,12 +518,11 @@ init_session_state()
 
 # Sync URL params with session state (Persistence fix)
 try:
+    # Support for both st.query_params (new) and experimental (old)
+    params = st.query_params if hasattr(st, "query_params") else st.experimental_get_query_params()
+
     # Restore from URL if session is empty/reset
     if not st.session_state.current_brief_name:
-        # Support for both st.query_params (new) and experimental (old)
-        params = st.query_params if hasattr(st, "query_params") else st.experimental_get_query_params()
-        
-        # Handle dict vs list return types
         brief_param = params.get("brief")
         if brief_param:
             if isinstance(brief_param, list):
@@ -531,15 +530,56 @@ try:
             
             if brief_param in st.session_state.saved_briefs:
                 st.session_state.current_brief_name = brief_param
-                # Also restore phase to avoid "Gestion" default
-                st.session_state.brief_phase = "🔄 Avant-brief" # Default to editing if brief is loaded
+                
+                # Restore phase if present
+                phase_param = params.get("phase")
+                if phase_param:
+                    if isinstance(phase_param, list): phase_param = phase_param[0]
+                    # Map URL friendly names back to full tab names if needed, or store full names
+                    # Simple mapping:
+                    phase_map = {
+                        "gestion": "📁 Gestion",
+                        "avant_brief": "🔄 Avant-brief",
+                        "reunion": "✅ Réunion de brief",
+                        "synthese": "📝 Synthèse"
+                    }
+                    st.session_state.brief_phase = phase_map.get(phase_param, "🔄 Avant-brief")
+                else:
+                    st.session_state.brief_phase = "🔄 Avant-brief"
+
+                # Restore step if present
+                step_param = params.get("step")
+                if step_param:
+                    if isinstance(step_param, list): step_param = step_param[0]
+                    try:
+                        st.session_state.reunion_step = int(step_param)
+                    except:
+                        st.session_state.reunion_step = 1
 
     # Update URL to match current state
     if st.session_state.current_brief_name:
+        # Prepare params dict
+        new_params = {"brief": st.session_state.current_brief_name}
+        
+        # Map phase to URL friendly
+        current_phase = st.session_state.get("brief_phase", "")
+        phase_reverse_map = {
+            "📁 Gestion": "gestion",
+            "🔄 Avant-brief": "avant_brief",
+            "✅ Réunion de brief": "reunion",
+            "📝 Synthèse": "synthese"
+        }
+        if current_phase in phase_reverse_map:
+            new_params["phase"] = phase_reverse_map[current_phase]
+            
+        # Add step if in reunion
+        if current_phase == "✅ Réunion de brief":
+            new_params["step"] = str(st.session_state.get("reunion_step", 1))
+            
         if hasattr(st, "query_params"):
-            st.query_params["brief"] = st.session_state.current_brief_name
+            st.query_params.update(new_params)
         else:
-            st.experimental_set_query_params(brief=st.session_state.current_brief_name)
+            st.experimental_set_query_params(**new_params)
 except Exception:
     pass
 
