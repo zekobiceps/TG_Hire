@@ -74,7 +74,7 @@ except ImportError:
         def build(self, *args, **kwargs): pass
     SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, getSampleStyleSheet, colors = [Dummy] * 7
     # A4 must be a tuple or list to be iterable/subscriptable
-    A4 = (210*mm, 297*mm) if 'mm' in locals() else (595.27, 841.89)
+    A4 = (595.27, 841.89) # type: ignore
 
 # === AJOUT COMPATIBILITÉ ANCIEN NOM ===
 PDF_AVAILABLE = PDF_PRETTY_AVAILABLE   # pour les fonctions existantes (export_brief_pdf)
@@ -1185,7 +1185,7 @@ def delete_brief_from_gsheet(brief_name: str) -> bool:
         return False
 
 # -------------------- Génération de nom de brief automatique --------------------
-def generate_automatic_brief_name(poste: str = None, manager: str = None, date_obj=None):
+def generate_automatic_brief_name(poste: str | None = None, manager: str | None = None, date_obj=None):
     """
     Génère un nom unique de brief: POSTE_MANAGER_YYYYMMDD[_n].
     Paramètres optionnels (fallback sur st.session_state pour compatibilité).
