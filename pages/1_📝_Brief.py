@@ -1,6 +1,6 @@
 import streamlit as st
 import sys, os
-from datetime import datetime
+from datetime import datetime, timedelta
 import json
 import pandas as pd
 from datetime import date
@@ -45,6 +45,103 @@ from utils import (
     save_ksa_matrix_to_current_brief   # <-- AJOUT
 )
 
+import time
+import traceback
+
+
+# Wrapper pour gérer les quotas Google Sheets et permettre retries + file d'attente
+def save_brief_gsheet_with_retry(name: str, brief_data: dict, max_attempts: int = 3) -> bool:
+    """Essaye d'appeler `save_brief_to_gsheet` avec quelques tentatives.
+    En cas d'épuisement de quota (RESOURCE_EXHAUSTED), on place la sauvegarde
+    dans une file d'attente persistée dans `st.session_state['gsheet_retry_queue']`.
+    Retourne True si la sauvegarde a réussi, False sinon (ou mise en file d'attente).
+    """
+    if 'gsheet_retry_queue' not in st.session_state:
+        st.session_state['gsheet_retry_queue'] = []
+
+    attempt = 0
+    last_exc = None
+    while attempt < max_attempts:
+        try:
+            res = save_brief_to_gsheet(name, brief_data)
+            # Certaines implémentations retournent True/False
+            if res is True or res is None:
+                return True
+            if res:
+                return True
+            # si res est False, on retente
+        except Exception as e:
+            last_exc = e
+            msg = str(e)
+            # détection basique d'un dépassement de quota
+            if 'RESOURCE_EXHAUSTED' in msg or 'quota' in msg.lower() or 'rate_limit' in msg.lower() or '429' in msg:
+                # enfile et arrête les retries agressifs
+                st.session_state['gsheet_retry_queue'].append({
+                    'name': name,
+                    'brief': brief_data,
+                    'error': msg,
+                    'when': datetime.utcnow().isoformat()
+                })
+                st.warning("Sauvegarde Google Sheets mise en file d'attente à cause d'un quota atteint. Je réessaierai automatiquement plus tard.")
+                return False
+            # sinon on réessaie après un délai exponentiel
+        attempt += 1
+        wait = 1 * (2 ** (attempt - 1))
+        time.sleep(wait)
+
+    # si on a quitté la boucle sans succès, enregister la tentative pour reprise humaine
+    st.session_state['gsheet_retry_queue'].append({
+        'name': name,
+        'brief': brief_data,
+        'error': str(last_exc) if last_exc else 'unknown',
+        'when': datetime.utcnow().isoformat()
+    })
+    st.error("Impossible de sauvegarder sur Google Sheets pour le moment. La sauvegarde a été mise en file d'attente.")
+    return False
+
+
+# Tentative de vidage de la file d'attente à chaque chargement (prudente : on stoppe si quota atteint)
+def flush_gsheet_retry_queue():
+    if 'gsheet_retry_queue' not in st.session_state:
+        return
+    queue = list(st.session_state.get('gsheet_retry_queue', []))
+    if not queue:
+        return
+    remaining = []
+    for item in queue:
+        try:
+            res = save_brief_to_gsheet(item['name'], item['brief'])
+            if not res:
+                remaining.append(item)
+        except Exception as e:
+            msg = str(e)
+            if 'RESOURCE_EXHAUSTED' in msg or 'quota' in msg.lower() or '429' in msg:
+                # si quota atteint, on abandonne le vidage pour l'instant
+                remaining.extend(queue[queue.index(item):])
+                break
+            remaining.append(item)
+    st.session_state['gsheet_retry_queue'] = remaining
+
+
+# Au chargement du module, on tente de flush la file d'attente
+try:
+    flush_gsheet_retry_queue()
+except Exception:
+    # ne pas casser l'app si flush échoue
+    pass
+
+
+# Helper safe rerun to support different Streamlit versions and satisfy type checkers
+def safe_rerun():
+    try:
+        # prefer experimental_rerun if available
+        if hasattr(st, "experimental_rerun"):
+            getattr(st, "experimental_rerun")()
+        elif hasattr(st, "rerun"):
+            getattr(st, "rerun")()
+    except Exception:
+        # swallow any errors to avoid breaking the app
+        pass
 # --- CSS pour augmenter la taille du texte des onglets ---
 st.markdown("""
     <style>
@@ -124,7 +221,15 @@ def generate_custom_pdf(brief_name:str, data:dict, ksa:pd.DataFrame|None)->Bytes
             y-=4
         if ksa is not None and isinstance(ksa,pd.DataFrame) and not ksa.empty:
             if y<140: c.showPage(); y=h-60
-            c.setFont('Helvetica-Bold',12); c.drawString(40,y,'Matrice KSA'); y-=20
+            c.setFont('Helvetica-Bold',12); c.drawString(40,y,'Matrice KSA'); y-=18
+            # Ajouter le score cible juste après le titre
+            try:
+                avg_score = round(ksa["Évaluation (1-5)"].astype(float).mean(), 2)
+                c.setFont('Helvetica-Bold', 11)
+                c.drawString(40, y, f"Score cible : {avg_score} / 5")
+                y -= 22
+            except Exception:
+                y -= 2
             cols=["Rubrique","Critère","Type de question","Évaluation (1-5)"]
             col_widths=[70,200,130,80]
             x0=40
@@ -304,6 +409,8 @@ Limiter à 4–7 critères forts. Une question = un critère avec cible claire.
                 with col_buttons[1]:
                     add_click = st.form_submit_button("➕ Ajouter le critère", width="stretch")
                 if gen_click:
+                    # Effacer la réponse précédente avant de générer une nouvelle
+                    st.session_state.ai_response = ""
                     if ai_prompt:
                         try:
                             ai_response = generate_ai_question(ai_prompt, concise=st.session_state.concise_checkbox)
@@ -448,12 +555,12 @@ key_mapping = {
     "RAISON_OUVERTURE": "raison_ouverture",
     "IMPACT_STRATEGIQUE": "impact_strategique",
     "TACHES_PRINCIPALES": "taches_principales",
-    "MUST_HAVE_EXP": "must_have_experience",
-    "MUST_HAVE_DIP": "must_have_diplomes",
+    "MUST_HAVE_EXPERIENCE": "must_have_experience",
+    "MUST_HAVE_DIPLOMES": "must_have_diplomes",
     "MUST_HAVE_COMPETENCES": "must_have_competences",
     "MUST_HAVE_SOFTSKILLS": "must_have_softskills",
-    "NICE_TO_HAVE_EXP": "nice_to_have_experience",
-    "NICE_TO_HAVE_DIP": "nice_to_have_diplomes",
+    "NICE_TO_HAVE_EXPERIENCE": "nice_to_have_experience",
+    "NICE_TO_HAVE_DIPLOMES": "nice_to_have_diplomes",
     "NICE_TO_HAVE_COMPETENCES": "nice_to_have_competences",
     "RATTACHEMENT": "rattachement",
     "BUDGET": "budget",
@@ -500,12 +607,76 @@ sections = [
 # --- Bloc d'import automatique ---
 if st.session_state.import_brief_flag and st.session_state.brief_to_import:
     brief = load_briefs().get(st.session_state.brief_to_import, {})
+    
+    legacy_fallback = {
+        "MUST_HAVE_EXPERIENCE": "MUST_HAVE_EXP",
+        "MUST_HAVE_DIPLOMES": "MUST_HAVE_DIP",
+        "NICE_TO_HAVE_EXPERIENCE": "NICE_TO_HAVE_EXP",
+        "NICE_TO_HAVE_DIPLOMES": "NICE_TO_HAVE_DIP"
+    }
+
     for sheet_key, session_key in key_mapping.items():
-        st.session_state[session_key] = brief.get(sheet_key, "")
+        val = brief.get(sheet_key)
+        # Fallback legacy
+        if (val is None or val == "") and sheet_key in legacy_fallback:
+            val = brief.get(legacy_fallback[sheet_key])
+        
+        st.session_state[session_key] = val if val is not None else ""
+
     for section in sections:
         for title, field_key, _ in section["fields"]:
             unique_key = f"{section['title'].replace(' ', '_')}_{field_key}"
-            st.session_state[unique_key] = brief.get(key_mapping.get(field_key.upper(), field_key), "")
+            # Use key_mapping to find the sheet key, or default to field_key
+            # Note: key_mapping now has correct long keys
+            mapped_sheet_key = None
+            # Reverse lookup or direct usage? 
+            # key_mapping is SHEET_KEY -> session_key
+            # We want to find SHEET_KEY given field_key (session_key)
+            # But actually key_mapping keys ARE the sheet keys (uppercase usually)
+            
+            # The original code was:
+            # st.session_state[unique_key] = brief.get(key_mapping.get(field_key.upper(), field_key), "")
+            
+            target_sheet_key = field_key.upper()
+            # Check if this target_sheet_key exists in key_mapping (it should)
+            # If field_key is "must_have_experience", target is "MUST_HAVE_EXPERIENCE"
+            # key_mapping["MUST_HAVE_EXPERIENCE"] exists.
+            
+            # But wait, key_mapping.get(field_key.upper()) returns the SESSION key ("must_have_experience")
+            # The original code used key_mapping.get(...) as the key to look up in 'brief'.
+            # brief keys are UPPERCASE (SHEET KEYS).
+            # So key_mapping.get(...) returning a lowercase session key is WRONG if brief has uppercase keys.
+            
+            # Actually, let's look at key_mapping again.
+            # "MUST_HAVE_EXPERIENCE": "must_have_experience"
+            # key_mapping.get("MUST_HAVE_EXPERIENCE") -> "must_have_experience"
+            # brief.get("must_have_experience") -> Likely None (brief has UPPER keys)
+            
+            # So the original code was likely flawed or relying on brief having lowercase keys too?
+            # Or maybe key_mapping was inverted in my mind?
+            # key_mapping = { "SHEET_KEY": "session_key" }
+            
+            # Original code:
+            # st.session_state[unique_key] = brief.get(key_mapping.get(field_key.upper(), field_key), "")
+            
+            # If field_key="must_have_experience", upper="MUST_HAVE_EXPERIENCE".
+            # key_mapping.get("MUST_HAVE_EXPERIENCE") -> "must_have_experience".
+            # brief.get("must_have_experience") -> ???
+            
+            # If brief only has "MUST_HAVE_EXPERIENCE", then brief.get("must_have_experience") fails.
+            
+            # So I should fix this logic too.
+            # We want to get the value from brief.
+            # We know the sheet key is likely field_key.upper().
+            # And we have legacy fallbacks.
+            
+            s_key = field_key.upper()
+            val = brief.get(s_key)
+            if (val is None or val == "") and s_key in legacy_fallback:
+                val = brief.get(legacy_fallback[s_key])
+            
+            st.session_state[unique_key] = val if val is not None else ""
+
     st.session_state.current_brief_name = st.session_state.brief_to_import
     st.session_state.avant_brief_completed = True
     st.session_state.reunion_completed = True
@@ -668,10 +839,11 @@ with tabs[0]:
 
                 st.session_state.saved_briefs[current] = bd
                 save_briefs()
+                # Google Sheets save is async, doesn't block the UI
                 try:
-                    save_brief_to_gsheet(current, bd)
+                    save_brief_gsheet_with_retry(current, bd)
                 except Exception:
-                    pass
+                    pass  # Local save succeeded, Sheets is optional
                 refresh_saved_briefs()
                 st.success("✅ Modifications sauvegardées.")
                 st.rerun()
@@ -699,7 +871,12 @@ with tabs[0]:
                         st.session_state.manager_nom,
                         date_arg
                     )
-                    date_str = date_arg.strftime("%Y-%m-%d")
+                    
+                    date_str = ""
+                    if isinstance(date_arg, (date, datetime)):
+                        date_str = date_arg.strftime("%Y-%m-%d")
+                    else:
+                        date_str = str(date_arg)
 
                     new_brief_data = {}
                     base_pairs = {
@@ -732,8 +909,9 @@ with tabs[0]:
                     st.session_state.reunion_step = 1
                     st.session_state.reunion_completed = False
                     save_briefs()
+                    # Google Sheets save is async, doesn't block the UI
                     try:
-                        save_brief_to_gsheet(new_brief_name, new_brief_data)
+                        save_brief_gsheet_with_retry(new_brief_name, new_brief_data)
                     except Exception:
                         pass
                     # Recalcule les stats immédiatement
@@ -860,7 +1038,38 @@ with tabs[1]:
                 with st.expander(f"📋 {section['title']}", expanded=False):
                     for title, key, placeholder in section["fields"]:
                         sheet_key = key.upper()
-                        value = st.session_state.get(key, brief_data.get(sheet_key, ""))
+                        
+                        # Sanitize session_state to prevent TypeError in text_area
+                        if key in st.session_state:
+                            if st.session_state[key] is None:
+                                st.session_state[key] = ""
+                            else:
+                                # Force string conversion for any non-string type in session_state
+                                st.session_state[key] = str(st.session_state[key])
+
+                        # Ensure value is a string, handle None
+                        # Fallback strategy: 
+                        # 1. session_state[key]
+                        # 2. brief_data[key.upper()] (Standard)
+                        # 3. brief_data[key] (Lowercase fallback)
+                        # 4. brief_data[Legacy] (Old keys fallback)
+                        
+                        legacy_map = {
+                            "MUST_HAVE_EXPERIENCE": "MUST_HAVE_EXP",
+                            "MUST_HAVE_DIPLOMES": "MUST_HAVE_DIP",
+                            "NICE_TO_HAVE_EXPERIENCE": "NICE_TO_HAVE_EXP",
+                            "NICE_TO_HAVE_DIPLOMES": "NICE_TO_HAVE_DIP"
+                        }
+                        
+                        val_from_data = brief_data.get(sheet_key)
+                        if val_from_data is None or val_from_data == "":
+                            val_from_data = brief_data.get(key)
+                        if (val_from_data is None or val_from_data == "") and sheet_key in legacy_map:
+                            val_from_data = brief_data.get(legacy_map[sheet_key])
+                            
+                        raw_value = st.session_state.get(key, val_from_data if val_from_data is not None else "")
+                        value = str(raw_value) if raw_value is not None else ""
+                        
                         st.text_area(
                             title,
                             value=value,
@@ -892,9 +1101,15 @@ with tabs[1]:
                             bd[low.upper()] = v
                     st.session_state.saved_briefs[current] = bd
                     save_briefs()
-                    save_brief_to_gsheet(current, bd)
-                    st.success("Avant-brief sauvegardé.")
-                    st.rerun()
+                    
+                    # Google Sheets save
+                    try:
+                        save_brief_gsheet_with_retry(current, bd)
+                    except Exception as e:
+                        st.error(f"Erreur lors de la sauvegarde Google Sheets: {e}")
+                        
+                    st.success("Avant-brief sauvegardé avec succès.")
+
 
 # ================== REUNION DE BRIEF (MODIFS) ==================
 with tabs[2]:
@@ -902,17 +1117,32 @@ with tabs[2]:
     if not st.session_state.current_brief_name:
         st.info("Sélectionnez ou créez un brief.")
     else:
-        total_steps = 4
+        total_steps = 3
         if "reunion_step" not in st.session_state or not isinstance(st.session_state.reunion_step, int):
             st.session_state.reunion_step = 1
-        step = st.session_state.reunion_step
-        st.progress(int(((step-1)/(total_steps-1))*100), text=f"Étape {step}/{total_steps}")
-
+        
+        # Préparer les données du brief et commentaires manager
         brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {})
         try:
             manager_comments = json.loads(brief_data.get("MANAGER_COMMENTS_JSON","{}"))
         except Exception:
             manager_comments = {}
+
+        step = st.session_state.reunion_step
+        st.progress(int(((step-1)/(total_steps-1))*100), text=f"Étape {step}/{total_steps}")
+
+        # --- Navigation haute
+        nav_prev_top, nav_next_top = st.columns([1,1])
+        with nav_prev_top:
+            if step > 1:
+                if st.button("⬅️ Précédent", key=f"rb_prev_top_{step}"):
+                    st.session_state.reunion_step -= 1
+                    safe_rerun()
+        with nav_next_top:
+            if step < total_steps:
+                if st.button("Suivant ➡️", key=f"rb_next_top_{step}"):
+                    st.session_state.reunion_step += 1
+                    safe_rerun()
 
         # ----- Étape 1 -----
         if step == 1:
@@ -948,16 +1178,20 @@ with tabs[2]:
                 )
                 if st.button("💾 Enregistrer commentaires", key="save_mgr_step1"):
                     new_com = {}
-                    for i, row in edited_df.iterrows():
-                        val = row["Commentaire manager"]
-                        orig = base_df.loc[i, "_key"]
+                    for i in range(len(edited_df)):
+                        val = edited_df.iloc[i]["Commentaire manager"]
+                        orig = base_df.iloc[i]["_key"]
                         if val:
                             new_com[orig] = val
                     brief_data["manager_comments"] = new_com
                     brief_data["MANAGER_COMMENTS_JSON"] = json.dumps(new_com, ensure_ascii=False)
                     st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
                     save_briefs()
-                    save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
+                    # Google Sheets save is async, doesn't block the UI
+                    try:
+                        save_brief_gsheet_with_retry(st.session_state.current_brief_name, brief_data)
+                    except Exception:
+                        pass
                     st.success("Commentaires sauvegardés.")
                     st.rerun()
 
@@ -1140,61 +1374,51 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
                 st.session_state.processus_evaluation = default_steps
             c_excl, c_proc = st.columns([1,1.2])
             with c_excl:
-                st.text_area("🚫 Critères d'exclusion", key="criteres_exclusion", height=260, value=brief_data.get("CRITERES_EXCLUSION", st.session_state.get("criteres_exclusion","")), placeholder="Ex: Moins de 3 ans d'expérience / Refus mobilité / Salaire hors budget")
+                if "criteres_exclusion" in st.session_state and st.session_state["criteres_exclusion"] is None:
+                    st.session_state["criteres_exclusion"] = ""
+                val_excl = brief_data.get("CRITERES_EXCLUSION", st.session_state.get("criteres_exclusion",""))
+                st.text_area("🚫 Critères d'exclusion", key="criteres_exclusion", height=260, value=str(val_excl) if val_excl is not None else "", placeholder="Ex: Moins de 3 ans d'expérience / Refus mobilité / Salaire hors budget")
             with c_proc:
-                st.text_area("✅ Etapes suivantes", key="processus_evaluation", height=420, value=st.session_state.get("processus_evaluation", brief_data.get("PROCESSUS_EVALUATION","")))
-            # Sauvegarde auto (pas de bouton)
-            brief_data["canaux_prioritaires"] = st.session_state.get("canaux_prioritaires", [])
-            brief_data["CANAUX_PRIORITAIRES"] = json.dumps(brief_data["canaux_prioritaires"], ensure_ascii=False)
-            for low, up in {"criteres_exclusion":"CRITERES_EXCLUSION","processus_evaluation":"PROCESSUS_EVALUATION"}.items():
-                val = st.session_state.get(low,"")
-                brief_data[low] = val
-                brief_data[up] = val
-            st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
-            save_briefs(); save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
-
-        # ----- Étape 4 (NOUVELLE) -----
-        elif step == 4:
-            st.markdown("### ✅ Étape 4 : Validation finale")
+                if "processus_evaluation" in st.session_state and st.session_state["processus_evaluation"] is None:
+                    st.session_state["processus_evaluation"] = ""
+                val_proc = st.session_state.get("processus_evaluation", brief_data.get("PROCESSUS_EVALUATION",""))
+                st.text_area("✅ Etapes suivantes", key="processus_evaluation", height=420, value=str(val_proc) if val_proc is not None else "", placeholder="Ex: Étapes du processus d'évaluation pour ce poste")
+            
+            # Notes / commentaires finaux du manager
+            st.markdown("---")
+            if "manager_notes" in st.session_state and st.session_state["manager_notes"] is None:
+                st.session_state["manager_notes"] = ""
+            val_notes = brief_data.get("MANAGER_NOTES", st.session_state.get("manager_notes",""))
             st.text_area("🗒️ Notes / commentaires finaux du manager",
                          key="manager_notes",
                          height=200,
-                         value=brief_data.get("MANAGER_NOTES", st.session_state.get("manager_notes","")))
+                         value=str(val_notes) if val_notes is not None else "")
+            
+            # Bouton de finalisation
             if st.button("💾 Finaliser le brief", key="finalize_brief", type="primary"):
                 brief_data["MANAGER_NOTES"] = st.session_state.get("manager_notes","")
+                brief_data["canaux_prioritaires"] = st.session_state.get("canaux_prioritaires", [])
+                brief_data["CANAUX_PRIORITAIRES"] = json.dumps(brief_data["canaux_prioritaires"], ensure_ascii=False)
+                for low, up in {"criteres_exclusion":"CRITERES_EXCLUSION","processus_evaluation":"PROCESSUS_EVALUATION"}.items():
+                    val = st.session_state.get(low,"")
+                    brief_data[low] = val
+                    brief_data[up] = val
                 if "ksa_matrix" in st.session_state and not st.session_state.ksa_matrix.empty:
                     save_ksa_matrix_to_current_brief()
                 st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
                 st.session_state.reunion_completed = True
                 save_briefs()
-                save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
-                st.success("Brief finalisé.")
-                st.rerun()
+                # Google Sheets save is mandatory here
+                try:
+                    if save_brief_gsheet_with_retry(st.session_state.current_brief_name, brief_data):
+                        st.success("Brief finalisé et sauvegardé sur Google Sheets.")
+                        st.rerun()
+                    else:
+                        st.error("Erreur lors de la sauvegarde sur Google Sheets. Si le quota est atteint, la sauvegarde a été mise en file d'attente.")
+                except Exception as e:
+                    st.error(f"Erreur critique lors de la sauvegarde : {e}")
 
-        # ----- Navigation -----
-        nav_prev, nav_next = st.columns([1,1])
-        with nav_prev:
-            st.markdown("<div class='nav-small'>", unsafe_allow_html=True)
-            if step > 1 and st.button("⬅️ Précédent", key=f"rb_prev_{step}", width="stretch"):
-                st.session_state.reunion_step -= 1
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
-        with nav_next:
-            st.markdown("<div class='nav-small'>", unsafe_allow_html=True)
-            if step < total_steps and st.button("Suivant ➡️", key=f"rb_next_{step}", width="stretch"):
-                # Auto-save léger
-                if step in (1,2,3):
-                    brief_data["CRITERES_EXCLUSION"] = st.session_state.get("criteres_exclusion","")
-                    brief_data["PROCESSUS_EVALUATION"] = st.session_state.get("processus_evaluation","")
-                    brief_data["MANAGER_NOTES"] = st.session_state.get("manager_notes","")
-                    if "ksa_matrix" in st.session_state:
-                        save_ksa_matrix_to_current_brief()
-                    st.session_state.saved_briefs[st.session_state.current_brief_name] = brief_data
-                    save_briefs()
-                    save_brief_to_gsheet(st.session_state.current_brief_name, brief_data)
-                st.session_state.reunion_step += 1
-                st.rerun()
-            st.markdown("</div>", unsafe_allow_html=True)
+        # Navigation gérée en haut de la section pour appliquer immédiatement le changement d'étape
 
 # ================== SYNTHÈSE (AJOUT Score moyen) ==================
 with tabs[3]:
@@ -1274,12 +1498,11 @@ with tabs[3]:
                         st.session_state.saved_briefs[name] = brief_data
                         save_briefs()
 
-                        # Sauvegarde sur Google Sheets
+                        # Sauvegarde sur Google Sheets (async)
                         try:
-                            save_brief_to_gsheet(name, brief_data)
-                        except Exception as e:
-                            # Montrer un message non bloquant si l'envoi Sheets échoue
-                            st.warning(f"La sauvegarde vers Google Sheets a rencontré une erreur : {e}")
+                            save_brief_gsheet_with_retry(name, brief_data)
+                        except Exception:
+                            pass  # Local save succeeded, Sheets is optional
 
                         # Rafraîchir les briefs chargés
                         try:

@@ -769,19 +769,90 @@ with st.sidebar:
 # ---------------- NAVIGATION PRINCIPALE ----------------
 st.title("Brief de Calibration")
 
-# Define tabs before using them
-tabs = st.tabs([
-    "📁 Gestion",
-    "🔄 Avant-brief",
-    "✅ Réunion de brief",
-    "📝 Synthèse"
-])
+# Use radio button for navigation to allow persistence
+# We hide the radio button style to make it look like tabs using CSS if needed, 
+# or just use horizontal radio for now.
+# To make it look like tabs, we can use the 'st.tabs' API but we can't control the active tab.
+# So we switch to st.radio with horizontal=True.
+
+# Ensure brief_phase is valid
+valid_phases = ["📁 Gestion", "🔄 Avant-brief", "✅ Réunion de brief", "📝 Synthèse"]
+if st.session_state.brief_phase not in valid_phases:
+    st.session_state.brief_phase = "📁 Gestion"
+
+# Sync nav_radio with brief_phase to prevent mismatch
+if "nav_radio" not in st.session_state or st.session_state.nav_radio != st.session_state.brief_phase:
+    st.session_state.nav_radio = st.session_state.brief_phase
+
+selected_phase = st.radio(
+    "Navigation",
+    valid_phases,
+    horizontal=True,
+    index=valid_phases.index(st.session_state.brief_phase),
+    key="nav_radio",
+    label_visibility="collapsed"
+)
+
+# Update session state if changed by user
+if selected_phase != st.session_state.brief_phase:
+    st.session_state.brief_phase = selected_phase
+    st.rerun()
+
+# Ensure URL is always up to date with current state
+try:
+    current_params = {
+        "phase": {
+            "📁 Gestion": "gestion",
+            "🔄 Avant-brief": "avant_brief",
+            "✅ Réunion de brief": "reunion",
+            "📝 Synthèse": "synthese"
+        }.get(st.session_state.brief_phase, "gestion")
+    }
+    
+    if st.session_state.current_brief_name:
+        current_params["brief"] = st.session_state.current_brief_name
+        
+    if st.session_state.brief_phase == "✅ Réunion de brief":
+        current_params["step"] = str(st.session_state.get("reunion_step", 1))
+        
+    if hasattr(st, "query_params"):
+        # Clear old params and set new ones to avoid accumulation if needed, 
+        # but update is usually fine. 
+        # For st.query_params (dict-like), we can just set items.
+        for k, v in current_params.items():
+            st.query_params[k] = v
+    else:
+        st.experimental_set_query_params(**current_params)
+except Exception:
+    pass
+
+# Create a container for the content
+content_container = st.container()
 
 st.markdown("""
 <style>
-div[data-testid="stTabs"] button p {
-    font-size: 18px;
+/* Style the radio button to look more like tabs */
+div[data-testid="stRadio"] > div {
+    display: flex;
+    justify-content: flex-start;
+    gap: 20px;
+    border-bottom: 1px solid #e0e0e0;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
 }
+div[data-testid="stRadio"] label {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 5px;
+}
+div[data-testid="stRadio"] label:hover {
+    background-color: #f0f2f6;
+}
+/* Highlight selected option - this is tricky with pure CSS on Streamlit radio, 
+   but the default radio style is acceptable for now. */
+
 .stTextArea textarea {
     white-space: pre-wrap !important;
 }
@@ -829,10 +900,11 @@ all_field_keys = [
 ]
 
 # ---------------- ONGLET GESTION ----------------
-with tabs[0]:
-    brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {}) if st.session_state.current_brief_name else {}
+if st.session_state.brief_phase == "📁 Gestion":
+    with content_container:
+        brief_data = st.session_state.saved_briefs.get(st.session_state.current_brief_name, {}) if st.session_state.current_brief_name else {}
 
-    col_left, col_right = st.columns([2, 2])
+        col_left, col_right = st.columns([2, 2])
 
     # Bloc "Créer un brief"
     with col_left:
@@ -1073,8 +1145,7 @@ with tabs[0]:
             """, unsafe_allow_html=True)
 
 # ---------------- AVANT-BRIEF ----------------
-# Dans l'onglet Avant-brief (tabs[1])
-with tabs[1]:
+if st.session_state.brief_phase == "🔄 Avant-brief":
     brief_data = load_briefs().get(st.session_state.current_brief_name, {}) if st.session_state.current_brief_name else {}
 
     if not st.session_state.current_brief_name:
@@ -1181,7 +1252,7 @@ with tabs[1]:
 
 
 # ================== REUNION DE BRIEF (MODIFS) ==================
-with tabs[2]:
+if st.session_state.brief_phase == "✅ Réunion de brief":
     st.subheader("✅ Réunion de brief")
     if not st.session_state.current_brief_name:
         st.info("Sélectionnez ou créez un brief.")
@@ -1506,7 +1577,7 @@ La Matrice KSA (Knowledge, Skills, Abilities) permet de structurer l'évaluation
         # Navigation gérée en haut de la section pour appliquer immédiatement le changement d'étape
 
 # ================== SYNTHÈSE (AJOUT Score moyen) ==================
-with tabs[3]:
+if st.session_state.brief_phase == "📝 Synthèse":
     if not st.session_state.current_brief_name:
         st.info("Sélectionnez un brief.")
     elif not st.session_state.reunion_completed:
