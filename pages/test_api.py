@@ -863,9 +863,10 @@ div[data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child {
 }
 /* Selected state styling using :has() selector */
 div[data-testid="stRadio"] label:has(input:checked) {
-    background-color: #FF4B4B !important;
-    color: white !important;
+    background-color: transparent !important;
+    color: #FF4B4B !important;
     border-bottom: 2px solid #FF4B4B !important;
+    font-weight: 600 !important;
 }
 </style>
 """, unsafe_allow_html=True)
