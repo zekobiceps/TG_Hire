@@ -837,8 +837,8 @@ st.markdown("""
 div[data-testid="stRadio"] > div {
     display: flex;
     justify-content: flex-start;
-    gap: 0px;
-    border-bottom: 1px solid #f0f2f6;
+    gap: 20px;
+    border-bottom: 1px solid #e0e0e0;
     padding-bottom: 0px;
     margin-bottom: 20px;
 }
@@ -846,7 +846,7 @@ div[data-testid="stRadio"] label {
     font-size: 14px !important;
     font-weight: 400 !important;
     cursor: pointer;
-    padding: 10px 20px;
+    padding: 10px 16px !important; /* Match Brief.py padding */
     border-radius: 0px;
     margin: 0px;
     background-color: transparent;
@@ -855,7 +855,7 @@ div[data-testid="stRadio"] label {
 }
 div[data-testid="stRadio"] label:hover {
     color: #FF4B4B;
-    background-color: transparent;
+    background-color: transparent; /* Keep transparent as per Brief.py usually */
 }
 /* Hide the radio circle */
 div[data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child {
