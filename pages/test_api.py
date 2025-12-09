@@ -861,13 +861,11 @@ div[data-testid="stRadio"] label:hover {
 div[data-testid="stRadio"] div[role="radiogroup"] > label > div:first-child {
     display: none;
 }
-/* Selected state styling - we can't easily target the label based on the checked input in pure CSS 
-   without :has(), but we can try to approximate or rely on Streamlit's structure.
-   Streamlit puts the input inside the label or adjacent.
-   If we can't target it perfectly, the default radio behavior (bolding) might persist.
-*/
-div[data-testid="stRadio"] label[data-baseweb="radio"] {
-    /* This targets the label container */
+/* Selected state styling using :has() selector */
+div[data-testid="stRadio"] label:has(input:checked) {
+    background-color: #FF4B4B !important;
+    color: white !important;
+    border-bottom: 2px solid #FF4B4B !important;
 }
 </style>
 """, unsafe_allow_html=True)
