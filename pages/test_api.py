@@ -45,6 +45,14 @@ from utils import (
     save_ksa_matrix_to_current_brief   # <-- AJOUT
 )
 
+# Must be the first Streamlit command
+st.set_page_config(
+    page_title="Brief de Calibration",
+    page_icon=None,
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
 import time
 import traceback
 
@@ -507,12 +515,33 @@ def delete_current_brief():
 
 # ---------------- INIT ----------------
 init_session_state()
-st.set_page_config(
-    page_title="Brief de Calibration",
-    page_icon=None,
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+
+# Sync URL params with session state (Persistence fix)
+try:
+    # Restore from URL if session is empty/reset
+    if not st.session_state.current_brief_name:
+        # Support for both st.query_params (new) and experimental (old)
+        params = st.query_params if hasattr(st, "query_params") else st.experimental_get_query_params()
+        
+        # Handle dict vs list return types
+        brief_param = params.get("brief")
+        if brief_param:
+            if isinstance(brief_param, list):
+                brief_param = brief_param[0]
+            
+            if brief_param in st.session_state.saved_briefs:
+                st.session_state.current_brief_name = brief_param
+                # Also restore phase to avoid "Gestion" default
+                st.session_state.brief_phase = "🔄 Avant-brief" # Default to editing if brief is loaded
+
+    # Update URL to match current state
+    if st.session_state.current_brief_name:
+        if hasattr(st, "query_params"):
+            st.query_params["brief"] = st.session_state.current_brief_name
+        else:
+            st.experimental_set_query_params(brief=st.session_state.current_brief_name)
+except Exception:
+    pass
 
 if "brief_phase" not in st.session_state:
     st.session_state.brief_phase = "📁 Gestion"
