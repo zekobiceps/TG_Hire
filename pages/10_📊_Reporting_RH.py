@@ -456,10 +456,21 @@ def load_data_from_files(csv_file=None, excel_file=None):
             elif excel_file is not None:
                 df_recrutement = pd.read_excel(excel_file, sheet_name=0)
             else:
-                # Fallback vers fichier local s'il existe
-                local_excel = 'Recrutement global PBI All  google sheet (5).xlsx'
-                if os.path.exists(local_excel):
-                    df_recrutement = pd.read_excel(local_excel, sheet_name=0)
+                # Fallback vers fichier local s'il existe (recherche du plus récent)
+                import glob
+                # Pattern pour trouver les fichiers Excel de recrutement
+                excel_files = glob.glob('Recrutement global PBI All*.xlsx')
+                if excel_files:
+                    # Trier par date de modification (le plus récent en dernier)
+                    excel_files.sort(key=os.path.getmtime)
+                    latest_excel = excel_files[-1]
+                    # st.info(f"Chargement automatique du fichier local : {latest_excel}")
+                    df_recrutement = pd.read_excel(latest_excel, sheet_name=0)
+                else:
+                    # Fallback legacy
+                    local_excel = 'Recrutement global PBI All  google sheet (5).xlsx'
+                    if os.path.exists(local_excel):
+                        df_recrutement = pd.read_excel(local_excel, sheet_name=0)
         except Exception as e:
             st.error(f"Erreur lors du chargement des données de recrutement: {e}")
 
@@ -2204,10 +2215,11 @@ def create_weekly_report_tab(df_recrutement=None):
                 else:
                     today = reporting_date if isinstance(reporting_date, datetime) else datetime.combine(reporting_date, datetime.min.time())
                 
-                # Alignement avec la logique du Reporting Hebdomadaire : Semaine PRÉCÉDENTE
+                # Alignement avec la logique du Reporting Hebdomadaire : Semaine PRÉCÉDENTE + Semaine COURANTE
+                # Pour éviter que les cartes disparaissent quand on passe à la semaine suivante
                 current_week_monday = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
                 start_filter = current_week_monday - timedelta(days=7) # Lundi précédent
-                end_filter = current_week_monday - timedelta(days=1)   # Dimanche précédent (inclus)
+                end_filter = current_week_monday + timedelta(days=6)   # Dimanche courant (inclus)
                 
                 # Filtrer les postes clôturés avec date d'acceptation dans la semaine du reporting
                 def in_reporting_week(poste):
@@ -2221,7 +2233,7 @@ def create_weekly_report_tab(df_recrutement=None):
                             return False
                     if not pd.notna(accept_date):
                         return False
-                    # Comparaison inclusive [Lundi précédent, Dimanche précédent]
+                    # Comparaison inclusive [Lundi précédent, Dimanche courant]
                     return start_filter <= accept_date <= end_filter + timedelta(days=1) # +1 jour pour inclure la fin de journée si datetime
                 postes_in_col = [p for p in postes_data if p["statut"] == statut and in_reporting_week(p)]
             elif statut == "Désistement":
@@ -2232,10 +2244,10 @@ def create_weekly_report_tab(df_recrutement=None):
                 else:
                     today = reporting_date if isinstance(reporting_date, datetime) else datetime.combine(reporting_date, datetime.min.time())
                 
-                # Alignement avec la logique du Reporting Hebdomadaire : Semaine PRÉCÉDENTE
+                # Alignement avec la logique du Reporting Hebdomadaire : Semaine PRÉCÉDENTE + Semaine COURANTE
                 current_week_monday = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
                 start_filter = current_week_monday - timedelta(days=7) # Lundi précédent
-                end_filter = current_week_monday - timedelta(days=1)   # Dimanche précédent (inclus)
+                end_filter = current_week_monday + timedelta(days=6)   # Dimanche courant (inclus)
                 
                 def in_reporting_week_desistement(poste):
                     desist_date = poste.get('date_desistement')
@@ -2250,7 +2262,7 @@ def create_weekly_report_tab(df_recrutement=None):
                     if not pd.notna(desist_date):
                         return False
                         
-                    # Comparaison inclusive [Lundi précédent, Dimanche précédent]
+                    # Comparaison inclusive [Lundi précédent, Dimanche courant]
                     return start_filter <= desist_date <= end_filter + timedelta(days=1)
 
                 postes_in_col = [p for p in postes_data if p["statut"] == statut and in_reporting_week_desistement(p)]
