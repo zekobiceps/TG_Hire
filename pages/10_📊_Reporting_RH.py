@@ -2203,8 +2203,12 @@ def create_weekly_report_tab(df_recrutement=None):
                     today = datetime.now()
                 else:
                     today = reporting_date if isinstance(reporting_date, datetime) else datetime.combine(reporting_date, datetime.min.time())
-                start_of_week = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
-                end_of_week = start_of_week + timedelta(days=4)  # Lundi à Vendredi inclus
+                
+                # Alignement avec la logique du Reporting Hebdomadaire : Semaine PRÉCÉDENTE
+                current_week_monday = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
+                start_filter = current_week_monday - timedelta(days=7) # Lundi précédent
+                end_filter = current_week_monday - timedelta(days=1)   # Dimanche précédent (inclus)
+                
                 # Filtrer les postes clôturés avec date d'acceptation dans la semaine du reporting
                 def in_reporting_week(poste):
                     accept_date = poste.get('date_acceptation')
@@ -2217,7 +2221,8 @@ def create_weekly_report_tab(df_recrutement=None):
                             return False
                     if not pd.notna(accept_date):
                         return False
-                    return start_of_week <= accept_date <= end_of_week
+                    # Comparaison inclusive [Lundi précédent, Dimanche précédent]
+                    return start_filter <= accept_date <= end_filter + timedelta(days=1) # +1 jour pour inclure la fin de journée si datetime
                 postes_in_col = [p for p in postes_data if p["statut"] == statut and in_reporting_week(p)]
             elif statut == "Désistement":
                 # Afficher uniquement ceux de la semaine du reporting (basé sur date de désistement)
@@ -2226,8 +2231,11 @@ def create_weekly_report_tab(df_recrutement=None):
                     today = datetime.now()
                 else:
                     today = reporting_date if isinstance(reporting_date, datetime) else datetime.combine(reporting_date, datetime.min.time())
-                start_of_week = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
-                end_of_week = start_of_week + timedelta(days=4)  # Lundi à Vendredi inclus
+                
+                # Alignement avec la logique du Reporting Hebdomadaire : Semaine PRÉCÉDENTE
+                current_week_monday = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
+                start_filter = current_week_monday - timedelta(days=7) # Lundi précédent
+                end_filter = current_week_monday - timedelta(days=1)   # Dimanche précédent (inclus)
                 
                 def in_reporting_week_desistement(poste):
                     desist_date = poste.get('date_desistement')
@@ -2242,7 +2250,8 @@ def create_weekly_report_tab(df_recrutement=None):
                     if not pd.notna(desist_date):
                         return False
                         
-                    return start_of_week <= desist_date <= end_of_week
+                    # Comparaison inclusive [Lundi précédent, Dimanche précédent]
+                    return start_filter <= desist_date <= end_filter + timedelta(days=1)
 
                 postes_in_col = [p for p in postes_data if p["statut"] == statut and in_reporting_week_desistement(p)]
             else:
