@@ -2074,6 +2074,7 @@ def create_weekly_report_tab(df_recrutement=None):
     recruteur_col = _find_col(cols, ['recruteur', 'recruiter'])
     commentaire_col = _find_col(cols, ['commentaire', 'comment'])
     accept_date_col = _find_col(cols, ["date d'acceptation du candidat", "date d'acceptation", "date d'acceptation de la promesse", "date d'acceptation promesse", "date d'accept"])  # robust search
+    desistement_date_col = _find_col(cols, ["date de désistement", "date désistement", "date desistement", "date desistement"])
 
     def _normalize_kanban(text):
         if text is None or (isinstance(text, float) and np.isnan(text)):
@@ -2128,6 +2129,8 @@ def create_weekly_report_tab(df_recrutement=None):
             titre = r.get(poste_col, '') if poste_col else r.get('Poste demandé', '')
             # Ajout de la date d'acceptation du candidat pour le filtrage "Clôture"
             accept_date = r.get(accept_date_col) if accept_date_col else None
+            # Ajout de la date de désistement pour le filtrage "Désistement"
+            desistement_date = r.get(desistement_date_col) if desistement_date_col else None
             postes_data.append({
                 'statut': canon,
                 'titre': titre or '',
@@ -2136,12 +2139,13 @@ def create_weekly_report_tab(df_recrutement=None):
                 'demandeur': r.get(demandeur_col, '') if demandeur_col else '',
                 'recruteur': r.get(recruteur_col, '') if recruteur_col else '',
                 'commentaire': r.get(commentaire_col, '') if commentaire_col else '',
-                'date_acceptation': accept_date
+                'date_acceptation': accept_date,
+                'date_desistement': desistement_date
             })
     
     # Afficher le titre avec le nombre total de cartes
-    total_cartes = len(postes_data)
-    st.subheader(f"Pipeline de Recrutement (Kanban) - Total: {total_cartes}")
+    # total_cartes = len(postes_data)
+    st.subheader("Pipeline de Recrutement (Kanban)")
     
     # Créer les colonnes Streamlit
     cols_streamlit = st.columns(len(statuts_kanban_display))
@@ -2215,6 +2219,32 @@ def create_weekly_report_tab(df_recrutement=None):
                         return False
                     return start_of_week <= accept_date <= end_of_week
                 postes_in_col = [p for p in postes_data if p["statut"] == statut and in_reporting_week(p)]
+            elif statut == "Désistement":
+                # Afficher uniquement ceux de la semaine du reporting (basé sur date de désistement)
+                reporting_date = st.session_state.get('reporting_date', None)
+                if reporting_date is None:
+                    today = datetime.now()
+                else:
+                    today = reporting_date if isinstance(reporting_date, datetime) else datetime.combine(reporting_date, datetime.min.time())
+                start_of_week = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
+                end_of_week = start_of_week + timedelta(days=4)  # Lundi à Vendredi inclus
+                
+                def in_reporting_week_desistement(poste):
+                    desist_date = poste.get('date_desistement')
+                    if not desist_date:
+                        return False
+                    
+                    if isinstance(desist_date, str):
+                        try:
+                            desist_date = pd.to_datetime(desist_date, errors='coerce')
+                        except Exception:
+                            return False
+                    if not pd.notna(desist_date):
+                        return False
+                        
+                    return start_of_week <= desist_date <= end_of_week
+
+                postes_in_col = [p for p in postes_data if p["statut"] == statut and in_reporting_week_desistement(p)]
             else:
                 postes_in_col = [p for p in postes_data if p["statut"] == statut]
             nb_postes = len(postes_in_col)
