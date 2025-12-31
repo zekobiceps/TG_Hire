@@ -1619,6 +1619,7 @@ def create_weekly_report_tab(df_recrutement=None):
             'TG STONE': 'TG STONE.PNG',
             'TG WOOD': 'TG WOOD.PNG',
             'STAM': 'STAM.png',
+            'BFO': 'BFO.png',
             'TGCC IMMOBILIER': 'tgcc-immobilier.png',
             'TGCC-IMMOBILIER': 'tgcc-immobilier.png'
         }
@@ -1734,7 +1735,7 @@ def create_weekly_report_tab(df_recrutement=None):
             text-align: center !important;
             padding: 10px 8px !important;
             border: 1px solid white !important;
-            font-size: 1.0em;
+            font-size: 1.3em;
             line-height: 1.2;
         }
         .custom-table td {
@@ -1766,7 +1767,7 @@ def create_weekly_report_tab(df_recrutement=None):
         .custom-table .total-row td {
             background-color: #9C182F !important; /* Assurer le fond rouge sur chaque cellule */
             color: white !important; /* Assurer le texte blanc */
-            font-size: 0.8em !important;
+            font-size: 1.3em !important;
             font-weight: bold !important;
             border: 1px solid #9C182F !important; /* Bordures rouges */
         }
