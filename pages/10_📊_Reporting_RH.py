@@ -2671,7 +2671,10 @@ def generate_table_html_image(weekly_metrics):
         # Trouver Chromium automatiquement
         chromium_path = find_chromium_executable()
         if not chromium_path:
+            st.error("❌ Chromium non trouvé - les images seront générées avec PIL (sans logos)")
             raise Exception("Chromium non trouvé")
+        
+        st.success(f"✅ Chromium détecté: {chromium_path}")
         
         # Configurer html2image pour utiliser Chromium avec flags no-sandbox
         hti = Html2Image(
@@ -2679,7 +2682,6 @@ def generate_table_html_image(weekly_metrics):
             browser_executable=chromium_path,
             custom_flags=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--headless']
         )
-        st.info(f"✅ Chromium trouvé: {chromium_path}")
     except Exception as e:
         st.warning(f"⚠️ html2image non disponible ({e}), utilisation de PIL à la place")
         # Fallback vers PIL
@@ -2754,7 +2756,7 @@ def generate_table_html_image(weekly_metrics):
                     width: 100%;
                 }}
                 .custom-table {{
-                    width: 75%;
+                    width: 90%;
                     margin: 0 auto;
                     border-collapse: collapse;
                     background-color: white;
@@ -2765,13 +2767,15 @@ def generate_table_html_image(weekly_metrics):
                     color: white;
                     font-weight: bold;
                     text-align: center;
-                    padding: 6px 4px;
+                    padding: 8px 6px;
                     border: 1px solid white;
-                    font-size: 1.1em;
-                    line-height: 1.3;
+                    font-size: 1.0em;
+                    line-height: 1.2;
                     white-space: normal;
                     word-wrap: break-word;
-                    max-width: 150px;
+                    overflow-wrap: break-word;
+                    word-break: break-word;
+                    min-width: 120px;
                 }}
                 .custom-table td {{
                     text-align: center;
@@ -2885,7 +2889,10 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
         # Trouver Chromium automatiquement
         chromium_path = find_chromium_executable()
         if not chromium_path:
+            st.error(f"❌ Chromium non trouvé pour Kanban {statut} - utilisation de PIL (limité)")
             raise Exception("Chromium non trouvé")
+        
+        st.success(f"✅ Chromium détecté pour Kanban {statut}: {chromium_path}")
         
         # Configurer html2image
         hti = Html2Image(
@@ -2893,9 +2900,8 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
             browser_executable=chromium_path,
             custom_flags=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--headless']
         )
-        st.info(f"✅ Chromium trouvé: {chromium_path}")
     except Exception as e:
-        st.warning(f"⚠️ html2image non disponible ({e}), utilisation de PIL à la place")
+        st.warning(f"⚠️ html2image non disponible pour {statut} ({e}), utilisation de PIL à la place")
         # Fallback vers PIL
         return generate_kanban_statut_image_simple(df_recrutement, statut, max_cards)
     
