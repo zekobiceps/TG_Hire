@@ -7,6 +7,7 @@ import numpy as np
 from datetime import datetime, timedelta
 import warnings
 import os
+import base64
 warnings.filterwarnings('ignore')
 import re
 import streamlit.components.v1 as components
@@ -1594,11 +1595,31 @@ def create_weekly_report_tab(df_recrutement=None):
         unsafe_allow_html=True
     )
     if metrics and len(metrics) > 0:
+        # Helper pour le logo TGCC
+        tgcc_logo_b64 = None
+        if os.path.exists("tgcc.png"):
+            with open("tgcc.png", "rb") as f:
+                tgcc_logo_b64 = base64.b64encode(f.read()).decode()
+        
+        def get_entity_display(name):
+            name_str = str(name)
+            # Si c'est une entité TGCC et qu'on a le logo, on affiche le logo + le nom spécifique (ex: SIEGE)
+            # Ou juste le logo si c'est "TGCC" tout court
+            if "tgcc" in name_str.lower() and tgcc_logo_b64:
+                # On essaie d'extraire la partie spécifique après "TGCC -"
+                parts = re.split(r'tgcc\s*-\s*', name_str, flags=re.IGNORECASE)
+                suffix = parts[1] if len(parts) > 1 else ""
+                logo_html = f'<img src="data:image/png;base64,{tgcc_logo_b64}" height="30" style="vertical-align: middle; margin-right: 5px;">'
+                if suffix:
+                    return f'{logo_html} <span style="vertical-align: middle;">{suffix}</span>'
+                return logo_html
+            return name_str
+
         # Préparer les données pour le HTML
         table_data = []
         for entite, data in metrics_included.items():
             table_data.append({
-                'Entité': entite,
+                'Entité': get_entity_display(entite),
                 'Nb postes ouverts avant début semaine': data['avant'] if data['avant'] > 0 else '-',
                 'Nb nouveaux postes ouverts cette semaine': data['nouveaux'] if data['nouveaux'] > 0 else '-',
                 'Nb postes pourvus cette semaine': data['pourvus'] if data['pourvus'] > 0 else '-',
@@ -1629,7 +1650,8 @@ def create_weekly_report_tab(df_recrutement=None):
             border-collapse: collapse;
             font-family: Arial, sans-serif;
             box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-            max-width: 900px;
+            width: 100%;
+            max-width: 1200px;
             margin: 0 auto;
         }
         .custom-table th {
@@ -1637,24 +1659,24 @@ def create_weekly_report_tab(df_recrutement=None):
             color: white !important;
             font-weight: bold !important;
             text-align: center !important;
-            padding: 8px 6px !important;
+            padding: 10px 8px !important;
             border: 1px solid white !important;
-            font-size: 0.8em;
+            font-size: 1.0em;
             line-height: 1.2;
         }
         .custom-table td {
             text-align: center !important;
-            padding: 6px 4px !important;
+            padding: 8px 6px !important;
             border: 1px solid #ddd !important;
             background-color: white !important;
-            font-size: 0.75em;
+            font-size: 0.95em;
             line-height: 1.1;
         }
         .custom-table .entity-cell {
             text-align: left !important;
             padding-left: 10px !important;
             font-weight: 500;
-            min-width: 120px;
+            min-width: 150px;
         }
         .custom-table .total-row {
             background-color: #DC143C !important; /* Rouge vif */
@@ -2085,7 +2107,7 @@ def create_weekly_report_tab(df_recrutement=None):
     entite_col = _find_col(cols, ['entité', 'entite', 'entité demandeuse', 'entite demandeuse', 'entité'])
     lieu_col = _find_col(cols, ['lieu', 'affectation', 'site'])
     demandeur_col = _find_col(cols, ['demandeur', 'requester'])
-    recruteur_col = _find_col(cols, ['responsable de traitement de la demande', 'recruteur', 'recruiter'])
+    recruteur_col = _find_col(cols, ['responsable de traitement', 'recruteur', 'recruiter'])
     commentaire_col = _find_col(cols, ['commentaire', 'comment'])
     accept_date_col = _find_col(cols, ["date d'acceptation du candidat", "date d'acceptation", "date d'acceptation de la promesse", "date d'acceptation promesse", "date d'accept"])  # robust search
     desistement_date_col = _find_col(cols, ["date de désistement", "date désistement", "date desistement", "date desistement"])
