@@ -1660,8 +1660,8 @@ def create_weekly_report_tab(df_recrutement=None):
 
             if logo_file and logo_file in logos_dict:
                 logo_b64_str = logos_dict[logo_file]
-                # Image agrandie pour meilleure visibilité
-                img_tag = f'<img src="data:image/png;base64,{logo_b64_str}" height="105" style="vertical-align: middle;">'
+                # Image avec taille optimale et centrée
+                img_tag = f'<img src="data:image/png;base64,{logo_b64_str}" height="63" style="vertical-align: middle; display: block; margin: 0 auto;">'
                 
                 # Gestion spécifique pour TGCC avec suffixe (ex: TGCC - SIEGE)
                 # Si on a trouvé via le mapping ou via le nom de fichier
@@ -1738,17 +1738,18 @@ def create_weekly_report_tab(df_recrutement=None):
         }
         .custom-table td {
             text-align: center !important;
-            padding: 6px 4px !important;
+            padding: 10px 8px !important;
             border: 1px solid #ddd !important;
             background-color: white !important;
-            font-size: 0.75em;
-            line-height: 1.1;
+            font-size: 1.3em;
+            line-height: 1.2;
+            font-weight: 500;
         }
         .custom-table .entity-cell {
-            text-align: left !important;
-            padding-left: 10px !important;
-            font-weight: 500;
-            min-width: 120px;
+            text-align: center !important;
+            padding: 10px !important;
+            font-weight: 600;
+            min-width: 150px;
         }
         .custom-table .total-row {
             background-color: #9C182F !important; /* Rouge vif */
