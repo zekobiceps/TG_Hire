@@ -2770,9 +2770,12 @@ def generate_table_html_image(weekly_metrics):
     """Génère une image du tableau des besoins avec logos"""
     import tempfile
     
+    st.info("🔍 Début génération tableau HTML avec logos...")
+    
     try:
         # Essayer d'abord avec html2image + Chromium
         from html2image import Html2Image
+        st.info("✅ Module Html2Image importé")
         
         # Trouver Chromium automatiquement
         chromium_path = find_chromium_executable()
@@ -2788,6 +2791,7 @@ def generate_table_html_image(weekly_metrics):
             browser_executable=chromium_path,
             custom_flags=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--headless']
         )
+        st.success("✅ Html2Image configuré")
     except Exception as e:
         st.warning(f"⚠️ html2image non disponible ({e}), utilisation de PIL à la place")
         # Fallback vers PIL
@@ -2840,6 +2844,8 @@ def generate_table_html_image(weekly_metrics):
                 if entity_key.upper() in name_upper:
                     if entity_key in logos_dict:
                         logo_b64 = logos_dict[entity_key]
+                        # Log pour débogage
+                        print(f"Match: '{name_str}' -> '{entity_key}'")
                         # Ajuster les tailles selon les besoins
                         size_map = {
                             'TG STEEL': 45,      # Réduit
@@ -2857,6 +2863,7 @@ def generate_table_html_image(weekly_metrics):
                         logo_size = size_map.get(entity_key, 63)
                         img_tag = f'<img src="data:image/png;base64,{logo_b64}" style="height: {logo_size}px; vertical-align: middle;" />'
                         return img_tag
+            print(f"No match for: '{name_str}'")
             return name_str
         
         # Calculer les totaux
@@ -2982,7 +2989,14 @@ def generate_table_html_image(weekly_metrics):
         """
         
         # Convertir en image avec html2image (haute résolution)
+        # Supprimer l'ancien fichier s'il existe
+        old_file = os.path.join(tempfile.gettempdir(), 'table.png')
+        if os.path.exists(old_file):
+            os.remove(old_file)
+            st.info(f"🗑️ Ancien fichier table.png supprimé")
+        
         image_path = hti.screenshot(html_str=html_table, save_as='table.png', size=(1920, 1080))[0]
+        st.success(f"✅ Image tableau générée: {image_path}")
         
         return image_path
     except Exception as e:
@@ -3005,9 +3019,12 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
     """
     import tempfile
     
+    st.info(f"🔍 Début génération Kanban pour {statut}...")
+    
     try:
         # Essayer d'abord avec html2image + Chromium
         from html2image import Html2Image
+        st.info(f"✅ Module Html2Image importé pour {statut}")
         
         # Trouver Chromium automatiquement
         chromium_path = find_chromium_executable()
