@@ -2954,13 +2954,35 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
             st.warning("⚠️ Métriques hebdomadaires vides, le PowerPoint sera généré avec des données limitées.")
         
         # Générer les images simples avec PIL (pas de dépendance Chrome)
-        st.info("Génération des images pour le PowerPoint...")
+        st.info("📊 Génération des images pour le PowerPoint...")
         table_image_path = generate_table_image_simple(weekly_metrics) if weekly_metrics else None
         kanban_image_path = generate_kanban_image_simple(df_recrutement)
         
+        # Debug: Vérifier les chemins des images
+        if table_image_path and os.path.exists(table_image_path):
+            st.success(f"✅ Image tableau générée: {os.path.basename(table_image_path)}")
+        else:
+            st.warning("⚠️ Échec génération image tableau")
+            
+        if kanban_image_path and os.path.exists(kanban_image_path):
+            st.success(f"✅ Image Kanban générée: {os.path.basename(kanban_image_path)}")
+        else:
+            st.warning("⚠️ Échec génération image Kanban")
+        
         # Parcourir chaque slide et remplacer les placeholders
         for slide_idx, slide in enumerate(prs.slides):
+            st.info(f"📄 Traitement de la slide {slide_idx + 1}/{len(prs.slides)}")
             shapes_to_remove = []
+            
+            # Debug: lister tous les shapes avec texte
+            text_shapes = []
+            for shape in slide.shapes:
+                shape_text = getattr(shape, "text", None)
+                if shape_text and shape_text.strip():
+                    text_shapes.append(shape_text[:100])  # Premier 100 chars
+            
+            if text_shapes:
+                st.code(f"Slide {slide_idx + 1} - Shapes avec texte:\n" + "\n".join([f"  - {t}" for t in text_shapes]))
             
             for shape in slide.shapes:
                 # Utiliser getattr pour éviter les erreurs Pylance
@@ -2970,12 +2992,15 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                     
                 # Tableau des besoins par entité - Insérer l'image
                 if "{{TABLEAU_BESOINS_ENTITES}}" in shape_text:
+                    st.info(f"🔍 Placeholder {{{{TABLEAU_BESOINS_ENTITES}}}} trouvé dans slide {slide_idx + 1}")
                     try:
                         # Récupérer la position et taille du shape original
                         left = shape.left
                         top = shape.top
                         width = shape.width
                         height = shape.height
+                        
+                        st.info(f"📐 Position Tableau: left={left}, top={top}, width={width}, height={height}")
                         
                         # Marquer le shape pour suppression
                         shapes_to_remove.append(shape)
@@ -2983,7 +3008,9 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                         # Insérer l'image du tableau si elle existe
                         if table_image_path and os.path.exists(table_image_path):
                             slide.shapes.add_picture(table_image_path, left, top, width=width, height=height)
+                            st.success(f"✅ Image tableau insérée dans slide {slide_idx + 1}")
                         else:
+                            st.error(f"❌ Image tableau non trouvée: {table_image_path}")
                             # Fallback: ajouter un message d'erreur
                             txBox = slide.shapes.add_textbox(left, top, width, height)
                             text_frame = txBox.text_frame
@@ -2991,10 +3018,13 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                             p.text = "Erreur: Impossible de générer l'image du tableau"
                             p.font.size = Pt(14)
                     except Exception as e:
-                        st.error(f"Erreur lors de l'insertion du tableau: {e}")
+                        st.error(f"❌ Erreur lors de l'insertion du tableau: {e}")
+                        import traceback
+                        st.code(traceback.format_exc())
                 
                 # Métrique total postes - Insérer l'image du Kanban
                 elif "{{METRIC_TOTAL_POSTES}}" in shape_text:
+                    st.info(f"🔍 Placeholder {{{{METRIC_TOTAL_POSTES}}}} trouvé dans slide {slide_idx + 1}")
                     try:
                         # Récupérer la position et taille du shape original
                         left = shape.left
@@ -3002,13 +3032,17 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                         width = shape.width
                         height = shape.height
                         
+                        st.info(f"📐 Position Kanban: left={left}, top={top}, width={width}, height={height}")
+                        
                         # Marquer le shape pour suppression
                         shapes_to_remove.append(shape)
                         
                         # Insérer l'image du Kanban si elle existe
                         if kanban_image_path and os.path.exists(kanban_image_path):
                             slide.shapes.add_picture(kanban_image_path, left, top, width=width, height=height)
+                            st.success(f"✅ Image Kanban insérée dans slide {slide_idx + 1}")
                         else:
+                            st.error(f"❌ Image Kanban non trouvée: {kanban_image_path}")
                             # Fallback: ajouter un message d'erreur
                             txBox = slide.shapes.add_textbox(left, top, width, height)
                             text_frame = txBox.text_frame
@@ -3016,7 +3050,9 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                             p.text = "Erreur: Impossible de générer l'image du Kanban"
                             p.font.size = Pt(14)
                     except Exception as e:
-                        st.error(f"Erreur lors de l'insertion du Kanban: {e}")
+                        st.error(f"❌ Erreur lors de l'insertion du Kanban: {e}")
+                        import traceback
+                        st.code(traceback.format_exc())
                 
                 # Graphiques Plotly - on peut ajouter d'autres placeholders ici
                 elif "{{GRAPH_" in shape_text:
