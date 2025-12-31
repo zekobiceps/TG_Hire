@@ -3496,165 +3496,18 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
         st.info("📊 Génération des images avec les visualisations Streamlit...")
         table_image_path = generate_table_html_image(weekly_metrics) if weekly_metrics else None
         
-        # --- CORRECTION : Utiliser la MÊME logique de filtrage que dans create_weekly_report_tab ---
-        def prepare_kanban_data(df_recrutement):
-            """Prépare les données du Kanban avec la même logique que create_weekly_report_tab"""
-            postes_data = []
-            
-            # Détection des colonnes (identique à create_weekly_report_tab)
-            cols = df_recrutement.columns.tolist() if df_recrutement is not None else []
-            
-            def _find_col(cols, keywords):
-                for k in keywords:
-                    for c in cols:
-                        if k in c.lower():
-                            return c
-                return None
-            
-            kanban_col = 'Colonne TG Hire' if 'Colonne TG Hire' in cols else _find_col(cols, ['colonne tg hire'])
-            poste_col = _find_col(cols, ['poste', 'title', 'post'])
-            entite_col = _find_col(cols, ['entité', 'entite', 'entité demandeuse', 'entite demandeuse', 'entité'])
-            lieu_col = _find_col(cols, ['lieu', 'affectation', 'site'])
-            demandeur_col = _find_col(cols, ['demandeur', 'requester'])
-            recruteur_col = _find_col(cols, ['responsable de traitement', 'recruteur', 'recruiter'])
-            commentaire_col = _find_col(cols, ['commentaire', 'comment'])
-            accept_date_col = _find_col(cols, ["date d'acceptation du candidat", "date d'acceptation", "date d'acceptation de la promesse", "date d'acceptation promesse", "date d'accept"])
-            desistement_date_col = _find_col(cols, ["date de désistement", "date désistement", "date desistement"])
-            
-            def _normalize_kanban(text):
-                if text is None or (isinstance(text, float) and np.isnan(text)):
-                    return ''
-                s = str(text)
-                s = unicodedata.normalize('NFKD', s)
-                s = ''.join(ch for ch in s if not unicodedata.combining(ch))
-                return s.lower().strip()
-            
-            # Statuts Kanban canoniques
-            statuts_kanban_display = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
-            
-            # Mapping de formes possibles -> statut canonique
-            status_map = {
-                'desistement': 'Désistement',
-                'desisté': 'Désistement',
-                'sourcing': 'Sourcing',
-                'shortlist': 'Shortlisté',
-                'shortlisté': 'Shortlisté',
-                'shortliste': 'Shortlisté',
-                'signature drh': 'Signature DRH',
-                'signature': 'Signature DRH',
-                'cloture': 'Clôture',
-                'clôture': 'Clôture',
-                'dépriorisé': 'Dépriorisé',
-                'depriorise': 'Dépriorisé',
-            }
-            
-            if df_recrutement is not None and kanban_col:
-                # Utiliser uniquement la colonne "Colonne TG Hire" pour le statut Kanban
-                df_kanban = df_recrutement[df_recrutement[kanban_col].notna()].copy()
-                df_kanban[kanban_col] = df_kanban[kanban_col].astype(str)
-                
-                for _, r in df_kanban.iterrows():
-                    raw_kanban = r.get(kanban_col)
-                    if pd.isna(raw_kanban):
-                        continue
-                    
-                    norm = _normalize_kanban(raw_kanban)
-                    canon = None
-                    
-                    for key, val in status_map.items():
-                        if key in norm:
-                            canon = val
-                            break
-                    
-                    if canon is None:
-                        for tgt in statuts_kanban_display:
-                            if _normalize_kanban(tgt) == norm:
-                                canon = tgt
-                                break
-                    
-                    if canon is None:
-                        continue
-
-                    titre = r.get(poste_col, '') if poste_col else r.get('Poste demandé', '')
-                    accept_date = r.get(accept_date_col) if accept_date_col else None
-                    desistement_date = r.get(desistement_date_col) if desistement_date_col else None
-                    
-                    postes_data.append({
-                        'statut': canon,
-                        'titre': titre or '',
-                        'entite': r.get(entite_col, '') if entite_col else r.get('Entité demandeuse', ''),
-                        'lieu': r.get(lieu_col, '') if lieu_col else '',
-                        'demandeur': r.get(demandeur_col, '') if demandeur_col else '',
-                        'recruteur': str(r.get(recruteur_col, '')).replace('nan', '') if recruteur_col else '',
-                        'commentaire': r.get(commentaire_col, '') if commentaire_col else '',
-                        'date_acceptation': accept_date,
-                        'date_desistement': desistement_date
-                    })
-            
-            return postes_data
-        
-        # Récupérer les données Kanban AVEC la même logique
-        postes_data_actual = prepare_kanban_data(df_recrutement)
-        
-        # Filtrer par semaine pour Clôture et Désistement (comme dans create_weekly_report_tab)
+        # Obtenir la date de reporting pour le filtre Clôture/Désistement
         from datetime import datetime, timedelta
         reporting_date = st.session_state.get('reporting_date', datetime.now().date())
         if isinstance(reporting_date, str):
             reporting_date = pd.to_datetime(reporting_date).date()
         
+        # Calculer la fenêtre de dates (semaine précédente + courante)
         current_week_monday = datetime(year=reporting_date.year, month=reporting_date.month, day=reporting_date.day) - timedelta(days=reporting_date.weekday())
         start_filter = current_week_monday - timedelta(days=7)  # Lundi précédent
-        end_filter = current_week_monday + timedelta(days=6)    # Dimanche courant (inclus)
+        end_filter = current_week_monday + timedelta(days=6)    # Dimanche courant
         
-        # Séparer les données par statut avec filtres
-        kanban_by_status = {
-            "Sourcing": [],
-            "Shortlisté": [],
-            "Signature DRH": [],
-            "Clôture": [],
-            "Désistement": []
-        }
-        
-        for poste in postes_data_actual:
-            statut = poste["statut"]
-            
-            if statut == "Clôture":
-                # Filtrer par date d'acceptation
-                accept_date = poste.get('date_acceptation')
-                if accept_date:
-                    if isinstance(accept_date, str):
-                        try:
-                            accept_date = pd.to_datetime(accept_date, errors='coerce')
-                        except Exception:
-                            continue
-                    
-                    if pd.notna(accept_date):
-                        # Convertir en datetime.date pour comparaison
-                        accept_date_date = accept_date.date() if hasattr(accept_date, 'date') else accept_date
-                        
-                        # Utiliser la même logique de filtrage que dans l'interface
-                        if start_filter.date() <= accept_date_date <= end_filter.date():
-                            kanban_by_status[statut].append(poste)
-            
-            elif statut == "Désistement":
-                # Filtrer par date de désistement
-                desist_date = poste.get('date_desistement')
-                if desist_date:
-                    if isinstance(desist_date, str):
-                        try:
-                            desist_date = pd.to_datetime(desist_date, errors='coerce')
-                        except Exception:
-                            continue
-                    
-                    if pd.notna(desist_date):
-                        desist_date_date = desist_date.date() if hasattr(desist_date, 'date') else desist_date
-                        
-                        if start_filter.date() <= desist_date_date <= end_filter.date():
-                            kanban_by_status[statut].append(poste)
-            
-            else:
-                # Pas de filtre pour les autres statuts
-                kanban_by_status[statut].append(poste)
+        st.info(f"📅 Période de filtrage Clôture/Désistement: {start_filter.date()} au {end_filter.date()}")
         
         # Générer une image par statut Kanban
         statuts = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
@@ -3663,22 +3516,59 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
         for statut in statuts:
             st.info(f"🔄 Génération de l'image pour {statut}...")
             
-            # Créer un DataFrame temporaire avec les données filtrées
-            if kanban_by_status[statut]:
-                df_temp = pd.DataFrame(kanban_by_status[statut])
+            # Pour Clôture et Désistement, appliquer le filtre de date
+            if statut == "Clôture":
+                # Trouver la colonne de date d'acceptation
+                accept_col = None
+                for col_name in df_recrutement.columns:
+                    if "date" in col_name.lower() and ("accept" in col_name.lower() or "promesse" in col_name.lower()):
+                        accept_col = col_name
+                        break
                 
-                # Ajouter les colonnes attendues par generate_kanban_statut_image
-                df_temp['Colonne TG Hire'] = statut
-                df_temp['Poste demandé '] = df_temp['titre']
-                df_temp['Entité demandeuse'] = df_temp['entite']
-                df_temp['Affectation'] = df_temp['lieu']
-                df_temp['Nom Prénom du demandeur'] = df_temp['demandeur']
-                df_temp['Responsable de traitement de  la demande '] = df_temp['recruteur']
-                df_temp['Commentaire'] = df_temp['commentaire']
+                if accept_col:
+                    df_filtered = df_recrutement[
+                        (df_recrutement['Colonne TG Hire'] == 'Clôture')
+                    ].copy()
+                    # Filtrer par date
+                    df_filtered[accept_col] = pd.to_datetime(df_filtered[accept_col], errors='coerce')
+                    df_filtered = df_filtered[
+                        (df_filtered[accept_col].dt.date >= start_filter.date()) &
+                        (df_filtered[accept_col].dt.date <= end_filter.date())
+                    ]
+                    st.info(f"📅 Clôture filtrée: {len(df_filtered)} postes (colonne: {accept_col})")
+                else:
+                    df_filtered = df_recrutement[df_recrutement['Colonne TG Hire'] == 'Clôture'].copy()
+                    st.warning(f"⚠️ Colonne date d'acceptation non trouvée, affichage de tous les {len(df_filtered)} postes clôturés")
+                
+                kanban_images[statut] = generate_kanban_statut_image(df_filtered, statut, max_cards=100)
+                
+            elif statut == "Désistement":
+                # Trouver la colonne de date de désistement
+                desist_col = None
+                for col_name in df_recrutement.columns:
+                    if "date" in col_name.lower() and "désist" in col_name.lower():
+                        desist_col = col_name
+                        break
+                
+                if desist_col:
+                    df_filtered = df_recrutement[
+                        (df_recrutement['Colonne TG Hire'] == 'Désistement')
+                    ].copy()
+                    # Filtrer par date
+                    df_filtered[desist_col] = pd.to_datetime(df_filtered[desist_col], errors='coerce')
+                    df_filtered = df_filtered[
+                        (df_filtered[desist_col].dt.date >= start_filter.date()) &
+                        (df_filtered[desist_col].dt.date <= end_filter.date())
+                    ]
+                    st.info(f"📅 Désistement filtré: {len(df_filtered)} postes (colonne: {desist_col})")
+                else:
+                    df_filtered = df_recrutement[df_recrutement['Colonne TG Hire'] == 'Désistement'].copy()
+                    st.warning(f"⚠️ Colonne date désistement non trouvée, affichage de tous les {len(df_filtered)} désistements")
+                
+                kanban_images[statut] = generate_kanban_statut_image(df_filtered, statut, max_cards=100)
             else:
-                df_temp = pd.DataFrame()  # DataFrame vide si pas de données
-            
-            kanban_images[statut] = generate_kanban_statut_image(df_temp, statut, max_cards=100)
+                # Pour les autres statuts, pas de filtre de date
+                kanban_images[statut] = generate_kanban_statut_image(df_recrutement, statut, max_cards=100)
         
         # Debug: Vérifier les chemins des images
         if table_image_path and os.path.exists(table_image_path):
