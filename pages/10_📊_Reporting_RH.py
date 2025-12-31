@@ -2433,9 +2433,11 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
         # Calculer les métriques hebdomadaires
         weekly_metrics = calculate_weekly_metrics(df_recrutement)
         
-        if not weekly_metrics or 'table_data' not in weekly_metrics:
-            st.warning("⚠️ Aucune donnée hebdomadaire disponible pour générer le PowerPoint.")
-            return None
+        # Debug: afficher les informations sur weekly_metrics
+        if weekly_metrics:
+            st.info(f"✅ Métriques hebdomadaires calculées: {len(weekly_metrics.get('table_data', []))} lignes")
+        else:
+            st.warning("⚠️ Métriques hebdomadaires vides, le PowerPoint sera généré avec des données limitées.")
         
         # Parcourir chaque slide et remplacer les placeholders
         for slide_idx, slide in enumerate(prs.slides):
@@ -2450,6 +2452,15 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                 # Tableau des besoins par entité
                 if "{{TABLEAU_BESOINS_ENTITES}}" in shape_text:
                     try:
+                        if not weekly_metrics or 'table_data' not in weekly_metrics:
+                            # Si pas de données, afficher un message
+                            text_frame = getattr(shape, "text_frame", None)
+                            if text_frame:
+                                text_frame.clear()
+                                p = text_frame.paragraphs[0] if text_frame.paragraphs else text_frame.add_paragraph()
+                                p.text = "Aucune donnée disponible"
+                            continue
+                        
                         # Récupérer la position et taille du shape original
                         left = shape.left
                         top = shape.top
@@ -2531,6 +2542,15 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                 # Métrique total postes
                 elif "{{METRIC_TOTAL_POSTES}}" in shape_text:
                     try:
+                        if not weekly_metrics or 'table_data' not in weekly_metrics or len(weekly_metrics['table_data']) == 0:
+                            # Si pas de données, afficher un message
+                            text_frame = getattr(shape, "text_frame", None)
+                            if text_frame:
+                                text_frame.clear()
+                                p = text_frame.paragraphs[0] if text_frame.paragraphs else text_frame.add_paragraph()
+                                p.text = "Aucune donnée disponible"
+                            continue
+                        
                         total_row = weekly_metrics['table_data'][-1]
                         total_postes = str(total_row.get('Nb postes en cours cette semaine (sourcing)', 'N/A')).replace('**', '')
                         
