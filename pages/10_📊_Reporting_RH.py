@@ -2345,6 +2345,9 @@ def create_weekly_report_tab(df_recrutement=None):
         color: #2c3e50;
         line-height: 1.2;
         white-space: normal;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
     }
     .kanban-card p {
         margin-bottom: 2px;
@@ -3160,6 +3163,7 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
                     overflow-wrap: break-word;
                     word-break: break-word;
                     hyphens: auto;
+                    white-space: normal !important;
                     max-width: 100%;
                 }}
                 .kanban-card p {{
@@ -3264,6 +3268,7 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
         y_offset = 120
         col = 0
         
+        import textwrap
         for idx, row in df_statut.iterrows():
             if y_offset > height - 200:
                 break
@@ -3277,8 +3282,14 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
             # Contenu - utiliser noms colonnes originaux (avec gestion des espaces potentiels)
             # Titre
             titre_col = 'Poste demandé' if 'Poste demandé' in row else 'Poste demandé '
-            titre = str(row.get(titre_col, 'N/A')).strip()[:50]
-            draw.text((x + 10, y_offset + 10), titre, fill='#9C182F', font=font_card_title)
+            titre = str(row.get(titre_col, 'N/A')).strip()
+            # Wrap title into up to 2 lines to prevent overflow
+            max_chars_per_line = 30
+            wrapped_lines = textwrap.wrap(titre, width=max_chars_per_line) or ['N/A']
+            wrapped_lines = wrapped_lines[:2]
+            for i, line in enumerate(wrapped_lines):
+                draw.text((x + 10, y_offset + 10 + (i * 20)), line, fill='#9C182F', font=font_card_title)
+            title_block_height = 10 + (len(wrapped_lines) * 20)
             
             # Entité
             entite_val = str(row.get('Entité demandeuse', 'N/A')).strip()
@@ -3286,7 +3297,7 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
             entite_txt = f"> {entite_val}"
             if affectation_val:
                 entite_txt += f" - {affectation_val}"
-            draw.text((x + 10, y_offset + 40), entite_txt[:50], fill='#555', font=font_card)
+            draw.text((x + 10, y_offset + title_block_height + 20), entite_txt[:50], fill='#555', font=font_card)
             
             # Demandeur
             demandeur_col = 'Nom Prénom du demandeur'
@@ -3296,7 +3307,7 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
             
             demandeur_val = str(row.get(demandeur_col, 'N/A')).strip()
             demandeur = f"* {demandeur_val}"
-            draw.text((x + 10, y_offset + 65), demandeur[:50], fill='#555', font=font_card)
+            draw.text((x + 10, y_offset + title_block_height + 45), demandeur[:50], fill='#555', font=font_card)
             
             # Recruteur
             recruteur_col = 'Responsable de traitement de la demande'
@@ -3306,7 +3317,7 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
                 
             recruteur_val = str(row.get(recruteur_col, 'N/A')).strip()
             recruteur = f"# {recruteur_val}"
-            draw.text((x + 10, y_offset + 90), recruteur[:50], fill='#555', font=font_card)
+            draw.text((x + 10, y_offset + title_block_height + 70), recruteur[:50], fill='#555', font=font_card)
             
             col += 1
             if col >= 6:
@@ -3954,6 +3965,7 @@ def main():
                                 # Convertir en PDF
                                 try:
                                     from pptx import Presentation
+                                    from pptx.enum.shapes import MSO_SHAPE_TYPE
                                     from reportlab.lib.pagesizes import A4, landscape
                                     from reportlab.pdfgen import canvas
                                     from reportlab.lib.utils import ImageReader
@@ -3981,9 +3993,13 @@ def main():
                                         # Extraire les images de la slide
                                         img_y = page_height - 80
                                         for shape in slide.shapes:
-                                            if hasattr(shape, "image"):
-                                                try:
-                                                    img_data = shape.image.blob
+                                            try:
+                                                # Extraire uniquement les images (pictures)
+                                                if getattr(shape, "shape_type", None) == MSO_SHAPE_TYPE.PICTURE:
+                                                    img_obj = getattr(shape, "image", None)
+                                                    if img_obj is None:
+                                                        continue
+                                                    img_data = img_obj.blob
                                                     img = Image.open(io.BytesIO(img_data))
                                                     
                                                     # Redimensionner pour tenir dans la page
@@ -4010,8 +4026,8 @@ def main():
                                                     c.drawImage(ImageReader(temp_img), 50, img_y - new_height, 
                                                                width=new_width, height=new_height)
                                                     img_y -= new_height + 20
-                                                except Exception as img_e:
-                                                    st.warning(f"Image non extraite: {img_e}")
+                                            except Exception as img_e:
+                                                st.warning(f"Image non extraite: {img_e}")
                                         
                                         c.showPage()
                                     
