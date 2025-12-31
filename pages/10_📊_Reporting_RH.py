@@ -1639,15 +1639,33 @@ def create_weekly_report_tab(df_recrutement=None):
                     if key in name_upper:
                         logo_file = entity_logo_map[key]
                         break
-            
+                
+                # 3. Si toujours pas trouvé, essayer de matcher directement le nom du fichier (sans extension)
+                if not logo_file:
+                    for filename in logos_dict.keys():
+                        # Enlever l'extension pour comparer
+                        base_name = os.path.splitext(filename)[0].upper()
+                        if base_name == name_upper or base_name in name_upper:
+                            logo_file = filename
+                            break
+
             if logo_file and logo_file in logos_dict:
                 logo_b64_str = logos_dict[logo_file]
                 # Image un peu plus grande pour lisibilité
                 img_tag = f'<img src="data:image/png;base64,{logo_b64_str}" height="35" style="vertical-align: middle;">'
                 
                 # Gestion spécifique pour TGCC avec suffixe (ex: TGCC - SIEGE)
-                matched_key = next((k for k in sorted(entity_logo_map.keys(), key=len, reverse=True) if k in name_upper), None)
-                
+                # Si on a trouvé via le mapping ou via le nom de fichier
+                matched_key = None
+                if name_upper in entity_logo_map:
+                    matched_key = name_upper
+                else:
+                    # Essayer de trouver la clé correspondante dans le mapping
+                    matched_key = next((k for k in sorted(entity_logo_map.keys(), key=len, reverse=True) if k in name_upper), None)
+                    # Si pas dans le mapping mais trouvé via fichier direct
+                    if not matched_key and logo_file:
+                         matched_key = os.path.splitext(logo_file)[0].upper()
+
                 if matched_key:
                     # Regex pour trouver le suffixe après la clé (ex: " - SIEGE")
                     pattern = re.escape(matched_key) + r'\s*-\s*(.*)'
@@ -1697,7 +1715,6 @@ def create_weekly_report_tab(df_recrutement=None):
             font-family: Arial, sans-serif;
             box-shadow: 0 1px 4px rgba(0,0,0,0.1);
             width: 100%;
-            max-width: 1200px;
             margin: 0 auto;
         }
         .custom-table th {
