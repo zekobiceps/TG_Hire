@@ -908,10 +908,12 @@ with tab3:
         
         # Préparer les données pour l'analyse temporelle
         time_analysis = time_series.copy()
-        time_analysis['date'] = pd.to_datetime(time_analysis['date'])
-        time_analysis['year'] = time_analysis['date'].dt.year
-        time_analysis['month'] = time_analysis['date'].dt.month
-        time_analysis['quarter'] = time_analysis['date'].dt.quarter
+        time_analysis['date'] = pd.to_datetime(time_analysis['date'], errors='coerce')
+        # Use DatetimeIndex accessors to avoid Pylance dt attribute issues
+        dt_index = pd.DatetimeIndex(time_analysis['date'])
+        time_analysis['year'] = dt_index.year
+        time_analysis['month'] = dt_index.month
+        time_analysis['quarter'] = dt_index.quarter
         
         col_temp1, col_temp2 = st.columns(2)
         
