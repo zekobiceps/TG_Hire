@@ -3304,7 +3304,7 @@ def generate_kanban_html_image(df_recrutement):
         st.info(f"✅ Chromium trouvé: {chromium_path}")
     except Exception as e:
         st.warning(f"⚠️ html2image non disponible ({e}), utilisation de PIL à la place")
-        return generate_kanban_image_simple(df_recrutement)
+        return generate_table_image_simple(weekly_metrics)
     
     try:
         # Charger les données réelles du dataframe
