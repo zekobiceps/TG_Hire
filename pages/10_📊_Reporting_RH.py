@@ -2173,7 +2173,7 @@ def create_weekly_report_tab(df_recrutement=None):
                 'entite': r.get(entite_col, '') if entite_col else r.get('Entité demandeuse', ''),
                 'lieu': r.get(lieu_col, '') if lieu_col else '',
                 'demandeur': r.get(demandeur_col, '') if demandeur_col else '',
-                'recruteur': r.get(recruteur_col, '') if recruteur_col else '',
+                'recruteur': str(r.get(recruteur_col, '')).replace('nan', '') if recruteur_col else '',
                 'commentaire': r.get(commentaire_col, '') if commentaire_col else '',
                 'date_acceptation': accept_date,
                 'date_desistement': desistement_date
