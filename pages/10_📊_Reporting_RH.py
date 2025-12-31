@@ -2549,16 +2549,27 @@ def generate_kanban_image_simple(df_recrutement):
     """Génère une image simple du Kanban avec PIL"""
     from PIL import Image, ImageDraw, ImageFont
     import tempfile
+    import pandas as pd
     
     try:
-        # Charger les données du kanban
-        colonnes = {
-            'Sourcing': df_recrutement[df_recrutement['Statut de la demande'] == 'Sourcing'].head(5),
-            'Shortlisté': df_recrutement[df_recrutement['Statut de la demande'] == 'Shortlisté'].head(5),
-            'Signature DRH': df_recrutement[df_recrutement['Statut de la demande'] == 'Signature DRH'].head(5),
-            'Clôture': df_recrutement[df_recrutement['Statut de la demande'] == 'Clôture'].head(5),
-            'Désistement': df_recrutement[df_recrutement['Statut de la demande'] == 'Désistement'].head(5),
-        }
+        # Si pas de dataframe, utiliser des données par défaut
+        if df_recrutement is None or len(df_recrutement) == 0:
+            colonnes = {
+                'Sourcing': pd.DataFrame(),
+                'Shortlisté': pd.DataFrame(),
+                'Signature DRH': pd.DataFrame(),
+                'Clôture': pd.DataFrame(),
+                'Désistement': pd.DataFrame(),
+            }
+        else:
+            # Charger les données du kanban
+            colonnes = {
+                'Sourcing': df_recrutement[df_recrutement['Statut de la demande'] == 'Sourcing'].head(5),
+                'Shortlisté': df_recrutement[df_recrutement['Statut de la demande'] == 'Shortlisté'].head(5),
+                'Signature DRH': df_recrutement[df_recrutement['Statut de la demande'] == 'Signature DRH'].head(5),
+                'Clôture': df_recrutement[df_recrutement['Statut de la demande'] == 'Clôture'].head(5),
+                'Désistement': df_recrutement[df_recrutement['Statut de la demande'] == 'Désistement'].head(5),
+            }
         
         # Dimensions
         col_width = 260
@@ -2630,15 +2641,22 @@ def generate_kanban_image_simple(df_recrutement):
 
 def generate_table_html_image(weekly_metrics):
     """Génère une image du tableau des besoins avec logos"""
-    from html2image import Html2Image
     import tempfile
     
-    # Configurer html2image pour utiliser Chromium avec flags no-sandbox
-    hti = Html2Image(
-        output_path=tempfile.gettempdir(),
-        browser_executable='/usr/bin/chromium',
-        custom_flags=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
-    )
+    try:
+        # Essayer d'abord avec html2image + Chromium
+        from html2image import Html2Image
+        
+        # Configurer html2image pour utiliser Chromium avec flags no-sandbox
+        hti = Html2Image(
+            output_path=tempfile.gettempdir(),
+            browser_executable='/usr/bin/chromium',
+            custom_flags=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--headless']
+        )
+    except Exception as e:
+        st.warning(f"⚠️ html2image non disponible ({e}), utilisation de PIL à la place")
+        # Fallback vers PIL
+        return generate_table_image_simple(weekly_metrics)
     
     try:
         # Créer le HTML du tableau exactement comme dans Streamlit
@@ -2814,21 +2832,31 @@ def generate_table_html_image(weekly_metrics):
         
         return image_path
     except Exception as e:
-        st.error(f"Erreur lors de la génération de l'image du tableau: {e}")
-        return None
+        st.error(f"Erreur lors de la génération de l'image du tableau avec html2image: {e}")
+        st.info("Tentative avec PIL...")
+        # Fallback vers PIL
+        return generate_table_image_simple(weekly_metrics)
 
 
 def generate_kanban_html_image():
     """Génère une image du Kanban"""
-    from html2image import Html2Image
     import tempfile
     
-    # Configurer html2image pour utiliser Chromium avec flags no-sandbox
-    hti = Html2Image(
-        output_path=tempfile.gettempdir(),
-        browser_executable='/usr/bin/chromium',
-        custom_flags=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
-    )
+    try:
+        # Essayer d'abord avec html2image + Chromium
+        from html2image import Html2Image
+        
+        # Configurer html2image pour utiliser Chromium avec flags no-sandbox
+        hti = Html2Image(
+            output_path=tempfile.gettempdir(),
+            browser_executable='/usr/bin/chromium',
+            custom_flags=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--headless']
+        )
+    except Exception as e:
+        st.warning(f"⚠️ html2image non disponible ({e}), utilisation de PIL à la place")
+        # Fallback vers PIL - besoin du dataframe
+        # Pour le Kanban, on utilise des données hardcodées
+        return generate_kanban_image_simple(None)
     
     try:
         # HTML du Kanban (repris du code existant)
@@ -2935,8 +2963,10 @@ def generate_kanban_html_image():
         
         return image_path
     except Exception as e:
-        st.error(f"Erreur lors de la génération de l'image du Kanban: {e}")
-        return None
+        st.error(f"Erreur lors de la génération de l'image du Kanban avec html2image: {e}")
+        st.info("Tentative avec PIL...")
+        # Fallback vers PIL
+        return generate_kanban_image_simple(None)
 
 
 def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2).pptx"):
