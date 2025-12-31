@@ -1435,6 +1435,10 @@ def calculate_weekly_metrics(df_recrutement):
     }
     
     # Calculer les métriques par entité
+    # Normaliser les noms d'entités pour éviter les doublons (ex: "TG WOOD" vs "TG WOOD ")
+    if real_entite_col:
+        df[real_entite_col] = df[real_entite_col].astype(str).str.strip().str.upper()
+    
     entites = df[real_entite_col].dropna().unique()
     metrics_by_entity = {}
     
@@ -3211,12 +3215,30 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
     
     # Filtrer les données
     if df_recrutement is not None and len(df_recrutement) > 0:
-        df_statut = df_recrutement[df_recrutement['Colonne TG Hire'] == statut]
-        count = len(df_statut)
+        # Trouver la colonne 'Colonne TG Hire' (avec gestion des espaces)
+        col_tg_hire = next((c for c in df_recrutement.columns if 'colonne' in c.lower() and 'tg' in c.lower() and 'hire' in c.lower()), None)
+        
+        if col_tg_hire:
+            df_statut = df_recrutement[df_recrutement[col_tg_hire] == statut]
+            count = len(df_statut)
+        else:
+            # Fallback: essayer de trouver une colonne 'Statut'
+            col_statut = next((c for c in df_recrutement.columns if 'statut' in c.lower()), None)
+            if col_statut:
+                df_statut = df_recrutement[df_recrutement[col_statut] == statut]
+                count = len(df_statut)
+            else:
+                df_statut = None
+                count = 0
     else:
         df_statut = None
         count = 0
     
+    # Ajouter un timestamp de génération pour prouver que l'image est fraîche
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    draw.text((width - 150, 50), f"Généré à {timestamp}", fill='white', font=font_card, anchor='mm')
+
     draw.text((width // 2, 50), f"{statut} ({count} postes)", fill='white', font=font_header, anchor='mm')
     
     # Cartes en grille 6 colonnes
