@@ -1617,6 +1617,7 @@ def create_weekly_report_tab(df_recrutement=None):
             'TG STEEL': 'TG STEEL.PNG',
             'TG STONE': 'TG STONE.PNG',
             'TG WOOD': 'TG WOOD.PNG',
+            'STAM': 'STAM.png',
             'TGCC IMMOBILIER': 'tgcc-immobilier.png',
             'TGCC-IMMOBILIER': 'tgcc-immobilier.png'
         }
@@ -1628,25 +1629,34 @@ def create_weekly_report_tab(df_recrutement=None):
             # Trouver le logo correspondant
             logo_file = None
             
-            # 1. Correspondance exacte ou via mapping
+            # 1. Correspondance exacte dans le mapping
             if name_upper in entity_logo_map:
                 logo_file = entity_logo_map[name_upper]
-            else:
-                # 2. Recherche de sous-chaîne (ex: "TG ALU - ATELIER" contient "TG ALU")
-                # On trie par longueur décroissante pour matcher le plus long d'abord
+            
+            # 2. Si pas trouvé, chercher directement dans les fichiers disponibles (insensible à la casse)
+            if not logo_file:
+                for filename in logos_dict.keys():
+                    # Enlever l'extension et mettre en majuscules pour comparer
+                    base_name = os.path.splitext(filename)[0].upper()
+                    # Correspondance exacte avec le nom de l'entité
+                    if base_name == name_upper:
+                        logo_file = filename
+                        break
+            
+            # 3. Si toujours pas trouvé, recherche de sous-chaîne dans le mapping (ex: "TGCC - SIEGE" contient "TGCC")
+            if not logo_file:
                 for key in sorted(entity_logo_map.keys(), key=len, reverse=True):
                     if key in name_upper:
                         logo_file = entity_logo_map[key]
                         break
-                
-                # 3. Si toujours pas trouvé, essayer de matcher directement le nom du fichier (sans extension)
-                if not logo_file:
-                    for filename in logos_dict.keys():
-                        # Enlever l'extension pour comparer
-                        base_name = os.path.splitext(filename)[0].upper()
-                        if base_name == name_upper or base_name in name_upper:
-                            logo_file = filename
-                            break
+            
+            # 4. Dernière tentative: recherche de sous-chaîne dans les noms de fichiers
+            if not logo_file:
+                for filename in logos_dict.keys():
+                    base_name = os.path.splitext(filename)[0].upper()
+                    if base_name in name_upper or name_upper in base_name:
+                        logo_file = filename
+                        break
 
             if logo_file and logo_file in logos_dict:
                 logo_b64_str = logos_dict[logo_file]
