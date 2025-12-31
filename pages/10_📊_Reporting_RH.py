@@ -2816,10 +2816,10 @@ def generate_table_html_image(weekly_metrics):
                     <thead>
                         <tr>
                             <th>Entité</th>
-                            <th>Nb postes ouverts avant début semaine</th>
-                            <th>Nb nouveaux postes ouverts cette semaine</th>
-                            <th>Nb postes pourvus cette semaine</th>
-                            <th>Nb postes en cours cette semaine (sourcing)</th>
+                            <th>Postes avant</th>
+                            <th>Nouveaux postes</th>
+                            <th>Postes pourvus</th>
+                            <th>Postes en cours</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -2862,6 +2862,222 @@ def generate_table_html_image(weekly_metrics):
         st.info("Tentative avec PIL...")
         # Fallback vers PIL
         return generate_table_image_simple(weekly_metrics)
+
+
+def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
+    """Génère une image pour un statut Kanban spécifique.
+    
+    Args:
+        df_recrutement: DataFrame avec les données
+        statut: Le statut à afficher ('Sourcing', 'Shortlisté', etc.)
+        max_cards: Nombre maximum de cartes à afficher
+    
+    Returns:
+        Chemin de l'image générée
+    """
+    import tempfile
+    
+    try:
+        # Essayer d'abord avec html2image + Chromium
+        from html2image import Html2Image
+        
+        # Trouver Chromium automatiquement
+        chromium_path = find_chromium_executable()
+        if not chromium_path:
+            raise Exception("Chromium non trouvé")
+        
+        # Configurer html2image
+        hti = Html2Image(
+            output_path=tempfile.gettempdir(),
+            browser_executable=chromium_path,
+            custom_flags=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--headless']
+        )
+        st.info(f"✅ Chromium trouvé: {chromium_path}")
+    except Exception as e:
+        st.warning(f"⚠️ html2image non disponible ({e}), utilisation de PIL à la place")
+        # Fallback vers PIL
+        return generate_kanban_statut_image_simple(df_recrutement, statut, max_cards)
+    
+    try:
+        # Charger les données pour ce statut
+        postes_data = []
+        
+        for index, row in df_recrutement.iterrows():
+            if row.get('Statut de la demande') == statut:
+                postes_data.append({
+                    "titre": str(row.get('Intitulé du poste', 'N/A')),
+                    "entite": str(row.get('Entité demandeuse', 'N/A')),
+                    "lieu": str(row.get('Ville', 'N/A')),
+                    "demandeur": str(row.get('Nom du Demandeur', 'N/A')),
+                    "recruteur": str(row.get('RH en charge du recrutement', 'N/A')),
+                    "commentaire": str(row.get('Commentaire', '')) if pd.notna(row.get('Commentaire')) else None
+                })
+        
+        # Limiter le nombre de cartes
+        postes_data = postes_data[:max_cards]
+        
+        # Créer HTML
+        html_content = f"""
+        <html>
+        <head>
+            <style>
+                body {{
+                    margin: 0;
+                    padding: 20px;
+                    font-family: Arial, sans-serif;
+                    background: white;
+                }}
+                .statut-header {{
+                    background-color: #9C182F;
+                    color: white;
+                    padding: 20px;
+                    border-radius: 8px;
+                    font-size: 2em;
+                    font-weight: bold;
+                    text-align: center;
+                    margin-bottom: 30px;
+                }}
+                .cards-container {{
+                    display: grid;
+                    grid-template-columns: repeat(2, 1fr);
+                    gap: 20px;
+                    padding: 20px;
+                }}
+                .kanban-card {{
+                    background-color: #f0f2f6;
+                    border-radius: 8px;
+                    padding: 15px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    border-left: 4px solid #1f77b4;
+                }}
+                .kanban-card h4 {{
+                    margin: 0 0 10px 0;
+                    color: #9C182F;
+                    font-size: 1.3em;
+                }}
+                .kanban-card p {{
+                    margin: 5px 0;
+                    font-size: 1.1em;
+                    color: #555;
+                }}
+                .no-data {{
+                    text-align: center;
+                    font-size: 1.5em;
+                    color: #999;
+                    padding: 50px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="statut-header">{statut} ({len(postes_data)} postes)</div>
+            <div class="cards-container">
+        """
+        
+        if len(postes_data) == 0:
+            html_content += '<div class="no-data">Aucun poste dans ce statut</div>'
+        else:
+            for poste in postes_data:
+                commentaire_html = f"<p>💬 {poste['commentaire']}</p>" if poste.get('commentaire') else ""
+                html_content += f"""
+                <div class="kanban-card">
+                    <h4><b>{poste['titre']}</b></h4>
+                    <p>📍 {poste['entite']} - {poste['lieu']}</p>
+                    <p>👤 {poste['demandeur']}</p>
+                    <p>✍️ {poste['recruteur']}</p>
+                    {commentaire_html}
+                </div>
+                """
+        
+        html_content += """
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Générer l'image
+        image_filename = f'{statut.lower().replace(" ", "_")}.png'
+        image_path = hti.screenshot(html_str=html_content, save_as=image_filename, size=(1920, 1080))[0]
+        
+        return image_path
+    except Exception as e:
+        st.error(f"Erreur lors de la génération de l'image {statut}: {e}")
+        return generate_kanban_statut_image_simple(df_recrutement, statut, max_cards)
+
+
+def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
+    """Génère une image simple pour un statut avec PIL (fallback)."""
+    from PIL import Image, ImageDraw, ImageFont
+    import tempfile
+    
+    width, height = 1920, 1080
+    img = Image.new('RGB', (width, height), 'white')
+    draw = ImageDraw.Draw(img)
+    
+    try:
+        font_header = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 40)
+        font_card_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 18)
+        font_card = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16)
+    except:
+        font_header = ImageFont.load_default()
+        font_card_title = ImageFont.load_default()
+        font_card = ImageFont.load_default()
+    
+    # Header
+    draw.rectangle([0, 0, width, 100], fill='#9C182F')
+    
+    # Filtrer les données
+    if df_recrutement is not None and len(df_recrutement) > 0:
+        df_statut = df_recrutement[df_recrutement['Statut de la demande'] == statut].head(max_cards)
+        count = len(df_statut)
+    else:
+        df_statut = None
+        count = 0
+    
+    draw.text((width // 2, 50), f"{statut} ({count} postes)", fill='white', font=font_header, anchor='mm')
+    
+    # Cartes en grille 2 colonnes
+    if df_statut is not None and count > 0:
+        card_width = (width - 60) // 2
+        card_height = 150
+        x_positions = [20, 20 + card_width + 20]
+        y_offset = 120
+        col = 0
+        
+        for idx, row in df_statut.iterrows():
+            if y_offset > height - 200:
+                break
+            
+            x = x_positions[col]
+            
+            # Carte
+            draw.rectangle([x, y_offset, x + card_width, y_offset + card_height], 
+                          fill='#f0f2f6', outline='#ddd', width=2)
+            
+            # Contenu
+            titre = str(row.get('Intitulé du poste', 'N/A'))[:50]
+            draw.text((x + 10, y_offset + 10), titre, fill='#9C182F', font=font_card_title)
+            
+            entite = f"📍 {row.get('Entité demandeuse', 'N/A')} - {row.get('Ville', 'N/A')}"
+            draw.text((x + 10, y_offset + 40), entite[:50], fill='#555', font=font_card)
+            
+            demandeur = f"👤 {row.get('Nom du Demandeur', 'N/A')}"
+            draw.text((x + 10, y_offset + 65), demandeur[:50], fill='#555', font=font_card)
+            
+            recruteur = f"✍️ {row.get('RH en charge du recrutement', 'N/A')}"
+            draw.text((x + 10, y_offset + 90), recruteur[:50], fill='#555', font=font_card)
+            
+            col += 1
+            if col >= 2:
+                col = 0
+                y_offset += card_height + 20
+    else:
+        draw.text((width // 2, height // 2), "Aucun poste dans ce statut", 
+                 fill='#999', font=font_header, anchor='mm')
+    
+    # Sauvegarder
+    output_path = os.path.join(tempfile.gettempdir(), f'{statut.lower().replace(" ", "_")}_reporting.png')
+    img.save(output_path)
+    return output_path
 
 
 def generate_kanban_html_image(df_recrutement):
@@ -3045,18 +3261,26 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
         # Générer les images HTML avec logos (utilise html2image + Chromium)
         st.info("📊 Génération des images avec les visualisations Streamlit...")
         table_image_path = generate_table_html_image(weekly_metrics) if weekly_metrics else None
-        kanban_image_path = generate_kanban_html_image(df_recrutement)
+        
+        # Générer une image par statut Kanban
+        statuts = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+        kanban_images = {}
+        for statut in statuts:
+            st.info(f"🔄 Génération de l'image pour {statut}...")
+            kanban_images[statut] = generate_kanban_statut_image(df_recrutement, statut, max_cards=10)
         
         # Debug: Vérifier les chemins des images
         if table_image_path and os.path.exists(table_image_path):
             st.success(f"✅ Image tableau générée: {os.path.basename(table_image_path)}")
         else:
             st.warning("⚠️ Échec génération image tableau")
-            
-        if kanban_image_path and os.path.exists(kanban_image_path):
-            st.success(f"✅ Image Kanban générée: {os.path.basename(kanban_image_path)}")
-        else:
-            st.warning("⚠️ Échec génération image Kanban")
+        
+        # Vérifier les images Kanban
+        for statut, img_path in kanban_images.items():
+            if img_path and os.path.exists(img_path):
+                st.success(f"✅ Image {statut} générée: {os.path.basename(img_path)}")
+            else:
+                st.warning(f"⚠️ Échec génération image {statut}")
         
         # Parcourir chaque slide et remplacer les placeholders
         for slide_idx, slide in enumerate(prs.slides):
@@ -3119,43 +3343,57 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                         import traceback
                         st.code(traceback.format_exc())
                 
-                # Métrique total postes - Insérer l'image du Kanban
+                # Métrique total postes - Créer 5 slides Kanban (une par statut)
                 elif "{{METRIC_TOTAL_POSTES}}" in shape_text:
                     st.info(f"🔍 Placeholder {{{{METRIC_TOTAL_POSTES}}}} trouvé dans slide {slide_idx + 1}")
+                    st.info("📋 Création de 5 slides Kanban (une par statut)...")
                     try:
-                        # Récupérer la position et taille du shape original
-                        left = shape.left
-                        top = shape.top
-                        width = shape.width
-                        height = shape.height
-                        
-                        st.info(f"📐 Position Kanban: left={left}, top={top}, width={width}, height={height}")
-                        
                         # Marquer le shape pour suppression
                         shapes_to_remove.append(shape)
                         
-                        # Insérer l'image du Kanban si elle existe (en grand format)
-                        if kanban_image_path and os.path.exists(kanban_image_path):
-                            # Utiliser toute la largeur de la slide pour une meilleure visibilité
-                            slide_width = prs.slide_width
-                            slide_height = prs.slide_height
-                            # Positionner l'image en laissant des marges
-                            img_left = Inches(0.5)
-                            img_top = Inches(1.5)
-                            img_width = slide_width - Inches(1)  # Marges gauche/droite
-                            img_height = slide_height - Inches(2.5)  # Marges haut/bas
-                            slide.shapes.add_picture(kanban_image_path, img_left, img_top, width=img_width, height=img_height)
-                            st.success(f"✅ Image Kanban insérée dans slide {slide_idx + 1} (dimensions optimisées)")
-                        else:
-                            st.error(f"❌ Image Kanban non trouvée: {kanban_image_path}")
-                            # Fallback: ajouter un message d'erreur
-                            txBox = slide.shapes.add_textbox(left, top, width, height)
-                            text_frame = txBox.text_frame
-                            p = text_frame.paragraphs[0]
-                            p.text = "Erreur: Impossible de générer l'image du Kanban"
-                            p.font.size = Pt(14)
+                        # Pour chaque statut, insérer l'image dans cette slide ou créer de nouvelles slides
+                        # On va insérer toutes les images Kanban après cette slide
+                        # Pour l'instant, on insère juste la première dans la slide actuelle
+                        
+                        # Récupérer les dimensions de slide pour positionnement
+                        slide_width = prs.slide_width
+                        slide_height = prs.slide_height
+                        img_left = Inches(0.5)
+                        img_top = Inches(1.5)
+                        img_width = slide_width - Inches(1)
+                        img_height = slide_height - Inches(2.5)
+                        
+                        # Insérer les 5 images Kanban dans les slides suivantes
+                        # Note: On va créer 4 nouvelles slides après celle-ci
+                        statut_index = 0
+                        for statut, img_path in kanban_images.items():
+                            if statut_index == 0:
+                                # Première image dans la slide actuelle
+                                if img_path and os.path.exists(img_path):
+                                    slide.shapes.add_picture(img_path, img_left, img_top, width=img_width, height=img_height)
+                                    st.success(f"✅ Image {statut} insérée dans slide {slide_idx + 1}")
+                                else:
+                                    st.warning(f"⚠️ Image {statut} non trouvée")
+                            else:
+                                # Créer une nouvelle slide pour les autres statuts
+                                # Utiliser le même layout que la slide actuelle
+                                new_slide = prs.slides.add_slide(slide.slide_layout)
+                                
+                                # Copier le titre si disponible
+                                if slide.shapes.title:
+                                    new_slide.shapes.title.text = slide.shapes.title.text
+                                
+                                # Insérer l'image
+                                if img_path and os.path.exists(img_path):
+                                    new_slide.shapes.add_picture(img_path, img_left, img_top, width=img_width, height=img_height)
+                                    st.success(f"✅ Nouvelle slide créée pour {statut}")
+                                else:
+                                    st.warning(f"⚠️ Image {statut} non trouvée")
+                            
+                            statut_index += 1
+                        
                     except Exception as e:
-                        st.error(f"❌ Erreur lors de l'insertion du Kanban: {e}")
+                        st.error(f"❌ Erreur lors de l'insertion des Kanban: {e}")
                         import traceback
                         st.code(traceback.format_exc())
                 
@@ -3180,11 +3418,14 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                 os.remove(table_image_path)
             except:
                 pass
-        if kanban_image_path and os.path.exists(kanban_image_path):
-            try:
-                os.remove(kanban_image_path)
-            except:
-                pass
+        
+        # Nettoyer les images Kanban temporaires
+        for img_path in kanban_images.values():
+            if img_path and os.path.exists(img_path):
+                try:
+                    os.remove(img_path)
+                except:
+                    pass
         
         # Sauvegarder le PowerPoint modifié dans un BytesIO
         ppt_bytes = BytesIO()
