@@ -2348,6 +2348,10 @@ def create_weekly_report_tab(df_recrutement=None):
         word-wrap: break-word;
         overflow-wrap: break-word;
         hyphens: auto;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
     }
     .kanban-card p {
         margin-bottom: 2px;
@@ -3164,6 +3168,10 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
                     word-break: break-word;
                     hyphens: auto;
                     white-space: normal !important;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 3;
+                    -webkit-box-orient: vertical;
+                    overflow: hidden;
                     max-width: 100%;
                 }}
                 .kanban-card p {{
@@ -3263,7 +3271,7 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
     # Cartes en grille 6 colonnes
     if df_statut is not None and count > 0:
         card_width = (width - 140) // 6  # 6 colonnes
-        card_height = 130
+        card_height = 160
         x_positions = [20 + i * (card_width + 20) for i in range(6)]
         y_offset = 120
         col = 0
@@ -3286,7 +3294,7 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
             # Wrap title into up to 2 lines to prevent overflow
             max_chars_per_line = 30
             wrapped_lines = textwrap.wrap(titre, width=max_chars_per_line) or ['N/A']
-            wrapped_lines = wrapped_lines[:2]
+            wrapped_lines = wrapped_lines[:3]
             for i, line in enumerate(wrapped_lines):
                 draw.text((x + 10, y_offset + 10 + (i * 20)), line, fill='#9C182F', font=font_card_title)
             title_block_height = 10 + (len(wrapped_lines) * 20)
@@ -3435,6 +3443,14 @@ def generate_kanban_html_image(df_recrutement):
                 .kanban-card h4 {
                     margin: 0 0 8px 0;
                     color: #9C182F;
+                    white-space: normal;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                    hyphens: auto;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 3;
+                    -webkit-box-orient: vertical;
+                    overflow: hidden;
                 }
                 .kanban-card p {
                     margin: 4px 0;
@@ -3664,10 +3680,10 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                         import traceback
                         st.code(traceback.format_exc())
                 
-                # Métrique total postes - Créer 5 slides Kanban (une par statut)
+                # Métrique total postes - Créer 5 slides Kanban (une par statut) dans l'ordre souhaité
                 elif "{{METRIC_TOTAL_POSTES}}" in shape_text:
                     st.info(f"🔍 Placeholder {{{{METRIC_TOTAL_POSTES}}}} trouvé dans slide {slide_idx + 1}")
-                    st.info("📋 Création de 5 slides Kanban (une par statut)...")
+                    st.info("📋 Création de 5 slides Kanban (une par statut) dans l'ordre: Sourcing, Shortlisté, Signature DRH, Clôture, Désistement...")
                     try:
                         # Marquer le shape pour suppression
                         shapes_to_remove.append(shape)
@@ -3690,34 +3706,21 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                             img_width = Inches(9)
                             img_height = Inches(6)
                         
-                        # Insérer les 5 images Kanban dans les slides suivantes
-                        # Note: On va créer 4 nouvelles slides après celle-ci
-                        statut_index = 0
-                        for statut, img_path in kanban_images.items():
-                            if statut_index == 0:
-                                # Première image dans la slide actuelle
-                                if img_path and os.path.exists(img_path):
-                                    slide.shapes.add_picture(img_path, img_left, img_top, width=img_width, height=img_height)
-                                    st.success(f"✅ Image {statut} insérée dans slide {slide_idx + 1}")
-                                else:
-                                    st.warning(f"⚠️ Image {statut} non trouvée")
+                        # Insérer les 5 images Kanban dans des slides séparées selon l'ordre demandé
+                        ordered_status = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+                        for statut in ordered_status:
+                            img_path = kanban_images.get(statut)
+                            # Créer une nouvelle slide pour chaque statut (ne pas utiliser la slide actuelle)
+                            new_slide = prs.slides.add_slide(slide.slide_layout)
+                            # Titre de la slide: nom du statut
+                            if hasattr(new_slide.shapes, 'title') and new_slide.shapes.title:
+                                new_slide.shapes.title.text = f"Kanban - {statut}"
+                            # Insérer l'image
+                            if img_path and os.path.exists(img_path):
+                                new_slide.shapes.add_picture(img_path, img_left, img_top, width=img_width, height=img_height)
+                                st.success(f"✅ Slide insérée pour {statut}")
                             else:
-                                # Créer une nouvelle slide pour les autres statuts
-                                # Utiliser le même layout que la slide actuelle
-                                new_slide = prs.slides.add_slide(slide.slide_layout)
-                                
-                                # Copier le titre si disponible
-                                if hasattr(slide.shapes, 'title') and slide.shapes.title and hasattr(new_slide.shapes, 'title') and new_slide.shapes.title:
-                                    new_slide.shapes.title.text = slide.shapes.title.text
-                                
-                                # Insérer l'image
-                                if img_path and os.path.exists(img_path):
-                                    new_slide.shapes.add_picture(img_path, img_left, img_top, width=img_width, height=img_height)
-                                    st.success(f"✅ Nouvelle slide créée pour {statut}")
-                                else:
-                                    st.warning(f"⚠️ Image {statut} non trouvée")
-                            
-                            statut_index += 1
+                                st.warning(f"⚠️ Image {statut} non trouvée")
                         
                     except Exception as e:
                         st.error(f"❌ Erreur lors de l'insertion des Kanban: {e}")
