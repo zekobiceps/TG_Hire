@@ -15,4 +15,4 @@ venv/
 .venv/
 
 # Streamlit
-.streamlit/
+.streamlit/.specstory/

@@ -2456,7 +2456,7 @@ def create_weekly_report_tab(df_recrutement=None):
 
 
 def generate_table_image_simple(weekly_metrics):
-    """Génère une image simple du tableau avec PIL (pas de dépendance Chrome)"""
+    """Génère une image simple du tableau avec PIL incluant les LOGOS"""
     from PIL import Image, ImageDraw, ImageFont
     import tempfile
     
@@ -2471,10 +2471,57 @@ def generate_table_image_simple(weekly_metrics):
         total_pourvus = sum(data['pourvus'] for data in metrics_included.values())
         total_en_cours = sum(data['en_cours'] for data in metrics_included.values())
         
-        # Créer l'image
-        num_rows = len(metrics_included) + 2  # +2 for header and total
-        row_height = 60  # Plus grand pour meilleure lisibilité
-        width = 1920    # Haute résolution
+        # --- CHARGEMENT DES LOGOS ---
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        logo_folder = os.path.join(os.path.dirname(current_dir), "LOGO")
+        loaded_logos = {}
+        
+        # Mapping des noms d'entités vers les fichiers
+        entity_logo_map = {
+            'TGCC': 'TGCC.PNG', 'TGEM': 'TGEM.PNG', 'TG ALU': 'TG ALU.PNG',
+            'TG COVER': 'TG COVER.PNG', 'TG STEEL': 'TG STEEL.PNG',
+            'TG STONE': 'TG STONE.PNG', 'TG WOOD': 'TG WOOD.PNG',
+            'STAM': 'STAM.png', 'BFO': 'BFO.png',
+            'TGCC IMMOBILIER': 'tgcc-immobilier.png', 'TGCC-IMMOBILIER': 'tgcc-immobilier.png',
+            'TGCC Immobilier': 'tgcc-immobilier.png'
+        }
+
+        if os.path.exists(logo_folder):
+            for filename in os.listdir(logo_folder):
+                if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.jfif')):
+                    try:
+                        img_path = os.path.join(logo_folder, filename)
+                        loaded_logos[filename.upper()] = Image.open(img_path).convert("RGBA")
+                    except Exception as e:
+                        print(f"Erreur chargement logo {filename}: {e}")
+
+        def get_logo_image(entity_name):
+            """Récupère l'image du logo pour une entité"""
+            name_upper = str(entity_name).upper().strip()
+            
+            # Chercher dans le mapping
+            filename = None
+            for key in entity_logo_map:
+                if key.upper() in name_upper or name_upper in key.upper():
+                    filename = entity_logo_map[key]
+                    break
+            
+            # Si pas trouvé, chercher directement
+            if not filename:
+                for fname in loaded_logos.keys():
+                    base_name = os.path.splitext(fname)[0]
+                    if base_name in name_upper or name_upper in base_name:
+                        filename = fname
+                        break
+            
+            if filename and filename.upper() in loaded_logos:
+                return loaded_logos[filename.upper()]
+            return None
+
+        # --- DESSIN DU TABLEAU ---
+        num_rows = len(metrics_included) + 2  # +1 pour header, +1 pour total
+        row_height = 80  # Hauteur augmentée pour les logos
+        width = 1920
         height = num_rows * row_height + 60
         
         img = Image.new('RGB', (width, height), 'white')
@@ -2482,15 +2529,15 @@ def generate_table_image_simple(weekly_metrics):
         
         # Police
         try:
-            font_header = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 18)  # Plus grand
-            font_data = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16)
+            font_header = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24)
+            font_data = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 20)
         except:
             font_header = ImageFont.load_default()
             font_data = ImageFont.load_default()
         
         # Header
         headers = ['Entité', 'Postes avant', 'Nouveaux postes', 'Postes pourvus', 'Postes en cours']
-        col_widths = [280, 280, 280, 280, 280]
+        col_widths = [350, 300, 300, 300, 300]  # Première colonne plus large pour logos
         x_positions = [0] + [sum(col_widths[:i+1]) for i in range(len(col_widths))]
         
         # Dessiner le header
@@ -2506,9 +2553,32 @@ def generate_table_image_simple(weekly_metrics):
             if ((y_offset - row_height) // row_height) % 2 == 0:
                 draw.rectangle([0, y_offset, width, y_offset + row_height], fill='#f9f9f9')
             
-            # Tracer les cellules
-            draw.text((x_positions[0] + col_widths[0] // 2, y_offset + row_height // 2), 
-                     entite[:20], fill='black', font=font_data, anchor='mm')
+            # Logo ou texte de l'entité
+            logo_img = get_logo_image(entite)
+            cell_center_x = x_positions[0] + col_widths[0] // 2
+            cell_center_y = y_offset + row_height // 2
+            
+            if logo_img:
+                # Redimensionner le logo
+                aspect_ratio = logo_img.width / logo_img.height
+                new_h = 60
+                new_w = int(new_h * aspect_ratio)
+                if new_w > col_widths[0] - 20:
+                    new_w = col_widths[0] - 20
+                    new_h = int(new_w / aspect_ratio)
+                
+                logo_resized = logo_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                paste_x = int(cell_center_x - new_w / 2)
+                paste_y = int(cell_center_y - new_h / 2)
+                
+                # Coller avec transparence
+                if logo_resized.mode == 'RGBA':
+                    img.paste(logo_resized, (paste_x, paste_y), logo_resized)
+                else:
+                    img.paste(logo_resized, (paste_x, paste_y))
+            else:
+                # Fallback texte si pas de logo
+                draw.text((cell_center_x, cell_center_y), entite[:20], fill='black', font=font_data, anchor='mm')
             draw.text((x_positions[1] + col_widths[1] // 2, y_offset + row_height // 2), 
                      str(data['avant'] if data['avant'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
             draw.text((x_positions[2] + col_widths[2] // 2, y_offset + row_height // 2), 
@@ -2637,6 +2707,25 @@ def generate_kanban_image_simple(df_recrutement):
     except Exception as e:
         st.error(f"Erreur génération image kanban: {e}")
         return None
+
+
+def check_logos():
+    """Vérifie que les logos sont bien accessibles"""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    logo_folder = os.path.join(os.path.dirname(current_dir), "LOGO")
+    
+    if not os.path.exists(logo_folder):
+        st.error(f"❌ Dossier LOGO non trouvé: {logo_folder}")
+        return False
+    
+    logos = os.listdir(logo_folder)
+    if not logos:
+        st.error("❌ Aucun logo trouvé dans le dossier LOGO")
+        return False
+    
+    st.success(f"✅ {len(logos)} logos trouvés dans: {logo_folder}")
+    st.info(f"📁 Fichiers: {', '.join(logos[:5])}{'...' if len(logos) > 5 else ''}")
+    return True
 
 
 def find_chromium_executable():
