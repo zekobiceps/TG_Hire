@@ -2641,6 +2641,8 @@ def generate_kanban_image_simple(df_recrutement):
 
 def find_chromium_executable():
     """Trouve le chemin de l'exécutable Chromium en testant plusieurs emplacements."""
+    import shutil
+    
     possible_paths = [
         '/usr/lib/chromium/chromium',  # Debian/Ubuntu vrai binaire
         '/usr/bin/chromium',           # Script wrapper
@@ -2652,7 +2654,6 @@ def find_chromium_executable():
         'google-chrome'
     ]
     
-    import shutil
     for path in possible_paths:
         if os.path.isfile(path) or shutil.which(path):
             return path
@@ -2904,12 +2905,13 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
         
         for index, row in df_recrutement.iterrows():
             if row.get('Colonne TG Hire') == statut:
+                # Utiliser les noms de colonnes originaux du fichier Excel
                 postes_data.append({
-                    "titre": str(row.get('Intitulé du poste', 'N/A')),
-                    "entite": str(row.get('Entité demandeuse', 'N/A')),
-                    "lieu": str(row.get('Ville', 'N/A')),
-                    "demandeur": str(row.get('Nom du Demandeur', 'N/A')),
-                    "recruteur": str(row.get('RH en charge du recrutement', 'N/A')),
+                    "titre": str(row.get('Poste demandé ', 'N/A')).strip(),
+                    "entite": str(row.get('Entité demandeuse', 'N/A')).strip(),
+                    "lieu": str(row.get('Affectation', 'N/A')).strip(),
+                    "demandeur": str(row.get('Nom Prénom du demandeur', 'N/A')).strip(),
+                    "recruteur": str(row.get('Responsable de traitement de  la demande ', 'N/A')).strip(),
                     "commentaire": str(row.get('Commentaire', '')) if pd.notna(row.get('Commentaire')) else None
                 })
                 # Limiter le nombre de cartes
@@ -3047,17 +3049,17 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
             draw.rectangle([x, y_offset, x + card_width, y_offset + card_height], 
                           fill='#f0f2f6', outline='#ddd', width=2)
             
-            # Contenu
-            titre = str(row.get('Intitulé du poste', 'N/A'))[:50]
+            # Contenu - utiliser noms colonnes originaux
+            titre = str(row.get('Poste demandé ', 'N/A'))[:50]
             draw.text((x + 10, y_offset + 10), titre, fill='#9C182F', font=font_card_title)
             
-            entite = f"📍 {row.get('Entité demandeuse', 'N/A')} - {row.get('Ville', 'N/A')}"
+            entite = f"📍 {row.get('Entité demandeuse', 'N/A')} - {row.get('Affectation', 'N/A')}"
             draw.text((x + 10, y_offset + 40), entite[:50], fill='#555', font=font_card)
             
-            demandeur = f"👤 {row.get('Nom du Demandeur', 'N/A')}"
+            demandeur = f"👤 {row.get('Nom Prénom du demandeur', 'N/A')}"
             draw.text((x + 10, y_offset + 65), demandeur[:50], fill='#555', font=font_card)
             
-            recruteur = f"✍️ {row.get('RH en charge du recrutement', 'N/A')}"
+            recruteur = f"✍️ {row.get('Responsable de traitement de  la demande ', 'N/A')}"
             draw.text((x + 10, y_offset + 90), recruteur[:50], fill='#555', font=font_card)
             
             col += 1
@@ -3103,11 +3105,11 @@ def generate_kanban_html_image(df_recrutement):
         for index, row in df_recrutement.iterrows():
             if row.get('Colonne TG Hire') in statuts:
                 postes_data.append({
-                    "titre": str(row.get('Intitulé du poste', 'N/A')),
-                    "entite": str(row.get('Entité demandeuse', 'N/A')),
-                    "lieu": str(row.get('Ville', 'N/A')),
-                    "demandeur": str(row.get('Nom du Demandeur', 'N/A')),
-                    "recruteur": str(row.get('RH en charge du recrutement', 'N/A')),
+                    "titre": str(row.get('Poste demandé ', 'N/A')).strip(),
+                    "entite": str(row.get('Entité demandeuse', 'N/A')).strip(),
+                    "lieu": str(row.get('Affectation', 'N/A')).strip(),
+                    "demandeur": str(row.get('Nom Prénom du demandeur', 'N/A')).strip(),
+                    "recruteur": str(row.get('Responsable de traitement de  la demande ', 'N/A')).strip(),
                     "statut": str(row.get('Colonne TG Hire', 'N/A')),
                     "commentaire": str(row.get('Commentaire', '')) if pd.notna(row.get('Commentaire')) else None
                 })
@@ -3258,7 +3260,28 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
         kanban_images = {}
         for statut in statuts:
             st.info(f"🔄 Génération de l'image pour {statut}...")
-            kanban_images[statut] = generate_kanban_statut_image(df_recrutement, statut, max_cards=100)
+            
+            # Pour Clôture, filtrer uniquement la dernière semaine
+            if statut == "Clôture":
+                # Obtenir la date de reporting
+                from datetime import datetime, timedelta
+                reporting_date = st.session_state.get('reporting_date', datetime.now().date())
+                if isinstance(reporting_date, str):
+                    reporting_date = pd.to_datetime(reporting_date).date()
+                
+                week_start = reporting_date - timedelta(days=reporting_date.weekday())
+                
+                # Filtrer les postes clôturés cette semaine
+                df_cloture_filtered = df_recrutement[
+                    (df_recrutement['Colonne TG Hire'] == 'Clôture') &
+                    (pd.to_datetime(df_recrutement['Date d\'entrée effective du candidat'], errors='coerce').dt.date >= week_start) &
+                    (pd.to_datetime(df_recrutement['Date d\'entrée effective du candidat'], errors='coerce').dt.date <= reporting_date)
+                ].copy()
+                
+                st.info(f"📅 Clôture filtrée: {len(df_cloture_filtered)} postes clôturés entre {week_start} et {reporting_date}")
+                kanban_images[statut] = generate_kanban_statut_image(df_cloture_filtered, statut, max_cards=100)
+            else:
+                kanban_images[statut] = generate_kanban_statut_image(df_recrutement, statut, max_cards=100)
         
         # Debug: Vérifier les chemins des images
         if table_image_path and os.path.exists(table_image_path):
