@@ -1596,7 +1596,7 @@ def create_weekly_report_tab(df_recrutement=None):
     )
     if metrics and len(metrics) > 0:
         # Charger tous les logos disponibles dans le dossier LOGO
-        logos_b64 = {}
+        logos_dict = {}
         # Utiliser un chemin absolu pour éviter les problèmes de répertoire courant
         current_dir = os.path.dirname(os.path.abspath(__file__))
         root_dir = os.path.dirname(current_dir)
@@ -1607,7 +1607,7 @@ def create_weekly_report_tab(df_recrutement=None):
                 if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
                     path = os.path.join(logo_dir, filename)
                     with open(path, "rb") as f:
-                        logos_b64[filename] = base64.b64encode(f.read()).decode()
+                        logos_dict[filename] = base64.b64encode(f.read()).decode()
         
         # Mapping entité -> nom de fichier logo
         entity_logo_map = {
@@ -1640,10 +1640,10 @@ def create_weekly_report_tab(df_recrutement=None):
                         logo_file = entity_logo_map[key]
                         break
             
-            if logo_file and logo_file in logos_b64:
-                logo_b64 = logos_b64[logo_file]
+            if logo_file and logo_file in logos_dict:
+                logo_b64_str = logos_dict[logo_file]
                 # Image un peu plus grande pour lisibilité
-                img_tag = f'<img src="data:image/png;base64,{logo_b64}" height="35" style="vertical-align: middle;">'
+                img_tag = f'<img src="data:image/png;base64,{logo_b64_str}" height="35" style="vertical-align: middle;">'
                 
                 # Gestion spécifique pour TGCC avec suffixe (ex: TGCC - SIEGE)
                 matched_key = next((k for k in sorted(entity_logo_map.keys(), key=len, reverse=True) if k in name_upper), None)
