@@ -1661,8 +1661,15 @@ def create_weekly_report_tab(df_recrutement=None):
 
             if logo_file and logo_file in logos_dict:
                 logo_b64_str = logos_dict[logo_file]
+                # Tailles spécifiques pour certains logos
+                if name_upper in ['TG STEEL', 'TG STONE'] or 'IMMOBILIER' in name_upper:
+                    logo_height = 50
+                elif name_upper == 'BFO':
+                    logo_height = 80
+                else:
+                    logo_height = 63
                 # Image avec taille optimale et centrée
-                img_tag = f'<img src="data:image/png;base64,{logo_b64_str}" height="63" style="vertical-align: middle; display: block; margin: 0 auto;">'
+                img_tag = f'<img src="data:image/png;base64,{logo_b64_str}" height="{logo_height}" style="vertical-align: middle; display: block; margin: 0 auto;">'
                 
                 # Gestion spécifique pour TGCC avec suffixe (ex: TGCC - SIEGE)
                 # Si on a trouvé via le mapping ou via le nom de fichier
@@ -1735,7 +1742,10 @@ def create_weekly_report_tab(df_recrutement=None):
             padding: 10px 8px !important;
             border: 1px solid white !important;
             font-size: 1.3em;
-            line-height: 1.2;
+            line-height: 1.3;
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            max-width: 180px;
         }
         .custom-table td {
             text-align: center !important;
@@ -1771,8 +1781,8 @@ def create_weekly_report_tab(df_recrutement=None):
             border: 1px solid #9C182F !important; /* Bordures rouges */
         }
         .custom-table .total-row .entity-cell {
-            text-align: left !important;
-            padding-left: 10px !important;
+            text-align: center !important;
+            padding: 10px !important;
             font-weight: bold !important;
             background-color: #9C182F !important; /* Fond rouge pour la cellule entité */
             color: white !important; /* Texte blanc pour la cellule entité */
