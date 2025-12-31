@@ -2749,20 +2749,32 @@ def find_chromium_executable():
     """Trouve le chemin de l'exécutable Chromium en testant plusieurs emplacements."""
     import shutil
     
+    # Liste des chemins à tester, dans l'ordre de priorité
+    # IMPORTANT: html2image a besoin du vrai binaire, pas du script wrapper
     possible_paths = [
-        '/usr/lib/chromium/chromium',  # Debian/Ubuntu vrai binaire
-        '/usr/bin/chromium',           # Script wrapper
-        '/usr/bin/chromium-browser',
-        '/usr/bin/google-chrome',
+        '/usr/lib/chromium/chromium',  # Debian/Ubuntu - VRAI BINAIRE (priorité 1)
+        '/usr/bin/google-chrome',       # Google Chrome
         '/usr/bin/google-chrome-stable',
-        'chromium',                    # PATH
+        '/usr/bin/chromium',            # Script wrapper (peut ne pas fonctionner avec html2image)
+        '/usr/bin/chromium-browser',
+        'chromium',                     # PATH
         'chromium-browser',
         'google-chrome'
     ]
     
     for path in possible_paths:
-        if os.path.isfile(path) or shutil.which(path):
+        # Vérifier si le fichier existe
+        if os.path.isfile(path):
+            st.info(f"🔍 Test chemin: {path} - ✅ TROUVÉ")
             return path
+        elif shutil.which(path):
+            found_path = shutil.which(path)
+            st.info(f"🔍 Test chemin: {path} - ✅ TROUVÉ via PATH: {found_path}")
+            return found_path
+        else:
+            st.warning(f"🔍 Test chemin: {path} - ❌ Non trouvé")
+    
+    st.error("❌ Aucun exécutable Chromium trouvé dans tous les chemins testés")
     return None
 
 
