@@ -18,6 +18,20 @@ import gspread
 from google.oauth2 import service_account
 import unicodedata
 from pptx import Presentation
+def _format_long_title(title: str, max_line_length: int = 20) -> str:
+    """Insert spaces in very long titles without natural breaks to force wrapping.
+    - If the title already contains spaces, return as-is (CSS will wrap).
+    - If no spaces and length > max_line_length, insert spaces every max_line_length chars.
+    """
+    if title is None:
+        return ""
+    s = str(title).strip()
+    if len(s) <= max_line_length:
+        return s
+    if " " in s:
+        return s
+    chunks = [s[i:i+max_line_length] for i in range(0, len(s), max_line_length)]
+    return " ".join(chunks)
 from pptx.util import Inches, Pt
 from PIL import Image
 import io
@@ -2348,6 +2362,7 @@ def create_weekly_report_tab(df_recrutement=None):
         word-wrap: break-word;
         overflow-wrap: break-word;
         hyphens: auto;
+        word-break: break-all;
         display: -webkit-box;
         -webkit-line-clamp: 3;
         -webkit-box-orient: vertical;
@@ -2450,10 +2465,11 @@ def create_weekly_report_tab(df_recrutement=None):
         for poste in postes_in_col:
             commentaire = poste.get('commentaire', '')
             commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
+            titre_fmt = _format_long_title(poste.get('titre', ''))
             
             # Construction sans indentation pour éviter l'interprétation Markdown (blocs de code)
             card_div = f"""<div class="kanban-card">
-<h4><b>{poste['titre']}</b></h4>
+<h4><b>{titre_fmt}</b></h4>
 <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
 <p>👤 {poste.get('demandeur', 'N/A')}</p>
 <p>✍️ {poste.get('recruteur', 'N/A')}</p>
@@ -3160,12 +3176,21 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
                 .kanban-card h4 {{
                     margin: 0 0 6px 0;
                     color: #9C182F;
+                    white-space: normal;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                    word-break: break-all;
+                    hyphens: auto;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 3;
+                    -webkit-box-orient: vertical;
+                    overflow: hidden;
                     font-size: 0.95em;
                     line-height: 1.3;
                     font-weight: bold;
                     word-wrap: break-word;
                     overflow-wrap: break-word;
-                    word-break: break-word;
+                    word-break: break-all;
                     hyphens: auto;
                     white-space: normal !important;
                     display: -webkit-box;
@@ -3192,10 +3217,11 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
         """
         
         for poste in postes_data:
+                titre_fmt = _format_long_title(poste.get('titre', ''))
                 commentaire_html = f"<p style='color:#666;font-style:italic;'>[!] {poste['commentaire']}</p>" if poste.get('commentaire') and str(poste.get('commentaire')).strip() not in ['nan', 'None', ''] else ""
                 html_content += f"""
                 <div class="kanban-card">
-                    <h4><b>{poste['titre']}</b></h4>
+                    <h4><b>{titre_fmt}</b></h4>
                     <p><b>&gt;</b> {poste['entite']} - {poste['lieu']}</p>
                     <p><b>*</b> {poste['demandeur']}</p>
                     <p><b>#</b> {poste['recruteur']}</p>
@@ -3468,10 +3494,11 @@ def generate_kanban_html_image(df_recrutement):
             html_kanban += f'<div class="kanban-header">{statut} ({len(postes_in_col)})</div>'
             
             for poste in postes_in_col:
+                titre_fmt = _format_long_title(poste.get('titre', ''))
                 commentaire_html = f"<p>💬 {poste['commentaire']}</p>" if poste.get('commentaire') else ""
                 html_kanban += f'''
                 <div class="kanban-card">
-                    <h4><b>{poste['titre']}</b></h4>
+                    <h4><b>{titre_fmt}</b></h4>
                     <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
                     <p>👤 {poste.get('demandeur', 'N/A')}</p>
                     <p>✍️ {poste.get('recruteur', 'N/A')}</p>
