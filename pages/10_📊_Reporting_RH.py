@@ -3142,30 +3142,35 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
                 .kanban-card {{
                     background-color: #f0f2f6;
                     border-radius: 5px;
-                    padding: 8px;
+                    padding: 10px;
                     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
                     border-left: 4px solid #1f77b4;
                     min-height: 120px;
-                    overflow-wrap: break-word;
-                    word-wrap: break-word;
-                    word-break: break-word;
+                    max-width: 100%;
+                    overflow: hidden;
+                    box-sizing: border-box;
                 }}
                 .kanban-card h4 {{
-                    margin: 0 0 4px 0;
-                    color: #2c3e50;
-                    font-size: 1.0em;
-                    line-height: 1.2;
+                    margin: 0 0 6px 0;
+                    color: #9C182F;
+                    font-size: 0.95em;
+                    line-height: 1.3;
                     font-weight: bold;
-                    overflow-wrap: break-word;
                     word-wrap: break-word;
+                    overflow-wrap: break-word;
+                    word-break: break-word;
+                    hyphens: auto;
+                    max-width: 100%;
                 }}
                 .kanban-card p {{
-                    margin: 2px 0;
-                    font-size: 0.9em;
+                    margin: 3px 0;
+                    font-size: 0.85em;
                     color: #555;
-                    line-height: 1.1;
-                    overflow-wrap: break-word;
+                    line-height: 1.2;
                     word-wrap: break-word;
+                    overflow-wrap: break-word;
+                    word-break: break-word;
+                    max-width: 100%;
                 }}
             </style>
         </head>
@@ -3175,13 +3180,13 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
         """
         
         for poste in postes_data:
-                commentaire_html = f"<p style='color:#666;font-style:italic;'>&#128172; {poste['commentaire']}</p>" if poste.get('commentaire') and str(poste.get('commentaire')).strip() not in ['nan', 'None', ''] else ""
+                commentaire_html = f"<p style='color:#666;font-style:italic;'>[!] {poste['commentaire']}</p>" if poste.get('commentaire') and str(poste.get('commentaire')).strip() not in ['nan', 'None', ''] else ""
                 html_content += f"""
                 <div class="kanban-card">
                     <h4><b>{poste['titre']}</b></h4>
-                    <p>&#128205; {poste['entite']} - {poste['lieu']}</p>
-                    <p>&#128100; {poste['demandeur']}</p>
-                    <p>&#9997; {poste['recruteur']}</p>
+                    <p><b>&gt;</b> {poste['entite']} - {poste['lieu']}</p>
+                    <p><b>*</b> {poste['demandeur']}</p>
+                    <p><b>#</b> {poste['recruteur']}</p>
                     {commentaire_html}
                 </div>
                 """
@@ -3278,7 +3283,7 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
             # Entité
             entite_val = str(row.get('Entité demandeuse', 'N/A')).strip()
             affectation_val = str(row.get('Affectation', row.get('Direction concernée', ''))).strip()
-            entite_txt = f"📍 {entite_val}"
+            entite_txt = f"> {entite_val}"
             if affectation_val:
                 entite_txt += f" - {affectation_val}"
             draw.text((x + 10, y_offset + 40), entite_txt[:50], fill='#555', font=font_card)
@@ -3290,7 +3295,7 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
                 demandeur_col = next((c for c in row.index if 'demandeur' in c.lower() and 'nom' in c.lower()), 'Demandeur')
             
             demandeur_val = str(row.get(demandeur_col, 'N/A')).strip()
-            demandeur = f"👤 {demandeur_val}"
+            demandeur = f"* {demandeur_val}"
             draw.text((x + 10, y_offset + 65), demandeur[:50], fill='#555', font=font_card)
             
             # Recruteur
@@ -3300,7 +3305,7 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
                 recruteur_col = next((c for c in row.index if 'responsable' in c.lower() and 'traitement' in c.lower()), 'RH')
                 
             recruteur_val = str(row.get(recruteur_col, 'N/A')).strip()
-            recruteur = f"✍️ {recruteur_val}"
+            recruteur = f"# {recruteur_val}"
             draw.text((x + 10, y_offset + 90), recruteur[:50], fill='#555', font=font_card)
             
             col += 1
@@ -3923,8 +3928,16 @@ def main():
         with col_ppt2:
             # Vérifier que des données sont disponibles
             if df_recrutement is not None or st.session_state.get('synced_recrutement_df') is not None:
-                if st.button("📥 Générer et Télécharger le PowerPoint", type="primary", width="stretch"):
-                    with st.spinner("Génération du PowerPoint en cours..."):
+                # Option de format d'export
+                export_format = st.radio(
+                    "Format d'export:",
+                    ["PowerPoint (.pptx)", "PDF (.pdf)"],
+                    horizontal=True,
+                    help="PDF recommandé pour une meilleure compatibilité avec Office 2010"
+                )
+                
+                if st.button("📥 Générer et Télécharger le Rapport", type="primary", width="stretch"):
+                    with st.spinner("Génération du rapport en cours..."):
                         # Utiliser les données synchronisées si disponibles
                         data_to_use = st.session_state.get('synced_recrutement_df')
                         if data_to_use is None:
@@ -3936,17 +3949,122 @@ def main():
                         if ppt_bytes:
                             # Générer un nom de fichier avec la date
                             today_str = datetime.now().strftime("%Y-%m-%d")
-                            filename = f"Rapport_RH_{today_str}.pptx"
                             
-                            st.download_button(
-                                label="💾 Télécharger le Rapport PowerPoint",
-                                data=ppt_bytes,
-                                file_name=filename,
-                                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                                type="primary",
-                                width="stretch"
-                            )
-                            st.success("✅ PowerPoint généré avec succès !")
+                            if export_format == "PDF (.pdf)":
+                                # Convertir en PDF
+                                try:
+                                    from pptx import Presentation
+                                    from reportlab.lib.pagesizes import A4, landscape
+                                    from reportlab.pdfgen import canvas
+                                    from reportlab.lib.utils import ImageReader
+                                    from PIL import Image
+                                    import io
+                                    import tempfile
+                                    
+                                    st.info("📄 Conversion en PDF...")
+                                    
+                                    # Charger le PPT depuis les bytes
+                                    ppt_bytes.seek(0)
+                                    prs = Presentation(ppt_bytes)
+                                    
+                                    # Créer un PDF
+                                    pdf_buffer = io.BytesIO()
+                                    c = canvas.Canvas(pdf_buffer, pagesize=landscape(A4))
+                                    page_width, page_height = landscape(A4)
+                                    
+                                    # Pour chaque slide, extraire les images et les ajouter au PDF
+                                    for slide_idx, slide in enumerate(prs.slides):
+                                        # Ajouter un titre de page
+                                        c.setFont("Helvetica-Bold", 16)
+                                        c.drawString(50, page_height - 40, f"Slide {slide_idx + 1}")
+                                        
+                                        # Extraire les images de la slide
+                                        img_y = page_height - 80
+                                        for shape in slide.shapes:
+                                            if hasattr(shape, "image"):
+                                                try:
+                                                    img_data = shape.image.blob
+                                                    img = Image.open(io.BytesIO(img_data))
+                                                    
+                                                    # Redimensionner pour tenir dans la page
+                                                    max_width = page_width - 100
+                                                    max_height = page_height - 150
+                                                    img_ratio = img.width / img.height
+                                                    
+                                                    if img.width > max_width:
+                                                        new_width = max_width
+                                                        new_height = new_width / img_ratio
+                                                    else:
+                                                        new_width = img.width
+                                                        new_height = img.height
+                                                    
+                                                    if new_height > max_height:
+                                                        new_height = max_height
+                                                        new_width = new_height * img_ratio
+                                                    
+                                                    # Sauvegarder temporairement
+                                                    temp_img = io.BytesIO()
+                                                    img.save(temp_img, format='PNG')
+                                                    temp_img.seek(0)
+                                                    
+                                                    c.drawImage(ImageReader(temp_img), 50, img_y - new_height, 
+                                                               width=new_width, height=new_height)
+                                                    img_y -= new_height + 20
+                                                except Exception as img_e:
+                                                    st.warning(f"Image non extraite: {img_e}")
+                                        
+                                        c.showPage()
+                                    
+                                    c.save()
+                                    pdf_buffer.seek(0)
+                                    
+                                    st.download_button(
+                                        label="💾 Télécharger le Rapport PDF",
+                                        data=pdf_buffer,
+                                        file_name=f"Rapport_RH_{today_str}.pdf",
+                                        mime="application/pdf",
+                                        type="primary",
+                                        width="stretch"
+                                    )
+                                    st.success("✅ PDF généré avec succès !")
+                                    
+                                except ImportError:
+                                    st.error("❌ Module 'reportlab' non installé. Installation: pip install reportlab")
+                                    st.info("💡 En attendant, voici le PowerPoint:")
+                                    ppt_bytes.seek(0)
+                                    st.download_button(
+                                        label="💾 Télécharger le Rapport PowerPoint",
+                                        data=ppt_bytes,
+                                        file_name=f"Rapport_RH_{today_str}.pptx",
+                                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                                        type="secondary",
+                                        width="stretch"
+                                    )
+                                except Exception as pdf_e:
+                                    st.error(f"❌ Erreur lors de la conversion PDF: {pdf_e}")
+                                    st.info("💡 Téléchargez le PowerPoint à la place:")
+                                    ppt_bytes.seek(0)
+                                    st.download_button(
+                                        label="💾 Télécharger le Rapport PowerPoint",
+                                        data=ppt_bytes,
+                                        file_name=f"Rapport_RH_{today_str}.pptx",
+                                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                                        type="secondary",
+                                        width="stretch"
+                                    )
+                            else:
+                                # Export PowerPoint standard
+                                filename = f"Rapport_RH_{today_str}.pptx"
+                                
+                                st.download_button(
+                                    label="💾 Télécharger le Rapport PowerPoint",
+                                    data=ppt_bytes,
+                                    file_name=filename,
+                                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                                    type="primary",
+                                    width="stretch"
+                                )
+                                st.success("✅ PowerPoint généré avec succès !")
             else:
                 st.warning("⚠️ Veuillez d'abord charger des données (Google Sheets ou Excel) avant de générer le PowerPoint.")
     
