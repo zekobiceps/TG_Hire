@@ -2183,29 +2183,29 @@ def create_weekly_report_tab(df_recrutement=None):
     .kanban-card h4 {
         margin-top: 0;
         margin-bottom: 4px;
-        font-size: 0.85em;
+        font-size: 1.0em;
         color: #2c3e50;
         line-height: 1.2;
         white-space: normal;
     }
     .kanban-card p {
         margin-bottom: 2px;
-        font-size: 0.75em;
+        font-size: 0.9em;
         color: #555;
         line-height: 1.1;
         white-space: normal;
     }
     .kanban-header {
-        text-align: left;
+        text-align: center;
         font-weight: bold;
         font-size: 1.2em;
-        color: #2c3e50;
+        color: #FFFFFF;
         padding: 8px;
-        background-color: #e8f4fd;
+        background-color: #FF0000;
         border-radius: 6px;
         margin-bottom: 10px;
         margin-top: 20px;
-        border: 1px solid #bee5eb;
+        border: 1px solid #cc0000;
     }
     </style>
     """, unsafe_allow_html=True)
