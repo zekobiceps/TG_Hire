@@ -17,6 +17,10 @@ import json
 import gspread
 from google.oauth2 import service_account
 import unicodedata
+from pptx import Presentation
+from pptx.util import Inches, Pt
+from PIL import Image
+import io
 
 def _normalize_text(text):
     """A global function to safely normalize text, handling None and NaN values."""
@@ -2409,6 +2413,72 @@ def create_weekly_report_tab(df_recrutement=None):
         st.markdown(cards_html, unsafe_allow_html=True)
 
 
+def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2).pptx"):
+    """
+    Génère un rapport PowerPoint à partir d'un template en remplaçant les placeholders
+    par les graphiques et tableaux générés.
+    
+    Returns: BytesIO contenant le fichier PowerPoint généré
+    """
+    try:
+        # Charger le template
+        prs = Presentation(template_path)
+        
+        # Préparer les données pour les placeholders
+        # Calculer les métriques hebdomadaires
+        weekly_metrics = calculate_weekly_metrics(df_recrutement)
+        
+        # Parcourir chaque slide et remplacer les placeholders
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                # Vérifier si le shape a un attribut text
+                if not hasattr(shape, "text"):
+                    continue
+                    
+                # Tableau des besoins par entité
+                if "{{TABLEAU_BESOINS_ENTITES}}" in shape.text:
+                    try:
+                        # Créer le tableau des besoins
+                        if weekly_metrics and 'table_data' in weekly_metrics:
+                            # Supprimer le placeholder texte
+                            if hasattr(shape, "text_frame"):
+                                text_frame = shape.text_frame
+                                text_frame.clear()
+                                p = text_frame.paragraphs[0]
+                                p.text = "Tableau des besoins par entité (voir données hebdomadaires)"
+                                p.font.size = Pt(12)
+                    except Exception as e:
+                        if hasattr(shape, "text"):
+                            shape.text = f"Erreur génération tableau: {str(e)}"
+                
+                # Métrique total postes
+                elif "{{METRIC_TOTAL_POSTES}}" in shape.text:
+                    try:
+                        if weekly_metrics and 'table_data' in weekly_metrics:
+                            total_row = weekly_metrics['table_data'][-1]
+                            total_postes = total_row.get('Nb postes en cours cette semaine (sourcing)', 'N/A')
+                            shape.text = f"Total Postes en Cours: {total_postes}"
+                    except Exception as e:
+                        shape.text = f"Erreur: {str(e)}"
+                
+                # Graphiques Plotly - on peut ajouter d'autres placeholders ici
+                # Pour l'instant, on remplace juste par du texte
+                elif "{{GRAPH_" in shape.text:
+                    placeholder = shape.text.strip()
+                    shape.text = f"Graphique {placeholder} (à venir)"
+        
+        # Sauvegarder le PowerPoint modifié dans un BytesIO
+        ppt_bytes = BytesIO()
+        prs.save(ppt_bytes)
+        ppt_bytes.seek(0)
+        
+        return ppt_bytes
+    
+    except Exception as e:
+        st.error(f"Erreur lors de la génération du PowerPoint: {e}")
+        return None
+
+
 def main():
     st.title("📊 Tableau de Bord RH")
     st.markdown("---")
@@ -2459,7 +2529,7 @@ def main():
         )
     
     # Créer les onglets (Demandes et Recrutement regroupés)
-    tabs = st.tabs(["📂 Upload", "🗂️ Demandes & Recrutement", "📅 Hebdomadaire", "🤝 Intégrations"])
+    tabs = st.tabs(["📂 Upload & Téléchargement", "🗂️ Demandes & Recrutement", "📅 Hebdomadaire", "🤝 Intégrations"])
     
     # Variables pour stocker les fichiers uploadés
     # Use session_state to persist upload/refresh state
@@ -2558,8 +2628,56 @@ def main():
             st.session_state.data_updated = True
             st.success("Données mises à jour ! Consultez les autres onglets.")
     
-    # Charger les données (avec fichiers uploadés ou fichiers locaux)
+    # Charger les données ICI (avant l'onglet Upload pour pouvoir les utiliser)
     df_integration, df_recrutement = load_data_from_files(None, uploaded_excel)
+    
+    # Continuer l'onglet Upload avec la section PowerPoint
+    with tabs[0]:
+        # Section de génération du PowerPoint
+        st.markdown("---")
+        st.subheader("📥 Télécharger le Rapport PowerPoint")
+        
+        col_ppt1, col_ppt2 = st.columns(2)
+        
+        with col_ppt1:
+            st.info("📊 **Génération automatique de votre rapport PowerPoint**")
+            st.markdown("""
+            Le rapport PowerPoint inclura :
+            - 📊 Tableau des besoins par entité (Hebdomadaire)
+            - 📈 Métriques et statistiques
+            - 📉 Graphiques de Demandes & Recrutement
+            - 🤝 Données d'Intégration
+            """)
+        
+        with col_ppt2:
+            # Vérifier que des données sont disponibles
+            if df_recrutement is not None or st.session_state.get('synced_recrutement_df') is not None:
+                if st.button("📥 Générer et Télécharger le PowerPoint", type="primary", width="stretch"):
+                    with st.spinner("Génération du PowerPoint en cours..."):
+                        # Utiliser les données synchronisées si disponibles
+                        data_to_use = st.session_state.get('synced_recrutement_df')
+                        if data_to_use is None:
+                            data_to_use = df_recrutement
+                        
+                        # Générer le PowerPoint
+                        ppt_bytes = generate_powerpoint_report(data_to_use)
+                        
+                        if ppt_bytes:
+                            # Générer un nom de fichier avec la date
+                            today_str = datetime.now().strftime("%Y-%m-%d")
+                            filename = f"Rapport_RH_{today_str}.pptx"
+                            
+                            st.download_button(
+                                label="💾 Télécharger le Rapport PowerPoint",
+                                data=ppt_bytes,
+                                file_name=filename,
+                                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                                type="primary",
+                                width="stretch"
+                            )
+                            st.success("✅ PowerPoint généré avec succès !")
+            else:
+                st.warning("⚠️ Veuillez d'abord charger des données (Google Sheets ou Excel) avant de générer le PowerPoint.")
     
     # Message d'information sur les données chargées
     has_uploaded = (st.session_state.uploaded_excel is not None) or (st.session_state.get('synced_recrutement_df') is not None)
