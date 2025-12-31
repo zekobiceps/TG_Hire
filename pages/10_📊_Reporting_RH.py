@@ -1544,7 +1544,47 @@ def calculate_weekly_metrics(df_recrutement):
             'en_cours_status_count': postes_en_cours_status
         }
     
-    return metrics_by_entity
+    # Créer aussi table_data pour l'export PowerPoint
+    excluded_entities = {'BESIX-TGCC', 'DECO EXCELL', 'TG PREFA'}
+    metrics_included = {k: v for k, v in metrics_by_entity.items() if k not in excluded_entities}
+    
+    # Calculer les totaux
+    total_avant = sum(data['avant'] for data in metrics_included.values())
+    total_nouveaux = sum(data['nouveaux'] for data in metrics_included.values())
+    total_pourvus = sum(data['pourvus'] for data in metrics_included.values())
+    total_en_cours = sum(data['en_cours'] for data in metrics_included.values())
+    total_en_cours_status = sum(data.get('en_cours_status_count', 0) for data in metrics_included.values())
+    
+    # Préparer les données pour le tableau
+    table_data = []
+    for entite, data in metrics_included.items():
+        table_data.append({
+            'Entité': entite,  # Sans les logos pour le PowerPoint
+            'Nb postes ouverts avant début semaine': data['avant'] if data['avant'] > 0 else 0,
+            'Nb nouveaux postes ouverts cette semaine': data['nouveaux'] if data['nouveaux'] > 0 else 0,
+            'Nb postes pourvus cette semaine': data['pourvus'] if data['pourvus'] > 0 else 0,
+            'Nb postes en cours cette semaine (sourcing)': data['en_cours'] if data['en_cours'] > 0 else 0
+        })
+    
+    # Ajouter la ligne TOTAL
+    table_data.append({
+        'Entité': 'TOTAL',
+        'Nb postes ouverts avant début semaine': total_avant,
+        'Nb nouveaux postes ouverts cette semaine': total_nouveaux,
+        'Nb postes pourvus cette semaine': total_pourvus,
+        'Nb postes en cours cette semaine (sourcing)': total_en_cours
+    })
+    
+    return {
+        'metrics_by_entity': metrics_by_entity,
+        'table_data': table_data,
+        'totals': {
+            'avant': total_avant,
+            'nouveaux': total_nouveaux,
+            'pourvus': total_pourvus,
+            'en_cours': total_en_cours
+        }
+    }
 
 def create_weekly_report_tab(df_recrutement=None):
     """Onglet Reporting Hebdomadaire (simplifié)
@@ -1560,7 +1600,9 @@ def create_weekly_report_tab(df_recrutement=None):
     # Calculer les métriques
     if df_recrutement is not None and len(df_recrutement) > 0:
         try:
-            metrics = calculate_weekly_metrics(df_recrutement)
+            metrics_result = calculate_weekly_metrics(df_recrutement)
+            # Extraire metrics_by_entity de la nouvelle structure
+            metrics = metrics_result.get('metrics_by_entity', {}) if isinstance(metrics_result, dict) else {}
         except Exception as e:
             st.error(f"⚠️ Erreur lors du calcul des métriques: {e}")
             metrics = {}
