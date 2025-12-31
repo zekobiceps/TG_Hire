@@ -2271,20 +2271,29 @@ def create_weekly_report_tab(df_recrutement=None):
         nb_postes = len(postes_in_col)
         # En-tête de colonne avec le nombre de cartes
         st.markdown(f'<div class="kanban-header">{statut} ({nb_postes})</div>', unsafe_allow_html=True)
-        # Afficher les cartes (1 par ligne)
-        for poste in postes_in_col:
-            commentaire = poste.get('commentaire', '')
-            commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
-            card_html = f"""
-            <div class="kanban-card">
-                <h4><b>{poste['titre']}</b></h4>
-                <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
-                <p>👤 {poste.get('demandeur', 'N/A')}</p>
-                <p>✍️ {poste.get('recruteur', 'N/A')}</p>
-                {commentaire_html}
-            </div>
-            """
-            st.markdown(card_html, unsafe_allow_html=True)
+        # Afficher les cartes en grille (4 par ligne pour maximiser l'espace)
+        cols_per_row = 4
+        for idx in range(0, len(postes_in_col), cols_per_row):
+            card_cols = st.columns(cols_per_row)
+            for k in range(cols_per_row):
+                if idx + k < len(postes_in_col):
+                    poste = postes_in_col[idx + k]
+                    commentaire = poste.get('commentaire', '')
+                    commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
+                    with card_cols[k]:
+                        card_html = f"""
+                        <div class="kanban-card">
+                            <h4><b>{poste['titre']}</b></h4>
+                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
+                            <p>👤 {poste.get('demandeur', 'N/A')}</p>
+                            <p>✍️ {poste.get('recruteur', 'N/A')}</p>
+                            {commentaire_html}
+                        </div>
+                        """
+                        st.markdown(card_html, unsafe_allow_html=True)
+                else:
+                    with card_cols[k]:
+                        st.empty()
 
 
 def main():
