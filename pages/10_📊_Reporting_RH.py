@@ -2455,6 +2455,478 @@ def create_weekly_report_tab(df_recrutement=None):
         st.markdown(cards_html, unsafe_allow_html=True)
 
 
+def generate_table_image_simple(weekly_metrics):
+    """Génère une image simple du tableau avec PIL (pas de dépendance Chrome)"""
+    from PIL import Image, ImageDraw, ImageFont
+    import tempfile
+    
+    try:
+        metrics_by_entity = weekly_metrics.get('metrics_by_entity', {})
+        excluded_entities = {'BESIX-TGCC', 'DECO EXCELL', 'TG PREFA'}
+        metrics_included = {k: v for k, v in metrics_by_entity.items() if k not in excluded_entities}
+        
+        # Calculer les totaux
+        total_avant = sum(data['avant'] for data in metrics_included.values())
+        total_nouveaux = sum(data['nouveaux'] for data in metrics_included.values())
+        total_pourvus = sum(data['pourvus'] for data in metrics_included.values())
+        total_en_cours = sum(data['en_cours'] for data in metrics_included.values())
+        
+        # Créer l'image
+        num_rows = len(metrics_included) + 2  # +2 for header and total
+        row_height = 50
+        width = 1400
+        height = num_rows * row_height + 40
+        
+        img = Image.new('RGB', (width, height), 'white')
+        draw = ImageDraw.Draw(img)
+        
+        # Police
+        try:
+            font_header = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)
+            font_data = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 13)
+        except:
+            font_header = ImageFont.load_default()
+            font_data = ImageFont.load_default()
+        
+        # Header
+        headers = ['Entité', 'Postes avant', 'Nouveaux postes', 'Postes pourvus', 'Postes en cours']
+        col_widths = [280, 280, 280, 280, 280]
+        x_positions = [0] + [sum(col_widths[:i+1]) for i in range(len(col_widths))]
+        
+        # Dessiner le header
+        draw.rectangle([0, 0, width, row_height], fill='#9C182F')
+        for i, header in enumerate(headers):
+            x = x_positions[i] + col_widths[i] // 2
+            draw.text((x, row_height // 2), header, fill='white', font=font_header, anchor='mm')
+        
+        # Données
+        y_offset = row_height
+        for entite, data in sorted(metrics_included.items()):
+            # Lignes alternées
+            if ((y_offset - row_height) // row_height) % 2 == 0:
+                draw.rectangle([0, y_offset, width, y_offset + row_height], fill='#f9f9f9')
+            
+            # Tracer les cellules
+            draw.text((x_positions[0] + col_widths[0] // 2, y_offset + row_height // 2), 
+                     entite[:20], fill='black', font=font_data, anchor='mm')
+            draw.text((x_positions[1] + col_widths[1] // 2, y_offset + row_height // 2), 
+                     str(data['avant'] if data['avant'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
+            draw.text((x_positions[2] + col_widths[2] // 2, y_offset + row_height // 2), 
+                     str(data['nouveaux'] if data['nouveaux'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
+            draw.text((x_positions[3] + col_widths[3] // 2, y_offset + row_height // 2), 
+                     str(data['pourvus'] if data['pourvus'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
+            draw.text((x_positions[4] + col_widths[4] // 2, y_offset + row_height // 2), 
+                     str(data['en_cours'] if data['en_cours'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
+            
+            # Bordures
+            draw.line([(0, y_offset + row_height), (width, y_offset + row_height)], fill='#ddd', width=1)
+            y_offset += row_height
+        
+        # Ligne TOTAL
+        draw.rectangle([0, y_offset, width, y_offset + row_height], fill='#9C182F')
+        draw.text((x_positions[0] + col_widths[0] // 2, y_offset + row_height // 2), 
+                 'TOTAL', fill='white', font=font_header, anchor='mm')
+        draw.text((x_positions[1] + col_widths[1] // 2, y_offset + row_height // 2), 
+                 str(total_avant), fill='white', font=font_header, anchor='mm')
+        draw.text((x_positions[2] + col_widths[2] // 2, y_offset + row_height // 2), 
+                 str(total_nouveaux), fill='white', font=font_header, anchor='mm')
+        draw.text((x_positions[3] + col_widths[3] // 2, y_offset + row_height // 2), 
+                 str(total_pourvus), fill='white', font=font_header, anchor='mm')
+        draw.text((x_positions[4] + col_widths[4] // 2, y_offset + row_height // 2), 
+                 str(total_en_cours), fill='white', font=font_header, anchor='mm')
+        
+        # Sauvegarder
+        output_path = os.path.join(tempfile.gettempdir(), 'table_reporting.png')
+        img.save(output_path)
+        return output_path
+        
+    except Exception as e:
+        st.error(f"Erreur génération image tableau: {e}")
+        return None
+
+
+def generate_kanban_image_simple(df_recrutement):
+    """Génère une image simple du Kanban avec PIL"""
+    from PIL import Image, ImageDraw, ImageFont
+    import tempfile
+    
+    try:
+        # Charger les données du kanban
+        colonnes = {
+            'Sourcing': df_recrutement[df_recrutement['Statut de la demande'] == 'Sourcing'].head(5),
+            'Shortlisté': df_recrutement[df_recrutement['Statut de la demande'] == 'Shortlisté'].head(5),
+            'Signature DRH': df_recrutement[df_recrutement['Statut de la demande'] == 'Signature DRH'].head(5),
+            'Clôture': df_recrutement[df_recrutement['Statut de la demande'] == 'Clôture'].head(5),
+            'Désistement': df_recrutement[df_recrutement['Statut de la demande'] == 'Désistement'].head(5),
+        }
+        
+        # Dimensions
+        col_width = 260
+        num_cols = 5
+        width = col_width * num_cols + 40
+        height = 800
+        
+        img = Image.new('RGB', (width, height), 'white')
+        draw = ImageDraw.Draw(img)
+        
+        # Polices
+        try:
+            font_header = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 15)
+            font_card_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 11)
+            font_card = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
+        except:
+            font_header = ImageFont.load_default()
+            font_card_title = ImageFont.load_default()
+            font_card = ImageFont.load_default()
+        
+        x_offset = 20
+        for statut, df_col in colonnes.items():
+            # En-tête de colonne
+            draw.rectangle([x_offset, 20, x_offset + col_width - 10, 60], fill='#9C182F', outline='#9C182F')
+            count = len(df_col)
+            draw.text((x_offset + col_width // 2 - 5, 40), f"{statut} ({count})", 
+                     fill='white', font=font_header, anchor='mm')
+            
+            # Cartes
+            y_offset = 80
+            for idx, row in df_col.iterrows():
+                if y_offset > height - 100:
+                    break
+                
+                # Carte
+                draw.rectangle([x_offset + 5, y_offset, x_offset + col_width - 15, y_offset + 90], 
+                              fill='#f9f9f9', outline='#ddd', width=2)
+                
+                # Titre du poste
+                titre = str(row.get('Intitulé du poste', 'N/A'))[:30]
+                draw.text((x_offset + 10, y_offset + 10), titre, fill='#9C182F', font=font_card_title)
+                
+                # Entité et lieu
+                entite = str(row.get('Entité demandeuse', ''))[:15]
+                lieu = str(row.get('Ville', ''))[:15]
+                draw.text((x_offset + 10, y_offset + 30), f"{entite} - {lieu}", fill='black', font=font_card)
+                
+                # Demandeur
+                demandeur = str(row.get('Nom du Demandeur', ''))[:20]
+                draw.text((x_offset + 10, y_offset + 50), f"👤 {demandeur}", fill='black', font=font_card)
+                
+                # Recruteur
+                recruteur = str(row.get('RH en charge du recrutement', ''))[:20]
+                draw.text((x_offset + 10, y_offset + 70), f"✍️ {recruteur}", fill='black', font=font_card)
+                
+                y_offset += 100
+            
+            x_offset += col_width
+        
+        # Sauvegarder
+        output_path = os.path.join(tempfile.gettempdir(), 'kanban_reporting.png')
+        img.save(output_path)
+        return output_path
+        
+    except Exception as e:
+        st.error(f"Erreur génération image kanban: {e}")
+        return None
+
+
+def generate_table_html_image(weekly_metrics):
+    """Génère une image du tableau des besoins avec logos"""
+    from html2image import Html2Image
+    import tempfile
+    
+    try:
+        # Créer le HTML du tableau exactement comme dans Streamlit
+        metrics_by_entity = weekly_metrics.get('metrics_by_entity', {})
+        excluded_entities = {'BESIX-TGCC', 'DECO EXCELL', 'TG PREFA'}
+        metrics_included = {k: v for k, v in metrics_by_entity.items() if k not in excluded_entities}
+        
+        # Charger les logos
+        logo_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "LOGO")
+        entity_logo_map = {
+            'TGCC': 'TGCC.PNG',
+            'TGEM': 'TGEM.PNG',
+            'TG ALU': 'TG ALU.PNG',
+            'TG COVER': 'TG COVER.PNG',
+            'TG STEEL': 'TG STEEL.PNG',
+            'TG STONE': 'TG STONE.PNG',
+            'TG WOOD': 'TG WOOD.PNG',
+            'STAM': 'STAM.png',
+            'BFO': 'BFO.png',
+            'TGCC IMMOBILIER': 'tgcc-immobilier.png',
+            'TGCC Immobilier': 'tgcc-immobilier.png'
+        }
+        
+        logos_dict = {}
+        for entity, logo_file in entity_logo_map.items():
+            logo_path = os.path.join(logo_folder, logo_file)
+            if os.path.exists(logo_path):
+                with open(logo_path, "rb") as f:
+                    logos_dict[entity] = base64.b64encode(f.read()).decode()
+        
+        # Fonction pour obtenir l'affichage avec logo
+        def get_entity_display(name_str):
+            if not name_str or pd.isna(name_str):
+                return name_str
+            
+            for entity_key, logo_b64 in logos_dict.items():
+                if entity_key.upper() in str(name_str).upper():
+                    size_map = {
+                        'TG STEEL': 50,
+                        'TG STONE': 50,
+                        'TGCC IMMOBILIER': 50,
+                        'TGCC Immobilier': 50,
+                        'BFO': 80
+                    }
+                    logo_size = size_map.get(entity_key, 63)
+                    img_tag = f'<img src="data:image/png;base64,{logo_b64}" style="height: {logo_size}px; vertical-align: middle;" />'
+                    return img_tag
+            return name_str
+        
+        # Calculer les totaux
+        total_avant = sum(data['avant'] for data in metrics_included.values())
+        total_nouveaux = sum(data['nouveaux'] for data in metrics_included.values())
+        total_pourvus = sum(data['pourvus'] for data in metrics_included.values())
+        total_en_cours = sum(data['en_cours'] for data in metrics_included.values())
+        
+        # Créer le HTML
+        html_table = f"""
+        <html>
+        <head>
+            <style>
+                body {{
+                    margin: 0;
+                    padding: 20px;
+                    font-family: Arial, sans-serif;
+                    background: white;
+                }}
+                .table-container {{
+                    width: 100%;
+                }}
+                .custom-table {{
+                    width: 75%;
+                    margin: 0 auto;
+                    border-collapse: collapse;
+                    background-color: white;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                }}
+                .custom-table th {{
+                    background-color: #9C182F;
+                    color: white;
+                    font-weight: bold;
+                    text-align: center;
+                    padding: 6px 4px;
+                    border: 1px solid white;
+                    font-size: 1.1em;
+                    line-height: 1.3;
+                    white-space: normal;
+                    word-wrap: break-word;
+                    max-width: 150px;
+                }}
+                .custom-table td {{
+                    text-align: center;
+                    padding: 6px 4px;
+                    border: 1px solid #ddd;
+                    background-color: white;
+                    font-size: 1.1em;
+                    line-height: 1.2;
+                    font-weight: 500;
+                }}
+                .custom-table .entity-cell {{
+                    text-align: center;
+                    padding: 4px 2px;
+                    font-weight: 600;
+                    min-width: 80px;
+                    max-width: 100px;
+                }}
+                .custom-table .total-row {{
+                    background-color: #9C182F;
+                    color: white;
+                    font-weight: bold;
+                    border-top: 2px solid #9C182F;
+                }}
+                .custom-table .total-row td {{
+                    background-color: #9C182F;
+                    color: white;
+                    font-size: 1.1em;
+                    font-weight: bold;
+                    border: 1px solid #9C182F;
+                }}
+                .custom-table .total-row .entity-cell {{
+                    text-align: center;
+                    padding: 4px 2px;
+                    font-weight: bold;
+                    background-color: #9C182F;
+                    color: white;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="table-container">
+                <table class="custom-table">
+                    <thead>
+                        <tr>
+                            <th>Entité</th>
+                            <th>Nb postes ouverts avant début semaine</th>
+                            <th>Nb nouveaux postes ouverts cette semaine</th>
+                            <th>Nb postes pourvus cette semaine</th>
+                            <th>Nb postes en cours cette semaine (sourcing)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        """
+        
+        # Ajouter les lignes de données
+        for entite, data in metrics_included.items():
+            html_table += f'''<tr>
+                <td class="entity-cell">{get_entity_display(entite)}</td>
+                <td>{data['avant'] if data['avant'] > 0 else '-'}</td>
+                <td>{data['nouveaux'] if data['nouveaux'] > 0 else '-'}</td>
+                <td>{data['pourvus'] if data['pourvus'] > 0 else '-'}</td>
+                <td>{data['en_cours'] if data['en_cours'] > 0 else '-'}</td>
+            </tr>'''
+        
+        # Ligne TOTAL
+        html_table += f'''<tr class="total-row">
+            <td class="entity-cell">TOTAL</td>
+            <td>{total_avant}</td>
+            <td>{total_nouveaux}</td>
+            <td>{total_pourvus}</td>
+            <td>{total_en_cours}</td>
+        </tr>
+        '''
+        
+        html_table += """
+                    </tbody>
+                </table>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Convertir en image
+        hti = Html2Image(output_path=tempfile.gettempdir())
+        image_path = hti.screenshot(html_str=html_table, save_as='table.png', size=(1200, 800))[0]
+        
+        return image_path
+    except Exception as e:
+        st.error(f"Erreur lors de la génération de l'image du tableau: {e}")
+        return None
+
+
+def generate_kanban_html_image():
+    """Génère une image du Kanban"""
+    from html2image import Html2Image
+    import tempfile
+    
+    try:
+        # HTML du Kanban (repris du code existant)
+        postes_data = [
+            {"titre": "Ingénieur Achat", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.BOUZOUBAA", "recruteur": "Zakaria", "statut": "Sourcing"},
+            {"titre": "Directeur Achats Adjoint", "entite": "TGCC", "lieu": "Siège", "demandeur": "C.BENABDELLAH", "recruteur": "Zakaria", "statut": "Sourcing"},
+            {"titre": "INGENIEUR TRAVAUX", "entite": "TGCC", "lieu": "YAMED LOT B", "demandeur": "M.TAZI", "recruteur": "Zakaria", "statut": "Sourcing"},
+            {"titre": "CHEF DE PROJETS", "entite": "TGCC", "lieu": "DESSALEMENT JORF", "demandeur": "M.FENNAN", "recruteur": "ZAKARIA", "statut": "Shortlisté"},
+            {"titre": "Planificateur", "entite": "TGCC", "lieu": "ASFI-B", "demandeur": "SOUFIANI", "recruteur": "Ghita", "statut": "Shortlisté"},
+            {"titre": "RESPONSABLE TRANS INTERCH", "entite": "TG PREFA", "lieu": "OUED SALEH", "demandeur": "FBOUZOUBAA", "recruteur": "Ghita", "statut": "Shortlisté"},
+            {"titre": "PROJETEUR DESSINATEUR", "entite": "TG WOOD", "lieu": "OUED SALEH", "demandeur": "S.MENJRA", "recruteur": "Zakaria", "statut": "Signature DRH"},
+            {"titre": "Projeteur", "entite": "TGCC", "lieu": "TSP Safi", "demandeur": "B.MORABET", "recruteur": "Zakaria", "statut": "Signature DRH"},
+            {"titre": "Consultant SAP", "entite": "TGCC", "lieu": "Siège", "demandeur": "O.KETTA", "recruteur": "Zakaria", "statut": "Signature DRH"},
+            {"titre": "Doc Controller", "entite": "TGEM", "lieu": "SIEGE", "demandeur": "A.SANKARI", "recruteur": "Zakaria", "statut": "Clôture"},
+            {"titre": "Ingénieur étude/qualité", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.MOUTANABI", "recruteur": "Zakaria", "statut": "Clôture"},
+            {"titre": "Responsable Cybersecurité", "entite": "TGCC", "lieu": "Siège", "demandeur": "Ghazi", "recruteur": "Zakaria", "statut": "Clôture"},
+            {"titre": "Conducteur de Travaux", "entite": "TGCC", "lieu": "JORF LASFAR", "demandeur": "M.FENNAN", "recruteur": "Zakaria", "statut": "Désistement"},
+            {"titre": "Chef de Chantier", "entite": "TGCC", "lieu": "TOARC", "demandeur": "M.FENNAN", "recruteur": "Zakaria", "statut": "Désistement"},
+            {"titre": "Magasinier", "entite": "TG WOOD", "lieu": "Oulad Saleh", "demandeur": "K.TAZI", "recruteur": "Ghita", "statut": "Désistement", "commentaire": "Pas de retour du demandeur"}
+        ]
+        
+        statuts = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+        
+        html_kanban = """
+        <html>
+        <head>
+            <style>
+                body {
+                    margin: 0;
+                    padding: 20px;
+                    font-family: Arial, sans-serif;
+                    background: #f5f5f5;
+                }
+                .kanban-container {
+                    display: flex;
+                    gap: 15px;
+                    overflow-x: auto;
+                    padding: 10px;
+                }
+                .kanban-column {
+                    min-width: 200px;
+                    background-color: #f0f0f0;
+                    border-radius: 8px;
+                    padding: 10px;
+                }
+                .kanban-header {
+                    background-color: #9C182F;
+                    color: white;
+                    padding: 10px;
+                    border-radius: 5px;
+                    font-weight: bold;
+                    text-align: center;
+                    margin-bottom: 10px;
+                    font-size: 1.3em;
+                }
+                .kanban-card {
+                    background-color: white;
+                    border-radius: 5px;
+                    padding: 10px;
+                    margin-bottom: 10px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                }
+                .kanban-card h4 {
+                    margin: 0 0 8px 0;
+                    color: #9C182F;
+                }
+                .kanban-card p {
+                    margin: 4px 0;
+                    font-size: 0.9em;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="kanban-container">
+        """
+        
+        for statut in statuts:
+            postes_in_col = [p for p in postes_data if p["statut"] == statut]
+            html_kanban += f'<div class="kanban-column">'
+            html_kanban += f'<div class="kanban-header">{statut} ({len(postes_in_col)})</div>'
+            
+            for poste in postes_in_col:
+                commentaire_html = f"<p>💬 {poste['commentaire']}</p>" if poste.get('commentaire') else ""
+                html_kanban += f'''
+                <div class="kanban-card">
+                    <h4><b>{poste['titre']}</b></h4>
+                    <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
+                    <p>👤 {poste.get('demandeur', 'N/A')}</p>
+                    <p>✍️ {poste.get('recruteur', 'N/A')}</p>
+                    {commentaire_html}
+                </div>
+                '''
+            
+            html_kanban += '</div>'
+        
+        html_kanban += """
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Convertir en image
+        hti = Html2Image(output_path=tempfile.gettempdir())
+        image_path = hti.screenshot(html_str=html_kanban, save_as='kanban.png', size=(1400, 900))[0]
+        
+        return image_path
+    except Exception as e:
+        st.error(f"Erreur lors de la génération de l'image du Kanban: {e}")
+        return None
+
+
 def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2).pptx"):
     """
     Génère un rapport PowerPoint à partir d'un template en remplaçant les placeholders
@@ -2481,6 +2953,11 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
         else:
             st.warning("⚠️ Métriques hebdomadaires vides, le PowerPoint sera généré avec des données limitées.")
         
+        # Générer les images simples avec PIL (pas de dépendance Chrome)
+        st.info("Génération des images pour le PowerPoint...")
+        table_image_path = generate_table_image_simple(weekly_metrics) if weekly_metrics else None
+        kanban_image_path = generate_kanban_image_simple(df_recrutement)
+        
         # Parcourir chaque slide et remplacer les placeholders
         for slide_idx, slide in enumerate(prs.slides):
             shapes_to_remove = []
@@ -2491,18 +2968,9 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                 if shape_text is None:
                     continue
                     
-                # Tableau des besoins par entité
+                # Tableau des besoins par entité - Insérer l'image
                 if "{{TABLEAU_BESOINS_ENTITES}}" in shape_text:
                     try:
-                        if not weekly_metrics or 'table_data' not in weekly_metrics:
-                            # Si pas de données, afficher un message
-                            text_frame = getattr(shape, "text_frame", None)
-                            if text_frame:
-                                text_frame.clear()
-                                p = text_frame.paragraphs[0] if text_frame.paragraphs else text_frame.add_paragraph()
-                                p.text = "Aucune donnée disponible"
-                            continue
-                        
                         # Récupérer la position et taille du shape original
                         left = shape.left
                         top = shape.top
@@ -2512,107 +2980,43 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                         # Marquer le shape pour suppression
                         shapes_to_remove.append(shape)
                         
-                        # Créer le tableau PowerPoint
-                        table_data = weekly_metrics['table_data']
-                        rows = len(table_data) + 1  # +1 pour l'en-tête
-                        cols = 5  # Entité, Postes ouverts, Nouveaux postes, Postes pourvus, Postes en cours
-                        
-                        # Ajouter le tableau
-                        table_shape = slide.shapes.add_table(rows, cols, left, top, width, height)
-                        table = table_shape.table
-                        
-                        # En-têtes
-                        headers = ["Entité", "Postes ouverts", "Nouveaux postes", "Postes pourvus", "Postes en cours"]
-                        for col_idx, header in enumerate(headers):
-                            cell = table.rows[0].cells[col_idx]
-                            cell.text = header
-                            # Style de l'en-tête
-                            cell.fill.solid()
-                            cell.fill.fore_color.rgb = RGBColor(156, 24, 47)  # #9C182F
-                            paragraph = cell.text_frame.paragraphs[0]
-                            paragraph.font.bold = True
-                            paragraph.font.size = Pt(11)
-                            paragraph.font.color.rgb = RGBColor(255, 255, 255)
-                            paragraph.alignment = PP_ALIGN.CENTER
-                        
-                        # Données (sans la ligne TOTAL)
-                        data_rows = table_data[:-1] if len(table_data) > 0 else []
-                        for row_idx, row_data in enumerate(data_rows, start=1):
-                            table.rows[row_idx].cells[0].text = str(row_data.get('Entité', ''))
-                            table.rows[row_idx].cells[1].text = str(row_data.get('Nb postes ouverts avant début semaine', '0'))
-                            table.rows[row_idx].cells[2].text = str(row_data.get('Nb nouveaux postes ouverts cette semaine', '0'))
-                            table.rows[row_idx].cells[3].text = str(row_data.get('Nb postes pourvus cette semaine', '0'))
-                            table.rows[row_idx].cells[4].text = str(row_data.get('Nb postes en cours cette semaine (sourcing)', '0'))
-                            
-                            # Centrer le texte
-                            for col_idx in range(cols):
-                                cell = table.rows[row_idx].cells[col_idx]
-                                paragraph = cell.text_frame.paragraphs[0]
-                                paragraph.alignment = PP_ALIGN.CENTER
-                                paragraph.font.size = Pt(10)
-                        
-                        # Ligne TOTAL (dernière ligne)
-                        if len(table_data) > 0:
-                            total_row = table_data[-1]
-                            last_row_idx = rows - 1
-                            table.rows[last_row_idx].cells[0].text = "TOTAL"
-                            table.rows[last_row_idx].cells[1].text = str(total_row.get('Nb postes ouverts avant début semaine', '0')).replace('**', '')
-                            table.rows[last_row_idx].cells[2].text = str(total_row.get('Nb nouveaux postes ouverts cette semaine', '0')).replace('**', '')
-                            table.rows[last_row_idx].cells[3].text = str(total_row.get('Nb postes pourvus cette semaine', '0')).replace('**', '')
-                            table.rows[last_row_idx].cells[4].text = str(total_row.get('Nb postes en cours cette semaine (sourcing)', '0')).replace('**', '')
-                            
-                            # Style de la ligne TOTAL
-                            for col_idx in range(cols):
-                                cell = table.rows[last_row_idx].cells[col_idx]
-                                cell.fill.solid()
-                                cell.fill.fore_color.rgb = RGBColor(156, 24, 47)  # #9C182F
-                                paragraph = cell.text_frame.paragraphs[0]
-                                paragraph.font.bold = True
-                                paragraph.font.size = Pt(11)
-                                paragraph.font.color.rgb = RGBColor(255, 255, 255)
-                                paragraph.alignment = PP_ALIGN.CENTER
-                        
+                        # Insérer l'image du tableau si elle existe
+                        if table_image_path and os.path.exists(table_image_path):
+                            slide.shapes.add_picture(table_image_path, left, top, width=width, height=height)
+                        else:
+                            # Fallback: ajouter un message d'erreur
+                            txBox = slide.shapes.add_textbox(left, top, width, height)
+                            text_frame = txBox.text_frame
+                            p = text_frame.paragraphs[0]
+                            p.text = "Erreur: Impossible de générer l'image du tableau"
+                            p.font.size = Pt(14)
                     except Exception as e:
-                        # En cas d'erreur, ajouter un message d'erreur dans une zone de texte
-                        text_frame = getattr(shape, "text_frame", None)
-                        if text_frame:
-                            text_frame.clear()
-                            p = text_frame.paragraphs[0] if text_frame.paragraphs else text_frame.add_paragraph()
-                            p.text = f"Erreur génération tableau: {str(e)}"
-                            st.error(f"Erreur lors de la génération du tableau: {e}")
+                        st.error(f"Erreur lors de l'insertion du tableau: {e}")
                 
-                # Métrique total postes
+                # Métrique total postes - Insérer l'image du Kanban
                 elif "{{METRIC_TOTAL_POSTES}}" in shape_text:
                     try:
-                        if not weekly_metrics or 'table_data' not in weekly_metrics or len(weekly_metrics['table_data']) == 0:
-                            # Si pas de données, afficher un message
-                            text_frame = getattr(shape, "text_frame", None)
-                            if text_frame:
-                                text_frame.clear()
-                                p = text_frame.paragraphs[0] if text_frame.paragraphs else text_frame.add_paragraph()
-                                p.text = "Aucune donnée disponible"
-                            continue
+                        # Récupérer la position et taille du shape original
+                        left = shape.left
+                        top = shape.top
+                        width = shape.width
+                        height = shape.height
                         
-                        total_row = weekly_metrics['table_data'][-1]
-                        total_postes = str(total_row.get('Nb postes en cours cette semaine (sourcing)', 'N/A')).replace('**', '')
+                        # Marquer le shape pour suppression
+                        shapes_to_remove.append(shape)
                         
-                        # Remplacer le texte du placeholder
-                        text_frame = getattr(shape, "text_frame", None)
-                        if text_frame:
-                            text_frame.clear()
-                            p = text_frame.paragraphs[0] if text_frame.paragraphs else text_frame.add_paragraph()
-                            p.text = f"Total Postes en Cours: {total_postes}"
-                            p.font.size = Pt(24)
-                            p.font.bold = True
-                            p.font.color.rgb = RGBColor(156, 24, 47)
-                            p.alignment = PP_ALIGN.CENTER
+                        # Insérer l'image du Kanban si elle existe
+                        if kanban_image_path and os.path.exists(kanban_image_path):
+                            slide.shapes.add_picture(kanban_image_path, left, top, width=width, height=height)
+                        else:
+                            # Fallback: ajouter un message d'erreur
+                            txBox = slide.shapes.add_textbox(left, top, width, height)
+                            text_frame = txBox.text_frame
+                            p = text_frame.paragraphs[0]
+                            p.text = "Erreur: Impossible de générer l'image du Kanban"
+                            p.font.size = Pt(14)
                     except Exception as e:
-                        text_frame = getattr(shape, "text_frame", None)
-                        if text_frame:
-                            text_frame.clear()
-                            p = text_frame.paragraphs[0] if text_frame.paragraphs else text_frame.add_paragraph()
-                            p.text = f"Erreur: {str(e)}"
-                            st.error(f"Erreur lors de la génération de la métrique: {e}")
+                        st.error(f"Erreur lors de l'insertion du Kanban: {e}")
                 
                 # Graphiques Plotly - on peut ajouter d'autres placeholders ici
                 elif "{{GRAPH_" in shape_text:
@@ -2629,12 +3033,18 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                 sp = shape.element
                 sp.getparent().remove(sp)
         
-        # Sauvegarder le PowerPoint modifié dans un BytesIO
-        ppt_bytes = BytesIO()
-        prs.save(ppt_bytes)
-        ppt_bytes.seek(0)
+        # Nettoyer les fichiers temporaires
+        if table_image_path and os.path.exists(table_image_path):
+            try:
+                os.remove(table_image_path)
+            except:
+                pass
+        if kanban_image_path and os.path.exists(kanban_image_path):
+            try:
+                os.remove(kanban_image_path)
+            except:
+                pass
         
-        return ppt_bytes
         # Sauvegarder le PowerPoint modifié dans un BytesIO
         ppt_bytes = BytesIO()
         prs.save(ppt_bytes)
