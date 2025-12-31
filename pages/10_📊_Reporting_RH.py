@@ -2827,8 +2827,8 @@ def generate_table_html_image(weekly_metrics):
         </html>
         """
         
-        # Convertir en image avec html2image
-        image_path = hti.screenshot(html_str=html_table, save_as='table.png', size=(1200, 800))[0]
+        # Convertir en image avec html2image (haute résolution)
+        image_path = hti.screenshot(html_str=html_table, save_as='table.png', size=(1920, 1080))[0]
         
         return image_path
     except Exception as e:
@@ -2838,8 +2838,8 @@ def generate_table_html_image(weekly_metrics):
         return generate_table_image_simple(weekly_metrics)
 
 
-def generate_kanban_html_image():
-    """Génère une image du Kanban"""
+def generate_kanban_html_image(df_recrutement):
+    """Génère une image du Kanban avec les données réelles"""
     import tempfile
     
     try:
@@ -2854,13 +2854,28 @@ def generate_kanban_html_image():
         )
     except Exception as e:
         st.warning(f"⚠️ html2image non disponible ({e}), utilisation de PIL à la place")
-        # Fallback vers PIL - besoin du dataframe
-        # Pour le Kanban, on utilise des données hardcodées
-        return generate_kanban_image_simple(None)
+        return generate_kanban_image_simple(df_recrutement)
     
     try:
-        # HTML du Kanban (repris du code existant)
-        postes_data = [
+        # Charger les données réelles du dataframe
+        statuts = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+        postes_data = []
+        
+        for index, row in df_recrutement.iterrows():
+            if row.get('Statut de la demande') in statuts:
+                postes_data.append({
+                    "titre": str(row.get('Intitulé du poste', 'N/A')),
+                    "entite": str(row.get('Entité demandeuse', 'N/A')),
+                    "lieu": str(row.get('Ville', 'N/A')),
+                    "demandeur": str(row.get('Nom du Demandeur', 'N/A')),
+                    "recruteur": str(row.get('RH en charge du recrutement', 'N/A')),
+                    "statut": str(row.get('Statut de la demande', 'N/A')),
+                    "commentaire": str(row.get('Commentaire', '')) if pd.notna(row.get('Commentaire')) else None
+                })
+        
+        # Si pas de données, utiliser un exemple
+        if len(postes_data) == 0:
+            postes_data = [
             {"titre": "Ingénieur Achat", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.BOUZOUBAA", "recruteur": "Zakaria", "statut": "Sourcing"},
             {"titre": "Directeur Achats Adjoint", "entite": "TGCC", "lieu": "Siège", "demandeur": "C.BENABDELLAH", "recruteur": "Zakaria", "statut": "Sourcing"},
             {"titre": "INGENIEUR TRAVAUX", "entite": "TGCC", "lieu": "YAMED LOT B", "demandeur": "M.TAZI", "recruteur": "Zakaria", "statut": "Sourcing"},
@@ -2958,8 +2973,8 @@ def generate_kanban_html_image():
         </html>
         """
         
-        # Convertir en image avec html2image
-        image_path = hti.screenshot(html_str=html_kanban, save_as='kanban.png', size=(1400, 900))[0]
+        # Convertir en image avec html2image (haute résolution)
+        image_path = hti.screenshot(html_str=html_kanban, save_as='kanban.png', size=(1920, 1080))[0]
         
         return image_path
     except Exception as e:
@@ -2998,7 +3013,7 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
         # Générer les images HTML avec logos (utilise html2image + Chromium)
         st.info("📊 Génération des images avec les visualisations Streamlit...")
         table_image_path = generate_table_html_image(weekly_metrics) if weekly_metrics else None
-        kanban_image_path = generate_kanban_html_image()
+        kanban_image_path = generate_kanban_html_image(df_recrutement)
         
         # Debug: Vérifier les chemins des images
         if table_image_path and os.path.exists(table_image_path):
@@ -3047,10 +3062,18 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                         # Marquer le shape pour suppression
                         shapes_to_remove.append(shape)
                         
-                        # Insérer l'image du tableau si elle existe
+                        # Insérer l'image du tableau si elle existe (en grand format)
                         if table_image_path and os.path.exists(table_image_path):
-                            slide.shapes.add_picture(table_image_path, left, top, width=width, height=height)
-                            st.success(f"✅ Image tableau insérée dans slide {slide_idx + 1}")
+                            # Utiliser toute la largeur de la slide pour une meilleure visibilité
+                            slide_width = prs.slide_width
+                            slide_height = prs.slide_height
+                            # Positionner l'image en laissant des marges
+                            img_left = Inches(0.5)
+                            img_top = Inches(1.5)
+                            img_width = slide_width - Inches(1)  # Marges gauche/droite
+                            img_height = slide_height - Inches(2.5)  # Marges haut/bas
+                            slide.shapes.add_picture(table_image_path, img_left, img_top, width=img_width, height=img_height)
+                            st.success(f"✅ Image tableau insérée dans slide {slide_idx + 1} (dimensions optimisées)")
                         else:
                             st.error(f"❌ Image tableau non trouvée: {table_image_path}")
                             # Fallback: ajouter un message d'erreur
@@ -3079,10 +3102,18 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                         # Marquer le shape pour suppression
                         shapes_to_remove.append(shape)
                         
-                        # Insérer l'image du Kanban si elle existe
+                        # Insérer l'image du Kanban si elle existe (en grand format)
                         if kanban_image_path and os.path.exists(kanban_image_path):
-                            slide.shapes.add_picture(kanban_image_path, left, top, width=width, height=height)
-                            st.success(f"✅ Image Kanban insérée dans slide {slide_idx + 1}")
+                            # Utiliser toute la largeur de la slide pour une meilleure visibilité
+                            slide_width = prs.slide_width
+                            slide_height = prs.slide_height
+                            # Positionner l'image en laissant des marges
+                            img_left = Inches(0.5)
+                            img_top = Inches(1.5)
+                            img_width = slide_width - Inches(1)  # Marges gauche/droite
+                            img_height = slide_height - Inches(2.5)  # Marges haut/bas
+                            slide.shapes.add_picture(kanban_image_path, img_left, img_top, width=img_width, height=img_height)
+                            st.success(f"✅ Image Kanban insérée dans slide {slide_idx + 1} (dimensions optimisées)")
                         else:
                             st.error(f"❌ Image Kanban non trouvée: {kanban_image_path}")
                             # Fallback: ajouter un message d'erreur
