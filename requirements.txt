@@ -19,6 +19,7 @@ pillow
 PyMuPDF
 json5
 lxml
+html2image
 
 # Machine learning
 scikit-learn
