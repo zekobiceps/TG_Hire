@@ -3331,7 +3331,7 @@ def generate_kanban_html_image(df_recrutement):
         st.info(f"✅ Chromium trouvé: {chromium_path}")
     except Exception as e:
         st.warning(f"⚠️ html2image non disponible ({e}), utilisation de PIL à la place")
-        return generate_table_image_simple(weekly_metrics)
+        return generate_kanban_image_simple(df_recrutement)
     
     try:
         # Charger les données réelles du dataframe
@@ -3458,7 +3458,7 @@ def generate_kanban_html_image(df_recrutement):
         st.error(f"Erreur lors de la génération de l'image du Kanban avec html2image: {e}")
         st.info("Tentative avec PIL...")
         # Fallback vers PIL
-        return generate_kanban_image_simple(None)
+        return generate_kanban_image_simple(df_recrutement)
 
 
 def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2).pptx"):
