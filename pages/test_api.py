@@ -1633,7 +1633,7 @@ def create_weekly_report_tab(df_recrutement=None):
             margin: 0 auto;
         }
         .custom-table th {
-            background-color: #DC143C !important; /* Rouge vif */
+            background-color: #9C182F !important; /* Rouge vif */
             color: white !important;
             font-weight: bold !important;
             text-align: center !important;
@@ -1657,10 +1657,10 @@ def create_weekly_report_tab(df_recrutement=None):
             min-width: 120px;
         }
         .custom-table .total-row {
-            background-color: #DC143C !important; /* Rouge vif */
+            background-color: #9C182F !important; /* Rouge vif */
             color: white !important;
             font-weight: bold !important;
-            border-top: 2px solid #DC143C !important;
+            border-top: 2px solid #9C182F !important;
         }
         .custom-table .total-row .entity-cell {
             text-align: left !important;
@@ -1668,17 +1668,17 @@ def create_weekly_report_tab(df_recrutement=None):
             font-weight: bold !important;
         }
         .custom-table .total-row td {
-            background-color: #DC143C !important; /* Assurer le fond rouge sur chaque cellule */
+            background-color: #9C182F !important; /* Assurer le fond rouge sur chaque cellule */
             color: white !important; /* Assurer le texte blanc */
             font-size: 0.8em !important;
             font-weight: bold !important;
-            border: 1px solid #DC143C !important; /* Bordures rouges */
+            border: 1px solid #9C182F !important; /* Bordures rouges */
         }
         .custom-table .total-row .entity-cell {
             text-align: left !important;
             padding-left: 10px !important;
             font-weight: bold !important;
-            background-color: #DC143C !important; /* Fond rouge pour la cellule entité */
+            background-color: #9C182F !important; /* Fond rouge pour la cellule entité */
             color: white !important; /* Texte blanc pour la cellule entité */
         }
         </style>
@@ -2201,7 +2201,7 @@ def create_weekly_report_tab(df_recrutement=None):
         font-size: 1.3em !important;
         color: #FFFFFF !important;
         padding: 8px;
-        background-color: #DC143C !important;
+        background-color: #9C182F !important;
         border-radius: 6px;
         margin-bottom: 10px;
         margin-top: 20px;

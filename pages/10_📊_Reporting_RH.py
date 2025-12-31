@@ -1595,24 +1595,66 @@ def create_weekly_report_tab(df_recrutement=None):
         unsafe_allow_html=True
     )
     if metrics and len(metrics) > 0:
-        # Helper pour le logo TGCC
-        tgcc_logo_b64 = None
-        if os.path.exists("tgcc.png"):
-            with open("tgcc.png", "rb") as f:
-                tgcc_logo_b64 = base64.b64encode(f.read()).decode()
+        # Charger tous les logos disponibles dans le dossier LOGO
+        logos_b64 = {}
+        logo_dir = "/workspaces/TG_Hire/LOGO"
+        if os.path.exists(logo_dir):
+            for filename in os.listdir(logo_dir):
+                if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    path = os.path.join(logo_dir, filename)
+                    with open(path, "rb") as f:
+                        logos_b64[filename] = base64.b64encode(f.read()).decode()
         
+        # Mapping entité -> nom de fichier logo
+        entity_logo_map = {
+            'TGCC': 'TGCC.PNG',
+            'TGEM': 'TGEM.PNG',
+            'TG ALU': 'TG ALU.PNG',
+            'TG COVER': 'TG COVER.PNG',
+            'TG STEEL': 'TG STEEL.PNG',
+            'TG STONE': 'TG STONE.PNG',
+            'TG WOOD': 'TG WOOD.PNG',
+            'TGCC IMMOBILIER': 'tgcc-immobilier.png',
+            'TGCC-IMMOBILIER': 'tgcc-immobilier.png'
+        }
+
         def get_entity_display(name):
-            name_str = str(name)
-            # Si c'est une entité TGCC et qu'on a le logo, on affiche le logo + le nom spécifique (ex: SIEGE)
-            # Ou juste le logo si c'est "TGCC" tout court
-            if "tgcc" in name_str.lower() and tgcc_logo_b64:
-                # On essaie d'extraire la partie spécifique après "TGCC -"
-                parts = re.split(r'tgcc\s*-\s*', name_str, flags=re.IGNORECASE)
-                suffix = parts[1] if len(parts) > 1 else ""
-                logo_html = f'<img src="data:image/png;base64,{tgcc_logo_b64}" height="30" style="vertical-align: middle; margin-right: 5px;">'
-                if suffix:
-                    return f'{logo_html} <span style="vertical-align: middle;">{suffix}</span>'
-                return logo_html
+            name_str = str(name).strip()
+            name_upper = name_str.upper()
+            
+            # Trouver le logo correspondant
+            logo_file = None
+            
+            # 1. Correspondance exacte ou via mapping
+            if name_upper in entity_logo_map:
+                logo_file = entity_logo_map[name_upper]
+            else:
+                # 2. Recherche de sous-chaîne (ex: "TG ALU - ATELIER" contient "TG ALU")
+                # On trie par longueur décroissante pour matcher le plus long d'abord
+                for key in sorted(entity_logo_map.keys(), key=len, reverse=True):
+                    if key in name_upper:
+                        logo_file = entity_logo_map[key]
+                        break
+            
+            if logo_file and logo_file in logos_b64:
+                logo_b64 = logos_b64[logo_file]
+                # Image un peu plus grande pour lisibilité
+                img_tag = f'<img src="data:image/png;base64,{logo_b64}" height="35" style="vertical-align: middle;">'
+                
+                # Gestion spécifique pour TGCC avec suffixe (ex: TGCC - SIEGE)
+                matched_key = next((k for k in sorted(entity_logo_map.keys(), key=len, reverse=True) if k in name_upper), None)
+                
+                if matched_key:
+                    # Regex pour trouver le suffixe après la clé (ex: " - SIEGE")
+                    pattern = re.escape(matched_key) + r'\s*-\s*(.*)'
+                    match = re.search(pattern, name_str, flags=re.IGNORECASE)
+                    if match:
+                        suffix = match.group(1)
+                        if suffix:
+                            return f'{img_tag} <span style="vertical-align: middle; margin-left: 5px; font-weight: bold;">{suffix}</span>'
+                
+                return img_tag
+            
             return name_str
 
         # Préparer les données pour le HTML
@@ -1655,7 +1697,7 @@ def create_weekly_report_tab(df_recrutement=None):
             margin: 0 auto;
         }
         .custom-table th {
-            background-color: #DC143C !important; /* Rouge vif */
+            background-color: #9C182F !important; /* Rouge vif */
             color: white !important;
             font-weight: bold !important;
             text-align: center !important;
@@ -1679,10 +1721,10 @@ def create_weekly_report_tab(df_recrutement=None):
             min-width: 150px;
         }
         .custom-table .total-row {
-            background-color: #DC143C !important; /* Rouge vif */
+            background-color: #9C182F !important; /* Rouge vif */
             color: white !important;
             font-weight: bold !important;
-            border-top: 2px solid #DC143C !important;
+            border-top: 2px solid #9C182F !important;
         }
         .custom-table .total-row .entity-cell {
             text-align: left !important;
@@ -1690,17 +1732,17 @@ def create_weekly_report_tab(df_recrutement=None):
             font-weight: bold !important;
         }
         .custom-table .total-row td {
-            background-color: #DC143C !important; /* Assurer le fond rouge sur chaque cellule */
+            background-color: #9C182F !important; /* Assurer le fond rouge sur chaque cellule */
             color: white !important; /* Assurer le texte blanc */
             font-size: 0.8em !important;
             font-weight: bold !important;
-            border: 1px solid #DC143C !important; /* Bordures rouges */
+            border: 1px solid #9C182F !important; /* Bordures rouges */
         }
         .custom-table .total-row .entity-cell {
             text-align: left !important;
             padding-left: 10px !important;
             font-weight: bold !important;
-            background-color: #DC143C !important; /* Fond rouge pour la cellule entité */
+            background-color: #9C182F !important; /* Fond rouge pour la cellule entité */
             color: white !important; /* Texte blanc pour la cellule entité */
         }
         </style>
@@ -2223,7 +2265,7 @@ def create_weekly_report_tab(df_recrutement=None):
         font-size: 1.3em !important;
         color: #FFFFFF !important;
         padding: 8px;
-        background-color: #DC143C !important;
+        background-color: #9C182F !important;
         border-radius: 6px;
         margin-bottom: 10px;
         margin-top: 20px;
