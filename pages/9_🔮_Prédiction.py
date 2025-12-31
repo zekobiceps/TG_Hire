@@ -908,6 +908,7 @@ with tab3:
         
         # Préparer les données pour l'analyse temporelle
         time_analysis = time_series.copy()
+        time_analysis['date'] = pd.to_datetime(time_analysis['date'])
         time_analysis['year'] = time_analysis['date'].dt.year
         time_analysis['month'] = time_analysis['date'].dt.month
         time_analysis['quarter'] = time_analysis['date'].dt.quarter

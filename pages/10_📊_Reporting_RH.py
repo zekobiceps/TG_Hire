@@ -2554,7 +2554,28 @@ def generate_table_image_simple(weekly_metrics):
         
         # Données
         y_offset = row_height
-        for entite, data in sorted(metrics_included.items()):
+        
+        # Custom sort and filter
+        sorted_items = []
+        for entite, data in metrics_included.items():
+            # Filter out empty TG WOOD (duplicate) or any empty entity
+            # User specifically mentioned duplicate TG WOOD being empty
+            if 'TG WOOD' in str(entite).upper() and data['avant'] == 0 and data['nouveaux'] == 0 and data['pourvus'] == 0 and data['en_cours'] == 0:
+                continue
+            sorted_items.append((entite, data))
+            
+        # Sort: TGCC first, then others
+        def sort_key(item):
+            name = str(item[0]).upper().strip()
+            if name == 'TGCC':
+                return '000_TGCC' # Force first
+            if 'TGCC' in name and 'IMMOBILIER' not in name:
+                 return '001_TGCC_OTHER'
+            return name
+            
+        sorted_items.sort(key=sort_key)
+
+        for entite, data in sorted_items:
             # Lignes alternées
             if ((y_offset - row_height) // row_height) % 2 == 0:
                 draw.rectangle([0, y_offset, width, y_offset + row_height], fill='#f9f9f9')
@@ -3216,17 +3237,38 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
             draw.rectangle([x, y_offset, x + card_width, y_offset + card_height], 
                           fill='#f0f2f6', outline='#ddd', width=2)
             
-            # Contenu - utiliser noms colonnes originaux
-            titre = str(row.get('Poste demandé ', 'N/A'))[:50]
+            # Contenu - utiliser noms colonnes originaux (avec gestion des espaces potentiels)
+            # Titre
+            titre_col = 'Poste demandé' if 'Poste demandé' in row else 'Poste demandé '
+            titre = str(row.get(titre_col, 'N/A')).strip()[:50]
             draw.text((x + 10, y_offset + 10), titre, fill='#9C182F', font=font_card_title)
             
-            entite = f"📍 {row.get('Entité demandeuse', 'N/A')} - {row.get('Affectation', 'N/A')}"
-            draw.text((x + 10, y_offset + 40), entite[:50], fill='#555', font=font_card)
+            # Entité
+            entite_val = str(row.get('Entité demandeuse', 'N/A')).strip()
+            affectation_val = str(row.get('Affectation', row.get('Direction concernée', ''))).strip()
+            entite_txt = f"📍 {entite_val}"
+            if affectation_val:
+                entite_txt += f" - {affectation_val}"
+            draw.text((x + 10, y_offset + 40), entite_txt[:50], fill='#555', font=font_card)
             
-            demandeur = f"👤 {row.get('Nom Prénom du demandeur', 'N/A')}"
+            # Demandeur
+            demandeur_col = 'Nom Prénom du demandeur'
+            if demandeur_col not in row:
+                # Chercher une colonne ressemblante
+                demandeur_col = next((c for c in row.index if 'demandeur' in c.lower() and 'nom' in c.lower()), 'Demandeur')
+            
+            demandeur_val = str(row.get(demandeur_col, 'N/A')).strip()
+            demandeur = f"👤 {demandeur_val}"
             draw.text((x + 10, y_offset + 65), demandeur[:50], fill='#555', font=font_card)
             
-            recruteur = f"✍️ {row.get('Responsable de traitement de  la demande ', 'N/A')}"
+            # Recruteur
+            recruteur_col = 'Responsable de traitement de la demande'
+            if recruteur_col not in row:
+                # Chercher avec double espace ou autre
+                recruteur_col = next((c for c in row.index if 'responsable' in c.lower() and 'traitement' in c.lower()), 'RH')
+                
+            recruteur_val = str(row.get(recruteur_col, 'N/A')).strip()
+            recruteur = f"✍️ {recruteur_val}"
             draw.text((x + 10, y_offset + 90), recruteur[:50], fill='#555', font=font_card)
             
             col += 1
