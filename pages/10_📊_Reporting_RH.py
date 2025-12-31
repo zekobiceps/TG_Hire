@@ -2424,6 +2424,7 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
         from pptx.util import Inches, Pt
         from pptx.enum.text import PP_ALIGN
         from pptx.dml.color import RGBColor
+        from pptx.shapes.base import BaseShape
         
         # Charger le template
         prs = Presentation(template_path)
@@ -2432,76 +2433,80 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
         # Calculer les métriques hebdomadaires
         weekly_metrics = calculate_weekly_metrics(df_recrutement)
         
+        if not weekly_metrics or 'table_data' not in weekly_metrics:
+            st.warning("⚠️ Aucune donnée hebdomadaire disponible pour générer le PowerPoint.")
+            return None
+        
         # Parcourir chaque slide et remplacer les placeholders
         for slide_idx, slide in enumerate(prs.slides):
             shapes_to_remove = []
-            table_added = False
             
             for shape in slide.shapes:
-                # Vérifier si le shape a un attribut text
-                if not hasattr(shape, "text"):
+                # Utiliser getattr pour éviter les erreurs Pylance
+                shape_text = getattr(shape, "text", None)
+                if shape_text is None:
                     continue
                     
                 # Tableau des besoins par entité
-                if "{{TABLEAU_BESOINS_ENTITES}}" in shape.text:
+                if "{{TABLEAU_BESOINS_ENTITES}}" in shape_text:
                     try:
-                        if weekly_metrics and 'table_data' in weekly_metrics:
-                            # Récupérer la position et taille du shape original
-                            left = shape.left
-                            top = shape.top
-                            width = shape.width
-                            height = shape.height
+                        # Récupérer la position et taille du shape original
+                        left = shape.left
+                        top = shape.top
+                        width = shape.width
+                        height = shape.height
+                        
+                        # Marquer le shape pour suppression
+                        shapes_to_remove.append(shape)
+                        
+                        # Créer le tableau PowerPoint
+                        table_data = weekly_metrics['table_data']
+                        rows = len(table_data) + 1  # +1 pour l'en-tête
+                        cols = 5  # Entité, Postes ouverts, Nouveaux postes, Postes pourvus, Postes en cours
+                        
+                        # Ajouter le tableau
+                        table_shape = slide.shapes.add_table(rows, cols, left, top, width, height)
+                        table = table_shape.table
+                        
+                        # En-têtes
+                        headers = ["Entité", "Postes ouverts", "Nouveaux postes", "Postes pourvus", "Postes en cours"]
+                        for col_idx, header in enumerate(headers):
+                            cell = table.rows[0].cells[col_idx]
+                            cell.text = header
+                            # Style de l'en-tête
+                            cell.fill.solid()
+                            cell.fill.fore_color.rgb = RGBColor(156, 24, 47)  # #9C182F
+                            paragraph = cell.text_frame.paragraphs[0]
+                            paragraph.font.bold = True
+                            paragraph.font.size = Pt(11)
+                            paragraph.font.color.rgb = RGBColor(255, 255, 255)
+                            paragraph.alignment = PP_ALIGN.CENTER
+                        
+                        # Données (sans la ligne TOTAL)
+                        data_rows = table_data[:-1] if len(table_data) > 0 else []
+                        for row_idx, row_data in enumerate(data_rows, start=1):
+                            table.rows[row_idx].cells[0].text = str(row_data.get('Entité', ''))
+                            table.rows[row_idx].cells[1].text = str(row_data.get('Nb postes ouverts avant début semaine', '0'))
+                            table.rows[row_idx].cells[2].text = str(row_data.get('Nb nouveaux postes ouverts cette semaine', '0'))
+                            table.rows[row_idx].cells[3].text = str(row_data.get('Nb postes pourvus cette semaine', '0'))
+                            table.rows[row_idx].cells[4].text = str(row_data.get('Nb postes en cours cette semaine (sourcing)', '0'))
                             
-                            # Marquer le shape pour suppression
-                            shapes_to_remove.append(shape)
-                            
-                            # Créer le tableau PowerPoint
-                            table_data = weekly_metrics['table_data']
-                            rows = len(table_data) + 1  # +1 pour l'en-tête
-                            cols = 5  # Entité, Postes ouverts, Nouveaux postes, Postes pourvus, Postes en cours
-                            
-                            # Ajouter le tableau
-                            table_shape = slide.shapes.add_table(rows, cols, left, top, width, height)
-                            table = table_shape.table
-                            
-                            # En-têtes
-                            headers = ["Entité", "Postes ouverts", "Nouveaux postes", "Postes pourvus", "Postes en cours"]
-                            for col_idx, header in enumerate(headers):
-                                cell = table.rows[0].cells[col_idx]
-                                cell.text = header
-                                # Style de l'en-tête
-                                cell.fill.solid()
-                                cell.fill.fore_color.rgb = RGBColor(156, 24, 47)  # #9C182F
+                            # Centrer le texte
+                            for col_idx in range(cols):
+                                cell = table.rows[row_idx].cells[col_idx]
                                 paragraph = cell.text_frame.paragraphs[0]
-                                paragraph.font.bold = True
-                                paragraph.font.size = Pt(11)
-                                paragraph.font.color.rgb = RGBColor(255, 255, 255)
                                 paragraph.alignment = PP_ALIGN.CENTER
-                            
-                            # Données (sans la ligne TOTAL)
-                            data_rows = table_data[:-1]
-                            for row_idx, row_data in enumerate(data_rows, start=1):
-                                table.rows[row_idx].cells[0].text = str(row_data.get('Entité', ''))
-                                table.rows[row_idx].cells[1].text = str(row_data.get('Nb postes ouverts avant début semaine', ''))
-                                table.rows[row_idx].cells[2].text = str(row_data.get('Nb nouveaux postes ouverts cette semaine', ''))
-                                table.rows[row_idx].cells[3].text = str(row_data.get('Nb postes pourvus cette semaine', ''))
-                                table.rows[row_idx].cells[4].text = str(row_data.get('Nb postes en cours cette semaine (sourcing)', ''))
-                                
-                                # Centrer le texte
-                                for col_idx in range(cols):
-                                    cell = table.rows[row_idx].cells[col_idx]
-                                    paragraph = cell.text_frame.paragraphs[0]
-                                    paragraph.alignment = PP_ALIGN.CENTER
-                                    paragraph.font.size = Pt(10)
-                            
-                            # Ligne TOTAL (dernière ligne)
+                                paragraph.font.size = Pt(10)
+                        
+                        # Ligne TOTAL (dernière ligne)
+                        if len(table_data) > 0:
                             total_row = table_data[-1]
                             last_row_idx = rows - 1
                             table.rows[last_row_idx].cells[0].text = "TOTAL"
-                            table.rows[last_row_idx].cells[1].text = str(total_row.get('Nb postes ouverts avant début semaine', '')).replace('**', '')
-                            table.rows[last_row_idx].cells[2].text = str(total_row.get('Nb nouveaux postes ouverts cette semaine', '')).replace('**', '')
-                            table.rows[last_row_idx].cells[3].text = str(total_row.get('Nb postes pourvus cette semaine', '')).replace('**', '')
-                            table.rows[last_row_idx].cells[4].text = str(total_row.get('Nb postes en cours cette semaine (sourcing)', '')).replace('**', '')
+                            table.rows[last_row_idx].cells[1].text = str(total_row.get('Nb postes ouverts avant début semaine', '0')).replace('**', '')
+                            table.rows[last_row_idx].cells[2].text = str(total_row.get('Nb nouveaux postes ouverts cette semaine', '0')).replace('**', '')
+                            table.rows[last_row_idx].cells[3].text = str(total_row.get('Nb postes pourvus cette semaine', '0')).replace('**', '')
+                            table.rows[last_row_idx].cells[4].text = str(total_row.get('Nb postes en cours cette semaine (sourcing)', '0')).replace('**', '')
                             
                             # Style de la ligne TOTAL
                             for col_idx in range(cols):
@@ -2513,43 +2518,47 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                                 paragraph.font.size = Pt(11)
                                 paragraph.font.color.rgb = RGBColor(255, 255, 255)
                                 paragraph.alignment = PP_ALIGN.CENTER
-                            
-                            table_added = True
+                        
                     except Exception as e:
-                        if hasattr(shape, "text_frame") and shape.text_frame:
-                            shape.text_frame.clear()
-                            p = shape.text_frame.paragraphs[0]
+                        # En cas d'erreur, ajouter un message d'erreur dans une zone de texte
+                        text_frame = getattr(shape, "text_frame", None)
+                        if text_frame:
+                            text_frame.clear()
+                            p = text_frame.paragraphs[0] if text_frame.paragraphs else text_frame.add_paragraph()
                             p.text = f"Erreur génération tableau: {str(e)}"
+                            st.error(f"Erreur lors de la génération du tableau: {e}")
                 
                 # Métrique total postes
-                elif "{{METRIC_TOTAL_POSTES}}" in shape.text:
+                elif "{{METRIC_TOTAL_POSTES}}" in shape_text:
                     try:
-                        if weekly_metrics and 'table_data' in weekly_metrics:
-                            total_row = weekly_metrics['table_data'][-1]
-                            total_postes = str(total_row.get('Nb postes en cours cette semaine (sourcing)', 'N/A')).replace('**', '')
-                            
-                            # Remplacer le texte du placeholder
-                            if hasattr(shape, "text_frame") and shape.text_frame:
-                                text_frame = shape.text_frame
-                                text_frame.clear()
-                                p = text_frame.paragraphs[0]
-                                p.text = f"Total Postes en Cours: {total_postes}"
-                                p.font.size = Pt(24)
-                                p.font.bold = True
-                                p.font.color.rgb = RGBColor(156, 24, 47)
-                                p.alignment = PP_ALIGN.CENTER
+                        total_row = weekly_metrics['table_data'][-1]
+                        total_postes = str(total_row.get('Nb postes en cours cette semaine (sourcing)', 'N/A')).replace('**', '')
+                        
+                        # Remplacer le texte du placeholder
+                        text_frame = getattr(shape, "text_frame", None)
+                        if text_frame:
+                            text_frame.clear()
+                            p = text_frame.paragraphs[0] if text_frame.paragraphs else text_frame.add_paragraph()
+                            p.text = f"Total Postes en Cours: {total_postes}"
+                            p.font.size = Pt(24)
+                            p.font.bold = True
+                            p.font.color.rgb = RGBColor(156, 24, 47)
+                            p.alignment = PP_ALIGN.CENTER
                     except Exception as e:
-                        if hasattr(shape, "text_frame") and shape.text_frame:
-                            shape.text_frame.clear()
-                            p = shape.text_frame.paragraphs[0]
+                        text_frame = getattr(shape, "text_frame", None)
+                        if text_frame:
+                            text_frame.clear()
+                            p = text_frame.paragraphs[0] if text_frame.paragraphs else text_frame.add_paragraph()
                             p.text = f"Erreur: {str(e)}"
+                            st.error(f"Erreur lors de la génération de la métrique: {e}")
                 
                 # Graphiques Plotly - on peut ajouter d'autres placeholders ici
-                elif "{{GRAPH_" in shape.text:
-                    placeholder = shape.text.strip()
-                    if hasattr(shape, "text_frame") and shape.text_frame:
-                        shape.text_frame.clear()
-                        p = shape.text_frame.paragraphs[0]
+                elif "{{GRAPH_" in shape_text:
+                    placeholder = shape_text.strip()
+                    text_frame = getattr(shape, "text_frame", None)
+                    if text_frame:
+                        text_frame.clear()
+                        p = text_frame.paragraphs[0] if text_frame.paragraphs else text_frame.add_paragraph()
                         p.text = f"Graphique {placeholder} (à venir)"
                         p.font.size = Pt(12)
             
@@ -2558,6 +2567,12 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                 sp = shape.element
                 sp.getparent().remove(sp)
         
+        # Sauvegarder le PowerPoint modifié dans un BytesIO
+        ppt_bytes = BytesIO()
+        prs.save(ppt_bytes)
+        ppt_bytes.seek(0)
+        
+        return ppt_bytes
         # Sauvegarder le PowerPoint modifié dans un BytesIO
         ppt_bytes = BytesIO()
         prs.save(ppt_bytes)
