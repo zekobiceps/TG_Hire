@@ -32,6 +32,49 @@ def _format_long_title(title: str, max_line_length: int = 20) -> str:
         return s
     chunks = [s[i:i+max_line_length] for i in range(0, len(s), max_line_length)]
     return " ".join(chunks)
+def smart_wrap_title(title, max_line_length=25):
+    """Retourne un titre avec des balises <br> aux bons endroits.
+    - Coupe aux espaces si possible pour respecter max_line_length
+    - Gère les titres sans espaces (souvent en MAJUSCULES) via regex
+    - Dernier recours: coupe tous les max_line_length caractères
+    """
+    if not isinstance(title, str):
+        return title
+
+    s = title.strip()
+    if len(s) <= max_line_length:
+        return s
+
+    # Si le titre contient des espaces, essayer de couper aux espaces
+    if " " in s:
+        words = s.split()
+        lines = []
+        current = ""
+        for w in words:
+            sep = (1 if current else 0)
+            if len(current) + sep + len(w) <= max_line_length:
+                current = (current + (" " if current else "") + w)
+            else:
+                if current:
+                    lines.append(current)
+                current = w
+        if current:
+            lines.append(current)
+        return "<br>".join(lines)
+
+    # Pour les titres sans espaces (majuscules, acronymes, chiffres)
+    try:
+        parts = re.findall(r"[A-Z][a-z]+|[A-Z]{2,}|[a-z]+|\d+", s)
+    except Exception:
+        parts = []
+
+    if len(parts) > 1:
+        spaced = " ".join(parts)
+        return smart_wrap_title(spaced, max_line_length)
+
+    # Dernier recours: couper tous les max_line_length caractères
+    chunks = [s[i:i+max_line_length] for i in range(0, len(s), max_line_length)]
+    return "<br>".join(chunks)
 from pptx.util import Inches, Pt
 from PIL import Image
 import io
@@ -2465,7 +2508,7 @@ def create_weekly_report_tab(df_recrutement=None):
         for poste in postes_in_col:
             commentaire = poste.get('commentaire', '')
             commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
-            titre_fmt = _format_long_title(poste.get('titre', ''))
+            titre_fmt = smart_wrap_title(poste.get('titre', ''))
             
             # Construction sans indentation pour éviter l'interprétation Markdown (blocs de code)
             card_div = f"""<div class="kanban-card">
@@ -2748,24 +2791,28 @@ def generate_kanban_image_simple(df_recrutement):
                 draw.rectangle([x_offset + 5, y_offset, x_offset + col_width - 15, y_offset + 90], 
                               fill='#f9f9f9', outline='#ddd', width=2)
                 
-                # Titre du poste
-                titre = str(row.get('Intitulé du poste', 'N/A'))[:30]
-                draw.text((x_offset + 10, y_offset + 10), titre, fill='#9C182F', font=font_card_title)
+                # Titre du poste (wrap jusqu'à 3 lignes)
+                titre_raw = str(row.get('Intitulé du poste', 'N/A')).strip()
+                titre_formatted = smart_wrap_title(titre_raw, max_line_length=25)
+                title_lines = [seg for seg in titre_formatted.replace('<br>', '\n').split('\n') if seg][:3]
+                for i, line in enumerate(title_lines):
+                    draw.text((x_offset + 10, y_offset + 10 + (i * 16)), line, fill='#9C182F', font=font_card_title)
+                title_block_height = 10 + (len(title_lines) * 16)
                 
                 # Entité et lieu
-                entite = str(row.get('Entité demandeuse', ''))[:15]
-                lieu = str(row.get('Ville', ''))[:15]
-                draw.text((x_offset + 10, y_offset + 30), f"{entite} - {lieu}", fill='black', font=font_card)
+                entite = str(row.get('Entité demandeuse', '')).strip()
+                lieu = str(row.get('Ville', '')).strip()
+                draw.text((x_offset + 10, y_offset + title_block_height + 18), f"{entite[:40]} - {lieu[:40]}", fill='black', font=font_card)
                 
                 # Demandeur
-                demandeur = str(row.get('Nom du Demandeur', ''))[:20]
-                draw.text((x_offset + 10, y_offset + 50), f"👤 {demandeur}", fill='black', font=font_card)
+                demandeur = str(row.get('Nom du Demandeur', '')).strip()[:50]
+                draw.text((x_offset + 10, y_offset + title_block_height + 36), f"👤 {demandeur}", fill='black', font=font_card)
                 
                 # Recruteur
-                recruteur = str(row.get('RH en charge du recrutement', ''))[:20]
-                draw.text((x_offset + 10, y_offset + 70), f"✍️ {recruteur}", fill='black', font=font_card)
+                recruteur = str(row.get('RH en charge du recrutement', '')).strip()[:50]
+                draw.text((x_offset + 10, y_offset + title_block_height + 54), f"✍️ {recruteur}", fill='black', font=font_card)
                 
-                y_offset += 100
+                y_offset += max(100, title_block_height + 70)
             
             x_offset += col_width
         
@@ -3176,23 +3223,15 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
                 .kanban-card h4 {{
                     margin: 0 0 6px 0;
                     color: #9C182F;
-                    white-space: normal;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
-                    word-break: break-all;
-                    hyphens: auto;
-                    display: -webkit-box;
-                    -webkit-line-clamp: 3;
-                    -webkit-box-orient: vertical;
-                    overflow: hidden;
                     font-size: 0.95em;
                     line-height: 1.3;
                     font-weight: bold;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
-                    word-break: break-all;
-                    hyphens: auto;
+                    /* Forcer les coupures de mots */
                     white-space: normal !important;
+                    word-break: break-all !important;
+                    overflow-wrap: anywhere !important;
+                    hyphens: auto !important;
+                    /* Limiter à 3 lignes maximum */
                     display: -webkit-box;
                     -webkit-line-clamp: 3;
                     -webkit-box-orient: vertical;
@@ -3217,7 +3256,7 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
         """
         
         for poste in postes_data:
-                titre_fmt = _format_long_title(poste.get('titre', ''))
+                titre_fmt = smart_wrap_title(poste.get('titre', ''))
                 commentaire_html = f"<p style='color:#666;font-style:italic;'>[!] {poste['commentaire']}</p>" if poste.get('commentaire') and str(poste.get('commentaire')).strip() not in ['nan', 'None', ''] else ""
                 html_content += f"""
                 <div class="kanban-card">
@@ -3302,7 +3341,6 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
         y_offset = 120
         col = 0
         
-        import textwrap
         for idx, row in df_statut.iterrows():
             if y_offset > height - 200:
                 break
@@ -3317,10 +3355,9 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
             # Titre
             titre_col = 'Poste demandé' if 'Poste demandé' in row else 'Poste demandé '
             titre = str(row.get(titre_col, 'N/A')).strip()
-            # Wrap title into up to 2 lines to prevent overflow
-            max_chars_per_line = 30
-            wrapped_lines = textwrap.wrap(titre, width=max_chars_per_line) or ['N/A']
-            wrapped_lines = wrapped_lines[:3]
+            # Wrap title robustly (use <br> segments then draw lines)
+            formatted = smart_wrap_title(titre, max_line_length=25)
+            wrapped_lines = [seg for seg in formatted.replace('<br>', '\n').split('\n') if seg][:3]
             for i, line in enumerate(wrapped_lines):
                 draw.text((x + 10, y_offset + 10 + (i * 20)), line, fill='#9C182F', font=font_card_title)
             title_block_height = 10 + (len(wrapped_lines) * 20)
@@ -3469,10 +3506,10 @@ def generate_kanban_html_image(df_recrutement):
                 .kanban-card h4 {
                     margin: 0 0 8px 0;
                     color: #9C182F;
-                    white-space: normal;
-                    word-wrap: break-word;
-                    overflow-wrap: break-word;
-                    hyphens: auto;
+                    white-space: normal !important;
+                    word-break: break-all !important;
+                    overflow-wrap: anywhere !important;
+                    hyphens: auto !important;
                     display: -webkit-box;
                     -webkit-line-clamp: 3;
                     -webkit-box-orient: vertical;
@@ -3494,7 +3531,7 @@ def generate_kanban_html_image(df_recrutement):
             html_kanban += f'<div class="kanban-header">{statut} ({len(postes_in_col)})</div>'
             
             for poste in postes_in_col:
-                titre_fmt = _format_long_title(poste.get('titre', ''))
+                titre_fmt = smart_wrap_title(poste.get('titre', ''))
                 commentaire_html = f"<p>💬 {poste['commentaire']}</p>" if poste.get('commentaire') else ""
                 html_kanban += f'''
                 <div class="kanban-card">
