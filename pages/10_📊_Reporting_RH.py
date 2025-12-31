@@ -2564,8 +2564,13 @@ def generate_table_image_simple(weekly_metrics):
         for entite, data in metrics_included.items():
             # Filter out empty TG WOOD (duplicate) or any empty entity
             # User specifically mentioned duplicate TG WOOD being empty
-            if 'TG WOOD' in str(entite).upper() and data['avant'] == 0 and data['nouveaux'] == 0 and data['pourvus'] == 0 and data['en_cours'] == 0:
+            entite_str = str(entite).upper().strip()
+            if 'TG WOOD' in entite_str and data['avant'] == 0 and data['nouveaux'] == 0 and data['pourvus'] == 0 and data['en_cours'] == 0:
                 continue
+            # Also filter out literal "NAN" or "NONE" strings if they appear as entities
+            if entite_str in ['NAN', 'NONE', '']:
+                continue
+                
             sorted_items.append((entite, data))
             
         # Sort: TGCC first, then others
