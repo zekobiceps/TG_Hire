@@ -3584,125 +3584,190 @@ def _html_kpi_card(title, value, color="#1f77b4"):
         </div>
         """
 
-def generate_demandes_recrutement_html_image(df_recrutement):
-        """Image HTML résumant l'onglet DEMANDES DE RECRUTEMENT (KPIs + listes)."""
+# --- Plotly image helpers for PPT composition ---
+def _plotly_fig_to_pil(fig, width=900, height=520):
+        """Render a Plotly figure to a PIL Image using kaleido. Falls back to PNG bytes in memory."""
+        try:
+            import plotly.io as pio
+            import io
+            img_bytes = pio.to_image(fig, format="png", width=width, height=height, engine="kaleido")
+            from PIL import Image
+            return Image.open(io.BytesIO(img_bytes)).convert('RGB')
+        except Exception as e:
+            st.warning(f"⚠️ Impossible d'exporter le graphique (kaleido manquant ?): {e}")
+            return None
+
+def _compose_dashboard_image(title_text, kpi_items, chart_rows, output_filename):
+        """Compose a 1920x1080 dashboard image with a title, KPI row and chart rows.
+        - title_text: string
+        - kpi_items: list of tuples (label, value, color)
+        - chart_rows: list of lists of PIL.Image objects (each inner list is a row)
+        - output_filename: name to save in temp dir
+        Returns absolute path to saved PNG.
+        """
         import tempfile
-        # KPIs
+        from PIL import Image, ImageDraw, ImageFont
+
+        W, H = 1920, 1080
+        M = 36  # outer margin
+        img = Image.new('RGB', (W, H), 'white')
+        draw = ImageDraw.Draw(img)
+        try:
+            font_title = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 42)
+            font_kpi_label = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 22)
+            font_kpi_value = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 30)
+        except Exception:
+            font_title = ImageFont.load_default()
+            font_kpi_label = ImageFont.load_default()
+            font_kpi_value = ImageFont.load_default()
+
+        # Title
+        draw.text((M, M), title_text, fill="#9C182F", font=font_title)
+
+        # KPI row layout
+        kpi_top = M + 70
+        kpi_height = 100
+        kpi_gap = 16
+        kpi_cols = max(1, len(kpi_items))
+        kpi_col_width = int((W - 2*M - (kpi_gap * (kpi_cols - 1))) / kpi_cols)
+        for i, (lab, val, col) in enumerate(kpi_items):
+            x = M + i * (kpi_col_width + kpi_gap)
+            y = kpi_top
+            # card background
+            draw.rounded_rectangle([x, y, x + kpi_col_width, y + kpi_height], radius=12, fill="#f8f9fa", outline="#e1e5ea")
+            draw.line([(x+6, y), (x+6, y + kpi_height)], fill=col, width=6)
+            draw.text((x + 16, y + 16), lab, fill="#334", font=font_kpi_label)
+            draw.text((x + 16, y + 52), str(val), fill=col, font=font_kpi_value)
+
+        # Charts layout
+        current_y = kpi_top + kpi_height + 24
+        row_gap = 24
+        for row in chart_rows:
+            if not row:
+                continue
+            # Determine widths per chart in row
+            charts = [c for c in row if c is not None]
+            if not charts:
+                continue
+            cols = len(charts)
+            # leave margins left/right
+            avail_w = W - 2*M
+            gap = 16
+            col_w = int((avail_w - gap * (cols - 1)) / cols)
+            # uniform height per row
+            row_h = 360
+            x = M
+            for cimg in charts:
+                try:
+                    # resize maintaining aspect
+                    ci = cimg.copy()
+                    ci.thumbnail((col_w, row_h))
+                    img.paste(ci, (x, current_y))
+                except Exception:
+                    pass
+                x += col_w + gap
+            current_y += row_h + row_gap
+
+        out_path = os.path.join(tempfile.gettempdir(), output_filename)
+        img.save(out_path)
+        return out_path
+
+def generate_demandes_recrutement_html_image(df_recrutement):
+        """Compose an image with the same charts as the Streamlit 'Demandes' tab."""
         df = df_recrutement.copy()
+        # KPIs
         total = len(df)
-        # Date colonne
         date_col = next((c for c in df.columns if "réception" in c.lower() and "date" in c.lower()), None)
         nouvelles = 0
         if date_col is not None:
-                now = datetime.now()
-                start_of_month = now.replace(day=1)
-                try:
-                        s = pd.to_datetime(df[date_col], errors='coerce')
-                        nouvelles = int((s >= start_of_month).sum())
-                except Exception:
-                        nouvelles = 0
-        # Annulées/Dépriorisées
+            now = datetime.now(); start_of_month = now.replace(day=1)
+            try:
+                s = pd.to_datetime(df[date_col], errors='coerce')
+                nouvelles = int((s >= start_of_month).sum())
+            except Exception:
+                nouvelles = 0
         annulees = 0
         if 'Statut de la demande' in df.columns:
-                annulees = int(df['Statut de la demande'].astype(str).str.contains('annul|déprioris', case=False, na=False).sum())
+            annulees = int(df['Statut de la demande'].astype(str).str.contains('annul|déprioris', case=False, na=False).sum())
         taux_annulation = f"{round((annulees/total)*100,1)}%" if total > 0 else "N/A"
 
-        # Top directions
-        dir_counts = df['Direction concernée'].value_counts() if 'Direction concernée' in df.columns else pd.Series(dtype=int)
-        dir_top = dir_counts.head(8)
-        # Top postes
-        poste_counts = df['Poste demandé'].value_counts() if 'Poste demandé' in df.columns else pd.Series(dtype=int)
-        poste_top = poste_counts.head(8)
-
-        # Compose HTML
-        kpi_html = """
-        <style>
-        .kpi-grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0;}}
-        .kpi-card{{background:#f8f9fa;border-radius:8px;padding:12px;border-left:4px solid #1f77b4;}}
-        .kpi-title{{font-size:0.9em;color:#334;}}
-        .kpi-value{{font-size:1.4em;font-weight:bold;}}
-        .section{{margin-top:12px;}}
-        .bar-list{{display:flex;flex-direction:column;gap:6px;}}
-        .bar-item{{display:flex;align-items:center;gap:8px;}}
-        .bar-label{{flex:0 0 240px;font-size:0.85em;color:#333;}}
-        .bar{{height:16px;background:#e9ecef;border-radius:8px;flex:1;position:relative;}}
-        .bar-fill{{height:100%;background:#1f77b4;border-radius:8px;}}
-        .bar-value{{font-size:0.85em;color:#333;min-width:36px;text-align:right;}}
-        .page-title{{font-size:1.3em;font-weight:bold;color:#9C182F;margin-bottom:8px;}}
-        </style>
-        <div class='page-title'>📋 DEMANDES DE RECRUTEMENT</div>
-        <div class='kpi-grid'>
-            {k1}{k2}{k3}{k4}
-        </div>
-        <div class='section' style='display:grid;grid-template-columns:1fr 1fr;gap:16px;'>
-            <div>
-                <h4 style='margin:0 0 6px 0;color:#2c3e50;'>Top Directions</h4>
-                <div class='bar-list'>
-                    {dirs}
-                </div>
-            </div>
-            <div>
-                <h4 style='margin:0 0 6px 0;color:#2c3e50;'>Top Postes</h4>
-                <div class='bar-list'>
-                    {postes}
-                </div>
-            </div>
-        </div>
-        """
-
-        # Build KPI blocks
-        k1 = _html_kpi_card("Nombre de demandes", total)
-        k2 = _html_kpi_card("Nouvelles (mois en cours)", nouvelles, "#2ca02c")
-        k3 = _html_kpi_card("Annulées/Dépriorisées", annulees, "#ff7f0e")
-        k4 = _html_kpi_card("Taux d'annulation", taux_annulation, "#d62728")
-
-        # Build bar items
-        def _bars(series):
-                items = []
-                maxv = int(series.max()) if not series.empty else 1
-                for label, val in series.items():
-                        w = int(100 * (val/maxv))
-                        items.append(f"<div class='bar-item'><div class='bar-label'>{label}</div><div class='bar'><div class='bar-fill' style='width:{w}%;'></div></div><div class='bar-value'>{val}</div></div>")
-                return "\n".join(items) if items else "<div>Aucune donnée</div>"
-
-        html_full = kpi_html.format(k1=k1, k2=k2, k3=k3, k4=k4, dirs=_bars(dir_top), postes=_bars(poste_top))
-
-        # Ajouter un tableau synthétique des demandes (top 10) similaire à Streamlit
-        if 'Poste demandé' in df.columns:
-            top_rows = df[['Poste demandé','Direction concernée','Entité demandeuse']].copy() if 'Direction concernée' in df.columns and 'Entité demandeuse' in df.columns else df[['Poste demandé']].copy()
-            top_rows = top_rows.head(10)
-            table_html = top_rows.to_html(index=False)
-            html_full += f"<div class='section'><h4 style='margin:8px 0;color:#2c3e50;'>Aperçu des demandes (Top 10)</h4>{table_html}</div>"
-
-        # Render via html2image or fallback
+        # Figures
+        import plotly.express as px
+        import plotly.graph_objects as go
+        figs_row1 = []
+        # pie statut
         try:
-                from html2image import Html2Image
-                chromium_path = find_chromium_executable()
-                if not chromium_path:
-                        raise Exception("Chromium non trouvé")
-                hti = Html2Image(output_path=tempfile.gettempdir(), browser_executable=chromium_path,
-                                                 custom_flags=['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--headless'])
-                img_path = hti.screenshot(html_str=html_full, save_as='demandes_recrutement.png', size=(1920,1080))[0]
-                return img_path
+            if 'Statut de la demande' in df.columns:
+                statut_counts = df['Statut de la demande'].value_counts()
+                fig_statut = go.Figure(data=[go.Pie(labels=statut_counts.index, values=statut_counts.values, hole=.5)])
+                fig_statut.update_layout(title="Répartition par statut", height=320, margin=dict(l=20,r=20,t=40,b=10))
+                figs_row1.append(fig_statut)
         except Exception:
-                # Fallback PIL simple
-                from PIL import Image, ImageDraw, ImageFont
-                img = Image.new('RGB',(1920,1080),'white')
-                d = ImageDraw.Draw(img)
-                try:
-                        f_title = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 36)
-                        f_text = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 20)
-                except:
-                        f_title = ImageFont.load_default(); f_text = ImageFont.load_default()
-                d.text((40,40), '📋 DEMANDES DE RECRUTEMENT', fill='#9C182F', font=f_title)
-                y=100
-                for line in [f"Nombre de demandes: {total}", f"Nouvelles (mois): {nouvelles}", f"Annulées/Dépriorisées: {annulees}", f"Taux d'annulation: {taux_annulation}"]:
-                        d.text((40,y), line, fill='black', font=f_text); y+=32
-                out = os.path.join(tempfile.gettempdir(),'demandes_recrutement.png'); img.save(out); return out
+            figs_row1.append(None)
+        # bar raison
+        try:
+            if 'Raison du recrutement' in df.columns:
+                raison_counts = df['Raison du recrutement'].value_counts()
+                df_raison = raison_counts.rename_axis('Raison').reset_index(name='Count')
+                fig_raison = px.bar(df_raison, x='Raison', y='Count', title="Raison du recrutement", text='Count')
+                fig_raison.update_traces(marker_color='grey', textposition='outside')
+                fig_raison.update_layout(height=320, margin=dict(l=20,r=20,t=40,b=10), xaxis_title=None, yaxis_title=None)
+                figs_row1.append(fig_raison)
+        except Exception:
+            figs_row1.append(None)
+        # evolution demandes monthly
+        figs_row1.append(None)  # placeholder; we'll compute next
+        if date_col in df.columns:
+            try:
+                df['Mois_Année_Demande'] = pd.to_datetime(df[date_col], errors='coerce').dt.to_period('M').dt.to_timestamp()
+                monthly = df.groupby('Mois_Année_Demande').size().rename('Count')
+                if not monthly.empty:
+                    all_months = pd.date_range(start=monthly.index.min(), end=monthly.index.max(), freq='MS')
+                    monthly = monthly.reindex(all_months, fill_value=0).reset_index().rename(columns={'index':'Mois'})
+                    monthly['Label'] = monthly['Mois'].dt.strftime('%b %Y')
+                    fig_evo = px.bar(monthly, x='Label', y='Count', title="Évolution des demandes", text='Count')
+                    fig_evo.update_traces(marker_color='#1f77b4', textposition='outside')
+                    fig_evo.update_layout(height=320, margin=dict(l=20,r=20,t=40,b=10), xaxis_title=None, yaxis_title=None)
+                    figs_row1[-1] = fig_evo
+            except Exception:
+                pass
+
+        # row2: direction and poste bars (horizontal)
+        figs_row2 = []
+        try:
+            if 'Direction concernée' in df.columns:
+                direction_counts = df['Direction concernée'].value_counts()
+                dfd = direction_counts.rename_axis('Direction').reset_index(name='Count').sort_values('Count', ascending=False)
+                dfd['Label'] = dfd['Direction']
+                fig_dir = px.bar(dfd, x='Count', y='Label', title="Comparaison par direction", text='Count', orientation='h')
+                fig_dir.update_traces(marker_color='#ff7f0e', textposition='inside', texttemplate='%{x}')
+                fig_dir.update_layout(height=max(320, 24*len(dfd)), margin=dict(l=160,t=40,b=30,r=20), xaxis_title=None, yaxis_title=None)
+                figs_row2.append(fig_dir)
+        except Exception:
+            figs_row2.append(None)
+        try:
+            if 'Poste demandé' in df.columns:
+                poste_counts = df['Poste demandé'].value_counts()
+                dfp = poste_counts.rename_axis('Poste').reset_index(name='Count').sort_values('Count', ascending=False)
+                dfp['Label'] = dfp['Poste']
+                fig_poste = px.bar(dfp, x='Count', y='Label', title="Comparaison par poste", text='Count', orientation='h')
+                fig_poste.update_traces(marker_color='#2ca02c', textposition='inside', texttemplate='%{x}')
+                fig_poste.update_layout(height=max(320, 24*len(dfp)), margin=dict(l=160,t=40,b=30,r=20), xaxis_title=None, yaxis_title=None)
+                figs_row2.append(fig_poste)
+        except Exception:
+            figs_row2.append(None)
+
+        # Convert figures to PIL images
+        row1_imgs = [(_plotly_fig_to_pil(f, width=600, height=320) if f else None) for f in figs_row1]
+        row2_imgs = [(_plotly_fig_to_pil(f, width=900, height=360) if f else None) for f in figs_row2]
+
+        # Compose final image
+        kpis = [("Nombre de demandes", total, "#1f77b4"), ("Nouvelles (mois en cours)", nouvelles, "#2ca02c"), ("Annulées/Dépriorisées", annulees, "#ff7f0e"), ("Taux d'annulation", taux_annulation, "#d62728")]
+        chart_rows = [row1_imgs, row2_imgs]
+        return _compose_dashboard_image("📋 DEMANDES DE RECRUTEMENT", kpis, chart_rows, 'demandes_recrutement.png')
 
 def generate_recrutements_clotures_html_image(df_recrutement):
-    """Image HTML résumant l'onglet RECRUTEMENTS CLÔTURÉS."""
-    import tempfile
+    """Compose an image with charts matching the Streamlit 'Clôturés' tab."""
     df = df_recrutement.copy()
     df_cl = df[df['Statut de la demande'] == 'Clôture'] if 'Statut de la demande' in df.columns else df.iloc[0:0]
     nb = len(df_cl)
@@ -3714,121 +3779,77 @@ def generate_recrutements_clotures_html_image(df_recrutement):
     if rec_col and ret_col:
         try:
             s = pd.to_datetime(df_cl[rec_col], errors='coerce'); e = pd.to_datetime(df_cl[ret_col], errors='coerce')
-            mask = s.notna() & e.notna()
-            durees = (e[mask]-s[mask]).dt.days
-            durees = durees[durees > 0]
+            mask = s.notna() & e.notna(); durees = (e[mask]-s[mask]).dt.days; durees = durees[durees > 0]
             delai_display = str(round(durees.mean(),1)) if len(durees)>0 else "N/A"
         except Exception:
             delai_display = "N/A"
 
-    dir_counts = df_cl['Direction concernée'].value_counts() if 'Direction concernée' in df_cl.columns else pd.Series(dtype=int)
-    dir_top = dir_counts.head(8)
-    mois_col = next((c for c in df_cl.columns if "entrée effective" in c.lower() or "date d'entrée" in c.lower()), None)
-    mois_series = pd.Series(dtype=int)
-    if mois_col:
-        s = pd.to_datetime(df_cl[mois_col], errors='coerce')
-        mois_series = s.dt.to_period('M').value_counts().sort_index()
-    mois_top = mois_series.tail(10)
-
-    kpi_html = """
-    <style>
-    .kpi-grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0;}}
-    .kpi-card{{background:#f8f9fa;border-radius:8px;padding:12px;border-left:4px solid #1f77b4;}}
-    .kpi-title{{font-size:0.9em;color:#334;}}
-    .kpi-value{{font-size:1.4em;font-weight:bold;}}
-    .section{{margin-top:12px;}}
-    .bar-list{{display:flex;flex-direction:column;gap:6px;}}
-    .bar-item{{display:flex;align-items:center;gap:8px;}}
-    .bar-label{{flex:0 0 240px;font-size:0.85em;color:#333;}}
-    .bar{{height:16px;background:#e9ecef;border-radius:8px;flex:1;position:relative;}}
-    .bar-fill{{height:100%;background:#2ca02c;border-radius:8px;}}
-    .bar-value{{font-size:0.85em;color:#333;min-width:36px;text-align:right;}}
-    .page-title{{font-size:1.3em;font-weight:bold;color:#9C182F;margin-bottom:8px;}}
-    </style>
-    <div class='page-title'>🎯 RECRUTEMENTS CLÔTURÉS</div>
-    <div class='kpi-grid'>
-        {k1}{k2}{k3}{k4}
-    </div>
-    <div class='section' style='display:grid;grid-template-columns:1fr 1fr;gap:16px;'>
-        <div>
-            <h4 style='margin:0 0 6px 0;color:#2c3e50;'>Top Directions</h4>
-            <div class='bar-list'>
-                {dirs}
-            </div>
-        </div>
-        <div>
-            <h4 style='margin:0 0 6px 0;color:#2c3e50;'>Évolution mensuelle (derniers mois)</h4>
-            <div class='bar-list'>
-                {mois}
-            </div>
-        </div>
-    </div>
-    """
-
-    k1 = _html_kpi_card("Nombre de recrutements", nb)
-    k2 = _html_kpi_card("Postes concernés", postes_uniques, "#2ca02c")
-    k3 = _html_kpi_card("Directions concernées", directions_uniques, "#ff7f0e")
-    k4 = _html_kpi_card("Délai moyen (jours)", delai_display, "#d62728")
-
-    def _bars_labeled(series, color="#2ca02c"):
-        if isinstance(series, pd.Series) and series.dtype == 'int64':
-            maxv = int(series.max()) if not series.empty else 1
-            items = []
-            for label, val in series.items():
-                w = int(100 * (val/maxv))
-                items.append(f"<div class='bar-item'><div class='bar-label'>{label}</div><div class='bar'><div class='bar-fill' style='width:{w}%;background:{color};'></div></div><div class='bar-value'>{val}</div></div>")
-            return "\n".join(items) if items else "<div>Aucune donnée</div>"
-        else:
-            # handle Period counts
-            maxv = int(series.max()) if hasattr(series, 'max') and series.size>0 else 1
-            items = []
-            for label, val in series.items():
-                lbl = str(label)
-                w = int(100 * (int(val)/maxv))
-                items.append(f"<div class='bar-item'><div class='bar-label'>{lbl}</div><div class='bar'><div class='bar-fill' style='width:{w}%;background:{color};'></div></div><div class='bar-value'>{val}</div></div>")
-            return "\n".join(items) if items else "<div>Aucune donnée</div>"
-
-    html_full = kpi_html.format(k1=k1, k2=k2, k3=k3, k4=k4, dirs=_bars_labeled(dir_top), mois=_bars_labeled(mois_top))
-
-    # Ajouter un aperçu des recrutements clôturés (Top 10)
-    cols = [c for c in ['Poste demandé','Direction concernée','Entité demandeuse'] if c in df_cl.columns]
-    if cols:
-        preview = df_cl[cols].head(10)
-        html_full += f"<div class='section'><h4 style='margin:8px 0;color:#2c3e50;'>Aperçu des recrutements (Top 10)</h4>{preview.to_html(index=False)}</div>"
-
+    import plotly.express as px
+    import plotly.graph_objects as go
+    # Row1: evolution monthly + modalité pie
+    figs_row1 = []
+    # Evolution
     try:
-        from html2image import Html2Image
-        chromium_path = find_chromium_executable()
-        if not chromium_path:
-            raise Exception("Chromium non trouvé")
-        hti = Html2Image(output_path=tempfile.gettempdir(), browser_executable=chromium_path,
-                         custom_flags=['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--headless'])
-        img_path = hti.screenshot(html_str=html_full, save_as='recrutements_clotures.png', size=(1920,1080))[0]
-        return img_path
+        mois_col = next((c for c in df_cl.columns if "entrée effective" in c.lower() or "date d'entrée" in c.lower()), None)
+        if mois_col:
+            s = pd.to_datetime(df_cl[mois_col], errors='coerce')
+            series = s.dt.to_period('M').value_counts().sort_index()
+            monthly = series.rename_axis('Mois').reset_index(name='Count')
+            monthly['Label'] = monthly['Mois'].astype(str)
+            fig_evo = px.bar(monthly, x='Label', y='Count', title="Évolution des recrutements", text='Count')
+            fig_evo.update_traces(marker_color='#1f77b4', textposition='outside')
+            fig_evo.update_layout(height=320, margin=dict(l=20,r=20,t=40,b=10), xaxis_title=None, yaxis_title=None)
+            figs_row1.append(fig_evo)
     except Exception:
-        from PIL import Image, ImageDraw, ImageFont
-        img = Image.new('RGB',(1920,1080),'white')
-        d = ImageDraw.Draw(img)
-        try:
-            f_title = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 36)
-            f_text = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 20)
-        except:
-            f_title = ImageFont.load_default(); f_text = ImageFont.load_default()
-        d.text((40,40), '🎯 RECRUTEMENTS CLÔTURÉS', fill='#9C182F', font=f_title)
-        y=100
-        for line in [f"Nombre de recrutements: {nb}", f"Postes concernés: {postes_uniques}", f"Directions concernées: {directions_uniques}", f"Délai moyen (jours): {delai_display}"]:
-            d.text((40,y), line, fill='black', font=f_text); y+=32
-        out = os.path.join(tempfile.gettempdir(),'recrutements_clotures.png'); img.save(out); return out
+        figs_row1.append(None)
+    # Modalité pie
+    try:
+        if 'Modalité de recrutement' in df_cl.columns:
+            modalite_data = df_cl['Modalité de recrutement'].value_counts()
+            fig_mod = go.Figure(data=[go.Pie(labels=modalite_data.index, values=modalite_data.values, hole=.5, textposition='inside', textinfo='percent')])
+            fig_mod.update_layout(title="Répartition par Modalité", height=320, margin=dict(l=20,r=20,t=40,b=10))
+            figs_row1.append(fig_mod)
+    except Exception:
+        figs_row1.append(None)
+
+    # Row2: direction and poste
+    figs_row2 = []
+    try:
+        if 'Direction concernée' in df_cl.columns:
+            direction_counts = df_cl['Direction concernée'].value_counts()
+            dfd = direction_counts.rename_axis('Direction').reset_index(name='Count').sort_values('Count', ascending=False)
+            dfd['Label'] = dfd['Direction']
+            fig_dir = px.bar(dfd, x='Count', y='Label', title="Comparaison par direction", text='Count', orientation='h')
+            fig_dir.update_traces(marker_color='#ff7f0e', textposition='inside', texttemplate='%{x}')
+            fig_dir.update_layout(height=max(320, 24*len(dfd)), margin=dict(l=160,t=40,b=30,r=20), xaxis_title=None, yaxis_title=None)
+            figs_row2.append(fig_dir)
+    except Exception:
+        figs_row2.append(None)
+    try:
+        if 'Poste demandé' in df_cl.columns:
+            poste_counts = df_cl['Poste demandé'].value_counts()
+            dfp = poste_counts.rename_axis('Poste').reset_index(name='Count').sort_values('Count', ascending=False)
+            dfp['Label'] = dfp['Poste']
+            fig_poste = px.bar(dfp, x='Count', y='Label', title="Comparaison par poste", text='Count', orientation='h')
+            fig_poste.update_traces(marker_color='#2ca02c', textposition='inside', texttemplate='%{x}')
+            fig_poste.update_layout(height=max(320, 24*len(dfp)), margin=dict(l=160,t=40,b=30,r=20), xaxis_title=None, yaxis_title=None)
+            figs_row2.append(fig_poste)
+    except Exception:
+        figs_row2.append(None)
+
+    row1_imgs = [(_plotly_fig_to_pil(f, width=900, height=320) if f else None) for f in figs_row1]
+    row2_imgs = [(_plotly_fig_to_pil(f, width=900, height=360) if f else None) for f in figs_row2]
+
+    kpis = [("Nombre de recrutements", nb, "#1f77b4"), ("Postes concernés", postes_uniques, "#2ca02c"), ("Directions concernées", directions_uniques, "#ff7f0e"), ("Délai moyen (jours)", delai_display, "#d62728")]
+    chart_rows = [row1_imgs, row2_imgs]
+    return _compose_dashboard_image("🎯 RECRUTEMENTS CLÔTURÉS", kpis, chart_rows, 'recrutements_clotures.png')
 
 def generate_integrations_html_image(df_recrutement):
-    """Image HTML résumant l'onglet Intégrations avec KPIs et graphiques simples."""
-    import tempfile
+    """Compose an image with charts matching the Streamlit 'Intégrations' tab."""
     df = df_recrutement.copy()
     candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
     date_integration_col = "Date d'entrée prévisionnelle"
     plan_integration_col = "Plan d'intégration à préparer"
-
-    # Filtrer intégrations en cours: statut "En cours" + candidat nommé
     if 'Statut de la demande' in df.columns:
         df = df[df['Statut de la demande'] == 'En cours']
     if candidat_col in df.columns:
@@ -3841,104 +3862,44 @@ def generate_integrations_html_image(df_recrutement):
             a_preparer = int((df[plan_integration_col].astype(str).str.lower() == 'oui').sum())
         except Exception:
             a_preparer = 0
-
     en_retard = 0
     if date_integration_col in df.columns:
         try:
             s = pd.to_datetime(df[date_integration_col], errors='coerce')
             reporting_date = st.session_state.get('reporting_date', datetime.now().date())
-            if isinstance(reporting_date, datetime):
-                today = reporting_date
-            else:
-                today = datetime.combine(reporting_date, datetime.min.time())
+            today = reporting_date if isinstance(reporting_date, datetime) else datetime.combine(reporting_date, datetime.min.time())
             en_retard = int(((s.notna()) & (s < today)).sum())
         except Exception:
             en_retard = 0
 
-    # Top affectations
-    affect_counts = pd.Series(dtype=int)
-    if 'Affectation' in df.columns:
-        affect_counts = df['Affectation'].value_counts().head(8)
-
-    # Monthly integration planned
-    monthly_series = pd.Series(dtype=int)
-    if date_integration_col in df.columns:
-        s = pd.to_datetime(df[date_integration_col], errors='coerce')
-        monthly_series = s.dt.to_period('M').value_counts().sort_index().tail(10)
-
-    # HTML
-    kpi_html = """
-    <style>
-    .kpi-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:12px 0;}}
-    .kpi-card{{background:#f8f9fa;border-radius:8px;padding:12px;border-left:4px solid #1f77b4;}}
-    .kpi-title{{font-size:0.9em;color:#334;}}
-    .kpi-value{{font-size:1.4em;font-weight:bold;}}
-    .section{{margin-top:12px;}}
-    .bar-list{{display:flex;flex-direction:column;gap:6px;}}
-    .bar-item{{display:flex;align-items:center;gap:8px;}}
-    .bar-label{{flex:0 0 260px;font-size:0.85em;color:#333;}}
-    .bar{{height:16px;background:#e9ecef;border-radius:8px;flex:1;position:relative;}}
-    .bar-fill{{height:100%;background:#2ca02c;border-radius:8px;}}
-    .bar-value{{font-size:0.85em;color:#333;min-width:36px;text-align:right;}}
-    .page-title{{font-size:1.3em;font-weight:bold;color:#9C182F;margin-bottom:8px;}}
-    </style>
-    <div class='page-title'>📊 Intégrations</div>
-    <div class='kpi-grid'>
-      {k1}{k2}{k3}
-    </div>
-    <div class='section' style='display:grid;grid-template-columns:1fr 1fr;gap:16px;'>
-      <div>
-        <h4 style='margin:0 0 6px 0;color:#2c3e50;'>Top Affectations</h4>
-        <div class='bar-list'>
-          {affects}
-        </div>
-      </div>
-      <div>
-        <h4 style='margin:0 0 6px 0;color:#2c3e50;'>Évolution des intégrations prévues</h4>
-        <div class='bar-list'>
-          {monthly}
-        </div>
-      </div>
-    </div>
-    """
-
-    k1 = _html_kpi_card("Intégrations en cours", nb_int)
-    k2 = _html_kpi_card("Plan d'intégration à préparer", a_preparer, "#ff7f0e")
-    k3 = _html_kpi_card("En retard", en_retard, "#d62728")
-
-    def _bars(series, color="#2ca02c"):
-        items = []
-        maxv = int(series.max()) if not series.empty else 1
-        for label, val in series.items():
-            w = int(100 * (int(val)/maxv))
-            items.append(f"<div class='bar-item'><div class='bar-label'>{label}</div><div class='bar'><div class='bar-fill' style='width:{w}%;background:{color};'></div></div><div class='bar-value'>{val}</div></div>")
-        return "\n".join(items) if items else "<div>Aucune donnée</div>"
-
-    html_full = kpi_html.format(k1=k1, k2=k2, k3=k3, affects=_bars(affect_counts), monthly=_bars(monthly_series))
-
+    import plotly.express as px
+    # Row1: affectation pie + monthly bar
+    figs_row1 = []
     try:
-        from html2image import Html2Image
-        chromium_path = find_chromium_executable()
-        if not chromium_path:
-            raise Exception("Chromium non trouvé")
-        hti = Html2Image(output_path=tempfile.gettempdir(), browser_executable=chromium_path,
-                         custom_flags=['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--headless'])
-        img_path = hti.screenshot(html_str=html_full, save_as='integrations.png', size=(1920,1080))[0]
-        return img_path
+        if 'Affectation' in df.columns:
+            affect_counts = df['Affectation'].value_counts().head(10)
+            fig_aff = px.pie(values=affect_counts.values, names=affect_counts.index, title="Répartition par Affectation")
+            fig_aff.update_traces(textposition='inside', textinfo='percent+label')
+            fig_aff.update_layout(height=360, margin=dict(l=20,r=20,t=40,b=10))
+            figs_row1.append(fig_aff)
     except Exception:
-        from PIL import Image, ImageDraw, ImageFont
-        img = Image.new('RGB',(1920,1080),'white')
-        d = ImageDraw.Draw(img)
-        try:
-            f_title = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 36)
-            f_text = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 20)
-        except:
-            f_title = ImageFont.load_default(); f_text = ImageFont.load_default()
-        d.text((40,40), '📊 Intégrations', fill='#9C182F', font=f_title)
-        y=100
-        for line in [f"Intégrations en cours: {nb_int}", f"Plan d'intégration à préparer: {a_preparer}", f"En retard: {en_retard}"]:
-            d.text((40,y), line, fill='black', font=f_text); y+=32
-        out = os.path.join(tempfile.gettempdir(),'integrations.png'); img.save(out); return out
+        figs_row1.append(None)
+    try:
+        if date_integration_col in df.columns:
+            s = pd.to_datetime(df[date_integration_col], errors='coerce')
+            monthly = s.dt.to_period('M').value_counts().sort_index().rename_axis('Mois').reset_index(name='Count')
+            monthly['Label'] = monthly['Mois'].astype(str)
+            fig_month = px.bar(monthly, x='Label', y='Count', title="Évolution des Intégrations Prévues", text='Count')
+            fig_month.update_traces(marker_color='#2ca02c', textposition='outside')
+            fig_month.update_layout(height=360, margin=dict(l=20,r=20,t=40,b=10), xaxis_title=None, yaxis_title=None)
+            figs_row1.append(fig_month)
+    except Exception:
+        figs_row1.append(None)
+
+    row1_imgs = [(_plotly_fig_to_pil(f, width=900, height=360) if f else None) for f in figs_row1]
+    kpis = [("Intégrations en cours", nb_int, "#1f77b4"), ("Plan d'intégration à préparer", a_preparer, "#ff7f0e"), ("En retard", en_retard, "#d62728")]
+    chart_rows = [row1_imgs]
+    return _compose_dashboard_image("📊 Intégrations", kpis, chart_rows, 'integrations.png')
 def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2).pptx"):
     """
     Génère un rapport PowerPoint à partir d'un template en remplaçant les placeholders

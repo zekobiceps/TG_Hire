@@ -21,6 +21,9 @@ json5
 lxml
 html2image
 
+# Static image export for Plotly charts
+kaleido
+
 # Machine learning
 scikit-learn
 sentence-transformers
