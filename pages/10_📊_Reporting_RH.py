@@ -1597,7 +1597,11 @@ def create_weekly_report_tab(df_recrutement=None):
     if metrics and len(metrics) > 0:
         # Charger tous les logos disponibles dans le dossier LOGO
         logos_b64 = {}
-        logo_dir = "LOGO"
+        # Utiliser un chemin absolu pour éviter les problèmes de répertoire courant
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        root_dir = os.path.dirname(current_dir)
+        logo_dir = os.path.join(root_dir, "LOGO")
+        
         if os.path.exists(logo_dir):
             for filename in os.listdir(logo_dir):
                 if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
