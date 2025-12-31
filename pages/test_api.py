@@ -1594,11 +1594,73 @@ def create_weekly_report_tab(df_recrutement=None):
         unsafe_allow_html=True
     )
     if metrics and len(metrics) > 0:
+        # Charger tous les logos disponibles dans le dossier LOGO
+        logos_b64 = {}
+        logo_dir = "LOGO"
+        if os.path.exists(logo_dir):
+            for filename in os.listdir(logo_dir):
+                if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    path = os.path.join(logo_dir, filename)
+                    with open(path, "rb") as f:
+                        logos_b64[filename] = base64.b64encode(f.read()).decode()
+        
+        # Mapping entité -> nom de fichier logo
+        entity_logo_map = {
+            'TGCC': 'TGCC.PNG',
+            'TGEM': 'TGEM.PNG',
+            'TG ALU': 'TG ALU.PNG',
+            'TG COVER': 'TG COVER.PNG',
+            'TG STEEL': 'TG STEEL.PNG',
+            'TG STONE': 'TG STONE.PNG',
+            'TG WOOD': 'TG WOOD.PNG',
+            'TGCC IMMOBILIER': 'tgcc-immobilier.png',
+            'TGCC-IMMOBILIER': 'tgcc-immobilier.png'
+        }
+
+        def get_entity_display(name):
+            name_str = str(name).strip()
+            name_upper = name_str.upper()
+            
+            # Trouver le logo correspondant
+            logo_file = None
+            
+            # 1. Correspondance exacte ou via mapping
+            if name_upper in entity_logo_map:
+                logo_file = entity_logo_map[name_upper]
+            else:
+                # 2. Recherche de sous-chaîne (ex: "TG ALU - ATELIER" contient "TG ALU")
+                # On trie par longueur décroissante pour matcher le plus long d'abord
+                for key in sorted(entity_logo_map.keys(), key=len, reverse=True):
+                    if key in name_upper:
+                        logo_file = entity_logo_map[key]
+                        break
+            
+            if logo_file and logo_file in logos_b64:
+                logo_b64 = logos_b64[logo_file]
+                # Image un peu plus grande pour lisibilité
+                img_tag = f'<img src="data:image/png;base64,{logo_b64}" height="35" style="vertical-align: middle;">'
+                
+                # Gestion spécifique pour TGCC avec suffixe (ex: TGCC - SIEGE)
+                matched_key = next((k for k in sorted(entity_logo_map.keys(), key=len, reverse=True) if k in name_upper), None)
+                
+                if matched_key:
+                    # Regex pour trouver le suffixe après la clé (ex: " - SIEGE")
+                    pattern = re.escape(matched_key) + r'\s*-\s*(.*)'
+                    match = re.search(pattern, name_str, flags=re.IGNORECASE)
+                    if match:
+                        suffix = match.group(1)
+                        if suffix:
+                            return f'{img_tag} <span style="vertical-align: middle; margin-left: 5px; font-weight: bold;">{suffix}</span>'
+                
+                return img_tag
+            
+            return name_str
+
         # Préparer les données pour le HTML
         table_data = []
         for entite, data in metrics_included.items():
             table_data.append({
-                'Entité': entite,
+                'Entité': get_entity_display(entite),
                 'Nb postes ouverts avant début semaine': data['avant'] if data['avant'] > 0 else '-',
                 'Nb nouveaux postes ouverts cette semaine': data['nouveaux'] if data['nouveaux'] > 0 else '-',
                 'Nb postes pourvus cette semaine': data['pourvus'] if data['pourvus'] > 0 else '-',
