@@ -2564,11 +2564,11 @@ def generate_kanban_image_simple(df_recrutement):
         else:
             # Charger les données du kanban
             colonnes = {
-                'Sourcing': df_recrutement[df_recrutement['Statut de la demande'] == 'Sourcing'].head(5),
-                'Shortlisté': df_recrutement[df_recrutement['Statut de la demande'] == 'Shortlisté'].head(5),
-                'Signature DRH': df_recrutement[df_recrutement['Statut de la demande'] == 'Signature DRH'].head(5),
-                'Clôture': df_recrutement[df_recrutement['Statut de la demande'] == 'Clôture'].head(5),
-                'Désistement': df_recrutement[df_recrutement['Statut de la demande'] == 'Désistement'].head(5),
+                'Sourcing': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Sourcing'],
+                'Shortlisté': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Shortlisté'],
+                'Signature DRH': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Signature DRH'],
+                'Clôture': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Clôture'],
+                'Désistement': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Désistement'],
             }
         
         # Dimensions (haute résolution)
@@ -2816,10 +2816,10 @@ def generate_table_html_image(weekly_metrics):
                     <thead>
                         <tr>
                             <th>Entité</th>
-                            <th>Postes avant</th>
-                            <th>Nouveaux postes</th>
-                            <th>Postes pourvus</th>
-                            <th>Postes en cours</th>
+                            <th>Nb postes ouverts avant début semaine</th>
+                            <th>Nb nouveaux postes ouverts cette semaine</th>
+                            <th>Nb postes pourvus cette semaine</th>
+                            <th>Nb postes en cours cette semaine (sourcing)</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -2903,7 +2903,7 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
         postes_data = []
         
         for index, row in df_recrutement.iterrows():
-            if row.get('Statut de la demande') == statut:
+            if row.get('Colonne TG Hire') == statut:
                 postes_data.append({
                     "titre": str(row.get('Intitulé du poste', 'N/A')),
                     "entite": str(row.get('Entité demandeuse', 'N/A')),
@@ -2912,9 +2912,9 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
                     "recruteur": str(row.get('RH en charge du recrutement', 'N/A')),
                     "commentaire": str(row.get('Commentaire', '')) if pd.notna(row.get('Commentaire')) else None
                 })
-        
-        # Limiter le nombre de cartes
-        postes_data = postes_data[:max_cards]
+                # Limiter le nombre de cartes
+                if len(postes_data) >= max_cards:
+                    break
         
         # Créer HTML
         html_content = f"""
@@ -2939,32 +2939,29 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
                 }}
                 .cards-container {{
                     display: grid;
-                    grid-template-columns: repeat(2, 1fr);
-                    gap: 20px;
+                    grid-template-columns: repeat(6, 1fr);
+                    gap: 15px;
                     padding: 20px;
                 }}
                 .kanban-card {{
                     background-color: #f0f2f6;
-                    border-radius: 8px;
-                    padding: 15px;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    border-radius: 5px;
+                    padding: 8px;
+                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
                     border-left: 4px solid #1f77b4;
+                    min-height: 80px;
                 }}
                 .kanban-card h4 {{
-                    margin: 0 0 10px 0;
-                    color: #9C182F;
-                    font-size: 1.3em;
+                    margin: 0 0 4px 0;
+                    color: #2c3e50;
+                    font-size: 1.1em;
+                    line-height: 1.2;
                 }}
                 .kanban-card p {{
-                    margin: 5px 0;
-                    font-size: 1.1em;
+                    margin: 2px 0;
+                    font-size: 1.0em;
                     color: #555;
-                }}
-                .no-data {{
-                    text-align: center;
-                    font-size: 1.5em;
-                    color: #999;
-                    padding: 50px;
+                    line-height: 1.1;
                 }}
             </style>
         </head>
@@ -2973,10 +2970,7 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
             <div class="cards-container">
         """
         
-        if len(postes_data) == 0:
-            html_content += '<div class="no-data">Aucun poste dans ce statut</div>'
-        else:
-            for poste in postes_data:
+        for poste in postes_data:
                 commentaire_html = f"<p>💬 {poste['commentaire']}</p>" if poste.get('commentaire') else ""
                 html_content += f"""
                 <div class="kanban-card">
@@ -3027,7 +3021,7 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
     
     # Filtrer les données
     if df_recrutement is not None and len(df_recrutement) > 0:
-        df_statut = df_recrutement[df_recrutement['Statut de la demande'] == statut].head(max_cards)
+        df_statut = df_recrutement[df_recrutement['Colonne TG Hire'] == statut]
         count = len(df_statut)
     else:
         df_statut = None
@@ -3035,11 +3029,11 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
     
     draw.text((width // 2, 50), f"{statut} ({count} postes)", fill='white', font=font_header, anchor='mm')
     
-    # Cartes en grille 2 colonnes
+    # Cartes en grille 6 colonnes
     if df_statut is not None and count > 0:
-        card_width = (width - 60) // 2
-        card_height = 150
-        x_positions = [20, 20 + card_width + 20]
+        card_width = (width - 140) // 6  # 6 colonnes
+        card_height = 130
+        x_positions = [20 + i * (card_width + 20) for i in range(6)]
         y_offset = 120
         col = 0
         
@@ -3067,12 +3061,9 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
             draw.text((x + 10, y_offset + 90), recruteur[:50], fill='#555', font=font_card)
             
             col += 1
-            if col >= 2:
+            if col >= 6:
                 col = 0
                 y_offset += card_height + 20
-    else:
-        draw.text((width // 2, height // 2), "Aucun poste dans ce statut", 
-                 fill='#999', font=font_header, anchor='mm')
     
     # Sauvegarder
     output_path = os.path.join(tempfile.gettempdir(), f'{statut.lower().replace(" ", "_")}_reporting.png')
@@ -3110,14 +3101,14 @@ def generate_kanban_html_image(df_recrutement):
         postes_data = []
         
         for index, row in df_recrutement.iterrows():
-            if row.get('Statut de la demande') in statuts:
+            if row.get('Colonne TG Hire') in statuts:
                 postes_data.append({
                     "titre": str(row.get('Intitulé du poste', 'N/A')),
                     "entite": str(row.get('Entité demandeuse', 'N/A')),
                     "lieu": str(row.get('Ville', 'N/A')),
                     "demandeur": str(row.get('Nom du Demandeur', 'N/A')),
                     "recruteur": str(row.get('RH en charge du recrutement', 'N/A')),
-                    "statut": str(row.get('Statut de la demande', 'N/A')),
+                    "statut": str(row.get('Colonne TG Hire', 'N/A')),
                     "commentaire": str(row.get('Commentaire', '')) if pd.notna(row.get('Commentaire')) else None
                 })
         
@@ -3267,7 +3258,7 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
         kanban_images = {}
         for statut in statuts:
             st.info(f"🔄 Génération de l'image pour {statut}...")
-            kanban_images[statut] = generate_kanban_statut_image(df_recrutement, statut, max_cards=10)
+            kanban_images[statut] = generate_kanban_statut_image(df_recrutement, statut, max_cards=100)
         
         # Debug: Vérifier les chemins des images
         if table_image_path and os.path.exists(table_image_path):
@@ -3326,9 +3317,13 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                             # Positionner l'image en laissant des marges
                             img_left = Inches(0.5)
                             img_top = Inches(1.5)
-                            img_width = slide_width - Inches(1)  # Marges gauche/droite
-                            img_height = slide_height - Inches(2.5)  # Marges haut/bas
-                            slide.shapes.add_picture(table_image_path, img_left, img_top, width=img_width, height=img_height)
+                            # Calculer dimensions avec vérification
+                            if slide_width and slide_height:
+                                img_width = Inches((slide_width.inches if hasattr(slide_width, 'inches') else slide_width / 914400) - 1)
+                                img_height = Inches((slide_height.inches if hasattr(slide_height, 'inches') else slide_height / 914400) - 2.5)
+                                slide.shapes.add_picture(table_image_path, img_left, img_top, width=img_width, height=img_height)
+                            else:
+                                slide.shapes.add_picture(table_image_path, img_left, img_top)
                             st.success(f"✅ Image tableau insérée dans slide {slide_idx + 1} (dimensions optimisées)")
                         else:
                             st.error(f"❌ Image tableau non trouvée: {table_image_path}")
@@ -3360,8 +3355,14 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                         slide_height = prs.slide_height
                         img_left = Inches(0.5)
                         img_top = Inches(1.5)
-                        img_width = slide_width - Inches(1)
-                        img_height = slide_height - Inches(2.5)
+                        
+                        # Calculer dimensions avec vérification
+                        if slide_width and slide_height:
+                            img_width = Inches((slide_width.inches if hasattr(slide_width, 'inches') else slide_width / 914400) - 1)
+                            img_height = Inches((slide_height.inches if hasattr(slide_height, 'inches') else slide_height / 914400) - 2.5)
+                        else:
+                            img_width = Inches(9)
+                            img_height = Inches(6)
                         
                         # Insérer les 5 images Kanban dans les slides suivantes
                         # Note: On va créer 4 nouvelles slides après celle-ci
@@ -3380,7 +3381,7 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                                 new_slide = prs.slides.add_slide(slide.slide_layout)
                                 
                                 # Copier le titre si disponible
-                                if slide.shapes.title:
+                                if hasattr(slide.shapes, 'title') and slide.shapes.title and hasattr(new_slide.shapes, 'title') and new_slide.shapes.title:
                                     new_slide.shapes.title.text = slide.shapes.title.text
                                 
                                 # Insérer l'image
