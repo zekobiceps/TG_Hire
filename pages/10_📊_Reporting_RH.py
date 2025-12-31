@@ -2811,8 +2811,15 @@ def generate_kanban_image_simple(df_recrutement):
                 # Recruteur
                 recruteur = str(row.get('RH en charge du recrutement', '')).strip()[:50]
                 draw.text((x_offset + 10, y_offset + title_block_height + 54), f"✍️ {recruteur}", fill='black', font=font_card)
+
+                # Commentaire (si présent)
+                comment_col = next((c for c in row.index if 'comment' in c.lower()), None)
+                if comment_col:
+                    commentaire_val = str(row.get(comment_col, '')).strip()
+                    if commentaire_val:
+                        draw.text((x_offset + 10, y_offset + title_block_height + 72), f"[!] {commentaire_val[:80]}", fill='#666666', font=font_card)
                 
-                y_offset += max(100, title_block_height + 70)
+                y_offset += max(110, title_block_height + 88)
             
             x_offset += col_width
         
@@ -3389,11 +3396,18 @@ def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
             recruteur_val = str(row.get(recruteur_col, 'N/A')).strip()
             recruteur = f"# {recruteur_val}"
             draw.text((x + 10, y_offset + title_block_height + 70), recruteur[:50], fill='#555', font=font_card)
+
+            # Commentaire (si présent)
+            comment_col = next((c for c in row.index if 'comment' in c.lower()), None)
+            if comment_col:
+                commentaire_val = str(row.get(comment_col, '')).strip()
+                if commentaire_val:
+                    draw.text((x + 10, y_offset + title_block_height + 88), f"[!] {commentaire_val[:80]}", fill='#666666', font=font_card)
             
             col += 1
             if col >= 6:
                 col = 0
-                y_offset += card_height + 20
+                y_offset += card_height + 30
     
     # Sauvegarder
     output_path = os.path.join(tempfile.gettempdir(), f'{statut.lower().replace(" ", "_")}_reporting.png')
@@ -3653,6 +3667,13 @@ def generate_demandes_recrutement_html_image(df_recrutement):
 
         html_full = kpi_html.format(k1=k1, k2=k2, k3=k3, k4=k4, dirs=_bars(dir_top), postes=_bars(poste_top))
 
+        # Ajouter un tableau synthétique des demandes (top 10) similaire à Streamlit
+        if 'Poste demandé' in df.columns:
+            top_rows = df[['Poste demandé','Direction concernée','Entité demandeuse']].copy() if 'Direction concernée' in df.columns and 'Entité demandeuse' in df.columns else df[['Poste demandé']].copy()
+            top_rows = top_rows.head(10)
+            table_html = top_rows.to_html(index=False)
+            html_full += f"<div class='section'><h4 style='margin:8px 0;color:#2c3e50;'>Aperçu des demandes (Top 10)</h4>{table_html}</div>"
+
         # Render via html2image or fallback
         try:
                 from html2image import Html2Image
@@ -3769,6 +3790,12 @@ def generate_recrutements_clotures_html_image(df_recrutement):
 
     html_full = kpi_html.format(k1=k1, k2=k2, k3=k3, k4=k4, dirs=_bars_labeled(dir_top), mois=_bars_labeled(mois_top))
 
+    # Ajouter un aperçu des recrutements clôturés (Top 10)
+    cols = [c for c in ['Poste demandé','Direction concernée','Entité demandeuse'] if c in df_cl.columns]
+    if cols:
+        preview = df_cl[cols].head(10)
+        html_full += f"<div class='section'><h4 style='margin:8px 0;color:#2c3e50;'>Aperçu des recrutements (Top 10)</h4>{preview.to_html(index=False)}</div>"
+
     try:
         from html2image import Html2Image
         chromium_path = find_chromium_executable()
@@ -3793,6 +3820,125 @@ def generate_recrutements_clotures_html_image(df_recrutement):
             d.text((40,y), line, fill='black', font=f_text); y+=32
         out = os.path.join(tempfile.gettempdir(),'recrutements_clotures.png'); img.save(out); return out
 
+def generate_integrations_html_image(df_recrutement):
+    """Image HTML résumant l'onglet Intégrations avec KPIs et graphiques simples."""
+    import tempfile
+    df = df_recrutement.copy()
+    candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
+    date_integration_col = "Date d'entrée prévisionnelle"
+    plan_integration_col = "Plan d'intégration à préparer"
+
+    # Filtrer intégrations en cours: statut "En cours" + candidat nommé
+    if 'Statut de la demande' in df.columns:
+        df = df[df['Statut de la demande'] == 'En cours']
+    if candidat_col in df.columns:
+        df = df[(df[candidat_col].notna()) & (df[candidat_col].astype(str).str.strip() != "")]
+
+    nb_int = len(df)
+    a_preparer = 0
+    if plan_integration_col in df.columns:
+        try:
+            a_preparer = int((df[plan_integration_col].astype(str).str.lower() == 'oui').sum())
+        except Exception:
+            a_preparer = 0
+
+    en_retard = 0
+    if date_integration_col in df.columns:
+        try:
+            s = pd.to_datetime(df[date_integration_col], errors='coerce')
+            reporting_date = st.session_state.get('reporting_date', datetime.now().date())
+            if isinstance(reporting_date, datetime):
+                today = reporting_date
+            else:
+                today = datetime.combine(reporting_date, datetime.min.time())
+            en_retard = int(((s.notna()) & (s < today)).sum())
+        except Exception:
+            en_retard = 0
+
+    # Top affectations
+    affect_counts = pd.Series(dtype=int)
+    if 'Affectation' in df.columns:
+        affect_counts = df['Affectation'].value_counts().head(8)
+
+    # Monthly integration planned
+    monthly_series = pd.Series(dtype=int)
+    if date_integration_col in df.columns:
+        s = pd.to_datetime(df[date_integration_col], errors='coerce')
+        monthly_series = s.dt.to_period('M').value_counts().sort_index().tail(10)
+
+    # HTML
+    kpi_html = """
+    <style>
+    .kpi-grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:12px 0;}}
+    .kpi-card{{background:#f8f9fa;border-radius:8px;padding:12px;border-left:4px solid #1f77b4;}}
+    .kpi-title{{font-size:0.9em;color:#334;}}
+    .kpi-value{{font-size:1.4em;font-weight:bold;}}
+    .section{{margin-top:12px;}}
+    .bar-list{{display:flex;flex-direction:column;gap:6px;}}
+    .bar-item{{display:flex;align-items:center;gap:8px;}}
+    .bar-label{{flex:0 0 260px;font-size:0.85em;color:#333;}}
+    .bar{{height:16px;background:#e9ecef;border-radius:8px;flex:1;position:relative;}}
+    .bar-fill{{height:100%;background:#2ca02c;border-radius:8px;}}
+    .bar-value{{font-size:0.85em;color:#333;min-width:36px;text-align:right;}}
+    .page-title{{font-size:1.3em;font-weight:bold;color:#9C182F;margin-bottom:8px;}}
+    </style>
+    <div class='page-title'>📊 Intégrations</div>
+    <div class='kpi-grid'>
+      {k1}{k2}{k3}
+    </div>
+    <div class='section' style='display:grid;grid-template-columns:1fr 1fr;gap:16px;'>
+      <div>
+        <h4 style='margin:0 0 6px 0;color:#2c3e50;'>Top Affectations</h4>
+        <div class='bar-list'>
+          {affects}
+        </div>
+      </div>
+      <div>
+        <h4 style='margin:0 0 6px 0;color:#2c3e50;'>Évolution des intégrations prévues</h4>
+        <div class='bar-list'>
+          {monthly}
+        </div>
+      </div>
+    </div>
+    """
+
+    k1 = _html_kpi_card("Intégrations en cours", nb_int)
+    k2 = _html_kpi_card("Plan d'intégration à préparer", a_preparer, "#ff7f0e")
+    k3 = _html_kpi_card("En retard", en_retard, "#d62728")
+
+    def _bars(series, color="#2ca02c"):
+        items = []
+        maxv = int(series.max()) if not series.empty else 1
+        for label, val in series.items():
+            w = int(100 * (int(val)/maxv))
+            items.append(f"<div class='bar-item'><div class='bar-label'>{label}</div><div class='bar'><div class='bar-fill' style='width:{w}%;background:{color};'></div></div><div class='bar-value'>{val}</div></div>")
+        return "\n".join(items) if items else "<div>Aucune donnée</div>"
+
+    html_full = kpi_html.format(k1=k1, k2=k2, k3=k3, affects=_bars(affect_counts), monthly=_bars(monthly_series))
+
+    try:
+        from html2image import Html2Image
+        chromium_path = find_chromium_executable()
+        if not chromium_path:
+            raise Exception("Chromium non trouvé")
+        hti = Html2Image(output_path=tempfile.gettempdir(), browser_executable=chromium_path,
+                         custom_flags=['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--headless'])
+        img_path = hti.screenshot(html_str=html_full, save_as='integrations.png', size=(1920,1080))[0]
+        return img_path
+    except Exception:
+        from PIL import Image, ImageDraw, ImageFont
+        img = Image.new('RGB',(1920,1080),'white')
+        d = ImageDraw.Draw(img)
+        try:
+            f_title = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 36)
+            f_text = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 20)
+        except:
+            f_title = ImageFont.load_default(); f_text = ImageFont.load_default()
+        d.text((40,40), '📊 Intégrations', fill='#9C182F', font=f_title)
+        y=100
+        for line in [f"Intégrations en cours: {nb_int}", f"Plan d'intégration à préparer: {a_preparer}", f"En retard: {en_retard}"]:
+            d.text((40,y), line, fill='black', font=f_text); y+=32
+        out = os.path.join(tempfile.gettempdir(),'integrations.png'); img.save(out); return out
 def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2).pptx"):
     """
     Génère un rapport PowerPoint à partir d'un template en remplaçant les placeholders
@@ -3891,8 +4037,30 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                 else:
                     df_filtered = df_recrutement[df_recrutement['Colonne TG Hire'] == 'Désistement'].copy()
                     st.warning(f"⚠️ Colonne date désistement non trouvée, affichage de tous les {len(df_filtered)} désistements")
-                
-                kanban_images[statut] = generate_kanban_statut_image(df_filtered, statut, max_cards=100)
+                # Toujours générer une image même si aucune donnée
+                img_path_desist = generate_kanban_statut_image(df_filtered, statut, max_cards=100)
+                if not img_path_desist or not os.path.exists(img_path_desist):
+                    # Placeholder image
+                    try:
+                        from PIL import Image, ImageDraw, ImageFont
+                        import tempfile
+                        width, height = 1920, 1080
+                        img = Image.new('RGB',(width,height),'white')
+                        d = ImageDraw.Draw(img)
+                        try:
+                            f_title = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 42)
+                            f_text = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 20)
+                        except:
+                            f_title = ImageFont.load_default(); f_text = ImageFont.load_default()
+                        d.text((width//2, 80), 'Désistement (0 poste)', fill='#9C182F', font=f_title, anchor='mm')
+                        d.text((width//2, height//2), 'Aucune donnée pour cette période', fill='#666666', font=f_text, anchor='mm')
+                        ph_path = os.path.join(tempfile.gettempdir(),'desistement_empty.png')
+                        img.save(ph_path)
+                        kanban_images[statut] = ph_path
+                    except Exception:
+                        kanban_images[statut] = img_path_desist
+                else:
+                    kanban_images[statut] = img_path_desist
             else:
                 # Pour les autres statuts, pas de filtre de date
                 kanban_images[statut] = generate_kanban_statut_image(df_recrutement, statut, max_cards=100)
@@ -4022,7 +4190,7 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                             else:
                                 st.warning(f"⚠️ Image {statut} non trouvée")
 
-                        # Ajouter juste après Désistement: DEMANDES DE RECRUTEMENT puis RECRUTEMENTS CLÔTURÉS
+                        # Ajouter juste après Désistement: DEMANDES DE RECRUTEMENT puis RECRUTEMENTS CLÔTURÉS, puis INTÉGRATIONS
                         if demandes_img and os.path.exists(demandes_img):
                             slide_dem = prs.slides.add_slide(slide.slide_layout)
                             if hasattr(slide_dem.shapes, 'title') and slide_dem.shapes.title:
@@ -4040,6 +4208,17 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                             st.success("✅ Slide ajoutée: RECRUTEMENTS CLÔTURÉS")
                         else:
                             st.warning("⚠️ Image RECRUTEMENTS CLÔTURÉS non trouvée")
+
+                        # Intégrations
+                        integrations_img = generate_integrations_html_image(df_recrutement)
+                        if integrations_img and os.path.exists(integrations_img):
+                            slide_int = prs.slides.add_slide(slide.slide_layout)
+                            if hasattr(slide_int.shapes, 'title') and slide_int.shapes.title:
+                                slide_int.shapes.title.text = "📊 Intégrations"
+                            slide_int.shapes.add_picture(integrations_img, img_left, img_top, width=img_width, height=img_height)
+                            st.success("✅ Slide ajoutée: Intégrations")
+                        else:
+                            st.warning("⚠️ Image Intégrations non trouvée")
                         
                     except Exception as e:
                         st.error(f"❌ Erreur lors de l'insertion des Kanban: {e}")
@@ -4077,7 +4256,7 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                     pass
 
         # Nettoyer les images supplémentaires
-        for extra in [demandes_img, clotures_img]:
+        for extra in [demandes_img, clotures_img, integrations_img]:
             try:
                 if extra and os.path.exists(extra):
                     os.remove(extra)
