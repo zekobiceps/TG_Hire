@@ -1660,8 +1660,8 @@ def create_weekly_report_tab(df_recrutement=None):
 
             if logo_file and logo_file in logos_dict:
                 logo_b64_str = logos_dict[logo_file]
-                # Image un peu plus grande pour lisibilité
-                img_tag = f'<img src="data:image/png;base64,{logo_b64_str}" height="35" style="vertical-align: middle;">'
+                # Image agrandie pour meilleure visibilité
+                img_tag = f'<img src="data:image/png;base64,{logo_b64_str}" height="105" style="vertical-align: middle;">'
                 
                 # Gestion spécifique pour TGCC avec suffixe (ex: TGCC - SIEGE)
                 # Si on a trouvé via le mapping ou via le nom de fichier
@@ -1723,7 +1723,7 @@ def create_weekly_report_tab(df_recrutement=None):
             border-collapse: collapse;
             font-family: Arial, sans-serif;
             box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-            width: 100%;
+            width: 90%;
             margin: 0 auto;
         }
         .custom-table th {
