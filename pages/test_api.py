@@ -1731,7 +1731,7 @@ def create_weekly_report_tab(df_recrutement=None):
             border-collapse: collapse;
             font-family: Arial, sans-serif;
             box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-            width: 90%;
+            width: 75%;
             margin: 0 auto;
         }
         .custom-table th {
@@ -1739,28 +1739,28 @@ def create_weekly_report_tab(df_recrutement=None):
             color: white !important;
             font-weight: bold !important;
             text-align: center !important;
-            padding: 10px 8px !important;
+            padding: 6px 4px !important;
             border: 1px solid white !important;
-            font-size: 1.3em;
+            font-size: 1.1em;
             line-height: 1.3;
             white-space: normal !important;
             word-wrap: break-word !important;
-            max-width: 180px;
+            max-width: 150px;
         }
         .custom-table td {
             text-align: center !important;
-            padding: 10px 8px !important;
+            padding: 6px 4px !important;
             border: 1px solid #ddd !important;
             background-color: white !important;
-            font-size: 1.3em;
+            font-size: 1.1em;
             line-height: 1.2;
             font-weight: 500;
         }
         .custom-table .entity-cell {
             text-align: center !important;
-            padding: 10px !important;
+            padding: 6px 4px !important;
             font-weight: 600;
-            min-width: 150px;
+            min-width: 120px;
         }
         .custom-table .total-row {
             background-color: #9C182F !important; /* Rouge vif */
@@ -1776,13 +1776,13 @@ def create_weekly_report_tab(df_recrutement=None):
         .custom-table .total-row td {
             background-color: #9C182F !important; /* Assurer le fond rouge sur chaque cellule */
             color: white !important; /* Assurer le texte blanc */
-            font-size: 1.3em !important;
+            font-size: 1.1em !important;
             font-weight: bold !important;
             border: 1px solid #9C182F !important; /* Bordures rouges */
         }
         .custom-table .total-row .entity-cell {
             text-align: center !important;
-            padding: 10px !important;
+            padding: 6px 4px !important;
             font-weight: bold !important;
             background-color: #9C182F !important; /* Fond rouge pour la cellule entité */
             color: white !important; /* Texte blanc pour la cellule entité */
