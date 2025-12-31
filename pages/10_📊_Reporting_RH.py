@@ -3562,6 +3562,237 @@ def generate_kanban_html_image(df_recrutement):
         return generate_kanban_image_simple(df_recrutement)
 
 
+def _html_kpi_card(title, value, color="#1f77b4"):
+        return f"""
+        <div class='kpi-card'>
+            <div class='kpi-title'>{title}</div>
+            <div class='kpi-value' style='color:{color};'>{value}</div>
+        </div>
+        """
+
+def generate_demandes_recrutement_html_image(df_recrutement):
+        """Image HTML résumant l'onglet DEMANDES DE RECRUTEMENT (KPIs + listes)."""
+        import tempfile
+        # KPIs
+        df = df_recrutement.copy()
+        total = len(df)
+        # Date colonne
+        date_col = next((c for c in df.columns if "réception" in c.lower() and "date" in c.lower()), None)
+        nouvelles = 0
+        if date_col is not None:
+                now = datetime.now()
+                start_of_month = now.replace(day=1)
+                try:
+                        s = pd.to_datetime(df[date_col], errors='coerce')
+                        nouvelles = int((s >= start_of_month).sum())
+                except Exception:
+                        nouvelles = 0
+        # Annulées/Dépriorisées
+        annulees = 0
+        if 'Statut de la demande' in df.columns:
+                annulees = int(df['Statut de la demande'].astype(str).str.contains('annul|déprioris', case=False, na=False).sum())
+        taux_annulation = f"{round((annulees/total)*100,1)}%" if total > 0 else "N/A"
+
+        # Top directions
+        dir_counts = df['Direction concernée'].value_counts() if 'Direction concernée' in df.columns else pd.Series(dtype=int)
+        dir_top = dir_counts.head(8)
+        # Top postes
+        poste_counts = df['Poste demandé'].value_counts() if 'Poste demandé' in df.columns else pd.Series(dtype=int)
+        poste_top = poste_counts.head(8)
+
+        # Compose HTML
+        kpi_html = """
+        <style>
+        .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0;}
+        .kpi-card{background:#f8f9fa;border-radius:8px;padding:12px;border-left:4px solid #1f77b4;}
+        .kpi-title{font-size:0.9em;color:#334;}
+        .kpi-value{font-size:1.4em;font-weight:bold;}
+        .section{margin-top:12px;}
+        .bar-list{display:flex;flex-direction:column;gap:6px;}
+        .bar-item{display:flex;align-items:center;gap:8px;}
+        .bar-label{flex:0 0 240px;font-size:0.85em;color:#333;}
+        .bar{height:16px;background:#e9ecef;border-radius:8px;flex:1;position:relative;}
+        .bar-fill{height:100%;background:#1f77b4;border-radius:8px;}
+        .bar-value{font-size:0.85em;color:#333;min-width:36px;text-align:right;}
+        .page-title{font-size:1.3em;font-weight:bold;color:#9C182F;margin-bottom:8px;}
+        </style>
+        <div class='page-title'>📋 DEMANDES DE RECRUTEMENT</div>
+        <div class='kpi-grid'>
+            {k1}{k2}{k3}{k4}
+        </div>
+        <div class='section' style='display:grid;grid-template-columns:1fr 1fr;gap:16px;'>
+            <div>
+                <h4 style='margin:0 0 6px 0;color:#2c3e50;'>Top Directions</h4>
+                <div class='bar-list'>
+                    {dirs}
+                </div>
+            </div>
+            <div>
+                <h4 style='margin:0 0 6px 0;color:#2c3e50;'>Top Postes</h4>
+                <div class='bar-list'>
+                    {postes}
+                </div>
+            </div>
+        </div>
+        """
+
+        # Build KPI blocks
+        k1 = _html_kpi_card("Nombre de demandes", total)
+        k2 = _html_kpi_card("Nouvelles (mois en cours)", nouvelles, "#2ca02c")
+        k3 = _html_kpi_card("Annulées/Dépriorisées", annulees, "#ff7f0e")
+        k4 = _html_kpi_card("Taux d'annulation", taux_annulation, "#d62728")
+
+        # Build bar items
+        def _bars(series):
+                items = []
+                maxv = int(series.max()) if not series.empty else 1
+                for label, val in series.items():
+                        w = int(100 * (val/maxv))
+                        items.append(f"<div class='bar-item'><div class='bar-label'>{label}</div><div class='bar'><div class='bar-fill' style='width:{w}%;'></div></div><div class='bar-value'>{val}</div></div>")
+                return "\n".join(items) if items else "<div>Aucune donnée</div>"
+
+        html_full = kpi_html.format(k1=k1, k2=k2, k3=k3, k4=k4, dirs=_bars(dir_top), postes=_bars(poste_top))
+
+        # Render via html2image or fallback
+        try:
+                from html2image import Html2Image
+                chromium_path = find_chromium_executable()
+                if not chromium_path:
+                        raise Exception("Chromium non trouvé")
+                hti = Html2Image(output_path=tempfile.gettempdir(), browser_executable=chromium_path,
+                                                 custom_flags=['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--headless'])
+                img_path = hti.screenshot(html_str=html_full, save_as='demandes_recrutement.png', size=(1920,1080))[0]
+                return img_path
+        except Exception:
+                # Fallback PIL simple
+                from PIL import Image, ImageDraw, ImageFont
+                img = Image.new('RGB',(1920,1080),'white')
+                d = ImageDraw.Draw(img)
+                try:
+                        f_title = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 36)
+                        f_text = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 20)
+                except:
+                        f_title = ImageFont.load_default(); f_text = ImageFont.load_default()
+                d.text((40,40), '📋 DEMANDES DE RECRUTEMENT', fill='#9C182F', font=f_title)
+                y=100
+                for line in [f"Nombre de demandes: {total}", f"Nouvelles (mois): {nouvelles}", f"Annulées/Dépriorisées: {annulees}", f"Taux d'annulation: {taux_annulation}"]:
+                        d.text((40,y), line, fill='black', font=f_text); y+=32
+                out = os.path.join(tempfile.gettempdir(),'demandes_recrutement.png'); img.save(out); return out
+
+def generate_recrutements_clotures_html_image(df_recrutement):
+    """Image HTML résumant l'onglet RECRUTEMENTS CLÔTURÉS."""
+    import tempfile
+    df = df_recrutement.copy()
+    df_cl = df[df['Statut de la demande'] == 'Clôture'] if 'Statut de la demande' in df.columns else df.iloc[0:0]
+    nb = len(df_cl)
+    postes_uniques = df_cl['Poste demandé'].nunique() if 'Poste demandé' in df_cl.columns else 0
+    directions_uniques = df_cl['Direction concernée'].nunique() if 'Direction concernée' in df_cl.columns else 0
+    delai_display = "N/A"
+    rec_col = next((c for c in df_cl.columns if "réception" in c.lower() and "date" in c.lower()), None)
+    ret_col = next((c for c in df_cl.columns if "retour" in c.lower() and "date" in c.lower()), None)
+    if rec_col and ret_col:
+        try:
+            s = pd.to_datetime(df_cl[rec_col], errors='coerce'); e = pd.to_datetime(df_cl[ret_col], errors='coerce')
+            mask = s.notna() & e.notna()
+            durees = (e[mask]-s[mask]).dt.days
+            durees = durees[durees > 0]
+            delai_display = str(round(durees.mean(),1)) if len(durees)>0 else "N/A"
+        except Exception:
+            delai_display = "N/A"
+
+    dir_counts = df_cl['Direction concernée'].value_counts() if 'Direction concernée' in df_cl.columns else pd.Series(dtype=int)
+    dir_top = dir_counts.head(8)
+    mois_col = next((c for c in df_cl.columns if "entrée effective" in c.lower() or "date d'entrée" in c.lower()), None)
+    mois_series = pd.Series(dtype=int)
+    if mois_col:
+        s = pd.to_datetime(df_cl[mois_col], errors='coerce')
+        mois_series = s.dt.to_period('M').value_counts().sort_index()
+    mois_top = mois_series.tail(10)
+
+    kpi_html = """
+    <style>
+    .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0;}
+    .kpi-card{background:#f8f9fa;border-radius:8px;padding:12px;border-left:4px solid #1f77b4;}
+    .kpi-title{font-size:0.9em;color:#334;}
+    .kpi-value{font-size:1.4em;font-weight:bold;}
+    .section{margin-top:12px;}
+    .bar-list{display:flex;flex-direction:column;gap:6px;}
+    .bar-item{display:flex;align-items:center;gap:8px;}
+    .bar-label{flex:0 0 240px;font-size:0.85em;color:#333;}
+    .bar{height:16px;background:#e9ecef;border-radius:8px;flex:1;position:relative;}
+    .bar-fill{height:100%;background:#2ca02c;border-radius:8px;}
+    .bar-value{font-size:0.85em;color:#333;min-width:36px;text-align:right;}
+    .page-title{font-size:1.3em;font-weight:bold;color:#9C182F;margin-bottom:8px;}
+    </style>
+    <div class='page-title'>🎯 RECRUTEMENTS CLÔTURÉS</div>
+    <div class='kpi-grid'>
+        {k1}{k2}{k3}{k4}
+    </div>
+    <div class='section' style='display:grid;grid-template-columns:1fr 1fr;gap:16px;'>
+        <div>
+            <h4 style='margin:0 0 6px 0;color:#2c3e50;'>Top Directions</h4>
+            <div class='bar-list'>
+                {dirs}
+            </div>
+        </div>
+        <div>
+            <h4 style='margin:0 0 6px 0;color:#2c3e50;'>Évolution mensuelle (derniers mois)</h4>
+            <div class='bar-list'>
+                {mois}
+            </div>
+        </div>
+    </div>
+    """
+
+    k1 = _html_kpi_card("Nombre de recrutements", nb)
+    k2 = _html_kpi_card("Postes concernés", postes_uniques, "#2ca02c")
+    k3 = _html_kpi_card("Directions concernées", directions_uniques, "#ff7f0e")
+    k4 = _html_kpi_card("Délai moyen (jours)", delai_display, "#d62728")
+
+    def _bars_labeled(series, color="#2ca02c"):
+        if isinstance(series, pd.Series) and series.dtype == 'int64':
+            maxv = int(series.max()) if not series.empty else 1
+            items = []
+            for label, val in series.items():
+                w = int(100 * (val/maxv))
+                items.append(f"<div class='bar-item'><div class='bar-label'>{label}</div><div class='bar'><div class='bar-fill' style='width:{w}%;background:{color};'></div></div><div class='bar-value'>{val}</div></div>")
+            return "\n".join(items) if items else "<div>Aucune donnée</div>"
+        else:
+            # handle Period counts
+            maxv = int(series.max()) if hasattr(series, 'max') and series.size>0 else 1
+            items = []
+            for label, val in series.items():
+                lbl = str(label)
+                w = int(100 * (int(val)/maxv))
+                items.append(f"<div class='bar-item'><div class='bar-label'>{lbl}</div><div class='bar'><div class='bar-fill' style='width:{w}%;background:{color};'></div></div><div class='bar-value'>{val}</div></div>")
+            return "\n".join(items) if items else "<div>Aucune donnée</div>"
+
+    html_full = kpi_html.format(k1=k1, k2=k2, k3=k3, k4=k4, dirs=_bars_labeled(dir_top), mois=_bars_labeled(mois_top))
+
+    try:
+        from html2image import Html2Image
+        chromium_path = find_chromium_executable()
+        if not chromium_path:
+            raise Exception("Chromium non trouvé")
+        hti = Html2Image(output_path=tempfile.gettempdir(), browser_executable=chromium_path,
+                         custom_flags=['--no-sandbox','--disable-dev-shm-usage','--disable-gpu','--headless'])
+        img_path = hti.screenshot(html_str=html_full, save_as='recrutements_clotures.png', size=(1920,1080))[0]
+        return img_path
+    except Exception:
+        from PIL import Image, ImageDraw, ImageFont
+        img = Image.new('RGB',(1920,1080),'white')
+        d = ImageDraw.Draw(img)
+        try:
+            f_title = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 36)
+            f_text = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 20)
+        except:
+            f_title = ImageFont.load_default(); f_text = ImageFont.load_default()
+        d.text((40,40), '🎯 RECRUTEMENTS CLÔTURÉS', fill='#9C182F', font=f_title)
+        y=100
+        for line in [f"Nombre de recrutements: {nb}", f"Postes concernés: {postes_uniques}", f"Directions concernées: {directions_uniques}", f"Délai moyen (jours): {delai_display}"]:
+            d.text((40,y), line, fill='black', font=f_text); y+=32
+        out = os.path.join(tempfile.gettempdir(),'recrutements_clotures.png'); img.save(out); return out
+
 def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2).pptx"):
     """
     Génère un rapport PowerPoint à partir d'un template en remplaçant les placeholders
@@ -3678,6 +3909,11 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                 st.success(f"✅ Image {statut} générée: {os.path.basename(img_path)}")
             else:
                 st.warning(f"⚠️ Échec génération image {statut}")
+
+        # Générer les deux slides supplémentaires: Demandes de Recrutement et Recrutements Clôturés
+        st.info("🧩 Génération des images pour DEMANDES DE RECRUTEMENT et RECRUTEMENTS CLÔTURÉS...")
+        demandes_img = generate_demandes_recrutement_html_image(df_recrutement)
+        clotures_img = generate_recrutements_clotures_html_image(df_recrutement)
         
         # Parcourir chaque slide et remplacer les placeholders
         for slide_idx, slide in enumerate(prs.slides):
@@ -3785,6 +4021,25 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                                 st.success(f"✅ Slide insérée pour {statut}")
                             else:
                                 st.warning(f"⚠️ Image {statut} non trouvée")
+
+                        # Ajouter juste après Désistement: DEMANDES DE RECRUTEMENT puis RECRUTEMENTS CLÔTURÉS
+                        if demandes_img and os.path.exists(demandes_img):
+                            slide_dem = prs.slides.add_slide(slide.slide_layout)
+                            if hasattr(slide_dem.shapes, 'title') and slide_dem.shapes.title:
+                                slide_dem.shapes.title.text = "📋 DEMANDES DE RECRUTEMENT"
+                            slide_dem.shapes.add_picture(demandes_img, img_left, img_top, width=img_width, height=img_height)
+                            st.success("✅ Slide ajoutée: DEMANDES DE RECRUTEMENT")
+                        else:
+                            st.warning("⚠️ Image DEMANDES DE RECRUTEMENT non trouvée")
+
+                        if clotures_img and os.path.exists(clotures_img):
+                            slide_clo = prs.slides.add_slide(slide.slide_layout)
+                            if hasattr(slide_clo.shapes, 'title') and slide_clo.shapes.title:
+                                slide_clo.shapes.title.text = "🎯 RECRUTEMENTS CLÔTURÉS"
+                            slide_clo.shapes.add_picture(clotures_img, img_left, img_top, width=img_width, height=img_height)
+                            st.success("✅ Slide ajoutée: RECRUTEMENTS CLÔTURÉS")
+                        else:
+                            st.warning("⚠️ Image RECRUTEMENTS CLÔTURÉS non trouvée")
                         
                     except Exception as e:
                         st.error(f"❌ Erreur lors de l'insertion des Kanban: {e}")
@@ -3820,6 +4075,14 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                     os.remove(img_path)
                 except:
                     pass
+
+        # Nettoyer les images supplémentaires
+        for extra in [demandes_img, clotures_img]:
+            try:
+                if extra and os.path.exists(extra):
+                    os.remove(extra)
+            except:
+                pass
         
         # Sauvegarder le PowerPoint modifié dans un BytesIO
         ppt_bytes = BytesIO()
