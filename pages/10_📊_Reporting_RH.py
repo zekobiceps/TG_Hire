@@ -1759,9 +1759,10 @@ def create_weekly_report_tab(df_recrutement=None):
         }
         .custom-table .entity-cell {
             text-align: center !important;
-            padding: 6px 4px !important;
+            padding: 4px 2px !important;
             font-weight: 600;
-            min-width: 120px;
+            min-width: 80px;
+            max-width: 100px;
         }
         .custom-table .total-row {
             background-color: #9C182F !important; /* Rouge vif */
@@ -1783,7 +1784,7 @@ def create_weekly_report_tab(df_recrutement=None):
         }
         .custom-table .total-row .entity-cell {
             text-align: center !important;
-            padding: 6px 4px !important;
+            padding: 4px 2px !important;
             font-weight: bold !important;
             background-color: #9C182F !important; /* Fond rouge pour la cellule entité */
             color: white !important; /* Texte blanc pour la cellule entité */
