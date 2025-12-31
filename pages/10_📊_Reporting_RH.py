@@ -2473,17 +2473,17 @@ def generate_table_image_simple(weekly_metrics):
         
         # Créer l'image
         num_rows = len(metrics_included) + 2  # +2 for header and total
-        row_height = 50
-        width = 1400
-        height = num_rows * row_height + 40
+        row_height = 60  # Plus grand pour meilleure lisibilité
+        width = 1920    # Haute résolution
+        height = num_rows * row_height + 60
         
         img = Image.new('RGB', (width, height), 'white')
         draw = ImageDraw.Draw(img)
         
         # Police
         try:
-            font_header = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)
-            font_data = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 13)
+            font_header = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 18)  # Plus grand
+            font_data = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16)
         except:
             font_header = ImageFont.load_default()
             font_data = ImageFont.load_default()
@@ -2571,20 +2571,20 @@ def generate_kanban_image_simple(df_recrutement):
                 'Désistement': df_recrutement[df_recrutement['Statut de la demande'] == 'Désistement'].head(5),
             }
         
-        # Dimensions
-        col_width = 260
+        # Dimensions (haute résolution)
+        col_width = 370  # Plus large
         num_cols = 5
-        width = col_width * num_cols + 40
-        height = 800
+        width = col_width * num_cols + 60
+        height = 1080  # Haute résolution
         
         img = Image.new('RGB', (width, height), 'white')
         draw = ImageDraw.Draw(img)
         
-        # Polices
+        # Polices (plus grandes)
         try:
-            font_header = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 15)
-            font_card_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 11)
-            font_card = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
+            font_header = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
+            font_card_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)
+            font_card = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 12)
         except:
             font_header = ImageFont.load_default()
             font_card_title = ImageFont.load_default()
@@ -2639,6 +2639,26 @@ def generate_kanban_image_simple(df_recrutement):
         return None
 
 
+def find_chromium_executable():
+    """Trouve le chemin de l'exécutable Chromium en testant plusieurs emplacements."""
+    possible_paths = [
+        '/usr/lib/chromium/chromium',  # Debian/Ubuntu vrai binaire
+        '/usr/bin/chromium',           # Script wrapper
+        '/usr/bin/chromium-browser',
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable',
+        'chromium',                    # PATH
+        'chromium-browser',
+        'google-chrome'
+    ]
+    
+    import shutil
+    for path in possible_paths:
+        if os.path.isfile(path) or shutil.which(path):
+            return path
+    return None
+
+
 def generate_table_html_image(weekly_metrics):
     """Génère une image du tableau des besoins avec logos"""
     import tempfile
@@ -2647,12 +2667,18 @@ def generate_table_html_image(weekly_metrics):
         # Essayer d'abord avec html2image + Chromium
         from html2image import Html2Image
         
+        # Trouver Chromium automatiquement
+        chromium_path = find_chromium_executable()
+        if not chromium_path:
+            raise Exception("Chromium non trouvé")
+        
         # Configurer html2image pour utiliser Chromium avec flags no-sandbox
         hti = Html2Image(
             output_path=tempfile.gettempdir(),
-            browser_executable='/usr/bin/chromium',
+            browser_executable=chromium_path,
             custom_flags=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--headless']
         )
+        st.info(f"✅ Chromium trouvé: {chromium_path}")
     except Exception as e:
         st.warning(f"⚠️ html2image non disponible ({e}), utilisation de PIL à la place")
         # Fallback vers PIL
@@ -2846,12 +2872,18 @@ def generate_kanban_html_image(df_recrutement):
         # Essayer d'abord avec html2image + Chromium
         from html2image import Html2Image
         
+        # Trouver Chromium automatiquement
+        chromium_path = find_chromium_executable()
+        if not chromium_path:
+            raise Exception("Chromium non trouvé")
+        
         # Configurer html2image pour utiliser Chromium avec flags no-sandbox
         hti = Html2Image(
             output_path=tempfile.gettempdir(),
-            browser_executable='/usr/bin/chromium',
+            browser_executable=chromium_path,
             custom_flags=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--headless']
         )
+        st.info(f"✅ Chromium trouvé: {chromium_path}")
     except Exception as e:
         st.warning(f"⚠️ html2image non disponible ({e}), utilisation de PIL à la place")
         return generate_kanban_image_simple(df_recrutement)
