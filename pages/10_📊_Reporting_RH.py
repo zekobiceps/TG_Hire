@@ -2476,14 +2476,20 @@ def generate_table_image_simple(weekly_metrics):
         logo_folder = os.path.join(os.path.dirname(current_dir), "LOGO")
         loaded_logos = {}
         
-        # Mapping des noms d'entités vers les fichiers
+        # Mapping des noms d'entités vers les fichiers (ordre prioritaire)
         entity_logo_map = {
-            'TGCC': 'TGCC.PNG', 'TGEM': 'TGEM.PNG', 'TG ALU': 'TG ALU.PNG',
-            'TG COVER': 'TG COVER.PNG', 'TG STEEL': 'TG STEEL.PNG',
-            'TG STONE': 'TG STONE.PNG', 'TG WOOD': 'TG WOOD.PNG',
-            'STAM': 'STAM.png', 'BFO': 'BFO.png',
-            'TGCC IMMOBILIER': 'tgcc-immobilier.png', 'TGCC-IMMOBILIER': 'tgcc-immobilier.png',
-            'TGCC Immobilier': 'tgcc-immobilier.png'
+            'TGCC IMMOBILIER': 'tgcc-immobilier.png',
+            'TGCC-IMMOBILIER': 'tgcc-immobilier.png',
+            'TGCC Immobilier': 'tgcc-immobilier.png',
+            'TG STEEL': 'TG STEEL.PNG',
+            'TG STONE': 'TG STONE.PNG',
+            'TG ALU': 'TG ALU.PNG',
+            'TG COVER': 'TG COVER.PNG',
+            'TG WOOD': 'TG WOOD.PNG',
+            'STAM': 'STAM.png',
+            'BFO': 'BFO.png',
+            'TGEM': 'TGEM.PNG',
+            'TGCC': 'TGCC.PNG'
         }
 
         if os.path.exists(logo_folder):
@@ -2496,13 +2502,13 @@ def generate_table_image_simple(weekly_metrics):
                         print(f"Erreur chargement logo {filename}: {e}")
 
         def get_logo_image(entity_name):
-            """Récupère l'image du logo pour une entité"""
+            """Récupère l'image du logo pour une entité (priorité à IMMOBILIER)"""
             name_upper = str(entity_name).upper().strip()
             
-            # Chercher dans le mapping
+            # Chercher dans le mapping avec ordre de priorité (déjà ordonné dans entity_logo_map)
             filename = None
             for key in entity_logo_map:
-                if key.upper() in name_upper or name_upper in key.upper():
+                if key.upper() in name_upper:
                     filename = entity_logo_map[key]
                     break
             
@@ -2559,9 +2565,20 @@ def generate_table_image_simple(weekly_metrics):
             cell_center_y = y_offset + row_height // 2
             
             if logo_img:
-                # Redimensionner le logo
+                # Redimensionner le logo avec tailles personnalisées
+                entite_upper = str(entite).upper().strip()
+                if 'STEEL' in entite_upper or 'STONE' in entite_upper:
+                    new_h = 45  # Plus petit pour STEEL et STONE
+                elif 'BFO' in entite_upper:
+                    new_h = 70  # Plus grand pour BFO
+                elif 'ALU' in entite_upper or 'WOOD' in entite_upper:
+                    new_h = 65  # Plus grand pour ALU et WOOD
+                elif 'COVER' in entite_upper:
+                    new_h = 60  # Plus grand pour COVER
+                else:
+                    new_h = 55  # Taille standard
+                
                 aspect_ratio = logo_img.width / logo_img.height
-                new_h = 60
                 new_w = int(new_h * aspect_ratio)
                 if new_w > col_widths[0] - 20:
                     new_w = col_widths[0] - 20
@@ -2810,18 +2827,36 @@ def generate_table_html_image(weekly_metrics):
             if not name_str or pd.isna(name_str):
                 return name_str
             
-            for entity_key, logo_b64 in logos_dict.items():
-                if entity_key.upper() in str(name_str).upper():
-                    size_map = {
-                        'TG STEEL': 50,
-                        'TG STONE': 50,
-                        'TGCC IMMOBILIER': 50,
-                        'TGCC Immobilier': 50,
-                        'BFO': 80
-                    }
-                    logo_size = size_map.get(entity_key, 63)
-                    img_tag = f'<img src="data:image/png;base64,{logo_b64}" style="height: {logo_size}px; vertical-align: middle;" />'
-                    return img_tag
+            name_upper = str(name_str).upper().strip()
+            
+            # Ordre de priorité: vérifier IMMOBILIER en premier pour éviter confusion avec TGCC simple
+            priority_order = [
+                'TGCC IMMOBILIER', 'TGCC-IMMOBILIER', 'TGCC Immobilier',
+                'TG STEEL', 'TG STONE', 'TG ALU', 'TG COVER', 'TG WOOD',
+                'STAM', 'BFO', 'TGEM', 'TGCC'
+            ]
+            
+            for entity_key in priority_order:
+                if entity_key.upper() in name_upper:
+                    if entity_key in logos_dict:
+                        logo_b64 = logos_dict[entity_key]
+                        # Ajuster les tailles selon les besoins
+                        size_map = {
+                            'TG STEEL': 45,      # Réduit
+                            'TG STONE': 45,      # Réduit
+                            'TGCC IMMOBILIER': 50,
+                            'TGCC Immobilier': 50,
+                            'BFO': 90,           # Augmenté
+                            'TG ALU': 75,        # Augmenté
+                            'TG COVER': 70,      # Augmenté
+                            'TG WOOD': 75,       # Augmenté
+                            'STAM': 63,
+                            'TGEM': 63,
+                            'TGCC': 63
+                        }
+                        logo_size = size_map.get(entity_key, 63)
+                        img_tag = f'<img src="data:image/png;base64,{logo_b64}" style="height: {logo_size}px; vertical-align: middle;" />'
+                        return img_tag
             return name_str
         
         # Calculer les totaux
@@ -2880,7 +2915,6 @@ def generate_table_html_image(weekly_metrics):
                     padding: 4px 2px;
                     font-weight: 600;
                     min-width: 80px;
-                    max-width: 100px;
                 }}
                 .custom-table .total-row {{
                     background-color: #9C182F;
@@ -3017,6 +3051,7 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
         html_content = f"""
         <html>
         <head>
+            <meta charset="UTF-8">
             <style>
                 body {{
                     margin: 0;
@@ -3046,19 +3081,27 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
                     padding: 8px;
                     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
                     border-left: 4px solid #1f77b4;
-                    min-height: 80px;
+                    min-height: 120px;
+                    overflow-wrap: break-word;
+                    word-wrap: break-word;
+                    word-break: break-word;
                 }}
                 .kanban-card h4 {{
                     margin: 0 0 4px 0;
                     color: #2c3e50;
-                    font-size: 1.1em;
+                    font-size: 1.0em;
                     line-height: 1.2;
+                    font-weight: bold;
+                    overflow-wrap: break-word;
+                    word-wrap: break-word;
                 }}
                 .kanban-card p {{
                     margin: 2px 0;
-                    font-size: 1.0em;
+                    font-size: 0.9em;
                     color: #555;
                     line-height: 1.1;
+                    overflow-wrap: break-word;
+                    word-wrap: break-word;
                 }}
             </style>
         </head>
@@ -3068,13 +3111,13 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
         """
         
         for poste in postes_data:
-                commentaire_html = f"<p>💬 {poste['commentaire']}</p>" if poste.get('commentaire') else ""
+                commentaire_html = f"<p style='color:#666;font-style:italic;'>&#128172; {poste['commentaire']}</p>" if poste.get('commentaire') and str(poste.get('commentaire')).strip() not in ['nan', 'None', ''] else ""
                 html_content += f"""
                 <div class="kanban-card">
                     <h4><b>{poste['titre']}</b></h4>
-                    <p>📍 {poste['entite']} - {poste['lieu']}</p>
-                    <p>👤 {poste['demandeur']}</p>
-                    <p>✍️ {poste['recruteur']}</p>
+                    <p>&#128205; {poste['entite']} - {poste['lieu']}</p>
+                    <p>&#128100; {poste['demandeur']}</p>
+                    <p>&#9997; {poste['recruteur']}</p>
                     {commentaire_html}
                 </div>
                 """
