@@ -2161,9 +2161,6 @@ def create_weekly_report_tab(df_recrutement=None):
     # total_cartes = len(postes_data)
     st.subheader("Pipeline de Recrutement (Kanban)")
     
-    # Créer les colonnes Streamlit
-    cols_streamlit = st.columns(len(statuts_kanban_display))
-    
     # CSS pour styliser les cartes (compactes, 3 par ligne)
     st.markdown("""
     <style>
@@ -2191,140 +2188,140 @@ def create_weekly_report_tab(df_recrutement=None):
         line-height: 0.95;
     }
     .kanban-header {
-        text-align: center;
+        text-align: left;
         font-weight: bold;
-        font-size: 1.0em;
+        font-size: 1.2em;
         color: #2c3e50;
         padding: 6px;
         background-color: #e8f4fd;
         border-radius: 6px;
         margin-bottom: 8px;
+        margin-top: 15px;
         border: 1px solid #bee5eb;
     }
     </style>
     """, unsafe_allow_html=True)
     
-    # Remplir chaque colonne avec les postes correspondants
+    # Remplir chaque section (ligne) avec les postes correspondants
     for i, statut in enumerate(statuts_kanban_display):
-        with cols_streamlit[i]:
-            # Filtrer les postes pour cette colonne
-            if statut == "Clôture":
-                # Afficher uniquement ceux de la semaine du reporting
-                # On utilise la date d'acceptation du candidat pour filtrer
-                # Récupérer la date de reporting
-                reporting_date = st.session_state.get('reporting_date', None)
-                if reporting_date is None:
-                    today = datetime.now()
-                else:
-                    today = reporting_date if isinstance(reporting_date, datetime) else datetime.combine(reporting_date, datetime.min.time())
-                
-                # Alignement avec la logique du Reporting Hebdomadaire : Semaine PRÉCÉDENTE + Semaine COURANTE
-                # Pour éviter que les cartes disparaissent quand on passe à la semaine suivante
-                current_week_monday = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
-                start_filter = current_week_monday - timedelta(days=7) # Lundi précédent
-                end_filter = current_week_monday + timedelta(days=6)   # Dimanche courant (inclus)
-                
-                # Filtrer les postes clôturés avec date d'acceptation dans la semaine du reporting
-                def in_reporting_week(poste):
-                    accept_date = poste.get('date_acceptation')
-                    if not accept_date:
-                        return False
-                    if isinstance(accept_date, str):
-                        try:
-                            accept_date = pd.to_datetime(accept_date, errors='coerce')
-                        except Exception:
-                            return False
-                    if not pd.notna(accept_date):
-                        return False
-                    # Comparaison inclusive [Lundi précédent, Dimanche courant]
-                    return start_filter <= accept_date <= end_filter + timedelta(days=1) # +1 jour pour inclure la fin de journée si datetime
-                postes_in_col = [p for p in postes_data if p["statut"] == statut and in_reporting_week(p)]
-            elif statut == "Désistement":
-                # Afficher uniquement ceux de la semaine du reporting (basé sur date de désistement)
-                reporting_date = st.session_state.get('reporting_date', None)
-                if reporting_date is None:
-                    today = datetime.now()
-                else:
-                    today = reporting_date if isinstance(reporting_date, datetime) else datetime.combine(reporting_date, datetime.min.time())
-                
-                # Alignement avec la logique du Reporting Hebdomadaire : Semaine PRÉCÉDENTE + Semaine COURANTE
-                current_week_monday = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
-                start_filter = current_week_monday - timedelta(days=7) # Lundi précédent
-                end_filter = current_week_monday + timedelta(days=6)   # Dimanche courant (inclus)
-                
-                def in_reporting_week_desistement(poste):
-                    desist_date = poste.get('date_desistement')
-                    if not desist_date:
-                        return False
-                    
-                    if isinstance(desist_date, str):
-                        try:
-                            desist_date = pd.to_datetime(desist_date, errors='coerce')
-                        except Exception:
-                            return False
-                    if not pd.notna(desist_date):
-                        return False
-                        
-                    # Comparaison inclusive [Lundi précédent, Dimanche courant]
-                    return start_filter <= desist_date <= end_filter + timedelta(days=1)
-
-                postes_in_col = [p for p in postes_data if p["statut"] == statut and in_reporting_week_desistement(p)]
+        # Filtrer les postes pour cette colonne
+        if statut == "Clôture":
+            # Afficher uniquement ceux de la semaine du reporting
+            # On utilise la date d'acceptation du candidat pour filtrer
+            # Récupérer la date de reporting
+            reporting_date = st.session_state.get('reporting_date', None)
+            if reporting_date is None:
+                today = datetime.now()
             else:
-                postes_in_col = [p for p in postes_data if p["statut"] == statut]
-            nb_postes = len(postes_in_col)
-            # En-tête de colonne avec le nombre de cartes
-            st.markdown(f'<div class="kanban-header">{statut} ({nb_postes})</div>', unsafe_allow_html=True)
-            # Afficher les cartes avec 3 par ligne
-            for idx in range(0, len(postes_in_col), 3):
-                card_cols = st.columns(3)
-                if idx < len(postes_in_col):
-                    poste = postes_in_col[idx]
-                    commentaire = poste.get('commentaire', '')
-                    commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
-                    with card_cols[0]:
-                        card_html = f"""
-                        <div class="kanban-card">
-                            <h4><b>{poste['titre']}</b></h4>
-                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
-                            <p>👤 {poste.get('demandeur', 'N/A')}</p>
-                            <p>✍️ {poste.get('recruteur', 'N/A')}</p>
-                            {commentaire_html}
-                        </div>
-                        """
-                        st.markdown(card_html, unsafe_allow_html=True)
-                if idx + 1 < len(postes_in_col):
-                    poste = postes_in_col[idx + 1]
-                    commentaire = poste.get('commentaire', '')
-                    commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
-                    with card_cols[1]:
-                        card_html = f"""
-                        <div class="kanban-card">
-                            <h4><b>{poste['titre']}</b></h4>
-                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
-                            <p>👤 {poste.get('demandeur', 'N/A')}</p>
-                            <p>✍️ {poste.get('recruteur', 'N/A')}</p>
-                            {commentaire_html}
-                        </div>
-                        """
-                        st.markdown(card_html, unsafe_allow_html=True)
-                if idx + 2 < len(postes_in_col):
-                    poste = postes_in_col[idx + 2]
-                    commentaire = poste.get('commentaire', '')
-                    commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
-                    with card_cols[2]:
-                        card_html = f"""
-                        <div class="kanban-card">
-                            <h4><b>{poste['titre']}</b></h4>
-                            <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
-                            <p>👤 {poste.get('demandeur', 'N/A')}</p>
-                            <p>✍️ {poste.get('recruteur', 'N/A')}</p>
-                            {commentaire_html}
-                        </div>
-                        """
-                        st.markdown(card_html, unsafe_allow_html=True)
-                else:
-                    with card_cols[2]:
-                        st.empty()
+                today = reporting_date if isinstance(reporting_date, datetime) else datetime.combine(reporting_date, datetime.min.time())
+            
+            # Alignement avec la logique du Reporting Hebdomadaire : Semaine PRÉCÉDENTE + Semaine COURANTE
+            # Pour éviter que les cartes disparaissent quand on passe à la semaine suivante
+            current_week_monday = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
+            start_filter = current_week_monday - timedelta(days=7) # Lundi précédent
+            end_filter = current_week_monday + timedelta(days=6)   # Dimanche courant (inclus)
+            
+            # Filtrer les postes clôturés avec date d'acceptation dans la semaine du reporting
+            def in_reporting_week(poste):
+                accept_date = poste.get('date_acceptation')
+                if not accept_date:
+                    return False
+                if isinstance(accept_date, str):
+                    try:
+                        accept_date = pd.to_datetime(accept_date, errors='coerce')
+                    except Exception:
+                        return False
+                if not pd.notna(accept_date):
+                    return False
+                # Comparaison inclusive [Lundi précédent, Dimanche courant]
+                return start_filter <= accept_date <= end_filter + timedelta(days=1) # +1 jour pour inclure la fin de journée si datetime
+            postes_in_col = [p for p in postes_data if p["statut"] == statut and in_reporting_week(p)]
+        elif statut == "Désistement":
+            # Afficher uniquement ceux de la semaine du reporting (basé sur date de désistement)
+            reporting_date = st.session_state.get('reporting_date', None)
+            if reporting_date is None:
+                today = datetime.now()
+            else:
+                today = reporting_date if isinstance(reporting_date, datetime) else datetime.combine(reporting_date, datetime.min.time())
+            
+            # Alignement avec la logique du Reporting Hebdomadaire : Semaine PRÉCÉDENTE + Semaine COURANTE
+            current_week_monday = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
+            start_filter = current_week_monday - timedelta(days=7) # Lundi précédent
+            end_filter = current_week_monday + timedelta(days=6)   # Dimanche courant (inclus)
+            
+            def in_reporting_week_desistement(poste):
+                desist_date = poste.get('date_desistement')
+                if not desist_date:
+                    return False
+                
+                if isinstance(desist_date, str):
+                    try:
+                        desist_date = pd.to_datetime(desist_date, errors='coerce')
+                    except Exception:
+                        return False
+                if not pd.notna(desist_date):
+                    return False
+                    
+                # Comparaison inclusive [Lundi précédent, Dimanche courant]
+                return start_filter <= desist_date <= end_filter + timedelta(days=1)
+
+            postes_in_col = [p for p in postes_data if p["statut"] == statut and in_reporting_week_desistement(p)]
+        else:
+            postes_in_col = [p for p in postes_data if p["statut"] == statut]
+        nb_postes = len(postes_in_col)
+        # En-tête de colonne avec le nombre de cartes
+        st.markdown(f'<div class="kanban-header">{statut} ({nb_postes})</div>', unsafe_allow_html=True)
+        # Afficher les cartes avec 3 par ligne
+        for idx in range(0, len(postes_in_col), 3):
+            card_cols = st.columns(3)
+            if idx < len(postes_in_col):
+                poste = postes_in_col[idx]
+                commentaire = poste.get('commentaire', '')
+                commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
+                with card_cols[0]:
+                    card_html = f"""
+                    <div class="kanban-card">
+                        <h4><b>{poste['titre']}</b></h4>
+                        <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
+                        <p>👤 {poste.get('demandeur', 'N/A')}</p>
+                        <p>✍️ {poste.get('recruteur', 'N/A')}</p>
+                        {commentaire_html}
+                    </div>
+                    """
+                    st.markdown(card_html, unsafe_allow_html=True)
+            if idx + 1 < len(postes_in_col):
+                poste = postes_in_col[idx + 1]
+                commentaire = poste.get('commentaire', '')
+                commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
+                with card_cols[1]:
+                    card_html = f"""
+                    <div class="kanban-card">
+                        <h4><b>{poste['titre']}</b></h4>
+                        <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
+                        <p>👤 {poste.get('demandeur', 'N/A')}</p>
+                        <p>✍️ {poste.get('recruteur', 'N/A')}</p>
+                        {commentaire_html}
+                    </div>
+                    """
+                    st.markdown(card_html, unsafe_allow_html=True)
+            if idx + 2 < len(postes_in_col):
+                poste = postes_in_col[idx + 2]
+                commentaire = poste.get('commentaire', '')
+                commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
+                with card_cols[2]:
+                    card_html = f"""
+                    <div class="kanban-card">
+                        <h4><b>{poste['titre']}</b></h4>
+                        <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
+                        <p>👤 {poste.get('demandeur', 'N/A')}</p>
+                        <p>✍️ {poste.get('recruteur', 'N/A')}</p>
+                        {commentaire_html}
+                    </div>
+                    """
+                    st.markdown(card_html, unsafe_allow_html=True)
+            else:
+                with card_cols[2]:
+                    st.empty()
 
 
 def main():
