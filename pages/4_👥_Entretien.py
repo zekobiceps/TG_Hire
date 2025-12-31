@@ -628,7 +628,7 @@ with main_tabs[3]:
 
         # --- Historique des Données ---
         st.header("Historique des Évaluations")
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(df, width="stretch")
         st.caption("Vous pouvez trier et explorer les données en cliquant sur les en-têtes de colonnes.")
 
         # Option d'export
@@ -703,7 +703,7 @@ with main_tabs[4]:
         # Statistiques détaillées
         st.subheader("Statistiques Détaillées")
         if len(df) > 0:
-            st.dataframe(df.describe(), use_container_width=True)
+            st.dataframe(df.describe(), width="stretch")
 
         # Analyse par test utilisé
         if 'Test Utilisé' in df.columns:
@@ -714,4 +714,4 @@ with main_tabs[4]:
                 'Score Cognitif': 'mean',
                 'Score Échantillon': 'mean'
             }).round(2)
-            st.dataframe(test_stats, use_container_width=True)
+            st.dataframe(test_stats, width="stretch")

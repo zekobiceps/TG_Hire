@@ -591,7 +591,7 @@ def render_plotly_scrollable(fig, max_height=500):
         components.html(wrapper, height=max_height, scrolling=True)
     except Exception:
         # Fallback to default renderer
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width="stretch")
 
 def create_recrutements_clotures_tab(df_recrutement, global_filters):
     """Onglet Recrutements Clôturés avec style carte"""
@@ -682,7 +682,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                         tickangle=45
                     )
                 )
-                st.plotly_chart(fig_evolution, use_container_width=True)
+                st.plotly_chart(fig_evolution, width="stretch")
     
     with col2:
         # Répartition par modalité de recrutement (CORRECTION: légende déplacée à l'extérieur)
@@ -710,7 +710,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 # Ajuster les marges pour faire de la place à la légende
                 margin=dict(l=20, r=150, t=50, b=20)
             )
-            st.plotly_chart(fig_modalite, use_container_width=True)
+            st.plotly_chart(fig_modalite, width="stretch")
 
     # Graphiques en ligne 2
     col3, col4 = st.columns(2)
@@ -831,7 +831,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                      'bar': {'color': "green"},
                     }))
         fig_candidats.update_layout(height=300)
-        st.plotly_chart(fig_candidats, use_container_width=True)
+        st.plotly_chart(fig_candidats, width="stretch")
 
     # ... KPI row now includes Délai moyen de recrutement (moved up)
 
@@ -906,7 +906,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             height=300,
             legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5)
         )
-        st.plotly_chart(fig_statut, use_container_width=True)
+        st.plotly_chart(fig_statut, width="stretch")
     
     with col2:
         # Comparaison par raison du recrutement
@@ -933,7 +933,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
                 xaxis={'categoryorder':'total descending'},
                 title=dict(text="Comparaison par raison du recrutement", x=0, xanchor='left', font=TITLE_FONT)
             )
-            st.plotly_chart(fig_raison, use_container_width=True)
+            st.plotly_chart(fig_raison, width="stretch")
     
     with col3:
         # Évolution des demandes
@@ -961,7 +961,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
                     hovertemplate='%{y}<extra></extra>'
                 )
                 fig_evolution_demandes.update_layout(height=360, margin=dict(t=60, b=30, l=20, r=20), xaxis_title=None, yaxis_title=None)
-                st.plotly_chart(fig_evolution_demandes, use_container_width=True)
+                st.plotly_chart(fig_evolution_demandes, width="stretch")
     
     # Deuxième ligne de graphiques
     col4, col5 = st.columns(2)
@@ -1126,7 +1126,7 @@ def create_integrations_tab(df_recrutement, global_filters):
         if 'Affectation' in df_filtered.columns:
             # Utiliser la fonction existante create_affectation_chart
             fig_affectation = create_affectation_chart(df_filtered)
-            st.plotly_chart(fig_affectation, use_container_width=True)
+            st.plotly_chart(fig_affectation, width="stretch")
         else:
             st.warning("Colonne 'Affectation' non trouvée dans les données.")
 
@@ -1151,7 +1151,7 @@ def create_integrations_tab(df_recrutement, global_filters):
                 hovertemplate='%{y}<extra></extra>'
             )
             fig_evolution_int.update_layout(height=400, xaxis_title="Mois", yaxis_title="Nombre")
-            st.plotly_chart(fig_evolution_int, use_container_width=True)
+            st.plotly_chart(fig_evolution_int, width="stretch")
     
     # Tableau détaillé des intégrations
     st.subheader("📋 Détail des Intégrations en Cours")
@@ -1196,7 +1196,7 @@ def create_integrations_tab(df_recrutement, global_filters):
         df_display = df_display.reset_index(drop=True)
         
         # Afficher sans index (hide_index=True)
-        st.dataframe(df_display, use_container_width=True, hide_index=True)
+        st.dataframe(df_display, width="stretch", hide_index=True)
     else:
         st.warning("Colonnes d'affichage non disponibles")
 
@@ -2494,7 +2494,7 @@ def main():
             
             if st.button("🔁 Synchroniser depuis Google Sheets", 
                         help="Synchroniser les données depuis Google Sheets",
-                        use_container_width=True):
+                        width="stretch"):
                 
                 try:
                     # Utiliser la fonction de connexion automatique (comme dans Home.py)
@@ -2554,7 +2554,7 @@ def main():
         
         # Bouton pour actualiser les données - s'étale sur les deux colonnes
         st.markdown("---")
-        if st.button("🔄 Actualiser les Graphiques", type="primary", use_container_width=True):
+        if st.button("🔄 Actualiser les Graphiques", type="primary", width="stretch"):
             st.session_state.data_updated = True
             st.success("Données mises à jour ! Consultez les autres onglets.")
     
