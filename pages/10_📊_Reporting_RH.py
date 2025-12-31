@@ -2085,7 +2085,7 @@ def create_weekly_report_tab(df_recrutement=None):
     entite_col = _find_col(cols, ['entité', 'entite', 'entité demandeuse', 'entite demandeuse', 'entité'])
     lieu_col = _find_col(cols, ['lieu', 'affectation', 'site'])
     demandeur_col = _find_col(cols, ['demandeur', 'requester'])
-    recruteur_col = _find_col(cols, ['recruteur', 'recruiter'])
+    recruteur_col = _find_col(cols, ['responsable de traitement de la demande', 'recruteur', 'recruiter'])
     commentaire_col = _find_col(cols, ['commentaire', 'comment'])
     accept_date_col = _find_col(cols, ["date d'acceptation du candidat", "date d'acceptation", "date d'acceptation de la promesse", "date d'acceptation promesse", "date d'accept"])  # robust search
     desistement_date_col = _find_col(cols, ["date de désistement", "date désistement", "date desistement", "date desistement"])
@@ -2201,11 +2201,11 @@ def create_weekly_report_tab(df_recrutement=None):
         font-size: 1.3em !important;
         color: #FFFFFF !important;
         padding: 8px;
-        background-color: #FF0000 !important;
+        background-color: #DC143C !important;
         border-radius: 6px;
         margin-bottom: 10px;
         margin-top: 20px;
-        border: 1px solid #cc0000;
+        border: 1px solid #B01030;
     }
     </style>
     """, unsafe_allow_html=True)
