@@ -2633,6 +2633,13 @@ def generate_table_html_image(weekly_metrics):
     from html2image import Html2Image
     import tempfile
     
+    # Configurer html2image pour utiliser Chromium avec flags no-sandbox
+    hti = Html2Image(
+        output_path=tempfile.gettempdir(),
+        browser_executable='/usr/bin/chromium',
+        custom_flags=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+    )
+    
     try:
         # Créer le HTML du tableau exactement comme dans Streamlit
         metrics_by_entity = weekly_metrics.get('metrics_by_entity', {})
@@ -2802,8 +2809,7 @@ def generate_table_html_image(weekly_metrics):
         </html>
         """
         
-        # Convertir en image
-        hti = Html2Image(output_path=tempfile.gettempdir())
+        # Convertir en image avec html2image
         image_path = hti.screenshot(html_str=html_table, save_as='table.png', size=(1200, 800))[0]
         
         return image_path
@@ -2816,6 +2822,13 @@ def generate_kanban_html_image():
     """Génère une image du Kanban"""
     from html2image import Html2Image
     import tempfile
+    
+    # Configurer html2image pour utiliser Chromium avec flags no-sandbox
+    hti = Html2Image(
+        output_path=tempfile.gettempdir(),
+        browser_executable='/usr/bin/chromium',
+        custom_flags=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+    )
     
     try:
         # HTML du Kanban (repris du code existant)
@@ -2917,8 +2930,7 @@ def generate_kanban_html_image():
         </html>
         """
         
-        # Convertir en image
-        hti = Html2Image(output_path=tempfile.gettempdir())
+        # Convertir en image avec html2image
         image_path = hti.screenshot(html_str=html_kanban, save_as='kanban.png', size=(1400, 900))[0]
         
         return image_path
@@ -2953,10 +2965,10 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
         else:
             st.warning("⚠️ Métriques hebdomadaires vides, le PowerPoint sera généré avec des données limitées.")
         
-        # Générer les images simples avec PIL (pas de dépendance Chrome)
-        st.info("📊 Génération des images pour le PowerPoint...")
-        table_image_path = generate_table_image_simple(weekly_metrics) if weekly_metrics else None
-        kanban_image_path = generate_kanban_image_simple(df_recrutement)
+        # Générer les images HTML avec logos (utilise html2image + Chromium)
+        st.info("📊 Génération des images avec les visualisations Streamlit...")
+        table_image_path = generate_table_html_image(weekly_metrics) if weekly_metrics else None
+        kanban_image_path = generate_kanban_html_image()
         
         # Debug: Vérifier les chemins des images
         if table_image_path and os.path.exists(table_image_path):
