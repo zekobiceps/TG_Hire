@@ -3603,18 +3603,18 @@ def generate_demandes_recrutement_html_image(df_recrutement):
         # Compose HTML
         kpi_html = """
         <style>
-        .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0;}
-        .kpi-card{background:#f8f9fa;border-radius:8px;padding:12px;border-left:4px solid #1f77b4;}
-        .kpi-title{font-size:0.9em;color:#334;}
-        .kpi-value{font-size:1.4em;font-weight:bold;}
-        .section{margin-top:12px;}
-        .bar-list{display:flex;flex-direction:column;gap:6px;}
-        .bar-item{display:flex;align-items:center;gap:8px;}
-        .bar-label{flex:0 0 240px;font-size:0.85em;color:#333;}
-        .bar{height:16px;background:#e9ecef;border-radius:8px;flex:1;position:relative;}
-        .bar-fill{height:100%;background:#1f77b4;border-radius:8px;}
-        .bar-value{font-size:0.85em;color:#333;min-width:36px;text-align:right;}
-        .page-title{font-size:1.3em;font-weight:bold;color:#9C182F;margin-bottom:8px;}
+        .kpi-grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0;}}
+        .kpi-card{{background:#f8f9fa;border-radius:8px;padding:12px;border-left:4px solid #1f77b4;}}
+        .kpi-title{{font-size:0.9em;color:#334;}}
+        .kpi-value{{font-size:1.4em;font-weight:bold;}}
+        .section{{margin-top:12px;}}
+        .bar-list{{display:flex;flex-direction:column;gap:6px;}}
+        .bar-item{{display:flex;align-items:center;gap:8px;}}
+        .bar-label{{flex:0 0 240px;font-size:0.85em;color:#333;}}
+        .bar{{height:16px;background:#e9ecef;border-radius:8px;flex:1;position:relative;}}
+        .bar-fill{{height:100%;background:#1f77b4;border-radius:8px;}}
+        .bar-value{{font-size:0.85em;color:#333;min-width:36px;text-align:right;}}
+        .page-title{{font-size:1.3em;font-weight:bold;color:#9C182F;margin-bottom:8px;}}
         </style>
         <div class='page-title'>📋 DEMANDES DE RECRUTEMENT</div>
         <div class='kpi-grid'>
@@ -3711,18 +3711,18 @@ def generate_recrutements_clotures_html_image(df_recrutement):
 
     kpi_html = """
     <style>
-    .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0;}
-    .kpi-card{background:#f8f9fa;border-radius:8px;padding:12px;border-left:4px solid #1f77b4;}
-    .kpi-title{font-size:0.9em;color:#334;}
-    .kpi-value{font-size:1.4em;font-weight:bold;}
-    .section{margin-top:12px;}
-    .bar-list{display:flex;flex-direction:column;gap:6px;}
-    .bar-item{display:flex;align-items:center;gap:8px;}
-    .bar-label{flex:0 0 240px;font-size:0.85em;color:#333;}
-    .bar{height:16px;background:#e9ecef;border-radius:8px;flex:1;position:relative;}
-    .bar-fill{height:100%;background:#2ca02c;border-radius:8px;}
-    .bar-value{font-size:0.85em;color:#333;min-width:36px;text-align:right;}
-    .page-title{font-size:1.3em;font-weight:bold;color:#9C182F;margin-bottom:8px;}
+    .kpi-grid{{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0;}}
+    .kpi-card{{background:#f8f9fa;border-radius:8px;padding:12px;border-left:4px solid #1f77b4;}}
+    .kpi-title{{font-size:0.9em;color:#334;}}
+    .kpi-value{{font-size:1.4em;font-weight:bold;}}
+    .section{{margin-top:12px;}}
+    .bar-list{{display:flex;flex-direction:column;gap:6px;}}
+    .bar-item{{display:flex;align-items:center;gap:8px;}}
+    .bar-label{{flex:0 0 240px;font-size:0.85em;color:#333;}}
+    .bar{{height:16px;background:#e9ecef;border-radius:8px;flex:1;position:relative;}}
+    .bar-fill{{height:100%;background:#2ca02c;border-radius:8px;}}
+    .bar-value{{font-size:0.85em;color:#333;min-width:36px;text-align:right;}}
+    .page-title{{font-size:1.3em;font-weight:bold;color:#9C182F;margin-bottom:8px;}}
     </style>
     <div class='page-title'>🎯 RECRUTEMENTS CLÔTURÉS</div>
     <div class='kpi-grid'>
