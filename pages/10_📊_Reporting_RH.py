@@ -2518,63 +2518,32 @@ def create_weekly_report_tab(df_recrutement=None):
 def generate_table_image_simple(weekly_metrics):
     """Génère une image simple du tableau avec PIL incluant les LOGOS"""
     from PIL import Image, ImageDraw, ImageFont
-    """
-    .kanban-container {
-        display: flex;
-        flex-wrap: nowrap;
-        gap: 10px;
-        margin-bottom: 10px;
-        width: 100%;
-    }
-    .kanban-card {
-        flex: 1 1 auto;
-        border-radius: 5px;
-        background-color: #f0f2f6;
-        padding: 8px;
-        border-left: 4px solid #1f77b4;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        min-height: 80px;
-        margin: 0;
-        box-sizing: border-box;
-    }
-    .kanban-card h4 {
-        margin-top: 0;
-        margin-bottom: 4px;
-        font-size: 1.25em !important;
-        color: #2c3e50;
-        line-height: 1.2;
-        white-space: normal;
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-        hyphens: auto;
-        word-break: break-all;
-        display: -webkit-box;
-        -webkit-line-clamp: 3;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-    }
-    .kanban-card p {
-        margin-bottom: 2px;
-        font-size: 1.0em !important;
-        color: #555;
-        line-height: 1.1;
-        white-space: normal;
-    }
-    .kanban-header {
-        font-weight: bold;
-        font-size: 2em !important;
-        color: #FFFFFF !important;
-        padding: 8px 0 8px 10px;
-        background-color: #9C182F !important;
-        border-radius: 6px;
-        margin-bottom: 0;
-        margin-top: 20px;
-        border: 1px solid #B01030;
-        text-align: left !important;
-        width: 100%;
-        box-sizing: border-box;
-    }
-    """
+    import tempfile
+    # --- Fonction utilitaire pour les logos ---
+    def get_logo_image(entity_name):
+        name_upper = str(entity_name).upper().strip()
+        filename = None
+        for map_key, map_filename in entity_logo_map.items():
+            if map_key.upper() in name_upper:
+                filename = map_filename
+                break
+        if not filename:
+            for fname in loaded_logos.keys():
+                base_name = os.path.splitext(fname)[0]
+                if base_name in name_upper or name_upper in base_name:
+                    filename = fname
+                    break
+        if filename and filename.upper() in loaded_logos:
+            return loaded_logos[filename.upper()]
+        return None
+
+    metrics_by_entity = weekly_metrics.get('metrics_by_entity', {})
+    excluded_entities = {'BESIX-TGCC', 'DECO EXCELL', 'TG PREFA'}
+    metrics_included = {k: v for k, v in metrics_by_entity.items() if k not in excluded_entities}
+    total_avant = sum(data['avant'] for data in metrics_included.values())
+    total_nouveaux = sum(data['nouveaux'] for data in metrics_included.values())
+    total_pourvus = sum(data['pourvus'] for data in metrics_included.values())
+    total_en_cours = sum(data['en_cours'] for data in metrics_included.values())
 
         # --- DESSIN DU TABLEAU ---
         num_rows = len(metrics_included) + 2  # +1 pour header, +1 pour total
