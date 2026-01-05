@@ -2516,6 +2516,7 @@ def create_weekly_report_tab(df_recrutement=None):
 def generate_table_image_simple(weekly_metrics):
     """Génère une image simple du tableau avec PIL incluant les LOGOS"""
     from PIL import Image, ImageDraw, ImageFont
+    """
     .kanban-container {
         display: flex;
         flex-wrap: nowrap;
@@ -2571,6 +2572,7 @@ def generate_table_image_simple(weekly_metrics):
         width: 100%;
         box-sizing: border-box;
     }
+    """
                     filename = entity_logo_map[key]
                     break
             
