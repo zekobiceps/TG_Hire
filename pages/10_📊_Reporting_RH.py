@@ -2575,20 +2575,6 @@ def generate_table_image_simple(weekly_metrics):
         box-sizing: border-box;
     }
     """
-                    filename = entity_logo_map[key]
-                    break
-            
-            # Si pas trouvé, chercher directement
-            if not filename:
-                for fname in loaded_logos.keys():
-                    base_name = os.path.splitext(fname)[0]
-                    if base_name in name_upper or name_upper in base_name:
-                        filename = fname
-                        break
-            
-            if filename and filename.upper() in loaded_logos:
-                return loaded_logos[filename.upper()]
-            return None
 
         # --- DESSIN DU TABLEAU ---
         num_rows = len(metrics_included) + 2  # +1 pour header, +1 pour total
