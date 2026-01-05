@@ -20,157 +20,176 @@ import unicodedata
 from pptx import Presentation
 def _format_long_title(title: str, max_line_length: int = 20) -> str:
     """Insert spaces in very long titles without natural breaks to force wrapping.
-    def generate_table_image_simple(weekly_metrics):
-        """Génère une image simple du tableau avec PIL incluant les LOGOS"""
-        import os
-        import tempfile
-        from PIL import Image, ImageDraw, ImageFont
-        try:
-            # Mapping des noms d'entités vers les fichiers (ordre prioritaire)
-            entity_logo_map = {
-                'TGCC IMMOBILIER': 'tgcc-immobilier.png',
-                'TGCC-IMMOBILIER': 'tgcc-immobilier.png',
-                'TGCC Immobilier': 'tgcc-immobilier.png',
-                'TG STEEL': 'TG STEEL.PNG',
-                'TG STONE': 'TG STONE.PNG',
-                'TG ALU': 'TG ALU.PNG',
-                'TG COVER': 'TG COVER.PNG',
-                'TG WOOD': 'TG WOOD.PNG',
-                'STAM': 'STAM.png',
-                'BFO': 'BFO.png',
-                'TGEM': 'TGEM.PNG',
-                'TGCC': 'TGCC.PNG'
-            }
-            # Chargement des logos
-            current_dir = os.path.dirname(os.path.abspath(__file__))
-            logo_folder = os.path.join(os.path.dirname(current_dir), "LOGO")
-            loaded_logos = {}
-            if os.path.exists(logo_folder):
-                for filename in os.listdir(logo_folder):
-                    if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.jfif')):
-                        try:
-                            img_path = os.path.join(logo_folder, filename)
-                            loaded_logos[filename.upper()] = Image.open(img_path).convert("RGBA")
-                        except Exception as e:
-                            print(f"Erreur chargement logo {filename}: {e}")
+    - If the title already contains spaces, return as-is (CSS will wrap).
+    - If no spaces and length > max_line_length, insert spaces every max_line_length chars.
+    """
+    if title is None:
+        return ""
+    s = str(title).strip()
+    if len(s) <= max_line_length:
+        return s
+    if " " in s:
+        return s
+    chunks = [s[i:i+max_line_length] for i in range(0, len(s), max_line_length)]
+    return " ".join(chunks)
+def smart_wrap_title(title, max_line_length=25):
+    """Retourne un titre avec des balises <br> aux bons endroits.
+    - Coupe aux espaces si possible pour respecter max_line_length
+    - Gère les titres sans espaces (souvent en MAJUSCULES) via regex
+    - Dernier recours: coupe tous les max_line_length caractères
+    """
+    if not isinstance(title, str):
+        return title
 
-            def get_logo_image(entity_name):
-                name_upper = str(entity_name).upper().strip()
-                filename = None
-                for map_key, map_filename in entity_logo_map.items():
-                    if map_key.upper() in name_upper:
-                        filename = map_filename
-                        break
-                if not filename:
-                    for fname in loaded_logos.keys():
-                        base_name = os.path.splitext(fname)[0]
-                        if base_name in name_upper or name_upper in base_name:
-                            filename = fname
-                            break
-                if filename and filename.upper() in loaded_logos:
-                    return loaded_logos[filename.upper()]
-                return None
+    s = title.strip()
+    if len(s) <= max_line_length:
+        return s
 
-            metrics_by_entity = weekly_metrics.get('metrics_by_entity', {})
-            excluded_entities = {'BESIX-TGCC', 'DECO EXCELL', 'TG PREFA'}
-            metrics_included = {k: v for k, v in metrics_by_entity.items() if k not in excluded_entities}
-            total_avant = sum(data['avant'] for data in metrics_included.values())
-            total_nouveaux = sum(data['nouveaux'] for data in metrics_included.values())
-            total_pourvus = sum(data['pourvus'] for data in metrics_included.values())
-            total_en_cours = sum(data['en_cours'] for data in metrics_included.values())
+    # Si le titre contient des espaces, essayer de couper aux espaces
+    if " " in s:
+        words = s.split()
+        lines = []
+        current = ""
+        for w in words:
+            sep = (1 if current else 0)
+            if len(current) + sep + len(w) <= max_line_length:
+                current = (current + (" " if current else "") + w)
+            else:
+                if current:
+                    lines.append(current)
+                current = w
+        if current:
+            lines.append(current)
+        return "<br>".join(lines)
 
-            # --- DESSIN DU TABLEAU ---
-            num_rows = len(metrics_included) + 2  # +1 pour header, +1 pour total
-            row_height = 80  # Hauteur augmentée pour les logos
-            width = 1920
-            height = num_rows * row_height + 60
-            img = Image.new('RGB', (width, height), 'white')
-            draw = ImageDraw.Draw(img)
-            # Police
-            try:
-                font_header = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24)
-                font_data = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 20)
-            except:
-                font_header = ImageFont.load_default()
-                font_data = ImageFont.load_default()
-            # Header
-            headers = ['Entité', 'Postes avant', 'Nouveaux postes', 'Postes pourvus', 'Postes en cours']
-            col_widths = [350, 300, 300, 300, 300]  # Première colonne plus large pour logos
-            x_positions = [0] + [sum(col_widths[:i+1]) for i in range(len(col_widths))]
-            # Dessiner le header
-            draw.rectangle([0, 0, width, row_height], fill='#9C182F')
-            for i, header in enumerate(headers):
-                x = x_positions[i] + col_widths[i] // 2
-                draw.text((x, row_height // 2), header, fill='white', font=font_header, anchor='mm')
-            # Données
-            y_offset = row_height
-            # Custom sort and filter
-            sorted_items = []
-            for entite, data in metrics_included.items():
-                entite_str = str(entite).upper().strip()
-                if 'TG WOOD' in entite_str and data['avant'] == 0 and data['nouveaux'] == 0 and data['pourvus'] == 0 and data['en_cours'] == 0:
-                    continue
-                if entite_str in ['NAN', 'NONE', '']:
-                    continue
-                sorted_items.append((entite, data))
-            def sort_key(item):
-                name = str(item[0]).upper().strip()
-                if name == 'TGCC':
-                    return '000_TGCC'
-                if 'TGCC' in name and 'IMMOBILIER' not in name:
-                    return '001_TGCC_OTHER'
-                return name
-            sorted_items.sort(key=sort_key)
-            for entite, data in sorted_items:
-                if ((y_offset - row_height) // row_height) % 2 == 0:
-                    draw.rectangle([0, y_offset, width, y_offset + row_height], fill='#f9f9f9')
-                logo_img = get_logo_image(entite)
-                cell_center_x = x_positions[0] + col_widths[0] // 2
-                cell_center_y = y_offset + row_height // 2
-                if logo_img:
-                    entite_upper = str(entite).upper().strip()
-                    if 'STEEL' in entite_upper or 'STONE' in entite_upper:
-                        new_h = 45
-                    elif 'BFO' in entite_upper:
-                        new_h = 70
-                    elif 'ALU' in entite_upper or 'WOOD' in entite_upper:
-                        new_h = 65
-                    elif 'COVER' in entite_upper:
-                        new_h = 60
-                    else:
-                        new_h = 55
-                    aspect_ratio = logo_img.width / logo_img.height
-                    new_w = int(new_h * aspect_ratio)
-                    if new_w > col_widths[0] - 20:
-                        new_w = col_widths[0] - 20
-                        new_h = int(new_w / aspect_ratio)
-                    logo_resized = logo_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-                    paste_x = int(cell_center_x - new_w / 2)
-                    paste_y = int(cell_center_y - new_h / 2)
-                    if logo_resized.mode == 'RGBA':
-                        img.paste(logo_resized, (paste_x, paste_y), logo_resized)
-                    else:
-                        img.paste(logo_resized, (paste_x, paste_y))
-                else:
-                    draw.text((cell_center_x, cell_center_y), entite[:20], fill='black', font=font_data, anchor='mm')
-                draw.text((x_positions[1] + col_widths[1] // 2, y_offset + row_height // 2), str(data['avant'] if data['avant'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
-                draw.text((x_positions[2] + col_widths[2] // 2, y_offset + row_height // 2), str(data['nouveaux'] if data['nouveaux'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
-                draw.text((x_positions[3] + col_widths[3] // 2, y_offset + row_height // 2), str(data['pourvus'] if data['pourvus'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
-                draw.text((x_positions[4] + col_widths[4] // 2, y_offset + row_height // 2), str(data['en_cours'] if data['en_cours'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
-                draw.line([(0, y_offset + row_height), (width, y_offset + row_height)], fill='#ddd', width=1)
-                y_offset += row_height
-            draw.rectangle([0, y_offset, width, y_offset + row_height], fill='#9C182F')
-            draw.text((x_positions[0] + col_widths[0] // 2, y_offset + row_height // 2), 'TOTAL', fill='white', font=font_header, anchor='mm')
-            draw.text((x_positions[1] + col_widths[1] // 2, y_offset + row_height // 2), str(total_avant), fill='white', font=font_header, anchor='mm')
-            draw.text((x_positions[2] + col_widths[2] // 2, y_offset + row_height // 2), str(total_nouveaux), fill='white', font=font_header, anchor='mm')
-            draw.text((x_positions[3] + col_widths[3] // 2, y_offset + row_height // 2), str(total_pourvus), fill='white', font=font_header, anchor='mm')
-            draw.text((x_positions[4] + col_widths[4] // 2, y_offset + row_height // 2), str(total_en_cours), fill='white', font=font_header, anchor='mm')
-            output_path = os.path.join(tempfile.gettempdir(), 'table_reporting.png')
-            img.save(output_path)
-            return output_path
-        except Exception as e:
-            st.error(f"Erreur génération image tableau: {e}")
-            return None
+    # Pour les titres sans espaces (majuscules, acronymes, chiffres)
+    try:
+        parts = re.findall(r"[A-Z][a-z]+|[A-Z]{2,}|[a-z]+|\d+", s)
+    except Exception:
+        parts = []
+
+    if len(parts) > 1:
+        spaced = " ".join(parts)
+        return smart_wrap_title(spaced, max_line_length)
+
+    # Dernier recours: couper tous les max_line_length caractères
+    chunks = [s[i:i+max_line_length] for i in range(0, len(s), max_line_length)]
+    return "<br>".join(chunks)
+from pptx.util import Inches, Pt
+from PIL import Image
+import io
+
+def _normalize_text(text):
+    """A global function to safely normalize text, handling None and NaN values."""
+    if text is None or (isinstance(text, float) and np.isnan(text)):
+        return ''
+    s = str(text)
+    s = unicodedata.normalize('NFKD', s)
+    s = ''.join(ch for ch in s if not unicodedata.combining(ch))
+    return s.lower().strip()
+
+def _norm(x):
+    """Robust text normalization for status/keywords matching."""
+    return _normalize_text(x)
+
+st.set_page_config(
+    page_title="📊 Reporting RH Complet",
+    page_icon="📊",
+    layout="wide"
+)
+
+# Vérification de la connexion
+if not st.session_state.get("logged_in", False):
+    st.stop()
+
+
+def _truncate_label(label: str, max_len: int = 20) -> str:
+    """Truncate long labels to a max length and append ellipsis.
+
+    Returns a truncated string (if needed). Keep a plain truncation without
+    changing accents/characters. Default max_len=20 (adjustable).
+    """
+    if not isinstance(label, str):
+        return label
+    if len(label) <= max_len:
+        return label
+    return label[: max_len - 4].rstrip() + '....'
+
+
+# Shared title font used for all main charts so typography is consistent
+TITLE_FONT = dict(family="Arial, sans-serif", size=16, color="#111111", )
+
+
+def _parse_mixed_dates(series):
+    """Parse a pandas Series that may contain mixed date representations.
+
+    Strategy:
+      1. If values are numeric (Excel serial), convert using Excel epoch.
+      2. Try pd.to_datetime(..., dayfirst=True) to favor dd/mm/YYYY formats.
+      3. Fallback to pd.to_datetime(..., errors='coerce') for other formats.
+
+    Returns a datetime64[ns] Series with NaT for unparseable values.
+    """
+    s = series.copy()
+    try:
+        # If the series is numeric (Excel serials), convert per-element where it looks numeric
+        if pd.api.types.is_numeric_dtype(s):
+            def _maybe_excel(x):
+                try:
+                    xf = float(x)
+                    return pd.Timestamp('1899-12-30') + pd.Timedelta(days=xf)
+                except Exception:
+                    return pd.NaT
+
+            return s.apply(lambda v: _maybe_excel(v) if pd.notna(v) and str(v).strip().replace('.', '', 1).isdigit() else pd.NaT).combine_first(pd.to_datetime(s, dayfirst=True, errors='coerce'))
+    except Exception:
+        # fall through to permissive parsing below
+        pass
+
+    # First try dayfirst parsing (dd/mm/YYYY common in French contexts)
+    parsed = pd.to_datetime(s, dayfirst=True, errors='coerce')
+    # If many values still NaT, try fallback parsing
+    if parsed.isna().sum() > len(parsed) * 0.25:
+        parsed_alt = pd.to_datetime(s, errors='coerce')
+        parsed = parsed.combine_first(parsed_alt)
+
+    return parsed
+
+
+def render_kpi_cards(recrutements, postes, directions, delai_display, delai_help=None):
+    """Render a single-row set of KPI cards (inline, bordered with colored left stripe).
+
+    Cards: [Nombre de recrutements] [Postes concernés] [Directions concernées] [Délai moyen]
+    Returns an HTML string ready to be inserted with st.markdown(..., unsafe_allow_html=True)
+    """
+
+    css = """
+<style>
+.kpi-row{display:flex;gap:12px;flex-wrap:nowrap;align-items:stretch;margin-bottom:12px}
+.kpi-card{flex:1 1 0;background:#fff;border-radius:6px;padding:12px;display:flex;flex-direction:column;justify-content:center;border:1px solid #e6eef6}
+.kpi-card .title{font-size:12px;color:#2c3e50;margin-bottom:6px}
+.kpi-card .value{font-size:22px;font-weight:700;color:#172b4d}
+.kpi-accent{border-left:6px solid #1f77b4}
+.kpi-green{border-left-color:#2ca02c}
+.kpi-orange{border-left-color:#ff7f0e}
+.kpi-purple{border-left-color:#6f42c1}
+.kpi-help{font-size:11px;color:#555;margin-top:6px}
+@media(max-width:800px){.kpi-row{flex-direction:column}}
+</style>
+"""
+
+    html = f"""
+{css}
+<div class='kpi-row'>
+    <div class='kpi-card kpi-accent' style='flex:2'>
+        <div class='title'>Nombre de recrutements</div>
+        <div class='value'>{recrutements:,}</div>
+    </div>
+    <div class='kpi-card kpi-green'>
+        <div class='title'>Postes concernés</div>
+        <div class='value'>{postes:,}</div>
+    </div>
+    <div class='kpi-card kpi-orange'>
         <div class='title'>Directions concernées</div>
         <div class='value'>{directions:,}</div>
     </div>
@@ -201,24 +220,22 @@ def _format_long_title(title: str, max_line_length: int = 20) -> str:
         df2 = df2[df2['time_to_hire_days'].notna()].copy()
 
     if df2.empty:
-            filename = None
-            # Recherche dans le mapping avec ordre de priorité
-            for map_key, map_filename in entity_logo_map.items():
-                if map_key.upper() in name_upper:
-                    filename = map_filename
-                    break
+        overall = None
+    else:
+        overall = {
+            'mean': float(df2['time_to_hire_days'].mean()),
+            'median': float(df2['time_to_hire_days'].median()),
+            'std': float(df2['time_to_hire_days'].std()),
+            'count': int(df2['time_to_hire_days'].count())
+        }
 
-            # Si pas trouvé, chercher directement dans les fichiers chargés
-            if not filename:
-                for fname in loaded_logos.keys():
-                    base_name = os.path.splitext(fname)[0]
-                    if base_name in name_upper or name_upper in base_name:
-                        filename = fname
-                        break
-
-            if filename and filename.upper() in loaded_logos:
-                return loaded_logos[filename.upper()]
-            return None
+    # Grouped aggregates
+    by_direction = None
+    by_poste = None
+    if 'Direction concernée' in df2.columns:
+        by_direction = df2.groupby('Direction concernée')['time_to_hire_days'].agg(['count', 'mean', 'median', 'std']).reset_index().sort_values('mean')
+    if 'Poste demandé' in df2.columns:
+        by_poste = df2.groupby('Poste demandé')['time_to_hire_days'].agg(['count', 'mean', 'median', 'std']).reset_index().sort_values('mean')
 
     return {
         'start_col': start_col,
@@ -2468,21 +2485,15 @@ def create_weekly_report_tab(df_recrutement=None):
         nb_postes = len(postes_in_col)
         st.markdown(f'<div class="kanban-header">{statut} ({nb_postes})</div>', unsafe_allow_html=True)
 
-        # Limiter à 8 cartes par ligne et étaler sur la largeur
+        # Limiter à 8 cartes par ligne
         max_cards_per_row = 8
         for row_start in range(0, len(postes_in_col), max_cards_per_row):
-            row_cards = postes_in_col[row_start:row_start+max_cards_per_row]
-            # Calculer le nombre de cartes dans la ligne
-            nb_row_cards = len(row_cards)
-            # Ajuster le style flex pour que les cartes s'étalent sur la largeur
-            cards_html = f'<div class="kanban-container" style="display: flex; flex-wrap: nowrap; gap: 10px; justify-content: stretch;">'
-            for poste in row_cards:
+            cards_html = '<div class="kanban-container">'
+            for poste in postes_in_col[row_start:row_start+max_cards_per_row]:
                 commentaire = poste.get('commentaire', '')
                 commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
                 titre_fmt = smart_wrap_title(poste.get('titre', ''))
-                # Largeur dynamique pour chaque carte
-                card_width = f"{100/nb_row_cards - 1:.2f}%" if nb_row_cards > 0 else "12%"
-                card_div = f"""<div class=\"kanban-card\" style=\"width: {card_width}; min-width: 180px;\">
+                card_div = f"""<div class="kanban-card">
 <h4><b>{titre_fmt}</b></h4>
 <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
 <p>👤 {poste.get('demandeur', 'N/A')}</p>
@@ -2491,69 +2502,30 @@ def create_weekly_report_tab(df_recrutement=None):
 </div>"""
                 cards_html += card_div
             cards_html += '</div>'
-            # Titre de colonne plus grand et aligné avec la ligne
-            st.markdown(f'<div class="kanban-header" style="font-size:2em; margin-bottom:0; margin-top:20px; border-radius:6px; border:1px solid #B01030; background-color:#9C182F; color:#fff; text-align:left; padding-left:10px; width:100%;">{statut} ({nb_postes})</div>', unsafe_allow_html=True)
             st.markdown(cards_html, unsafe_allow_html=True)
 
 
 def generate_table_image_simple(weekly_metrics):
-        import os
-        # Mapping des noms d'entités vers les fichiers (ordre prioritaire)
-        entity_logo_map = {
-            'TGCC IMMOBILIER': 'tgcc-immobilier.png',
-            'TGCC-IMMOBILIER': 'tgcc-immobilier.png',
-            'TGCC Immobilier': 'tgcc-immobilier.png',
-            'TG STEEL': 'TG STEEL.PNG',
-            'TG STONE': 'TG STONE.PNG',
-            'TG ALU': 'TG ALU.PNG',
-            'TG COVER': 'TG COVER.PNG',
-            'TG WOOD': 'TG WOOD.PNG',
-            'STAM': 'STAM.png',
-            'BFO': 'BFO.png',
-            'TGEM': 'TGEM.PNG',
-            'TGCC': 'TGCC.PNG'
-        }
-
-        # Chargement des logos
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        logo_folder = os.path.join(os.path.dirname(current_dir), "LOGO")
-        loaded_logos = {}
-        if os.path.exists(logo_folder):
-            for filename in os.listdir(logo_folder):
-                if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.jfif')):
-                    try:
-                        img_path = os.path.join(logo_folder, filename)
-                        loaded_logos[filename.upper()] = Image.open(img_path).convert("RGBA")
-                    except Exception as e:
-                        print(f"Erreur chargement logo {filename}: {e}")
     """Génère une image simple du tableau avec PIL incluant les LOGOS"""
     from PIL import Image, ImageDraw, ImageFont
     import tempfile
-    # --- Fonction utilitaire pour les logos ---
-    def get_logo_image(entity_name):
-        name_upper = str(entity_name).upper().strip()
-        filename = None
-        for map_key, map_filename in entity_logo_map.items():
-            if map_key.upper() in name_upper:
-                filename = map_filename
-                break
-        if not filename:
-            for fname in loaded_logos.keys():
-                base_name = os.path.splitext(fname)[0]
-                if base_name in name_upper or name_upper in base_name:
-                    filename = fname
-                    break
-        if filename and filename.upper() in loaded_logos:
-            return loaded_logos[filename.upper()]
-        return None
-
-    metrics_by_entity = weekly_metrics.get('metrics_by_entity', {})
-    excluded_entities = {'BESIX-TGCC', 'DECO EXCELL', 'TG PREFA'}
-    metrics_included = {k: v for k, v in metrics_by_entity.items() if k not in excluded_entities}
-    import os
-    from PIL import Image, ImageDraw, ImageFont
-    import tempfile
+    
     try:
+        metrics_by_entity = weekly_metrics.get('metrics_by_entity', {})
+        excluded_entities = {'BESIX-TGCC', 'DECO EXCELL', 'TG PREFA'}
+        metrics_included = {k: v for k, v in metrics_by_entity.items() if k not in excluded_entities}
+        
+        # Calculer les totaux
+        total_avant = sum(data['avant'] for data in metrics_included.values())
+        total_nouveaux = sum(data['nouveaux'] for data in metrics_included.values())
+        total_pourvus = sum(data['pourvus'] for data in metrics_included.values())
+        total_en_cours = sum(data['en_cours'] for data in metrics_included.values())
+        
+        # --- CHARGEMENT DES LOGOS ---
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        logo_folder = os.path.join(os.path.dirname(current_dir), "LOGO")
+        loaded_logos = {}
+        
         # Mapping des noms d'entités vers les fichiers (ordre prioritaire)
         entity_logo_map = {
             'TGCC IMMOBILIER': 'tgcc-immobilier.png',
@@ -2569,10 +2541,7 @@ def generate_table_image_simple(weekly_metrics):
             'TGEM': 'TGEM.PNG',
             'TGCC': 'TGCC.PNG'
         }
-        # Chargement des logos
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        logo_folder = os.path.join(os.path.dirname(current_dir), "LOGO")
-        loaded_logos = {}
+
         if os.path.exists(logo_folder):
             for filename in os.listdir(logo_folder):
                 if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.jfif')):
@@ -2583,37 +2552,37 @@ def generate_table_image_simple(weekly_metrics):
                         print(f"Erreur chargement logo {filename}: {e}")
 
         def get_logo_image(entity_name):
+            """Récupère l'image du logo pour une entité (priorité à IMMOBILIER)"""
             name_upper = str(entity_name).upper().strip()
+            
+            # Chercher dans le mapping avec ordre de priorité (déjà ordonné dans entity_logo_map)
             filename = None
-            for map_key, map_filename in entity_logo_map.items():
-                if map_key.upper() in name_upper:
-                    filename = map_filename
+            for key in entity_logo_map:
+                if key.upper() in name_upper:
+                    filename = entity_logo_map[key]
                     break
+            
+            # Si pas trouvé, chercher directement
             if not filename:
                 for fname in loaded_logos.keys():
                     base_name = os.path.splitext(fname)[0]
                     if base_name in name_upper or name_upper in base_name:
                         filename = fname
                         break
+            
             if filename and filename.upper() in loaded_logos:
                 return loaded_logos[filename.upper()]
             return None
-
-        metrics_by_entity = weekly_metrics.get('metrics_by_entity', {})
-        excluded_entities = {'BESIX-TGCC', 'DECO EXCELL', 'TG PREFA'}
-        metrics_included = {k: v for k, v in metrics_by_entity.items() if k not in excluded_entities}
-        total_avant = sum(data['avant'] for data in metrics_included.values())
-        total_nouveaux = sum(data['nouveaux'] for data in metrics_included.values())
-        total_pourvus = sum(data['pourvus'] for data in metrics_included.values())
-        total_en_cours = sum(data['en_cours'] for data in metrics_included.values())
 
         # --- DESSIN DU TABLEAU ---
         num_rows = len(metrics_included) + 2  # +1 pour header, +1 pour total
         row_height = 80  # Hauteur augmentée pour les logos
         width = 1920
         height = num_rows * row_height + 60
+        
         img = Image.new('RGB', (width, height), 'white')
         draw = ImageDraw.Draw(img)
+        
         # Police
         try:
             font_header = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24)
@@ -2621,84 +2590,174 @@ def generate_table_image_simple(weekly_metrics):
         except:
             font_header = ImageFont.load_default()
             font_data = ImageFont.load_default()
+        
         # Header
         headers = ['Entité', 'Postes avant', 'Nouveaux postes', 'Postes pourvus', 'Postes en cours']
         col_widths = [350, 300, 300, 300, 300]  # Première colonne plus large pour logos
         x_positions = [0] + [sum(col_widths[:i+1]) for i in range(len(col_widths))]
+        
         # Dessiner le header
         draw.rectangle([0, 0, width, row_height], fill='#9C182F')
         for i, header in enumerate(headers):
             x = x_positions[i] + col_widths[i] // 2
             draw.text((x, row_height // 2), header, fill='white', font=font_header, anchor='mm')
+        
         # Données
         y_offset = row_height
+        
         # Custom sort and filter
         sorted_items = []
         for entite, data in metrics_included.items():
+            # Filter out empty TG WOOD (duplicate) or any empty entity
+            # User specifically mentioned duplicate TG WOOD being empty
             entite_str = str(entite).upper().strip()
             if 'TG WOOD' in entite_str and data['avant'] == 0 and data['nouveaux'] == 0 and data['pourvus'] == 0 and data['en_cours'] == 0:
                 continue
+            # Also filter out literal "NAN" or "NONE" strings if they appear as entities
             if entite_str in ['NAN', 'NONE', '']:
                 continue
+                
             sorted_items.append((entite, data))
+            
+        # Sort: TGCC first, then others
         def sort_key(item):
             name = str(item[0]).upper().strip()
             if name == 'TGCC':
-                return '000_TGCC'
+                return '000_TGCC' # Force first
             if 'TGCC' in name and 'IMMOBILIER' not in name:
-                return '001_TGCC_OTHER'
+                 return '001_TGCC_OTHER'
             return name
+            
         sorted_items.sort(key=sort_key)
+
         for entite, data in sorted_items:
+            # Lignes alternées
             if ((y_offset - row_height) // row_height) % 2 == 0:
                 draw.rectangle([0, y_offset, width, y_offset + row_height], fill='#f9f9f9')
+            
+            # Logo ou texte de l'entité
             logo_img = get_logo_image(entite)
             cell_center_x = x_positions[0] + col_widths[0] // 2
             cell_center_y = y_offset + row_height // 2
+            
             if logo_img:
+                # Redimensionner le logo avec tailles personnalisées
                 entite_upper = str(entite).upper().strip()
                 if 'STEEL' in entite_upper or 'STONE' in entite_upper:
-                    new_h = 45
+                    new_h = 45  # Plus petit pour STEEL et STONE
                 elif 'BFO' in entite_upper:
-                    new_h = 70
+                    new_h = 70  # Plus grand pour BFO
                 elif 'ALU' in entite_upper or 'WOOD' in entite_upper:
-                    new_h = 65
+                    new_h = 65  # Plus grand pour ALU et WOOD
                 elif 'COVER' in entite_upper:
-                    new_h = 60
+                    new_h = 60  # Plus grand pour COVER
                 else:
-                    new_h = 55
+                    new_h = 55  # Taille standard
+                
                 aspect_ratio = logo_img.width / logo_img.height
                 new_w = int(new_h * aspect_ratio)
                 if new_w > col_widths[0] - 20:
                     new_w = col_widths[0] - 20
                     new_h = int(new_w / aspect_ratio)
+                
                 logo_resized = logo_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
                 paste_x = int(cell_center_x - new_w / 2)
                 paste_y = int(cell_center_y - new_h / 2)
+                
+                # Coller avec transparence
                 if logo_resized.mode == 'RGBA':
                     img.paste(logo_resized, (paste_x, paste_y), logo_resized)
                 else:
                     img.paste(logo_resized, (paste_x, paste_y))
             else:
+                # Fallback texte si pas de logo
                 draw.text((cell_center_x, cell_center_y), entite[:20], fill='black', font=font_data, anchor='mm')
-            draw.text((x_positions[1] + col_widths[1] // 2, y_offset + row_height // 2), str(data['avant'] if data['avant'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
-            draw.text((x_positions[2] + col_widths[2] // 2, y_offset + row_height // 2), str(data['nouveaux'] if data['nouveaux'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
-            draw.text((x_positions[3] + col_widths[3] // 2, y_offset + row_height // 2), str(data['pourvus'] if data['pourvus'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
-            draw.text((x_positions[4] + col_widths[4] // 2, y_offset + row_height // 2), str(data['en_cours'] if data['en_cours'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
+            draw.text((x_positions[1] + col_widths[1] // 2, y_offset + row_height // 2), 
+                     str(data['avant'] if data['avant'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
+            draw.text((x_positions[2] + col_widths[2] // 2, y_offset + row_height // 2), 
+                     str(data['nouveaux'] if data['nouveaux'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
+            draw.text((x_positions[3] + col_widths[3] // 2, y_offset + row_height // 2), 
+                     str(data['pourvus'] if data['pourvus'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
+            draw.text((x_positions[4] + col_widths[4] // 2, y_offset + row_height // 2), 
+                     str(data['en_cours'] if data['en_cours'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
+            
+            # Bordures
             draw.line([(0, y_offset + row_height), (width, y_offset + row_height)], fill='#ddd', width=1)
             y_offset += row_height
+        
+        # Ligne TOTAL
         draw.rectangle([0, y_offset, width, y_offset + row_height], fill='#9C182F')
-        draw.text((x_positions[0] + col_widths[0] // 2, y_offset + row_height // 2), 'TOTAL', fill='white', font=font_header, anchor='mm')
-        draw.text((x_positions[1] + col_widths[1] // 2, y_offset + row_height // 2), str(total_avant), fill='white', font=font_header, anchor='mm')
-        draw.text((x_positions[2] + col_widths[2] // 2, y_offset + row_height // 2), str(total_nouveaux), fill='white', font=font_header, anchor='mm')
-        draw.text((x_positions[3] + col_widths[3] // 2, y_offset + row_height // 2), str(total_pourvus), fill='white', font=font_header, anchor='mm')
-        draw.text((x_positions[4] + col_widths[4] // 2, y_offset + row_height // 2), str(total_en_cours), fill='white', font=font_header, anchor='mm')
+        draw.text((x_positions[0] + col_widths[0] // 2, y_offset + row_height // 2), 
+                 'TOTAL', fill='white', font=font_header, anchor='mm')
+        draw.text((x_positions[1] + col_widths[1] // 2, y_offset + row_height // 2), 
+                 str(total_avant), fill='white', font=font_header, anchor='mm')
+        draw.text((x_positions[2] + col_widths[2] // 2, y_offset + row_height // 2), 
+                 str(total_nouveaux), fill='white', font=font_header, anchor='mm')
+        draw.text((x_positions[3] + col_widths[3] // 2, y_offset + row_height // 2), 
+                 str(total_pourvus), fill='white', font=font_header, anchor='mm')
+        draw.text((x_positions[4] + col_widths[4] // 2, y_offset + row_height // 2), 
+                 str(total_en_cours), fill='white', font=font_header, anchor='mm')
+        
+        # Sauvegarder
         output_path = os.path.join(tempfile.gettempdir(), 'table_reporting.png')
         img.save(output_path)
         return output_path
+        
     except Exception as e:
         st.error(f"Erreur génération image tableau: {e}")
         return None
+
+
+def generate_kanban_image_simple(df_recrutement):
+    """Génère une image simple du Kanban avec PIL"""
+    from PIL import Image, ImageDraw, ImageFont
+    import tempfile
+    import pandas as pd
+    
+    try:
+        # Si pas de dataframe, utiliser des données par défaut
+        if df_recrutement is None or len(df_recrutement) == 0:
+            colonnes = {
+                'Sourcing': pd.DataFrame(),
+                'Shortlisté': pd.DataFrame(),
+                'Signature DRH': pd.DataFrame(),
+                'Clôture': pd.DataFrame(),
+                'Désistement': pd.DataFrame(),
+            }
+        else:
+            # Charger les données du kanban
+            colonnes = {
+                'Sourcing': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Sourcing'],
+                'Shortlisté': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Shortlisté'],
+                'Signature DRH': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Signature DRH'],
+                'Clôture': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Clôture'],
+                'Désistement': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Désistement'],
+            }
+        
+        # Dimensions (haute résolution)
+        col_width = 370  # Plus large
+        num_cols = 5
+        width = col_width * num_cols + 60
+        height = 1080  # Haute résolution
+        
+        img = Image.new('RGB', (width, height), 'white')
+        draw = ImageDraw.Draw(img)
+        
+        # Polices (plus grandes)
+        try:
+            font_header = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
+            font_card_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)
+            font_card = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 12)
+        except:
+            font_header = ImageFont.load_default()
+            font_card_title = ImageFont.load_default()
+            font_card = ImageFont.load_default()
+        
+        x_offset = 20
+        for statut, df_col in colonnes.items():
+            # En-tête de colonne
+            draw.rectangle([x_offset, 20, x_offset + col_width - 10, 60], fill='#9C182F', outline='#9C182F')
+            count = len(df_col)
             draw.text((x_offset + col_width // 2 - 5, 40), f"{statut} ({count})", 
                      fill='white', font=font_header, anchor='mm')
             
