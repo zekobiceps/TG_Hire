@@ -2485,15 +2485,21 @@ def create_weekly_report_tab(df_recrutement=None):
         nb_postes = len(postes_in_col)
         st.markdown(f'<div class="kanban-header">{statut} ({nb_postes})</div>', unsafe_allow_html=True)
 
-        # Limiter à 8 cartes par ligne
+        # Limiter à 8 cartes par ligne et étaler sur la largeur
         max_cards_per_row = 8
         for row_start in range(0, len(postes_in_col), max_cards_per_row):
-            cards_html = '<div class="kanban-container">'
-            for poste in postes_in_col[row_start:row_start+max_cards_per_row]:
+            row_cards = postes_in_col[row_start:row_start+max_cards_per_row]
+            # Calculer le nombre de cartes dans la ligne
+            nb_row_cards = len(row_cards)
+            # Ajuster le style flex pour que les cartes s'étalent sur la largeur
+            cards_html = f'<div class="kanban-container" style="display: flex; flex-wrap: nowrap; gap: 10px; justify-content: stretch;">'
+            for poste in row_cards:
                 commentaire = poste.get('commentaire', '')
                 commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
                 titre_fmt = smart_wrap_title(poste.get('titre', ''))
-                card_div = f"""<div class="kanban-card">
+                # Largeur dynamique pour chaque carte
+                card_width = f"{100/nb_row_cards - 1:.2f}%" if nb_row_cards > 0 else "12%"
+                card_div = f"""<div class=\"kanban-card\" style=\"width: {card_width}; min-width: 180px;\">
 <h4><b>{titre_fmt}</b></h4>
 <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
 <p>👤 {poste.get('demandeur', 'N/A')}</p>
@@ -2502,63 +2508,69 @@ def create_weekly_report_tab(df_recrutement=None):
 </div>"""
                 cards_html += card_div
             cards_html += '</div>'
+            # Titre de colonne plus grand et aligné avec la ligne
+            st.markdown(f'<div class="kanban-header" style="font-size:2em; margin-bottom:0; margin-top:20px; border-radius:6px; border:1px solid #B01030; background-color:#9C182F; color:#fff; text-align:left; padding-left:10px; width:100%;">{statut} ({nb_postes})</div>', unsafe_allow_html=True)
             st.markdown(cards_html, unsafe_allow_html=True)
 
 
 def generate_table_image_simple(weekly_metrics):
     """Génère une image simple du tableau avec PIL incluant les LOGOS"""
     from PIL import Image, ImageDraw, ImageFont
-    import tempfile
-    
-    try:
-        metrics_by_entity = weekly_metrics.get('metrics_by_entity', {})
-        excluded_entities = {'BESIX-TGCC', 'DECO EXCELL', 'TG PREFA'}
-        metrics_included = {k: v for k, v in metrics_by_entity.items() if k not in excluded_entities}
-        
-        # Calculer les totaux
-        total_avant = sum(data['avant'] for data in metrics_included.values())
-        total_nouveaux = sum(data['nouveaux'] for data in metrics_included.values())
-        total_pourvus = sum(data['pourvus'] for data in metrics_included.values())
-        total_en_cours = sum(data['en_cours'] for data in metrics_included.values())
-        
-        # --- CHARGEMENT DES LOGOS ---
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        logo_folder = os.path.join(os.path.dirname(current_dir), "LOGO")
-        loaded_logos = {}
-        
-        # Mapping des noms d'entités vers les fichiers (ordre prioritaire)
-        entity_logo_map = {
-            'TGCC IMMOBILIER': 'tgcc-immobilier.png',
-            'TGCC-IMMOBILIER': 'tgcc-immobilier.png',
-            'TGCC Immobilier': 'tgcc-immobilier.png',
-            'TG STEEL': 'TG STEEL.PNG',
-            'TG STONE': 'TG STONE.PNG',
-            'TG ALU': 'TG ALU.PNG',
-            'TG COVER': 'TG COVER.PNG',
-            'TG WOOD': 'TG WOOD.PNG',
-            'STAM': 'STAM.png',
-            'BFO': 'BFO.png',
-            'TGEM': 'TGEM.PNG',
-            'TGCC': 'TGCC.PNG'
-        }
-
-        if os.path.exists(logo_folder):
-            for filename in os.listdir(logo_folder):
-                if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.jfif')):
-                    try:
-                        img_path = os.path.join(logo_folder, filename)
-                        loaded_logos[filename.upper()] = Image.open(img_path).convert("RGBA")
-                    except Exception as e:
-                        print(f"Erreur chargement logo {filename}: {e}")
-
-        def get_logo_image(entity_name):
-            """Récupère l'image du logo pour une entité (priorité à IMMOBILIER)"""
-            name_upper = str(entity_name).upper().strip()
-            
-            # Chercher dans le mapping avec ordre de priorité (déjà ordonné dans entity_logo_map)
-            filename = None
-            for key in entity_logo_map:
-                if key.upper() in name_upper:
+    .kanban-container {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 10px;
+        margin-bottom: 10px;
+        width: 100%;
+    }
+    .kanban-card {
+        flex: 1 1 auto;
+        border-radius: 5px;
+        background-color: #f0f2f6;
+        padding: 8px;
+        border-left: 4px solid #1f77b4;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        min-height: 80px;
+        margin: 0;
+        box-sizing: border-box;
+    }
+    .kanban-card h4 {
+        margin-top: 0;
+        margin-bottom: 4px;
+        font-size: 1.25em !important;
+        color: #2c3e50;
+        line-height: 1.2;
+        white-space: normal;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
+        word-break: break-all;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .kanban-card p {
+        margin-bottom: 2px;
+        font-size: 1.0em !important;
+        color: #555;
+        line-height: 1.1;
+        white-space: normal;
+    }
+    .kanban-header {
+        font-weight: bold;
+        font-size: 2em !important;
+        color: #FFFFFF !important;
+        padding: 8px 0 8px 10px;
+        background-color: #9C182F !important;
+        border-radius: 6px;
+        margin-bottom: 0;
+        margin-top: 20px;
+        border: 1px solid #B01030;
+        text-align: left !important;
+        width: 100%;
+        box-sizing: border-box;
+    }
                     filename = entity_logo_map[key]
                     break
             
