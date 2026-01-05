@@ -220,22 +220,24 @@ def render_kpi_cards(recrutements, postes, directions, delai_display, delai_help
         df2 = df2[df2['time_to_hire_days'].notna()].copy()
 
     if df2.empty:
-        overall = None
-    else:
-        overall = {
-            'mean': float(df2['time_to_hire_days'].mean()),
-            'median': float(df2['time_to_hire_days'].median()),
-            'std': float(df2['time_to_hire_days'].std()),
-            'count': int(df2['time_to_hire_days'].count())
-        }
+            filename = None
+            # Recherche dans le mapping avec ordre de priorité
+            for map_key, map_filename in entity_logo_map.items():
+                if map_key.upper() in name_upper:
+                    filename = map_filename
+                    break
 
-    # Grouped aggregates
-    by_direction = None
-    by_poste = None
-    if 'Direction concernée' in df2.columns:
-        by_direction = df2.groupby('Direction concernée')['time_to_hire_days'].agg(['count', 'mean', 'median', 'std']).reset_index().sort_values('mean')
-    if 'Poste demandé' in df2.columns:
-        by_poste = df2.groupby('Poste demandé')['time_to_hire_days'].agg(['count', 'mean', 'median', 'std']).reset_index().sort_values('mean')
+            # Si pas trouvé, chercher directement dans les fichiers chargés
+            if not filename:
+                for fname in loaded_logos.keys():
+                    base_name = os.path.splitext(fname)[0]
+                    if base_name in name_upper or name_upper in base_name:
+                        filename = fname
+                        break
+
+            if filename and filename.upper() in loaded_logos:
+                return loaded_logos[filename.upper()]
+            return None
 
     return {
         'start_col': start_col,
