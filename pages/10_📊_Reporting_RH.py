@@ -2516,6 +2516,35 @@ def create_weekly_report_tab(df_recrutement=None):
 
 
 def generate_table_image_simple(weekly_metrics):
+        import os
+        # Mapping des noms d'entités vers les fichiers (ordre prioritaire)
+        entity_logo_map = {
+            'TGCC IMMOBILIER': 'tgcc-immobilier.png',
+            'TGCC-IMMOBILIER': 'tgcc-immobilier.png',
+            'TGCC Immobilier': 'tgcc-immobilier.png',
+            'TG STEEL': 'TG STEEL.PNG',
+            'TG STONE': 'TG STONE.PNG',
+            'TG ALU': 'TG ALU.PNG',
+            'TG COVER': 'TG COVER.PNG',
+            'TG WOOD': 'TG WOOD.PNG',
+            'STAM': 'STAM.png',
+            'BFO': 'BFO.png',
+            'TGEM': 'TGEM.PNG',
+            'TGCC': 'TGCC.PNG'
+        }
+
+        # Chargement des logos
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        logo_folder = os.path.join(os.path.dirname(current_dir), "LOGO")
+        loaded_logos = {}
+        if os.path.exists(logo_folder):
+            for filename in os.listdir(logo_folder):
+                if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.jfif')):
+                    try:
+                        img_path = os.path.join(logo_folder, filename)
+                        loaded_logos[filename.upper()] = Image.open(img_path).convert("RGBA")
+                    except Exception as e:
+                        print(f"Erreur chargement logo {filename}: {e}")
     """Génère une image simple du tableau avec PIL incluant les LOGOS"""
     from PIL import Image, ImageDraw, ImageFont
     import tempfile
@@ -2540,20 +2569,70 @@ def generate_table_image_simple(weekly_metrics):
     metrics_by_entity = weekly_metrics.get('metrics_by_entity', {})
     excluded_entities = {'BESIX-TGCC', 'DECO EXCELL', 'TG PREFA'}
     metrics_included = {k: v for k, v in metrics_by_entity.items() if k not in excluded_entities}
-    total_avant = sum(data['avant'] for data in metrics_included.values())
-    total_nouveaux = sum(data['nouveaux'] for data in metrics_included.values())
-    total_pourvus = sum(data['pourvus'] for data in metrics_included.values())
-    total_en_cours = sum(data['en_cours'] for data in metrics_included.values())
+    import os
+    from PIL import Image, ImageDraw, ImageFont
+    import tempfile
+    try:
+        # Mapping des noms d'entités vers les fichiers (ordre prioritaire)
+        entity_logo_map = {
+            'TGCC IMMOBILIER': 'tgcc-immobilier.png',
+            'TGCC-IMMOBILIER': 'tgcc-immobilier.png',
+            'TGCC Immobilier': 'tgcc-immobilier.png',
+            'TG STEEL': 'TG STEEL.PNG',
+            'TG STONE': 'TG STONE.PNG',
+            'TG ALU': 'TG ALU.PNG',
+            'TG COVER': 'TG COVER.PNG',
+            'TG WOOD': 'TG WOOD.PNG',
+            'STAM': 'STAM.png',
+            'BFO': 'BFO.png',
+            'TGEM': 'TGEM.PNG',
+            'TGCC': 'TGCC.PNG'
+        }
+        # Chargement des logos
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        logo_folder = os.path.join(os.path.dirname(current_dir), "LOGO")
+        loaded_logos = {}
+        if os.path.exists(logo_folder):
+            for filename in os.listdir(logo_folder):
+                if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.jfif')):
+                    try:
+                        img_path = os.path.join(logo_folder, filename)
+                        loaded_logos[filename.upper()] = Image.open(img_path).convert("RGBA")
+                    except Exception as e:
+                        print(f"Erreur chargement logo {filename}: {e}")
+
+        def get_logo_image(entity_name):
+            name_upper = str(entity_name).upper().strip()
+            filename = None
+            for map_key, map_filename in entity_logo_map.items():
+                if map_key.upper() in name_upper:
+                    filename = map_filename
+                    break
+            if not filename:
+                for fname in loaded_logos.keys():
+                    base_name = os.path.splitext(fname)[0]
+                    if base_name in name_upper or name_upper in base_name:
+                        filename = fname
+                        break
+            if filename and filename.upper() in loaded_logos:
+                return loaded_logos[filename.upper()]
+            return None
+
+        metrics_by_entity = weekly_metrics.get('metrics_by_entity', {})
+        excluded_entities = {'BESIX-TGCC', 'DECO EXCELL', 'TG PREFA'}
+        metrics_included = {k: v for k, v in metrics_by_entity.items() if k not in excluded_entities}
+        total_avant = sum(data['avant'] for data in metrics_included.values())
+        total_nouveaux = sum(data['nouveaux'] for data in metrics_included.values())
+        total_pourvus = sum(data['pourvus'] for data in metrics_included.values())
+        total_en_cours = sum(data['en_cours'] for data in metrics_included.values())
 
         # --- DESSIN DU TABLEAU ---
         num_rows = len(metrics_included) + 2  # +1 pour header, +1 pour total
         row_height = 80  # Hauteur augmentée pour les logos
         width = 1920
         height = num_rows * row_height + 60
-        
         img = Image.new('RGB', (width, height), 'white')
         draw = ImageDraw.Draw(img)
-        
         # Police
         try:
             font_header = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24)
@@ -2561,174 +2640,84 @@ def generate_table_image_simple(weekly_metrics):
         except:
             font_header = ImageFont.load_default()
             font_data = ImageFont.load_default()
-        
         # Header
         headers = ['Entité', 'Postes avant', 'Nouveaux postes', 'Postes pourvus', 'Postes en cours']
         col_widths = [350, 300, 300, 300, 300]  # Première colonne plus large pour logos
         x_positions = [0] + [sum(col_widths[:i+1]) for i in range(len(col_widths))]
-        
         # Dessiner le header
         draw.rectangle([0, 0, width, row_height], fill='#9C182F')
         for i, header in enumerate(headers):
             x = x_positions[i] + col_widths[i] // 2
             draw.text((x, row_height // 2), header, fill='white', font=font_header, anchor='mm')
-        
         # Données
         y_offset = row_height
-        
         # Custom sort and filter
         sorted_items = []
         for entite, data in metrics_included.items():
-            # Filter out empty TG WOOD (duplicate) or any empty entity
-            # User specifically mentioned duplicate TG WOOD being empty
             entite_str = str(entite).upper().strip()
             if 'TG WOOD' in entite_str and data['avant'] == 0 and data['nouveaux'] == 0 and data['pourvus'] == 0 and data['en_cours'] == 0:
                 continue
-            # Also filter out literal "NAN" or "NONE" strings if they appear as entities
             if entite_str in ['NAN', 'NONE', '']:
                 continue
-                
             sorted_items.append((entite, data))
-            
-        # Sort: TGCC first, then others
         def sort_key(item):
             name = str(item[0]).upper().strip()
             if name == 'TGCC':
-                return '000_TGCC' # Force first
+                return '000_TGCC'
             if 'TGCC' in name and 'IMMOBILIER' not in name:
-                 return '001_TGCC_OTHER'
+                return '001_TGCC_OTHER'
             return name
-            
         sorted_items.sort(key=sort_key)
-
         for entite, data in sorted_items:
-            # Lignes alternées
             if ((y_offset - row_height) // row_height) % 2 == 0:
                 draw.rectangle([0, y_offset, width, y_offset + row_height], fill='#f9f9f9')
-            
-            # Logo ou texte de l'entité
             logo_img = get_logo_image(entite)
             cell_center_x = x_positions[0] + col_widths[0] // 2
             cell_center_y = y_offset + row_height // 2
-            
             if logo_img:
-                # Redimensionner le logo avec tailles personnalisées
                 entite_upper = str(entite).upper().strip()
                 if 'STEEL' in entite_upper or 'STONE' in entite_upper:
-                    new_h = 45  # Plus petit pour STEEL et STONE
+                    new_h = 45
                 elif 'BFO' in entite_upper:
-                    new_h = 70  # Plus grand pour BFO
+                    new_h = 70
                 elif 'ALU' in entite_upper or 'WOOD' in entite_upper:
-                    new_h = 65  # Plus grand pour ALU et WOOD
+                    new_h = 65
                 elif 'COVER' in entite_upper:
-                    new_h = 60  # Plus grand pour COVER
+                    new_h = 60
                 else:
-                    new_h = 55  # Taille standard
-                
+                    new_h = 55
                 aspect_ratio = logo_img.width / logo_img.height
                 new_w = int(new_h * aspect_ratio)
                 if new_w > col_widths[0] - 20:
                     new_w = col_widths[0] - 20
                     new_h = int(new_w / aspect_ratio)
-                
                 logo_resized = logo_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
                 paste_x = int(cell_center_x - new_w / 2)
                 paste_y = int(cell_center_y - new_h / 2)
-                
-                # Coller avec transparence
                 if logo_resized.mode == 'RGBA':
                     img.paste(logo_resized, (paste_x, paste_y), logo_resized)
                 else:
                     img.paste(logo_resized, (paste_x, paste_y))
             else:
-                # Fallback texte si pas de logo
                 draw.text((cell_center_x, cell_center_y), entite[:20], fill='black', font=font_data, anchor='mm')
-            draw.text((x_positions[1] + col_widths[1] // 2, y_offset + row_height // 2), 
-                     str(data['avant'] if data['avant'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
-            draw.text((x_positions[2] + col_widths[2] // 2, y_offset + row_height // 2), 
-                     str(data['nouveaux'] if data['nouveaux'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
-            draw.text((x_positions[3] + col_widths[3] // 2, y_offset + row_height // 2), 
-                     str(data['pourvus'] if data['pourvus'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
-            draw.text((x_positions[4] + col_widths[4] // 2, y_offset + row_height // 2), 
-                     str(data['en_cours'] if data['en_cours'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
-            
-            # Bordures
+            draw.text((x_positions[1] + col_widths[1] // 2, y_offset + row_height // 2), str(data['avant'] if data['avant'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
+            draw.text((x_positions[2] + col_widths[2] // 2, y_offset + row_height // 2), str(data['nouveaux'] if data['nouveaux'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
+            draw.text((x_positions[3] + col_widths[3] // 2, y_offset + row_height // 2), str(data['pourvus'] if data['pourvus'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
+            draw.text((x_positions[4] + col_widths[4] // 2, y_offset + row_height // 2), str(data['en_cours'] if data['en_cours'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
             draw.line([(0, y_offset + row_height), (width, y_offset + row_height)], fill='#ddd', width=1)
             y_offset += row_height
-        
-        # Ligne TOTAL
         draw.rectangle([0, y_offset, width, y_offset + row_height], fill='#9C182F')
-        draw.text((x_positions[0] + col_widths[0] // 2, y_offset + row_height // 2), 
-                 'TOTAL', fill='white', font=font_header, anchor='mm')
-        draw.text((x_positions[1] + col_widths[1] // 2, y_offset + row_height // 2), 
-                 str(total_avant), fill='white', font=font_header, anchor='mm')
-        draw.text((x_positions[2] + col_widths[2] // 2, y_offset + row_height // 2), 
-                 str(total_nouveaux), fill='white', font=font_header, anchor='mm')
-        draw.text((x_positions[3] + col_widths[3] // 2, y_offset + row_height // 2), 
-                 str(total_pourvus), fill='white', font=font_header, anchor='mm')
-        draw.text((x_positions[4] + col_widths[4] // 2, y_offset + row_height // 2), 
-                 str(total_en_cours), fill='white', font=font_header, anchor='mm')
-        
-        # Sauvegarder
+        draw.text((x_positions[0] + col_widths[0] // 2, y_offset + row_height // 2), 'TOTAL', fill='white', font=font_header, anchor='mm')
+        draw.text((x_positions[1] + col_widths[1] // 2, y_offset + row_height // 2), str(total_avant), fill='white', font=font_header, anchor='mm')
+        draw.text((x_positions[2] + col_widths[2] // 2, y_offset + row_height // 2), str(total_nouveaux), fill='white', font=font_header, anchor='mm')
+        draw.text((x_positions[3] + col_widths[3] // 2, y_offset + row_height // 2), str(total_pourvus), fill='white', font=font_header, anchor='mm')
+        draw.text((x_positions[4] + col_widths[4] // 2, y_offset + row_height // 2), str(total_en_cours), fill='white', font=font_header, anchor='mm')
         output_path = os.path.join(tempfile.gettempdir(), 'table_reporting.png')
         img.save(output_path)
         return output_path
-        
     except Exception as e:
         st.error(f"Erreur génération image tableau: {e}")
         return None
-
-
-def generate_kanban_image_simple(df_recrutement):
-    """Génère une image simple du Kanban avec PIL"""
-    from PIL import Image, ImageDraw, ImageFont
-    import tempfile
-    import pandas as pd
-    
-    try:
-        # Si pas de dataframe, utiliser des données par défaut
-        if df_recrutement is None or len(df_recrutement) == 0:
-            colonnes = {
-                'Sourcing': pd.DataFrame(),
-                'Shortlisté': pd.DataFrame(),
-                'Signature DRH': pd.DataFrame(),
-                'Clôture': pd.DataFrame(),
-                'Désistement': pd.DataFrame(),
-            }
-        else:
-            # Charger les données du kanban
-            colonnes = {
-                'Sourcing': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Sourcing'],
-                'Shortlisté': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Shortlisté'],
-                'Signature DRH': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Signature DRH'],
-                'Clôture': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Clôture'],
-                'Désistement': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Désistement'],
-            }
-        
-        # Dimensions (haute résolution)
-        col_width = 370  # Plus large
-        num_cols = 5
-        width = col_width * num_cols + 60
-        height = 1080  # Haute résolution
-        
-        img = Image.new('RGB', (width, height), 'white')
-        draw = ImageDraw.Draw(img)
-        
-        # Polices (plus grandes)
-        try:
-            font_header = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
-            font_card_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)
-            font_card = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 12)
-        except:
-            font_header = ImageFont.load_default()
-            font_card_title = ImageFont.load_default()
-            font_card = ImageFont.load_default()
-        
-        x_offset = 20
-        for statut, df_col in colonnes.items():
-            # En-tête de colonne
-            draw.rectangle([x_offset, 20, x_offset + col_width - 10, 60], fill='#9C182F', outline='#9C182F')
-            count = len(df_col)
             draw.text((x_offset + col_width // 2 - 5, 40), f"{statut} ({count})", 
                      fill='white', font=font_header, anchor='mm')
             
