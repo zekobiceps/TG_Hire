@@ -2435,24 +2435,16 @@ def create_weekly_report_tab(df_recrutement=None):
     
     # Remplir chaque section (ligne) avec les postes correspondants
     for i, statut in enumerate(statuts_kanban_display):
-        # Filtrer les postes pour cette colonne
+        # ...filtrage des postes_in_col (inchangé)...
         if statut == "Clôture":
-            # Afficher uniquement ceux de la semaine du reporting
-            # On utilise la date d'acceptation du candidat pour filtrer
-            # Récupérer la date de reporting
             reporting_date = st.session_state.get('reporting_date', None)
             if reporting_date is None:
                 today = datetime.now()
             else:
                 today = reporting_date if isinstance(reporting_date, datetime) else datetime.combine(reporting_date, datetime.min.time())
-            
-            # Alignement avec la logique du Reporting Hebdomadaire : Semaine PRÉCÉDENTE + Semaine COURANTE
-            # Pour éviter que les cartes disparaissent quand on passe à la semaine suivante
             current_week_monday = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
-            start_filter = current_week_monday - timedelta(days=7) # Lundi précédent
-            end_filter = current_week_monday + timedelta(days=6)   # Dimanche courant (inclus)
-            
-            # Filtrer les postes clôturés avec date d'acceptation dans la semaine du reporting
+            start_filter = current_week_monday - timedelta(days=7)
+            end_filter = current_week_monday + timedelta(days=6)
             def in_reporting_week(poste):
                 accept_date = poste.get('date_acceptation')
                 if not accept_date:
@@ -2464,27 +2456,21 @@ def create_weekly_report_tab(df_recrutement=None):
                         return False
                 if not pd.notna(accept_date):
                     return False
-                # Comparaison inclusive [Lundi précédent, Dimanche courant]
-                return start_filter <= accept_date <= end_filter + timedelta(days=1) # +1 jour pour inclure la fin de journée si datetime
+                return start_filter <= accept_date <= end_filter + timedelta(days=1)
             postes_in_col = [p for p in postes_data if p["statut"] == statut and in_reporting_week(p)]
         elif statut == "Désistement":
-            # Afficher uniquement ceux de la semaine du reporting (basé sur date de désistement)
             reporting_date = st.session_state.get('reporting_date', None)
             if reporting_date is None:
                 today = datetime.now()
             else:
                 today = reporting_date if isinstance(reporting_date, datetime) else datetime.combine(reporting_date, datetime.min.time())
-            
-            # Alignement avec la logique du Reporting Hebdomadaire : Semaine PRÉCÉDENTE + Semaine COURANTE
             current_week_monday = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
-            start_filter = current_week_monday - timedelta(days=7) # Lundi précédent
-            end_filter = current_week_monday + timedelta(days=6)   # Dimanche courant (inclus)
-            
+            start_filter = current_week_monday - timedelta(days=7)
+            end_filter = current_week_monday + timedelta(days=6)
             def in_reporting_week_desistement(poste):
                 desist_date = poste.get('date_desistement')
                 if not desist_date:
                     return False
-                
                 if isinstance(desist_date, str):
                     try:
                         desist_date = pd.to_datetime(desist_date, errors='coerce')
@@ -2492,37 +2478,31 @@ def create_weekly_report_tab(df_recrutement=None):
                         return False
                 if not pd.notna(desist_date):
                     return False
-                    
-                # Comparaison inclusive [Lundi précédent, Dimanche courant]
                 return start_filter <= desist_date <= end_filter + timedelta(days=1)
-
             postes_in_col = [p for p in postes_data if p["statut"] == statut and in_reporting_week_desistement(p)]
         else:
             postes_in_col = [p for p in postes_data if p["statut"] == statut]
         nb_postes = len(postes_in_col)
-        # En-tête de colonne avec le nombre de cartes
         st.markdown(f'<div class="kanban-header">{statut} ({nb_postes})</div>', unsafe_allow_html=True)
-        
-        # Générer le HTML pour toutes les cartes de cette section
-        cards_html = '<div class="kanban-container">'
-        for poste in postes_in_col:
-            commentaire = poste.get('commentaire', '')
-            commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
-            titre_fmt = smart_wrap_title(poste.get('titre', ''))
-            
-            # Construction sans indentation pour éviter l'interprétation Markdown (blocs de code)
-            card_div = f"""<div class="kanban-card">
+
+        # Limiter à 8 cartes par ligne
+        max_cards_per_row = 8
+        for row_start in range(0, len(postes_in_col), max_cards_per_row):
+            cards_html = '<div class="kanban-container">'
+            for poste in postes_in_col[row_start:row_start+max_cards_per_row]:
+                commentaire = poste.get('commentaire', '')
+                commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
+                titre_fmt = smart_wrap_title(poste.get('titre', ''))
+                card_div = f"""<div class="kanban-card">
 <h4><b>{titre_fmt}</b></h4>
 <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
 <p>👤 {poste.get('demandeur', 'N/A')}</p>
 <p>✍️ {poste.get('recruteur', 'N/A')}</p>
 {commentaire_html}
 </div>"""
-            cards_html += card_div
-        cards_html += '</div>'
-        
-        # Afficher le conteneur flexbox
-        st.markdown(cards_html, unsafe_allow_html=True)
+                cards_html += card_div
+            cards_html += '</div>'
+            st.markdown(cards_html, unsafe_allow_html=True)
 
 
 def generate_table_image_simple(weekly_metrics):
