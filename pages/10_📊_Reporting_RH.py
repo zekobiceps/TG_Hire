@@ -1134,17 +1134,6 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
 
     # ... KPI row now includes Délai moyen de recrutement (moved up)
 
-def create_demandes_recrutement_tab(df_recrutement, global_filters):
-    """Onglet Demandes de Recrutement avec style carte"""
-    
-    # Appliquer les filtres globaux
-    df_filtered = apply_global_filters(df_recrutement, global_filters)
-    
-    # Colonne de date pour les calculs
-    date_col = 'Date de réception de la demande aprés validation de la DRH'
-    
-    # KPIs principaux - Indicateurs de demandes sur la même ligne
-    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.metric("Nombre de demandes", len(df_filtered))
@@ -1384,17 +1373,6 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
 
     # ... KPI row now includes Délai moyen de recrutement (moved up)
 
-def create_demandes_recrutement_tab(df_recrutement, global_filters):
-    """Onglet Demandes de Recrutement avec style carte"""
-    
-    # Appliquer les filtres globaux
-    df_filtered = apply_global_filters(df_recrutement, global_filters)
-    
-    # Colonne de date pour les calculs
-    date_col = 'Date de réception de la demande aprés validation de la DRH'
-    
-    # KPIs principaux - Indicateurs de demandes sur la même ligne
-    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.metric("Nombre de demandes", len(df_filtered))
@@ -1634,17 +1612,6 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
 
     # ... KPI row now includes Délai moyen de recrutement (moved up)
 
-def create_demandes_recrutement_tab(df_recrutement, global_filters):
-    """Onglet Demandes de Recrutement avec style carte"""
-    
-    # Appliquer les filtres globaux
-    df_filtered = apply_global_filters(df_recrutement, global_filters)
-    
-    # Colonne de date pour les calculs
-    date_col = 'Date de réception de la demande aprés validation de la DRH'
-    
-    # KPIs principaux - Indicateurs de demandes sur la même ligne
-    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.metric("Nombre de demandes", len(df_filtered))
@@ -1884,17 +1851,6 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
 
     # ... KPI row now includes Délai moyen de recrutement (moved up)
 
-def create_demandes_recrutement_tab(df_recrutement, global_filters):
-    """Onglet Demandes de Recrutement avec style carte"""
-    
-    # Appliquer les filtres globaux
-    df_filtered = apply_global_filters(df_recrutement, global_filters)
-    
-    # Colonne de date pour les calculs
-    date_col = 'Date de réception de la demande aprés validation de la DRH'
-    
-    # KPIs principaux - Indicateurs de demandes sur la même ligne
-    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.metric("Nombre de demandes", len(df_filtered))
@@ -2134,17 +2090,6 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
 
     # ... KPI row now includes Délai moyen de recrutement (moved up)
 
-def create_demandes_recrutement_tab(df_recrutement, global_filters):
-    """Onglet Demandes de Recrutement avec style carte"""
-    
-    # Appliquer les filtres globaux
-    df_filtered = apply_global_filters(df_recrutement, global_filters)
-    
-    # Colonne de date pour les calculs
-    date_col = 'Date de réception de la demande aprés validation de la DRH'
-    
-    # KPIs principaux - Indicateurs de demandes sur la même ligne
-    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.metric("Nombre de demandes", len(df_filtered))
@@ -2384,17 +2329,6 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
 
     # ... KPI row now includes Délai moyen de recrutement (moved up)
 
-def create_demandes_recrutement_tab(df_recrutement, global_filters):
-    """Onglet Demandes de Recrutement avec style carte"""
-    
-    # Appliquer les filtres globaux
-    df_filtered = apply_global_filters(df_recrutement, global_filters)
-    
-    # Colonne de date pour les calculs
-    date_col = 'Date de réception de la demande aprés validation de la DRH'
-    
-    # KPIs principaux - Indicateurs de demandes sur la même ligne
-    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.metric("Nombre de demandes", len(df_filtered))
@@ -2634,17 +2568,6 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
 
     # ... KPI row now includes Délai moyen de recrutement (moved up)
 
-def create_demandes_recrutement_tab(df_recrutement, global_filters):
-    """Onglet Demandes de Recrutement avec style carte"""
-    
-    # Appliquer les filtres globaux
-    df_filtered = apply_global_filters(df_recrutement, global_filters)
-    
-    # Colonne de date pour les calculs
-    date_col = 'Date de réception de la demande aprés validation de la DRH'
-    
-    # KPIs principaux - Indicateurs de demandes sur la même ligne
-    col1, col2, col3, col4 = st.columns(4)
     
     with col1:
         st.metric("Nombre de demandes", len(df_filtered))

@@ -136,10 +136,19 @@ def generate_powerpoint():
         shapes_to_remove = []
         
         for shape in slide.shapes:
-            if not hasattr(shape, "text"):
-                continue
-                
-            shape_text = shape.text
+            # Pylance-safe text extraction: some shapes don't expose `.text`
+            shape_text = getattr(shape, "text", None)
+            if shape_text is None or not str(shape_text).strip():
+                # Fallback to text_frame when available
+                has_tf = getattr(shape, "has_text_frame", False)
+                if has_tf:
+                    tf = getattr(shape, "text_frame", None)
+                    if tf and getattr(tf, "text", None):
+                        shape_text = tf.text
+                    else:
+                        continue
+                else:
+                    continue
             
             # Tableau des entités
             if "{{TABLEAU_BESOINS_ENTITES}}" in shape_text:
