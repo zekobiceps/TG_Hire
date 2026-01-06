@@ -117,7 +117,7 @@ def _truncate_label(label: str, max_len: int = 20) -> str:
 
 
 # Shared title font used for all main charts so typography is consistent
-TITLE_FONT = dict(family="Arial, sans-serif", size=16, color="#111111", )
+TITLE_FONT = dict(family="Arial, sans-serif", size=18, color="#111111", )
 
 
 def _parse_mixed_dates(series):
@@ -165,15 +165,15 @@ def render_kpi_cards(recrutements, postes, directions, delai_display, delai_help
 
     css = """
 <style>
-.kpi-row{display:flex;gap:12px;flex-wrap:nowrap;align-items:stretch;margin-bottom:12px}
-.kpi-card{flex:1 1 0;background:#fff;border-radius:6px;padding:12px;display:flex;flex-direction:column;justify-content:center;border:1px solid #e6eef6}
-.kpi-card .title{font-size:12px;color:#2c3e50;margin-bottom:6px}
-.kpi-card .value{font-size:22px;font-weight:700;color:#172b4d}
+.kpi-row{display:flex;gap:16px;flex-wrap:nowrap;align-items:stretch;margin-bottom:14px;justify-content:center}
+.kpi-card{flex:1 1 0;background:#fff;border-radius:8px;padding:14px;display:flex;flex-direction:column;justify-content:center;border:1px solid #e6eef6;min-width:180px}
+.kpi-card .title{font-size:14px;color:#2c3e50;margin-bottom:8px}
+.kpi-card .value{font-size:26px;font-weight:700;color:#172b4d}
 .kpi-accent{border-left:6px solid #1f77b4}
 .kpi-green{border-left-color:#2ca02c}
 .kpi-orange{border-left-color:#ff7f0e}
 .kpi-purple{border-left-color:#6f42c1}
-.kpi-help{font-size:11px;color:#555;margin-top:6px}
+.kpi-help{font-size:12px;color:#555;margin-top:8px}
 @media(max-width:800px){.kpi-row{flex-direction:column}}
 </style>
 """
@@ -261,6 +261,25 @@ st.markdown("""
     background-color: #FF3333 !important;
     color: white !important;
 }
+</style>
+""", unsafe_allow_html=True)
+
+# Global tweaks: enlarge tab labels, plot titles and legend fonts for better readability
+st.markdown("""
+<style>
+/* Tabs: increase font-size and weight */
+button[role="tab"] { font-size: 18px !important; font-weight: 600 !important; }
+
+/* Plotly title and legend sizing (fallback selector) */
+.plotly .gtitle, .plotly .gtitle text { font-family: Arial, sans-serif !important; font-size: 18px !important; fill: #111 !important; }
+.plotly .legend { font-size: 14px !important; }
+
+/* Streamlit metric enlargement (best-effort selectors) */
+div[data-testid="metric-container"] .stMetricValue, .stMetricValue, .metric-value { font-size: 26px !important; font-weight: 700 !important; }
+div[data-testid="metric-container"] .stMetricLabel, .stMetricLabel, .metric-label { font-size: 14px !important; color: #2c3e50 !important; }
+
+/* Slight increase for general section subtitles */
+.stSubheader, .stMarkdown h3 { font-size: 1.06em !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -618,8 +637,12 @@ def create_affectation_chart(df):
         title="🏢 Répartition par Affectation (Top 10)"
     )
     
-    fig.update_traces(textposition='inside', textinfo='percent+label')
-    fig.update_layout(height=400)
+    fig.update_traces(textposition='inside', textinfo='percent+label', textfont=dict(size=14))
+    fig.update_layout(
+        height=460,
+        title=dict(text="🏢 Répartition par Affectation (Top 10)", x=0, xanchor='left', font=TITLE_FONT),
+        legend=dict(font=dict(size=14))
+    )
     
     return fig
 
@@ -632,14 +655,14 @@ def render_plotly_scrollable(fig, max_height=500):
         # Inject a small CSS block that targets Plotly's title classes inside the
         # generated HTML so we can enforce consistent font and left alignment
         injected_css = """
-<style>
-/* Ensure the plotly SVG title (gtitle) uses our TITLE_FONT and is left-aligned */
-.plotly .gtitle, .plotly .gtitle text { font-family: Arial, sans-serif !important; font-size: 16px !important; fill: #111111 !important; }
-.plotly .gtitle { text-anchor: start !important; }
-/* Force the plot container to align left inside the Streamlit component */
-.streamlit-plotly-wrapper{ display:flex; justify-content:flex-start; }
-</style>
-"""
+    <style>
+    /* Ensure the plotly SVG title (gtitle) uses our TITLE_FONT and is left-aligned */
+    .plotly .gtitle, .plotly .gtitle text { font-family: Arial, sans-serif !important; font-size: 18px !important; fill: #111111 !important; }
+    .plotly .gtitle { text-anchor: start !important; }
+    /* Force the plot container to align left inside the Streamlit component */
+    .streamlit-plotly-wrapper{ display:flex; justify-content:flex-start; }
+    </style>
+    """
 
         # Wrap the plot HTML in a left-aligned container so the chart isn't centered
         wrapper = f"""
@@ -757,19 +780,21 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 textposition='inside',
                 textinfo='percent'
             )])
+            fig_modalite.update_traces(textfont=dict(size=14))
             fig_modalite.update_layout(
-                title="Répartition par Modalité de recrutement",
-                height=300,
+                title=dict(text="Répartition par Modalité de recrutement", x=0, xanchor='left', font=TITLE_FONT),
+                height=380,
                 # Légende positionnée à droite pour éviter le chevauchement
                 legend=dict(
                     orientation="v", 
                     yanchor="middle", 
                     y=0.5, 
                     xanchor="left", 
-                    x=1.05
+                    x=1.0,
+                    font=dict(size=14)
                 ),
                 # Ajuster les marges pour faire de la place à la légende
-                margin=dict(l=20, r=150, t=50, b=20)
+                margin=dict(l=20, r=140, t=60, b=20)
             )
             st.plotly_chart(fig_modalite, width="stretch")
 
@@ -962,10 +987,11 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         # Répartition par statut de la demande
         statut_counts = df_filtered['Statut de la demande'].value_counts()
         fig_statut = go.Figure(data=[go.Pie(labels=statut_counts.index, values=statut_counts.values, hole=.5)])
+        fig_statut.update_traces(textfont=dict(size=14))
         fig_statut.update_layout(
             title=dict(text="Répartition par statut de la demande", x=0, xanchor='left', font=TITLE_FONT),
-            height=300,
-            legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5)
+            height=380,
+            legend=dict(orientation="h", yanchor="bottom", y=-0.45, xanchor="center", x=0.5, font=dict(size=13))
         )
         st.plotly_chart(fig_statut, width="stretch")
     
@@ -1281,11 +1307,12 @@ def create_demandes_recrutement_combined_tab(df_recrutement):
         margin-top: 0;
         margin-bottom: 10px;
         color: #2c3e50;
-        font-size: 1.1em;
+        font-size: 1.25em;
+        font-weight: 600;
     }
     .report-card p {
         margin-bottom: 8px;
-        font-size: 0.9em;
+        font-size: 1.02em;
         color: #5a6c7d;
     }
     .report-card .status-badge {
@@ -3183,57 +3210,57 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
                 .statut-header {{
                     background-color: #9C182F;
                     color: white;
-                    padding: 20px;
+                    padding: 22px;
                     border-radius: 8px;
-                    font-size: 2em;
+                    font-size: 2.3em;
                     font-weight: bold;
                     text-align: center;
-                    margin-bottom: 30px;
+                    margin-bottom: 28px;
                 }}
                 .cards-container {{
                     display: grid;
-                    grid-template-columns: repeat(6, 1fr);
-                    gap: 15px;
+                    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+                    gap: 20px;
                     padding: 20px;
+                    justify-items: center;
+                    justify-content: center;
+                    align-items: start;
+                    max-width: 1200px;
+                    margin: 0 auto;
                 }}
                 .kanban-card {{
                     background-color: #f0f2f6;
-                    border-radius: 5px;
-                    padding: 10px;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                    border-left: 4px solid #1f77b4;
-                    min-height: 120px;
-                    max-width: 100%;
-                    overflow: hidden;
+                    border-radius: 8px;
+                    padding: 14px;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+                    border-left: 5px solid #1f77b4;
+                    min-height: 140px;
+                    width: 100%;
                     box-sizing: border-box;
                 }}
                 .kanban-card h4 {{
-                    margin: 0 0 6px 0;
+                    margin: 0 0 8px 0;
                     color: #9C182F;
-                    font-size: 0.95em;
-                    line-height: 1.3;
-                    font-weight: bold;
-                    /* Forcer les coupures de mots */
+                    font-size: 1.05em;
+                    line-height: 1.25;
+                    font-weight: 700;
                     white-space: normal !important;
-                    word-break: break-all !important;
-                    overflow-wrap: anywhere !important;
+                    word-break: break-word !important;
+                    overflow-wrap: break-word !important;
                     hyphens: auto !important;
-                    /* Limiter à 3 lignes maximum */
                     display: -webkit-box;
                     -webkit-line-clamp: 3;
                     -webkit-box-orient: vertical;
                     overflow: hidden;
-                    max-width: 100%;
                 }}
                 .kanban-card p {{
-                    margin: 3px 0;
-                    font-size: 0.85em;
-                    color: #555;
-                    line-height: 1.2;
+                    margin: 4px 0;
+                    font-size: 0.96em;
+                    color: #444;
+                    line-height: 1.3;
                     word-wrap: break-word;
                     overflow-wrap: break-word;
                     word-break: break-word;
-                    max-width: 100%;
                 }}
             </style>
         </head>
@@ -3680,7 +3707,8 @@ def generate_demandes_recrutement_html_image(df_recrutement):
             if 'Statut de la demande' in df.columns:
                 statut_counts = df['Statut de la demande'].value_counts()
                 fig_statut = go.Figure(data=[go.Pie(labels=statut_counts.index, values=statut_counts.values, hole=.5)])
-                fig_statut.update_layout(title="Répartition par statut", height=320, margin=dict(l=20,r=20,t=40,b=10))
+                fig_statut.update_traces(textfont=dict(size=14))
+                fig_statut.update_layout(title=dict(text="Répartition par statut", x=0, xanchor='left', font=TITLE_FONT), height=360, margin=dict(l=20,r=20,t=48,b=12), legend=dict(font=dict(size=13)))
                 figs_row1.append(fig_statut)
         except Exception:
             figs_row1.append(None)
@@ -3787,7 +3815,8 @@ def generate_recrutements_clotures_html_image(df_recrutement):
         if 'Modalité de recrutement' in df_cl.columns:
             modalite_data = df_cl['Modalité de recrutement'].value_counts()
             fig_mod = go.Figure(data=[go.Pie(labels=modalite_data.index, values=modalite_data.values, hole=.5, textposition='inside', textinfo='percent')])
-            fig_mod.update_layout(title="Répartition par Modalité", height=320, margin=dict(l=20,r=20,t=40,b=10))
+            fig_mod.update_traces(textfont=dict(size=14))
+            fig_mod.update_layout(title=dict(text="Répartition par Modalité", x=0, xanchor='left', font=TITLE_FONT), height=360, margin=dict(l=20,r=20,t=48,b=12), legend=dict(font=dict(size=13)))
             figs_row1.append(fig_mod)
     except Exception:
         figs_row1.append(None)
@@ -3859,8 +3888,8 @@ def generate_integrations_html_image(df_recrutement):
         if 'Affectation' in df.columns:
             affect_counts = df['Affectation'].value_counts().head(10)
             fig_aff = px.pie(values=affect_counts.values, names=affect_counts.index, title="Répartition par Affectation")
-            fig_aff.update_traces(textposition='inside', textinfo='percent+label')
-            fig_aff.update_layout(height=360, margin=dict(l=20,r=20,t=40,b=10))
+            fig_aff.update_traces(textposition='inside', textinfo='percent+label', textfont=dict(size=14))
+            fig_aff.update_layout(title=dict(text="Répartition par Affectation", x=0, xanchor='left', font=TITLE_FONT), height=420, margin=dict(l=20,r=20,t=48,b=12), legend=dict(font=dict(size=14)))
             figs_row1.append(fig_aff)
     except Exception:
         figs_row1.append(None)
