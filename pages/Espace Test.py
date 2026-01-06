@@ -267,16 +267,28 @@ st.markdown("""
 # Global tweaks: enlarge tab labels, plot titles and legend fonts for better readability
 st.markdown("""
 <style>
-/* Tabs: increase font-size and weight */
-button[role="tab"] { font-size: 18px !important; font-weight: 600 !important; }
+/* Tabs: increase font-size and weight (stronger selectors) */
+div[role="tablist"] > button, button[role="tab"], div[role="tablist"] button[role="tab"] {
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    padding: 8px 14px !important;
+}
 
 /* Plotly title and legend sizing (fallback selector) */
 .plotly .gtitle, .plotly .gtitle text { font-family: Arial, sans-serif !important; font-size: 18px !important; fill: #111 !important; }
 .plotly .legend { font-size: 14px !important; }
 
-/* Streamlit metric enlargement (best-effort selectors) */
-div[data-testid="metric-container"] .stMetricValue, .stMetricValue, .metric-value { font-size: 26px !important; font-weight: 700 !important; }
-div[data-testid="metric-container"] .stMetricLabel, .stMetricLabel, .metric-label { font-size: 14px !important; color: #2c3e50 !important; }
+/* Streamlit metrics: aggressive selectors to increase label and value sizes */
+div[data-testid="metric-container"] div[data-testid="stMetric"] span[data-testid], div[data-testid="metric-container"] .stMetricValue, .stMetricValue {
+    font-size: 28px !important; font-weight: 800 !important; line-height:1 !important;
+}
+div[data-testid="metric-container"] div[data-testid="stMetric"] p, .stMetricLabel {
+    font-size: 15px !important; color: #2c3e50 !important; margin:0 !important;
+}
+
+/* Fallback generic selectors for metrics */
+span[data-testid="stMetricLabel"] { font-size:15px !important; }
+span[data-testid="stMetricValue"] { font-size:28px !important; font-weight:700 !important; }
 
 /* Slight increase for general section subtitles */
 .stSubheader, .stMarkdown h3 { font-size: 1.06em !important; }
@@ -629,21 +641,29 @@ def create_integration_timeline(df):
 
 def create_affectation_chart(df):
     """Créer un graphique par affectation"""
-    affectation_stats = df['Affectation'].value_counts().head(10)
-    
+    # Prefer 'Entité demandeuse' if present, else fallback to 'Affectation'
+    if 'Entité demandeuse' in df.columns and df['Entité demandeuse'].notna().sum() > 0:
+        serie = df['Entité demandeuse'].value_counts()
+        title = "🏢 Répartition par Entité (Top 10)"
+    elif 'Affectation' in df.columns:
+        serie = df['Affectation'].value_counts()
+        title = "🏢 Répartition par Affectation (Top 10)"
+    else:
+        serie = pd.Series([], dtype=int)
+        title = "Répartition"
+
+    serie = serie.head(10)
     fig = px.pie(
-        values=affectation_stats.values,
-        names=affectation_stats.index,
-        title="🏢 Répartition par Affectation (Top 10)"
+        values=serie.values,
+        names=serie.index,
+        title=title
     )
-    
     fig.update_traces(textposition='inside', textinfo='percent+label', textfont=dict(size=14))
     fig.update_layout(
-        height=460,
-        title=dict(text="🏢 Répartition par Affectation (Top 10)", x=0, xanchor='left', font=TITLE_FONT),
+        height=420,
+        title=dict(text=title, x=0, xanchor='left', font=TITLE_FONT),
         legend=dict(font=dict(size=14))
     )
-    
     return fig
 
 
@@ -1272,18 +1292,24 @@ def create_integrations_tab(df_recrutement, global_filters):
             
             df_display[date_integration_col] = df_display[date_integration_col].apply(format_date_safely)
         
-        # Renommer pour affichage plus propre
-        df_display = df_display.rename(columns={
-            candidat_col: "Candidat",
-            'Poste demandé ': "Poste",
-            date_integration_col: "Date d'Intégration Prévue"
-        })
+            # Renommer pour affichage plus propre
+            # Exclure les lignes sans date d'intégration prévue afin d'éviter les lignes affichées comme 'N/A'
+            if date_integration_col in df_display.columns:
+                # Garder une copie pour les KPIs, mais filtrer le tableau détaillé
+                df_display_table = df_display[df_display[date_integration_col].notna()].copy()
+            else:
+                df_display_table = df_display.copy()
+
+            df_display_table = df_display_table.rename(columns={
+                candidat_col: "Candidat",
+                'Poste demandé ': "Poste",
+                date_integration_col: "Date d'Intégration Prévue"
+            })
         
         # Réinitialiser l'index pour enlever les numéros de ligne
-        df_display = df_display.reset_index(drop=True)
-        
+        df_display_table = df_display_table.reset_index(drop=True)
         # Afficher sans index (hide_index=True)
-        st.dataframe(df_display, width="stretch", hide_index=True)
+        st.dataframe(df_display_table, width="stretch", hide_index=True)
     else:
         st.warning("Colonnes d'affichage non disponibles")
 
@@ -3502,27 +3528,29 @@ def generate_kanban_html_image(df_recrutement):
                     padding: 10px;
                 }
                 .kanban-column {
-                    min-width: 200px;
+                    min-width: 260px;
                     background-color: #f0f0f0;
-                    border-radius: 8px;
-                    padding: 10px;
+                    border-radius: 10px;
+                    padding: 14px;
+                    box-sizing: border-box;
                 }
                 .kanban-header {
                     background-color: #9C182F;
                     color: white;
-                    padding: 10px;
-                    border-radius: 5px;
-                    font-weight: bold;
+                    padding: 12px;
+                    border-radius: 6px;
+                    font-weight: 800;
                     text-align: center;
-                    margin-bottom: 10px;
-                    font-size: 1.3em;
+                    margin-bottom: 12px;
+                    font-size: 1.45em;
                 }
                 .kanban-card {
                     background-color: white;
-                    border-radius: 5px;
-                    padding: 10px;
-                    margin-bottom: 10px;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    border-radius: 6px;
+                    padding: 14px;
+                    margin-bottom: 12px;
+                    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+                    min-height: 120px;
                 }
                 .kanban-card h4 {
                     margin: 0 0 8px 0;
