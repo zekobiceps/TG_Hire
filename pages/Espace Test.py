@@ -154,6 +154,47 @@ def apply_title_style(fig):
     return fig
 
 
+def get_current_commit_hash(short: bool = True) -> str:
+    """Return the current git commit hash (short by default).
+
+    Tries subprocess git first, then falls back to reading .git/HEAD or
+    environment variable GIT_COMMIT. Returns 'unknown' if not available.
+    """
+    import subprocess
+    try:
+        if short:
+            out = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], stderr=subprocess.DEVNULL)
+        else:
+            out = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL)
+        return out.decode().strip()
+    except Exception:
+        # Try environment variable
+        import os
+        env = os.environ.get('GIT_COMMIT') or os.environ.get('COMMIT_SHA') or os.environ.get('GITHUB_SHA')
+        if env:
+            return env[:7] if short else env
+        # Try minimal .git reading
+        try:
+            git_head = None
+            head_path = os.path.join(os.path.dirname(__file__), '..', '.git', 'HEAD')
+            head_path = os.path.abspath(head_path)
+            if os.path.exists(head_path):
+                with open(head_path, 'r') as f:
+                    ref = f.read().strip()
+                if ref.startswith('ref:'):
+                    ref_path = ref.split(' ', 1)[1]
+                    ref_file = os.path.join(os.path.dirname(head_path), ref_path)
+                    if os.path.exists(ref_file):
+                        with open(ref_file, 'r') as rf:
+                            val = rf.read().strip()
+                            return val[:7] if short else val
+                else:
+                    return ref[:7] if short else ref
+        except Exception:
+            pass
+    return 'unknown'
+
+
 def _parse_mixed_dates(series):
     """Parse a pandas Series that may contain mixed date representations.
 
@@ -4322,6 +4363,12 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
 
 def main():
     st.title("📊 Tableau de Bord RH")
+    # Afficher le hash du commit actuel pour aider au debug des déploiements
+    try:
+        commit_hash = get_current_commit_hash()
+        st.markdown(f"<div style='font-size:12px;color:#666;margin-top:-8px'>Commit: {commit_hash}</div>", unsafe_allow_html=True)
+    except Exception:
+        pass
     st.markdown("---")
     # Date de reporting : permet de fixer la date de référence pour tous les calculs
     if 'reporting_date' not in st.session_state:
