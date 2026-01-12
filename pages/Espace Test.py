@@ -4616,13 +4616,4 @@ def main():
             st.warning("📊 Aucune donnée disponible pour les intégrations. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
 
 if __name__ == "__main__":
-    main()        if df_recrutement is not None:
-            # Créer les filtres spécifiques pour les intégrations (sans période)
-            st.sidebar.subheader("🔧 Filtres - Intégrations")
-            int_filters = create_integration_filters(df_recrutement, "integrations")
-            create_integrations_tab(df_recrutement, int_filters)
-        else:
-            st.warning("📊 Aucune donnée disponible pour les intégrations. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
-
-if __name__ == "__main__":
     main()
