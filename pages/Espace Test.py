@@ -139,6 +139,21 @@ def render_generic_metrics(metrics):
 TITLE_FONT = dict(family="Arial, sans-serif", size=18, color="#111111", )
 
 
+def apply_title_style(fig):
+    """Applique la police et le style de titre standardisé à une figure Plotly."""
+    try:
+        fig.update_layout(title_font=TITLE_FONT)
+    except Exception:
+        try:
+            current = ''
+            if hasattr(fig.layout, 'title') and getattr(fig.layout.title, 'text', None):
+                current = fig.layout.title.text
+            fig.update_layout(title=dict(text=current, x=0, xanchor='left', font=TITLE_FONT))
+        except Exception:
+            pass
+    return fig
+
+
 def _parse_mixed_dates(series):
     """Parse a pandas Series that may contain mixed date representations.
 
@@ -717,7 +732,8 @@ def render_plotly_scrollable(fig, max_height=500):
         components.html(wrapper, height=max_height, scrolling=True)
     except Exception:
         # Fallback to default renderer
-        st.plotly_chart(fig, width="stretch")
+                fig = apply_title_style(fig)
+                st.plotly_chart(fig, width="stretch")
 
 def create_recrutements_clotures_tab(df_recrutement, global_filters):
     """Onglet Recrutements Clôturés avec style carte"""
@@ -806,6 +822,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                         tickangle=45
                     )
                 )
+                fig_evolution = apply_title_style(fig_evolution)
                 st.plotly_chart(fig_evolution, width="stretch")
     
     with col2:
@@ -836,6 +853,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 # Ajuster les marges pour faire de la place à la légende
                 margin=dict(l=20, r=140, t=60, b=20)
             )
+            fig_modalite = apply_title_style(fig_modalite)
             st.plotly_chart(fig_modalite, width="stretch")
 
     # Graphiques en ligne 2
@@ -957,6 +975,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                      'bar': {'color': "green"},
                     }))
         fig_candidats.update_layout(height=300)
+        fig_candidats = apply_title_style(fig_candidats)
         st.plotly_chart(fig_candidats, width="stretch")
 
     # ... KPI row now includes Délai moyen de recrutement (moved up)
@@ -1009,6 +1028,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             height=380,
             legend=dict(orientation="h", yanchor="bottom", y=-0.45, xanchor="center", x=0.5, font=dict(size=13))
         )
+        fig_statut = apply_title_style(fig_statut)
         st.plotly_chart(fig_statut, width="stretch")
     
     with col2:
@@ -1036,6 +1056,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
                 xaxis={'categoryorder':'total descending'},
                 title=dict(text="Comparaison par raison du recrutement", x=0, xanchor='left', font=TITLE_FONT)
             )
+            fig_raison = apply_title_style(fig_raison)
             st.plotly_chart(fig_raison, width="stretch")
     
     with col3:
@@ -1064,6 +1085,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
                     hovertemplate='%{y}<extra></extra>'
                 )
                 fig_evolution_demandes.update_layout(height=360, margin=dict(t=60, b=30, l=20, r=20), xaxis_title=None, yaxis_title=None)
+                fig_evolution_demandes = apply_title_style(fig_evolution_demandes)
                 st.plotly_chart(fig_evolution_demandes, width="stretch")
     
     # Deuxième ligne de graphiques
@@ -1233,6 +1255,7 @@ def create_integrations_tab(df_recrutement, global_filters):
         if 'Affectation' in df_filtered.columns:
             # Utiliser la fonction existante create_affectation_chart
             fig_affectation = create_affectation_chart(df_filtered)
+            fig_affectation = apply_title_style(fig_affectation)
             st.plotly_chart(fig_affectation, width="stretch")
         else:
             st.warning("Colonne 'Affectation' non trouvée dans les données.")
