@@ -116,6 +116,25 @@ def _truncate_label(label: str, max_len: int = 20) -> str:
     return label[: max_len - 4].rstrip() + '....'
 
 
+def render_generic_metrics(metrics):
+    """Render a horizontal row of metric cards via HTML.
+    metrics: list of tuples (title, value, color_hex)
+    """
+    css = """
+    <style>
+    .gen-kpi-row{display:flex;gap:18px;justify-content:center;align-items:stretch;margin-bottom:18px}
+    .gen-kpi{background:#fff;border-radius:8px;padding:14px 18px;min-width:220px;flex:0 1 auto;border:1px solid #e6eef6;box-shadow:0 2px 6px rgba(0,0,0,0.04)}
+    .gen-kpi .t{font-size:14px;color:#2c3e50;margin-bottom:8px;font-weight:700}
+    .gen-kpi .v{font-size:28px;color:#172b4d;font-weight:800}
+    </style>
+    """
+    cards = []
+    for title, value, color in metrics:
+        cards.append(f"<div class='gen-kpi'><div class='t'>{title}</div><div class='v' style='color:{color};'>{value}</div></div>")
+    html = css + "<div class='gen-kpi-row'>" + "".join(cards) + "</div>"
+    return html
+
+
 # Shared title font used for all main charts so typography is consistent
 TITLE_FONT = dict(family="Arial, sans-serif", size=18, color="#111111", )
 
@@ -297,6 +316,8 @@ span[data-testid="stMetricValue"] { font-size:28px !important; font-weight:700 !
 
 # Données pour le Kanban
 postes_data = [
+    # Colonne Nouvelle demande
+    {"titre": "Nouvelle Demande Exemple", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "X.DEMANDE", "recruteur": "Jalal", "statut": "Nouvelle demande"},
     # Colonne Sourcing
     {"titre": "Ingénieur Achat", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.BOUZOUBAA", "recruteur": "Zakaria", "statut": "Sourcing"},
     {"titre": "Directeur Achats Adjoint", "entite": "TGCC", "lieu": "Siège", "demandeur": "C.BENABDELLAH", "recruteur": "Zakaria", "statut": "Sourcing"},
@@ -735,16 +756,14 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         except Exception:
             pass
 
-    # Revert to simple metrics (no bordered-card styling) in the Recrutements Clôturés section
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Nombre de recrutements", recrutements)
-    with col2:
-        st.metric("Postes concernés", postes_uniques)
-    with col3:
-        st.metric("Nombre de Directions concernées", directions_uniques)
-    with col4:
-        st.metric("Délai moyen recrutement (jours)", delai_display)
+    # Render KPIs as HTML cards for larger/consistent styling
+    metrics_html = render_generic_metrics([
+        ("Nombre de recrutements", recrutements, "#1f77b4"),
+        ("Postes concernés", postes_uniques, "#2ca02c"),
+        ("Nombre de Directions concernées", directions_uniques, "#ff7f0e"),
+        ("Délai moyen recrutement (jours)", delai_display, "#6f42c1")
+    ])
+    st.markdown(metrics_html, unsafe_allow_html=True)
     
     # Graphiques en ligne 1
     col1, col2 = st.columns([2,1])
@@ -951,53 +970,29 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
     date_col = 'Date de réception de la demande aprés validation de la DRH'
     
     # KPIs principaux - Indicateurs de demandes sur la même ligne
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Nombre de demandes", len(df_filtered))
-    
-    with col2:
-        # Nouvelles Demandes (ce mois-ci)
-        today = datetime.now()
-        start_of_month = today.replace(day=1)
-        if date_col in df_filtered.columns:
-            nouvelles_demandes = len(df_filtered[df_filtered[date_col] >= start_of_month])
-            st.metric(
-                "Nouvelles Demandes (ce mois-ci)", 
-                nouvelles_demandes,
-                help="Le nombre de demandes reçues durant le mois en cours."
-            )
-        else:
-            st.metric("Nouvelles Demandes (ce mois-ci)", "N/A")
-    
-    with col3:
-        # Demandes Annulées / Dépriorisées
-        if 'Statut de la demande' in df_filtered.columns:
-            demandes_annulees = len(df_filtered[
-                df_filtered['Statut de la demande'].str.contains('annul|déprioris|Annul|Déprioris|ANNUL|DÉPRIORIS', case=False, na=False)
-            ])
-            st.metric(
-                "Demandes Annulées/Dépriorisées", 
-                demandes_annulees,
-                help="Le nombre de demandes qui ont été stoppées. 'fuite' du pipeline."
-            )
-        else:
-            st.metric("Demandes Annulées/Dépriorisées", "N/A")
-    
-    with col4:
-        # Taux d'annulation
-        if 'Statut de la demande' in df_filtered.columns and len(df_filtered) > 0:
-            demandes_annulees = len(df_filtered[
-                df_filtered['Statut de la demande'].str.contains('annul|déprioris|Annul|Déprioris|ANNUL|DÉPRIORIS', case=False, na=False)
-            ])
-            taux_annulation = round((demandes_annulees / len(df_filtered)) * 100, 1)
-            st.metric(
-                "Taux d'annulation", 
-                f"{taux_annulation}%",
-                help="Pourcentage de demandes annulées ou dépriorisées par rapport au total."
-            )
-        else:
-            st.metric("Taux d'annulation", "N/A")
+    # Rendre les KPI principaux via HTML pour contrôle précis des tailles
+    total_demandes = len(df_filtered)
+    today = datetime.now()
+    start_of_month = today.replace(day=1)
+    nouvelles_demandes = 0
+    if date_col in df_filtered.columns:
+        try:
+            nouvelles_demandes = int((pd.to_datetime(df_filtered[date_col], errors='coerce') >= start_of_month).sum())
+        except Exception:
+            nouvelles_demandes = 0
+
+    demandes_annulees = 0
+    if 'Statut de la demande' in df_filtered.columns:
+        demandes_annulees = int(df_filtered['Statut de la demande'].astype(str).str.contains('annul|déprioris', case=False, na=False).sum())
+    taux_annulation = f"{round((demandes_annulees / total_demandes) * 100, 1)}%" if total_demandes > 0 else "N/A"
+
+    metrics_html = render_generic_metrics([
+        ("Nombre de demandes", total_demandes, "#1f77b4"),
+        ("Nouvelles Demandes (ce mois-ci)", nouvelles_demandes, "#2ca02c"),
+        ("Demandes Annulées/Dépriorisées", demandes_annulees, "#ff7f0e"),
+        ("Taux d'annulation", taux_annulation, "#d62728")
+    ])
+    st.markdown(metrics_html, unsafe_allow_html=True)
 
     # Graphiques principaux
     st.markdown("---")
@@ -1196,21 +1191,20 @@ def create_integrations_tab(df_recrutement, global_filters):
     # Appliquer les filtres globaux
     df_filtered = apply_global_filters(df_integrations, global_filters)
     
-    # KPIs d'intégration
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("👥 Intégrations en cours", len(df_filtered))
-    with col2:
-        # Plans d'intégration à préparer
-        if plan_integration_col in df_filtered.columns:
-            a_preparer = len(df_filtered[df_filtered[plan_integration_col].astype(str).str.lower() == 'oui'])
-            st.metric("📋 Plan d'intégration à préparer", a_preparer)
-        else:
-            st.metric("📋 Plan d'intégration à préparer", "N/A")
-    with col3:
-        # Intégrations en retard (date prévue passée)
-        if date_integration_col in df_filtered.columns:
-            df_filtered[date_integration_col] = pd.to_datetime(df_filtered[date_integration_col], errors='coerce')
+    # KPIs d'intégration (HTML cards pour contrôle précis des tailles)
+    nb_int = len(df_filtered)
+    a_preparer = 0
+    if plan_integration_col in df_filtered.columns:
+        try:
+            a_preparer = int((df_filtered[plan_integration_col].astype(str).str.lower() == 'oui').sum())
+        except Exception:
+            a_preparer = 0
+
+    en_retard = "N/A"
+    if date_integration_col in df_filtered.columns:
+        try:
+            df_temp = df_filtered.copy()
+            df_temp[date_integration_col] = pd.to_datetime(df_temp[date_integration_col], errors='coerce')
             reporting_date = st.session_state.get('reporting_date', None)
             if reporting_date is None:
                 today = datetime.now()
@@ -1219,11 +1213,16 @@ def create_integrations_tab(df_recrutement, global_filters):
                     today = reporting_date
                 else:
                     today = datetime.combine(reporting_date, datetime.min.time())
-            en_retard = len(df_filtered[(df_filtered[date_integration_col].notna()) & 
-                                      (df_filtered[date_integration_col] < today)])
-            st.metric("⚠️ En retard", en_retard)
-        else:
-            st.metric("⚠️ En retard", "N/A")
+            en_retard = int(((df_temp[date_integration_col].notna()) & (df_temp[date_integration_col] < today)).sum())
+        except Exception:
+            en_retard = "N/A"
+
+    metrics_html = render_generic_metrics([
+        ("👥 Intégrations en cours", nb_int, "#1f77b4"),
+        ("📋 Plan d'intégration à préparer", a_preparer, "#ff7f0e"),
+        ("⚠️ En retard", en_retard, "#d62728")
+    ])
+    st.markdown(metrics_html, unsafe_allow_html=True)
     
     # Graphiques
     col1, col2 = st.columns(2)
@@ -1274,38 +1273,32 @@ def create_integrations_tab(df_recrutement, global_filters):
     colonnes_disponibles = [col for col in colonnes_affichage if col in df_filtered.columns]
     
     if colonnes_disponibles:
+        # Travailler sur une copie des colonnes disponibles
         df_display = df_filtered[colonnes_disponibles].copy()
-        
-        # Formater la date pour enlever l'heure et s'assurer du bon format DD/MM/YYYY
+
+        # Exclure les lignes sans date d'intégration prévue AVANT le formatage
         if date_integration_col in df_display.columns:
-            # Essayer d'abord le format DD/MM/YYYY puis MM/DD/YYYY si nécessaire
+            df_display = df_display[df_display[date_integration_col].notna() & df_display[date_integration_col].astype(str).str.strip().ne('')].copy()
+
+            # Formater la date pour enlever l'heure et s'assurer du bon format DD/MM/YYYY
             def format_date_safely(date_str):
-                if pd.isna(date_str) or date_str == '' or date_str == 'N/A' or date_str is pd.NaT:
+                if pd.isna(date_str) or date_str == '' or str(date_str).strip().upper() == 'N/A' or date_str is pd.NaT:
                     return 'N/A'
-                
                 parsed_date = pd.to_datetime(date_str, errors='coerce')
-                
                 if pd.notna(parsed_date):
                     return parsed_date.strftime('%d/%m/%Y')
                 else:
                     return 'N/A'
-            
-            df_display[date_integration_col] = df_display[date_integration_col].apply(format_date_safely)
-        
-            # Renommer pour affichage plus propre
-            # Exclure les lignes sans date d'intégration prévue afin d'éviter les lignes affichées comme 'N/A'
-            if date_integration_col in df_display.columns:
-                # Garder une copie pour les KPIs, mais filtrer le tableau détaillé
-                df_display_table = df_display[df_display[date_integration_col].notna()].copy()
-            else:
-                df_display_table = df_display.copy()
 
-            df_display_table = df_display_table.rename(columns={
-                candidat_col: "Candidat",
-                'Poste demandé ': "Poste",
-                date_integration_col: "Date d'Intégration Prévue"
-            })
-        
+            df_display[date_integration_col] = df_display[date_integration_col].apply(format_date_safely)
+
+        # Renommer pour affichage plus propre
+        df_display_table = df_display.rename(columns={
+            candidat_col: "Candidat",
+            'Poste demandé ': "Poste",
+            date_integration_col: "Date d'Intégration Prévue"
+        })
+
         # Réinitialiser l'index pour enlever les numéros de ligne
         df_display_table = df_display_table.reset_index(drop=True)
         # Afficher sans index (hide_index=True)
@@ -2367,10 +2360,12 @@ def create_weekly_report_tab(df_recrutement=None):
         return s.lower().strip()
 
     # Statuts Kanban canoniques (ordre d'affichage)
-    statuts_kanban_display = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+    statuts_kanban_display = ["Nouvelle demande", "Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
 
     # Mapping de formes possibles -> statut canonique
     status_map = {
+        'nouvelle demande': 'Nouvelle demande',
+        'nouvelle': 'Nouvelle demande',
         'desistement': 'Désistement',
         'desisté': 'Désistement',
         'sourcing': 'Sourcing',
@@ -3245,13 +3240,14 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
                 }}
                 .cards-container {{
                     display: grid;
-                    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-                    gap: 20px;
+                    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+                    grid-auto-flow: dense;
+                    gap: 22px;
                     padding: 20px;
                     justify-items: center;
                     justify-content: center;
                     align-items: start;
-                    max-width: 1200px;
+                    width: 100%;
                     margin: 0 auto;
                 }}
                 .kanban-card {{
@@ -3474,7 +3470,7 @@ def generate_kanban_html_image(df_recrutement):
     
     try:
         # Charger les données réelles du dataframe
-        statuts = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+        statuts = ["Nouvelle demande", "Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
         postes_data = []
         
         for index, row in df_recrutement.iterrows():
@@ -3509,7 +3505,7 @@ def generate_kanban_html_image(df_recrutement):
             {"titre": "Magasinier", "entite": "TG WOOD", "lieu": "Oulad Saleh", "demandeur": "K.TAZI", "recruteur": "Ghita", "statut": "Désistement", "commentaire": "Pas de retour du demandeur"}
         ]
         
-        statuts = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+        statuts = ["Nouvelle demande", "Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
         
         html_kanban = """
         <html>
@@ -3981,7 +3977,7 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
         st.info(f"📅 Période de filtrage Clôture/Désistement: {start_filter.date()} au {end_filter.date()}")
         
         # Générer une image par statut Kanban
-        statuts = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+        statuts = ["Nouvelle demande", "Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
         kanban_images = {}
         
         for statut in statuts:
@@ -4173,7 +4169,7 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                             img_height = Inches(6)
                         
                         # Insérer les 5 images Kanban dans des slides séparées selon l'ordre demandé
-                        ordered_status = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+                        ordered_status = ["Nouvelle demande", "Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
                         for statut in ordered_status:
                             img_path = kanban_images.get(statut)
                             # Créer une nouvelle slide pour chaque statut (ne pas utiliser la slide actuelle)
@@ -4612,6 +4608,15 @@ def main():
     with tabs[3]:
         # Onglet Intégrations basé sur les données Excel
         if df_recrutement is not None:
+            # Créer les filtres spécifiques pour les intégrations (sans période)
+            st.sidebar.subheader("🔧 Filtres - Intégrations")
+            int_filters = create_integration_filters(df_recrutement, "integrations")
+            create_integrations_tab(df_recrutement, int_filters)
+        else:
+            st.warning("📊 Aucune donnée disponible pour les intégrations. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
+
+if __name__ == "__main__":
+    main()        if df_recrutement is not None:
             # Créer les filtres spécifiques pour les intégrations (sans période)
             st.sidebar.subheader("🔧 Filtres - Intégrations")
             int_filters = create_integration_filters(df_recrutement, "integrations")
