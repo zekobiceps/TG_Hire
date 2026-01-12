@@ -882,11 +882,10 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             custom_data=['Direction']
         )
         fig_direction.update_traces(
-            marker_color='#ff7f0e',
-            textposition='inside',
+            marker_color='grey',
+            textposition='outside',
             texttemplate='%{x}',
             textfont=dict(size=11),
-            textangle=90,
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         try:
@@ -901,7 +900,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         # Largest at top: reverse the category array so descending values appear from top to bottom
         height_dir = max(300, 28 * len(df_direction))
         fig_direction.update_layout(
-            height=height_dir,
+            height=320,
             xaxis_title=None,
             yaxis_title=None,
             margin=dict(l=160, t=40, b=30, r=20),
@@ -975,7 +974,11 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                      'bar': {'color': "green"},
                     }))
         fig_candidats.update_layout(height=300)
-        fig_candidats = apply_title_style(fig_candidats)
+        # Appliquer un titre explicite (évite le fallback qui peut rendre 'undefined')
+        try:
+            fig_candidats.update_layout(title=dict(text="Nombre de candidats présélectionnés", x=0, xanchor='left', font=TITLE_FONT))
+        except Exception:
+            pass
         st.plotly_chart(fig_candidats, width="stretch")
 
     # ... KPI row now includes Délai moyen de recrutement (moved up)
@@ -1084,7 +1087,8 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
                     texttemplate='%{y}',
                     hovertemplate='%{y}<extra></extra>'
                 )
-                fig_evolution_demandes.update_layout(height=360, margin=dict(t=60, b=30, l=20, r=20), xaxis_title=None, yaxis_title=None)
+                # Aligner la marge supérieure avec les autres titres (ex: pie statuts)
+                fig_evolution_demandes.update_layout(height=320, margin=dict(t=48, b=30, l=20, r=20), xaxis_title=None, yaxis_title=None)
                 fig_evolution_demandes = apply_title_style(fig_evolution_demandes)
                 st.plotly_chart(fig_evolution_demandes, width="stretch")
     
@@ -1153,17 +1157,16 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             custom_data=['Poste']
         )
         fig_poste.update_traces(
-            marker_color='#2ca02c',
-            textposition='inside',
+            marker_color='grey',
+            textposition='outside',
             texttemplate='%{x}',
             textfont=dict(size=11),
-            textangle=90,
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
-        height_poste = max(300, 28 * len(df_poste))
+        height_poste = 320
         category_array_poste = list(df_poste['Label_display'][::-1])
         fig_poste.update_layout(
-            height=height_poste,
+            height=320,
             xaxis_title=None,
             yaxis_title=None,
             margin=dict(l=160, t=40, b=30, r=20),
@@ -3820,8 +3823,8 @@ def generate_demandes_recrutement_html_image(df_recrutement):
                 dfd = direction_counts.rename_axis('Direction').reset_index(name='Count').sort_values('Count', ascending=False)
                 dfd['Label'] = dfd['Direction']
                 fig_dir = px.bar(dfd, x='Count', y='Label', title="Comparaison par direction", text='Count', orientation='h')
-                fig_dir.update_traces(marker_color='#ff7f0e', textposition='inside', texttemplate='%{x}')
-                fig_dir.update_layout(height=max(320, 24*len(dfd)), margin=dict(l=160,t=40,b=30,r=20), xaxis_title=None, yaxis_title=None)
+                fig_dir.update_traces(marker_color='grey', textposition='outside', texttemplate='%{x}', textfont=dict(size=11), hovertemplate='%{y}<extra></extra>')
+                fig_dir.update_layout(height=320, margin=dict(l=160,t=40,b=30,r=20), xaxis_title=None, yaxis_title=None)
                 figs_row2.append(fig_dir)
         except Exception:
             figs_row2.append(None)
@@ -3831,8 +3834,8 @@ def generate_demandes_recrutement_html_image(df_recrutement):
                 dfp = poste_counts.rename_axis('Poste').reset_index(name='Count').sort_values('Count', ascending=False)
                 dfp['Label'] = dfp['Poste']
                 fig_poste = px.bar(dfp, x='Count', y='Label', title="Comparaison par poste", text='Count', orientation='h')
-                fig_poste.update_traces(marker_color='#2ca02c', textposition='inside', texttemplate='%{x}')
-                fig_poste.update_layout(height=max(320, 24*len(dfp)), margin=dict(l=160,t=40,b=30,r=20), xaxis_title=None, yaxis_title=None)
+                fig_poste.update_traces(marker_color='grey', textposition='outside', texttemplate='%{x}', textfont=dict(size=11), hovertemplate='%{y}<extra></extra>')
+                fig_poste.update_layout(height=320, margin=dict(l=160,t=40,b=30,r=20), xaxis_title=None, yaxis_title=None)
                 figs_row2.append(fig_poste)
         except Exception:
             figs_row2.append(None)
