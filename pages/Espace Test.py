@@ -853,7 +853,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 )
                 fig_evolution.update_layout(
                     height=360,
-                    margin=dict(t=60, b=30, l=20, r=20),
+                    margin=dict(t=48, b=30, l=20, r=20),
                     xaxis_title=None,
                     yaxis_title=None,
                     xaxis=dict(
@@ -924,30 +924,20 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         )
         fig_direction.update_traces(
             marker_color='grey',
-            textposition='outside',
+            textposition='auto',
             texttemplate='%{x}',
             textfont=dict(size=11),
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
-        try:
-            fig_direction.update_layout(title=dict(text="Comparaison par direction", x=0, xanchor='left', font=TITLE_FONT))
-        except Exception:
-            pass
-        # Standardize title styling (left aligned)
-        try:
-            fig_direction.update_layout(title=dict(text="Comparaison par direction", x=0, xanchor='left', font=TITLE_FONT))
-        except Exception:
-            pass
-        # Largest at top: reverse the category array so descending values appear from top to bottom
-        height_dir = max(300, 28 * len(df_direction))
         fig_direction.update_layout(
-            height=320,
+            height=300,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=160, t=40, b=30, r=20),
+            margin=dict(l=160, t=48, b=30, r=20),
             yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_direction['Label_display'][::-1]))
         )
-        # Use a compact default visible area (320px) and allow scrolling to see rest
+        fig_direction = apply_title_style(fig_direction)
+        # Use a compact default visible area and allow scrolling when long
         render_plotly_scrollable(fig_direction, max_height=320)
 
     with col4:
@@ -969,29 +959,21 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             custom_data=['Poste']
         )
         fig_poste.update_traces(
-            marker_color='#2ca02c',
-            textposition='inside',
+            marker_color='grey',
+            textposition='auto',
             texttemplate='%{x}',
             textfont=dict(size=11),
-            textangle=90,
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
-        try:
-            fig_poste.update_layout(title=dict(text="Comparaison par poste", x=0, xanchor='left', font=TITLE_FONT))
-        except Exception:
-            pass
-        try:
-            fig_poste.update_layout(title=dict(text="Comparaison par poste", x=0, xanchor='left', font=TITLE_FONT))
-        except Exception:
-            pass
         height_poste = max(300, 28 * len(df_poste))
         fig_poste.update_layout(
-            height=height_poste,
+            height=300 if height_poste < 360 else height_poste,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=160, t=40, b=30, r=20),
+            margin=dict(l=160, t=48, b=30, r=20),
             yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_poste['Label_display'][::-1]))
         )
+        fig_poste = apply_title_style(fig_poste)
         render_plotly_scrollable(fig_poste, max_height=320)
 
 
@@ -1011,15 +993,16 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             mode = "gauge+number",
             value = total_candidats,
             title = {'text': "Nombre de candidats présélectionnés"},
-            gauge = {'axis': {'range': [None, max(total_candidats * 2, 100)]},
+            gauge = {'axis': {'range': [0, max(total_candidats * 2, 100)]},
                      'bar': {'color': "green"},
                     }))
-        fig_candidats.update_layout(height=300)
+        fig_candidats.update_layout(height=300, margin=dict(t=48, b=20, l=20, r=20))
         # Appliquer un titre explicite (évite le fallback qui peut rendre 'undefined')
         try:
             fig_candidats.update_layout(title=dict(text="Nombre de candidats présélectionnés", x=0, xanchor='left', font=TITLE_FONT))
         except Exception:
             pass
+        fig_candidats = apply_title_style(fig_candidats)
         st.plotly_chart(fig_candidats, width="stretch")
 
     # ... KPI row now includes Délai moyen de recrutement (moved up)
@@ -2050,22 +2033,57 @@ def create_weekly_report_tab(df_recrutement=None):
         # --- Tableau : Recrutements en cours par recruteur (juste après 'Besoins en Cours par Entité')
         try:
             if df_recrutement is not None and 'Colonne TG Hire' in df_recrutement.columns:
-                mask_en_cours = df_recrutement['Colonne TG Hire'].isin(['Sourcing', 'Shortlisté', 'Signature DRH'])
+                # On veut un tableau avec une colonne par statut: Sourcing, Shortlisté, Signature DRH, Clôture
+                wanted_statuses = ['Sourcing', 'Shortlisté', 'Signature DRH', 'Clôture']
+                mask_en_cours = df_recrutement['Colonne TG Hire'].isin(wanted_statuses)
                 df_en_cours = df_recrutement[mask_en_cours].copy()
+
                 # Identifier la colonne recruteur de façon robuste
                 recruteur_col = next((c for c in df_en_cours.columns if 'responsable' in c.lower() and 'traitement' in c.lower()), None)
                 if not recruteur_col:
                     recruteur_col = next((c for c in df_en_cours.columns if 'recruteur' in c.lower() or 'responsable' in c.lower()), None)
 
                 if recruteur_col and not df_en_cours.empty:
-                    rec_counts = df_en_cours[recruteur_col].fillna('(Sans)').value_counts().reset_index()
-                    rec_counts.columns = ['Recruteur', 'Nb postes en cours']
+                    # Pivot: lignes = recruteur, colonnes = statut
+                    pivot = pd.crosstab(df_en_cours[recruteur_col].fillna('(Sans)').astype(str), df_en_cours['Colonne TG Hire'])
+                    # S'assurer de l'ordre des colonnes et présence de toutes
+                    for s in wanted_statuses:
+                        if s not in pivot.columns:
+                            pivot[s] = 0
+                    pivot = pivot[wanted_statuses]
 
+                    # Totaux par recruteur
+                    pivot['TOTAL'] = pivot.sum(axis=1)
+
+                    # Totaux globaux par statut
+                    totals = pivot[wanted_statuses].sum(axis=0)
+
+                    # Construire le HTML du tableau
                     html_rec = '<div class="table-container" style="margin-top:12px;">'
-                    html_rec += '<table class="custom-table" style="width:40%;">'
-                    html_rec += '<thead><tr><th>Recruteur</th><th>Nb postes en cours</th></tr></thead><tbody>'
-                    for _, r in rec_counts.iterrows():
-                        html_rec += f'<tr><td class="entity-cell">{r["Recruteur"]}</td><td>{int(r["Nb postes en cours"])}</td></tr>'
+                    html_rec += '<table class="custom-table" style="width:70%;">'
+                    # Header
+                    html_rec += '<thead><tr><th>Recruteur</th>'
+                    for s in wanted_statuses:
+                        html_rec += f'<th>{s}</th>'
+                    html_rec += '<th>TOTAL</th></tr></thead><tbody>'
+
+                    # Lignes par recruteur
+                    for rec, row in pivot.iterrows():
+                        html_rec += '<tr>'
+                        html_rec += f'<td class="entity-cell">{rec}</td>'
+                        for s in wanted_statuses:
+                            html_rec += f'<td>{int(row[s])}</td>'
+                        html_rec += f'<td>{int(row["TOTAL"])}</td>'
+                        html_rec += '</tr>'
+
+                    # Ligne TOTAL
+                    html_rec += '<tr class="total-row">'
+                    html_rec += f'<td class="entity-cell">TOTAL</td>'
+                    for s in wanted_statuses:
+                        html_rec += f'<td>{int(totals[s])}</td>'
+                    html_rec += f'<td>{int(pivot["TOTAL"].sum())}</td>'
+                    html_rec += '</tr>'
+
                     html_rec += '</tbody></table></div>'
 
                     st.markdown('<div style="font-weight:600;margin-top:8px;">📋 Recrutements en cours par recruteur</div>', unsafe_allow_html=True)
