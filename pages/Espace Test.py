@@ -123,9 +123,9 @@ def render_generic_metrics(metrics):
     css = """
     <style>
     .gen-kpi-row{display:flex;gap:18px;justify-content:center;align-items:stretch;margin-bottom:18px}
-    .gen-kpi{background:#fff;border-radius:8px;padding:14px 18px;min-width:220px;flex:0 1 auto;border:1px solid #e6eef6;box-shadow:0 2px 6px rgba(0,0,0,0.04)}
-    .gen-kpi .t{font-size:14px;color:#2c3e50;margin-bottom:8px;font-weight:700}
-    .gen-kpi .v{font-size:28px;color:#172b4d;font-weight:800}
+    .gen-kpi{background:#fff;border-radius:8px;padding:14px 18px;min-width:220px;flex:0 1 auto;border:1px solid #e6eef6;box-shadow:0 2px 6px rgba(0,0,0,0.04);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+    .gen-kpi .t{font-size:14px;color:#2c3e50;margin-bottom:8px;font-weight:700;text-align:center}
+    .gen-kpi .v{font-size:28px;color:#172b4d;font-weight:800;text-align:center}
     </style>
     """
     cards = []
@@ -185,14 +185,14 @@ def render_kpi_cards(recrutements, postes, directions, delai_display, delai_help
     css = """
 <style>
 .kpi-row{display:flex;gap:16px;flex-wrap:nowrap;align-items:stretch;margin-bottom:14px;justify-content:center}
-.kpi-card{flex:1 1 0;background:#fff;border-radius:8px;padding:14px;display:flex;flex-direction:column;justify-content:center;border:1px solid #e6eef6;min-width:180px}
-.kpi-card .title{font-size:14px;color:#2c3e50;margin-bottom:8px}
-.kpi-card .value{font-size:26px;font-weight:700;color:#172b4d}
+.kpi-card{flex:1 1 0;background:#fff;border-radius:8px;padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #e6eef6;min-width:180px;text-align:center}
+.kpi-card .title{font-size:14px;color:#2c3e50;margin-bottom:8px;font-weight:700;text-align:center}
+.kpi-card .value{font-size:26px;font-weight:700;color:#172b4d;text-align:center}
 .kpi-accent{border-left:6px solid #1f77b4}
 .kpi-green{border-left-color:#2ca02c}
 .kpi-orange{border-left-color:#ff7f0e}
 .kpi-purple{border-left-color:#6f42c1}
-.kpi-help{font-size:12px;color:#555;margin-top:8px}
+.kpi-help{font-size:12px;color:#555;margin-top:8px;text-align:center}
 @media(max-width:800px){.kpi-row{flex-direction:column}}
 </style>
 """
@@ -298,11 +298,12 @@ div[role="tablist"] > button, button[role="tab"], div[role="tablist"] button[rol
 .plotly .legend { font-size: 14px !important; }
 
 /* Streamlit metrics: aggressive selectors to increase label and value sizes */
+/* Streamlit metrics: aggressive selectors to increase label and value sizes and center them */
 div[data-testid="metric-container"] div[data-testid="stMetric"] span[data-testid], div[data-testid="metric-container"] .stMetricValue, .stMetricValue {
-    font-size: 28px !important; font-weight: 800 !important; line-height:1 !important;
+    font-size: 28px !important; font-weight: 800 !important; line-height:1 !important; display:block; text-align:center !important;
 }
 div[data-testid="metric-container"] div[data-testid="stMetric"] p, .stMetricLabel {
-    font-size: 15px !important; color: #2c3e50 !important; margin:0 !important;
+    font-size: 15px !important; color: #2c3e50 !important; margin:0 !important; display:block; text-align:center !important;
 }
 
 /* Fallback generic selectors for metrics */
@@ -1727,16 +1728,14 @@ def create_weekly_report_tab(df_recrutement=None):
     # total lines with statut 'En cours' (may include those with candidate)
     total_en_cours_status = sum(m.get('en_cours_status_count', 0) for m in metrics_included.values())
 
-    # KPI cards (simple)
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Postes en cours (sourcing)", total_en_cours)
-    with col2:
-        st.metric("Postes pourvus cette semaine", total_pourvus)
-    with col3:
-        st.metric("Nouveaux postes ouverts", total_nouveaux)
-    with col4:
-        st.metric("Total postes ouverts avant la semaine", total_avant)
+    # KPI cards (styled and centered like other KPI cards)
+    kpi_cards_html = render_generic_metrics([
+        ("Postes en cours (sourcing)", total_en_cours, "#1f77b4"),
+        ("Postes pourvus cette semaine", total_pourvus, "#2ca02c"),
+        ("Nouveaux postes ouverts", total_nouveaux, "#ff7f0e"),
+        ("Total postes ouverts avant la semaine", total_avant, "#6f42c1")
+    ])
+    st.markdown(kpi_cards_html, unsafe_allow_html=True)
 
     st.markdown("---")
 
