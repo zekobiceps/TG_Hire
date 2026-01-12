@@ -2002,6 +2002,32 @@ def create_weekly_report_tab(df_recrutement=None):
         html_table += '</tbody></table></div>'
 
         st.markdown(html_table, unsafe_allow_html=True)
+
+        # --- Tableau : Recrutements en cours par recruteur (juste après 'Besoins en Cours par Entité')
+        try:
+            if df_recrutement is not None and 'Colonne TG Hire' in df_recrutement.columns:
+                mask_en_cours = df_recrutement['Colonne TG Hire'].isin(['Sourcing', 'Shortlisté', 'Signature DRH'])
+                df_en_cours = df_recrutement[mask_en_cours].copy()
+                # Identifier la colonne recruteur de façon robuste
+                recruteur_col = next((c for c in df_en_cours.columns if 'responsable' in c.lower() and 'traitement' in c.lower()), None)
+                if not recruteur_col:
+                    recruteur_col = next((c for c in df_en_cours.columns if 'recruteur' in c.lower() or 'responsable' in c.lower()), None)
+
+                if recruteur_col and not df_en_cours.empty:
+                    rec_counts = df_en_cours[recruteur_col].fillna('(Sans)').value_counts().reset_index()
+                    rec_counts.columns = ['Recruteur', 'Nb postes en cours']
+
+                    html_rec = '<div class="table-container" style="margin-top:12px;">'
+                    html_rec += '<table class="custom-table" style="width:40%;">'
+                    html_rec += '<thead><tr><th>Recruteur</th><th>Nb postes en cours</th></tr></thead><tbody>'
+                    for _, r in rec_counts.iterrows():
+                        html_rec += f'<tr><td class="entity-cell">{r["Recruteur"]}</td><td>{int(r["Nb postes en cours"])}</td></tr>'
+                    html_rec += '</tbody></table></div>'
+
+                    st.markdown('<div style="font-weight:600;margin-top:8px;">📋 Recrutements en cours par recruteur</div>', unsafe_allow_html=True)
+                    st.markdown(html_rec, unsafe_allow_html=True)
+        except Exception:
+            pass
     else:
         # Affichage par défaut si pas de metrics
         default_html = """
