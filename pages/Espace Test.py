@@ -151,6 +151,16 @@ def apply_title_style(fig):
             fig.update_layout(title=dict(text=current, x=0, xanchor='left', font=TITLE_FONT))
         except Exception:
             pass
+    # Increase generic data-label fontsize and legend font for better readability
+    try:
+        fig.update_traces(textfont=dict(size=13))
+    except Exception:
+        pass
+    try:
+        if hasattr(fig.layout, 'legend'):
+            fig.update_layout(legend=dict(font=dict(size=13)))
+    except Exception:
+        pass
     return fig
 
 
@@ -926,7 +936,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             marker_color='grey',
             textposition='auto',
             texttemplate='%{x}',
-            textfont=dict(size=11),
+            textfont=dict(size=13),
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         fig_direction.update_layout(
@@ -962,7 +972,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             marker_color='grey',
             textposition='auto',
             texttemplate='%{x}',
-            textfont=dict(size=11),
+            textfont=dict(size=13),
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         height_poste = max(300, 28 * len(df_poste))
@@ -992,16 +1002,13 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         fig_candidats = go.Figure(go.Indicator(
             mode = "gauge+number",
             value = total_candidats,
-            title = {'text': "Nombre de candidats présélectionnés"},
+            title = {'text': ''},
             gauge = {'axis': {'range': [0, max(total_candidats * 2, 100)]},
                      'bar': {'color': "green"},
                     }))
         fig_candidats.update_layout(height=300, margin=dict(t=48, b=20, l=20, r=20))
-        # Appliquer un titre explicite (évite le fallback qui peut rendre 'undefined')
-        try:
-            fig_candidats.update_layout(title=dict(text="Nombre de candidats présélectionnés", x=0, xanchor='left', font=TITLE_FONT))
-        except Exception:
-            pass
+        # Le titre principal est affiché à gauche par le markup extérieur ;
+        # on évite d'avoir un titre centré dans la figure.
         fig_candidats = apply_title_style(fig_candidats)
         st.plotly_chart(fig_candidats, width="stretch")
 
@@ -1140,11 +1147,10 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         )
         # Show values inside bars and full label on hover
         fig_direction.update_traces(
-            marker_color='#ff7f0e',
-            textposition='inside',
+            marker_color='grey',
+            textposition='auto',
             texttemplate='%{x}',
-            textfont=dict(size=11),
-            textangle=90,
+            textfont=dict(size=13),
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         # Dynamic height so long lists become scrollable on the page
@@ -1155,8 +1161,8 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             height=height_dir,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=160, t=40, b=30, r=20),
-            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_dir),
+            margin=dict(l=160, t=48, b=30, r=20),
+            yaxis=dict(automargin=True, tickfont=dict(size=13), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_dir),
             title=dict(text="Comparaison par direction", x=0, xanchor='left', font=TITLE_FONT)
         )
         # Render inside the column so the two charts are on the same row and the component width matches the column
@@ -1182,9 +1188,9 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         )
         fig_poste.update_traces(
             marker_color='grey',
-            textposition='outside',
+            textposition='auto',
             texttemplate='%{x}',
-            textfont=dict(size=11),
+            textfont=dict(size=13),
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         height_poste = 320
@@ -1193,8 +1199,8 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             height=320,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=160, t=40, b=30, r=20),
-            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_poste),
+            margin=dict(l=160, t=48, b=30, r=20),
+            yaxis=dict(automargin=True, tickfont=dict(size=13), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_poste),
             title=dict(text="Comparaison par poste", x=0, xanchor='left', font=TITLE_FONT)
         )
         render_plotly_scrollable(fig_poste, max_height=320)
@@ -2035,28 +2041,32 @@ def create_weekly_report_tab(df_recrutement=None):
             if df_recrutement is not None and 'Colonne TG Hire' in df_recrutement.columns:
                 # On veut un tableau avec une colonne par statut: Sourcing, Shortlisté, Signature DRH, Clôture
                 wanted_statuses = ['Sourcing', 'Shortlisté', 'Signature DRH', 'Clôture']
-                mask_en_cours = df_recrutement['Colonne TG Hire'].isin(wanted_statuses)
-                df_en_cours = df_recrutement[mask_en_cours].copy()
-
-                # Identifier la colonne recruteur de façon robuste
-                recruteur_col = next((c for c in df_en_cours.columns if 'responsable' in c.lower() and 'traitement' in c.lower()), None)
+                # Construire un pivot complet par recruteur (colonnes = Colonne TG Hire demandées)
+                # Le TOTAL affiché est le nombre de lignes pour lesquelles 'Statut de la demande' == 'En cours'
+                # Identifier la colonne recruteur de façon robuste (sur le DF complet)
+                recruteur_col = next((c for c in df_recrutement.columns if 'responsable' in c.lower() and 'traitement' in c.lower()), None)
                 if not recruteur_col:
-                    recruteur_col = next((c for c in df_en_cours.columns if 'recruteur' in c.lower() or 'responsable' in c.lower()), None)
+                    recruteur_col = next((c for c in df_recrutement.columns if 'recruteur' in c.lower() or 'responsable' in c.lower()), None)
 
-                if recruteur_col and not df_en_cours.empty:
-                    # Pivot: lignes = recruteur, colonnes = statut
-                    pivot = pd.crosstab(df_en_cours[recruteur_col].fillna('(Sans)').astype(str), df_en_cours['Colonne TG Hire'])
+                if recruteur_col:
+                    # Pivot sur l'ensemble des données pour récupérer les colonnes d'intérêt
+                    pivot = pd.crosstab(df_recrutement[recruteur_col].fillna('').astype(str).str.strip(), df_recrutement['Colonne TG Hire'])
                     # S'assurer de l'ordre des colonnes et présence de toutes
                     for s in wanted_statuses:
                         if s not in pivot.columns:
                             pivot[s] = 0
                     pivot = pivot[wanted_statuses]
 
-                    # Totaux par recruteur
-                    pivot['TOTAL'] = pivot.sum(axis=1)
+                    # Supprimer les lignes sans recruteur explicite
+                    pivot.index = pivot.index.astype(str)
+                    pivot = pivot[~pivot.index.str.strip().str.lower().isin(['', '(sans)', 'nan', 'none'])]
 
-                    # Totaux globaux par statut
-                    totals = pivot[wanted_statuses].sum(axis=0)
+                    # Calculer le TOTAL demandé: nombre de lignes par recruteur avec Statut de la demande == 'En cours'
+                    if 'Statut de la demande' in df_recrutement.columns:
+                        total_series = df_recrutement[df_recrutement['Statut de la demande'] == 'En cours'].groupby(recruteur_col).size()
+                    else:
+                        total_series = pd.Series(dtype=int)
+                    pivot['TOTAL'] = total_series.reindex(pivot.index).fillna(0).astype(int)
 
                     # Construire le HTML du tableau
                     html_rec = '<div class="table-container" style="margin-top:12px;">'
@@ -2075,14 +2085,6 @@ def create_weekly_report_tab(df_recrutement=None):
                             html_rec += f'<td>{int(row[s])}</td>'
                         html_rec += f'<td>{int(row["TOTAL"])}</td>'
                         html_rec += '</tr>'
-
-                    # Ligne TOTAL
-                    html_rec += '<tr class="total-row">'
-                    html_rec += f'<td class="entity-cell">TOTAL</td>'
-                    for s in wanted_statuses:
-                        html_rec += f'<td>{int(totals[s])}</td>'
-                    html_rec += f'<td>{int(pivot["TOTAL"].sum())}</td>'
-                    html_rec += '</tr>'
 
                     html_rec += '</tbody></table></div>'
 
@@ -3882,8 +3884,8 @@ def generate_demandes_recrutement_html_image(df_recrutement):
                 dfd = direction_counts.rename_axis('Direction').reset_index(name='Count').sort_values('Count', ascending=False)
                 dfd['Label'] = dfd['Direction']
                 fig_dir = px.bar(dfd, x='Count', y='Label', title="Comparaison par direction", text='Count', orientation='h')
-                fig_dir.update_traces(marker_color='grey', textposition='outside', texttemplate='%{x}', textfont=dict(size=11), hovertemplate='%{y}<extra></extra>')
-                fig_dir.update_layout(height=320, margin=dict(l=160,t=40,b=30,r=20), xaxis_title=None, yaxis_title=None)
+                fig_dir.update_traces(marker_color='grey', textposition='auto', texttemplate='%{x}', textfont=dict(size=13), hovertemplate='%{y}<extra></extra>')
+                fig_dir.update_layout(height=320, margin=dict(l=160,t=48,b=30,r=20), xaxis_title=None, yaxis_title=None, yaxis=dict(tickfont=dict(size=13)))
                 figs_row2.append(fig_dir)
         except Exception:
             figs_row2.append(None)
@@ -3893,8 +3895,8 @@ def generate_demandes_recrutement_html_image(df_recrutement):
                 dfp = poste_counts.rename_axis('Poste').reset_index(name='Count').sort_values('Count', ascending=False)
                 dfp['Label'] = dfp['Poste']
                 fig_poste = px.bar(dfp, x='Count', y='Label', title="Comparaison par poste", text='Count', orientation='h')
-                fig_poste.update_traces(marker_color='grey', textposition='outside', texttemplate='%{x}', textfont=dict(size=11), hovertemplate='%{y}<extra></extra>')
-                fig_poste.update_layout(height=320, margin=dict(l=160,t=40,b=30,r=20), xaxis_title=None, yaxis_title=None)
+                fig_poste.update_traces(marker_color='grey', textposition='auto', texttemplate='%{x}', textfont=dict(size=13), hovertemplate='%{y}<extra></extra>')
+                fig_poste.update_layout(height=320, margin=dict(l=160,t=48,b=30,r=20), xaxis_title=None, yaxis_title=None, yaxis=dict(tickfont=dict(size=13)))
                 figs_row2.append(fig_poste)
         except Exception:
             figs_row2.append(None)
@@ -4435,7 +4437,7 @@ def main():
         )
     
     # Créer les onglets (Demandes et Recrutement regroupés)
-    tabs = st.tabs(["📂 Upload & Téléchargement", "🗂️ Demandes & Recrutement", "📅 Hebdomadaire", "🤝 Intégrations"])
+    tabs = st.tabs(["📂 Upload & Téléchargement", "🗂️ Demandes & Recrutement", "📅 Hebdomadaire", "🤝 Intégrations", "📖 Méthodologie"])
     
     # Variables pour stocker les fichiers uploadés
     # Use session_state to persist upload/refresh state
@@ -4730,6 +4732,21 @@ def main():
             create_integrations_tab(df_recrutement, int_filters)
         else:
             st.warning("📊 Aucune donnée disponible pour les intégrations. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
+
+    with tabs[4]:
+        st.header("📖 Méthodologie du Reporting")
+        st.markdown("""
+        **Résumé des méthodes de calcul utilisées dans ce reporting :
+
+        - **Besoins en cours par entité** : calculés à partir des demandes validées par la DRH. Les postes "en cours" sont soit déterminés par le statut `En cours`, soit par la formule (postes avant + nouveaux - pourvus) si les dates manquent.
+        - **Recrutements en cours par recruteur** : tableau pivot par `Colonne TG Hire` (Sourcing, Shortlisté, Signature DRH, Clôture). La colonne `TOTAL` correspond au nombre de lignes pour lesquelles la colonne `Statut de la demande` est exactement `En cours` (comptage par recruteur). Les lignes sans recruteur explicite sont exclues.
+        - **Comparaison par direction / poste / raison** : histogrammes basés sur les valeurs de colonnes `Direction concernée`, `Poste demandé` et `Raison du recrutement`. Les étiquettes affichent les totaux par catégorie.
+        - **Évolution des demandes / intégrations** : bar charts mensuels agrégés par date (date de réception de la demande ou date d'entrée prévue). Les mois sans valeur sont remplis à 0 pour assurer la continuité de la série.
+        - **Nombre de candidats présélectionnés** : somme des valeurs numériques de la colonne `Nb de candidats pré-selectionnés` (valeurs non numériques traitées comme 0).
+        - **KPIs hebdomadaires** : fenêtre de calcul basée sur la `reporting_date` (Semaine précédente : Lundi->Vendredi). Les métriques `avant`, `nouveaux`, `pourvus`, `en_cours` sont calculées avec des règles décrites dans le debug (explications détaillées dans l'onglet Debug).
+
+        Si vous souhaitez des précisions ou que l'on adapte une règle métier (ex : inclure/exclure certaines entités ou considérer une autre colonne pour le statut), dites-moi quelle règle changer et je l'implémente.
+        """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()

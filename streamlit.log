@@ -6,24 +6,6 @@ Collecting usage statistics. To deactivate, set browser.gatherUsageStats to fals
   You can now view your Streamlit app in your browser.
 
   Local URL: http://localhost:8501
-  Network URL: http://10.0.11.248:8501
-  External URL: http://172.210.53.234:8501
+  Network URL: http://10.0.13.237:8501
+  External URL: http://20.42.11.19:8501
 
-2025-10-08 19:27:53.849 Script compilation error
-Traceback (most recent call last):
-  File "/home/vscode/.local/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 571, in _run_script
-    code = self._script_cache.get_bytecode(script_path)
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/vscode/.local/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_cache.py", line 72, in get_bytecode
-    filebody = magic.add_magic(filebody, script_path)
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/home/vscode/.local/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/magic.py", line 45, in add_magic
-    tree = ast.parse(code, script_path, "exec")
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/usr/local/lib/python3.11/ast.py", line 50, in parse
-    return compile(source, filename, mode, flags,
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/workspaces/TG_Hire/pages/9_🔮_Prédiction.py", line 1192
-    with st.expander("📋 Ouvrir/fermer: Tableau des prédictions par Poste"):
-IndentationError: unexpected indent
-2025-10-08 19:27:53.857 Thread 'MainThread': missing ScriptRunContext! This warning can be ignored when running in bare mode.
