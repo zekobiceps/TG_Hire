@@ -34,6 +34,8 @@ PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
 UTILS_PATH = os.path.abspath(os.path.join(PROJECT_ROOT, "utils.py"))
 try:
     spec = importlib.util.spec_from_file_location("utils", UTILS_PATH)
+    if spec is None or spec.loader is None:
+        raise ImportError("Impossible de créer un spec valide pour utils.py")
     utils = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(utils)
     utils.init_session_state()
@@ -148,7 +150,8 @@ def load_data_from_sheet():
         }
         
         for row in rows:
-            quadrant = quadrant_mapping.get(row.get('Quadrant', '').strip(), row.get('Quadrant', '').strip())
+            q_raw = str(row.get('Quadrant', '')).strip()
+            quadrant = quadrant_mapping.get(q_raw, q_raw)
             if quadrant in data:
                 data[quadrant].append({
                     "date": row.get("Date", "N/A"),
@@ -188,6 +191,62 @@ def save_to_google_sheet(quadrant, entry):
         
     except Exception as e:
         st.error(f"❌ Échec de l'enregistrement dans Google Sheets : {e}")
+        return False
+
+def delete_from_google_sheet(quadrant: str, cand: dict) -> bool:
+    """Supprime un candidat du Google Sheet en se basant sur Quadrant, Date, Nom, Poste, Entreprise.
+    Retourne True si la suppression a réussi."""
+    try:
+        gc = get_gsheet_client()
+        if not gc:
+            return False
+        sh = gc.open_by_url(GOOGLE_SHEET_URL)
+        worksheet = sh.worksheet(WORKSHEET_NAME)
+
+        # Récupérer toutes les valeurs (inclut l'entête en 1ère ligne)
+        all_values = worksheet.get_all_values()
+        if not all_values:
+            return False
+        headers = all_values[0]
+
+        # Créer un index des colonnes
+        def idx(col_name: str) -> int:
+            return headers.index(col_name) if col_name in headers else -1
+
+        idx_quadrant = idx('Quadrant')
+        idx_date = idx('Date')
+        idx_nom = idx('Nom')
+        idx_poste = idx('Poste')
+        idx_entreprise = idx('Entreprise')
+
+        # Normaliser les champs recherchés
+        target = {
+            'Quadrant': str(quadrant).strip(),
+            'Date': str(cand.get('date', '')).strip(),
+            'Nom': str(cand.get('nom', '')).strip(),
+            'Poste': str(cand.get('poste', '')).strip(),
+            'Entreprise': str(cand.get('entreprise', '')).strip(),
+        }
+
+        # Chercher la première ligne correspondante (à partir de la 2e ligne)
+        for row_idx in range(1, len(all_values)):
+            row = all_values[row_idx]
+            def safe_get(i):
+                return str(row[i]).strip() if 0 <= i < len(row) and i >= 0 else ''
+
+            if (
+                safe_get(idx_quadrant) == target['Quadrant'] and
+                safe_get(idx_date) == target['Date'] and
+                safe_get(idx_nom) == target['Nom'] and
+                safe_get(idx_poste) == target['Poste'] and
+                safe_get(idx_entreprise) == target['Entreprise']
+            ):
+                # gspread est 1-based pour delete_rows (inclut l'entête)
+                worksheet.delete_rows(row_idx + 1)
+                return True
+        return False
+    except Exception as e:
+        st.error(f"❌ Échec de la suppression dans Google Sheets : {e}")
         return False
 
 # -------------------- INITIALISATION --------------------
@@ -280,12 +339,18 @@ with tab1:
                 if cv_drive_link and cv_drive_link.startswith('http'):
                     st.markdown(f"**CV :** [Ouvrir depuis Google Drive]({cv_drive_link})", unsafe_allow_html=True)
                 
-                export_text = f"Nom: {cand['nom']}\nPoste: {cand['poste']}\nEntreprise: {cand['entreprise']}\nLinkedIn: {cand.get('linkedin', '')}\nNotes: {cand['notes']}\nCV: {cand.get('cv_link', 'Aucun')}"
-                st.download_button(
-                    "⬇️ Exporter (Texte)", data=export_text,
-                    file_name=f"cartographie_{cand['nom']}.txt", mime="text/plain",
-                    key=f"download_carto_{quadrant_choisi}_{i}"
-                )
+                # Bouton de suppression à la place de l'export texte
+                col_a, col_b = st.columns([1,1])
+                with col_a:
+                    if st.button("🗑️ Supprimer ce candidat", key=f"delete_carto_{quadrant_choisi}_{i}"):
+                        ok = delete_from_google_sheet(quadrant_choisi, cand)
+                        if ok:
+                            st.success("✅ Candidat supprimé de la cartographie.")
+                            st.cache_data.clear()
+                            st.session_state.cartographie_data = load_data_from_sheet()
+                            st.experimental_rerun() if hasattr(st, 'experimental_rerun') else st.rerun()
+                        else:
+                            st.error("❌ Impossible de trouver/supprimer ce candidat dans Google Sheets.")
 
     st.subheader("📤 Exporter toute la cartographie")
     if st.button("⬇️ Exporter en CSV (Global)"):
