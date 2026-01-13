@@ -116,8 +116,93 @@ def _truncate_label(label: str, max_len: int = 20) -> str:
     return label[: max_len - 4].rstrip() + '....'
 
 
+def render_generic_metrics(metrics):
+    """Render a horizontal row of metric cards via HTML.
+    metrics: list of tuples (title, value, color_hex)
+    """
+    css = """
+    <style>
+    .gen-kpi-row{display:flex;gap:18px;justify-content:center;align-items:stretch;margin-bottom:18px}
+    .gen-kpi{background:#fff;border-radius:8px;padding:14px 18px;min-width:220px;flex:0 1 auto;border:1px solid #e6eef6;box-shadow:0 2px 6px rgba(0,0,0,0.04);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+    .gen-kpi .t{font-size:14px;color:#2c3e50;margin-bottom:8px;font-weight:700;text-align:center}
+    .gen-kpi .v{font-size:28px;color:#172b4d;font-weight:800;text-align:center}
+    </style>
+    """
+    cards = []
+    for title, value, color in metrics:
+        cards.append(f"<div class='gen-kpi'><div class='t'>{title}</div><div class='v' style='color:{color};'>{value}</div></div>")
+    html = css + "<div class='gen-kpi-row'>" + "".join(cards) + "</div>"
+    return html
+
+
 # Shared title font used for all main charts so typography is consistent
-TITLE_FONT = dict(family="Arial, sans-serif", size=16, color="#111111", )
+TITLE_FONT = dict(family="Arial, sans-serif", size=18, color="#111111", )
+
+
+def apply_title_style(fig):
+    """Applique la police et le style de titre standardisé à une figure Plotly."""
+    try:
+        fig.update_layout(title_font=TITLE_FONT)
+    except Exception:
+        try:
+            current = ''
+            if hasattr(fig.layout, 'title') and getattr(fig.layout.title, 'text', None):
+                current = fig.layout.title.text
+            fig.update_layout(title=dict(text=current, x=0, xanchor='left', font=TITLE_FONT))
+        except Exception:
+            pass
+    # Increase generic data-label fontsize and legend font for better readability
+    try:
+        fig.update_traces(textfont=dict(size=15))
+    except Exception:
+        pass
+    try:
+        if hasattr(fig.layout, 'legend'):
+            fig.update_layout(legend=dict(font=dict(size=13)))
+    except Exception:
+        pass
+    return fig
+
+
+def get_current_commit_hash(short: bool = True) -> str:
+    """Return the current git commit hash (short by default).
+
+    Tries subprocess git first, then falls back to reading .git/HEAD or
+    environment variable GIT_COMMIT. Returns 'unknown' if not available.
+    """
+    import subprocess
+    try:
+        if short:
+            out = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], stderr=subprocess.DEVNULL)
+        else:
+            out = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL)
+        return out.decode().strip()
+    except Exception:
+        # Try environment variable
+        import os
+        env = os.environ.get('GIT_COMMIT') or os.environ.get('COMMIT_SHA') or os.environ.get('GITHUB_SHA')
+        if env:
+            return env[:7] if short else env
+        # Try minimal .git reading
+        try:
+            git_head = None
+            head_path = os.path.join(os.path.dirname(__file__), '..', '.git', 'HEAD')
+            head_path = os.path.abspath(head_path)
+            if os.path.exists(head_path):
+                with open(head_path, 'r') as f:
+                    ref = f.read().strip()
+                if ref.startswith('ref:'):
+                    ref_path = ref.split(' ', 1)[1]
+                    ref_file = os.path.join(os.path.dirname(head_path), ref_path)
+                    if os.path.exists(ref_file):
+                        with open(ref_file, 'r') as rf:
+                            val = rf.read().strip()
+                            return val[:7] if short else val
+                else:
+                    return ref[:7] if short else ref
+        except Exception:
+            pass
+    return 'unknown'
 
 
 def _parse_mixed_dates(series):
@@ -165,15 +250,15 @@ def render_kpi_cards(recrutements, postes, directions, delai_display, delai_help
 
     css = """
 <style>
-.kpi-row{display:flex;gap:12px;flex-wrap:nowrap;align-items:stretch;margin-bottom:12px}
-.kpi-card{flex:1 1 0;background:#fff;border-radius:6px;padding:12px;display:flex;flex-direction:column;justify-content:center;border:1px solid #e6eef6}
-.kpi-card .title{font-size:12px;color:#2c3e50;margin-bottom:6px}
-.kpi-card .value{font-size:22px;font-weight:700;color:#172b4d}
+.kpi-row{display:flex;gap:16px;flex-wrap:nowrap;align-items:stretch;margin-bottom:14px;justify-content:center}
+.kpi-card{flex:1 1 0;background:#fff;border-radius:8px;padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #e6eef6;min-width:180px;text-align:center}
+.kpi-card .title{font-size:14px;color:#2c3e50;margin-bottom:8px;font-weight:700;text-align:center}
+.kpi-card .value{font-size:26px;font-weight:700;color:#172b4d;text-align:center}
 .kpi-accent{border-left:6px solid #1f77b4}
 .kpi-green{border-left-color:#2ca02c}
 .kpi-orange{border-left-color:#ff7f0e}
 .kpi-purple{border-left-color:#6f42c1}
-.kpi-help{font-size:11px;color:#555;margin-top:6px}
+.kpi-help{font-size:12px;color:#555;margin-top:8px;text-align:center}
 @media(max-width:800px){.kpi-row{flex-direction:column}}
 </style>
 """
@@ -264,8 +349,42 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Global tweaks: enlarge tab labels, plot titles and legend fonts for better readability
+st.markdown("""
+<style>
+/* Tabs: increase font-size and weight (stronger selectors) */
+div[role="tablist"] > button, button[role="tab"], div[role="tablist"] button[role="tab"] {
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    padding: 8px 14px !important;
+}
+
+/* Plotly title and legend sizing (fallback selector) */
+.plotly .gtitle, .plotly .gtitle text { font-family: Arial, sans-serif !important; font-size: 18px !important; fill: #111 !important; }
+.plotly .legend { font-size: 14px !important; }
+
+/* Streamlit metrics: aggressive selectors to increase label and value sizes */
+/* Streamlit metrics: aggressive selectors to increase label and value sizes and center them */
+div[data-testid="metric-container"] div[data-testid="stMetric"] span[data-testid], div[data-testid="metric-container"] .stMetricValue, .stMetricValue {
+    font-size: 28px !important; font-weight: 800 !important; line-height:1 !important; display:block; text-align:center !important;
+}
+div[data-testid="metric-container"] div[data-testid="stMetric"] p, .stMetricLabel {
+    font-size: 15px !important; color: #2c3e50 !important; margin:0 !important; display:block; text-align:center !important;
+}
+
+/* Fallback generic selectors for metrics */
+span[data-testid="stMetricLabel"] { font-size:15px !important; }
+span[data-testid="stMetricValue"] { font-size:28px !important; font-weight:700 !important; }
+
+/* Slight increase for general section subtitles */
+.stSubheader, .stMarkdown h3 { font-size: 1.06em !important; }
+</style>
+""", unsafe_allow_html=True)
+
 # Données pour le Kanban
 postes_data = [
+    # Colonne Nouvelle demande
+    {"titre": "Nouvelle Demande Exemple", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "X.DEMANDE", "recruteur": "Jalal", "statut": "Nouvelle demande"},
     # Colonne Sourcing
     {"titre": "Ingénieur Achat", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.BOUZOUBAA", "recruteur": "Zakaria", "statut": "Sourcing"},
     {"titre": "Directeur Achats Adjoint", "entite": "TGCC", "lieu": "Siège", "demandeur": "C.BENABDELLAH", "recruteur": "Zakaria", "statut": "Sourcing"},
@@ -610,17 +729,29 @@ def create_integration_timeline(df):
 
 def create_affectation_chart(df):
     """Créer un graphique par affectation"""
-    affectation_stats = df['Affectation'].value_counts().head(10)
-    
+    # Prefer 'Entité demandeuse' if present, else fallback to 'Affectation'
+    if 'Entité demandeuse' in df.columns and df['Entité demandeuse'].notna().sum() > 0:
+        serie = df['Entité demandeuse'].value_counts()
+        title = "🏢 Répartition par Entité (Top 10)"
+    elif 'Affectation' in df.columns:
+        serie = df['Affectation'].value_counts()
+        title = "🏢 Répartition par Affectation (Top 10)"
+    else:
+        serie = pd.Series([], dtype=int)
+        title = "Répartition"
+
+    serie = serie.head(10)
     fig = px.pie(
-        values=affectation_stats.values,
-        names=affectation_stats.index,
-        title="🏢 Répartition par Affectation (Top 10)"
+        values=serie.values,
+        names=serie.index,
+        title=title
     )
-    
-    fig.update_traces(textposition='inside', textinfo='percent+label')
-    fig.update_layout(height=400)
-    
+    fig.update_traces(textposition='inside', textinfo='percent+label', textfont=dict(size=14))
+    fig.update_layout(
+        height=420,
+        title=dict(text=title, x=0, xanchor='left', font=TITLE_FONT),
+        legend=dict(font=dict(size=14))
+    )
     return fig
 
 
@@ -632,14 +763,14 @@ def render_plotly_scrollable(fig, max_height=500):
         # Inject a small CSS block that targets Plotly's title classes inside the
         # generated HTML so we can enforce consistent font and left alignment
         injected_css = """
-<style>
-/* Ensure the plotly SVG title (gtitle) uses our TITLE_FONT and is left-aligned */
-.plotly .gtitle, .plotly .gtitle text { font-family: Arial, sans-serif !important; font-size: 16px !important; fill: #111111 !important; }
-.plotly .gtitle { text-anchor: start !important; }
-/* Force the plot container to align left inside the Streamlit component */
-.streamlit-plotly-wrapper{ display:flex; justify-content:flex-start; }
-</style>
-"""
+    <style>
+    /* Ensure the plotly SVG title (gtitle) uses our TITLE_FONT and is left-aligned */
+    .plotly .gtitle, .plotly .gtitle text { font-family: Arial, sans-serif !important; font-size: 18px !important; fill: #111111 !important; }
+    .plotly .gtitle { text-anchor: start !important; }
+    /* Force the plot container to align left inside the Streamlit component */
+    .streamlit-plotly-wrapper{ display:flex; justify-content:flex-start; }
+    </style>
+    """
 
         # Wrap the plot HTML in a left-aligned container so the chart isn't centered
         wrapper = f"""
@@ -652,7 +783,8 @@ def render_plotly_scrollable(fig, max_height=500):
         components.html(wrapper, height=max_height, scrolling=True)
     except Exception:
         # Fallback to default renderer
-        st.plotly_chart(fig, width="stretch")
+                fig = apply_title_style(fig)
+                st.plotly_chart(fig, width="stretch")
 
 def create_recrutements_clotures_tab(df_recrutement, global_filters):
     """Onglet Recrutements Clôturés avec style carte"""
@@ -692,16 +824,14 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         except Exception:
             pass
 
-    # Revert to simple metrics (no bordered-card styling) in the Recrutements Clôturés section
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Nombre de recrutements", recrutements)
-    with col2:
-        st.metric("Postes concernés", postes_uniques)
-    with col3:
-        st.metric("Nombre de Directions concernées", directions_uniques)
-    with col4:
-        st.metric("Délai moyen recrutement (jours)", delai_display)
+    # Render KPIs as HTML cards for larger/consistent styling
+    metrics_html = render_generic_metrics([
+        ("Nombre de recrutements", recrutements, "#1f77b4"),
+        ("Postes concernés", postes_uniques, "#2ca02c"),
+        ("Nombre de Directions concernées", directions_uniques, "#ff7f0e"),
+        ("Délai moyen recrutement (jours)", delai_display, "#6f42c1")
+    ])
+    st.markdown(metrics_html, unsafe_allow_html=True)
     
     # Graphiques en ligne 1
     col1, col2 = st.columns([2,1])
@@ -727,13 +857,14 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 )
                 fig_evolution.update_traces(
                     marker_color='#1f77b4',
-                    textposition='outside',
-                    texttemplate='%{y}',
+                    textposition='inside',
+                    texttemplate='<b>%{y}</b>',
+                    textfont=dict(size=15, color='white'),
                     hovertemplate='%{y}<extra></extra>'
                 )
                 fig_evolution.update_layout(
                     height=360,
-                    margin=dict(t=60, b=30, l=20, r=20),
+                    margin=dict(t=48, b=30, l=20, r=20),
                     xaxis_title=None,
                     yaxis_title=None,
                     xaxis=dict(
@@ -743,6 +874,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                         tickangle=45
                     )
                 )
+                fig_evolution = apply_title_style(fig_evolution)
                 st.plotly_chart(fig_evolution, width="stretch")
     
     with col2:
@@ -757,20 +889,23 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 textposition='inside',
                 textinfo='percent'
             )])
+            fig_modalite.update_traces(textfont=dict(size=14))
             fig_modalite.update_layout(
-                title="Répartition par Modalité de recrutement",
-                height=300,
+                title=dict(text="Répartition par Modalité de recrutement", x=0, xanchor='left', font=TITLE_FONT),
+                height=380,
                 # Légende positionnée à droite pour éviter le chevauchement
                 legend=dict(
                     orientation="v", 
                     yanchor="middle", 
                     y=0.5, 
                     xanchor="left", 
-                    x=1.05
+                    x=1.0,
+                    font=dict(size=14)
                 ),
                 # Ajuster les marges pour faire de la place à la légende
-                margin=dict(l=20, r=150, t=50, b=20)
+                margin=dict(l=20, r=140, t=60, b=20)
             )
+            fig_modalite = apply_title_style(fig_modalite)
             st.plotly_chart(fig_modalite, width="stretch")
 
     # Graphiques en ligne 2
@@ -799,32 +934,26 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             custom_data=['Direction']
         )
         fig_direction.update_traces(
-            marker_color='#ff7f0e',
-            textposition='inside',
-            texttemplate='%{x}',
-            textfont=dict(size=11),
-            textangle=90,
+            marker_color='grey',
+            textposition='auto',
+            texttemplate='<b>%{x}</b>',
+            textfont=dict(size=15, color='white'),
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
-        try:
-            fig_direction.update_layout(title=dict(text="Comparaison par direction", x=0, xanchor='left', font=TITLE_FONT))
-        except Exception:
-            pass
-        # Standardize title styling (left aligned)
-        try:
-            fig_direction.update_layout(title=dict(text="Comparaison par direction", x=0, xanchor='left', font=TITLE_FONT))
-        except Exception:
-            pass
-        # Largest at top: reverse the category array so descending values appear from top to bottom
-        height_dir = max(300, 28 * len(df_direction))
         fig_direction.update_layout(
-            height=height_dir,
+            height=300,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=160, t=40, b=30, r=20),
-            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_direction['Label_display'][::-1]))
+            margin=dict(l=160, t=48, b=30, r=20),
+            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_direction['Label_display'][::-1])),
+            title=dict(text="<b>Comparaison par direction</b>", x=0, xanchor='left', font=TITLE_FONT)
         )
-        # Use a compact default visible area (320px) and allow scrolling to see rest
+        fig_direction = apply_title_style(fig_direction)
+        try:
+            fig_direction.update_traces(textfont=dict(size=15, color='white'))
+        except Exception:
+            pass
+        # Use a compact default visible area and allow scrolling when long
         render_plotly_scrollable(fig_direction, max_height=320)
 
     with col4:
@@ -846,29 +975,26 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             custom_data=['Poste']
         )
         fig_poste.update_traces(
-            marker_color='#2ca02c',
-            textposition='inside',
-            texttemplate='%{x}',
-            textfont=dict(size=11),
-            textangle=90,
+            marker_color='grey',
+            textposition='auto',
+            texttemplate='<b>%{x}</b>',
+            textfont=dict(size=15, color='white'),
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
-        try:
-            fig_poste.update_layout(title=dict(text="Comparaison par poste", x=0, xanchor='left', font=TITLE_FONT))
-        except Exception:
-            pass
-        try:
-            fig_poste.update_layout(title=dict(text="Comparaison par poste", x=0, xanchor='left', font=TITLE_FONT))
-        except Exception:
-            pass
         height_poste = max(300, 28 * len(df_poste))
         fig_poste.update_layout(
-            height=height_poste,
+            height=300 if height_poste < 360 else height_poste,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=160, t=40, b=30, r=20),
-            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_poste['Label_display'][::-1]))
+            margin=dict(l=160, t=48, b=30, r=20),
+            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_poste['Label_display'][::-1])),
+            title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT)
         )
+        fig_poste = apply_title_style(fig_poste)
+        try:
+            fig_poste.update_traces(textfont=dict(size=15, color='white'))
+        except Exception:
+            pass
         render_plotly_scrollable(fig_poste, max_height=320)
 
 
@@ -884,15 +1010,73 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         except (KeyError, ValueError):
             total_candidats = 0
             
+        # Titre stylé comme les autres graphiques
+        st.markdown("<div style='font-family:Arial,sans-serif; font-size:18px; font-weight:700; color:#111111; text-align:left; margin:8px 0 4px 0;'>Nombre de candidats présélectionnés</div>", unsafe_allow_html=True)
+
         fig_candidats = go.Figure(go.Indicator(
             mode = "gauge+number",
             value = total_candidats,
-            title = {'text': "Nombre de candidats présélectionnés"},
-            gauge = {'axis': {'range': [None, max(total_candidats * 2, 100)]},
+            gauge = {'axis': {'range': [0, max(total_candidats * 2, 100)], 'visible': True},
                      'bar': {'color': "green"},
                     }))
-        fig_candidats.update_layout(height=300)
+        fig_candidats.update_layout(height=260, margin=dict(t=10, b=10, l=20, r=20))
         st.plotly_chart(fig_candidats, width="stretch")
+
+    with col6:
+        # Taux de refus = (Nb de refus aux promesses / Nb de promesses réalisées) * 100
+        # Recherche robuste des colonnes dans le dataframe
+        prom_col = next((c for c in df_filtered.columns if 'promess' in c.lower() and 'réalis' in c.lower()), None)
+        refus_col = next((c for c in df_filtered.columns if 'refus' in c.lower()), None)
+        prom_sum = 0
+        refus_sum = 0
+        try:
+            if prom_col and prom_col in df_filtered.columns:
+                prom_sum = pd.to_numeric(df_filtered[prom_col], errors='coerce').fillna(0).sum()
+            if refus_col and refus_col in df_filtered.columns:
+                refus_sum = pd.to_numeric(df_filtered[refus_col], errors='coerce').fillna(0).sum()
+        except Exception:
+            prom_sum = 0; refus_sum = 0
+
+        taux_refus = 0.0
+        if prom_sum and prom_sum > 0:
+            taux_refus = float(refus_sum) / float(prom_sum) * 100.0
+
+        st.markdown("<div style='font-family:Arial,sans-serif; font-size:18px; font-weight:700; color:#111111; text-align:left; margin:8px 0 4px 0;'>Taux de refus (%)</div>", unsafe_allow_html=True)
+        fig_refus = go.Figure(go.Indicator(
+            mode='gauge+number',
+            value=round(taux_refus, 1),
+            number={'suffix':' %'},
+            gauge={'axis': {'range':[0,100], 'visible': True}, 'bar': {'color':'#d62728'}}
+        ))
+        fig_refus.update_layout(height=280, margin=dict(t=20, b=20, l=20, r=20))
+        st.plotly_chart(fig_refus, width='stretch')
+
+    # Debug local pour l'onglet Recrutements Clôturés
+    st.markdown("---")
+    with st.expander("🔍 Debug - Détails des lignes (Recrutements Clôturés)", expanded=False):
+        try:
+            st.markdown("**Lignes contribuant aux graphiques avec calcul du délai:**")
+            df_debug_clo = df_filtered.copy()
+            # Colonnes source pour le délai
+            date_reception_col = 'Date de réception de la demande aprés validation de la DRH'
+            date_entree_col = "Date d'entrée effective du candidat"
+            # Formater les dates sans heure
+            if date_entree_col in df_debug_clo.columns:
+                df_debug_clo[date_entree_col] = pd.to_datetime(df_debug_clo[date_entree_col], errors='coerce').dt.strftime('%d/%m/%Y')
+            if date_reception_col in df_debug_clo.columns:
+                df_debug_clo['Date Réception'] = pd.to_datetime(df_debug_clo[date_reception_col], errors='coerce').dt.strftime('%d/%m/%Y')
+                # Calculer le délai en jours
+                date_rec = pd.to_datetime(df_filtered[date_reception_col], errors='coerce')
+                date_ent = pd.to_datetime(df_filtered[date_entree_col], errors='coerce')
+                df_debug_clo['Délai (jours)'] = (date_ent - date_rec).dt.days
+            cols_debug = ['Poste demandé', 'Entité demandeuse', 'Direction concernée', 'Date Réception', date_entree_col, 'Délai (jours)', 'Modalité de recrutement']
+            cols_available = [c for c in cols_debug if c in df_debug_clo.columns]
+            if cols_available:
+                st.dataframe(df_debug_clo[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
+            else:
+                st.dataframe(df_debug_clo.reset_index(drop=True), use_container_width=True, hide_index=True)
+        except Exception:
+            st.write("Aucune donnée disponible pour le debug.")
 
     # ... KPI row now includes Délai moyen de recrutement (moved up)
 
@@ -906,53 +1090,29 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
     date_col = 'Date de réception de la demande aprés validation de la DRH'
     
     # KPIs principaux - Indicateurs de demandes sur la même ligne
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Nombre de demandes", len(df_filtered))
-    
-    with col2:
-        # Nouvelles Demandes (ce mois-ci)
-        today = datetime.now()
-        start_of_month = today.replace(day=1)
-        if date_col in df_filtered.columns:
-            nouvelles_demandes = len(df_filtered[df_filtered[date_col] >= start_of_month])
-            st.metric(
-                "Nouvelles Demandes (ce mois-ci)", 
-                nouvelles_demandes,
-                help="Le nombre de demandes reçues durant le mois en cours."
-            )
-        else:
-            st.metric("Nouvelles Demandes (ce mois-ci)", "N/A")
-    
-    with col3:
-        # Demandes Annulées / Dépriorisées
-        if 'Statut de la demande' in df_filtered.columns:
-            demandes_annulees = len(df_filtered[
-                df_filtered['Statut de la demande'].str.contains('annul|déprioris|Annul|Déprioris|ANNUL|DÉPRIORIS', case=False, na=False)
-            ])
-            st.metric(
-                "Demandes Annulées/Dépriorisées", 
-                demandes_annulees,
-                help="Le nombre de demandes qui ont été stoppées. 'fuite' du pipeline."
-            )
-        else:
-            st.metric("Demandes Annulées/Dépriorisées", "N/A")
-    
-    with col4:
-        # Taux d'annulation
-        if 'Statut de la demande' in df_filtered.columns and len(df_filtered) > 0:
-            demandes_annulees = len(df_filtered[
-                df_filtered['Statut de la demande'].str.contains('annul|déprioris|Annul|Déprioris|ANNUL|DÉPRIORIS', case=False, na=False)
-            ])
-            taux_annulation = round((demandes_annulees / len(df_filtered)) * 100, 1)
-            st.metric(
-                "Taux d'annulation", 
-                f"{taux_annulation}%",
-                help="Pourcentage de demandes annulées ou dépriorisées par rapport au total."
-            )
-        else:
-            st.metric("Taux d'annulation", "N/A")
+    # Rendre les KPI principaux via HTML pour contrôle précis des tailles
+    total_demandes = len(df_filtered)
+    today = datetime.now()
+    start_of_month = today.replace(day=1)
+    nouvelles_demandes = 0
+    if date_col in df_filtered.columns:
+        try:
+            nouvelles_demandes = int((pd.to_datetime(df_filtered[date_col], errors='coerce') >= start_of_month).sum())
+        except Exception:
+            nouvelles_demandes = 0
+
+    demandes_annulees = 0
+    if 'Statut de la demande' in df_filtered.columns:
+        demandes_annulees = int(df_filtered['Statut de la demande'].astype(str).str.contains('annul|déprioris', case=False, na=False).sum())
+    taux_annulation = f"{round((demandes_annulees / total_demandes) * 100, 1)}%" if total_demandes > 0 else "N/A"
+
+    metrics_html = render_generic_metrics([
+        ("Nombre de demandes", total_demandes, "#1f77b4"),
+        ("Nouvelles Demandes (ce mois-ci)", nouvelles_demandes, "#2ca02c"),
+        ("Demandes Annulées/Dépriorisées", demandes_annulees, "#ff7f0e"),
+        ("Taux d'annulation", taux_annulation, "#d62728")
+    ])
+    st.markdown(metrics_html, unsafe_allow_html=True)
 
     # Graphiques principaux
     st.markdown("---")
@@ -962,11 +1122,13 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         # Répartition par statut de la demande
         statut_counts = df_filtered['Statut de la demande'].value_counts()
         fig_statut = go.Figure(data=[go.Pie(labels=statut_counts.index, values=statut_counts.values, hole=.5)])
+        fig_statut.update_traces(textfont=dict(size=14))
         fig_statut.update_layout(
             title=dict(text="Répartition par statut de la demande", x=0, xanchor='left', font=TITLE_FONT),
-            height=300,
-            legend=dict(orientation="h", yanchor="bottom", y=-0.4, xanchor="center", x=0.5)
+            height=380,
+            legend=dict(orientation="h", yanchor="bottom", y=-0.45, xanchor="center", x=0.5, font=dict(size=13))
         )
+        fig_statut = apply_title_style(fig_statut)
         st.plotly_chart(fig_statut, width="stretch")
     
     with col2:
@@ -978,13 +1140,15 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
                 df_raison,
                 x='Raison',
                 y='Count',
-                title="Comparaison par raison du recrutement",
+                title="<b>Comparaison par raison du recrutement</b>",
                 text='Count',
                 orientation='v'
             )
             fig_raison.update_traces(
                 marker_color='grey', 
                 textposition='auto',
+                texttemplate='<b>%{y}</b>',
+                textfont=dict(size=15, color='white'),
                 hovertemplate='%{y}<extra></extra>'
             )
             fig_raison.update_layout(
@@ -992,8 +1156,9 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
                 xaxis_title=None, 
                 yaxis_title=None,
                 xaxis={'categoryorder':'total descending'},
-                title=dict(text="Comparaison par raison du recrutement", x=0, xanchor='left', font=TITLE_FONT)
+                title=dict(text="<b>Comparaison par raison du recrutement</b>", x=0, xanchor='left', font=TITLE_FONT)
             )
+            fig_raison = apply_title_style(fig_raison)
             st.plotly_chart(fig_raison, width="stretch")
     
     with col3:
@@ -1017,11 +1182,14 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
                 )
                 fig_evolution_demandes.update_traces(
                     marker_color='#1f77b4',
-                    textposition='outside',
-                    texttemplate='%{y}',
+                    textposition='inside',
+                    texttemplate='<b>%{y}</b>',
+                    textfont=dict(size=15, color='white'),
                     hovertemplate='%{y}<extra></extra>'
                 )
-                fig_evolution_demandes.update_layout(height=360, margin=dict(t=60, b=30, l=20, r=20), xaxis_title=None, yaxis_title=None)
+                # Aligner la marge supérieure avec les autres titres (ex: pie statuts)
+                fig_evolution_demandes.update_layout(height=320, margin=dict(t=48, b=30, l=20, r=20), xaxis_title=None, yaxis_title=None)
+                fig_evolution_demandes = apply_title_style(fig_evolution_demandes)
                 st.plotly_chart(fig_evolution_demandes, width="stretch")
     
     # Deuxième ligne de graphiques
@@ -1048,11 +1216,10 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         )
         # Show values inside bars and full label on hover
         fig_direction.update_traces(
-            marker_color='#ff7f0e',
-            textposition='inside',
-            texttemplate='%{x}',
-            textfont=dict(size=11),
-            textangle=90,
+            marker_color='grey',
+            textposition='auto',
+            texttemplate='<b>%{x}</b>',
+            textfont=dict(size=15, color='white'),
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         # Dynamic height so long lists become scrollable on the page
@@ -1063,9 +1230,9 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             height=height_dir,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=160, t=40, b=30, r=20),
-            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_dir),
-            title=dict(text="Comparaison par direction", x=0, xanchor='left', font=TITLE_FONT)
+            margin=dict(l=160, t=48, b=30, r=20),
+            yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_dir),
+            title=dict(text="<b>Comparaison par direction</b>", x=0, xanchor='left', font=TITLE_FONT)
         )
         # Render inside the column so the two charts are on the same row and the component width matches the column
         render_plotly_scrollable(fig_direction, max_height=320)
@@ -1089,24 +1256,42 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             custom_data=['Poste']
         )
         fig_poste.update_traces(
-            marker_color='#2ca02c',
-            textposition='inside',
-            texttemplate='%{x}',
-            textfont=dict(size=11),
-            textangle=90,
+            marker_color='grey',
+            textposition='auto',
+            texttemplate='<b>%{x}</b>',
+            textfont=dict(size=15, color='white'),
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
-        height_poste = max(300, 28 * len(df_poste))
+        height_poste = 320
         category_array_poste = list(df_poste['Label_display'][::-1])
         fig_poste.update_layout(
-            height=height_poste,
+            height=320,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=160, t=40, b=30, r=20),
-            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_poste),
-            title=dict(text="Comparaison par poste", x=0, xanchor='left', font=TITLE_FONT)
+            margin=dict(l=160, t=48, b=30, r=20),
+            yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_poste),
+            title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT)
         )
         render_plotly_scrollable(fig_poste, max_height=320)
+
+    # Debug local pour l'onglet Demandes de Recrutement (en dehors des colonnes, aligné à gauche)
+    st.markdown("---")
+    with st.expander("🔍 Debug - Détails des lignes (Demandes de Recrutement)", expanded=False):
+        try:
+            st.markdown("**Lignes contribuant aux graphiques (toutes les données filtrées):**")
+            df_debug_dem = df_filtered.copy()
+            # Formater la date sans heure
+            date_col_dem = 'Date de réception de la demande aprés validation de la DRH'
+            if date_col_dem in df_debug_dem.columns:
+                df_debug_dem[date_col_dem] = pd.to_datetime(df_debug_dem[date_col_dem], errors='coerce').dt.strftime('%d/%m/%Y')
+            cols_debug = ['Poste demandé', 'Entité demandeuse', 'Direction concernée', 'Raison du recrutement', 'Statut de la demande', date_col_dem]
+            cols_available = [c for c in cols_debug if c in df_debug_dem.columns]
+            if cols_available:
+                st.dataframe(df_debug_dem[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
+            else:
+                st.dataframe(df_debug_dem.reset_index(drop=True), use_container_width=True, hide_index=True)
+        except Exception:
+            st.write("Aucune donnée disponible pour le debug.")
 
 def create_integrations_tab(df_recrutement, global_filters):
     """Onglet Intégrations basé sur les bonnes données"""
@@ -1132,10 +1317,13 @@ def create_integrations_tab(df_recrutement, global_filters):
     ])
     
     # Critères : Statut "En cours" ET candidat avec nom
+    # Filtrer pour ne garder que les intégrations avec une date d'entrée prévisionnelle
     df_integrations = df_recrutement[
         (df_recrutement['Statut de la demande'] == 'En cours') &
         (df_recrutement[candidat_col].notna()) &
-        (df_recrutement[candidat_col].str.strip() != "")
+        (df_recrutement[candidat_col].str.strip() != "") &
+        (df_recrutement[date_integration_col].notna()) &  # Ajout du filtre ici
+        (df_recrutement[date_integration_col].astype(str).str.strip() != "")
     ].copy()
     
     # Message de diagnostic
@@ -1150,21 +1338,20 @@ def create_integrations_tab(df_recrutement, global_filters):
     # Appliquer les filtres globaux
     df_filtered = apply_global_filters(df_integrations, global_filters)
     
-    # KPIs d'intégration
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("👥 Intégrations en cours", len(df_filtered))
-    with col2:
-        # Plans d'intégration à préparer
-        if plan_integration_col in df_filtered.columns:
-            a_preparer = len(df_filtered[df_filtered[plan_integration_col].astype(str).str.lower() == 'oui'])
-            st.metric("📋 Plan d'intégration à préparer", a_preparer)
-        else:
-            st.metric("📋 Plan d'intégration à préparer", "N/A")
-    with col3:
-        # Intégrations en retard (date prévue passée)
-        if date_integration_col in df_filtered.columns:
-            df_filtered[date_integration_col] = pd.to_datetime(df_filtered[date_integration_col], errors='coerce')
+    # KPIs d'intégration (HTML cards pour contrôle précis des tailles)
+    nb_int = len(df_filtered)
+    a_preparer = 0
+    if plan_integration_col in df_filtered.columns:
+        try:
+            a_preparer = int((df_filtered[plan_integration_col].astype(str).str.lower() == 'oui').sum())
+        except Exception:
+            a_preparer = 0
+
+    en_retard = "N/A"
+    if date_integration_col in df_filtered.columns:
+        try:
+            df_temp = df_filtered.copy()
+            df_temp[date_integration_col] = pd.to_datetime(df_temp[date_integration_col], errors='coerce')
             reporting_date = st.session_state.get('reporting_date', None)
             if reporting_date is None:
                 today = datetime.now()
@@ -1173,11 +1360,16 @@ def create_integrations_tab(df_recrutement, global_filters):
                     today = reporting_date
                 else:
                     today = datetime.combine(reporting_date, datetime.min.time())
-            en_retard = len(df_filtered[(df_filtered[date_integration_col].notna()) & 
-                                      (df_filtered[date_integration_col] < today)])
-            st.metric("⚠️ En retard", en_retard)
-        else:
-            st.metric("⚠️ En retard", "N/A")
+            en_retard = int(((df_temp[date_integration_col].notna()) & (df_temp[date_integration_col] < today)).sum())
+        except Exception:
+            en_retard = "N/A"
+
+    metrics_html = render_generic_metrics([
+        ("👥 Intégrations en cours", nb_int, "#1f77b4"),
+        ("📋 Plan d'intégration à préparer", a_preparer, "#ff7f0e"),
+        ("⚠️ En retard", en_retard, "#d62728")
+    ])
+    st.markdown(metrics_html, unsafe_allow_html=True)
     
     # Graphiques
     col1, col2 = st.columns(2)
@@ -1187,6 +1379,7 @@ def create_integrations_tab(df_recrutement, global_filters):
         if 'Affectation' in df_filtered.columns:
             # Utiliser la fonction existante create_affectation_chart
             fig_affectation = create_affectation_chart(df_filtered)
+            fig_affectation = apply_title_style(fig_affectation)
             st.plotly_chart(fig_affectation, width="stretch")
         else:
             st.warning("Colonne 'Affectation' non trouvée dans les données.")
@@ -1208,7 +1401,9 @@ def create_integrations_tab(df_recrutement, global_filters):
             )
             fig_evolution_int.update_traces(
                 marker_color='#2ca02c', 
-                textposition='outside',
+                textposition='inside',
+                texttemplate='<b>%{y}</b>',
+                textfont=dict(size=15, color='white'),
                 hovertemplate='%{y}<extra></extra>'
             )
             fig_evolution_int.update_layout(height=400, xaxis_title="Mois", yaxis_title="Nombre")
@@ -1228,38 +1423,90 @@ def create_integrations_tab(df_recrutement, global_filters):
     colonnes_disponibles = [col for col in colonnes_affichage if col in df_filtered.columns]
     
     if colonnes_disponibles:
+        # Travailler sur une copie des colonnes disponibles
         df_display = df_filtered[colonnes_disponibles].copy()
-        
-        # Formater la date pour enlever l'heure et s'assurer du bon format DD/MM/YYYY
+
+        # Exclure les lignes sans date d'intégration prévue AVANT le formatage
         if date_integration_col in df_display.columns:
-            # Essayer d'abord le format DD/MM/YYYY puis MM/DD/YYYY si nécessaire
+            df_display = df_display[df_display[date_integration_col].notna() & df_display[date_integration_col].astype(str).str.strip().ne('')].copy()
+            
+            # Trier par date d'intégration croissante AVANT formatage
+            try:
+                df_display['_sort_date'] = pd.to_datetime(df_display[date_integration_col], errors='coerce')
+                df_display = df_display.sort_values('_sort_date', ascending=True)
+                df_display = df_display.drop(columns=['_sort_date'])
+            except Exception:
+                pass
+
+            # Formater la date pour enlever l'heure et s'assurer du bon format DD/MM/YYYY
             def format_date_safely(date_str):
-                if pd.isna(date_str) or date_str == '' or date_str == 'N/A' or date_str is pd.NaT:
+                if pd.isna(date_str) or date_str == '' or str(date_str).strip().upper() == 'N/A' or date_str is pd.NaT:
                     return 'N/A'
-                
                 parsed_date = pd.to_datetime(date_str, errors='coerce')
-                
                 if pd.notna(parsed_date):
                     return parsed_date.strftime('%d/%m/%Y')
                 else:
                     return 'N/A'
-            
+
             df_display[date_integration_col] = df_display[date_integration_col].apply(format_date_safely)
-        
+
         # Renommer pour affichage plus propre
-        df_display = df_display.rename(columns={
+        df_display_table = df_display.rename(columns={
             candidat_col: "Candidat",
             'Poste demandé ': "Poste",
             date_integration_col: "Date d'Intégration Prévue"
         })
-        
+
         # Réinitialiser l'index pour enlever les numéros de ligne
-        df_display = df_display.reset_index(drop=True)
-        
+        df_display_table = df_display_table.reset_index(drop=True)
         # Afficher sans index (hide_index=True)
-        st.dataframe(df_display, width="stretch", hide_index=True)
+        st.dataframe(df_display_table, width="stretch", hide_index=True)
     else:
         st.warning("Colonnes d'affichage non disponibles")
+
+    # Debug local pour l'onglet Intégrations avec colonnes de contribution
+    st.markdown("---")
+    with st.expander("🔍 Debug - Détails des lignes (Intégrations)", expanded=False):
+        try:
+            st.markdown("**Lignes contribuant aux indicateurs (en cours, en retard, plan d'intégration à préparer):**")
+            # Construire les colonnes de contribution pour les indicateurs
+            df_debug_int = df_filtered.copy()
+            
+            # Contribution: En cours (toutes les lignes filtrées)
+            df_debug_int['contrib_en_cours'] = True
+            
+            # Contribution: En retard (date d'intégration prévue < aujourd'hui)
+            today = datetime.now()
+            if date_integration_col in df_debug_int.columns:
+                df_debug_int['_date_check'] = pd.to_datetime(df_debug_int[date_integration_col], errors='coerce')
+                df_debug_int['contrib_en_retard'] = df_debug_int['_date_check'] < today
+                df_debug_int = df_debug_int.drop(columns=['_date_check'])
+            else:
+                df_debug_int['contrib_en_retard'] = False
+            
+            # Contribution: Plan d'intégration à préparer (plan = 'oui')
+            if plan_integration_col in df_debug_int.columns:
+                df_debug_int['contrib_plan_a_preparer'] = df_debug_int[plan_integration_col].astype(str).str.lower() == 'oui'
+            else:
+                df_debug_int['contrib_plan_a_preparer'] = False
+            
+            # Trier par date d'intégration croissante
+            if date_integration_col in df_debug_int.columns:
+                df_debug_int['_sort_date'] = pd.to_datetime(df_debug_int[date_integration_col], errors='coerce')
+                df_debug_int = df_debug_int.sort_values('_sort_date', ascending=True)
+                df_debug_int = df_debug_int.drop(columns=['_sort_date'])
+            
+            # Formater la date sans l'heure
+            if date_integration_col in df_debug_int.columns:
+                df_debug_int[date_integration_col] = pd.to_datetime(df_debug_int[date_integration_col], errors='coerce').dt.strftime('%d/%m/%Y')
+            
+            # Sélectionner colonnes pertinentes (sans Plan d'intégration)
+            cols_display = [candidat_col, 'Poste demandé ', 'Entité demandeuse', date_integration_col, 'contrib_en_cours', 'contrib_en_retard', 'contrib_plan_a_preparer']
+            cols_available = [c for c in cols_display if c in df_debug_int.columns]
+            
+            st.dataframe(df_debug_int[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
+        except Exception as e:
+            st.write(f"Aucune donnée disponible pour le debug. Erreur: {e}")
 
 
 def create_demandes_recrutement_combined_tab(df_recrutement):
@@ -1281,11 +1528,12 @@ def create_demandes_recrutement_combined_tab(df_recrutement):
         margin-top: 0;
         margin-bottom: 10px;
         color: #2c3e50;
-        font-size: 1.1em;
+        font-size: 1.25em;
+        font-weight: 600;
     }
     .report-card p {
         margin-bottom: 8px;
-        font-size: 0.9em;
+        font-size: 1.02em;
         color: #5a6c7d;
     }
     .report-card .status-badge {
@@ -1681,16 +1929,14 @@ def create_weekly_report_tab(df_recrutement=None):
     # total lines with statut 'En cours' (may include those with candidate)
     total_en_cours_status = sum(m.get('en_cours_status_count', 0) for m in metrics_included.values())
 
-    # KPI cards (simple)
-    col1, col2, col3, col4 = st.columns(4)
-    with col1:
-        st.metric("Postes en cours (sourcing)", total_en_cours)
-    with col2:
-        st.metric("Postes pourvus cette semaine", total_pourvus)
-    with col3:
-        st.metric("Nouveaux postes ouverts", total_nouveaux)
-    with col4:
-        st.metric("Total postes ouverts avant la semaine", total_avant)
+    # KPI cards (styled and centered like other KPI cards)
+    kpi_cards_html = render_generic_metrics([
+        ("Postes en cours (sourcing)", total_en_cours, "#1f77b4"),
+        ("Postes pourvus cette semaine", total_pourvus, "#2ca02c"),
+        ("Nouveaux postes ouverts", total_nouveaux, "#ff7f0e"),
+        ("Total postes ouverts avant la semaine", total_avant, "#6f42c1")
+    ])
+    st.markdown(kpi_cards_html, unsafe_allow_html=True)
 
     st.markdown("---")
 
@@ -1698,7 +1944,7 @@ def create_weekly_report_tab(df_recrutement=None):
     st.markdown(
         '<div style="display: flex; align-items: center;">'
         '<span style="font-size: 1.25em; font-weight: 600;">📊 Besoins en Cours par Entité</span>'
-        '<span style="margin-left: 8px; cursor: pointer;" title="">?</span></div>',
+        '</div>',
         unsafe_allow_html=True
     )
     if metrics and len(metrics) > 0:
@@ -1934,6 +2180,85 @@ def create_weekly_report_tab(df_recrutement=None):
         html_table += '</tbody></table></div>'
 
         st.markdown(html_table, unsafe_allow_html=True)
+
+        # --- Tableau : Recrutements en cours par recruteur (juste après 'Besoins en Cours par Entité')
+        try:
+            if df_recrutement is not None and 'Colonne TG Hire' in df_recrutement.columns:
+                # On veut un tableau avec une colonne par statut: Nouvelle demande, Sourcing, Shortlisté, Signature DRH
+                wanted_statuses = ['Nouvelle demande', 'Sourcing', 'Shortlisté', 'Signature DRH']
+                # Construire un pivot complet par recruteur (colonnes = Colonne TG Hire demandées)
+                # Le TOTAL affiché est le nombre de lignes pour lesquelles 'Statut de la demande' == 'En cours'
+                # Identifier la colonne recruteur de façon robuste (sur le DF complet)
+                recruteur_col = next((c for c in df_recrutement.columns if 'responsable' in c.lower() and 'traitement' in c.lower()), None)
+                if not recruteur_col:
+                    recruteur_col = next((c for c in df_recrutement.columns if 'recruteur' in c.lower() or 'responsable' in c.lower()), None)
+
+                if recruteur_col:
+                    # Pivot sur l'ensemble des données pour récupérer les colonnes d'intérêt
+                    pivot = pd.crosstab(df_recrutement[recruteur_col].fillna('').astype(str).str.strip(), df_recrutement['Colonne TG Hire'])
+                    # S'assurer de l'ordre des colonnes et présence de toutes (ajoute 0 si manquante)
+                    for s in wanted_statuses:
+                        if s not in pivot.columns:
+                            pivot[s] = 0
+                    pivot = pivot[wanted_statuses]
+
+                    # Supprimer les lignes sans recruteur explicite et exclure certains recruteurs indésirables
+                    pivot.index = pivot.index.astype(str)
+                    pivot = pivot[~pivot.index.str.strip().str.lower().isin(['', '(sans)', 'nan', 'none'])]
+                    exclude_list = {n.lower() for n in [
+                        'Bouchra AJBILOU','Bouchra AOUISSE','Ghita LAKHDAR',
+                        'Reda Berrada','Reda Mohamed BERRADA','Saad FATI'
+                    ]}
+                    pivot = pivot[~pivot.index.str.lower().isin(exclude_list)]
+
+                    # Calculer la colonne demandée: Total = Nouvelle demande + Sourcing + Shortlisté + Signature DRH
+                    cols_sum = [c for c in wanted_statuses if c in pivot.columns]
+                    if cols_sum:
+                        pivot['Total'] = pivot[cols_sum].sum(axis=1).clip(lower=0).astype(int)
+                    else:
+                        pivot['Total'] = 0
+
+                    # Construire le HTML du tableau
+                    html_rec = '<div class="table-container" style="margin-top:8px;">'
+                    html_rec += '<table class="custom-table" style="width:60%; margin:0;">'
+                    # Header
+                    html_rec += '<thead><tr><th>Recruteur</th>'
+                    for s in wanted_statuses:
+                        html_rec += f'<th>{s}</th>'
+                    html_rec += '<th>Total</th></tr></thead><tbody>'
+
+                    # Lignes par recruteur
+                    for rec, row in pivot.iterrows():
+                        html_rec += '<tr>'
+                        html_rec += f'<td class="entity-cell">{rec}</td>'
+                        for s in wanted_statuses:
+                            html_rec += f'<td>{int(row[s])}</td>'
+                        html_rec += f'<td>{int(row["Total"])}</td>'
+                        html_rec += '</tr>'
+
+                    html_rec += '</tbody></table></div>'
+
+                    st.markdown('<div style="font-family:Arial,sans-serif; font-size:1.15em; font-weight:700; margin-top:12px;">📋 Recrutements en cours par recruteur</div>', unsafe_allow_html=True)
+                    st.markdown(html_rec, unsafe_allow_html=True)
+                    
+                    # Debug pour le tableau recruteur
+                    with st.expander("🔍 Debug - Détails des lignes (Recrutements par recruteur)", expanded=False):
+                        try:
+                            st.markdown("**Lignes contribuant au tableau (statut 'En cours') par statut:**")
+                            # Filtrer uniquement les lignes avec statut 'En cours'
+                            df_rec_debug = df_recrutement[df_recrutement['Statut de la demande'] == 'En cours'].copy()
+                            # Ajouter colonnes de contribution
+                            df_rec_debug['contrib_Nouvelle_demande'] = df_rec_debug['Colonne TG Hire'] == 'Nouvelle demande'
+                            df_rec_debug['contrib_Sourcing'] = df_rec_debug['Colonne TG Hire'] == 'Sourcing'
+                            df_rec_debug['contrib_Shortlisté'] = df_rec_debug['Colonne TG Hire'] == 'Shortlisté'
+                            df_rec_debug['contrib_Signature_DRH'] = df_rec_debug['Colonne TG Hire'] == 'Signature DRH'
+                            cols_show = ['Entité demandeuse', recruteur_col, 'Poste demandé', 'Colonne TG Hire', 'contrib_Nouvelle_demande', 'contrib_Sourcing', 'contrib_Shortlisté', 'contrib_Signature_DRH']
+                            cols_avail = [c for c in cols_show if c in df_rec_debug.columns]
+                            st.dataframe(df_rec_debug[cols_avail].reset_index(drop=True), use_container_width=True, hide_index=True)
+                        except Exception as e:
+                            st.write(f"Erreur debug: {e}")
+        except Exception:
+            pass
     else:
         # Affichage par défaut si pas de metrics
         default_html = """
@@ -2314,10 +2639,12 @@ def create_weekly_report_tab(df_recrutement=None):
         return s.lower().strip()
 
     # Statuts Kanban canoniques (ordre d'affichage)
-    statuts_kanban_display = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+    statuts_kanban_display = ["Nouvelle demande", "Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
 
     # Mapping de formes possibles -> statut canonique
     status_map = {
+        'nouvelle demande': 'Nouvelle demande',
+        'nouvelle': 'Nouvelle demande',
         'desistement': 'Désistement',
         'desisté': 'Désistement',
         'sourcing': 'Sourcing',
@@ -2503,6 +2830,26 @@ def create_weekly_report_tab(df_recrutement=None):
                 cards_html += card_div
             cards_html += '</div>'
             st.markdown(cards_html, unsafe_allow_html=True)
+
+    # Debug local pour Pipeline de Recrutement (Kanban)
+    st.markdown("---")
+    with st.expander("🔍 Debug - Détails des lignes (Pipeline Kanban)", expanded=False):
+        try:
+            st.markdown("**Lignes contribuant au pipeline par statut:**")
+            if postes_data:
+                # Convertir postes_data en DataFrame pour affichage
+                df_kanban_debug = pd.DataFrame(postes_data)
+                # Ajouter colonnes de contribution par statut
+                for s in statuts_kanban_display:
+                    df_kanban_debug[f'contrib_{s}'] = df_kanban_debug['statut'] == s
+                # Afficher colonnes pertinentes
+                cols_show = ['titre', 'entite', 'lieu', 'recruteur', 'statut'] + [f'contrib_{s}' for s in statuts_kanban_display]
+                cols_available = [c for c in cols_show if c in df_kanban_debug.columns]
+                st.dataframe(df_kanban_debug[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
+            else:
+                st.write("Aucune donnée de pipeline disponible.")
+        except Exception as e:
+            st.write(f"Erreur debug pipeline: {e}")
 
 
 def generate_table_image_simple(weekly_metrics):
@@ -3183,57 +3530,58 @@ def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
                 .statut-header {{
                     background-color: #9C182F;
                     color: white;
-                    padding: 20px;
+                    padding: 22px;
                     border-radius: 8px;
-                    font-size: 2em;
+                    font-size: 2.3em;
                     font-weight: bold;
                     text-align: center;
-                    margin-bottom: 30px;
+                    margin-bottom: 28px;
                 }}
                 .cards-container {{
                     display: grid;
-                    grid-template-columns: repeat(6, 1fr);
-                    gap: 15px;
+                    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+                    grid-auto-flow: dense;
+                    gap: 22px;
                     padding: 20px;
+                    justify-items: center;
+                    justify-content: center;
+                    align-items: start;
+                    width: 100%;
+                    margin: 0 auto;
                 }}
                 .kanban-card {{
                     background-color: #f0f2f6;
-                    border-radius: 5px;
-                    padding: 10px;
-                    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-                    border-left: 4px solid #1f77b4;
-                    min-height: 120px;
-                    max-width: 100%;
-                    overflow: hidden;
+                    border-radius: 8px;
+                    padding: 14px;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+                    border-left: 5px solid #1f77b4;
+                    min-height: 140px;
+                    width: 100%;
                     box-sizing: border-box;
                 }}
                 .kanban-card h4 {{
-                    margin: 0 0 6px 0;
+                    margin: 0 0 8px 0;
                     color: #9C182F;
-                    font-size: 0.95em;
-                    line-height: 1.3;
-                    font-weight: bold;
-                    /* Forcer les coupures de mots */
+                    font-size: 1.05em;
+                    line-height: 1.25;
+                    font-weight: 700;
                     white-space: normal !important;
-                    word-break: break-all !important;
-                    overflow-wrap: anywhere !important;
+                    word-break: break-word !important;
+                    overflow-wrap: break-word !important;
                     hyphens: auto !important;
-                    /* Limiter à 3 lignes maximum */
                     display: -webkit-box;
                     -webkit-line-clamp: 3;
                     -webkit-box-orient: vertical;
                     overflow: hidden;
-                    max-width: 100%;
                 }}
                 .kanban-card p {{
-                    margin: 3px 0;
-                    font-size: 0.85em;
-                    color: #555;
-                    line-height: 1.2;
+                    margin: 4px 0;
+                    font-size: 0.96em;
+                    color: #444;
+                    line-height: 1.3;
                     word-wrap: break-word;
                     overflow-wrap: break-word;
                     word-break: break-word;
-                    max-width: 100%;
                 }}
             </style>
         </head>
@@ -3421,7 +3769,7 @@ def generate_kanban_html_image(df_recrutement):
     
     try:
         # Charger les données réelles du dataframe
-        statuts = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+        statuts = ["Nouvelle demande", "Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
         postes_data = []
         
         for index, row in df_recrutement.iterrows():
@@ -3456,7 +3804,7 @@ def generate_kanban_html_image(df_recrutement):
             {"titre": "Magasinier", "entite": "TG WOOD", "lieu": "Oulad Saleh", "demandeur": "K.TAZI", "recruteur": "Ghita", "statut": "Désistement", "commentaire": "Pas de retour du demandeur"}
         ]
         
-        statuts = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+        statuts = ["Nouvelle demande", "Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
         
         html_kanban = """
         <html>
@@ -3475,27 +3823,29 @@ def generate_kanban_html_image(df_recrutement):
                     padding: 10px;
                 }
                 .kanban-column {
-                    min-width: 200px;
+                    min-width: 260px;
                     background-color: #f0f0f0;
-                    border-radius: 8px;
-                    padding: 10px;
+                    border-radius: 10px;
+                    padding: 14px;
+                    box-sizing: border-box;
                 }
                 .kanban-header {
                     background-color: #9C182F;
                     color: white;
-                    padding: 10px;
-                    border-radius: 5px;
-                    font-weight: bold;
+                    padding: 12px;
+                    border-radius: 6px;
+                    font-weight: 800;
                     text-align: center;
-                    margin-bottom: 10px;
-                    font-size: 1.3em;
+                    margin-bottom: 12px;
+                    font-size: 1.45em;
                 }
                 .kanban-card {
                     background-color: white;
-                    border-radius: 5px;
-                    padding: 10px;
-                    margin-bottom: 10px;
-                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    border-radius: 6px;
+                    padding: 14px;
+                    margin-bottom: 12px;
+                    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+                    min-height: 120px;
                 }
                 .kanban-card h4 {
                     margin: 0 0 8px 0;
@@ -3680,7 +4030,8 @@ def generate_demandes_recrutement_html_image(df_recrutement):
             if 'Statut de la demande' in df.columns:
                 statut_counts = df['Statut de la demande'].value_counts()
                 fig_statut = go.Figure(data=[go.Pie(labels=statut_counts.index, values=statut_counts.values, hole=.5)])
-                fig_statut.update_layout(title="Répartition par statut", height=320, margin=dict(l=20,r=20,t=40,b=10))
+                fig_statut.update_traces(textfont=dict(size=14))
+                fig_statut.update_layout(title=dict(text="Répartition par statut", x=0, xanchor='left', font=TITLE_FONT), height=360, margin=dict(l=20,r=20,t=48,b=12), legend=dict(font=dict(size=13)))
                 figs_row1.append(fig_statut)
         except Exception:
             figs_row1.append(None)
@@ -3720,8 +4071,8 @@ def generate_demandes_recrutement_html_image(df_recrutement):
                 dfd = direction_counts.rename_axis('Direction').reset_index(name='Count').sort_values('Count', ascending=False)
                 dfd['Label'] = dfd['Direction']
                 fig_dir = px.bar(dfd, x='Count', y='Label', title="Comparaison par direction", text='Count', orientation='h')
-                fig_dir.update_traces(marker_color='#ff7f0e', textposition='inside', texttemplate='%{x}')
-                fig_dir.update_layout(height=max(320, 24*len(dfd)), margin=dict(l=160,t=40,b=30,r=20), xaxis_title=None, yaxis_title=None)
+                fig_dir.update_traces(marker_color='grey', textposition='auto', texttemplate='%{x}', textfont=dict(size=15), hovertemplate='%{y}<extra></extra>')
+                fig_dir.update_layout(height=320, margin=dict(l=160,t=48,b=30,r=20), xaxis_title=None, yaxis_title=None, yaxis=dict(tickfont=dict(size=13)))
                 figs_row2.append(fig_dir)
         except Exception:
             figs_row2.append(None)
@@ -3731,8 +4082,8 @@ def generate_demandes_recrutement_html_image(df_recrutement):
                 dfp = poste_counts.rename_axis('Poste').reset_index(name='Count').sort_values('Count', ascending=False)
                 dfp['Label'] = dfp['Poste']
                 fig_poste = px.bar(dfp, x='Count', y='Label', title="Comparaison par poste", text='Count', orientation='h')
-                fig_poste.update_traces(marker_color='#2ca02c', textposition='inside', texttemplate='%{x}')
-                fig_poste.update_layout(height=max(320, 24*len(dfp)), margin=dict(l=160,t=40,b=30,r=20), xaxis_title=None, yaxis_title=None)
+                fig_poste.update_traces(marker_color='grey', textposition='auto', texttemplate='%{x}', textfont=dict(size=15), hovertemplate='%{y}<extra></extra>')
+                fig_poste.update_layout(height=320, margin=dict(l=160,t=48,b=30,r=20), xaxis_title=None, yaxis_title=None, yaxis=dict(tickfont=dict(size=13)))
                 figs_row2.append(fig_poste)
         except Exception:
             figs_row2.append(None)
@@ -3787,7 +4138,8 @@ def generate_recrutements_clotures_html_image(df_recrutement):
         if 'Modalité de recrutement' in df_cl.columns:
             modalite_data = df_cl['Modalité de recrutement'].value_counts()
             fig_mod = go.Figure(data=[go.Pie(labels=modalite_data.index, values=modalite_data.values, hole=.5, textposition='inside', textinfo='percent')])
-            fig_mod.update_layout(title="Répartition par Modalité", height=320, margin=dict(l=20,r=20,t=40,b=10))
+            fig_mod.update_traces(textfont=dict(size=14))
+            fig_mod.update_layout(title=dict(text="Répartition par Modalité", x=0, xanchor='left', font=TITLE_FONT), height=360, margin=dict(l=20,r=20,t=48,b=12), legend=dict(font=dict(size=13)))
             figs_row1.append(fig_mod)
     except Exception:
         figs_row1.append(None)
@@ -3859,8 +4211,8 @@ def generate_integrations_html_image(df_recrutement):
         if 'Affectation' in df.columns:
             affect_counts = df['Affectation'].value_counts().head(10)
             fig_aff = px.pie(values=affect_counts.values, names=affect_counts.index, title="Répartition par Affectation")
-            fig_aff.update_traces(textposition='inside', textinfo='percent+label')
-            fig_aff.update_layout(height=360, margin=dict(l=20,r=20,t=40,b=10))
+            fig_aff.update_traces(textposition='inside', textinfo='percent+label', textfont=dict(size=14))
+            fig_aff.update_layout(title=dict(text="Répartition par Affectation", x=0, xanchor='left', font=TITLE_FONT), height=420, margin=dict(l=20,r=20,t=48,b=12), legend=dict(font=dict(size=14)))
             figs_row1.append(fig_aff)
     except Exception:
         figs_row1.append(None)
@@ -3924,7 +4276,7 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
         st.info(f"📅 Période de filtrage Clôture/Désistement: {start_filter.date()} au {end_filter.date()}")
         
         # Générer une image par statut Kanban
-        statuts = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+        statuts = ["Nouvelle demande", "Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
         kanban_images = {}
         
         for statut in statuts:
@@ -4116,7 +4468,7 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
                             img_height = Inches(6)
                         
                         # Insérer les 5 images Kanban dans des slides séparées selon l'ordre demandé
-                        ordered_status = ["Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+                        ordered_status = ["Nouvelle demande", "Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
                         for statut in ordered_status:
                             img_path = kanban_images.get(statut)
                             # Créer une nouvelle slide pour chaque statut (ne pas utiliser la slide actuelle)
@@ -4218,6 +4570,12 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
 
 def main():
     st.title("📊 Tableau de Bord RH")
+    # Afficher le hash du commit actuel pour aider au debug des déploiements
+    try:
+        commit_hash = get_current_commit_hash()
+        st.markdown(f"<div style='font-size:12px;color:#666;margin-top:-8px'>Commit: {commit_hash}</div>", unsafe_allow_html=True)
+    except Exception:
+        pass
     st.markdown("---")
     # Date de reporting : permet de fixer la date de référence pour tous les calculs
     if 'reporting_date' not in st.session_state:
@@ -4266,7 +4624,21 @@ def main():
         )
     
     # Créer les onglets (Demandes et Recrutement regroupés)
-    tabs = st.tabs(["📂 Upload & Téléchargement", "🗂️ Demandes & Recrutement", "📅 Hebdomadaire", "🤝 Intégrations"])
+    # CSS pour agrandir le texte des onglets
+    st.markdown("""
+    <style>
+    .stTabs [data-baseweb="tab-list"] button {
+        font-size: 1.15em !important;
+        font-weight: 600 !important;
+        padding: 12px 20px !important;
+    }
+    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+        font-size: 1.15em !important;
+        font-weight: 600 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    tabs = st.tabs(["📂 Upload & Téléchargement", "🗂️ Demandes & Recrutement", "📅 Hebdomadaire", "🤝 Intégrations", "📖 Méthodologie"])
     
     # Variables pour stocker les fichiers uploadés
     # Use session_state to persist upload/refresh state
@@ -4561,6 +4933,19 @@ def main():
             create_integrations_tab(df_recrutement, int_filters)
         else:
             st.warning("📊 Aucune donnée disponible pour les intégrations. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
+
+    with tabs[4]:
+        st.header("📖 Méthodologie du Reporting")
+        st.markdown("""
+        - **Besoins en cours par entité** : calculés à partir des demandes validées par la DRH. Les postes "en cours" sont soit déterminés par le statut `En cours`, soit par la formule (postes avant + nouveaux - pourvus) si les dates manquent.
+        - **Recrutements en cours par recruteur** : tableau pivot par `Colonne TG Hire` (Sourcing, Shortlisté, Signature DRH, Clôture). La colonne affichée **"Total (sans clôture)"** est calculée pour chaque recruteur comme : `Sourcing + Shortlisté + Signature DRH - Clôture` (valeur minimale 0).
+        - **Comparaison par direction / poste / raison** : histogrammes basés sur les valeurs de colonnes `Direction concernée`, `Poste demandé` et `Raison du recrutement`. Les étiquettes affichent les totaux par catégorie (valeurs affichées en gras et couleur claire pour lisibilité).
+        - **Évolution des demandes / intégrations** : bar charts mensuels agrégés par date (date de réception de la demande ou date d'entrée prévue). Les valeurs sont intégrées dans les barres (au lieu d'être placées au-dessus) pour éviter qu'elles soient coupées.
+        - **Nombre de candidats présélectionnés** : somme des valeurs numériques de la colonne `Nb de candidats pré-selectionnés` (valeurs non numériques traitées comme 0). Le libellé est affiché à gauche du graphique pour éviter l'étiquette centrale indésirable.
+        - **Délai de recrutement** : calculé comme la différence en jours entre `Date d'entrée effective du candidat` et `Date de réception de la demande après validation de la DRH`. Affiché dans le debug "Recrutements Clôturés".
+        - **Intégrations — explication du signal "⚠️ En retard"** : une intégration est considérée en retard si la `Date d'entrée prévisionnelle` est antérieure à la date de reporting (aujourd'hui ou `reporting_date` sélectionnée). Le compteur `En retard` regroupe ces cas pour vous alerter.
+        - **KPIs hebdomadaires** : fenêtre de calcul basée sur la `reporting_date` (Semaine précédente : Lundi->Vendredi). Les métriques `avant`, `nouveaux`, `pourvus`, `en_cours` sont calculées avec des règles décrites dans le debug (onglet Debug) et sont utilisées pour fabriquer le tableau "Besoins en Cours par Entité".
+        """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
