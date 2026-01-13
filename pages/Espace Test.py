@@ -857,8 +857,9 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 )
                 fig_evolution.update_traces(
                     marker_color='#1f77b4',
-                    textposition='outside',
-                    texttemplate='%{y}',
+                    textposition='inside',
+                    texttemplate='<b>%{y}</b>',
+                    textfont=dict(size=13, color='white'),
                     hovertemplate='%{y}<extra></extra>'
                 )
                 fig_evolution.update_layout(
@@ -935,8 +936,8 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         fig_direction.update_traces(
             marker_color='grey',
             textposition='auto',
-            texttemplate='%{x}',
-            textfont=dict(size=13),
+            texttemplate='<b>%{x}</b>',
+            textfont=dict(size=13, color='white'),
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         fig_direction.update_layout(
@@ -971,8 +972,8 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         fig_poste.update_traces(
             marker_color='grey',
             textposition='auto',
-            texttemplate='%{x}',
-            textfont=dict(size=13),
+            texttemplate='<b>%{x}</b>',
+            textfont=dict(size=13, color='white'),
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         height_poste = max(300, 28 * len(df_poste))
@@ -999,6 +1000,9 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         except (KeyError, ValueError):
             total_candidats = 0
             
+        # Afficher le titre à gauche (évite le "undefined" au centre)
+        st.markdown("<div style='font-weight:700; text-align:left; margin-bottom:6px;'>Nombre de candidats présélectionnés</div>", unsafe_allow_html=True)
+
         fig_candidats = go.Figure(go.Indicator(
             mode = "gauge+number",
             value = total_candidats,
@@ -1011,6 +1015,37 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         # on évite d'avoir un titre centré dans la figure.
         fig_candidats = apply_title_style(fig_candidats)
         st.plotly_chart(fig_candidats, width="stretch")
+
+    with col6:
+        # Taux de refus = (Nb de refus aux promesses / Nb de promesses réalisées) * 100
+        # Recherche robuste des colonnes dans le dataframe
+        prom_col = next((c for c in df_filtered.columns if 'promess' in c.lower() and 'réalis' in c.lower()), None)
+        refus_col = next((c for c in df_filtered.columns if 'refus' in c.lower()), None)
+        prom_sum = 0
+        refus_sum = 0
+        try:
+            if prom_col and prom_col in df_filtered.columns:
+                prom_sum = pd.to_numeric(df_filtered[prom_col], errors='coerce').fillna(0).sum()
+            if refus_col and refus_col in df_filtered.columns:
+                refus_sum = pd.to_numeric(df_filtered[refus_col], errors='coerce').fillna(0).sum()
+        except Exception:
+            prom_sum = 0; refus_sum = 0
+
+        taux_refus = 0.0
+        if prom_sum and prom_sum > 0:
+            taux_refus = float(refus_sum) / float(prom_sum) * 100.0
+
+        st.markdown("<div style='font-weight:700; text-align:left; margin-bottom:6px;'>Taux de refus (%)</div>", unsafe_allow_html=True)
+        fig_refus = go.Figure(go.Indicator(
+            mode='gauge+number',
+            value=round(taux_refus, 1),
+            number={'suffix':' %'},
+            title={'text': ''},
+            gauge={'axis': {'range':[0,100]}, 'bar': {'color':'#d62728'}}
+        ))
+        fig_refus.update_layout(height=300, margin=dict(t=48, b=20, l=20, r=20))
+        fig_refus = apply_title_style(fig_refus)
+        st.plotly_chart(fig_refus, width='stretch')
 
     # ... KPI row now includes Délai moyen de recrutement (moved up)
 
@@ -1074,13 +1109,15 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
                 df_raison,
                 x='Raison',
                 y='Count',
-                title="Comparaison par raison du recrutement",
+                title="<b>Comparaison par raison du recrutement</b>",
                 text='Count',
                 orientation='v'
             )
             fig_raison.update_traces(
                 marker_color='grey', 
                 textposition='auto',
+                texttemplate='<b>%{y}</b>',
+                textfont=dict(size=13, color='white'),
                 hovertemplate='%{y}<extra></extra>'
             )
             fig_raison.update_layout(
@@ -1088,7 +1125,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
                 xaxis_title=None, 
                 yaxis_title=None,
                 xaxis={'categoryorder':'total descending'},
-                title=dict(text="Comparaison par raison du recrutement", x=0, xanchor='left', font=TITLE_FONT)
+                title=dict(text="<b>Comparaison par raison du recrutement</b>", x=0, xanchor='left', font=TITLE_FONT)
             )
             fig_raison = apply_title_style(fig_raison)
             st.plotly_chart(fig_raison, width="stretch")
@@ -1114,8 +1151,9 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
                 )
                 fig_evolution_demandes.update_traces(
                     marker_color='#1f77b4',
-                    textposition='outside',
-                    texttemplate='%{y}',
+                    textposition='inside',
+                    texttemplate='<b>%{y}</b>',
+                    textfont=dict(size=13, color='white'),
                     hovertemplate='%{y}<extra></extra>'
                 )
                 # Aligner la marge supérieure avec les autres titres (ex: pie statuts)
@@ -1157,13 +1195,13 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         height_dir = max(300, 28 * len(df_direction))
         # Ensure largest values appear on top by reversing the truncated label array
         category_array_dir = list(df_direction['Label_display'][::-1])
-        fig_direction.update_layout(
+            fig_direction.update_layout(
             height=height_dir,
             xaxis_title=None,
             yaxis_title=None,
             margin=dict(l=160, t=48, b=30, r=20),
             yaxis=dict(automargin=True, tickfont=dict(size=13), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_dir),
-            title=dict(text="Comparaison par direction", x=0, xanchor='left', font=TITLE_FONT)
+            title=dict(text="<b>Comparaison par direction</b>", x=0, xanchor='left', font=TITLE_FONT)
         )
         # Render inside the column so the two charts are on the same row and the component width matches the column
         render_plotly_scrollable(fig_direction, max_height=320)
@@ -1201,7 +1239,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             yaxis_title=None,
             margin=dict(l=160, t=48, b=30, r=20),
             yaxis=dict(automargin=True, tickfont=dict(size=13), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_poste),
-            title=dict(text="Comparaison par poste", x=0, xanchor='left', font=TITLE_FONT)
+            title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT)
         )
         render_plotly_scrollable(fig_poste, max_height=320)
 
@@ -1310,7 +1348,9 @@ def create_integrations_tab(df_recrutement, global_filters):
             )
             fig_evolution_int.update_traces(
                 marker_color='#2ca02c', 
-                textposition='outside',
+                textposition='inside',
+                texttemplate='<b>%{y}</b>',
+                textfont=dict(size=13, color='white'),
                 hovertemplate='%{y}<extra></extra>'
             )
             fig_evolution_int.update_layout(height=400, xaxis_title="Mois", yaxis_title="Nombre")
@@ -2057,16 +2097,17 @@ def create_weekly_report_tab(df_recrutement=None):
                             pivot[s] = 0
                     pivot = pivot[wanted_statuses]
 
-                    # Supprimer les lignes sans recruteur explicite
+                    # Supprimer les lignes sans recruteur explicite et exclure certains recruteurs indésirables
                     pivot.index = pivot.index.astype(str)
                     pivot = pivot[~pivot.index.str.strip().str.lower().isin(['', '(sans)', 'nan', 'none'])]
+                    exclude_list = {n.lower() for n in [
+                        'Bouchra AJBILOU','Bouchra AOUISSE','Ghita LAKHDAR',
+                        'Reda Berrada','Reda Mohamed BERRADA','Saad FATI'
+                    ]}
+                    pivot = pivot[~pivot.index.str.lower().isin(exclude_list)]
 
-                    # Calculer le TOTAL demandé: nombre de lignes par recruteur avec Statut de la demande == 'En cours'
-                    if 'Statut de la demande' in df_recrutement.columns:
-                        total_series = df_recrutement[df_recrutement['Statut de la demande'] == 'En cours'].groupby(recruteur_col).size()
-                    else:
-                        total_series = pd.Series(dtype=int)
-                    pivot['TOTAL'] = total_series.reindex(pivot.index).fillna(0).astype(int)
+                    # Calculer la colonne demandée: Total (sans clôture) = Sourcing + Shortlisté + Signature DRH - Clôture
+                    pivot['Total (sans clôture)'] = (pivot.get('Sourcing', 0) + pivot.get('Shortlisté', 0) + pivot.get('Signature DRH', 0) - pivot.get('Clôture', 0)).clip(lower=0).astype(int)
 
                     # Construire le HTML du tableau
                     html_rec = '<div class="table-container" style="margin-top:12px;">'
@@ -2075,7 +2116,7 @@ def create_weekly_report_tab(df_recrutement=None):
                     html_rec += '<thead><tr><th>Recruteur</th>'
                     for s in wanted_statuses:
                         html_rec += f'<th>{s}</th>'
-                    html_rec += '<th>TOTAL</th></tr></thead><tbody>'
+                    html_rec += '<th>Total (sans clôture)</th></tr></thead><tbody>'
 
                     # Lignes par recruteur
                     for rec, row in pivot.iterrows():
@@ -2083,7 +2124,7 @@ def create_weekly_report_tab(df_recrutement=None):
                         html_rec += f'<td class="entity-cell">{rec}</td>'
                         for s in wanted_statuses:
                             html_rec += f'<td>{int(row[s])}</td>'
-                        html_rec += f'<td>{int(row["TOTAL"])}</td>'
+                        html_rec += f'<td>{int(row["Total (sans clôture)"])}</td>'
                         html_rec += '</tr>'
 
                     html_rec += '</tbody></table></div>'
@@ -4739,13 +4780,12 @@ def main():
         **Résumé des méthodes de calcul utilisées dans ce reporting :
 
         - **Besoins en cours par entité** : calculés à partir des demandes validées par la DRH. Les postes "en cours" sont soit déterminés par le statut `En cours`, soit par la formule (postes avant + nouveaux - pourvus) si les dates manquent.
-        - **Recrutements en cours par recruteur** : tableau pivot par `Colonne TG Hire` (Sourcing, Shortlisté, Signature DRH, Clôture). La colonne `TOTAL` correspond au nombre de lignes pour lesquelles la colonne `Statut de la demande` est exactement `En cours` (comptage par recruteur). Les lignes sans recruteur explicite sont exclues.
-        - **Comparaison par direction / poste / raison** : histogrammes basés sur les valeurs de colonnes `Direction concernée`, `Poste demandé` et `Raison du recrutement`. Les étiquettes affichent les totaux par catégorie.
-        - **Évolution des demandes / intégrations** : bar charts mensuels agrégés par date (date de réception de la demande ou date d'entrée prévue). Les mois sans valeur sont remplis à 0 pour assurer la continuité de la série.
-        - **Nombre de candidats présélectionnés** : somme des valeurs numériques de la colonne `Nb de candidats pré-selectionnés` (valeurs non numériques traitées comme 0).
-        - **KPIs hebdomadaires** : fenêtre de calcul basée sur la `reporting_date` (Semaine précédente : Lundi->Vendredi). Les métriques `avant`, `nouveaux`, `pourvus`, `en_cours` sont calculées avec des règles décrites dans le debug (explications détaillées dans l'onglet Debug).
-
-        Si vous souhaitez des précisions ou que l'on adapte une règle métier (ex : inclure/exclure certaines entités ou considérer une autre colonne pour le statut), dites-moi quelle règle changer et je l'implémente.
+        - **Recrutements en cours par recruteur** : tableau pivot par `Colonne TG Hire` (Sourcing, Shortlisté, Signature DRH, Clôture). La colonne affichée **"Total (sans clôture)"** est calculée pour chaque recruteur comme : `Sourcing + Shortlisté + Signature DRH - Clôture` (valeur minimale 0). Les lignes sans recruteur explicite sont exclues. Certaines personnes (ex: Bouchra AJBILOU, Bouchra AOUISSE, Ghita LAKHDAR, Reda Berrada, Reda Mohamed BERRADA, Saad FATI) sont volontairement exclues du tableau.
+        - **Comparaison par direction / poste / raison** : histogrammes basés sur les valeurs de colonnes `Direction concernée`, `Poste demandé` et `Raison du recrutement`. Les étiquettes affichent les totaux par catégorie (valeurs affichées en gras et couleur claire pour lisibilité).
+        - **Évolution des demandes / intégrations** : bar charts mensuels agrégés par date (date de réception de la demande ou date d'entrée prévue). Les valeurs sont intégrées dans les barres (au lieu d'être placées au-dessus) pour éviter qu'elles soient coupées.
+        - **Nombre de candidats présélectionnés** : somme des valeurs numériques de la colonne `Nb de candidats pré-selectionnés` (valeurs non numériques traitées comme 0). Le libellé est affiché à gauche du graphique pour éviter l'étiquette centrale indésirable.
+        - **Intégrations — explication du signal "⚠️ En retard"** : une intégration est considérée en retard si la `Date d'entrée prévisionnelle` est antérieure à la date de reporting (aujourd'hui ou `reporting_date` sélectionnée). Le compteur `En retard` regroupe ces cas pour vous alerter.
+        - **KPIs hebdomadaires** : fenêtre de calcul basée sur la `reporting_date` (Semaine précédente : Lundi->Vendredi). Les métriques `avant`, `nouveaux`, `pourvus`, `en_cours` sont calculées avec des règles décrites dans le debug (onglet Debug) et sont utilisées pour fabriquer le tableau "Besoins en Cours par Entité".
         """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
