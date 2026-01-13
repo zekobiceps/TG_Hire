@@ -948,6 +948,10 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_direction['Label_display'][::-1]))
         )
         fig_direction = apply_title_style(fig_direction)
+        try:
+            fig_direction.update_traces(textfont=dict(size=13, color='white'))
+        except Exception:
+            pass
         # Use a compact default visible area and allow scrolling when long
         render_plotly_scrollable(fig_direction, max_height=320)
 
@@ -985,6 +989,10 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_poste['Label_display'][::-1]))
         )
         fig_poste = apply_title_style(fig_poste)
+        try:
+            fig_poste.update_traces(textfont=dict(size=13, color='white'))
+        except Exception:
+            pass
         render_plotly_scrollable(fig_poste, max_height=320)
 
 
@@ -1001,12 +1009,11 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             total_candidats = 0
             
         # Afficher le titre à gauche (évite le "undefined" au centre)
-        st.markdown("<div style='font-weight:700; text-align:left; margin-bottom:6px;'>Nombre de candidats présélectionnés</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-weight:700; text-align:left; margin:4px 0 4px 0;'>Nombre de candidats présélectionnés</div>", unsafe_allow_html=True)
 
         fig_candidats = go.Figure(go.Indicator(
             mode = "gauge+number",
             value = total_candidats,
-            title = {'text': ''},
             gauge = {'axis': {'range': [0, max(total_candidats * 2, 100)]},
                      'bar': {'color': "green"},
                     }))
@@ -1035,17 +1042,26 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         if prom_sum and prom_sum > 0:
             taux_refus = float(refus_sum) / float(prom_sum) * 100.0
 
-        st.markdown("<div style='font-weight:700; text-align:left; margin-bottom:6px;'>Taux de refus (%)</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-weight:700; text-align:left; margin:4px 0 4px 0;'>Taux de refus (%)</div>", unsafe_allow_html=True)
         fig_refus = go.Figure(go.Indicator(
             mode='gauge+number',
             value=round(taux_refus, 1),
             number={'suffix':' %'},
-            title={'text': ''},
             gauge={'axis': {'range':[0,100]}, 'bar': {'color':'#d62728'}}
         ))
         fig_refus.update_layout(height=300, margin=dict(t=48, b=20, l=20, r=20))
         fig_refus = apply_title_style(fig_refus)
         st.plotly_chart(fig_refus, width='stretch')
+
+    # Debug local pour l'onglet Recrutements Clôturés
+    st.markdown("---")
+    with st.expander("🔍 Debug - Données des graphiques (Recrutements Clôturés)", expanded=False):
+        try:
+            st.write("Colonnes disponibles:", list(df_filtered.columns))
+            st.write("Aperçu des données filtrées (5 premières lignes):")
+            st.dataframe(df_filtered.head())
+        except Exception:
+            st.write("Aucune donnée disponible pour le debug.")
 
     # ... KPI row now includes Délai moyen de recrutement (moved up)
 
@@ -1187,8 +1203,8 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         fig_direction.update_traces(
             marker_color='grey',
             textposition='auto',
-            texttemplate='%{x}',
-            textfont=dict(size=13),
+            texttemplate='<b>%{x}</b>',
+            textfont=dict(size=13, color='white'),
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         # Dynamic height so long lists become scrollable on the page
@@ -1227,8 +1243,8 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         fig_poste.update_traces(
             marker_color='grey',
             textposition='auto',
-            texttemplate='%{x}',
-            textfont=dict(size=13),
+            texttemplate='<b>%{x}</b>',
+            textfont=dict(size=13, color='white'),
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         height_poste = 320
@@ -1242,6 +1258,15 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT)
         )
         render_plotly_scrollable(fig_poste, max_height=320)
+        # Debug local pour l'onglet Demandes de Recrutement
+        st.markdown("---")
+        with st.expander("🔍 Debug - Données des graphiques (Demandes de Recrutement)", expanded=False):
+            try:
+                st.write("Colonnes disponibles:", list(df_filtered.columns))
+                st.write("Aperçu des données filtrées (5 premières lignes):")
+                st.dataframe(df_filtered.head())
+            except Exception:
+                st.write("Aucune donnée disponible pour le debug.")
 
 def create_integrations_tab(df_recrutement, global_filters):
     """Onglet Intégrations basé sur les bonnes données"""
@@ -1350,6 +1375,7 @@ def create_integrations_tab(df_recrutement, global_filters):
                 marker_color='#2ca02c', 
                 textposition='inside',
                 texttemplate='<b>%{y}</b>',
+                textangle=90,
                 textfont=dict(size=13, color='white'),
                 hovertemplate='%{y}<extra></extra>'
             )
@@ -1402,6 +1428,16 @@ def create_integrations_tab(df_recrutement, global_filters):
         st.dataframe(df_display_table, width="stretch", hide_index=True)
     else:
         st.warning("Colonnes d'affichage non disponibles")
+
+    # Debug local pour l'onglet Intégrations
+    st.markdown("---")
+    with st.expander("🔍 Debug - Données des graphiques (Intégrations)", expanded=False):
+        try:
+            st.write("Colonnes disponibles:", list(df_filtered.columns))
+            st.write("Aperçu des données filtrées (5 premières lignes):")
+            st.dataframe(df_filtered.head())
+        except Exception:
+            st.write("Aucune donnée disponible pour le debug.")
 
 
 def create_demandes_recrutement_combined_tab(df_recrutement):
@@ -2079,8 +2115,8 @@ def create_weekly_report_tab(df_recrutement=None):
         # --- Tableau : Recrutements en cours par recruteur (juste après 'Besoins en Cours par Entité')
         try:
             if df_recrutement is not None and 'Colonne TG Hire' in df_recrutement.columns:
-                # On veut un tableau avec une colonne par statut: Sourcing, Shortlisté, Signature DRH, Clôture
-                wanted_statuses = ['Sourcing', 'Shortlisté', 'Signature DRH', 'Clôture']
+                # On veut un tableau avec une colonne par statut: Nouvelle demande, Sourcing, Shortlisté, Signature DRH
+                wanted_statuses = ['Nouvelle demande', 'Sourcing', 'Shortlisté', 'Signature DRH']
                 # Construire un pivot complet par recruteur (colonnes = Colonne TG Hire demandées)
                 # Le TOTAL affiché est le nombre de lignes pour lesquelles 'Statut de la demande' == 'En cours'
                 # Identifier la colonne recruteur de façon robuste (sur le DF complet)
@@ -2091,7 +2127,7 @@ def create_weekly_report_tab(df_recrutement=None):
                 if recruteur_col:
                     # Pivot sur l'ensemble des données pour récupérer les colonnes d'intérêt
                     pivot = pd.crosstab(df_recrutement[recruteur_col].fillna('').astype(str).str.strip(), df_recrutement['Colonne TG Hire'])
-                    # S'assurer de l'ordre des colonnes et présence de toutes
+                    # S'assurer de l'ordre des colonnes et présence de toutes (ajoute 0 si manquante)
                     for s in wanted_statuses:
                         if s not in pivot.columns:
                             pivot[s] = 0
@@ -2106,16 +2142,12 @@ def create_weekly_report_tab(df_recrutement=None):
                     ]}
                     pivot = pivot[~pivot.index.str.lower().isin(exclude_list)]
 
-                    # Calculer la colonne demandée: Total (sans clôture) = Sourcing + Shortlisté + Signature DRH - Clôture
-                    # Calcul sûr du total: somme des colonnes sources moins Clôture, clip à 0
-                    cols_sum = [c for c in ['Sourcing', 'Shortlisté', 'Signature DRH'] if c in pivot.columns]
+                    # Calculer la colonne demandée: Total = Nouvelle demande + Sourcing + Shortlisté + Signature DRH
+                    cols_sum = [c for c in wanted_statuses if c in pivot.columns]
                     if cols_sum:
-                        pivot['Total (sans clôture)'] = (pivot[cols_sum].sum(axis=1) - pivot.get('Clôture', 0)).clip(lower=0).astype(int)
+                        pivot['Total'] = pivot[cols_sum].sum(axis=1).clip(lower=0).astype(int)
                     else:
-                        # If the 'Clôture' column is missing pivot.get returns an int 0;
-                        # wrap it into a Series aligned with pivot.index so .clip works correctly.
-                        cloture_series = pivot.get('Clôture', pd.Series(0, index=pivot.index))
-                        pivot['Total (sans clôture)'] = (-cloture_series).clip(lower=0).astype(int)
+                        pivot['Total'] = 0
 
                     # Construire le HTML du tableau
                     html_rec = '<div class="table-container" style="margin-top:12px;">'
@@ -2124,7 +2156,7 @@ def create_weekly_report_tab(df_recrutement=None):
                     html_rec += '<thead><tr><th>Recruteur</th>'
                     for s in wanted_statuses:
                         html_rec += f'<th>{s}</th>'
-                    html_rec += '<th>Total (sans clôture)</th></tr></thead><tbody>'
+                    html_rec += '<th>Total</th></tr></thead><tbody>'
 
                     # Lignes par recruteur
                     for rec, row in pivot.iterrows():
@@ -2132,7 +2164,7 @@ def create_weekly_report_tab(df_recrutement=None):
                         html_rec += f'<td class="entity-cell">{rec}</td>'
                         for s in wanted_statuses:
                             html_rec += f'<td>{int(row[s])}</td>'
-                        html_rec += f'<td>{int(row["Total (sans clôture)"])}</td>'
+                        html_rec += f'<td>{int(row["Total"])}</td>'
                         html_rec += '</tr>'
 
                     html_rec += '</tbody></table></div>'
