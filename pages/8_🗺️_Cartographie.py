@@ -351,45 +351,67 @@ if st.sidebar.button("🔍 Tester les connexions Google (Débug)"):
     else: st.sidebar.error("❌ Échec authentification Google Drive.")
 
 # -------------------- Onglets --------------------
-tab1, tab2, tab3 = st.tabs(["Gestion des candidats", "Vue globale", "Guide des quadrants"])
+tab1, tab2 = st.tabs(["Gestion des candidats", "Guide des quadrants"])
 
 with tab1:
     quadrant_choisi = st.selectbox("Quadrant:", list(st.session_state.cartographie_data.keys()), key="carto_quadrant")
     st.subheader("➕ Ajouter un candidat")
     
-    col1, col2, col3, col4 = st.columns(4)
-    with col1: nom = st.text_input("Nom du candidat", key="carto_nom")
-    with col2: poste = st.text_input("Poste", key="carto_poste")
-    with col3: entreprise = st.text_input("Entreprise", key="carto_entreprise")
-    with col4: linkedin = st.text_input("Lien LinkedIn", key="carto_linkedin")
-    
-    notes = st.text_area("Notes / Observations", key="carto_notes", height=100)
-    cv_file = st.file_uploader("Télécharger CV (PDF ou DOCX)", type=["pdf", "docx"], key="carto_cv")
+    left_col, right_col = st.columns([2,1])
+    with left_col:
+        col1, col2, col3, col4 = st.columns(4)
+        with col1: nom = st.text_input("Nom du candidat", key="carto_nom")
+        with col2: poste = st.text_input("Poste", key="carto_poste")
+        with col3: entreprise = st.text_input("Entreprise", key="carto_entreprise")
+        with col4: linkedin = st.text_input("Lien LinkedIn", key="carto_linkedin")
+        
+        notes = st.text_area("Notes / Observations", key="carto_notes", height=100)
+        cv_file = st.file_uploader("Télécharger CV (PDF ou DOCX)", type=["pdf", "docx"], key="carto_cv")
 
-    if st.button("💾 Ajouter à la cartographie", type="primary", width="stretch", key="btn_add_carto"):
-        if nom and poste:
-            cv_link = None
-            if cv_file:
-                # --- LA MODIFICATION EST ICI ---
-                # Récupérer l'extension du fichier original (ex: .pdf)
-                _, file_extension = os.path.splitext(cv_file.name)
-                # Créer le nom du fichier en utilisant uniquement le nom du candidat
-                cv_filename = f"{nom}{file_extension}"
+        if st.button("💾 Ajouter à la cartographie", type="primary", width="stretch", key="btn_add_carto"):
+            if nom and poste:
+                cv_link = None
+                if cv_file:
+                    # --- LA MODIFICATION EST ICI ---
+                    # Récupérer l'extension du fichier original (ex: .pdf)
+                    _, file_extension = os.path.splitext(cv_file.name)
+                    # Créer le nom du fichier en utilisant uniquement le nom du candidat
+                    cv_filename = f"{nom}{file_extension}"
+                    
+                    cv_link = upload_cv_to_drive(cv_filename, cv_file)
                 
-                cv_link = upload_cv_to_drive(cv_filename, cv_file)
-            
-            entry = {
-                "date": datetime.now().strftime("%Y-%m-%d %H:%M"), "nom": nom, "poste": poste,
-                "entreprise": entreprise, "linkedin": linkedin, "notes": notes, "cv_link": cv_link
-            }
-            
-            if save_to_google_sheet(quadrant_choisi, entry):
-                st.success(f"✅ {nom} ajouté à {quadrant_choisi}.")
-                st.cache_data.clear()
-                st.session_state.cartographie_data = load_data_from_sheet()
-                st.rerun()
-        else:
-            st.warning("⚠️ Merci de remplir au minimum Nom + Poste")
+                entry = {
+                    "date": datetime.now().strftime("%Y-%m-%d %H:%M"), "nom": nom, "poste": poste,
+                    "entreprise": entreprise, "linkedin": linkedin, "notes": notes, "cv_link": cv_link
+                }
+                
+                if save_to_google_sheet(quadrant_choisi, entry):
+                    st.success(f"✅ {nom} ajouté à {quadrant_choisi}.")
+                    st.cache_data.clear()
+                    st.session_state.cartographie_data = load_data_from_sheet()
+                    st.rerun()
+            else:
+                st.warning("⚠️ Merci de remplir au minimum Nom + Poste")
+
+    with right_col:
+        # Graphique répartition des candidats par quadrant (déplacé de l'ancien onglet Vue globale)
+        try:
+            import plotly.express as px
+            total_profils = sum(len(v) for v in st.session_state.cartographie_data.values())
+            counts = {k: len(st.session_state.cartographie_data[k]) for k in st.session_state.cartographie_data.keys()}
+            if sum(counts.values()) > 0:
+                df_counts = pd.DataFrame(list(counts.items()), columns=['Quadrant', 'Nombre'])
+                df_counts = df_counts[df_counts['Nombre'] > 0]
+                st.subheader(f"Répartition des candidats par quadrant ({total_profils} profils)")
+                fig = px.pie(df_counts, names='Quadrant', values='Nombre',
+                             color_discrete_sequence=["#636EFA", "#EF553B", "#00CC96", "#AB63FA"])
+                fig.update_traces(hovertemplate='<b>%{label}</b><br>Nombre: %{value}<br>Pourcentage: %{percent}<extra></extra>')
+                fig.update_layout(legend_font_size=16)
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Aucun candidat dans la cartographie pour l'instant.")
+        except ImportError:
+            st.warning("⚠️ Plotly n'est pas installé. Installez-le avec 'pip install plotly'.")
 
     st.divider()
     st.subheader("🔍 Rechercher un candidat")
@@ -406,7 +428,8 @@ with tab1:
         st.info("Aucun candidat correspondant dans ce quadrant.")
     else:
         for i, cand in enumerate(filtered_cands):
-            with st.expander(f"{cand['nom']} - {cand['poste']} ({cand['date']})", expanded=False):
+            edit_key = f"edit_carto_flag_{quadrant_choisi}_{i}"
+            with st.expander(f"{cand['nom']} - {cand['poste']} ({cand['date']})", expanded=st.session_state.get(edit_key, False)):
                 st.write(f"**Entreprise :** {cand.get('entreprise', 'Non spécifiée')}")
                 st.write(f"**LinkedIn :** {cand.get('linkedin', 'Non spécifié')}")
                 st.write(f"**Notes :** {cand.get('notes', '')}")
@@ -432,7 +455,6 @@ with tab1:
                         else:
                             st.error("❌ Impossible de trouver/supprimer ce candidat dans Google Sheets.")
                 with col_b:
-                    edit_key = f"edit_carto_flag_{quadrant_choisi}_{i}"
                     if st.button("✏️ Modifier ce candidat", key=f"edit_carto_btn_{quadrant_choisi}_{i}"):
                         st.session_state[edit_key] = True
 
@@ -444,6 +466,7 @@ with tab1:
                         entreprise_edit = st.text_input("Entreprise", value=str(cand.get('entreprise','')), key=f"edit_entreprise_{quadrant_choisi}_{i}")
                         linkedin_edit = st.text_input("Lien LinkedIn", value=str(cand.get('linkedin','')), key=f"edit_linkedin_{quadrant_choisi}_{i}")
                         notes_edit = st.text_area("Notes", value=str(cand.get('notes','')), height=100, key=f"edit_notes_{quadrant_choisi}_{i}")
+                        cv_edit_file = st.file_uploader("Uploader un nouveau CV (PDF ou DOCX)", type=["pdf","docx"], key=f"edit_cv_{quadrant_choisi}_{i}")
                         submitted = st.form_submit_button("💾 Enregistrer les modifications")
                         if submitted:
                             updated = {
@@ -453,6 +476,13 @@ with tab1:
                                 'Linkedin': linkedin_edit,
                                 'Notes': notes_edit,
                             }
+                            # Upload CV si fourni
+                            if cv_edit_file is not None:
+                                _, file_extension = os.path.splitext(cv_edit_file.name)
+                                cv_filename = f"{nom_edit}{file_extension}"
+                                new_link = upload_cv_to_drive(cv_filename, cv_edit_file)
+                                if new_link:
+                                    updated['CV_Link'] = new_link
                             ok = update_in_google_sheet(quadrant_choisi, cand, updated)
                             if ok:
                                 st.success("✅ Candidat mis à jour.")
@@ -482,36 +512,6 @@ with tab1:
         st.download_button("Télécharger CSV", data=csv_data, file_name="cartographie_talents.csv", mime="text/csv", key="export_csv")
 
 with tab2:
-    # On calcule le total des profils au début
-    total_profils = sum(len(v) for v in st.session_state.cartographie_data.values())
-    
-    try:
-        import plotly.express as px
-        counts = {k: len(st.session_state.cartographie_data[k]) for k in st.session_state.cartographie_data.keys()}
-        
-        if sum(counts.values()) > 0:
-            df_counts = pd.DataFrame(list(counts.items()), columns=['Quadrant', 'Nombre'])
-            df_counts = df_counts[df_counts['Nombre'] > 0]
-            
-            # --- MODIFICATION ICI ---
-            # Le titre du graphique inclut maintenant le nombre total de profils
-            st.subheader(f"Répartition des candidats par quadrant ({total_profils} profils)")
-
-            fig = px.pie(df_counts, names='Quadrant', values='Nombre',
-                         color_discrete_sequence=["#636EFA", "#EF553B", "#00CC96", "#AB63FA"])
-            
-            fig.update_traces(hovertemplate='<b>%{label}</b><br>Nombre: %{value}<br>Pourcentage: %{percent}<extra></extra>')
-            fig.update_layout(legend_font_size=16)
-            
-            st.plotly_chart(fig, width="stretch")
-            
-        else:
-            st.info("Aucun candidat dans la cartographie pour l'instant.")
-            
-    except ImportError:
-        st.warning("⚠️ La bibliothèque Plotly n'est pas installée. Le dashboard n'est pas disponible. Installez Plotly avec 'pip install plotly'.")
-
-with tab3:
     st.subheader("📚 Guide des quadrants de la cartographie")
     st.markdown("""
     ### 1. 🔍 Profils Identifiés
