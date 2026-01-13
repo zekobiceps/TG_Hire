@@ -249,6 +249,82 @@ def delete_from_google_sheet(quadrant: str, cand: dict) -> bool:
         st.error(f"❌ Échec de la suppression dans Google Sheets : {e}")
         return False
 
+def update_in_google_sheet(quadrant: str, original_cand: dict, updated_fields: dict) -> bool:
+    """Met à jour les informations d'un candidat dans Google Sheets.
+    On identifie la ligne par Quadrant, Date, Nom, Poste, Entreprise, puis on met à jour les colonnes fournies.
+    updated_fields attend des clés parmi: 'Nom', 'Poste', 'Entreprise', 'Linkedin', 'Notes', 'CV_Link'.
+    Retourne True si au moins une colonne a été mise à jour.
+    """
+    try:
+        gc = get_gsheet_client()
+        if not gc:
+            return False
+        sh = gc.open_by_url(GOOGLE_SHEET_URL)
+        worksheet = sh.worksheet(WORKSHEET_NAME)
+
+        all_values = worksheet.get_all_values()
+        if not all_values:
+            return False
+        headers = all_values[0]
+
+        def idx(col_name: str) -> int:
+            return headers.index(col_name) if col_name in headers else -1
+
+        # indices des colonnes clés d'identification
+        idx_quadrant = idx('Quadrant')
+        idx_date = idx('Date')
+        idx_nom = idx('Nom')
+        idx_poste = idx('Poste')
+        idx_entreprise = idx('Entreprise')
+
+        target = {
+            'Quadrant': str(quadrant).strip(),
+            'Date': str(original_cand.get('date', '')).strip(),
+            'Nom': str(original_cand.get('nom', '')).strip(),
+            'Poste': str(original_cand.get('poste', '')).strip(),
+            'Entreprise': str(original_cand.get('entreprise', '')).strip(),
+        }
+
+        row_found = -1
+        for row_idx in range(1, len(all_values)):
+            row = all_values[row_idx]
+            def safe_get(i):
+                return str(row[i]).strip() if 0 <= i < len(row) and i >= 0 else ''
+            if (
+                safe_get(idx_quadrant) == target['Quadrant'] and
+                safe_get(idx_date) == target['Date'] and
+                safe_get(idx_nom) == target['Nom'] and
+                safe_get(idx_poste) == target['Poste'] and
+                safe_get(idx_entreprise) == target['Entreprise']
+            ):
+                row_found = row_idx + 1  # gspread est 1-based
+                break
+
+        if row_found == -1:
+            return False
+
+        # indices des colonnes éditables
+        editable_cols = {
+            'Nom': idx('Nom'),
+            'Poste': idx('Poste'),
+            'Entreprise': idx('Entreprise'),
+            'Linkedin': idx('Linkedin'),
+            'Notes': idx('Notes'),
+            'CV_Link': idx('CV_Link'),
+        }
+
+        updated_any = False
+        for key, col_index in editable_cols.items():
+            if key in updated_fields and col_index >= 0:
+                value = str(updated_fields.get(key, '')).strip()
+                worksheet.update_cell(row_found, col_index + 1, value)
+                updated_any = True
+
+        return updated_any
+    except Exception as e:
+        st.error(f"❌ Échec de la mise à jour dans Google Sheets : {e}")
+        return False
+
 # -------------------- INITIALISATION --------------------
 if "cartographie_data" not in st.session_state:
     st.session_state.cartographie_data = load_data_from_sheet()
@@ -355,6 +431,41 @@ with tab1:
                                 st.rerun()
                         else:
                             st.error("❌ Impossible de trouver/supprimer ce candidat dans Google Sheets.")
+                with col_b:
+                    edit_key = f"edit_carto_flag_{quadrant_choisi}_{i}"
+                    if st.button("✏️ Modifier ce candidat", key=f"edit_carto_btn_{quadrant_choisi}_{i}"):
+                        st.session_state[edit_key] = True
+
+                if st.session_state.get(edit_key, False):
+                    st.markdown("**Modifier les informations du candidat**")
+                    with st.form(f"form_edit_{quadrant_choisi}_{i}", clear_on_submit=False):
+                        nom_edit = st.text_input("Nom", value=str(cand.get('nom','')), key=f"edit_nom_{quadrant_choisi}_{i}")
+                        poste_edit = st.text_input("Poste", value=str(cand.get('poste','')), key=f"edit_poste_{quadrant_choisi}_{i}")
+                        entreprise_edit = st.text_input("Entreprise", value=str(cand.get('entreprise','')), key=f"edit_entreprise_{quadrant_choisi}_{i}")
+                        linkedin_edit = st.text_input("Lien LinkedIn", value=str(cand.get('linkedin','')), key=f"edit_linkedin_{quadrant_choisi}_{i}")
+                        notes_edit = st.text_area("Notes", value=str(cand.get('notes','')), height=100, key=f"edit_notes_{quadrant_choisi}_{i}")
+                        submitted = st.form_submit_button("💾 Enregistrer les modifications")
+                        if submitted:
+                            updated = {
+                                'Nom': nom_edit,
+                                'Poste': poste_edit,
+                                'Entreprise': entreprise_edit,
+                                'Linkedin': linkedin_edit,
+                                'Notes': notes_edit,
+                            }
+                            ok = update_in_google_sheet(quadrant_choisi, cand, updated)
+                            if ok:
+                                st.success("✅ Candidat mis à jour.")
+                                st.session_state[edit_key] = False
+                                st.cache_data.clear()
+                                st.session_state.cartographie_data = load_data_from_sheet()
+                                rerun_fn = getattr(st, "experimental_rerun", None)
+                                if callable(rerun_fn):
+                                    rerun_fn()
+                                else:
+                                    st.rerun()
+                            else:
+                                st.error("❌ Mise à jour impossible (ligne introuvable ou erreur).")
 
     st.subheader("📤 Exporter toute la cartographie")
     if st.button("⬇️ Exporter en CSV (Global)"):
