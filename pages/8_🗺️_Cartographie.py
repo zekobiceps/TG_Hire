@@ -362,7 +362,7 @@ with tab1:
             f"""
             <script>
             const el = parent.document.getElementById('{anchor_target}');
-            if (el) {{ el.scrollIntoView({behavior: 'instant', block: 'start'}); }}
+            if (el) {{ el.scrollIntoView({{behavior: 'auto', block: 'start'}}); }}
             </script>
             """,
             height=0,
@@ -420,18 +420,21 @@ with tab1:
             if sum(counts.values()) > 0:
                 df_counts = pd.DataFrame(list(counts.items()), columns=['Quadrant', 'Nombre'])
                 df_counts = df_counts[df_counts['Nombre'] > 0]
-                                st.subheader(f"Répartition des candidats par quadrant ({total_profils} profils)")
-                                fig = px.pie(
-                                        df_counts,
-                                        names='Quadrant',
-                                        values='Nombre',
-                                        color_discrete_sequence=["#636EFA", "#EF553B", "#00CC96", "#AB63FA"]
-                                )
+                st.subheader(f"Répartition des candidats par quadrant ({total_profils} profils)")
+                fig = px.pie(
+                    df_counts,
+                    names='Quadrant',
+                    values='Nombre',
+                    color_discrete_sequence=["#636EFA", "#EF553B", "#00CC96", "#AB63FA"]
+                )
                 # Afficher pourcentage + valeur (valeur en gras) à l'intérieur
-                fig.update_traces(textposition='inside', textinfo='percent+value',
-                                  texttemplate='%{percent}<br><b>%{value}</b>',
-                                                                    hovertemplate='<b>%{label}</b><br>Nombre: %{value}<br>Pourcentage: %{percent}<extra></extra>',
-                                                                    textfont=dict(size=18))
+                fig.update_traces(
+                    textposition='inside',
+                    textinfo='percent+value',
+                    texttemplate='%{percent}<br><b>%{value}</b>',
+                    hovertemplate='<b>%{label}</b><br>Nombre: %{value}<br>Pourcentage: %{percent}<extra></extra>',
+                    textfont=dict(size=18)
+                )
                 fig.update_layout(legend_font_size=16)
                 st.plotly_chart(fig, use_container_width=True)
             else:
