@@ -409,7 +409,10 @@ with tab1:
                 st.subheader(f"Répartition des candidats par quadrant ({total_profils} profils)")
                 fig = px.pie(df_counts, names='Quadrant', values='Nombre',
                              color_discrete_sequence=["#636EFA", "#EF553B", "#00CC96", "#AB63FA"])
-                fig.update_traces(hovertemplate='<b>%{label}</b><br>Nombre: %{value}<br>Pourcentage: %{percent}<extra></extra>')
+                # Afficher pourcentage + valeur (valeur en gras) à l'intérieur
+                fig.update_traces(textposition='inside', textinfo='percent+value',
+                                  texttemplate='%{percent}<br><b>%{value}</b>',
+                                  hovertemplate='<b>%{label}</b><br>Nombre: %{value}<br>Pourcentage: %{percent}<extra></extra>')
                 fig.update_layout(legend_font_size=16)
                 st.plotly_chart(fig, use_container_width=True)
             else:
@@ -421,11 +424,26 @@ with tab1:
     st.subheader("🔍 Rechercher un candidat")
     search_cols = st.columns([1,2])
     with search_cols[0]:
-        quadrant_recherche = st.selectbox("Quadrant à rechercher", list(st.session_state.cartographie_data.keys()), key="carto_quadrant_search")
+        quadrants = ["Tout"] + list(st.session_state.cartographie_data.keys())
+        quadrant_recherche = st.selectbox("Quadrant à rechercher", quadrants, key="carto_quadrant_search")
     with search_cols[1]:
         search_term = st.text_input("Rechercher par nom ou poste", key="carto_search")
 
-    source_list = st.session_state.cartographie_data.get(quadrant_recherche, [])[::-1]
+    # Construire la source de recherche (supporte "Tout") et inclure le quadrant d'origine
+    if quadrant_recherche == "Tout":
+        source_list = []
+        for quad, cands in st.session_state.cartographie_data.items():
+            for cand in cands[::-1]:
+                c = cand.copy()
+                c['quadrant'] = quad
+                source_list.append(c)
+    else:
+        source_list = []
+        for cand in st.session_state.cartographie_data.get(quadrant_recherche, [])[::-1]:
+            c = cand.copy()
+            c['quadrant'] = quadrant_recherche
+            source_list.append(c)
+
     filtered_cands = [
         cand for cand in source_list
         if not search_term or search_term.lower() in cand['nom'].lower() or search_term.lower() in cand['poste'].lower()
@@ -436,9 +454,9 @@ with tab1:
     if not filtered_cands:
         st.info("Aucun candidat correspondant dans ce quadrant.")
     else:
-       for i, cand in enumerate(filtered_cands):
-            edit_key = f"edit_carto_flag_{quadrant_recherche}_{i}"
-            with st.expander(f"{cand['nom']} - {cand['poste']} ({cand['date']})", expanded=st.session_state.get(edit_key, False)):
+      for i, cand in enumerate(filtered_cands):
+          edit_key = f"edit_carto_flag_{quadrant_recherche}_{i}"
+          with st.expander(f"{cand['nom']} - {cand['poste']} ({cand['date']})", expanded=False):
                 st.write(f"**Entreprise :** {cand.get('entreprise', 'Non spécifiée')}")
                 st.write(f"**LinkedIn :** {cand.get('linkedin', 'Non spécifié')}")
                 st.write(f"**Notes :** {cand.get('notes', '')}")
@@ -451,7 +469,8 @@ with tab1:
                 col_a, col_b = st.columns([1,1])
                 with col_a:
                     if st.button("🗑️ Supprimer ce candidat", key=f"delete_carto_{quadrant_recherche}_{i}"):
-                        ok = delete_from_google_sheet(quadrant_recherche, cand)
+                        origin_quad = cand.get('quadrant', quadrant_recherche)
+                        ok = delete_from_google_sheet(origin_quad, cand)
                         if ok:
                             st.success("✅ Candidat supprimé de la cartographie.")
                             st.cache_data.clear()
@@ -467,6 +486,7 @@ with tab1:
                     if st.button("✏️ Modifier ce candidat", key=f"edit_carto_btn_{quadrant_recherche}_{i}"):
                         st.session_state[edit_key] = True
 
+                # Afficher le formulaire de modification directement sous le bloc, sans dépendre de l'expander
                 if st.session_state.get(edit_key, False):
                     st.markdown("**Modifier les informations du candidat**")
                     with st.form(f"form_edit_{quadrant_recherche}_{i}", clear_on_submit=False):
@@ -497,7 +517,8 @@ with tab1:
                                 new_link = upload_cv_to_drive(cv_filename, cv_edit_file)
                                 if new_link:
                                     updated['CV_Link'] = new_link
-                            ok = update_in_google_sheet(quadrant_recherche, cand, updated)
+                            origin_quad = cand.get('quadrant', quadrant_recherche)
+                            ok = update_in_google_sheet(origin_quad, cand, updated)
                             if ok:
                                 st.success("✅ Candidat mis à jour.")
                                 st.session_state[edit_key] = False
