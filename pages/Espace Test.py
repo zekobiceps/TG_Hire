@@ -1317,10 +1317,13 @@ def create_integrations_tab(df_recrutement, global_filters):
     ])
     
     # Critères : Statut "En cours" ET candidat avec nom
+    # Filtrer pour ne garder que les intégrations avec une date d'entrée prévisionnelle
     df_integrations = df_recrutement[
         (df_recrutement['Statut de la demande'] == 'En cours') &
         (df_recrutement[candidat_col].notna()) &
-        (df_recrutement[candidat_col].str.strip() != "")
+        (df_recrutement[candidat_col].str.strip() != "") &
+        (df_recrutement[date_integration_col].notna()) &  # Ajout du filtre ici
+        (df_recrutement[date_integration_col].astype(str).str.strip() != "")
     ].copy()
     
     # Message de diagnostic
