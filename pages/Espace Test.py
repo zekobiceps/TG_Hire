@@ -153,7 +153,7 @@ def apply_title_style(fig):
             pass
     # Increase generic data-label fontsize and legend font for better readability
     try:
-        fig.update_traces(textfont=dict(size=13))
+        fig.update_traces(textfont=dict(size=15))
     except Exception:
         pass
     try:
@@ -859,7 +859,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                     marker_color='#1f77b4',
                     textposition='inside',
                     texttemplate='<b>%{y}</b>',
-                    textfont=dict(size=13, color='white'),
+                    textfont=dict(size=15, color='white'),
                     hovertemplate='%{y}<extra></extra>'
                 )
                 fig_evolution.update_layout(
@@ -937,7 +937,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             marker_color='grey',
             textposition='auto',
             texttemplate='<b>%{x}</b>',
-            textfont=dict(size=13, color='white'),
+            textfont=dict(size=15, color='white'),
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         fig_direction.update_layout(
@@ -950,7 +950,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         )
         fig_direction = apply_title_style(fig_direction)
         try:
-            fig_direction.update_traces(textfont=dict(size=13, color='white'))
+            fig_direction.update_traces(textfont=dict(size=15, color='white'))
         except Exception:
             pass
         # Use a compact default visible area and allow scrolling when long
@@ -978,7 +978,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             marker_color='grey',
             textposition='auto',
             texttemplate='<b>%{x}</b>',
-            textfont=dict(size=13, color='white'),
+            textfont=dict(size=15, color='white'),
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         height_poste = max(300, 28 * len(df_poste))
@@ -992,7 +992,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         )
         fig_poste = apply_title_style(fig_poste)
         try:
-            fig_poste.update_traces(textfont=dict(size=13, color='white'))
+            fig_poste.update_traces(textfont=dict(size=15, color='white'))
         except Exception:
             pass
         render_plotly_scrollable(fig_poste, max_height=320)
@@ -1055,14 +1055,26 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
     st.markdown("---")
     with st.expander("🔍 Debug - Détails des lignes (Recrutements Clôturés)", expanded=False):
         try:
-            st.markdown("**Lignes contribuant aux graphiques (toutes les données filtrées):**")
-            # Afficher colonnes pertinentes uniquement
-            cols_debug = ['Poste demandé', 'Entité demandeuse', 'Direction concernée', 'Statut de la demande', "Date d'entrée effective du candidat", 'Modalité de recrutement']
-            cols_available = [c for c in cols_debug if c in df_filtered.columns]
+            st.markdown("**Lignes contribuant aux graphiques avec calcul du délai:**")
+            df_debug_clo = df_filtered.copy()
+            # Colonnes source pour le délai
+            date_reception_col = 'Date de réception de la demande aprés validation de la DRH'
+            date_entree_col = "Date d'entrée effective du candidat"
+            # Formater les dates sans heure
+            if date_entree_col in df_debug_clo.columns:
+                df_debug_clo[date_entree_col] = pd.to_datetime(df_debug_clo[date_entree_col], errors='coerce').dt.strftime('%d/%m/%Y')
+            if date_reception_col in df_debug_clo.columns:
+                df_debug_clo['Date Réception'] = pd.to_datetime(df_debug_clo[date_reception_col], errors='coerce').dt.strftime('%d/%m/%Y')
+                # Calculer le délai en jours
+                date_rec = pd.to_datetime(df_filtered[date_reception_col], errors='coerce')
+                date_ent = pd.to_datetime(df_filtered[date_entree_col], errors='coerce')
+                df_debug_clo['Délai (jours)'] = (date_ent - date_rec).dt.days
+            cols_debug = ['Poste demandé', 'Entité demandeuse', 'Direction concernée', 'Date Réception', date_entree_col, 'Délai (jours)', 'Modalité de recrutement']
+            cols_available = [c for c in cols_debug if c in df_debug_clo.columns]
             if cols_available:
-                st.dataframe(df_filtered[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
+                st.dataframe(df_debug_clo[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
             else:
-                st.dataframe(df_filtered.reset_index(drop=True), use_container_width=True, hide_index=True)
+                st.dataframe(df_debug_clo.reset_index(drop=True), use_container_width=True, hide_index=True)
         except Exception:
             st.write("Aucune donnée disponible pour le debug.")
 
@@ -1136,7 +1148,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
                 marker_color='grey', 
                 textposition='auto',
                 texttemplate='<b>%{y}</b>',
-                textfont=dict(size=13, color='white'),
+                textfont=dict(size=15, color='white'),
                 hovertemplate='%{y}<extra></extra>'
             )
             fig_raison.update_layout(
@@ -1172,7 +1184,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
                     marker_color='#1f77b4',
                     textposition='inside',
                     texttemplate='<b>%{y}</b>',
-                    textfont=dict(size=13, color='white'),
+                    textfont=dict(size=15, color='white'),
                     hovertemplate='%{y}<extra></extra>'
                 )
                 # Aligner la marge supérieure avec les autres titres (ex: pie statuts)
@@ -1207,7 +1219,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             marker_color='grey',
             textposition='auto',
             texttemplate='<b>%{x}</b>',
-            textfont=dict(size=13, color='white'),
+            textfont=dict(size=15, color='white'),
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         # Dynamic height so long lists become scrollable on the page
@@ -1219,7 +1231,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             xaxis_title=None,
             yaxis_title=None,
             margin=dict(l=160, t=48, b=30, r=20),
-            yaxis=dict(automargin=True, tickfont=dict(size=13), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_dir),
+            yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_dir),
             title=dict(text="<b>Comparaison par direction</b>", x=0, xanchor='left', font=TITLE_FONT)
         )
         # Render inside the column so the two charts are on the same row and the component width matches the column
@@ -1247,7 +1259,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             marker_color='grey',
             textposition='auto',
             texttemplate='<b>%{x}</b>',
-            textfont=dict(size=13, color='white'),
+            textfont=dict(size=15, color='white'),
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         height_poste = 320
@@ -1257,7 +1269,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             xaxis_title=None,
             yaxis_title=None,
             margin=dict(l=160, t=48, b=30, r=20),
-            yaxis=dict(automargin=True, tickfont=dict(size=13), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_poste),
+            yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_poste),
             title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT)
         )
         render_plotly_scrollable(fig_poste, max_height=320)
@@ -1267,13 +1279,17 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
     with st.expander("🔍 Debug - Détails des lignes (Demandes de Recrutement)", expanded=False):
         try:
             st.markdown("**Lignes contribuant aux graphiques (toutes les données filtrées):**")
-            # Afficher colonnes pertinentes uniquement
-            cols_debug = ['Poste demandé', 'Entité demandeuse', 'Direction concernée', 'Raison du recrutement', 'Statut de la demande', 'Date de réception de la demande aprés validation de la DRH']
-            cols_available = [c for c in cols_debug if c in df_filtered.columns]
+            df_debug_dem = df_filtered.copy()
+            # Formater la date sans heure
+            date_col_dem = 'Date de réception de la demande aprés validation de la DRH'
+            if date_col_dem in df_debug_dem.columns:
+                df_debug_dem[date_col_dem] = pd.to_datetime(df_debug_dem[date_col_dem], errors='coerce').dt.strftime('%d/%m/%Y')
+            cols_debug = ['Poste demandé', 'Entité demandeuse', 'Direction concernée', 'Raison du recrutement', 'Statut de la demande', date_col_dem]
+            cols_available = [c for c in cols_debug if c in df_debug_dem.columns]
             if cols_available:
-                st.dataframe(df_filtered[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
+                st.dataframe(df_debug_dem[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
             else:
-                st.dataframe(df_filtered.reset_index(drop=True), use_container_width=True, hide_index=True)
+                st.dataframe(df_debug_dem.reset_index(drop=True), use_container_width=True, hide_index=True)
         except Exception:
             st.write("Aucune donnée disponible pour le debug.")
 
@@ -1384,8 +1400,7 @@ def create_integrations_tab(df_recrutement, global_filters):
                 marker_color='#2ca02c', 
                 textposition='inside',
                 texttemplate='<b>%{y}</b>',
-                textangle=-90,
-                textfont=dict(size=13, color='white'),
+                textfont=dict(size=15, color='white'),
                 hovertemplate='%{y}<extra></extra>'
             )
             fig_evolution_int.update_layout(height=400, xaxis_title="Mois", yaxis_title="Nombre")
@@ -2226,14 +2241,15 @@ def create_weekly_report_tab(df_recrutement=None):
                     # Debug pour le tableau recruteur
                     with st.expander("🔍 Debug - Détails des lignes (Recrutements par recruteur)", expanded=False):
                         try:
-                            st.markdown("**Lignes contribuant au tableau par statut:**")
+                            st.markdown("**Lignes contribuant au tableau (statut 'En cours') par statut:**")
+                            # Filtrer uniquement les lignes avec statut 'En cours'
+                            df_rec_debug = df_recrutement[df_recrutement['Statut de la demande'] == 'En cours'].copy()
                             # Ajouter colonnes de contribution
-                            df_rec_debug = df_recrutement.copy()
                             df_rec_debug['contrib_Nouvelle_demande'] = df_rec_debug['Colonne TG Hire'] == 'Nouvelle demande'
                             df_rec_debug['contrib_Sourcing'] = df_rec_debug['Colonne TG Hire'] == 'Sourcing'
                             df_rec_debug['contrib_Shortlisté'] = df_rec_debug['Colonne TG Hire'] == 'Shortlisté'
                             df_rec_debug['contrib_Signature_DRH'] = df_rec_debug['Colonne TG Hire'] == 'Signature DRH'
-                            cols_show = [recruteur_col, 'Poste demandé', 'Colonne TG Hire', 'contrib_Nouvelle_demande', 'contrib_Sourcing', 'contrib_Shortlisté', 'contrib_Signature_DRH']
+                            cols_show = ['Entité demandeuse', recruteur_col, 'Poste demandé', 'Colonne TG Hire', 'contrib_Nouvelle_demande', 'contrib_Sourcing', 'contrib_Shortlisté', 'contrib_Signature_DRH']
                             cols_avail = [c for c in cols_show if c in df_rec_debug.columns]
                             st.dataframe(df_rec_debug[cols_avail].reset_index(drop=True), use_container_width=True, hide_index=True)
                         except Exception as e:
@@ -4052,7 +4068,7 @@ def generate_demandes_recrutement_html_image(df_recrutement):
                 dfd = direction_counts.rename_axis('Direction').reset_index(name='Count').sort_values('Count', ascending=False)
                 dfd['Label'] = dfd['Direction']
                 fig_dir = px.bar(dfd, x='Count', y='Label', title="Comparaison par direction", text='Count', orientation='h')
-                fig_dir.update_traces(marker_color='grey', textposition='auto', texttemplate='%{x}', textfont=dict(size=13), hovertemplate='%{y}<extra></extra>')
+                fig_dir.update_traces(marker_color='grey', textposition='auto', texttemplate='%{x}', textfont=dict(size=15), hovertemplate='%{y}<extra></extra>')
                 fig_dir.update_layout(height=320, margin=dict(l=160,t=48,b=30,r=20), xaxis_title=None, yaxis_title=None, yaxis=dict(tickfont=dict(size=13)))
                 figs_row2.append(fig_dir)
         except Exception:
@@ -4063,7 +4079,7 @@ def generate_demandes_recrutement_html_image(df_recrutement):
                 dfp = poste_counts.rename_axis('Poste').reset_index(name='Count').sort_values('Count', ascending=False)
                 dfp['Label'] = dfp['Poste']
                 fig_poste = px.bar(dfp, x='Count', y='Label', title="Comparaison par poste", text='Count', orientation='h')
-                fig_poste.update_traces(marker_color='grey', textposition='auto', texttemplate='%{x}', textfont=dict(size=13), hovertemplate='%{y}<extra></extra>')
+                fig_poste.update_traces(marker_color='grey', textposition='auto', texttemplate='%{x}', textfont=dict(size=15), hovertemplate='%{y}<extra></extra>')
                 fig_poste.update_layout(height=320, margin=dict(l=160,t=48,b=30,r=20), xaxis_title=None, yaxis_title=None, yaxis=dict(tickfont=dict(size=13)))
                 figs_row2.append(fig_poste)
         except Exception:
@@ -4605,6 +4621,20 @@ def main():
         )
     
     # Créer les onglets (Demandes et Recrutement regroupés)
+    # CSS pour agrandir le texte des onglets
+    st.markdown("""
+    <style>
+    .stTabs [data-baseweb="tab-list"] button {
+        font-size: 1.15em !important;
+        font-weight: 600 !important;
+        padding: 12px 20px !important;
+    }
+    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+        font-size: 1.15em !important;
+        font-weight: 600 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     tabs = st.tabs(["📂 Upload & Téléchargement", "🗂️ Demandes & Recrutement", "📅 Hebdomadaire", "🤝 Intégrations", "📖 Méthodologie"])
     
     # Variables pour stocker les fichiers uploadés
@@ -4909,6 +4939,7 @@ def main():
         - **Comparaison par direction / poste / raison** : histogrammes basés sur les valeurs de colonnes `Direction concernée`, `Poste demandé` et `Raison du recrutement`. Les étiquettes affichent les totaux par catégorie (valeurs affichées en gras et couleur claire pour lisibilité).
         - **Évolution des demandes / intégrations** : bar charts mensuels agrégés par date (date de réception de la demande ou date d'entrée prévue). Les valeurs sont intégrées dans les barres (au lieu d'être placées au-dessus) pour éviter qu'elles soient coupées.
         - **Nombre de candidats présélectionnés** : somme des valeurs numériques de la colonne `Nb de candidats pré-selectionnés` (valeurs non numériques traitées comme 0). Le libellé est affiché à gauche du graphique pour éviter l'étiquette centrale indésirable.
+        - **Délai de recrutement** : calculé comme la différence en jours entre `Date d'entrée effective du candidat` et `Date de réception de la demande après validation de la DRH`. Affiché dans le debug "Recrutements Clôturés".
         - **Intégrations — explication du signal "⚠️ En retard"** : une intégration est considérée en retard si la `Date d'entrée prévisionnelle` est antérieure à la date de reporting (aujourd'hui ou `reporting_date` sélectionnée). Le compteur `En retard` regroupe ces cas pour vous alerter.
         - **KPIs hebdomadaires** : fenêtre de calcul basée sur la `reporting_date` (Semaine précédente : Lundi->Vendredi). Les métriques `avant`, `nouveaux`, `pourvus`, `en_cours` sont calculées avec des règles décrites dans le debug (onglet Debug) et sont utilisées pour fabriquer le tableau "Besoins en Cours par Entité".
         """, unsafe_allow_html=True)
