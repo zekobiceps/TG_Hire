@@ -348,7 +348,11 @@ with tab1:
                             st.success("✅ Candidat supprimé de la cartographie.")
                             st.cache_data.clear()
                             st.session_state.cartographie_data = load_data_from_sheet()
-                            st.experimental_rerun() if hasattr(st, 'experimental_rerun') else st.rerun()
+                            rerun_fn = getattr(st, "experimental_rerun", None)
+                            if callable(rerun_fn):
+                                rerun_fn()
+                            else:
+                                st.rerun()
                         else:
                             st.error("❌ Impossible de trouver/supprimer ce candidat dans Google Sheets.")
 
