@@ -1195,7 +1195,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         height_dir = max(300, 28 * len(df_direction))
         # Ensure largest values appear on top by reversing the truncated label array
         category_array_dir = list(df_direction['Label_display'][::-1])
-            fig_direction.update_layout(
+        fig_direction.update_layout(
             height=height_dir,
             xaxis_title=None,
             yaxis_title=None,
@@ -2107,7 +2107,15 @@ def create_weekly_report_tab(df_recrutement=None):
                     pivot = pivot[~pivot.index.str.lower().isin(exclude_list)]
 
                     # Calculer la colonne demandée: Total (sans clôture) = Sourcing + Shortlisté + Signature DRH - Clôture
-                    pivot['Total (sans clôture)'] = (pivot.get('Sourcing', 0) + pivot.get('Shortlisté', 0) + pivot.get('Signature DRH', 0) - pivot.get('Clôture', 0)).clip(lower=0).astype(int)
+                    # Calcul sûr du total: somme des colonnes sources moins Clôture, clip à 0
+                    cols_sum = [c for c in ['Sourcing', 'Shortlisté', 'Signature DRH'] if c in pivot.columns]
+                    if cols_sum:
+                        pivot['Total (sans clôture)'] = (pivot[cols_sum].sum(axis=1) - pivot.get('Clôture', 0)).clip(lower=0).astype(int)
+                    else:
+                        # If the 'Clôture' column is missing pivot.get returns an int 0;
+                        # wrap it into a Series aligned with pivot.index so .clip works correctly.
+                        cloture_series = pivot.get('Clôture', pd.Series(0, index=pivot.index))
+                        pivot['Total (sans clôture)'] = (-cloture_series).clip(lower=0).astype(int)
 
                     # Construire le HTML du tableau
                     html_rec = '<div class="table-container" style="margin-top:12px;">'
