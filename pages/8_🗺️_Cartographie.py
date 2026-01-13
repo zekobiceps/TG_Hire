@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import os
 import io
 import pandas as pd
@@ -354,6 +355,19 @@ if st.sidebar.button("🔍 Tester les connexions Google (Débug)"):
 tab1, tab2 = st.tabs(["Gestion des candidats", "Guide des quadrants"])
 
 with tab1:
+        # Si on a demandé un scroll vers un élément spécifique (après clic Modifier)
+        if st.session_state.get('scroll_to'):
+            anchor_target = st.session_state.get('scroll_to')
+            components.html(
+                f"""
+                <script>
+                const el = parent.document.getElementById('{anchor_target}');
+                if (el) {{ el.scrollIntoView({{behavior: 'instant', block: 'start'}}); }}
+                </script>
+                """,
+                height=0,
+            )
+            del st.session_state['scroll_to']
     st.subheader("➕ Ajouter un candidat")
     
     left_col, right_col = st.columns([2,1])
@@ -407,12 +421,13 @@ with tab1:
                 df_counts = pd.DataFrame(list(counts.items()), columns=['Quadrant', 'Nombre'])
                 df_counts = df_counts[df_counts['Nombre'] > 0]
                 st.subheader(f"Répartition des candidats par quadrant ({total_profils} profils)")
-                fig = px.pie(df_counts, names='Quadrant', values='Nombre',
-                             color_discrete_sequence=["#636EFA", "#EF553B", "#00CC96", "#AB63FA"])
+                 fig = px.pie(df_counts, names='Quadrant', values='Nombre',
+                            color_discrete_sequence=["#636EFA", "#EF553B", "#00CC96", "#AB63FA"])
                 # Afficher pourcentage + valeur (valeur en gras) à l'intérieur
                 fig.update_traces(textposition='inside', textinfo='percent+value',
                                   texttemplate='%{percent}<br><b>%{value}</b>',
-                                  hovertemplate='<b>%{label}</b><br>Nombre: %{value}<br>Pourcentage: %{percent}<extra></extra>')
+                                hovertemplate='<b>%{label}</b><br>Nombre: %{value}<br>Pourcentage: %{percent}<extra></extra>',
+                                textfont=dict(size=18))
                 fig.update_layout(legend_font_size=16)
                 st.plotly_chart(fig, use_container_width=True)
             else:
@@ -456,7 +471,9 @@ with tab1:
     else:
       for i, cand in enumerate(filtered_cands):
           edit_key = f"edit_carto_flag_{quadrant_recherche}_{i}"
-          with st.expander(f"{cand['nom']} - {cand['poste']} ({cand['date']})", expanded=False):
+          anchor_id = f"cand_{quadrant_recherche}_{i}"
+          st.markdown(f"<div id='{anchor_id}'></div>", unsafe_allow_html=True)
+          with st.expander(f"{cand['nom']} - {cand['poste']} ({cand['date']})", expanded=st.session_state.get(edit_key, False)):
                 st.write(f"**Entreprise :** {cand.get('entreprise', 'Non spécifiée')}")
                 st.write(f"**LinkedIn :** {cand.get('linkedin', 'Non spécifié')}")
                 st.write(f"**Notes :** {cand.get('notes', '')}")
@@ -485,8 +502,9 @@ with tab1:
                 with col_b:
                     if st.button("✏️ Modifier ce candidat", key=f"edit_carto_btn_{quadrant_recherche}_{i}"):
                         st.session_state[edit_key] = True
+                        st.session_state['scroll_to'] = anchor_id
 
-                # Afficher le formulaire de modification directement sous le bloc, sans dépendre de l'expander
+                # Afficher le formulaire de modification directement sous le bloc, et ouvrir l'expander
                 if st.session_state.get(edit_key, False):
                     st.markdown("**Modifier les informations du candidat**")
                     with st.form(f"form_edit_{quadrant_recherche}_{i}", clear_on_submit=False):
