@@ -945,7 +945,8 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             xaxis_title=None,
             yaxis_title=None,
             margin=dict(l=160, t=48, b=30, r=20),
-            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_direction['Label_display'][::-1]))
+            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_direction['Label_display'][::-1])),
+            title=dict(text="<b>Comparaison par direction</b>", x=0, xanchor='left', font=TITLE_FONT)
         )
         fig_direction = apply_title_style(fig_direction)
         try:
@@ -986,7 +987,8 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             xaxis_title=None,
             yaxis_title=None,
             margin=dict(l=160, t=48, b=30, r=20),
-            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_poste['Label_display'][::-1]))
+            yaxis=dict(automargin=True, tickfont=dict(size=11), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_poste['Label_display'][::-1])),
+            title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT)
         )
         fig_poste = apply_title_style(fig_poste)
         try:
@@ -1008,15 +1010,16 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         except (KeyError, ValueError):
             total_candidats = 0
             
-        # Afficher le titre à gauche (évite le "undefined" au centre)
-        st.markdown("<div style='font-weight:700; text-align:left; margin:4px 0 4px 0;'>Nombre de candidats présélectionnés</div>", unsafe_allow_html=True)
+        # Titre stylé comme les autres graphiques
+        st.markdown("<div style='font-family:Arial,sans-serif; font-size:18px; font-weight:700; color:#111111; text-align:left; margin:8px 0 4px 0;'>Nombre de candidats présélectionnés</div>", unsafe_allow_html=True)
 
         fig_candidats = go.Figure(go.Indicator(
             mode = "gauge+number",
             value = total_candidats,
-            gauge = {'axis': {'range': [0, max(total_candidats * 2, 100)]},
+            gauge = {'axis': {'range': [0, max(total_candidats * 2, 100)], 'visible': True},
                      'bar': {'color': "green"},
                     }))
+        fig_candidats.update_layout(height=280, margin=dict(t=20, b=20, l=20, r=20))
         fig_candidats.update_layout(height=300, margin=dict(t=48, b=20, l=20, r=20))
         # Le titre principal est affiché à gauche par le markup extérieur ;
         # on évite d'avoir un titre centré dans la figure.
@@ -1042,24 +1045,28 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         if prom_sum and prom_sum > 0:
             taux_refus = float(refus_sum) / float(prom_sum) * 100.0
 
-        st.markdown("<div style='font-weight:700; text-align:left; margin:4px 0 4px 0;'>Taux de refus (%)</div>", unsafe_allow_html=True)
+        st.markdown("<div style='font-family:Arial,sans-serif; font-size:18px; font-weight:700; color:#111111; text-align:left; margin:8px 0 4px 0;'>Taux de refus (%)</div>", unsafe_allow_html=True)
         fig_refus = go.Figure(go.Indicator(
             mode='gauge+number',
             value=round(taux_refus, 1),
             number={'suffix':' %'},
-            gauge={'axis': {'range':[0,100]}, 'bar': {'color':'#d62728'}}
+            gauge={'axis': {'range':[0,100], 'visible': True}, 'bar': {'color':'#d62728'}}
         ))
-        fig_refus.update_layout(height=300, margin=dict(t=48, b=20, l=20, r=20))
-        fig_refus = apply_title_style(fig_refus)
+        fig_refus.update_layout(height=280, margin=dict(t=20, b=20, l=20, r=20))
         st.plotly_chart(fig_refus, width='stretch')
 
     # Debug local pour l'onglet Recrutements Clôturés
     st.markdown("---")
-    with st.expander("🔍 Debug - Données des graphiques (Recrutements Clôturés)", expanded=False):
+    with st.expander("🔍 Debug - Détails des lignes (Recrutements Clôturés)", expanded=False):
         try:
-            st.write("Colonnes disponibles:", list(df_filtered.columns))
-            st.write("Aperçu des données filtrées (5 premières lignes):")
-            st.dataframe(df_filtered.head())
+            st.markdown("**Lignes contribuant aux graphiques (toutes les données filtrées):**")
+            # Afficher colonnes pertinentes uniquement
+            cols_debug = ['Poste demandé', 'Entité demandeuse', 'Direction concernée', 'Statut de la demande', "Date d'entrée effective du candidat", 'Modalité de recrutement']
+            cols_available = [c for c in cols_debug if c in df_filtered.columns]
+            if cols_available:
+                st.dataframe(df_filtered[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
+            else:
+                st.dataframe(df_filtered.reset_index(drop=True), use_container_width=True, hide_index=True)
         except Exception:
             st.write("Aucune donnée disponible pour le debug.")
 
@@ -1258,15 +1265,21 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT)
         )
         render_plotly_scrollable(fig_poste, max_height=320)
-        # Debug local pour l'onglet Demandes de Recrutement
-        st.markdown("---")
-        with st.expander("🔍 Debug - Données des graphiques (Demandes de Recrutement)", expanded=False):
-            try:
-                st.write("Colonnes disponibles:", list(df_filtered.columns))
-                st.write("Aperçu des données filtrées (5 premières lignes):")
-                st.dataframe(df_filtered.head())
-            except Exception:
-                st.write("Aucune donnée disponible pour le debug.")
+
+    # Debug local pour l'onglet Demandes de Recrutement (en dehors des colonnes, aligné à gauche)
+    st.markdown("---")
+    with st.expander("🔍 Debug - Détails des lignes (Demandes de Recrutement)", expanded=False):
+        try:
+            st.markdown("**Lignes contribuant aux graphiques (toutes les données filtrées):**")
+            # Afficher colonnes pertinentes uniquement
+            cols_debug = ['Poste demandé', 'Entité demandeuse', 'Direction concernée', 'Raison du recrutement', 'Statut de la demande', 'Date de réception de la demande aprés validation de la DRH']
+            cols_available = [c for c in cols_debug if c in df_filtered.columns]
+            if cols_available:
+                st.dataframe(df_filtered[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
+            else:
+                st.dataframe(df_filtered.reset_index(drop=True), use_container_width=True, hide_index=True)
+        except Exception:
+            st.write("Aucune donnée disponible pour le debug.")
 
 def create_integrations_tab(df_recrutement, global_filters):
     """Onglet Intégrations basé sur les bonnes données"""
@@ -1402,6 +1415,14 @@ def create_integrations_tab(df_recrutement, global_filters):
         # Exclure les lignes sans date d'intégration prévue AVANT le formatage
         if date_integration_col in df_display.columns:
             df_display = df_display[df_display[date_integration_col].notna() & df_display[date_integration_col].astype(str).str.strip().ne('')].copy()
+            
+            # Trier par date d'intégration croissante AVANT formatage
+            try:
+                df_display['_sort_date'] = pd.to_datetime(df_display[date_integration_col], errors='coerce')
+                df_display = df_display.sort_values('_sort_date', ascending=True)
+                df_display = df_display.drop(columns=['_sort_date'])
+            except Exception:
+                pass
 
             # Formater la date pour enlever l'heure et s'assurer du bon format DD/MM/YYYY
             def format_date_safely(date_str):
@@ -1429,15 +1450,45 @@ def create_integrations_tab(df_recrutement, global_filters):
     else:
         st.warning("Colonnes d'affichage non disponibles")
 
-    # Debug local pour l'onglet Intégrations
+    # Debug local pour l'onglet Intégrations avec colonnes de contribution
     st.markdown("---")
-    with st.expander("🔍 Debug - Données des graphiques (Intégrations)", expanded=False):
+    with st.expander("🔍 Debug - Détails des lignes (Intégrations)", expanded=False):
         try:
-            st.write("Colonnes disponibles:", list(df_filtered.columns))
-            st.write("Aperçu des données filtrées (5 premières lignes):")
-            st.dataframe(df_filtered.head())
-        except Exception:
-            st.write("Aucune donnée disponible pour le debug.")
+            st.markdown("**Lignes contribuant aux indicateurs (en cours, en retard, plan d'intégration à préparer):**")
+            # Construire les colonnes de contribution pour les indicateurs
+            df_debug_int = df_filtered.copy()
+            
+            # Contribution: En cours (toutes les lignes filtrées)
+            df_debug_int['contrib_en_cours'] = True
+            
+            # Contribution: En retard (date d'intégration prévue < aujourd'hui)
+            today = datetime.now()
+            if date_integration_col in df_debug_int.columns:
+                df_debug_int['_date_check'] = pd.to_datetime(df_debug_int[date_integration_col], errors='coerce')
+                df_debug_int['contrib_en_retard'] = df_debug_int['_date_check'] < today
+                df_debug_int = df_debug_int.drop(columns=['_date_check'])
+            else:
+                df_debug_int['contrib_en_retard'] = False
+            
+            # Contribution: Plan d'intégration à préparer (plan = 'oui')
+            if plan_integration_col in df_debug_int.columns:
+                df_debug_int['contrib_plan_a_preparer'] = df_debug_int[plan_integration_col].astype(str).str.lower() == 'oui'
+            else:
+                df_debug_int['contrib_plan_a_preparer'] = False
+            
+            # Trier par date d'intégration croissante
+            if date_integration_col in df_debug_int.columns:
+                df_debug_int['_sort_date'] = pd.to_datetime(df_debug_int[date_integration_col], errors='coerce')
+                df_debug_int = df_debug_int.sort_values('_sort_date', ascending=True)
+                df_debug_int = df_debug_int.drop(columns=['_sort_date'])
+            
+            # Sélectionner colonnes pertinentes
+            cols_display = [candidat_col, 'Poste demandé ', 'Entité demandeuse', date_integration_col, plan_integration_col, 'contrib_en_cours', 'contrib_en_retard', 'contrib_plan_a_preparer']
+            cols_available = [c for c in cols_display if c in df_debug_int.columns]
+            
+            st.dataframe(df_debug_int[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
+        except Exception as e:
+            st.write(f"Aucune donnée disponible pour le debug. Erreur: {e}")
 
 
 def create_demandes_recrutement_combined_tab(df_recrutement):
@@ -2744,6 +2795,26 @@ def create_weekly_report_tab(df_recrutement=None):
                 cards_html += card_div
             cards_html += '</div>'
             st.markdown(cards_html, unsafe_allow_html=True)
+
+    # Debug local pour Pipeline de Recrutement (Kanban)
+    st.markdown("---")
+    with st.expander("🔍 Debug - Détails des lignes (Pipeline Kanban)", expanded=False):
+        try:
+            st.markdown("**Lignes contribuant au pipeline par statut:**")
+            if postes_data:
+                # Convertir postes_data en DataFrame pour affichage
+                df_kanban_debug = pd.DataFrame(postes_data)
+                # Ajouter colonnes de contribution par statut
+                for s in statuts_kanban_display:
+                    df_kanban_debug[f'contrib_{s}'] = df_kanban_debug['statut'] == s
+                # Afficher colonnes pertinentes
+                cols_show = ['titre', 'entite', 'lieu', 'recruteur', 'statut'] + [f'contrib_{s}' for s in statuts_kanban_display]
+                cols_available = [c for c in cols_show if c in df_kanban_debug.columns]
+                st.dataframe(df_kanban_debug[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
+            else:
+                st.write("Aucune donnée de pipeline disponible.")
+        except Exception as e:
+            st.write(f"Erreur debug pipeline: {e}")
 
 
 def generate_table_image_simple(weekly_metrics):
