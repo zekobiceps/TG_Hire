@@ -1019,11 +1019,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             gauge = {'axis': {'range': [0, max(total_candidats * 2, 100)], 'visible': True},
                      'bar': {'color': "green"},
                     }))
-        fig_candidats.update_layout(height=280, margin=dict(t=20, b=20, l=20, r=20))
-        fig_candidats.update_layout(height=300, margin=dict(t=48, b=20, l=20, r=20))
-        # Le titre principal est affiché à gauche par le markup extérieur ;
-        # on évite d'avoir un titre centré dans la figure.
-        fig_candidats = apply_title_style(fig_candidats)
+        fig_candidats.update_layout(height=260, margin=dict(t=10, b=10, l=20, r=20))
         st.plotly_chart(fig_candidats, width="stretch")
 
     with col6:
@@ -1388,7 +1384,7 @@ def create_integrations_tab(df_recrutement, global_filters):
                 marker_color='#2ca02c', 
                 textposition='inside',
                 texttemplate='<b>%{y}</b>',
-                textangle=90,
+                textangle=-90,
                 textfont=dict(size=13, color='white'),
                 hovertemplate='%{y}<extra></extra>'
             )
@@ -1482,8 +1478,12 @@ def create_integrations_tab(df_recrutement, global_filters):
                 df_debug_int = df_debug_int.sort_values('_sort_date', ascending=True)
                 df_debug_int = df_debug_int.drop(columns=['_sort_date'])
             
-            # Sélectionner colonnes pertinentes
-            cols_display = [candidat_col, 'Poste demandé ', 'Entité demandeuse', date_integration_col, plan_integration_col, 'contrib_en_cours', 'contrib_en_retard', 'contrib_plan_a_preparer']
+            # Formater la date sans l'heure
+            if date_integration_col in df_debug_int.columns:
+                df_debug_int[date_integration_col] = pd.to_datetime(df_debug_int[date_integration_col], errors='coerce').dt.strftime('%d/%m/%Y')
+            
+            # Sélectionner colonnes pertinentes (sans Plan d'intégration)
+            cols_display = [candidat_col, 'Poste demandé ', 'Entité demandeuse', date_integration_col, 'contrib_en_cours', 'contrib_en_retard', 'contrib_plan_a_preparer']
             cols_available = [c for c in cols_display if c in df_debug_int.columns]
             
             st.dataframe(df_debug_int[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
@@ -1926,7 +1926,7 @@ def create_weekly_report_tab(df_recrutement=None):
     st.markdown(
         '<div style="display: flex; align-items: center;">'
         '<span style="font-size: 1.25em; font-weight: 600;">📊 Besoins en Cours par Entité</span>'
-        '<span style="margin-left: 8px; cursor: pointer;" title="">?</span></div>',
+        '</div>',
         unsafe_allow_html=True
     )
     if metrics and len(metrics) > 0:
@@ -2201,8 +2201,8 @@ def create_weekly_report_tab(df_recrutement=None):
                         pivot['Total'] = 0
 
                     # Construire le HTML du tableau
-                    html_rec = '<div class="table-container" style="margin-top:12px;">'
-                    html_rec += '<table class="custom-table" style="width:70%;">'
+                    html_rec = '<div class="table-container" style="margin-top:8px;">'
+                    html_rec += '<table class="custom-table" style="width:60%; margin:0;">'
                     # Header
                     html_rec += '<thead><tr><th>Recruteur</th>'
                     for s in wanted_statuses:
@@ -2220,8 +2220,24 @@ def create_weekly_report_tab(df_recrutement=None):
 
                     html_rec += '</tbody></table></div>'
 
-                    st.markdown('<div style="font-weight:600;margin-top:8px;">📋 Recrutements en cours par recruteur</div>', unsafe_allow_html=True)
+                    st.markdown('<div style="font-family:Arial,sans-serif; font-size:1.15em; font-weight:700; margin-top:12px;">📋 Recrutements en cours par recruteur</div>', unsafe_allow_html=True)
                     st.markdown(html_rec, unsafe_allow_html=True)
+                    
+                    # Debug pour le tableau recruteur
+                    with st.expander("🔍 Debug - Détails des lignes (Recrutements par recruteur)", expanded=False):
+                        try:
+                            st.markdown("**Lignes contribuant au tableau par statut:**")
+                            # Ajouter colonnes de contribution
+                            df_rec_debug = df_recrutement.copy()
+                            df_rec_debug['contrib_Nouvelle_demande'] = df_rec_debug['Colonne TG Hire'] == 'Nouvelle demande'
+                            df_rec_debug['contrib_Sourcing'] = df_rec_debug['Colonne TG Hire'] == 'Sourcing'
+                            df_rec_debug['contrib_Shortlisté'] = df_rec_debug['Colonne TG Hire'] == 'Shortlisté'
+                            df_rec_debug['contrib_Signature_DRH'] = df_rec_debug['Colonne TG Hire'] == 'Signature DRH'
+                            cols_show = [recruteur_col, 'Poste demandé', 'Colonne TG Hire', 'contrib_Nouvelle_demande', 'contrib_Sourcing', 'contrib_Shortlisté', 'contrib_Signature_DRH']
+                            cols_avail = [c for c in cols_show if c in df_rec_debug.columns]
+                            st.dataframe(df_rec_debug[cols_avail].reset_index(drop=True), use_container_width=True, hide_index=True)
+                        except Exception as e:
+                            st.write(f"Erreur debug: {e}")
         except Exception:
             pass
     else:
@@ -4888,8 +4904,6 @@ def main():
     with tabs[4]:
         st.header("📖 Méthodologie du Reporting")
         st.markdown("""
-        **Résumé des méthodes de calcul utilisées dans ce reporting :
-
         - **Besoins en cours par entité** : calculés à partir des demandes validées par la DRH. Les postes "en cours" sont soit déterminés par le statut `En cours`, soit par la formule (postes avant + nouveaux - pourvus) si les dates manquent.
         - **Recrutements en cours par recruteur** : tableau pivot par `Colonne TG Hire` (Sourcing, Shortlisté, Signature DRH, Clôture). La colonne affichée **"Total (sans clôture)"** est calculée pour chaque recruteur comme : `Sourcing + Shortlisté + Signature DRH - Clôture` (valeur minimale 0). Les lignes sans recruteur explicite sont exclues. Certaines personnes (ex: Bouchra AJBILOU, Bouchra AOUISSE, Ghita LAKHDAR, Reda Berrada, Reda Mohamed BERRADA, Saad FATI) sont volontairement exclues du tableau.
         - **Comparaison par direction / poste / raison** : histogrammes basés sur les valeurs de colonnes `Direction concernée`, `Poste demandé` et `Raison du recrutement`. Les étiquettes affichent les totaux par catégorie (valeurs affichées en gras et couleur claire pour lisibilité).
