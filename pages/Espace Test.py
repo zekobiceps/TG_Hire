@@ -4243,7 +4243,7 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
         st.error(f"Erreur lors de la génération du PowerPoint: {e}")
         return None
 
-
+def espace_test_main_app():
     st.title("📊 Tableau de Bord RH")
     st.markdown("---")
     # Date de reporting : permet de fixer la date de référence pour tous les calculs
@@ -4604,4 +4604,4 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
         """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
-    main()
+    espace_test_main_app()
