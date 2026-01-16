@@ -4244,7 +4244,6 @@ def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2
         return None
 
 
-def main():
     st.title("📊 Tableau de Bord RH")
     st.markdown("---")
     # Date de reporting : permet de fixer la date de référence pour tous les calculs
@@ -4294,7 +4293,7 @@ def main():
         )
     
     # Créer les onglets (Demandes et Recrutement regroupés)
-    tabs = st.tabs(["📂 Upload & Téléchargement", "🗂️ Demandes & Recrutement", "📅 Hebdomadaire", "🤝 Intégrations"])
+    tabs = st.tabs(["📂 Upload & Téléchargement", "🗂️ Demandes & Recrutement", "📅 Hebdomadaire", "🤝 Intégrations", "📖 Méthodologie"])
     
     # Variables pour stocker les fichiers uploadés
     # Use session_state to persist upload/refresh state
@@ -4589,6 +4588,20 @@ def main():
             create_integrations_tab(df_recrutement, int_filters)
         else:
             st.warning("📊 Aucune donnée disponible pour les intégrations. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
+
+
+    with tabs[4]:
+        st.header("📖 Méthodologie du Reporting")
+        st.markdown("""
+        - **Besoins en cours par entité** : calculés à partir des demandes validées par la DRH. Les postes "en cours" sont soit déterminés par le statut `En cours`, soit par la formule (postes avant + nouveaux - pourvus) si les dates manquent.
+        - **Recrutements en cours par recruteur** : tableau pivot par `Colonne TG Hire` (Sourcing, Shortlisté, Signature DRH, Clôture). La colonne affichée **"Total (sans clôture)"** est calculée pour chaque recruteur comme : `Sourcing + Shortlisté + Signature DRH - Clôture` (valeur minimale 0).
+        - **Comparaison par direction / poste / raison** : histogrammes basés sur les valeurs de colonnes `Direction concernée`, `Poste demandé` et `Raison du recrutement`. Les étiquettes affichent les totaux par catégorie (valeurs affichées en gras et couleur claire pour lisibilité).
+        - **Évolution des demandes / intégrations** : bar charts mensuels agrégés par date (date de réception de la demande ou date d'entrée prévue). Les valeurs sont intégrées dans les barres (au lieu d'être placées au-dessus) pour éviter qu'elles soient coupées.
+        - **Nombre de candidats présélectionnés** : somme des valeurs numériques de la colonne `Nb de candidats pré-selectionnés` (valeurs non numériques traitées comme 0). Le libellé est affiché à gauche du graphique pour éviter l'étiquette centrale indésirable.
+        - **Délai de recrutement** : calculé comme la différence en jours entre `Date d'entrée effective du candidat` et `Date de réception de la demande après validation de la DRH`. Affiché dans le debug "Recrutements Clôturés".
+        - **Intégrations — explication du signal "⚠️ En retard"** : une intégration est considérée en retard si la `Date d'entrée prévisionnelle` est antérieure à la date de reporting (aujourd'hui ou `reporting_date` sélectionnée). Le compteur `En retard` regroupe ces cas pour vous alerter.
+        - **KPIs hebdomadaires** : fenêtre de calcul basée sur la `reporting_date` (Semaine précédente : Lundi->Vendredi). Les métriques `avant`, `nouveaux`, `pourvus`, `en_cours` sont calculées avec des règles décrites dans le debug (onglet Debug) et sont utilisées pour fabriquer le tableau "Besoins en Cours par Entité".
+        """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
