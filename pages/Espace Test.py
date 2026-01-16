@@ -693,6 +693,14 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             pass
 
     # Revert to simple metrics (no bordered-card styling) in the Recrutements Clôturés section
+    st.markdown("""
+        <style>
+        [data-testid="stMetric"] {
+            margin-bottom: -25px;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Nombre de recrutements", recrutements)
@@ -704,6 +712,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         st.metric("Délai moyen recrutement (jours)", delai_display)
     
     # Graphiques en ligne 1
+    st.markdown('<div style="margin-top: -30px;"></div>', unsafe_allow_html=True)
     col1, col2 = st.columns([2,1])
     
     with col1:
@@ -954,8 +963,8 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         else:
             st.metric("Taux d'annulation", "N/A")
 
-    # Graphiques principaux (espace réduit entre KPIs et visuels)
-    st.markdown("<div style='margin-top:-8px; margin-bottom:2px;'></div>", unsafe_allow_html=True)
+    # Graphiques principaux
+    st.markdown('<div style="margin-top: -30px;"></div>', unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1,1,2])
     
     with col1:
@@ -1179,8 +1188,8 @@ def create_integrations_tab(df_recrutement, global_filters):
         else:
             st.metric("⚠️ En retard", "N/A")
     
-    # Graphiques (espace réduit entre KPIs et visuels)
-    st.markdown("<div style='margin-top:-8px; margin-bottom:2px;'></div>", unsafe_allow_html=True)
+    # Graphiques
+    st.markdown('<div style="margin-top: -30px;"></div>', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
 
     # Graphique par affectation réactivé
@@ -1217,22 +1226,9 @@ def create_integrations_tab(df_recrutement, global_filters):
     
     # Tableau détaillé des intégrations
     st.subheader("📋 Détail des Intégrations en Cours")
-    # Garantir l'affichage du poste demandé juste après le candidat
-    poste_demande_col = next((c for c in df_filtered.columns if isinstance(c, str) and c.strip().lower() == 'poste demandé'), None)
-    if not poste_demande_col and 'Poste demandé ' in df_filtered.columns:
-        poste_demande_col = 'Poste demandé '
-    if not poste_demande_col:
-        for alt in ['Poste', 'Poste concerné']:
-            if alt in df_filtered.columns:
-                poste_demande_col = alt
-                break
-    if not poste_demande_col:
-        poste_demande_col = 'Poste demandé'
-        df_filtered[poste_demande_col] = np.nan
-
     colonnes_affichage = [
         candidat_col, 
-        poste_demande_col,
+        'Poste demandé',
         'Entité demandeuse',
         'Affectation',
         date_integration_col,
@@ -1263,7 +1259,7 @@ def create_integrations_tab(df_recrutement, global_filters):
         # Renommer pour affichage plus propre
         df_display = df_display.rename(columns={
             candidat_col: "Candidat",
-            poste_demande_col: "Poste demandé",
+            'Poste demandé': "Poste demandé",
             date_integration_col: "Date d'Intégration Prévue"
         })
         
@@ -1706,11 +1702,9 @@ def create_weekly_report_tab(df_recrutement=None):
     with col4:
         st.metric("Total postes ouverts avant la semaine", total_avant)
 
-    st.markdown("<div style='margin-top:-8px; margin-bottom:2px;'></div>", unsafe_allow_html=True)
-
     # Tableau récapitulatif par entité (HTML personnalisé, rendu centralisé)
     st.markdown(
-        '<div style="display: flex; align-items: center;">'
+        '<div style="display: flex; align-items: center; margin-top: -20px;">'
         '<span style="font-size: 1.25em; font-weight: 600;">📊 Besoins en Cours par Entité</span>'
         '<span style="margin-left: 8px; cursor: pointer;" title="">?</span></div>',
         unsafe_allow_html=True
