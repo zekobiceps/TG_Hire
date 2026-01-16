@@ -365,9 +365,9 @@ Searched for text `def create_recrutements_clotures_tab` (`**/pages/10_📊_Repo
 
 ---
 
-_**User (2026-01-16 15:56Z)**_
+_**User (2026-01-16 16:05Z)**_
 
-@agent Continue: "Continue to iterate?"
+tu peux me donner l'historique des commit de cette page avec les dates ?
 
 ---
 
@@ -379,6 +379,1876 @@ _**Agent (model copilot/gemini-3-flash-preview)**_
 
 
 Read [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#657-657), lines 657 to 760
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "3bffd54d-ceac-466f-9ae7-6e963dc7d3d4",
+  "terminalCommandId": "tool-1fddea14-a4e4-4e35-a750-ad9957e1a437",
+  "commandLine": {
+    "original": "git log --format=\"%h - %ad : %s\" --date=short -- \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " git log --format=\"%h - %ad : %s\" --date=short -- \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;/^git(\\s+(-C\\s+\\S+|--no-pager))*\\s+log\\b/ (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579546743,
+    "duration": 1491
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-1fddea14-a4e4-4e35-a750-ad9957e1a437"
+  },
+  "terminalCommandOutput": {
+    "text": "a1176e9e - 2026-01-16 : back to start\r\naaf717b9 - 2026-01-16 : Ajuste espacements KPIs et ajoute poste demandé\r\n60e5037e - 2026-01-13 : feat: Align chart text style and filter integrations\r\n8085240e - 2026-01-13 : feat: Align chart text style and filter integrations\r\nda632bb3 - 2026-01-13 : Fix: CSS tabs, recruiter debug entity+En cours filter, chart sizes 15, delay calc, date formatting\r\n49f1c3b1 - 2026-01-13 : fix(report): remove ?, fix gauge undefined, add recruiter debug, format dates, fix text angle, reduce table width\r\n4d15b85b - 2026-01-13 : fix(report): style gauge/chart titles, move debug left, add contribution columns, sort integrations, add pipeline debug\r\n63da7ba7 - 2026-01-13 : fix(report): clean gauges, recruiter pivot, bar label colors, integration text angle, add per-tab debug\r\ndcded184 - 2026-01-13 : fix(report): indentation and total calc\r\nb97b2e9d - 2026-01-13 : feat(report): exclude specific recruiters, compute 'Total (sans clôture)', improve chart labels/styles, add refusal rate and update methodology\r\neb491c1d - 2026-01-13 : fix(report): nettoyer tableau recruteurs, ajouter onglet Méthodologie, uniformiser graphiques et ajuster étiquettes\r\ncb418160 - 2026-01-12 : fix(report): tableau recruteurs pivot par statut; uniformise graphiques direction/poste; corrige gauge candidats et marge évolution\r\nd8527194 - 2026-01-12 : chore: show current git commit hash in UI for deployed app verification\r\n18a597c4 - 2026-01-12 : fix(ui): recruiter-by-status pivot table; unify direction/poste charts with raison style; fix candidats indicator title; align evolution chart margins\r\n0888a06f - 2026-01-12 : fix(table): correct Recrutements par recruteur formatting\r\n52e3d524 - 2026-01-12 : style(chart): unify Plotly title font via helper; add 'Recrutements en cours par recruteur' table\r\nce0ea627 - 2026-01-12 : style: center KPI titles/values, use cards for weekly KPIs; unify KPI card styling\r\n5a25bf4a - 2026-01-12 : fix(pages): remove duplicated trailing block and fix syntax near EOF\r\n135f34b8 - 2026-01-12 : feat(kanban): add 'Nouvelle demande' status and small État/Recruteur table; adjust kanban columns\r\na40a88ce - 2026-01-06 : UI: kanban columns/cards larger, filter integrations table to remove missing dates, use Entité for distribution, enforce larger tab &amp; metric fonts\r\n8cab1e48 - 2026-01-06 : UI: enlarge kanban cards, center grid, increase fonts and plot sizes\r\ndc1446bd - 2026-01-05 : test ind\r\nc1697e8d - 2026-01-05 : test ind",
+    "lineCount": 35
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+Voici l'historique des commits pour le fichier `Espace Test.py` :
+
+- **a1176e9e** (2026-01-16) : back to start
+- **aaf717b9** (2026-01-16) : Ajuste espacements KPIs et ajoute poste demandé
+- **60e5037e** (2026-01-13) : feat: Align chart text style and filter integrations
+- **8085240e** (2026-01-13) : feat: Align chart text style and filter integrations
+- **da632bb3** (2026-01-13) : Fix: CSS tabs, recruiter debug entity+En cours filter, chart sizes 15, delay calc, date formatting
+- **49f1c3b1** (2026-01-13) : fix(report): remove ?, fix gauge undefined, add recruiter debug, formats dates, fix text angle, reduce table width
+- **4d15b85b** (2026-01-13) : fix(report): style gauge/chart titles, move debug left, add contribution columns, sort integrations, add pipeline debug
+- **63da7ba7** (2026-01-13) : fix(report): clean gauges, recruiter pivot, bar label colors, integration text angle, add per-tab debug
+- **dcded184** (2026-01-13) : fix(report): indentation and total calc
+- **b97b2e9d** (2026-01-13) : feat(report): exclude specific recruiters, compute 'Total (sans clôture)', improve chart labels/styles, add refusal rate and update methodology
+- **eb491c1d** (2026-01-13) : fix(report): nettoyer tableau recruteurs, ajouter onglet Méthodologie, uniformiser graphiques et ajuster étiquettes
+- **cb418160** (2026-01-12) : fix(report): tableau recruteurs pivot par statut; uniformise graphiques direction/poste; corrige gauge candidats et marge évolution
+- **d8527194** (2026-01-12) : chore: show current git commit hash in UI for deployed app verification
+- **18a597c4** (2026-01-12) : fix(ui): recruiter-by-status pivot table; unify direction/poste charts with raison style; fix candidats indicator title; align evolution chart margins
+- **0888a06f** (2026-01-12) : fix(table): correct Recrutements par recruteur formatting
+- **52e3d524** (2026-01-12) : style(chart): unify Plotly title font via helper; add 'Recrutements en cours par recruteur' table
+- **ce0ea627** (2026-01-12) : style: center KPI titles/values, use cards for weekly KPIs; unify KPI card styling
+- **5a25bf4a** (2026-01-12) : fix(pages): remove duplicated trailing block and fix syntax near EOF
+- **135f34b8** (2026-01-12) : feat(kanban): add 'Nouvelle demande' status and small État/Recruteur table; adjust kanban columns
+- **a40a88ce** (2026-01-06) : UI: kanban columns/cards larger, filter integrations table to remove missing dates, use Entité for distribution, enforce larger tab & metric fonts
+- **8cab1e48** (2026-01-06) : UI: enlarge kanban cards, center grid, increase fonts and plot sizes
+- **dc1446bd** (2026-01-05) : test ind
+- **c1697e8d** (2026-01-05) : test ind
+
+---
+
+_**User (2026-01-16 16:09Z)**_
+
+réaplique moi ce commit "60e5037e" puis commite et push
+
+---
+
+_**Agent (model copilot/gemini-3-flash-preview)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "56d7884a-144b-41d8-8871-72cb697b3f43",
+  "terminalCommandId": "tool-bdd7edb7-759f-4c8e-b733-485e47e406a7",
+  "commandLine": {
+    "original": "git show 60e5037e",
+    "toolEdited": " git show 60e5037e"
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;/^git(\\s+(-C\\s+\\S+|--no-pager))*\\s+show\\b/ (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579597126,
+    "duration": 19
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-bdd7edb7-759f-4c8e-b733-485e47e406a7"
+  },
+  "terminalCommandOutput": {
+    "text": "\u001b[33mcommit 60e5037e241c98747aa38fdef4e0ac77423c9839\r\n\u001b[0mAuthor: GitHub Copilot &lt;copilot@example.com&gt;\r\nDate:   Tue Jan 13 12:57:49 2026 +0000\r\n\r\n    feat: Align chart text style and filter integrations\r\n\r\n\u001b[1mdiff --git a/pages/Espace Test.py b/pages/Espace Test.py\r\nindex 139d41c2..6cbf93d9 100755\r\n--- a/pages/Espace Test.py\r\n+++ b/pages/Espace Test.py\r\n\u001b[36;22m@@ -4938,7 +4938,7 @@\u001b[0m def main():\r\n         st.header(\"📖 Méthodologie du Reporting\")\r\n         st.markdown(\"\"\"\r\n         - **Besoins en cours par entité** : calculés à partir des demandes validées par la DRH. Les postes \"en cours\" sont soit déterminés par le statut &#96;En cours&#96;, soit par la formule (postes avant + nouveaux - pourvus) si les dates manquent.\r\n\u001b[31m-        - **Recrutements en cours par recruteur** : tableau pivot par &#96;Colonne TG Hire&#96; (Sourcing, Shortlisté, Signature DRH, Clôture). La colonne affichée **\"Total (sans clôture)\"** est calculée pour chaque recruteur comme : &#96;Sourcing + Shortlisté + Signature DRH - Clôture&#96; (valeur minimale 0). Les lignes sans recruteur explicite sont exclues. Certaines personnes (ex: Bouchra AJBILOU, Bouchra AOUISSE, Ghita LAKHDAR, Reda Berrada, Reda Mohamed BERRADA, Saad FATI) sont volontairement exclues du tableau.\r\n\u001b[32m+        - **Recrutements en cours par recruteur** : tableau pivot par &#96;Colonne TG Hire&#96; (Sourcing, Shortlisté, Signature DRH, Clôture). La colonne affichée **\"Total (sans clôture)\"** est calculée pour chaque recruteur comme : &#96;Sourcing + Shortlisté + Signature DRH - Clôture&#96; (valeur minimale 0).\r\n\u001b[0m         - **Comparaison par direction / poste / raison** : histogrammes basés sur les valeurs de colonnes &#96;Direction concernée&#96;, &#96;Poste demandé&#96; et &#96;Raison du recrutement&#96;. Les étiquettes affichent les totaux par catégorie (valeurs affichées en gras et couleur claire pour lisibilité).\r\n         - **Évolution des demandes / intégrations** : bar charts mensuels agrégés par date (date de réception de la demande ou date d'entrée prévue). Les valeurs sont intégrées dans les barres (au lieu d'être placées au-dessus) pour éviter qu'elles soient coupées.\r\n         - **Nombre de candidats présélectionnés** : somme des valeurs numériques de la colonne &#96;Nb de candidats pré-selectionnés&#96; (valeurs non numériques traitées comme 0). Le libellé est affiché à gauche du graphique pour éviter l'étiquette centrale indésirable.",
+    "lineCount": 34
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "61f9468e-b4be-470c-b2af-dc1c217e64a4",
+  "terminalCommandId": "tool-94e1021d-5aea-4663-ac43-b8db3fad880a",
+  "commandLine": {
+    "original": "git show --unified=3 60e5037e",
+    "toolEdited": " git show --unified=3 60e5037e"
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;/^git(\\s+(-C\\s+\\S+|--no-pager))*\\s+show\\b/ (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579604120,
+    "duration": 18
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-94e1021d-5aea-4663-ac43-b8db3fad880a"
+  },
+  "terminalCommandOutput": {
+    "text": "\u001b[33mcommit 60e5037e241c98747aa38fdef4e0ac77423c9839\r\n\u001b[0mAuthor: GitHub Copilot &lt;copilot@example.com&gt;\r\nDate:   Tue Jan 13 12:57:49 2026 +0000\r\n\r\n    feat: Align chart text style and filter integrations\r\n\r\n\u001b[1mdiff --git a/pages/Espace Test.py b/pages/Espace Test.py\r\nindex 139d41c2..6cbf93d9 100755\r\n--- a/pages/Espace Test.py\r\n+++ b/pages/Espace Test.py\r\n\u001b[36;22m@@ -4938,7 +4938,7 @@\u001b[0m def main():\r\n         st.header(\"📖 Méthodologie du Reporting\")\r\n         st.markdown(\"\"\"\r\n         - **Besoins en cours par entité** : calculés à partir des demandes validées par la DRH. Les postes \"en cours\" sont soit déterminés par le statut &#96;En cours&#96;, soit par la formule (postes avant + nouveaux - pourvus) si les dates manquent.\r\n\u001b[31m-        - **Recrutements en cours par recruteur** : tableau pivot par &#96;Colonne TG Hire&#96; (Sourcing, Shortlisté, Signature DRH, Clôture). La colonne affichée **\"Total (sans clôture)\"** est calculée pour chaque recruteur comme : &#96;Sourcing + Shortlisté + Signature DRH - Clôture&#96; (valeur minimale 0). Les lignes sans recruteur explicite sont exclues. Certaines personnes (ex: Bouchra AJBILOU, Bouchra AOUISSE, Ghita LAKHDAR, Reda Berrada, Reda Mohamed BERRADA, Saad FATI) sont volontairement exclues du tableau.\r\n\u001b[32m+        - **Recrutements en cours par recruteur** : tableau pivot par &#96;Colonne TG Hire&#96; (Sourcing, Shortlisté, Signature DRH, Clôture). La colonne affichée **\"Total (sans clôture)\"** est calculée pour chaque recruteur comme : &#96;Sourcing + Shortlisté + Signature DRH - Clôture&#96; (valeur minimale 0).\r\n\u001b[0m         - **Comparaison par direction / poste / raison** : histogrammes basés sur les valeurs de colonnes &#96;Direction concernée&#96;, &#96;Poste demandé&#96; et &#96;Raison du recrutement&#96;. Les étiquettes affichent les totaux par catégorie (valeurs affichées en gras et couleur claire pour lisibilité).\r\n         - **Évolution des demandes / intégrations** : bar charts mensuels agrégés par date (date de réception de la demande ou date d'entrée prévue). Les valeurs sont intégrées dans les barres (au lieu d'être placées au-dessus) pour éviter qu'elles soient coupées.\r\n         - **Nombre de candidats présélectionnés** : somme des valeurs numériques de la colonne &#96;Nb de candidats pré-selectionnés&#96; (valeurs non numériques traitées comme 0). Le libellé est affiché à gauche du graphique pour éviter l'étiquette centrale indésirable.",
+    "lineCount": 34
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "fd7f7bb4-cb09-4b74-8c5f-ea8fe4458548",
+  "terminalCommandId": "tool-e7062152-ee85-4bf5-a8ca-2db426c270ab",
+  "commandLine": {
+    "original": "git show --stat 60e5037e",
+    "toolEdited": " git show --stat 60e5037e"
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;/^git(\\s+(-C\\s+\\S+|--no-pager))*\\s+show\\b/ (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579608315,
+    "duration": 12
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-e7062152-ee85-4bf5-a8ca-2db426c270ab"
+  },
+  "terminalCommandOutput": {
+    "text": "\u001b[33mcommit 60e5037e241c98747aa38fdef4e0ac77423c9839\r\n\u001b[0mAuthor: GitHub Copilot &lt;copilot@example.com&gt;\r\nDate:   Tue Jan 13 12:57:49 2026 +0000\r\n\r\n    feat: Align chart text style and filter integrations\r\n\r\n pages/Espace Test.py | 2 \u001b[32m+\u001b[31m-\r\n\u001b[0m 1 file changed, 1 insertion(+), 1 deletion(-)",
+    "lineCount": 8
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "d80905d1-213e-4a4e-859a-af4bec1f89c1",
+  "terminalCommandId": "tool-a5d7c5eb-c634-4e88-9de0-cc09a3de9360",
+  "commandLine": {
+    "original": "git show --stat 8085240e",
+    "toolEdited": " git show --stat 8085240e"
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;/^git(\\s+(-C\\s+\\S+|--no-pager))*\\s+show\\b/ (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579612954,
+    "duration": 6
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-a5d7c5eb-c634-4e88-9de0-cc09a3de9360"
+  },
+  "terminalCommandOutput": {
+    "text": "\u001b[33mcommit 8085240e81670e7a21f252d1d1f120404bcb0167\r\n\u001b[0mAuthor: GitHub Copilot &lt;copilot@example.com&gt;\r\nDate:   Tue Jan 13 12:54:03 2026 +0000\r\n\r\n    feat: Align chart text style and filter integrations\r\n\r\n pages/Espace Test.py | 5 \u001b[32m++++\u001b[31m-\r\n\u001b[0m 1 file changed, 4 insertions(+), 1 deletion(-)",
+    "lineCount": 8
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "d7231058-9896-49ab-aa6b-333216bbe548",
+  "terminalCommandId": "tool-256ba8db-eb09-4146-a871-06630aacb3d2",
+  "commandLine": {
+    "original": "git cherry-pick 60e5037e",
+    "toolEdited": " git cherry-pick 60e5037e"
+  },
+  "language": "sh",
+  "terminalCommandState": {
+    "exitCode": 1,
+    "timestamp": 1768579620771,
+    "duration": 17
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-256ba8db-eb09-4146-a871-06630aacb3d2"
+  },
+  "terminalCommandOutput": {
+    "text": "Auto-merging pages/Espace Test.py\r\nCONFLICT (content): Merge conflict in pages/Espace Test.py\r\nerror: could not apply 60e5037e... feat: Align chart text style and filter integrations\r\n\u001b[33mhint: After resolving the conflicts, mark them with\r\nhint: \"git add/rm &lt;pathspec&gt;\", then run\r\nhint: \"git cherry-pick --continue\".\r\nhint: You can instead skip this commit with \"git cherry-pick --skip\".\r\nhint: To abort and get back to the state before \"git cherry-pick\",\r\nhint: run \"git cherry-pick --abort\".\r\nhint: Disable this message with \"git config set advice.mergeConflict false\"\u001b[0m",
+    "lineCount": 10
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 4
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "6a64995a-f318-47a0-a6d0-b628fde1229e",
+  "terminalCommandId": "tool-917df79e-098a-4992-95f2-1527c4eea0ba",
+  "commandLine": {
+    "original": "grep -n \"&lt;&lt;&lt;&lt;&lt;&lt;&lt;\" \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " grep -n \"&lt;&lt;&lt;&lt;&lt;&lt;&lt;\" \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;grep (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579626100,
+    "duration": 0
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-917df79e-098a-4992-95f2-1527c4eea0ba"
+  },
+  "terminalCommandOutput": {
+    "text": "4593:&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD",
+    "lineCount": 1
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#4580-4580), lines 4580 to 4620</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#4580-4580), lines 4580 to 4620
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "aebfb579-fb4a-4dde-b447-8dd5f989ef43",
+  "terminalCommandId": "tool-a9687f75-8f68-4f73-bda4-d867617a0b78",
+  "commandLine": {
+    "original": "grep -C 5 \"&lt;&lt;&lt;&lt;&lt;&lt;&lt;\" \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " grep -C 5 \"&lt;&lt;&lt;&lt;&lt;&lt;&lt;\" \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;grep (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579634786,
+    "duration": 2
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-a9687f75-8f68-4f73-bda4-d867617a0b78"
+  },
+  "terminalCommandOutput": {
+    "text": "            int_filters = create_integration_filters(df_recrutement, \"integrations\")\r\n            create_integrations_tab(df_recrutement, int_filters)\r\n        else:\r\n            st.warning(\"📊 Aucune donnée disponible pour les intégrations. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.\")\r\n\r\n&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD\r\n=======\r\n    with tabs[4]:\r\n        st.header(\"📖 Méthodologie du Reporting\")\r\n        st.markdown(\"\"\"\r\n        - **Besoins en cours par entité** : calculés à partir des demandes validées par la DRH. Les postes \"en cours\" sont soit déterminés par le statut &#96;En cours&#96;, soit par la formule (postes avant + nouveaux - pourvus) si les dates manquent.",
+    "lineCount": 14
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "e4ac0ec3-88da-46f9-a124-cff803d4a7de",
+  "terminalCommandId": "tool-d7aeed83-559c-40f9-9f74-7a7b6af6a453",
+  "commandLine": {
+    "original": "sed -n '4930,4960p' \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " sed -n '4930,4960p' \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579651978,
+    "duration": 0
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-d7aeed83-559c-40f9-9f74-7a7b6af6a453"
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 4
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "41496f59-c6fb-46b6-a000-00d6966622a4",
+  "terminalCommandId": "tool-4c45beb5-d665-4a10-ab30-b7d8f14251b0",
+  "commandLine": {
+    "original": "sed -n '4580,4650p' \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " sed -n '4580,4650p' \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579658329,
+    "duration": 10
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-4c45beb5-d665-4a10-ab30-b7d8f14251b0"
+  },
+  "terminalCommandOutput": {
+    "text": "    with tabs[2]:\r\n        create_weekly_report_tab(df_recrutement)\r\n\r\n    with tabs[3]:\r\n        # Onglet Intégrations basé sur les données Excel\r\n        if df_recrutement is not None:\r\n            # Créer les filtres spécifiques pour les intégrations (sans période)\r\n            st.sidebar.subheader(\"🔧 Filtres - Intégrations\")\r\n            int_filters = create_integration_filters(df_recrutement, \"integrations\")\r\n            create_integrations_tab(df_recrutement, int_filters)\r\n        else:\r\n            st.warning(\"📊 Aucune donnée disponible pour les intégrations. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.\")\r\n\r\n&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD\r\n=======\r\n    with tabs[4]:\r\n        st.header(\"📖 Méthodologie du Reporting\")\r\n        st.markdown(\"\"\"\r\n        - **Besoins en cours par entité** : calculés à partir des demandes validées par la DRH. Les postes \"en cours\" sont soit déterminés par le statut &#96;En cours&#96;, soit par la formule (postes avant + nouveaux - pourvus) si les dates manquent.\r\n        - **Recrutements en cours par recruteur** : tableau pivot par &#96;Colonne TG Hire&#96; (Sourcing, Shortlisté, Signature DRH, Clôture). La colonne affichée **\"Total (sans clôture)\"** est calculée pour chaque recruteur comme : &#96;Sourcing + Shortlisté + Signature DRH - Clôture&#96; (valeur minimale 0).\r\n        - **Comparaison par direction / poste / raison** : histogrammes basés sur les valeurs de colonnes &#96;Direction concernée&#96;, &#96;Poste demandé&#96; et &#96;Raison du recrutement&#96;. Les étiquettes affichent les totaux par catégorie (valeurs affichées en gras et couleur claire pour lisibilité).\r\n        - **Évolution des demandes / intégrations** : bar charts mensuels agrégés par date (date de réception de la demande ou date d'entrée prévue). Les valeurs sont intégrées dans les barres (au lieu d'être placées au-dessus) pour éviter qu'elles soient coupées.\r\n        - **Nombre de candidats présélectionnés** : somme des valeurs numériques de la colonne &#96;Nb de candidats pré-selectionnés&#96; (valeurs non numériques traitées comme 0). Le libellé est affiché à gauche du graphique pour éviter l'étiquette centrale indésirable.\r\n        - **Délai de recrutement** : calculé comme la différence en jours entre &#96;Date d'entrée effective du candidat&#96; et &#96;Date de réception de la demande après validation de la DRH&#96;. Affiché dans le debug \"Recrutements Clôturés\".\r\n        - **Intégrations — explication du signal \"⚠️ En retard\"** : une intégration est considérée en retard si la &#96;Date d'entrée prévisionnelle&#96; est antérieure à la date de reporting (aujourd'hui ou &#96;reporting_date&#96; sélectionnée). Le compteur &#96;En retard&#96; regroupe ces cas pour vous alerter.\r\n        - **KPIs hebdomadaires** : fenêtre de calcul basée sur la &#96;reporting_date&#96; (Semaine précédente : Lundi-&gt;Vendredi). Les métriques &#96;avant&#96;, &#96;nouveaux&#96;, &#96;pourvus&#96;, &#96;en_cours&#96; sont calculées avec des règles décrites dans le debug (onglet Debug) et sont utilisées pour fabriquer le tableau \"Besoins en Cours par Entité\".\r\n        \"\"\", unsafe_allow_html=True)\r\n\r\n&gt;&gt;&gt;&gt;&gt;&gt;&gt; 60e5037e (feat: Align chart text style and filter integrations)\r\nif __name__ == \"__main__\":",
+    "lineCount": 48
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 4
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "8eec17be-58ee-4a83-abf7-b2d5b25f5f8e",
+  "terminalCommandId": "tool-361ce56e-e85a-485a-8fec-dc8726c0c669",
+  "commandLine": {
+    "original": "grep -n \"tabs =\" \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " grep -n \"tabs =\" \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;grep (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579663520,
+    "duration": 6
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-361ce56e-e85a-485a-8fec-dc8726c0c669"
+  },
+  "terminalCommandOutput": {
+    "text": "4297:    tabs = st.tabs([\"📂 Upload &amp; Téléchargement\", \"🗂️ Demandes &amp; Recrutement\", \"📅 Hebdomadaire\", \"🤝 Intégrations\"])",
+    "lineCount": 2
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "bf2e88d0-92b8-4dfd-aca5-cf9f691669a1",
+  "terminalCommandId": "tool-72ae6818-be87-4b22-b829-7d9ccfca4741",
+  "commandLine": {
+    "original": "git show 60e5037e:pages/Espace\\ Test.py | grep -n \"tabs =\"",
+    "toolEdited": " git show 60e5037e:pages/Espace\\ Test.py | grep -n \"tabs =\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rules [&#96;/^git(\\s+(-C\\s+\\S+|--no-pager))*\\s+show\\b/ (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\"), [&#96;grep (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579667535,
+    "duration": 2
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-72ae6818-be87-4b22-b829-7d9ccfca4741"
+  },
+  "terminalCommandOutput": {
+    "text": "4641:    tabs = st.tabs([\"📂 Upload &amp; Téléchargement\", \"🗂️ Demandes &amp; Recrutement\", \"📅 Hebdomadaire\", \"🤝 Intégrations\", \"📖 Méthodologie\"])",
+    "lineCount": 2
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "9aa0cd28-8005-4fbd-a42d-0b3d72418b44",
+  "terminalCommandId": "tool-d96174e6-387f-4219-88c2-5d4aaa4eff57",
+  "commandLine": {
+    "original": "grep -n \"&lt;&lt;&lt;&lt;&lt;&lt;&lt;\" \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " grep -n \"&lt;&lt;&lt;&lt;&lt;&lt;&lt;\" \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;grep (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579671716,
+    "duration": 0
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-d96174e6-387f-4219-88c2-5d4aaa4eff57"
+  },
+  "terminalCommandOutput": {
+    "text": "4593:&lt;&lt;&lt;&lt;&lt;&lt;&lt; HEAD",
+    "lineCount": 1
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "aeef1bed-f820-4599-8c46-95763f3d7f82",
+  "terminalCommandId": "tool-aa74b887-92e7-420c-8d00-5bb80bdb4094",
+  "commandLine": {
+    "original": "sed -n '4297p' \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " sed -n '4297p' \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579677169,
+    "duration": 14
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-aa74b887-92e7-420c-8d00-5bb80bdb4094"
+  },
+  "terminalCommandOutput": {
+    "text": "    tabs = st.tabs([\"📂 Upload &amp; Téléchargement\", \"🗂️ Demandes &amp; Recrutement\", \"📅 Hebdomadaire\", \"🤝 Intégrations\"])",
+    "lineCount": 2
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 4
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "b3b01dff-763a-429a-9c4d-8dd3cc3a610c",
+  "terminalCommandId": "tool-2aa36ec4-34b3-4e0c-8ea3-edc6d973e4ac",
+  "commandLine": {
+    "original": "git show 8085240e",
+    "toolEdited": " git show 8085240e"
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;/^git(\\s+(-C\\s+\\S+|--no-pager))*\\s+show\\b/ (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579685667,
+    "duration": 3
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-2aa36ec4-34b3-4e0c-8ea3-edc6d973e4ac"
+  },
+  "terminalCommandOutput": {
+    "text": "\u001b[33mcommit 8085240e81670e7a21f252d1d1f120404bcb0167\r\n\u001b[0mAuthor: GitHub Copilot &lt;copilot@example.com&gt;\r\nDate:   Tue Jan 13 12:54:03 2026 +0000\r\n\r\n    feat: Align chart text style and filter integrations\r\n\r\n\u001b[1mdiff --git a/pages/Espace Test.py b/pages/Espace Test.py\r\nindex 6f951d02..139d41c2 100755\r\n--- a/pages/Espace Test.py\r\n+++ b/pages/Espace Test.py\r\n\u001b[36;22m@@ -1317,10 +1317,13 @@\u001b[0m def create_integrations_tab(df_recrutement, global_filters):\r\n     ])\r\n     \r\n     # Critères : Statut \"En cours\" ET candidat avec nom\r\n\u001b[32m+    # Filtrer pour ne garder que les intégrations avec une date d'entrée prévisionnelle\r\n\u001b[0m     df_integrations = df_recrutement[\r\n         (df_recrutement['Statut de la demande'] == 'En cours') &amp;\r\n         (df_recrutement[candidat_col].notna()) &amp;\r\n\u001b[31m-        (df_recrutement[candidat_col].str.strip() != \"\")\r\n\u001b[32m+        (df_recrutement[candidat_col].str.strip() != \"\") &amp;\r\n+        (df_recrutement[date_integration_col].notna()) &amp;  # Ajout du filtre ici\r\n+        (df_recrutement[date_integration_col].astype(str).str.strip() != \"\")\r\n\u001b[0m     ].copy()\r\n     \r\n     # Message de diagnostic",
+    "lineCount": 25
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "72402c9d-41d3-4afb-ad7b-e18b03068a67",
+  "terminalCommandId": "tool-1e912f62-ab44-4ead-a1f4-70007610e8eb",
+  "commandLine": {
+    "original": "git show a1176e9e",
+    "toolEdited": " git show a1176e9e"
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;/^git(\\s+(-C\\s+\\S+|--no-pager))*\\s+show\\b/ (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579694170,
+    "duration": 2014
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-1e912f62-ab44-4ead-a1f4-70007610e8eb"
+  },
+  "terminalCommandOutput": {
+    "text": "\u001b[31m-        figs_row2.append(None)\r\n-    try:\r\n-        if 'Poste demandé' in df_cl.columns:\r\n-            poste_counts = df_cl['Poste demandé'].value_counts()\r\n-            dfp = poste_counts.rename_axis('Poste').reset_index(name='Count').sort_values('Count', ascending=False)\r\n-            dfp['Label'] = dfp['Poste']\r\n-            fig_poste = px.bar(dfp, x='Count', y='Label', title=\"Comparaison par poste\", text='Count', orientation='h')\r\n-            fig_poste.update_traces(marker_color='#2ca02c', textposition='inside', texttemplate='%{x}')\r\n-            fig_poste.update_layout(height=max(320, 24*len(dfp)), margin=dict(l=160,t=40,b=30,r=20), xaxis_title=None, yaxis_title=None)\r\n-            figs_row2.append(fig_poste)\r\n-    except Exception:\r\n-        figs_row2.append(None)\r\n-\r\n-    row1_imgs = [(_plotly_fig_to_pil(f, width=900, height=320) if f else None) for f in figs_row1]\r\n-    row2_imgs = [(_plotly_fig_to_pil(f, width=900, height=360) if f else None) for f in figs_row2]\r\n-\r\n-    kpis = [(\"Nombre de recrutements\", nb, \"#1f77b4\"), (\"Postes concernés\", postes_uniques, \"#2ca02c\"), (\"Directions concernées\", directions_uniques, \"#ff7f0e\"), (\"Délai moyen (jours)\", delai_display, \"#d62728\")]\r\n-    chart_rows = [row1_imgs, row2_imgs]\r\n-    return _compose_dashboard_image(\"🎯 RECRUTEMENTS CLÔTURÉS\", kpis, chart_rows, 'recrutements_clotures.png')\r\n-\r\n-def generate_integrations_html_image(df_recrutement):\r\n-    \"\"\"Compose an image with charts matching the Streamlit 'Intégrations' tab.\"\"\"\r\n-    df = df_recrutement.copy()\r\n-    candidat_col = \"Nom Prénom du candidat retenu yant accepté la promesse d'embauche\"\r\n-    date_integration_col = \"Date d'entrée prévisionnelle\"\r\n-    plan_integration_col = \"Plan d'intégration à préparer\"\r\n-    if 'Statut de la demande' in df.columns:\r\n-        df = df[df['Statut de la demande'] == 'En cours']\r\n-    if candidat_col in df.columns:\r\n-        df = df[(df[candidat_col].notna()) &amp; (df[candidat_col].astype(str).str.strip() != \"\")]\r\n-\r\n-    nb_int = len(df)\r\n-    a_preparer = 0\r\n-    if plan_integration_col in df.columns:\r\n-        try:\r\n-            a_preparer = int((df[plan_integration_col].astype(str).str.lower() == 'oui').sum())\r\n-        except Exception:\r\n-            a_preparer = 0\r\n-    en_retard = 0\r\n-    if date_integration_col in df.columns:\r\n-        try:\r\n-            s = pd.to_datetime(df[date_integration_col], errors='coerce')\r\n-            reporting_date = st.session_state.get('reporting_date', datetime.now().date())\r\n-            today = reporting_date if isinstance(reporting_date, datetime) else datetime.combine(reporting_date, datetime.min.time())\r\n-            en_retard = int(((s.notna()) &amp; (s &lt; today)).sum())\r\n-        except Exception:\r\n-            en_retard = 0\r\n-\r\n-    import plotly.express as px\r\n-    # Row1: affectation pie + monthly bar\r\n-    figs_row1 = []\r\n-    try:\r\n-        if 'Affectation' in df.columns:\r\n-            affect_counts = df['Affectation'].value_counts().head(10)\r\n-            fig_aff = px.pie(values=affect_counts.values, names=affect_counts.index, title=\"Répartition par Affectation\")\r\n-            fig_aff.update_traces(textposition='inside', textinfo='percent+label')\r\n-            fig_aff.update_layout(height=360, margin=dict(l=20,r=20,t=40,b=10))\r\n-            figs_row1.append(fig_aff)\r\n-    except Exception:\r\n-        figs_row1.append(None)\r\n-    try:\r\n-        if date_integration_col in df.columns:\r\n-            s = pd.to_datetime(df[date_integration_col], errors='coerce')\r\n-            monthly = s.dt.to_period('M').value_counts().sort_index().rename_axis('Mois').reset_index(name='Count')\r\n-            monthly['Label'] = monthly['Mois'].astype(str)\r\n-            fig_month = px.bar(monthly, x='Label', y='Count', title=\"Évolution des Intégrations Prévues\", text='Count')\r\n-            fig_month.update_traces(marker_color='#2ca02c', textposition='outside')\r\n-            fig_month.update_layout(height=360, margin=dict(l=20,r=20,t=40,b=10), xaxis_title=None, yaxis_title=None)\r\n-            figs_row1.append(fig_month)\r\n-    except Exception:\r\n-        figs_row1.append(None)\r\n-\r\n-    row1_imgs = [(_plotly_fig_to_pil(f, width=900, height=360) if f else None) for f in figs_row1]\r\n-    kpis = [(\"Intégrations en cours\", nb_int, \"#1f77b4\"), (\"Plan d'intégration à préparer\", a_preparer, \"#ff7f0e\"), (\"En retard\", en_retard, \"#d62728\")]\r\n-    chart_rows = [row1_imgs]\r\n-    return _compose_dashboard_image(\"📊 Intégrations\", kpis, chart_rows, 'integrations.png')\r\n-def generate_powerpoint_report(df_recrutement, template_path=\"MASQUE PPT TGCC (2).pptx\"):\r\n-    \"\"\"\r\n-    Génère un rapport PowerPoint à partir d'un template en remplaçant les placeholders\r\n-    par les graphiques et tableaux générés.\r\n-    \r\n-    Returns: BytesIO contenant le fichier PowerPoint généré\r\n-    \"\"\"\r\n-    try:\r\n-        from pptx.util import Inches, Pt\r\n-        from pptx.enum.text import PP_ALIGN\r\n-        from pptx.dml.color import RGBColor\r\n-        from pptx.shapes.base import BaseShape\r\n-        \r\n-        # Charger le template\r\n-        prs = Presentation(template_path)\r\n-        \r\n-        # Préparer les données pour les placeholders\r\n-        # Calculer les métriques hebdomadaires\r\n-        weekly_metrics = calculate_weekly_metrics(df_recrutement)\r\n-        \r\n-        # Debug: afficher les informations sur weekly_metrics\r\n-        if weekly_metrics:\r\n-            st.info(f\"✅ Métriques hebdomadaires calculées: {len(weekly_metrics.get('table_data', []))} lignes\")\r\n-        else:\r\n-            st.warning(\"⚠️ Métriques hebdomadaires vides, le PowerPoint sera généré avec des données limitées.\")\r\n-        \r\n-        # Générer les images HTML avec logos (utilise html2image + Chromium)\r\n-        st.info(\"📊 Génération des images avec les visualisations Streamlit...\")\r\n-        table_image_path = generate_table_html_image(weekly_metrics) if weekly_metrics else None\r\n-        \r\n-        # Obtenir la date de reporting pour le filtre Clôture/Désistement\r\n-        from datetime import datetime, timedelta\r\n-        reporting_date = st.session_state.get('reporting_date', datetime.now().date())\r\n-        if isinstance(reporting_date, str):\r\n-            reporting_date = pd.to_datetime(reporting_date).date()\r\n-        \r\n-        # Calculer la fenêtre de dates (semaine précédente + courante)\r\n-        current_week_monday = datetime(year=reporting_date.year, month=reporting_date.month, day=reporting_date.day) - timedelta(days=reporting_date.weekday())\r\n-        start_filter = current_week_monday - timedelta(days=7)  # Lundi précédent\r\n-        end_filter = current_week_monday + timedelta(days=6)    # Dimanche courant\r\n-        \r\n-        st.info(f\"📅 Période de filtrage Clôture/Désistement: {start_filter.date()} au {end_filter.date()}\")\r\n-        \r\n-        # Générer une image par statut Kanban\r\n-        statuts = [\"Sourcing\", \"Shortlisté\", \"Signature DRH\", \"Clôture\", \"Désistement\"]\r\n-        kanban_images = {}\r\n-        \r\n-        for statut in statuts:\r\n-            st.info(f\"🔄 Génération de l'image pour {statut}...\")\r\n-            \r\n-            # Pour Clôture et Désistement, appliquer le filtre de date\r\n-            if statut == \"Clôture\":\r\n-                # Trouver la colonne de date d'acceptation\r\n-                accept_col = None\r\n-                for col_name in df_recrutement.columns:\r\n-                    if \"date\" in col_name.lower() and (\"accept\" in col_name.lower() or \"promesse\" in col_name.lower()):\r\n-                        accept_col = col_name\r\n-                        break\r\n-                \r\n-                if accept_col:\r\n-                    df_filtered = df_recrutement[\r\n-                        (df_recrutement['Colonne TG Hire'] == 'Clôture')\r\n-                    ].copy()\r\n-                    # Filtrer par date\r\n-                    df_filtered[accept_col] = pd.to_datetime(df_filtered[accept_col], errors='coerce')\r\n-                    df_filtered = df_filtered[\r\n-                        (df_filtered[accept_col].dt.date &gt;= start_filter.date()) &amp;\r\n-                        (df_filtered[accept_col].dt.date &lt;= end_filter.date())\r\n-                    ]\r\n-                    st.info(f\"📅 Clôture filtrée: {len(df_filtered)} postes (colonne: {accept_col})\")\r\n-                else:\r\n-                    df_filtered = df_recrutement[df_recrutement['Colonne TG Hire'] == 'Clôture'].copy()\r\n-                    st.warning(f\"⚠️ Colonne date d'acceptation non trouvée, affichage de tous les {len(df_filtered)} postes clôturés\")\r\n-                \r\n-                kanban_images[statut] = generate_kanban_statut_image(df_filtered, statut, max_cards=100)\r\n-                \r\n-            elif statut == \"Désistement\":\r\n-                # Trouver la colonne de date de désistement\r\n-                desist_col = None\r\n-                for col_name in df_recrutement.columns:\r\n-                    if \"date\" in col_name.lower() and \"désist\" in col_name.lower():\r\n-                        desist_col = col_name\r\n-                        break\r\n-                \r\n-                if desist_col:\r\n-                    df_filtered = df_recrutement[\r\n-                        (df_recrutement['Colonne TG Hire'] == 'Désistement')\r\n-                    ].copy()\r\n-                    # Filtrer par date\r\n-                    df_filtered[desist_col] = pd.to_datetime(df_filtered[desist_col], errors='coerce')\r\n-                    df_filtered = df_filtered[\r\n-                        (df_filtered[desist_col].dt.date &gt;= start_filter.date()) &amp;\r\n-                        (df_filtered[desist_col].dt.date &lt;= end_filter.date())\r\n-                    ]\r\n-                    st.info(f\"📅 Désistement filtré: {len(df_filtered)} postes (colonne: {desist_col})\")\r\n-                else:\r\n-                    df_filtered = df_recrutement[df_recrutement['Colonne TG Hire'] == 'Désistement'].copy()\r\n-                    st.warning(f\"⚠️ Colonne date désistement non trouvée, affichage de tous les {len(df_filtered)} désistements\")\r\n-                # Toujours générer une image même si aucune donnée\r\n-                img_path_desist = generate_kanban_statut_image(df_filtered, statut, max_cards=100)\r\n-                if not img_path_desist or not os.path.exists(img_path_desist):\r\n-                    # Placeholder image\r\n-                    try:\r\n-                        from PIL import Image, ImageDraw, ImageFont\r\n-                        import tempfile\r\n-                        width, height = 1920, 1080\r\n-                        img = Image.new('RGB',(width,height),'white')\r\n-                        d = ImageDraw.Draw(img)\r\n-                        try:\r\n-                            f_title = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 42)\r\n-                            f_text = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 20)\r\n-                        except:\r\n-                            f_title = ImageFont.load_default(); f_text = ImageFont.load_default()\r\n-                        d.text((width//2, 80), 'Désistement (0 poste)', fill='#9C182F', font=f_title, anchor='mm')\r\n-                        d.text((width//2, height//2), 'Aucune donnée pour cette période', fill='#666666', font=f_text, anchor='mm')\r\n-                        ph_path = os.path.join(tempfile.gettempdir(),'desistement_empty.png')\r\n-                        img.save(ph_path)\r\n-                        kanban_images[statut] = ph_path\r\n-                    except Exception:\r\n-                        kanban_images[statut] = img_path_desist\r\n-                else:\r\n-                    kanban_images[statut] = img_path_desist\r\n-            else:\r\n-                # Pour les autres statuts, pas de filtre de date\r\n-                kanban_images[statut] = generate_kanban_statut_image(df_recrutement, statut, max_cards=100)\r\n-        \r\n-        # Debug: Vérifier les chemins des images\r\n-        if table_image_path and os.path.exists(table_image_path):\r\n-            st.success(f\"✅ Image tableau générée: {os.path.basename(table_image_path)}\")\r\n-        else:\r\n-            st.warning(\"⚠️ Échec génération image tableau\")\r\n-        \r\n-        # Vérifier les images Kanban\r\n-        for statut, img_path in kanban_images.items():\r\n-            if img_path and os.path.exists(img_path):\r\n-                st.success(f\"✅ Image {statut} générée: {os.path.basename(img_path)}\")\r\n-            else:\r\n-                st.warning(f\"⚠️ Échec génération image {statut}\")\r\n-\r\n-        # Générer les deux slides supplémentaires: Demandes de Recrutement et Recrutements Clôturés\r\n-        st.info(\"🧩 Génération des images pour DEMANDES DE RECRUTEMENT et RECRUTEMENTS CLÔTURÉS...\")\r\n-        demandes_img = generate_demandes_recrutement_html_image(df_recrutement)\r\n-        clotures_img = generate_recrutements_clotures_html_image(df_recrutement)\r\n-        \r\n-        # Parcourir chaque slide et remplacer les placeholders\r\n-        for slide_idx, slide in enumerate(prs.slides):\r\n-            st.info(f\"📄 Traitement de la slide {slide_idx + 1}/{len(prs.slides)}\")\r\n-            shapes_to_remove = []\r\n-            \r\n-            # Debug: lister tous les shapes avec texte\r\n-            text_shapes = []\r\n-            for shape in slide.shapes:\r\n-                shape_text = getattr(shape, \"text\", None)\r\n-                if shape_text and shape_text.strip():\r\n-                    text_shapes.append(shape_text[:100])  # Premier 100 chars\r\n-            \r\n-            if text_shapes:\r\n-                st.code(f\"Slide {slide_idx + 1} - Shapes avec texte:\\n\" + \"\\n\".join([f\"  - {t}\" for t in text_shapes]))\r\n-            \r\n-            for shape in slide.shapes:\r\n-                # Utiliser getattr pour éviter les erreurs Pylance\r\n-                shape_text = getattr(shape, \"text\", None)\r\n-                if shape_text is None:\r\n-                    continue\r\n-                    \r\n-                # Tableau des besoins par entité - Insérer l'image\r\n-                if \"{{TABLEAU_BESOINS_ENTITES}}\" in shape_text:\r\n-                    st.info(f\"🔍 Placeholder {{{{TABLEAU_BESOINS_ENTITES}}}} trouvé dans slide {slide_idx + 1}\")\r\n-                    try:\r\n-                        # Récupérer la position et taille du shape original\r\n-                        left = shape.left\r\n-                        top = shape.top\r\n-                        width = shape.width\r\n-                        height = shape.height\r\n-                        \r\n-                        st.info(f\"📐 Position Tableau: left={left}, top={top}, width={width}, height={height}\")\r\n-                        \r\n-                        # Marquer le shape pour suppression\r\n-                        shapes_to_remove.append(shape)\r\n-                        \r\n-                        # Insérer l'image du tableau si elle existe (en grand format)\r\n-                        if table_image_path and os.path.exists(table_image_path):\r\n-                            # Utiliser toute la largeur de la slide pour une meilleure visibilité\r\n-                            slide_width = prs.slide_width\r\n-                            slide_height = prs.slide_height\r\n-                            # Positionner l'image en laissant des marges\r\n-                            img_left = Inches(0.5)\r\n-                            img_top = Inches(1.5)\r\n-                            # Calculer dimensions avec vérification\r\n-                            if slide_width and slide_height:\r\n-                                img_width = Inches((slide_width.inches if hasattr(slide_width, 'inches') else slide_width / 914400) - 1)\r\n-                                img_height = Inches((slide_height.inches if hasattr(slide_height, 'inches') else slide_height / 914400) - 2.5)\r\n-                                slide.shapes.add_picture(table_image_path, img_left, img_top, width=img_width, height=img_height)\r\n-                            else:\r\n-                                slide.shapes.add_picture(table_image_path, img_left, img_top)\r\n-                            st.success(f\"✅ Image tableau insérée dans slide {slide_idx + 1} (dimensions optimisées)\")\r\n-                        else:\r\n-                            st.error(f\"❌ Image tableau non trouvée: {table_image_path}\")\r\n-                            # Fallback: ajouter un message d'erreur\r\n-                            txBox = slide.shapes.add_textbox(left, top, width, height)\r\n-                            text_frame = txBox.text_frame\r\n-                            p = text_frame.paragraphs[0]\r\n-                            p.text = \"Erreur: Impossible de générer l'image du tableau\"\r\n-                            p.font.size = Pt(14)\r\n-                    except Exception as e:\r\n-                        st.error(f\"❌ Erreur lors de l'insertion du tableau: {e}\")\r\n-                        import traceback\r\n-                        st.code(traceback.format_exc())\r\n-                \r\n-                # Métrique total postes - Créer 5 slides Kanban (une par statut) dans l'ordre souhaité\r\n-                elif \"{{METRIC_TOTAL_POSTES}}\" in shape_text:\r\n-                    st.info(f\"🔍 Placeholder {{{{METRIC_TOTAL_POSTES}}}} trouvé dans slide {slide_idx + 1}\")\r\n-                    st.info(\"📋 Création de 5 slides Kanban (une par statut) dans l'ordre: Sourcing, Shortlisté, Signature DRH, Clôture, Désistement...\")\r\n-                    try:\r\n-                        # Marquer le shape pour suppression\r\n-                        shapes_to_remove.append(shape)\r\n-                        \r\n-                        # Pour chaque statut, insérer l'image dans cette slide ou créer de nouvelles slides\r\n-                        # On va insérer toutes les images Kanban après cette slide\r\n-                        # Pour l'instant, on insère juste la première dans la slide actuelle\r\n-                        \r\n-                        # Récupérer les dimensions de slide pour positionnement\r\n-                        slide_width = prs.slide_width\r\n-                        slide_height = prs.slide_height\r\n-                        img_left = Inches(0.5)\r\n-                        img_top = Inches(1.5)\r\n-                        \r\n-                        # Calculer dimensions avec vérification\r\n-                        if slide_width and slide_height:\r\n-                            img_width = Inches((slide_width.inches if hasattr(slide_width, 'inches') else slide_width / 914400) - 1)\r\n-                            img_height = Inches((slide_height.inches if hasattr(slide_height, 'inches') else slide_height / 914400) - 2.5)\r\n-                        else:\r\n-                            img_width = Inches(9)\r\n-                            img_height = Inches(6)\r\n-                        \r\n-                        # Insérer les 5 images Kanban dans des slides séparées selon l'ordre demandé\r\n-                        ordered_status = [\"Sourcing\", \"Shortlisté\", \"Signature DRH\", \"Clôture\", \"Désistement\"]\r\n-                        for statut in ordered_status:\r\n-                            img_path = kanban_images.get(statut)\r\n-                            # Créer une nouvelle slide pour chaque statut (ne pas utiliser la slide actuelle)\r\n-                            new_slide = prs.slides.add_slide(slide.slide_layout)\r\n-                            # Titre de la slide: nom du statut\r\n-                            if hasattr(new_slide.shapes, 'title') and new_slide.shapes.title:\r\n-                                new_slide.shapes.title.text = f\"Kanban - {statut}\"\r\n-                            # Insérer l'image\r\n-                            if img_path and os.path.exists(img_path):\r\n-                                new_slide.shapes.add_picture(img_path, img_left, img_top, width=img_width, height=img_height)\r\n-                                st.success(f\"✅ Slide insérée pour {statut}\")\r\n-                            else:\r\n-                                st.warning(f\"⚠️ Image {statut} non trouvée\")\r\n-\r\n-                        # Ajouter juste après Désistement: DEMANDES DE RECRUTEMENT puis RECRUTEMENTS CLÔTURÉS, puis INTÉGRATIONS\r\n-                        if demandes_img and os.path.exists(demandes_img):\r\n-                            slide_dem = prs.slides.add_slide(slide.slide_layout)\r\n-                            if hasattr(slide_dem.shapes, 'title') and slide_dem.shapes.title:\r\n-                                slide_dem.shapes.title.text = \"📋 DEMANDES DE RECRUTEMENT\"\r\n-                            slide_dem.shapes.add_picture(demandes_img, img_left, img_top, width=img_width, height=img_height)\r\n-                            st.success(\"✅ Slide ajoutée: DEMANDES DE RECRUTEMENT\")\r\n-                        else:\r\n-                            st.warning(\"⚠️ Image DEMANDES DE RECRUTEMENT non trouvée\")\r\n-\r\n-                        if clotures_img and os.path.exists(clotures_img):\r\n-                            slide_clo = prs.slides.add_slide(slide.slide_layout)\r\n-                            if hasattr(slide_clo.shapes, 'title') and slide_clo.shapes.title:\r\n-                                slide_clo.shapes.title.text = \"🎯 RECRUTEMENTS CLÔTURÉS\"\r\n-                            slide_clo.shapes.add_picture(clotures_img, img_left, img_top, width=img_width, height=img_height)\r\n-                            st.success(\"✅ Slide ajoutée: RECRUTEMENTS CLÔTURÉS\")\r\n-                        else:\r\n-                            st.warning(\"⚠️ Image RECRUTEMENTS CLÔTURÉS non trouvée\")\r\n-\r\n-                        # Intégrations\r\n-                        integrations_img = generate_integrations_html_image(df_recrutement)\r\n-                        if integrations_img and os.path.exists(integrations_img):\r\n-                            slide_int = prs.slides.add_slide(slide.slide_layout)\r\n-                            if hasattr(slide_int.shapes, 'title') and slide_int.shapes.title:\r\n-                                slide_int.shapes.title.text = \"📊 Intégrations\"\r\n-                            slide_int.shapes.add_picture(integrations_img, img_left, img_top, width=img_width, height=img_height)\r\n-                            st.success(\"✅ Slide ajoutée: Intégrations\")\r\n-                        else:\r\n-                            st.warning(\"⚠️ Image Intégrations non trouvée\")\r\n-                        \r\n-                    except Exception as e:\r\n-                        st.error(f\"❌ Erreur lors de l'insertion des Kanban: {e}\")\r\n-                        import traceback\r\n-                        st.code(traceback.format_exc())\r\n-                \r\n-                # Graphiques Plotly - on peut ajouter d'autres placeholders ici\r\n-                elif \"{{GRAPH_\" in shape_text:\r\n-                    placeholder = shape_text.strip()\r\n-                    text_frame = getattr(shape, \"text_frame\", None)\r\n-                    if text_frame:\r\n-                        text_frame.clear()\r\n-                        p = text_frame.paragraphs[0] if text_frame.paragraphs else text_frame.add_paragraph()\r\n-                        p.text = f\"Graphique {placeholder} (à venir)\"\r\n-                        p.font.size = Pt(12)\r\n-            \r\n-            # Supprimer les shapes marqués (après la boucle pour éviter les problèmes d'itération)\r\n-            for shape in shapes_to_remove:\r\n-                sp = shape.element\r\n-                sp.getparent().remove(sp)\r\n-        \r\n-        # Nettoyer les fichiers temporaires\r\n-        if table_image_path and os.path.exists(table_image_path):\r\n-            try:\r\n-                os.remove(table_image_path)\r\n-            except:\r\n-                pass\r\n-        \r\n-        # Nettoyer les images Kanban temporaires\r\n-        for img_path in kanban_images.values():\r\n-            if img_path and os.path.exists(img_path):\r\n-                try:\r\n-                    os.remove(img_path)\r\n-                except:\r\n-                    pass\r\n-\r\n-        # Nettoyer les images supplémentaires\r\n-        for extra in [demandes_img, clotures_img, integrations_img]:\r\n-            try:\r\n-                if extra and os.path.exists(extra):\r\n-                    os.remove(extra)\r\n-            except:\r\n-                pass\r\n-        \r\n-        # Sauvegarder le PowerPoint modifié dans un BytesIO\r\n-        ppt_bytes = BytesIO()\r\n-        prs.save(ppt_bytes)\r\n-        ppt_bytes.seek(0)\r\n-        \r\n-        return ppt_bytes\r\n-    \r\n-    except Exception as e:\r\n-        st.error(f\"Erreur lors de la génération du PowerPoint: {e}\")\r\n-        return None\r\n-\r\n-\r\n-def main():\r\n-    st.title(\"📊 Tableau de Bord RH\")\r\n-    st.markdown(\"---\")\r\n-    # Date de reporting : permet de fixer la date de référence pour tous les calculs\r\n-    if 'reporting_date' not in st.session_state:\r\n-        # default to today's date\r\n-        st.session_state['reporting_date'] = datetime.now().date()\r\n-\r\n-    with st.sidebar:\r\n-        st.subheader(\"🔧 Filtres - Hebdomadaire\")\r\n-        # Ensure the session value is a plain date object Streamlit expects.\r\n-        # Protect against cases where session_state may contain a str or pd.Timestamp\r\n-        rd_val = st.session_state.get('reporting_date', None)\r\n-        if rd_val is not None:\r\n-            try:\r\n-                # pandas Timestamp or datetime -&gt; date\r\n-                import pandas as _pd\r\n-                if isinstance(rd_val, _pd.Timestamp):\r\n-                    st.session_state['reporting_date'] = rd_val.date()\r\n-                elif hasattr(rd_val, 'date') and not isinstance(rd_val, str):\r\n-                    # datetime -&gt; date (leave date as-is)\r\n-                    try:\r\n-                        st.session_state['reporting_date'] = rd_val.date()\r\n-                    except Exception:\r\n-                        pass\r\n-                elif isinstance(rd_val, str):\r\n-                    # try parsing common formats\r\n-                    from dateutil import parser as _parser\r\n-                    try:\r\n-                        parsed = _parser.parse(rd_val)\r\n-                        st.session_state['reporting_date'] = parsed.date()\r\n-                    except Exception:\r\n-                        # fallback: keep original (Streamlit will raise if invalid)\r\n-                        pass\r\n-            except Exception:\r\n-                # If pandas isn't available or any unexpected issue, ignore and let Streamlit handle\r\n-                pass\r\n-        # Do not pass both &#96;value&#96; and &#96;key&#96; for the same widget to avoid Streamlit's\r\n-        # warning: the widget was created with a default value but also had its\r\n-        # value set via the Session State API. Passing &#96;key='reporting_date'&#96;\r\n-        # is enough for Streamlit to initialize the widget from\r\n-        # &#96;st.session_state['reporting_date']&#96;. Avoid providing &#96;value=&#96; here.\r\n-        rd = st.date_input(\r\n-            \"Date de reporting (hebdomadaire)\",\r\n-            help=\"Date utilisée comme référence pour le reporting hebdomadaire\",\r\n-            key='reporting_date',\r\n-            format='DD/MM/YYYY'\r\n-        )\r\n-    \r\n-    # Créer les onglets (Demandes et Recrutement regroupés)\r\n-    tabs = st.tabs([\"📂 Upload &amp; Téléchargement\", \"🗂️ Demandes &amp; Recrutement\", \"📅 Hebdomadaire\", \"🤝 Intégrations\"])\r\n-    \r\n-    # Variables pour stocker les fichiers uploadés\r\n-    # Use session_state to persist upload/refresh state\r\n-    if 'data_updated' not in st.session_state:\r\n-        st.session_state.data_updated = False\r\n-    if 'uploaded_excel' not in st.session_state:\r\n-        st.session_state.uploaded_excel = None\r\n-    uploaded_excel = st.session_state.uploaded_excel\r\n-    \r\n-    with tabs[0]:\r\n-        col1, col2 = st.columns(2)\r\n-\r\n-        with col1:\r\n-            st.subheader(\"🔗 Synchroniser depuis Google Sheets\")\r\n-            # Respecter la date de reporting si fournie dans st.session_state\r\n-            reporting_date = st.session_state.get('reporting_date', None)\r\n-            if reporting_date is None:\r\n-                today = datetime.now()\r\n-            else:\r\n-                # reporting_date is a date object from st.date_input; convert to datetime\r\n-                if isinstance(reporting_date, datetime):\r\n-                    today = reporting_date\r\n-                else:\r\n-                    today = datetime.combine(reporting_date, datetime.min.time())\r\n-            start_of_month = today.replace(day=1)\r\n-            # valeur par défaut du Google Sheet (identique à celle utilisée précédemment)\r\n-            default_sheet = \"https://docs.google.com/spreadsheets/d/1hvghSMjcbdY8yNZOWqALBpgMdLWB5CxVJCDwEm6JULI/edit?gid=785271056#gid=785271056\"\r\n-            gs_url = st.text_input(\"URL Google Sheet\", value=default_sheet, key=\"gsheet_url\")\r\n-            \r\n-            if 'synced_recrutement_df' not in st.session_state:\r\n-                st.session_state.synced_recrutement_df = None\r\n-            \r\n-            if st.button(\"🔁 Synchroniser depuis Google Sheets\", \r\n-                        help=\"Synchroniser les données depuis Google Sheets\",\r\n-                        width=\"stretch\"):\r\n-                \r\n-                try:\r\n-                    # Utiliser la fonction de connexion automatique (comme dans Home.py)\r\n-                    df_synced = load_data_from_google_sheets(gs_url)\r\n-                    \r\n-                    if df_synced is not None and len(df_synced) &gt; 0:\r\n-                        st.session_state.synced_recrutement_df = df_synced\r\n-                        st.session_state.data_updated = True\r\n-                        nb_lignes = len(df_synced)\r\n-                        nb_colonnes = len(df_synced.columns)\r\n-                        st.success(f\"✅ Synchronisation Google Sheets réussie ! Les onglets ont été mis à jour. ({nb_lignes} lignes, {nb_colonnes} colonnes)\")\r\n-                    else:\r\n-                        st.warning(\"⚠️ Aucune donnée trouvée dans la feuille Google Sheets.\")\r\n-                        \r\n-                except Exception as e:\r\n-                    err_str = str(e)\r\n-                    st.error(f\"Erreur lors de la synchronisation: {err_str}\")\r\n-                    \r\n-                    if '401' in err_str or 'Unauthorized' in err_str or 'HTTP Error 401' in err_str:\r\n-                        st.error(\"❌ **Feuille Google privée** - Vérifiez que:\")\r\n-                        st.markdown(\"\"\"\r\n-                        1. La feuille est partagée avec: &#96;your-service-account@your-project.iam.gserviceaccount.com&#96;\r\n-                        2. Les secrets Streamlit sont correctement configurés\r\n-                        3. L'URL de la feuille est correcte\r\n-                        \"\"\")\r\n-                    elif 'secrets' in err_str.lower():\r\n-                        st.error(\"❌ **Configuration des secrets manquante**\")\r\n-                        st.markdown(\"\"\"\r\n-                        Assurez-vous que les secrets suivants sont configurés:\r\n-                        - &#96;GCP_TYPE&#96;, &#96;GCP_PROJECT_ID&#96;, &#96;GCP_PRIVATE_KEY_ID&#96;\r\n-                        - &#96;GCP_PRIVATE_KEY&#96;, &#96;GCP_CLIENT_EMAIL&#96;, &#96;GCP_CLIENT_ID&#96;\r\n-                        - &#96;GCP_AUTH_URI&#96;, &#96;GCP_TOKEN_URI&#96;, etc.\r\n-                        \"\"\")\r\n-                    else:\r\n-                        st.error(f\"Erreur technique: {err_str}\")\r\n-\r\n-        with col2:\r\n-            st.subheader(\"📊 Fichier Excel - Données de Recrutement\")\r\n-            uploaded_excel = st.file_uploader(\r\n-                \"Choisir le fichier Excel de recrutement\",\r\n-                type=['xlsx', 'xls'],\r\n-                help=\"Fichier Excel contenant les données de recrutement\",\r\n-                key=\"excel_uploader\"\r\n-            )\r\n-            \r\n-            if uploaded_excel is not None:\r\n-                # Aperçu des données\r\n-                try:\r\n-                    preview_excel = pd.read_excel(uploaded_excel, sheet_name=0)\r\n-                    st.success(f\"✅ Fichier Excel chargé: {uploaded_excel.name} - {len(preview_excel)} lignes, {len(preview_excel.columns)} colonnes\")\r\n-                    st.dataframe(preview_excel.head(3), width=\"stretch\")\r\n-                    # Reset file pointer for later use\r\n-                    uploaded_excel.seek(0)\r\n-                    st.session_state.uploaded_excel = uploaded_excel\r\n-                except Exception as e:\r\n-                    st.error(f\"Erreur lors de la lecture de l'Excel: {e}\")\r\n-        \r\n-        # Bouton pour actualiser les données - s'étale sur les deux colonnes\r\n-        st.markdown(\"---\")\r\n-        if st.button(\"🔄 Actualiser les Graphiques\", type=\"primary\", width=\"stretch\"):\r\n-            st.session_state.data_updated = True\r\n-            st.success(\"Données mises à jour ! Consultez les autres onglets.\")\r\n-    \r\n-    # Charger les données ICI (avant l'onglet Upload pour pouvoir les utiliser)\r\n-    df_integration, df_recrutement = load_data_from_files(None, uploaded_excel)\r\n-    \r\n-    # Continuer l'onglet Upload avec la section PowerPoint\r\n-    with tabs[0]:\r\n-        # Section de génération du PowerPoint\r\n-        st.markdown(\"---\")\r\n-        st.subheader(\"📥 Télécharger le Rapport PowerPoint\")\r\n-        \r\n-        col_ppt1, col_ppt2 = st.columns(2)\r\n-        \r\n-        with col_ppt1:\r\n-            st.info(\"📊 **Génération automatique de votre rapport PowerPoint**\")\r\n-            st.markdown(\"\"\"\r\n-            Le rapport PowerPoint inclura :\r\n-            - 📊 Tableau des besoins par entité (Hebdomadaire)\r\n-            - 📈 Métriques et statistiques\r\n-            - 📉 Graphiques de Demandes &amp; Recrutement\r\n-            - 🤝 Données d'Intégration\r\n-            \"\"\")\r\n-        \r\n-        with col_ppt2:\r\n-            # Vérifier que des données sont disponibles\r\n-            if df_recrutement is not None or st.session_state.get('synced_recrutement_df') is not None:\r\n-                # Option de format d'export\r\n-                export_format = st.radio(\r\n-                    \"Format d'export:\",\r\n-                    [\"PowerPoint (.pptx)\", \"PDF (.pdf)\"],\r\n-                    horizontal=True,\r\n-                    help=\"PDF recommandé pour une meilleure compatibilité avec Office 2010\"\r\n-                )\r\n-                \r\n-                if st.button(\"📥 Générer et Télécharger le Rapport\", type=\"primary\", width=\"stretch\"):\r\n-                    with st.spinner(\"Génération du rapport en cours...\"):\r\n-                        # Utiliser les données synchronisées si disponibles\r\n-                        data_to_use = st.session_state.get('synced_recrutement_df')\r\n-                        if data_to_use is None:\r\n-                            data_to_use = df_recrutement\r\n-                        \r\n-                        # Générer le PowerPoint\r\n-                        ppt_bytes = generate_powerpoint_report(data_to_use)\r\n-                        \r\n-                        if ppt_bytes:\r\n-                            # Générer un nom de fichier avec la date\r\n-                            today_str = datetime.now().strftime(\"%Y-%m-%d\")\r\n-                            \r\n-                            if export_format == \"PDF (.pdf)\":\r\n-                                # Convertir en PDF\r\n-                                try:\r\n-                                    from pptx import Presentation\r\n-                                    from pptx.enum.shapes import MSO_SHAPE_TYPE\r\n-                                    from reportlab.lib.pagesizes import A4, landscape\r\n-                                    from reportlab.pdfgen import canvas\r\n-                                    from reportlab.lib.utils import ImageReader\r\n-                                    from PIL import Image\r\n-                                    import io\r\n-                                    import tempfile\r\n-                                    \r\n-                                    st.info(\"📄 Conversion en PDF...\")\r\n-                                    \r\n-                                    # Charger le PPT depuis les bytes\r\n-                                    ppt_bytes.seek(0)\r\n-                                    prs = Presentation(ppt_bytes)\r\n-                                    \r\n-                                    # Créer un PDF\r\n-                                    pdf_buffer = io.BytesIO()\r\n-                                    c = canvas.Canvas(pdf_buffer, pagesize=landscape(A4))\r\n-                                    page_width, page_height = landscape(A4)\r\n-                                    \r\n-                                    # Pour chaque slide, extraire les images et les ajouter au PDF\r\n-                                    for slide_idx, slide in enumerate(prs.slides):\r\n-                                        # Ajouter un titre de page\r\n-                                        c.setFont(\"Helvetica-Bold\", 16)\r\n-                                        c.drawString(50, page_height - 40, f\"Slide {slide_idx + 1}\")\r\n-                                        \r\n-                                        # Extraire les images de la slide\r\n-                                        img_y = page_height - 80\r\n-                                        for shape in slide.shapes:\r\n-                                            try:\r\n-                                                # Extraire uniquement les images (pictures)\r\n-                                                if getattr(shape, \"shape_type\", None) == MSO_SHAPE_TYPE.PICTURE:\r\n-                                                    img_obj = getattr(shape, \"image\", None)\r\n-                                                    if img_obj is None:\r\n-                                                        continue\r\n-                                                    img_data = img_obj.blob\r\n-                                                    img = Image.open(io.BytesIO(img_data))\r\n-                                                    \r\n-                                                    # Redimensionner pour tenir dans la page\r\n-                                                    max_width = page_width - 100\r\n-                                                    max_height = page_height - 150\r\n-                                                    img_ratio = img.width / img.height\r\n-                                                    \r\n-                                                    if img.width &gt; max_width:\r\n-                                                        new_width = max_width\r\n-                                                        new_height = new_width / img_ratio\r\n-                                                    else:\r\n-                                                        new_width = img.width\r\n-                                                        new_height = img.height\r\n-                                                    \r\n-                                                    if new_height &gt; max_height:\r\n-                                                        new_height = max_height\r\n-                                                        new_width = new_height * img_ratio\r\n-                                                    \r\n-                                                    # Sauvegarder temporairement\r\n-                                                    temp_img = io.BytesIO()\r\n-                                                    img.save(temp_img, format='PNG')\r\n-                                                    temp_img.seek(0)\r\n-                                                    \r\n-                                                    c.drawImage(ImageReader(temp_img), 50, img_y - new_height, \r\n-                                                               width=new_width, height=new_height)\r\n-                                                    img_y -= new_height + 20\r\n-                                            except Exception as img_e:\r\n-                                                st.warning(f\"Image non extraite: {img_e}\")\r\n-                                        \r\n-                                        c.showPage()\r\n-                                    \r\n-                                    c.save()\r\n-                                    pdf_buffer.seek(0)\r\n-                                    \r\n-                                    st.download_button(\r\n-                                        label=\"💾 Télécharger le Rapport PDF\",\r\n-                                        data=pdf_buffer,\r\n-                                        file_name=f\"Rapport_RH_{today_str}.pdf\",\r\n-                                        mime=\"application/pdf\",\r\n-                                        type=\"primary\",\r\n-                                        width=\"stretch\"\r\n-                                    )\r\n-                                    st.success(\"✅ PDF généré avec succès !\")\r\n-                                    \r\n-                                except ImportError:\r\n-                                    st.error(\"❌ Module 'reportlab' non installé. Installation: pip install reportlab\")\r\n-                                    st.info(\"💡 En attendant, voici le PowerPoint:\")\r\n-                                    ppt_bytes.seek(0)\r\n-                                    st.download_button(\r\n-                                        label=\"💾 Télécharger le Rapport PowerPoint\",\r\n-                                        data=ppt_bytes,\r\n-                                        file_name=f\"Rapport_RH_{today_str}.pptx\",\r\n-                                        mime=\"application/vnd.openxmlformats-officedocument.presentationml.presentation\",\r\n-                                        type=\"secondary\",\r\n-                                        width=\"stretch\"\r\n-                                    )\r\n-                                except Exception as pdf_e:\r\n-                                    st.error(f\"❌ Erreur lors de la conversion PDF: {pdf_e}\")\r\n-                                    st.info(\"💡 Téléchargez le PowerPoint à la place:\")\r\n-                                    ppt_bytes.seek(0)\r\n-                                    st.download_button(\r\n-                                        label=\"💾 Télécharger le Rapport PowerPoint\",\r\n-                                        data=ppt_bytes,\r\n-                                        file_name=f\"Rapport_RH_{today_str}.pptx\",\r\n-                                        mime=\"application/vnd.openxmlformats-officedocument.presentationml.presentation\",\r\n-                                        type=\"secondary\",\r\n-                                        width=\"stretch\"\r\n-                                    )\r\n-                            else:\r\n-                                # Export PowerPoint standard\r\n-                                filename = f\"Rapport_RH_{today_str}.pptx\"\r\n-                                \r\n-                                st.download_button(\r\n-                                    label=\"💾 Télécharger le Rapport PowerPoint\",\r\n-                                    data=ppt_bytes,\r\n-                                    file_name=filename,\r\n-                                    mime=\"application/vnd.openxmlformats-officedocument.presentationml.presentation\",\r\n-                                    type=\"primary\",\r\n-                                    width=\"stretch\"\r\n-                                )\r\n-                                st.success(\"✅ PowerPoint généré avec succès !\")\r\n-            else:\r\n-                st.warning(\"⚠️ Veuillez d'abord charger des données (Google Sheets ou Excel) avant de générer le PowerPoint.\")\r\n-    \r\n-    # Message d'information sur les données chargées\r\n-    has_uploaded = (st.session_state.uploaded_excel is not None) or (st.session_state.get('synced_recrutement_df') is not None)\r\n-    if df_recrutement is None and df_integration is None:\r\n-        st.sidebar.warning(\"⚠️ Aucune donnée disponible. Veuillez uploader vos fichiers dans l'onglet 'Upload Fichiers'.\")\r\n-    elif df_recrutement is None:\r\n-        st.sidebar.warning(\"⚠️ Données de recrutement non disponibles. Seules les données d'intégration sont chargées.\")\r\n-    elif df_integration is None:\r\n-        st.sidebar.warning(\"⚠️ Données d'intégration non disponibles. Seules les données de recrutement sont chargées.\")\r\n-\r\n-    with tabs[1]:\r\n-        if df_recrutement is not None:\r\n-            create_demandes_recrutement_combined_tab(df_recrutement)\r\n-        else:\r\n-            st.warning(\"📊 Aucune donnée de recrutement disponible. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.\")\r\n-    \r\n-    with tabs[2]:\r\n-        create_weekly_report_tab(df_recrutement)\r\n-\r\n-    with tabs[3]:\r\n-        # Onglet Intégrations basé sur les données Excel\r\n-        if df_recrutement is not None:\r\n-            # Créer les filtres spécifiques pour les intégrations (sans période)\r\n-            st.sidebar.subheader(\"🔧 Filtres - Intégrations\")\r\n-            int_filters = create_integration_filters(df_recrutement, \"integrations\")\r\n-            create_integrations_tab(df_recrutement, int_filters)\r\n-        else:\r\n-            st.warning(\"📊 Aucune donnée disponible pour les intégrations. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.\")\r\n-\r\n-if __name__ == \"__main__\":\r\n-    main()\r\n-&#96;&#96;&#96;\r\n-\r\n-\r\n-&lt;/details&gt;\r\n-&lt;/tool-use&gt;\r\n-\r\n----\r\n-\r\n-**Checking single test file content****Planning targeted grep searches**\r\n-\r\n-I'm preparing to grep for key section headers like \"demandes de recrutement\" to locate exact file parts needing UI adjustments, enabling focused edits in this large file.**Planning segmented parallel reads**\r\n-\r\n-I'm preparing to read three file sections near lines 900, 1210, and 1650 using parallel multi-tool reads to efficiently capture distinct content areas.**Clarifying column insertion and spacing tweaks**\r\n-\r\n-I'm confirming that the displayed columns already include a 'Poste demandé ' column with a trailing space after 'candidat', so I'll add a trimmed and correctly named column just after 'candidat' to meet the requirement. Also, I'll remove the st.markdown(\"---\") dividing lines after KPI sections in the recruitment requests, weekly reporting, and integrations to reduce vertical spacing and improve layout.**Assessing spacing and separators in sections**\r\n-\r\n-I'm identifying that the user refers to removing dividing lines and reducing spacing below 4 indicators in three sections: demandes, reporting hebdomadaire, and intégrations. The demandes and weekly sections have clear lines or separators, but intégrations lacks obvious dividing marks like st.markdown(\"---\"). I'll check lines around 2260-2310 to confirm if spacing or separator elements like st.markdown or st.div appear near the integration metrics to know how to remove the line and decrease spacing there.**Planning column addition and spacing reduction**\r\n-\r\n-I'm ensuring the integration detail table includes a correctly named \"Poste demandé\" column with fallback logic to handle variants or missing columns, creating a placeholder if needed. Also, I'll remove the large separator lines after metrics in demandes and weekly sections, replacing them with small margin spacers, and add similar spacing reduction after integration metrics for consistent layout tightening.**Patching weekly section markdown****Adding spacer after integration metrics**\r\n-\r\n-I'm inserting a spacer via st.markdown after the integration metrics and preparing to add logic for a poste column near the subheader before the charts.**Noticing potential indentation issue**\r\n-\r\n-I'm re-reading the code near the patch area to verify if indentation or context mismatch is causing the problem.**Adding spacer between metrics and graphs****Preparing precise patch with spacing adjustment****Adding poste column normalization**\r\n-\r\n-I'm inserting logic before the display columns list to dynamically find and normalize the \"Poste demandé\" column under various possible names, and updating the renaming mapping accordingly to use this normalized column variable.**Summarizing final changes and notes**\r\n-\r\n-The integration detail now includes the \"Poste demandé\" column after \"Candidat\" with spacing adjusted by replacing separators with a small spacer in demandes, weekly, and integrations. The model GPT-5.1-Codex-Max is already enabled and can’t be changed. Tests were not run. File references exclude line numbers to avoid inaccuracy, using encoded paths instead.- Removed the horizontal separators under KPI rows and replaced them with tight spacers in demandes, reporting hebdo, and intégrations sections to shrink the gap before charts/graphs (pages/Espace%20Test.py).\r\n-- Integration detail table now explicitly normalizes and displays the “Poste demandé” column right after “Candidat,” even when the source column name varies, ensuring it always shows up (pages/Espace%20Test.py).\r\n-\r\n-Notes: Tests not run (Streamlit UI change). Model is already set to GPT-5.1-Codex-Max.\r\n-\r\n----\r\n-\r\n-_**User (2026-01-16 15:46Z)**_\r\n-\r\n-comite et push\r\n-\r\n----\r\n-\r\n-_**Agent (model copilot/auto)**_\r\n-\r\n-**Preparing to commit changes**\r\n-\r\n----\r\n-\r\n\u001b[39;1mdiff --git a/pages/Espace Test.py b/pages/Espace Test.py\r\nindex 4b937de0..5bf68acb 100755\r\n--- a/pages/Espace Test.py\r\n+++ b/pages/Espace Test.py\r\n\u001b[36;22m@@ -693,6 +693,14 @@\u001b[0m def create_recrutements_clotures_tab(df_recrutement, global_filters):\r\n             pass\r\n \r\n     # Revert to simple metrics (no bordered-card styling) in the Recrutements Clôturés section\r\n\u001b[32m+    st.markdown(\"\"\"\r\n+        &lt;style&gt;\r\n+        [data-testid=\"stMetric\"] {\r\n+            margin-bottom: -25px;\r\n+        }\r\n+        &lt;/style&gt;\r\n+    \"\"\", unsafe_allow_html=True)\r\n+\u001b[39;41m    \u001b[0m\r\n     col1, col2, col3, col4 = st.columns(4)\r\n     with col1:\r\n         st.metric(\"Nombre de recrutements\", recrutements)\r\n\u001b[36m@@ -704,6 +712,7 @@\u001b[0m def create_recrutements_clotures_tab(df_recrutement, global_filters):\r\n         st.metric(\"Délai moyen recrutement (jours)\", delai_display)\r\n     \r\n     # Graphiques en ligne 1\r\n\u001b[32m+    st.markdown('&lt;div style=\"margin-top: -30px;\"&gt;&lt;/div&gt;', unsafe_allow_html=True)\r\n\u001b[0m     col1, col2 = st.columns([2,1])\r\n     \r\n     with col1:\r\n\u001b[36m@@ -954,8 +963,8 @@\u001b[0m def create_demandes_recrutement_tab(df_recrutement, global_filters):\r\n         else:\r\n             st.metric(\"Taux d'annulation\", \"N/A\")\r\n \r\n\u001b[31m-    # Graphiques principaux (espace réduit entre KPIs et visuels)\r\n-    st.markdown(\"&lt;div style='margin-top:-8px; margin-bottom:2px;'&gt;&lt;/div&gt;\", unsafe_allow_html=True)\r\n\u001b[32m+    # Graphiques principaux\r\n+    st.markdown('&lt;div style=\"margin-top: -30px;\"&gt;&lt;/div&gt;', unsafe_allow_html=True)\r\n\u001b[0m     col1, col2, col3 = st.columns([1,1,2])\r\n     \r\n     with col1:\r\n\u001b[36m@@ -1179,8 +1188,8 @@\u001b[0m def create_integrations_tab(df_recrutement, global_filters):\r\n         else:\r\n             st.metric(\"⚠️ En retard\", \"N/A\")\r\n     \r\n\u001b[31m-    # Graphiques (espace réduit entre KPIs et visuels)\r\n-    st.markdown(\"&lt;div style='margin-top:-8px; margin-bottom:2px;'&gt;&lt;/div&gt;\", unsafe_allow_html=True)\r\n\u001b[32m+    # Graphiques\r\n+    st.markdown('&lt;div style=\"margin-top: -30px;\"&gt;&lt;/div&gt;', unsafe_allow_html=True)\r\n\u001b[0m     col1, col2 = st.columns(2)\r\n \r\n     # Graphique par affectation réactivé\r\n\u001b[36m@@ -1217,22 +1226,9 @@\u001b[0m def create_integrations_tab(df_recrutement, global_filters):\r\n     \r\n     # Tableau détaillé des intégrations\r\n     st.subheader(\"📋 Détail des Intégrations en Cours\")\r\n\u001b[31m-    # Garantir l'affichage du poste demandé juste après le candidat\r\n-    poste_demande_col = next((c for c in df_filtered.columns if isinstance(c, str) and c.strip().lower() == 'poste demandé'), None)\r\n-    if not poste_demande_col and 'Poste demandé ' in df_filtered.columns:\r\n-        poste_demande_col = 'Poste demandé '\r\n-    if not poste_demande_col:\r\n-        for alt in ['Poste', 'Poste concerné']:\r\n-            if alt in df_filtered.columns:\r\n-                poste_demande_col = alt\r\n-                break\r\n-    if not poste_demande_col:\r\n-        poste_demande_col = 'Poste demandé'\r\n-        df_filtered[poste_demande_col] = np.nan\r\n-\r\n\u001b[0m     colonnes_affichage = [\r\n         candidat_col, \r\n\u001b[31m-        poste_demande_col,\r\n\u001b[32m+        'Poste demandé',\r\n\u001b[0m         'Entité demandeuse',\r\n         'Affectation',\r\n         date_integration_col,\r\n\u001b[36m@@ -1263,7 +1259,7 @@\u001b[0m def create_integrations_tab(df_recrutement, global_filters):\r\n         # Renommer pour affichage plus propre\r\n         df_display = df_display.rename(columns={\r\n             candidat_col: \"Candidat\",\r\n\u001b[31m-            poste_demande_col: \"Poste demandé\",\r\n\u001b[32m+            'Poste demandé': \"Poste demandé\",\r\n\u001b[0m             date_integration_col: \"Date d'Intégration Prévue\"\r\n         })\r\n         \r\n\u001b[36m@@ -1706,11 +1702,9 @@\u001b[0m def create_weekly_report_tab(df_recrutement=None):\r\n     with col4:\r\n         st.metric(\"Total postes ouverts avant la semaine\", total_avant)\r\n \r\n\u001b[31m-    st.markdown(\"&lt;div style='margin-top:-8px; margin-bottom:2px;'&gt;&lt;/div&gt;\", unsafe_allow_html=True)\r\n-\r\n\u001b[0m     # Tableau récapitulatif par entité (HTML personnalisé, rendu centralisé)\r\n     st.markdown(\r\n\u001b[31m-        '&lt;div style=\"display: flex; align-items: center;\"&gt;'\r\n\u001b[32m+        '&lt;div style=\"display: flex; align-items: center; margin-top: -20px;\"&gt;'\r\n\u001b[0m         '&lt;span style=\"font-size: 1.25em; font-weight: 600;\"&gt;📊 Besoins en Cours par Entité&lt;/span&gt;'\r\n         '&lt;span style=\"margin-left: 8px; cursor: pointer;\" title=\"\"&gt;?&lt;/span&gt;&lt;/div&gt;',\r\n         unsafe_allow_html=True\u001b[?2004h",
+    "lineCount": 1008
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "e492db85-3ac4-4ae1-9335-baceebe22f8d",
+  "terminalCommandId": "tool-3cbe6038-28b2-4ead-8533-0eb3991cd253",
+  "commandLine": {
+    "original": "git show --unified=0 60e5037e",
+    "toolEdited": " git show --unified=0 60e5037e"
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;/^git(\\s+(-C\\s+\\S+|--no-pager))*\\s+show\\b/ (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579702976,
+    "duration": 1
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-3cbe6038-28b2-4ead-8533-0eb3991cd253"
+  },
+  "terminalCommandOutput": {
+    "text": "\u001b[33mcommit 60e5037e241c98747aa38fdef4e0ac77423c9839\r\n\u001b[0mAuthor: GitHub Copilot &lt;copilot@example.com&gt;\r\nDate:   Tue Jan 13 12:57:49 2026 +0000\r\n\r\n    feat: Align chart text style and filter integrations\r\n\r\n\u001b[1mdiff --git a/pages/Espace Test.py b/pages/Espace Test.py\r\nindex 139d41c2..6cbf93d9 100755\r\n--- a/pages/Espace Test.py\r\n+++ b/pages/Espace Test.py\r\n\u001b[36;22m@@ -4941 +4941 @@\u001b[0m def main():\r\n\u001b[31m-        - **Recrutements en cours par recruteur** : tableau pivot par &#96;Colonne TG Hire&#96; (Sourcing, Shortlisté, Signature DRH, Clôture). La colonne affichée **\"Total (sans clôture)\"** est calculée pour chaque recruteur comme : &#96;Sourcing + Shortlisté + Signature DRH - Clôture&#96; (valeur minimale 0). Les lignes sans recruteur explicite sont exclues. Certaines personnes (ex: Bouchra AJBILOU, Bouchra AOUISSE, Ghita LAKHDAR, Reda Berrada, Reda Mohamed BERRADA, Saad FATI) sont volontairement exclues du tableau.\r\n\u001b[32m+        - **Recrutements en cours par recruteur** : tableau pivot par &#96;Colonne TG Hire&#96; (Sourcing, Shortlisté, Signature DRH, Clôture). La colonne affichée **\"Total (sans clôture)\"** est calculée pour chaque recruteur comme : &#96;Sourcing + Shortlisté + Signature DRH - Clôture&#96; (valeur minimale 0).\u001b[0m",
+    "lineCount": 20
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "97d18e11-bdce-4425-88bf-28b1ce64f747",
+  "terminalCommandId": "tool-51161a8d-7030-4fa7-ae90-cbcabcebd8c6",
+  "commandLine": {
+    "original": "wc -l \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " wc -l \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;wc (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579710780,
+    "duration": 0
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-51161a8d-7030-4fa7-ae90-cbcabcebd8c6"
+  },
+  "terminalCommandOutput": {
+    "text": "4609 /workspaces/TG_Hire/pages/Espace Test.py",
+    "lineCount": 1
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "6e504304-e0b2-4267-9eb6-ec0a9d9ac838",
+  "terminalCommandId": "tool-c698f246-1b62-4003-8317-9f712402d03d",
+  "commandLine": {
+    "original": "git show 60e5037e:pages/Espace\\ Test.py | wc -l",
+    "toolEdited": " git show 60e5037e:pages/Espace\\ Test.py | wc -l"
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rules [&#96;/^git(\\s+(-C\\s+\\S+|--no-pager))*\\s+show\\b/ (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\"), [&#96;wc (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579715238,
+    "duration": 3
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-c698f246-1b62-4003-8317-9f712402d03d"
+  },
+  "terminalCommandOutput": {
+    "text": "4950",
+    "lineCount": 1
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#4290-4290), lines 4290 to 4310</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#4290-4290), lines 4290 to 4310
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "1f3ebf24-e5f2-4aea-a1d4-a444279c0d81",
+  "terminalCommandId": "tool-7a92c093-0f38-4caa-9274-53371a3e26b9",
+  "commandLine": {
+    "original": "grep -n \"tabs = st.tabs\" \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " grep -n \"tabs = st.tabs\" \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;grep (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579726235,
+    "duration": 1
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-7a92c093-0f38-4caa-9274-53371a3e26b9"
+  },
+  "terminalCommandOutput": {
+    "text": "4297:    tabs = st.tabs([\"📂 Upload &amp; Téléchargement\", \"🗂️ Demandes &amp; Recrutement\", \"📅 Hebdomadaire\", \"🤝 Intégrations\"])",
+    "lineCount": 2
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "b31d5cf3-1b84-4f59-bd70-a2d167d0a68f",
+  "terminalCommandId": "tool-68eed602-5d4e-4c19-8413-eb5440ca37d3",
+  "commandLine": {
+    "original": "grep -nC 5 \"tabs = st.tabs\" \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " grep -nC 5 \"tabs = st.tabs\" \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;grep (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579733470,
+    "duration": 0
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-68eed602-5d4e-4c19-8413-eb5440ca37d3"
+  },
+  "terminalCommandOutput": {
+    "text": "4292-            key='reporting_date',\r\n4293-            format='DD/MM/YYYY'\r\n4294-        )\r\n4295-    \r\n4296-    # Créer les onglets (Demandes et Recrutement regroupés)\r\n4297:    tabs = st.tabs([\"📂 Upload &amp; Téléchargement\", \"🗂️ Demandes &amp; Recrutement\", \"📅 Hebdomadaire\", \"🤝 Intégrations\"])\r\n4298-    \r\n4299-    # Variables pour stocker les fichiers uploadés\r\n4300-    # Use session_state to persist upload/refresh state\r\n4301-    if 'data_updated' not in st.session_state:\r\n4302-        st.session_state.data_updated = False",
+    "lineCount": 12
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="copilot_replaceString">
+<details>
+<summary>Tool use: **copilot_replaceString**</summary>
+
+Additional data:
+
+```json
+{
+  "vscodeToolId": "copilot_replaceString",
+  "isHidden": true
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Replace String in File\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "869124db-5a8f-4047-80b4-7ecc6df8ed00",
+  "terminalCommandId": "tool-ef9c3961-7139-41de-ac94-95d3343c93d9",
+  "commandLine": {
+    "original": "sed -i '4297s/\\[\"📂 Upload &amp; Téléchargement\", \"🗂️ Demandes &amp; Recrutement\", \"📅 Hebdomadaire\", \"🤝 Intégrations\"\\]/\\[\"📂 Upload &amp; Téléchargement\", \"🗂️ Demandes &amp; Recrutement\", \"📅 Hebdomadaire\", \"🤝 Intégrations\", \"📖 Méthodologie\"\\]/' \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " sed -i '4297s/\\[\"📂 Upload &amp; Téléchargement\", \"🗂️ Demandes &amp; Recrutement\", \"📅 Hebdomadaire\", \"🤝 Intégrations\"\\]/\\[\"📂 Upload &amp; Téléchargement\", \"🗂️ Demandes &amp; Recrutement\", \"📅 Hebdomadaire\", \"🤝 Intégrations\", \"📖 Méthodologie\"\\]/' \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579748384,
+    "duration": 2
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-ef9c3961-7139-41de-ac94-95d3343c93d9"
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 4
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "10cea861-bf27-4799-b15c-66630aeed88f",
+  "terminalCommandId": "tool-e7cdec8d-eb8b-42d3-870b-770f5e52f702",
+  "commandLine": {
+    "original": "sed -n '4297p' \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " sed -n '4297p' \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768579785970,
+    "duration": 1
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-e7cdec8d-eb8b-42d3-870b-770f5e52f702"
+  },
+  "terminalCommandOutput": {
+    "text": "    tabs = st.tabs([\"📂 Upload [\"📂 Upload &amp; Téléchargement\", \"🗂️ Demandes &amp; Recrutement\", \"📅 Hebdomadaire\", \"🤝 Intégrations\"] Téléchargement\", \"🗂️ Demandes [\"📂 Upload &amp; Téléchargement\", \"🗂️ Demandes &amp; Recrutement\", \"📅 Hebdomadaire\", \"🤝 Intégrations\"] Recrutement\", \"📅 Hebdomadaire\", \"🤝 Intégrations\", \"📖 Méthodologie\"])",
+    "lineCount": 4
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 4
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+[object Object]
+
+---
+
+_**User (2026-01-16 16:09Z)**_
+
+@agent Continue: "Continue to iterate?"
+
+---
+
+_**Agent (model copilot/gemini-3-flash-preview)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "ee951f94-fe0d-4c76-983e-25a117803cf5",
+  "terminalCommandId": "tool-9bff2570-137f-42d5-a4b0-fabd0fdc704e",
+  "commandLine": {
+    "original": "sed -i '4297c\\    tabs = st.tabs([\"📂 Upload &amp; Téléchargement\", \"🗂️ Demandes &amp; Recrutement\", \"📅 Hebdomadaire\", \"🤝 Intégrations\", \"📖 Méthodologie\"])' \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " sed -i '4297c\\    tabs = st.tabs([\"📂 Upload &amp; Téléchargement\", \"🗂️ Demandes &amp; Recrutement\", \"📅 Hebdomadaire\", \"🤝 Intégrations\", \"📖 Méthodologie\"])' \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh"
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
 
 </details>
 </tool-use>
