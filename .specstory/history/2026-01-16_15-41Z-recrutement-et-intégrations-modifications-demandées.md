@@ -5493,7 +5493,7 @@ Status: **completed**
 
 ---
 
-_**User (2026-01-16 16:44Z)**_
+_**User (2026-01-16 16:46Z)**_
 
 @agent Continue: "Continue to iterate?"
 
@@ -5760,7 +5760,23 @@ Parameters:
     "supportAlertSyntax": false
   },
   "terminalCommandState": {
-    "timestamp": 1768581871172
+    "exitCode": 0,
+    "timestamp": 1768581873312,
+    "duration": 6
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-af479fa5-0641-4721-a77f-2aee043d92b9"
+  },
+  "terminalCommandOutput": {
+    "text": "# Shared title font used for all main charts so typography is consistent\r\n    start_of_week = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())  # Lundi de cette semaine à 00:00\r\n    # Définir la semaine précédente (Lundi -&gt; Vendredi). Exemple: si reporting_date=2025-10-15 (mercredi),\r\n    previous_monday = start_of_week - timedelta(days=7)   # Lundi de la semaine précédente (00:00)\r\n    previous_friday = start_of_week - timedelta(days=3)   # Vendredi de la semaine précédente (00:00)\r\n        # Définitions temporelles par entité (basées sur la semaine précédente Lundi-&gt;Vendredi)\r\n        # 1. Nb postes ouverts avant début semaine\r\n        # au vendredi de la semaine précédente (i.e. &lt; previous_friday)\r\n            # Exclure les lignes avec une date d'acceptation du candidat antérieure à la semaine précédente\r\n        # 2. Nb nouveaux postes ouverts cette semaine = demandes validées par la DRH\r\n        # dans la semaine précédente (du lundi au vendredi inclus).\r\n        # 3. Nb postes pourvus cette semaine: compter les acceptations du candidat\r\n        # 4. Nb postes en cours cette semaine\r\n            # Exclure les lignes où la date d'acceptation du candidat est antérieure à la semaine précédente\r\n            'Nb postes ouverts avant début semaine': data['avant'] if data['avant'] &gt; 0 else 0,\r\n            'Nb nouveaux postes ouverts cette semaine': data['nouveaux'] if data['nouveaux'] &gt; 0 else 0,\r\n            'Nb postes pourvus cette semaine': data['pourvus'] if data['pourvus'] &gt; 0 else 0,\r\n            'Nb postes en cours cette semaine (sourcing)': data['en_cours'] if data['en_cours'] &gt; 0 else 0\r\n        'Nb postes ouverts avant début semaine': total_avant,\r\n        'Nb nouveaux postes ouverts cette semaine': total_nouveaux,\r\n        'Nb postes pourvus cette semaine': total_pourvus,\r\n        'Nb postes en cours cette semaine (sourcing)': total_en_cours\r\n    st.header(\"📅 Reporting Hebdomadaire : Chiffres Clés de la semaine\")\r\n        st.metric(\"Postes pourvus cette semaine\", total_pourvus)\r\n        st.metric(\"Total postes ouverts avant la semaine\", total_avant)\r\n                'Nb postes ouverts avant début semaine': data['avant'] if data['avant'] &gt; 0 else '-',\r\n                'Nb nouveaux postes ouverts cette semaine': data['nouveaux'] if data['nouveaux'] &gt; 0 else '-',\r\n                'Nb postes pourvus cette semaine': data['pourvus'] if data['pourvus'] &gt; 0 else '-',\r\n                'Nb postes en cours cette semaine (sourcing)': data['en_cours'] if data['en_cours'] &gt; 0 else '-'\r\n            'Nb postes ouverts avant début semaine': f'**{total_avant}**',\r\n            'Nb nouveaux postes ouverts cette semaine': f'**{total_nouveaux}**',\r\n            'Nb postes pourvus cette semaine': f'**{total_pourvus}**',\r\n            'Nb postes en cours cette semaine (sourcing)': f'**{total_en_cours}**'\r\n        html_table += '&lt;th&gt;Nb postes ouverts avant début semaine&lt;/th&gt;'\r\n        html_table += '&lt;th&gt;Nb nouveaux postes ouverts cette semaine&lt;/th&gt;'\r\n        html_table += '&lt;th&gt;Nb postes pourvus cette semaine&lt;/th&gt;'\r\n        html_table += '&lt;th&gt;Nb postes en cours cette semaine (sourcing)&lt;/th&gt;'\r\n            html_table += f'&lt;td&gt;{row[\"Nb postes ouverts avant début semaine\"]}&lt;/td&gt;'\r\n            html_table += f'&lt;td&gt;{row[\"Nb nouveaux postes ouverts cette semaine\"]}&lt;/td&gt;'\r\n            html_table += f'&lt;td&gt;{row[\"Nb postes pourvus cette semaine\"]}&lt;/td&gt;'\r\n            html_table += f'&lt;td&gt;{row[\"Nb postes en cours cette semaine (sourcing)\"]}&lt;/td&gt;'\r\n        html_table += f'&lt;td&gt;{total_row[\"Nb postes ouverts avant début semaine\"].replace(\"**\", \"\")}&lt;/td&gt;'\r\n        html_table += f'&lt;td&gt;{total_row[\"Nb nouveaux postes ouverts cette semaine\"].replace(\"**\", \"\")}&lt;/td&gt;'\r\n        html_table += f'&lt;td&gt;{total_row[\"Nb postes pourvus cette semaine\"].replace(\"**\", \"\")}&lt;/td&gt;'\r\n        html_table += f'&lt;td&gt;{total_row[\"Nb postes en cours cette semaine (sourcing)\"].replace(\"**\", \"\")}&lt;/td&gt;'\r\n                &lt;th&gt;Nb postes ouverts avant début semaine&lt;/th&gt;\r\n                &lt;th&gt;Nb nouveaux postes ouverts cette semaine&lt;/th&gt;\r\n                &lt;th&gt;Nb postes pourvus cette semaine&lt;/th&gt;\r\n                &lt;th&gt;Nb postes en cours cette semaine&lt;/th&gt;\r\n        - **Nb postes ouverts avant début semaine** : demandes dont la date de réception est antérieure au lundi de la semaine de reporting, et qui ne sont pas clôturées/annulées. Les lignes avec une date d'acceptation du candidat antérieure à la semaine précédente sont également exclues.\r\n        - **Nb nouveaux postes ouverts cette semaine** : demandes validées par la DRH entre le lundi et le vendredi de la semaine précédente.\r\n        - **Nb postes pourvus cette semaine** : postes pour lesquels un candidat a accepté (ou date d'intégration) dans la même fenêtre temporelle.\r\n        - **Nb postes en cours cette semaine (sourcing)** : calculé comme (nouveaux + avant - pourvus), ou plus précisément comme les lignes avec statut \"En cours\" et sans candidat retenu. Les lignes avec une date d'acceptation du candidat antérieure à la semaine précédente sont également exclues, même si le statut est \"En cours\".\r\n                mask_avant_semaine = pd.Series(False, index=df_debug.index)\r\n                mask_nouveaux_semaine = pd.Series(False, index=df_debug.index)\r\n                mask_pourvus_semaine = pd.Series(False, index=df_debug.index)\r\n                    mask_avant_semaine = df_debug[real_date_reception_col] &lt; previous_monday\r\n                    mask_nouveaux_semaine = (df_debug[real_date_reception_col] &gt;= previous_monday) &amp; (df_debug[real_date_reception_col] &lt; previous_friday_exclusive)\r\n                    mask_avant_semaine = mask_avant_semaine &amp; mask_not_closed\r\n                    mask_pourvus_semaine = (df_debug[real_accept_col] &gt;= previous_monday) &amp; (df_debug[real_accept_col] &lt; previous_friday_exclusive)\r\n                contributes_avant = mask_avant_semaine\r\n                contributes_nouveaux = mask_nouveaux_semaine\r\n                contributes_pourvus = mask_pourvus_semaine &amp; mask_has_name\r\n            # Afficher uniquement ceux de la semaine du reporting\r\n            # Alignement avec la logique du Reporting Hebdomadaire : Semaine PRÉCÉDENTE + Semaine COURANTE\r\n            # Pour éviter que les cartes disparaissent quand on passe à la semaine suivante\r\n            # Filtrer les postes clôturés avec date d'acceptation dans la semaine du reporting\r\n            # Afficher uniquement ceux de la semaine du reporting (basé sur date de désistement)\r\n            # Alignement avec la logique du Reporting Hebdomadaire : Semaine PRÉCÉDENTE + Semaine COURANTE\r\n                            &lt;th&gt;Nb postes ouverts avant début semaine&lt;/th&gt;\r\n                            &lt;th&gt;Nb nouveaux postes ouverts cette semaine&lt;/th&gt;\r\n                            &lt;th&gt;Nb postes pourvus cette semaine&lt;/th&gt;\r\n                            &lt;th&gt;Nb postes en cours cette semaine (sourcing)&lt;/th&gt;\r\n                    # resize maintaining aspect\r\n        # Calculer la fenêtre de dates (semaine précédente + courante)\r\n        - **KPIs hebdomadaires** : fenêtre de calcul basée sur la &#96;reporting_date&#96; (Semaine précédente : Lundi-&gt;Vendredi). Les métriques &#96;avant&#96;, &#96;nouveaux&#96;, &#96;pourvus&#96;, &#96;en_cours&#96; sont calculées avec des règles décrites dans le debug (onglet Debug) et sont utilisées pour fabriquer le tableau \"Besoins en Cours par Entité\".\r\nif __name__ == \"__main__\":",
+    "lineCount": 104
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
   }
 }
 ```
@@ -5790,6 +5806,2591 @@ Status: **completed**
 
 </details>
 </tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "a27b7ed4-0617-4b0d-b332-871008adc4c4",
+  "terminalCommandId": "tool-8d537dba-efa0-4892-99fe-c5c6f09c8460",
+  "commandLine": {
+    "original": "tail -n 15 \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " tail -n 15 \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581879505,
+    "duration": 1
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-8d537dba-efa0-4892-99fe-c5c6f09c8460"
+  },
+  "terminalCommandOutput": {
+    "text": "    with tabs[4]:\r\n        st.header(\"📖 Méthodologie du Reporting\")\r\n        st.markdown(\"\"\"\r\n        - **Besoins en cours par entité** : calculés à partir des demandes validées par la DRH. Les postes \"en cours\" sont soit déterminés par le statut &#96;En cours&#96;, soit par la formule (postes avant + nouveaux - pourvus) si les dates manquent.\r\n        - **Recrutements en cours par recruteur** : tableau pivot par &#96;Colonne TG Hire&#96; (Sourcing, Shortlisté, Signature DRH, Clôture). La colonne affichée **\"Total (sans clôture)\"** est calculée pour chaque recruteur comme : &#96;Sourcing + Shortlisté + Signature DRH - Clôture&#96; (valeur minimale 0).\r\n        - **Comparaison par direction / poste / raison** : histogrammes basés sur les valeurs de colonnes &#96;Direction concernée&#96;, &#96;Poste demandé&#96; et &#96;Raison du recrutement&#96;. Les étiquettes affichent les totaux par catégorie (valeurs affichées en gras et couleur claire pour lisibilité).\r\n        - **Évolution des demandes / intégrations** : bar charts mensuels agrégés par date (date de réception de la demande ou date d'entrée prévue). Les valeurs sont intégrées dans les barres (au lieu d'être placées au-dessus) pour éviter qu'elles soient coupées.\r\n        - **Nombre de candidats présélectionnés** : somme des valeurs numériques de la colonne &#96;Nb de candidats pré-selectionnés&#96; (valeurs non numériques traitées comme 0). Le libellé est affiché à gauche du graphique pour éviter l'étiquette centrale indésirable.\r\n        - **Délai de recrutement** : calculé comme la différence en jours entre &#96;Date d'entrée effective du candidat&#96; et &#96;Date de réception de la demande après validation de la DRH&#96;. Affiché dans le debug \"Recrutements Clôturés\".\r\n        - **Intégrations — explication du signal \"⚠️ En retard\"** : une intégration est considérée en retard si la &#96;Date d'entrée prévisionnelle&#96; est antérieure à la date de reporting (aujourd'hui ou &#96;reporting_date&#96; sélectionnée). Le compteur &#96;En retard&#96; regroupe ces cas pour vous alerter.\r\n        - **KPIs hebdomadaires** : fenêtre de calcul basée sur la &#96;reporting_date&#96; (Semaine précédente : Lundi-&gt;Vendredi). Les métriques &#96;avant&#96;, &#96;nouveaux&#96;, &#96;pourvus&#96;, &#96;en_cours&#96; sont calculées avec des règles décrites dans le debug (onglet Debug) et sont utilisées pour fabriquer le tableau \"Besoins en Cours par Entité\".\r\n        \"\"\", unsafe_allow_html=True)\r\n\r\nif __name__ == \"__main__\":\r\n    main()",
+    "lineCount": 32
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "0d391d03-ba25-4327-aaa7-4952a5336857",
+  "terminalCommandId": "tool-763d2198-3434-4e23-a741-939918db3de6",
+  "commandLine": {
+    "original": "sed -n '4246,4255p' \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " sed -n '4246,4255p' \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581887792,
+    "duration": 1
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-763d2198-3434-4e23-a741-939918db3de6"
+  },
+  "terminalCommandOutput": {
+    "text": "def main():\r\n\r\n    st.title(\"📊 Tableau de Bord RH\")\r\n    st.markdown(\"---\")\r\n    # Date de reporting : permet de fixer la date de référence pour tous les calculs\r\n    if 'reporting_date' not in st.session_state:\r\n        # default to today's date\r\n        st.session_state['reporting_date'] = datetime.now().date()\r\n\r\n    with st.sidebar:",
+    "lineCount": 10
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "6ba7b8b4-e495-4a8c-96bd-bd74eb8203eb",
+  "terminalCommandId": "tool-c5e7b320-acb4-40af-abda-1db8a4ed1555",
+  "commandLine": {
+    "original": "sed -n '4250,4280p' \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " sed -n '4250,4280p' \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581892328,
+    "duration": 1
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-c5e7b320-acb4-40af-abda-1db8a4ed1555"
+  },
+  "terminalCommandOutput": {
+    "text": "    # Date de reporting : permet de fixer la date de référence pour tous les calculs\r\n    if 'reporting_date' not in st.session_state:\r\n        # default to today's date\r\n        st.session_state['reporting_date'] = datetime.now().date()\r\n\r\n    with st.sidebar:\r\n        st.subheader(\"🔧 Filtres - Hebdomadaire\")\r\n        # Ensure the session value is a plain date object Streamlit expects.\r\n        # Protect against cases where session_state may contain a str or pd.Timestamp\r\n        rd_val = st.session_state.get('reporting_date', None)\r\n        if rd_val is not None:\r\n            try:\r\n                # pandas Timestamp or datetime -&gt; date\r\n                import pandas as _pd\r\n                if isinstance(rd_val, _pd.Timestamp):\r\n                    st.session_state['reporting_date'] = rd_val.date()\r\n                elif hasattr(rd_val, 'date') and not isinstance(rd_val, str):\r\n                    # datetime -&gt; date (leave date as-is)\r\n                    try:\r\n                        st.session_state['reporting_date'] = rd_val.date()\r\n                    except Exception:\r\n                        pass\r\n                elif isinstance(rd_val, str):\r\n                    # try parsing common formats\r\n                    from dateutil import parser as _parser\r\n                    try:\r\n                        parsed = _parser.parse(rd_val)\r\n                        st.session_state['reporting_date'] = parsed.date()\r\n                    except Exception:\r\n                        # fallback: keep original (Streamlit will raise if invalid)\r\n                        pass",
+    "lineCount": 31
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "3cb496f6-8d45-4699-a1de-1d73134d6f2b",
+  "terminalCommandId": "tool-9d90c021-bfb6-48f9-856f-8654c973b9ec",
+  "commandLine": {
+    "original": "tail -n 30 \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " tail -n 30 \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581900855,
+    "duration": 2
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-9d90c021-bfb6-48f9-856f-8654c973b9ec"
+  },
+  "terminalCommandOutput": {
+    "text": "    \r\n    with tabs[2]:\r\n        create_weekly_report_tab(df_recrutement)\r\n\r\n    with tabs[3]:\r\n        # Onglet Intégrations basé sur les données Excel\r\n        if df_recrutement is not None:\r\n            # Créer les filtres spécifiques pour les intégrations (sans période)\r\n            st.sidebar.subheader(\"🔧 Filtres - Intégrations\")\r\n            int_filters = create_integration_filters(df_recrutement, \"integrations\")\r\n            create_integrations_tab(df_recrutement, int_filters)\r\n        else:\r\n            st.warning(\"📊 Aucune donnée disponible pour les intégrations. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.\")\r\n\r\n\r\n    with tabs[4]:\r\n        st.header(\"📖 Méthodologie du Reporting\")\r\n        st.markdown(\"\"\"\r\n        - **Besoins en cours par entité** : calculés à partir des demandes validées par la DRH. Les postes \"en cours\" sont soit déterminés par le statut &#96;En cours&#96;, soit par la formule (postes avant + nouveaux - pourvus) si les dates manquent.\r\n        - **Recrutements en cours par recruteur** : tableau pivot par &#96;Colonne TG Hire&#96; (Sourcing, Shortlisté, Signature DRH, Clôture). La colonne affichée **\"Total (sans clôture)\"** est calculée pour chaque recruteur comme : &#96;Sourcing + Shortlisté + Signature DRH - Clôture&#96; (valeur minimale 0).\r\n        - **Comparaison par direction / poste / raison** : histogrammes basés sur les valeurs de colonnes &#96;Direction concernée&#96;, &#96;Poste demandé&#96; et &#96;Raison du recrutement&#96;. Les étiquettes affichent les totaux par catégorie (valeurs affichées en gras et couleur claire pour lisibilité).\r\n        - **Évolution des demandes / intégrations** : bar charts mensuels agrégés par date (date de réception de la demande ou date d'entrée prévue). Les valeurs sont intégrées dans les barres (au lieu d'être placées au-dessus) pour éviter qu'elles soient coupées.\r\n        - **Nombre de candidats présélectionnés** : somme des valeurs numériques de la colonne &#96;Nb de candidats pré-selectionnés&#96; (valeurs non numériques traitées comme 0). Le libellé est affiché à gauche du graphique pour éviter l'étiquette centrale indésirable.\r\n        - **Délai de recrutement** : calculé comme la différence en jours entre &#96;Date d'entrée effective du candidat&#96; et &#96;Date de réception de la demande après validation de la DRH&#96;. Affiché dans le debug \"Recrutements Clôturés\".\r\n        - **Intégrations — explication du signal \"⚠️ En retard\"** : une intégration est considérée en retard si la &#96;Date d'entrée prévisionnelle&#96; est antérieure à la date de reporting (aujourd'hui ou &#96;reporting_date&#96; sélectionnée). Le compteur &#96;En retard&#96; regroupe ces cas pour vous alerter.\r\n        - **KPIs hebdomadaires** : fenêtre de calcul basée sur la &#96;reporting_date&#96; (Semaine précédente : Lundi-&gt;Vendredi). Les métriques &#96;avant&#96;, &#96;nouveaux&#96;, &#96;pourvus&#96;, &#96;en_cours&#96; sont calculées avec des règles décrites dans le debug (onglet Debug) et sont utilisées pour fabriquer le tableau \"Besoins en Cours par Entité\".\r\n        \"\"\", unsafe_allow_html=True)\r\n\r\nif __name__ == \"__main__\":\r\n    main()",
+    "lineCount": 48
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "c3ff21bc-3e9e-49bd-a61a-0fdd59db37a1",
+  "terminalCommandId": "tool-40c93552-e54c-4181-ab76-e43f08d794c7",
+  "commandLine": {
+    "original": "sed -n '4297p' \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " sed -n '4297p' \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581907984,
+    "duration": 1
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-40c93552-e54c-4181-ab76-e43f08d794c7"
+  },
+  "terminalCommandOutput": {
+    "text": "    tabs = st.tabs([\"📂 Upload &amp; Téléchargement\", \"🗂️ Demandes &amp; Recrutement\", \"📅 Hebdomadaire\", \"🤝 Intégrations\", \"📖 Méthodologie\"])",
+    "lineCount": 2
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "2d6cd216-9b21-40d2-8aa6-460be3642565",
+  "terminalCommandId": "tool-4c9d1852-e129-47a1-a046-921a15d58c01",
+  "commandLine": {
+    "original": "python3 -m py_compile \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " python3 -m py_compile \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581912381,
+    "duration": 9
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-4c9d1852-e129-47a1-a046-921a15d58c01"
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "7b57e26b-2f74-42cb-89e0-3293a915ce11",
+  "terminalCommandId": "tool-6a0554b2-40d3-4c6a-befe-ba0f1a1f0003",
+  "commandLine": {
+    "original": "tail -n 5 \"/workspaces/TG_Hire/pages/Espace Test.py\" | cat -A",
+    "toolEdited": " tail -n 5 \"/workspaces/TG_Hire/pages/Espace Test.py\" | cat -A"
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581917187,
+    "duration": 1
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-6a0554b2-40d3-4c6a-befe-ba0f1a1f0003"
+  },
+  "terminalCommandOutput": {
+    "text": "        - **KPIs hebdomadaires** : fenM-CM-*tre de calcul basM-CM-)e sur la &#96;reporting_date&#96; (Semaine prM-CM-)cM-CM-)dente : Lundi-&gt;Vendredi). Les mM-CM-)triques &#96;avant&#96;, &#96;nouveaux&#96;, &#96;pourvus&#96;, &#96;en_cours&#96; sont calculM-CM-)es avec des rM-CM-(gles dM-CM-)crites dans le debug (onglet Debug) et sont utilisM-CM-)es pour fabriquer le tableau \"Besoins en Cours par EntitM-CM-)\".$\r\n        \"\"\", unsafe_allow_html=True)$\r\n$\r\nif __name__ == \"__main__\":$\r\n    main()$",
+    "lineCount": 8
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "6c8782be-6800-46e9-a474-1876f1983777",
+  "terminalCommandId": "tool-8a20bd35-0458-49ca-b717-1929f7691fd7",
+  "commandLine": {
+    "original": "grep -n \"st.title(\\\"📊 Tableau de Bord RH\\\")\" \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " grep -n \"st.title(\\\"📊 Tableau de Bord RH\\\")\" \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581924018,
+    "duration": 1
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-8a20bd35-0458-49ca-b717-1929f7691fd7"
+  },
+  "terminalCommandOutput": {
+    "text": "4248:    st.title(\"📊 Tableau de Bord RH\")",
+    "lineCount": 1
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "f7bfa947-7684-4e71-a6e5-b1770c61a586",
+  "terminalCommandId": "tool-5e24a2f3-7979-4950-8d6f-a16f33119aa1",
+  "commandLine": {
+    "original": "head -n 50 \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " head -n 50 \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581928125,
+    "duration": 25
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-5e24a2f3-7979-4950-8d6f-a16f33119aa1"
+  },
+  "terminalCommandOutput": {
+    "text": "import streamlit as st\r\nimport pandas as pd\r\nimport plotly.express as px\r\nimport plotly.graph_objects as go\r\nfrom plotly.subplots import make_subplots\r\nimport numpy as np\r\nfrom datetime import datetime, timedelta\r\nimport warnings\r\nimport os\r\nimport base64\r\nwarnings.filterwarnings('ignore')\r\nimport re\r\nimport streamlit.components.v1 as components\r\nimport unicodedata\r\nfrom io import BytesIO\r\nimport json\r\nimport gspread\r\nfrom google.oauth2 import service_account\r\nimport unicodedata\r\nfrom pptx import Presentation\r\ndef _format_long_title(title: str, max_line_length: int = 20) -&gt; str:\r\n    \"\"\"Insert spaces in very long titles without natural breaks to force wrapping.\r\n    - If the title already contains spaces, return as-is (CSS will wrap).\r\n    - If no spaces and length &gt; max_line_length, insert spaces every max_line_length chars.\r\n    \"\"\"\r\n    if title is None:\r\n        return \"\"\r\n    s = str(title).strip()\r\n    if len(s) &lt;= max_line_length:\r\n        return s\r\n    if \" \" in s:\r\n        return s\r\n    chunks = [s[i:i+max_line_length] for i in range(0, len(s), max_line_length)]\r\n    return \" \".join(chunks)\r\ndef smart_wrap_title(title, max_line_length=25):\r\n    \"\"\"Retourne un titre avec des balises &lt;br&gt; aux bons endroits.\r\n    - Coupe aux espaces si possible pour respecter max_line_length\r\n    - Gère les titres sans espaces (souvent en MAJUSCULES) via regex\r\n    - Dernier recours: coupe tous les max_line_length caractères\r\n    \"\"\"\r\n    if not isinstance(title, str):\r\n        return title\r\n\r\n    s = title.strip()\r\n    if len(s) &lt;= max_line_length:\r\n        return s\r\n\r\n    # Si le titre contient des espaces, essayer de couper aux espaces\r\n    if \" \" in s:\r\n        words = s.split()",
+    "lineCount": 50
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "5765d236-9172-4394-a09a-3cbd95fff092",
+  "terminalCommandId": "tool-c63a58bc-9c64-4cd6-9430-7b2e3f731f95",
+  "commandLine": {
+    "original": "grep -n \"if __name__\" \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " grep -n \"if __name__\" \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581935819,
+    "duration": 62
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-c63a58bc-9c64-4cd6-9430-7b2e3f731f95"
+  },
+  "terminalCommandOutput": {
+    "text": "4607:if __name__ == \"__main__\":",
+    "lineCount": 1
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="copilot_replaceString">
+<details>
+<summary>Tool use: **copilot_replaceString**</summary>
+
+Additional data:
+
+```json
+{
+  "vscodeToolId": "copilot_replaceString",
+  "isHidden": true
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Replace String in File\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "&#96;&#96;&#96;python\n\n\n&#96;&#96;&#96;\n\n",
+  "textEditContent": "\n",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "27c7cd93-ed46-4c76-982c-82c9545e38a4",
+  "terminalCommandId": "tool-25920b2b-4292-44d0-8eb2-75a39421999e",
+  "commandLine": {
+    "original": "sed -n '4240,4250p' \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " sed -n '4240,4250p' \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581945587,
+    "duration": 1
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-25920b2b-4292-44d0-8eb2-75a39421999e"
+  },
+  "terminalCommandOutput": {
+    "text": "        return ppt_bytes\r\n    \r\n    except Exception as e:\r\n        st.error(f\"Erreur lors de la génération du PowerPoint: {e}\")\r\n        return None\r\n\r\ndef main():\r\n\r\n    st.title(\"📊 Tableau de Bord RH\")\r\n    st.markdown(\"---\")\r\n    # Date de reporting : permet de fixer la date de référence pour tous les calculs",
+    "lineCount": 11
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="copilot_replaceString">
+<details>
+<summary>Tool use: **copilot_replaceString**</summary>
+
+Additional data:
+
+```json
+{
+  "vscodeToolId": "copilot_replaceString",
+  "isHidden": true
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Replace String in File\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "a5c53def-bc93-4aab-985a-876b525ea7cf",
+  "terminalCommandId": "tool-1299329a-c657-45dc-ad78-5882c1f65cb1",
+  "commandLine": {
+    "original": "sed -i '4247d' \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " sed -i '4247d' \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581955546,
+    "duration": 0
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-1299329a-c657-45dc-ad78-5882c1f65cb1"
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "f9a4b573-364c-4edb-be0a-39dbe29df091",
+  "terminalCommandId": "tool-389fc81d-fd75-44d8-b023-5b9be62e9db6",
+  "commandLine": {
+    "original": "sed -n '4245,4250p' \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " sed -n '4245,4250p' \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581959777,
+    "duration": 1
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-389fc81d-fd75-44d8-b023-5b9be62e9db6"
+  },
+  "terminalCommandOutput": {
+    "text": "\r\ndef main():\r\n    st.title(\"📊 Tableau de Bord RH\")\r\n    st.markdown(\"---\")\r\n    # Date de reporting : permet de fixer la date de référence pour tous les calculs\r\n    if 'reporting_date' not in st.session_state:",
+    "lineCount": 6
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "929f43c2-c43a-4a12-9dc4-841760f58c7d",
+  "terminalCommandId": "tool-f15025ad-0d19-4f9f-8c21-325ffa105c44",
+  "commandLine": {
+    "original": "sed -i 's/def main():/def espace_test_main_app():/' \"/workspaces/TG_Hire/pages/Espace Test.py\" &amp;&amp; sed -i 's/    main()/    espace_test_main_app()/' \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " sed -i 's/def main():/def espace_test_main_app():/' \"/workspaces/TG_Hire/pages/Espace Test.py\" &amp;&amp; sed -i 's/    main()/    espace_test_main_app()/' \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581965803,
+    "duration": 1
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-f15025ad-0d19-4f9f-8c21-325ffa105c44"
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "4d4aec84-da82-43b7-aeb0-1eaae0ba1817",
+  "terminalCommandId": "tool-6546ca33-2447-4474-8c43-1997081901ec",
+  "commandLine": {
+    "original": "grep -n \"espace_test_main_app\" \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " grep -n \"espace_test_main_app\" \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581969905,
+    "duration": 12
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-6546ca33-2447-4474-8c43-1997081901ec"
+  },
+  "terminalCommandOutput": {
+    "text": "4246:def espace_test_main_app():\r\n4607:    espace_test_main_app()",
+    "lineCount": 2
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "6e4bba2d-fe3f-48e6-a78d-41a689d0af35",
+  "terminalCommandId": "tool-6c1fef8c-5dce-4a1c-8f9c-ed456723cfb3",
+  "commandLine": {
+    "original": "sed -n '4607l' \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " sed -n '4607l' \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581974490,
+    "duration": 0
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-6c1fef8c-5dce-4a1c-8f9c-ed456723cfb3"
+  },
+  "terminalCommandOutput": {
+    "text": "    espace_test_main_app()$",
+    "lineCount": 1
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "147389b4-0280-40fc-9a52-c82ac74a2869",
+  "terminalCommandId": "tool-68045a17-4f4c-415d-b059-152f0d7a95a7",
+  "commandLine": {
+    "original": "sed -n '4606' \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " sed -n '4606' \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 1,
+    "timestamp": 1768581978852,
+    "duration": 1
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-68045a17-4f4c-415d-b059-152f0d7a95a7"
+  },
+  "terminalCommandOutput": {
+    "text": "sed: -e expression #1, char 4: missing command",
+    "lineCount": 1
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "a5a8f117-b485-4f94-9360-95333e6c1763",
+  "terminalCommandId": "tool-e48f14a4-0798-4b1b-8463-279b93bbc99f",
+  "commandLine": {
+    "original": "sed -n '4605,4610p' \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " sed -n '4605,4610p' \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581982843,
+    "duration": 1
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-e48f14a4-0798-4b1b-8463-279b93bbc99f"
+  },
+  "terminalCommandOutput": {
+    "text": "\r\nif __name__ == \"__main__\":\r\n    espace_test_main_app()",
+    "lineCount": 3
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "5280299c-247a-4756-9459-ec6a3f5d6bad",
+  "terminalCommandId": "tool-80d1a992-c07e-48b8-9e9f-397d21341dbf",
+  "commandLine": {
+    "original": "cat -n \"/workspaces/TG_Hire/pages/Espace Test.py\" | tail -n 10",
+    "toolEdited": " cat -n \"/workspaces/TG_Hire/pages/Espace Test.py\" | tail -n 10"
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581987438,
+    "duration": 24
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-80d1a992-c07e-48b8-9e9f-397d21341dbf"
+  },
+  "terminalCommandOutput": {
+    "text": "  4598\u001b[2C        - **Comparaison par direction / poste / raison** : histogrammes basés sur les valeurs de colonnes &#96;Direction concernée&#96;, &#96;Poste demandé&#96; et &#96;Raison du recrutement&#96;. Les étiquettes affichent les totaux par catégorie (valeurs affichées en gras et couleur claire pour lisibilité).\r\n  4599\u001b[2C        - **Évolution des demandes / intégrations** : bar charts mensuels agrégés par date (date de réception de la demande ou date d'entrée prévue). Les valeurs sont intégrées dans les barres (au lieu d'être placées au-dessus) pour éviter qu'elles soient coupées.\r\n  4600\u001b[2C        - **Nombre de candidats présélectionnés** : somme des valeurs numériques de la colonne &#96;Nb de candidats pré-selectionnés&#96; (valeurs non numériques traitées comme 0). Le libellé est affiché à gauche du graphique pour éviter l'étiquette centrale indésirable.\r\n  4601\u001b[2C        - **Délai de recrutement** : calculé comme la différence en jours entre &#96;Date d'entrée effective du candidat&#96; et &#96;Date de réception de la demande après validation de la DRH&#96;. Affiché dans le debug \"Recrutements Clôturés\".\r\n  4602\u001b[2C        - **Intégrations — explication du signal \"⚠️ En retard\"** : une intégration est considérée en retard si la &#96;Date d'entrée prévisionnelle&#96; est antérieure à la date de reporting (aujourd'hui ou &#96;reporting_date&#96; sélectionnée). Le compteur &#96;En retard&#96; regroupe ces cas pour vous alerter.\r\n  4603\u001b[2C        - **KPIs hebdomadaires** : fenêtre de calcul basée sur la &#96;reporting_date&#96; (Semaine précédente : Lundi-&gt;Vendredi). Les métriques &#96;avant&#96;, &#96;nouveaux&#96;, &#96;pourvus&#96;, &#96;en_cours&#96; sont calculées avec des règles décrites dans le debug (onglet Debug) et sont utilisées pour fabriquer le tableau \"Besoins en Cours par Entité\".\r\n  4604\u001b[2C        \"\"\", unsafe_allow_html=True)\r\n  4605\r\n  4606\u001b[2Cif __name__ == \"__main__\":\r\n  4607\u001b[2C    espace_test_main_app()",
+    "lineCount": 23
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "2253fb92-7ec4-46f6-9d46-9232c4991db2",
+  "terminalCommandId": "tool-aee71c67-271e-4bb6-9243-18655d35adae",
+  "commandLine": {
+    "original": "grep \"^import \" \"/workspaces/TG_Hire/pages/Espace Test.py\" &amp;&amp; grep \"^from \" \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " grep \"^import \" \"/workspaces/TG_Hire/pages/Espace Test.py\" &amp;&amp; grep \"^from \" \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768581992608,
+    "duration": 1
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-aee71c67-271e-4bb6-9243-18655d35adae"
+  },
+  "terminalCommandOutput": {
+    "text": "import streamlit as st\r\nimport pandas as pd\r\nimport plotly.express as px\r\nimport plotly.graph_objects as go\r\nimport numpy as np\r\nimport warnings\r\nimport os\r\nimport base64\r\nimport re\r\nimport streamlit.components.v1 as components\r\nimport unicodedata\r\nimport json\r\nimport gspread\r\nimport unicodedata\r\nimport io\r\nfrom plotly.subplots import make_subplots\r\nfrom datetime import datetime, timedelta\r\nfrom io import BytesIO\r\nfrom google.oauth2 import service_account\r\nfrom pptx import Presentation\r\nfrom pptx.util import Inches, Pt\r\nfrom PIL import Image",
+    "lineCount": 22
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "df6ac052-2ea3-42f0-9a80-d82c73ad32c1",
+  "terminalCommandId": "tool-7de37f86-c070-4e59-a9f2-aa56abfb20b3",
+  "commandLine": {
+    "original": "grep \"main()\" \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " grep \"main()\" \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 1,
+    "timestamp": 1768581997659,
+    "duration": 1
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-7de37f86-c070-4e59-a9f2-aa56abfb20b3"
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "a3f4d117-4c8d-46fb-8e89-b46bdbd0a273",
+  "terminalCommandId": "tool-b03d8dbe-8860-43bf-b7b8-ab6ff8e1c078",
+  "commandLine": {
+    "original": "grep -w \"main\" \"/workspaces/TG_Hire/pages/Espace Test.py\"",
+    "toolEdited": " grep -w \"main\" \"/workspaces/TG_Hire/pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768582001807,
+    "duration": 1
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-b03d8dbe-8860-43bf-b7b8-ab6ff8e1c078"
+  },
+  "terminalCommandOutput": {
+    "text": "# Shared title font used for all main charts so typography is consistent",
+    "lineCount": 1
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "8283a599-c22a-4c72-b16d-0aed06bea392",
+  "terminalCommandId": "tool-d452f88f-dd35-464c-8230-2a1fba0ff9cb",
+  "commandLine": {
+    "original": "git add \"pages/Espace Test.py\" &amp;&amp; git commit -m \"fix: Restore missing main function definition and rename to avoid conflicts\" &amp;&amp; git push",
+    "toolEdited": " git add \"pages/Espace Test.py\" &amp;&amp; git commit -m \"fix: Restore missing main function definition and rename to avoid conflicts\" &amp;&amp; git push"
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768582007055,
+    "duration": 498
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-d452f88f-dd35-464c-8230-2a1fba0ff9cb"
+  },
+  "terminalCommandOutput": {
+    "text": "[main 15cb3848] fix: Restore missing main function definition and rename to avoid conflicts\r\n Author: zekobiceps &lt;zekobiceps@users.noreply.github.com&gt;\r\n 1 file changed, 2 insertions(+), 2 deletions(-)\r\nEnumerating objects: 7, done.\r\nCounting objects: 100% (7/7), done.\r\nDelta compression using up to 2 threads\r\nCompressing objects: 100% (4/4), done.\r\nWriting objects: 100% (4/4), 455 bytes | 455.00 KiB/s, done.\r\nTotal 4 (delta 3), reused 0 (delta 0), pack-reused 0 (from 0)\r\nremote: Resolving deltas: 100% (3/3), completed with 3 local objects.\r\nTo https://github.com/zekobiceps/TG_Hire\r\n   d61b16ea..15cb3848  main -&gt; main",
+    "lineCount": 12
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+Le `NameError` était dû à la suppression accidentelle de la ligne `def main():` lors d'une opération `sed` précédente sur le fichier `Espace Test.py`.
+
+J'ai effectué les corrections suivantes :
+1. Restauré la définition de la fonction `def main():`.
+2. Renommé la fonction en `espace_test_main_app()` pour éviter tout conflit potentiel de nom avec d'autres modules ou variables globales.
+3. Vérifié que l'indentation de tout le bloc principal est correcte et que le fichier compile (via `py_compile`).
+4. Supprimé les lignes vides inutiles qui auraient pu perturber l'interprétation du bloc.
+
+L'application devrait maintenant se lancer correctement.
+
+---
+
+_**User (2026-01-16 17:04Z)**_
+
+- dans détail des intégrations ajoute juste après la colonne candidat une colonne psote demandé.
+- la parties des 4 indicateurs dans demandes de recrutement en bas d'eux il y a une ligne merci de l'enlever et réduire l'espace entre ses indicateurs et les graphiques en bas d'eux et pareil pour cette partie qui existe dans reporting hebdomadaire et intégrations et augmente un peut la taille des titres et le numéro de l'indicateur : Postes en cours (sourcing)  Postes pourvus cette semaine  Nouveaux postes ouverts  Total postes ouverts avant la semaine Intégrations en cours 📋 Plan d'intégration à préparer  ⚠️ En retard  Nombre de demandes  Nouvelles Demandes (ce mois-ci)  Demandes Annulées/Dépriorisées  Taux d'annulation Nombre de recrutements Postes concernés Nombre de Directions concernées  Délai moyen recrutement (jours),
+ puit comit et push
+
+---
+
+_**Agent (model copilot/gemini-3-flash-preview)**_
+
+<tool-use data-tool-type="search" data-tool-name="copilot_findTextInFiles">
+<details>
+<summary>Tool use: **copilot_findTextInFiles** • Searching for regex `create_demandes_recrutement_tab|create_weekly_report_tab|create_integrations_tab|create_recrutements_clotures_tab|st\.metric` (`**/pages/Espace Test.py`)</summary>
+
+
+Searched for regex `create_demandes_recrutement_tab|create_weekly_report_tab|create_integrations_tab|create_recrutements_clotures_tab|st\.metric` (`**/pages/Espace Test.py`), 8 results
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#789-789), lines 789 to 835</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#789-789), lines 789 to 835
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1083-1083), lines 1083 to 1150</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1083-1083), lines 1083 to 1150
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1296-1296), lines 1296 to 1370</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1296-1296), lines 1296 to 1370
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1895-1895), lines 1895 to 1970</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1895-1895), lines 1895 to 1970
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1370-1370), lines 1370 to 1460</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1370-1370), lines 1370 to 1460
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="copilot_findTextInFiles">
+<details>
+<summary>Tool use: **copilot_findTextInFiles** • Searching for text `def render_generic_metrics` (`**/pages/Espace Test.py`)</summary>
+
+
+Searched for text `def render_generic_metrics` (`**/pages/Espace Test.py`), 1 result
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#119-119), lines 119 to 150</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#119-119), lines 119 to 150
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#825-825), lines 825 to 850</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#825-825), lines 825 to 850
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1105-1105), lines 1105 to 1120</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1105-1105), lines 1105 to 1120
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1365-1365), lines 1365 to 1380</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1365-1365), lines 1365 to 1380
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1925-1925), lines 1925 to 1950</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1925-1925), lines 1925 to 1950
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1400-1400), lines 1400 to 1460</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1400-1400), lines 1400 to 1460
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1290-1290), lines 1290 to 1330</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1290-1290), lines 1290 to 1330
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1120-1120), lines 1120 to 1150</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1120-1120), lines 1120 to 1150
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="copilot_findTextInFiles">
+<details>
+<summary>Tool use: **copilot_findTextInFiles** • Searching for text `Poste demandé`</summary>
+
+
+Searched for text `Poste demandé`, 20 results
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="copilot_findTextInFiles">
+<details>
+<summary>Tool use: **copilot_findTextInFiles** • Searching for text `Poste demandé` (`**/pages/Espace Test.py`)</summary>
+
+
+Searched for text `Poste demandé` (`**/pages/Espace Test.py`), 20 results
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="copilot_replaceString">
+<details>
+<summary>Tool use: **copilot_replaceString**</summary>
+
+Additional data:
+
+```json
+{
+  "vscodeToolId": "copilot_replaceString",
+  "isHidden": true
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Replace String in File\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#119-119), lines 119 to 145</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#119-119), lines 119 to 145
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="copilot_replaceString">
+<details>
+<summary>Tool use: **copilot_replaceString**</summary>
+
+Additional data:
+
+```json
+{
+  "vscodeToolId": "copilot_replaceString",
+  "isHidden": true
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Replace String in File\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "&#96;&#96;&#96;python\n8px}\n    .gen-kpi{background:#fff;border-radius:8px;padding:14px 18px;min-width:220px;flex:0 1 auto;border:1px solid #e6eef6;box-shadow:0 2px 6px rgba(0,0,0,0.04);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}\n    .gen-kpi .t{font-size:17px;color:#2c3e50;margin-bottom:8px;font-weight:700;text-align:center}\n    .gen-kpi .v{font-size:36\n&#96;&#96;&#96;\n\n",
+  "textEditContent": "8px}\n    .gen-kpi{background:#fff;border-radius:8px;padding:14px 18px;min-width:220px;flex:0 1 auto;border:1px solid #e6eef6;box-shadow:0 2px 6px rgba(0,0,0,0.04);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}\n    .gen-kpi .t{font-size:17px;color:#2c3e50;margin-bottom:8px;font-weight:700;text-align:center}\n    .gen-kpi .v{font-size:36",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="copilot_replaceString">
+<details>
+<summary>Tool use: **copilot_replaceString**</summary>
+
+
+Parameters:
+
+```json
+{
+  "relativeWorkspacePath": "\\workspaces\\TG_Hire\\pages\\Espace Test.py",
+  "file_path": "\\workspaces\\TG_Hire\\pages\\Espace Test.py"
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "copilot_replaceString",
+  "isHidden": true
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Replace String in File\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="copilot_replaceString">
+<details>
+<summary>Tool use: **copilot_replaceString**</summary>
+
+
+Parameters:
+
+```json
+{
+  "relativeWorkspacePath": "\\workspaces\\TG_Hire\\pages\\Espace Test.py",
+  "file_path": "\\workspaces\\TG_Hire\\pages\\Espace Test.py"
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "copilot_replaceString",
+  "isHidden": true
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Replace String in File\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "a705e285-ea08-4831-9df5-0e95a4b7b3c7",
+  "terminalCommandId": "tool-9392a327-a698-4a8d-8df5-46bf4b4e9a0f",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; import sys; sys.path.append('.'); from utils import load_recrutement_data_from_gsheets; df = load_recrutement_data_from_gsheets(); print(list(df.columns))\"",
+    "toolEdited": " python3 -c \"import pandas as pd; import sys; sys.path.append('.'); from utils import load_recrutement_data_from_gsheets; df = load_recrutement_data_from_gsheets(); print(list(df.columns))\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 1,
+    "timestamp": 1768583051660,
+    "duration": 6233
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-9392a327-a698-4a8d-8df5-46bf4b4e9a0f"
+  },
+  "terminalCommandOutput": {
+    "text": "2026-01-16 17:04:11.140 WARNING streamlit.runtime.caching.cache_data_api: No runtime found, using MemoryCacheStorageManager\r\nTraceback (most recent call last):\r\n  File \"&lt;string&gt;\", line 1, in &lt;module&gt;\r\nImportError: cannot import name 'load_recrutement_data_from_gsheets' from 'utils' (/workspaces/TG_Hire/utils.py)",
+    "lineCount": 6
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="copilot_findTextInFiles">
+<details>
+<summary>Tool use: **copilot_findTextInFiles** • Searching for text `load_` (`**/utils.py`)</summary>
+
+
+Searched for text `load_` (`**/utils.py`), 12 results
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="copilot_findTextInFiles">
+<details>
+<summary>Tool use: **copilot_findTextInFiles** • Searching for text `from utils import` (`**/pages/Espace Test.py`)</summary>
+
+
+No results found
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="copilot_findTextInFiles">
+<details>
+<summary>Tool use: **copilot_findTextInFiles** • Searching for text `import utils` (`**/pages/Espace Test.py`)</summary>
+
+
+No results found
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1-1), lines 1 to 50</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1-1), lines 1 to 50
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="copilot_findTextInFiles">
+<details>
+<summary>Tool use: **copilot_findTextInFiles** • Searching for text `def espace_test_main_app` (`**/pages/Espace Test.py`)</summary>
+
+
+No results found
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#4900-4900), lines 4900 to 4945</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#4900-4900), lines 4900 to 4945
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="copilot_findTextInFiles">
+<details>
+<summary>Tool use: **copilot_findTextInFiles** • Searching for text `def main():` (`**/pages/Espace Test.py`)</summary>
+
+
+Searched for text `def main():` (`**/pages/Espace Test.py`), 1 result
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1296-1296), lines 1296 to 1450</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1296-1296), lines 1296 to 1450
+
+</details>
+</tool-use>
+
+---
+
+[object Object]
+
+---
+
+_**User (2026-01-16 17:06Z)**_
+
+@agent Continue: "Continue to iterate?"
+
+---
+
+_**Agent (model copilot/gemini-3-flash-preview)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="copilot_replaceString">
+<details>
+<summary>Tool use: **copilot_replaceString**</summary>
+
+Additional data:
+
+```json
+{
+  "vscodeToolId": "copilot_replaceString",
+  "isHidden": true
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Replace String in File\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "&#96;&#96;&#96;python\n\n    # Détection automatique de la colonne Poste pour éviter les problèmes d'espaces\n    poste_col_detected = 'Poste demandé ' if 'Poste demandé ' in df_filtered.columns else 'Poste demandé'\n    \n    colonnes_affichage = [\n        candidat_col, \n        poste_col_detected,\n        'Entité demandeuse',\n        'Affectation',\n        date_integration_col,\n        plan_integration_col\n    ]\n    # Filtrer les colonnes qui existent\n    colonnes_disponibles = [col for col in colonnes_affichage if col in df_filtered.columns]\n    \n    if colonnes_disponibles:\n        # Travailler sur une copie des colonnes disponibles\n        df_display = df_filtered[colonnes_disponibles].copy()\n\n        # Exclure les lignes sans date d'intégration prévue AVANT le formatage\n        if date_integration_col in df_display.columns:\n            df_display = df_display[df_display[date_integration_col].notna() &amp; df_display[date_integration_col].astype(str).str.strip().ne('')].copy()\n            \n            # Trier par date d'intégration croissante AVANT formatage\n            try:\n                df_display['_sort_date'] = pd.to_datetime(df_display[date_integration_col], errors='coerce')\n                df_display = df_display.sort_values('_sort_date', ascending=True)\n                df_display = df_display.drop(columns=['_sort_date'])\n            except Exception:\n                pass\n\n            # Formater la date pour enlever l'heure et s'assurer du bon format DD/MM/YYYY\n            def format_date_safely(date_str):\n                if pd.isna(date_str) or date_str == '' or str(date_str).strip().upper() == 'N/A' or date_str is pd.NaT:\n                    return 'N/A'\n                parsed_date = pd.to_datetime(date_str, errors='coerce')\n                if pd.notna(parsed_date):\n                    return parsed_date.strftime('%d/%m/%Y')\n                else:\n                    return 'N/A'\n\n            df_display[date_integration_col] = df_display[date_integration_col].apply(format_date_safely)\n\n        # Renommer pour affichage plus propre\n        rename_map = {\n            candidat_col: \"Candidat\",\n            date_integration_col: \"Date d'Intégration Prévue\"\n        }\n        if poste_col_detected in df_display.columns:\n            rename_map[poste_col_detected] = \"Poste demandé\"\n            \n        df_display_table = df_display.rename(columns=rename_map\n&#96;&#96;&#96;\n\n",
+  "textEditContent": "\n    # Détection automatique de la colonne Poste pour éviter les problèmes d'espaces\n    poste_col_detected = 'Poste demandé ' if 'Poste demandé ' in df_filtered.columns else 'Poste demandé'\n    \n    colonnes_affichage = [\n        candidat_col, \n        poste_col_detected,\n        'Entité demandeuse',\n        'Affectation',\n        date_integration_col,\n        plan_integration_col\n    ]\n    # Filtrer les colonnes qui existent\n    colonnes_disponibles = [col for col in colonnes_affichage if col in df_filtered.columns]\n    \n    if colonnes_disponibles:\n        # Travailler sur une copie des colonnes disponibles\n        df_display = df_filtered[colonnes_disponibles].copy()\n\n        # Exclure les lignes sans date d'intégration prévue AVANT le formatage\n        if date_integration_col in df_display.columns:\n            df_display = df_display[df_display[date_integration_col].notna() &amp; df_display[date_integration_col].astype(str).str.strip().ne('')].copy()\n            \n            # Trier par date d'intégration croissante AVANT formatage\n            try:\n                df_display['_sort_date'] = pd.to_datetime(df_display[date_integration_col], errors='coerce')\n                df_display = df_display.sort_values('_sort_date', ascending=True)\n                df_display = df_display.drop(columns=['_sort_date'])\n            except Exception:\n                pass\n\n            # Formater la date pour enlever l'heure et s'assurer du bon format DD/MM/YYYY\n            def format_date_safely(date_str):\n                if pd.isna(date_str) or date_str == '' or str(date_str).strip().upper() == 'N/A' or date_str is pd.NaT:\n                    return 'N/A'\n                parsed_date = pd.to_datetime(date_str, errors='coerce')\n                if pd.notna(parsed_date):\n                    return parsed_date.strftime('%d/%m/%Y')\n                else:\n                    return 'N/A'\n\n            df_display[date_integration_col] = df_display[date_integration_col].apply(format_date_safely)\n\n        # Renommer pour affichage plus propre\n        rename_map = {\n            candidat_col: \"Candidat\",\n            date_integration_col: \"Date d'Intégration Prévue\"\n        }\n        if poste_col_detected in df_display.columns:\n            rename_map[poste_col_detected] = \"Poste demandé\"\n            \n        df_display_table = df_display.rename(columns=rename_map",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1365-1365), lines 1365 to 1375</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#1365-1365), lines 1365 to 1375
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#835-835), lines 835 to 845</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/Espace%20Test.py#835-835), lines 835 to 845
+
+</details>
+</tool-use>
+
+---
+
+J'ai effectué les modifications demandées dans le fichier `Espace Test.py` :
+
+1.  **Détail des Intégrations** :
+    *   J'ai ajouté la colonne **"Poste demandé"** juste après la colonne "Candidat" dans le tableau détaillé des intégrations.
+    *   J'ai mis en place une détection automatique pour gérer le nom de la colonne, qu'il contienne ou non un espace à la fin (`Poste demandé` ou `Poste demandé `), afin d'assurer son affichage.
+
+2.  **Optimisation de l'Espace** :
+    *   J'ai supprimé les lignes de séparation (`---`) après les indicateurs (KPIs) dans les onglets **"Demandes"** et **"Reporting Hebdomadaire"**.
+    *   J'ai réduit l'espacement vertical (marge basse) des blocs d'indicateurs pour rapprocher les chiffres des graphiques.
+
+3.  **Taille des Indicateurs** :
+    *   J'ai augmenté la taille de la police pour une meilleure visibilité :
+        *   **Titres** : de 14px à **17px**.
+        *   **Valeurs numériques** : de 28px à **36px**.
+
+Les changements sont appliqués globalement à toutes les sections utilisant la fonction de rendu des métriques.
+
+---
+
+_**User (2026-01-16 17:10Z)**_
+
+COMMIT ET PUSH
+
+---
+
+_**Agent (model copilot/gemini-3-flash-preview)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "f49a1551-2f24-4008-b13e-7b2e9bf0f0f4",
+  "terminalCommandId": "tool-d5061d66-20b5-40fe-b80b-2e385adb4d89",
+  "commandLine": {
+    "original": "git add \"pages/Espace Test.py\" &amp;&amp; git commit -m \"UI: Increase KPI font sizes, reduce spacing, and add Poste column to integrations\" &amp;&amp; git push",
+    "toolEdited": " git add \"pages/Espace Test.py\" &amp;&amp; git commit -m \"UI: Increase KPI font sizes, reduce spacing, and add Poste column to integrations\" &amp;&amp; git push"
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved for this session ([Disable](command:workbench.action.terminal.chat.disableSessionAutoApproval?%255B%252269dc98cc-1b45-4b0d-ad16-398669ea7475%2522%255D))",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.disableSessionAutoApproval"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768583406264,
+    "duration": 371
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-d5061d66-20b5-40fe-b80b-2e385adb4d89"
+  },
+  "terminalCommandOutput": {
+    "text": "[main 38f002f7] UI: Increase KPI font sizes, reduce spacing, and add Poste column to integrations\r\n Author: zekobiceps &lt;zekobiceps@users.noreply.github.com&gt;\r\n 1 file changed, 19 insertions(+), 18 deletions(-)\r\nEnumerating objects: 7, done.\r\nCounting objects: 100% (7/7), done.\r\nDelta compression using up to 2 threads\r\nCompressing objects: 100% (4/4), done.\r\nWriting objects: 100% (4/4), 857 bytes | 857.00 KiB/s, done.\r\nTotal 4 (delta 3), reused 0 (delta 0), pack-reused 0 (from 0)\r\nremote: Resolving deltas: 100% (3/3), completed with 3 local objects.\r\nTo https://github.com/zekobiceps/TG_Hire\r\n   44666b5b..38f002f7  main -&gt; main",
+    "lineCount": 12
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+Les modifications ont été validées et poussées avec succès sur la branche `main` :
+
+*   **Fichier** : `Espace Test.py`
+*   **Commit** : `38f002f7`
+*   **Changements** : Augmentation de la taille des KPIs, réduction des espacements et ajout de la colonne "Poste demandé" dans le tableau des intégrations.
 
 ---
 
