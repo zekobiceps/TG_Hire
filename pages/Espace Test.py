@@ -122,10 +122,10 @@ def render_generic_metrics(metrics):
     """
     css = """
     <style>
-    .gen-kpi-row{display:flex;gap:18px;justify-content:center;align-items:stretch;margin-bottom:18px}
+    .gen-kpi-row{display:flex;gap:18px;justify-content:center;align-items:stretch;margin-bottom:8px}
     .gen-kpi{background:#fff;border-radius:8px;padding:14px 18px;min-width:220px;flex:0 1 auto;border:1px solid #e6eef6;box-shadow:0 2px 6px rgba(0,0,0,0.04);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
-    .gen-kpi .t{font-size:14px;color:#2c3e50;margin-bottom:8px;font-weight:700;text-align:center}
-    .gen-kpi .v{font-size:28px;color:#172b4d;font-weight:800;text-align:center}
+    .gen-kpi .t{font-size:17px;color:#2c3e50;margin-bottom:8px;font-weight:700;text-align:center}
+    .gen-kpi .v{font-size:36px;color:#172b4d;font-weight:800;text-align:center}
     </style>
     """
     cards = []
@@ -1115,7 +1115,6 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
     st.markdown(metrics_html, unsafe_allow_html=True)
 
     # Graphiques principaux
-    st.markdown("---")
     col1, col2, col3 = st.columns([1,1,2])
     
     with col1:
@@ -1317,13 +1316,10 @@ def create_integrations_tab(df_recrutement, global_filters):
     ])
     
     # Critères : Statut "En cours" ET candidat avec nom
-    # Filtrer pour ne garder que les intégrations avec une date d'entrée prévisionnelle
     df_integrations = df_recrutement[
         (df_recrutement['Statut de la demande'] == 'En cours') &
         (df_recrutement[candidat_col].notna()) &
-        (df_recrutement[candidat_col].str.strip() != "") &
-        (df_recrutement[date_integration_col].notna()) &  # Ajout du filtre ici
-        (df_recrutement[date_integration_col].astype(str).str.strip() != "")
+        (df_recrutement[candidat_col].str.strip() != "")
     ].copy()
     
     # Message de diagnostic
@@ -1411,9 +1407,13 @@ def create_integrations_tab(df_recrutement, global_filters):
     
     # Tableau détaillé des intégrations
     st.subheader("📋 Détail des Intégrations en Cours")
+    
+    # Détection automatique de la colonne Poste pour éviter les problèmes d'espaces
+    poste_col_detected = 'Poste demandé ' if 'Poste demandé ' in df_filtered.columns else 'Poste demandé'
+    
     colonnes_affichage = [
         candidat_col, 
-        'Poste demandé ',
+        poste_col_detected,
         'Entité demandeuse',
         'Affectation',
         date_integration_col,
@@ -1451,11 +1451,14 @@ def create_integrations_tab(df_recrutement, global_filters):
             df_display[date_integration_col] = df_display[date_integration_col].apply(format_date_safely)
 
         # Renommer pour affichage plus propre
-        df_display_table = df_display.rename(columns={
+        rename_map = {
             candidat_col: "Candidat",
-            'Poste demandé ': "Poste",
             date_integration_col: "Date d'Intégration Prévue"
-        })
+        }
+        if poste_col_detected in df_display.columns:
+            rename_map[poste_col_detected] = "Poste demandé"
+            
+        df_display_table = df_display.rename(columns=rename_map)
 
         # Réinitialiser l'index pour enlever les numéros de ligne
         df_display_table = df_display_table.reset_index(drop=True)
@@ -1937,8 +1940,6 @@ def create_weekly_report_tab(df_recrutement=None):
         ("Total postes ouverts avant la semaine", total_avant, "#6f42c1")
     ])
     st.markdown(kpi_cards_html, unsafe_allow_html=True)
-
-    st.markdown("---")
 
     # Tableau récapitulatif par entité (HTML personnalisé, rendu centralisé)
     st.markdown(
@@ -4935,17 +4936,17 @@ def main():
             st.warning("📊 Aucune donnée disponible pour les intégrations. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
 
     with tabs[4]:
-        st.header("📖 Méthodologie du Reporting b")
+        st.header("📖 Méthodologie du Reporting")
         st.markdown("""
         - **Besoins en cours par entité** : calculés à partir des demandes validées par la DRH. Les postes "en cours" sont soit déterminés par le statut `En cours`, soit par la formule (postes avant + nouveaux - pourvus) si les dates manquent.
-        - **Recrutements en cours par recruteur** : tableau pivot par `Colonne TG Hire` (Sourcing, Shortlisté, Signature DRH, Clôture). La colonne affichée **"Total (sans clôture)"** est calculée pour chaque recruteur comme : `Sourcing + Shortlisté + Signature DRH - Clôture` (valeur minimale 0).
+        - **Recrutements en cours par recruteur** : tableau pivot par `Colonne TG Hire` (Sourcing, Shortlisté, Signature DRH, Clôture). La colonne affichée **"Total (sans clôture)"** est calculée pour chaque recruteur comme : `Sourcing + Shortlisté + Signature DRH - Clôture` (valeur minimale 0). Les lignes sans recruteur explicite sont exclues. Certaines personnes (ex: Bouchra AJBILOU, Bouchra AOUISSE, Ghita LAKHDAR, Reda Berrada, Reda Mohamed BERRADA, Saad FATI) sont volontairement exclues du tableau.
         - **Comparaison par direction / poste / raison** : histogrammes basés sur les valeurs de colonnes `Direction concernée`, `Poste demandé` et `Raison du recrutement`. Les étiquettes affichent les totaux par catégorie (valeurs affichées en gras et couleur claire pour lisibilité).
         - **Évolution des demandes / intégrations** : bar charts mensuels agrégés par date (date de réception de la demande ou date d'entrée prévue). Les valeurs sont intégrées dans les barres (au lieu d'être placées au-dessus) pour éviter qu'elles soient coupées.
         - **Nombre de candidats présélectionnés** : somme des valeurs numériques de la colonne `Nb de candidats pré-selectionnés` (valeurs non numériques traitées comme 0). Le libellé est affiché à gauche du graphique pour éviter l'étiquette centrale indésirable.
         - **Délai de recrutement** : calculé comme la différence en jours entre `Date d'entrée effective du candidat` et `Date de réception de la demande après validation de la DRH`. Affiché dans le debug "Recrutements Clôturés".
         - **Intégrations — explication du signal "⚠️ En retard"** : une intégration est considérée en retard si la `Date d'entrée prévisionnelle` est antérieure à la date de reporting (aujourd'hui ou `reporting_date` sélectionnée). Le compteur `En retard` regroupe ces cas pour vous alerter.
         - **KPIs hebdomadaires** : fenêtre de calcul basée sur la `reporting_date` (Semaine précédente : Lundi->Vendredi). Les métriques `avant`, `nouveaux`, `pourvus`, `en_cours` sont calculées avec des règles décrites dans le debug (onglet Debug) et sont utilisées pour fabriquer le tableau "Besoins en Cours par Entité".
-        """, unsafe_allow_html=True) 
+        """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
