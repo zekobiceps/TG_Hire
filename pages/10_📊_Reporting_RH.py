@@ -4998,7 +4998,7 @@ def main():
 
         ### 🎯 Indicateurs de Performance (KPIs)
         - **Nombre de candidats présélectionnés** : Somme cumulative de la colonne `Nb de candidats pré-selectionnés`.
-        - **Délai de recrutement (Time-to-Hire)** : Calculé comme la différence (en jours) entre la `Date du 1er retour équipe RH` et la `Date de réception de la demande`. Cet indicateur se base **uniquement** sur les postes ayant le statut **"Clôture"**.
+        - **Délai de recrutement (Duree de recrutement)** : Calculé selon la formule : `DATEDIFF('Date de réception de la demande','Date du 1er retour equipe RH', day)`. Cet indicateur se base **uniquement** sur les postes ayant le statut **"Clôture"**.
         - **Taux de refus** : Ratio entre le nombre de refus et le nombre de promesses d'embauche réalisées.
         """, unsafe_allow_html=True)
 
