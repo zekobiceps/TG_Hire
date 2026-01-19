@@ -814,13 +814,13 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
 
     # Compute delai display and help
     date_reception_col = 'Date de réception de la demande aprés validation de la DRH'
-    date_entree_col = 'Date d\'entrée effective du candidat'
+    date_retour_rh_col = 'Date du 1er retour equipe RH  au demandeur'
     delai_display = "N/A"
     delai_help = "Colonnes manquantes ou pas de durées valides"
-    if date_reception_col in df_filtered.columns and date_entree_col in df_filtered.columns:
+    if date_reception_col in df_filtered.columns and date_retour_rh_col in df_filtered.columns:
         try:
             s = pd.to_datetime(df_filtered[date_reception_col], errors='coerce')
-            e = pd.to_datetime(df_filtered[date_entree_col], errors='coerce')
+            e = pd.to_datetime(df_filtered[date_retour_rh_col], errors='coerce')
             mask = s.notna() & e.notna()
             if mask.sum() > 0:
                 durees = (e[mask] - s[mask]).dt.days
@@ -837,7 +837,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         ("Nombre de recrutements", recrutements, "#1f77b4"),
         ("Postes concernés", postes_uniques, "#2ca02c"),
         ("Nombre de Directions concernées", directions_uniques, "#ff7f0e"),
-        ("Time-to-Hire moyen (jours)", delai_display, "#6f42c1")
+        ("Délai moyen recrutement (jours)", delai_display, "#6f42c1")
     ])
     st.markdown(metrics_html, unsafe_allow_html=True)
     
@@ -4123,7 +4123,7 @@ def generate_recrutements_clotures_html_image(df_recrutement):
     directions_uniques = df_cl['Direction concernée'].nunique() if 'Direction concernée' in df_cl.columns else 0
     delai_display = "N/A"
     rec_col = next((c for c in df_cl.columns if "réception" in c.lower() and "date" in c.lower()), None)
-    ret_col = next((c for c in df_cl.columns if "entrée effective" in c.lower() or "date d'entrée" in c.lower()), None)
+    ret_col = next((c for c in df_cl.columns if "retour" in c.lower() and "date" in c.lower()), None)
     if rec_col and ret_col:
         try:
             s = pd.to_datetime(df_cl[rec_col], errors='coerce'); e = pd.to_datetime(df_cl[ret_col], errors='coerce')
@@ -4998,7 +4998,7 @@ def main():
 
         ### 🎯 Indicateurs de Performance (KPIs)
         - **Nombre de candidats présélectionnés** : Somme cumulative de la colonne `Nb de candidats pré-selectionnés`.
-        - **Délai de recrutement (Time-to-Hire)** : Calculé comme la différence (en jours) entre la `Date d'entrée effective` et la `Date de réception de la demande`. Cet indicateur se base **uniquement** sur les postes ayant le statut **"Clôture"**.
+        - **Délai de recrutement (Time-to-Hire)** : Calculé comme la différence (en jours) entre la `Date du 1er retour équipe RH` et la `Date de réception de la demande`. Cet indicateur se base **uniquement** sur les postes ayant le statut **"Clôture"**.
         - **Taux de refus** : Ratio entre le nombre de refus et le nombre de promesses d'embauche réalisées.
         """, unsafe_allow_html=True)
 
