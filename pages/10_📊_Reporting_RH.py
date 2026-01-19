@@ -755,8 +755,8 @@ def create_affectation_chart(df):
             yanchor="middle",
             y=0.5,
             xanchor="left",
-            x=0.85,  # Rapprocher la légende
-            font=dict(size=14)
+            x=0.75,  # Rapprochement vers la gauche vers le centre du graphique
+            font=dict(size=16) # Taille de légende augmentée
         ),
         margin=dict(l=20, r=20, t=60, b=20)
     )
@@ -946,6 +946,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             textposition='auto',
             texttemplate='<b>%{x}</b>',
             textfont=dict(size=15, color='white'),
+            textangle=0,  # Forcer l'orientation horizontale des valeurs
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         fig_direction.update_layout(
@@ -988,6 +989,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             textposition='auto',
             texttemplate='<b>%{x}</b>',
             textfont=dict(size=15, color='white'),
+            textangle=0,  # Forcer l'orientation horizontale des valeurs
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         height_poste = max(300, 28 * len(df_poste))
@@ -1229,6 +1231,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             textposition='auto',
             texttemplate='<b>%{x}</b>',
             textfont=dict(size=15, color='white'),
+            textangle=0, # Orientation horizontale des valeurs
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         # Dynamic height so long lists become scrollable on the page
@@ -1240,6 +1243,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             xaxis_title=None,
             yaxis_title=None,
             margin=dict(l=160, t=48, b=30, r=20),
+            xaxis=dict(tickangle=0),
             yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_dir),
             title=dict(text="<b>Comparaison par direction</b>", x=0, xanchor='left', font=TITLE_FONT)
         )
@@ -1269,6 +1273,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             textposition='auto',
             texttemplate='<b>%{x}</b>',
             textfont=dict(size=15, color='white'),
+            textangle=0, # Orientation horizontale des valeurs
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         height_poste = 320
@@ -1278,6 +1283,7 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             xaxis_title=None,
             yaxis_title=None,
             margin=dict(l=160, t=48, b=30, r=20),
+            xaxis=dict(tickangle=0),
             yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_poste),
             title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT)
         )
@@ -4964,20 +4970,38 @@ def main():
             *   Affinez vos analyses grâce aux filtres par **Entité**, **Direction** ou **Année**.
         4.  **Consultation et Export** :
             *   Naviguez dans les onglets (**Demandes**, **Hebdo**, **Intégrations**) pour visualiser les résultats.
-            *   Pour finir, retournez dans le premier onglet pour **télécharger votre rapport complet en PowerPoint ou PDF** (des captures d'écran des graphiques et tableaux y sont automatiquement intégrées).
+            *   Pour finir, prenez des captures d'écran des graphiques et tableaux pour les insérer dans votre rapport PowerPoint.
 
-        💡 *Une fonction permettant d'automatiser totalement la génération périodique du reporting est actuellement en cours de développement.*
+        💡 *Une fonction permettant d'automatiser totalement la génération périodique du reporting est actuellement en cours de développement (les captures d'écran des graphiques et tableaux y seront automatiquement intégrées).*
         """)
 
         st.markdown("---")
-        st.subheader("🔍 Définitions techniques")
+        st.subheader("🔍 Détail des Indicateurs & Méthodologie")
         st.markdown("""
-        - **Besoins en cours par entité** : calculés à partir des demandes validées par la DRH. Les postes "en cours" sont soit déterminés par le statut `En cours`, soit par la formule (postes avant + nouveaux - pourvus) si les données sont incomplètes.
-        - **Recrutements en cours par recruteur** : tableau pivot par `Colonne TG Hire` (Sourcing, Shortlisté, Signature DRH, Clôture). La colonne **"Total (sans clôture)"** représente la charge de travail actuelle : `Sourcing + Shortlisté + Signature DRH`.
-        - **Comparaison par direction / poste** : histogrammes basés sur les colonnes `Direction concernée` et `Poste demandé`.
-        - **Nombre de candidats présélectionnés** : somme des valeurs de la colonne `Nb de candidats pré-selectionnés`.
-        - **Délai de recrutement** : différence en jours entre la `Date d'entrée effective` et la `Date de réception de la demande`.
-        - **Intégrations en retard** : identifiées si la `Date d'entrée prévisionnelle` est dépassée par rapport à la date de reporting sélectionnée.
+        Cette section explique comment chaque indicateur est calculé pour garantir la fiabilité des données :
+
+        ### 📂 Onglet Demandes & Recrutement
+        - **Besoins en cours par entité** : Calculés à partir des demandes validées par la DRH. Un poste est considéré "en cours" s'il a le statut `En cours`. Si les données sont incomplètes, le système utilise la balance `(Stock Initial + Nouveaux - Pourvus)`.
+        - **Recrutements en cours par recruteur** : Tableau croisé dynamique basé sur la `Colonne TG Hire`. Le **"Total (hors clôture)"** additionne les étapes *Sourcing*, *Shortlisté* et *Signature DRH* pour mesurer la charge active.
+        - **Comparaison par direction / poste** : Histogrammes de volume basés sur les colonnes `Direction concernée` et `Poste demandé`. Les labels sont tronqués pour la lisibilité mais le nom complet est visible au survol.
+        - **Évolution mensuelle** : Agrégation temporelle basée sur la `Date de réception de la demande`.
+
+        ### 📅 Onglet Reporting Hebdomadaire
+        - **Fenêtre de calcul** : Basée sur la `Date de reporting` sélectionnée dans le menu latéral. Elle analyse la performance du **Lundi au Vendredi** de la semaine précédente.
+        - **Postes Avant** : Demandes ouvertes avant le lundi de la semaine S-1.
+        - **Nouveaux** : Demandes reçues entre le lundi et le vendredi de la semaine S-1.
+        - **Pourvus** : Recrutements dont la date d'acceptation du candidat tombe dans la semaine S-1.
+        - **Stock (En cours)** : Postes restant ouverts (Statut 'En cours' + Pas de candidat retenu) à la fin de la période.
+
+        ### 🤝 Onglet Intégrations
+        - **Critères d'Inclusion** : Seules les demandes avec le statut `En cours` ET un `Nom de candidat` renseigné sont affichées ici.
+        - **Signal "⚠️ En retard"** : Une alerte rouge s'affiche si la `Date d'entrée prévisionnelle` est antérieure à la date du jour (ou la date de reporting choisie).
+        - **Répartition par Entité** : Visualisation en "Donut Chart" pour identifier les filiales avec le plus gros volume d'arrivées imminentes.
+
+        ### 🎯 Indicateurs de Performance (KPIs)
+        - **Nombre de candidats présélectionnés** : Somme cumulative de la colonne `Nb de candidats pré-selectionnés`.
+        - **Délai de recrutement (Time-to-Hire)** : Calculé comme la différence (en jours) entre la `Date d'entrée effective` et la `Date de réception de la demande`.
+        - **Taux de refus** : Ratio entre le nombre de refus et le nombre de promesses d'embauche réalisées.
         """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
