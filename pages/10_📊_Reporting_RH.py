@@ -138,6 +138,85 @@ def render_generic_metrics(metrics):
 # Shared title font used for all main charts so typography is consistent
 TITLE_FONT = dict(family="Arial, sans-serif", size=18, color="#111111", )
 
+# --- Centralisation des Logos et Affichage Entités ---
+ENTITY_LOGO_MAP = {
+    'TGCC': 'TGCC.PNG',
+    'TGEM': 'TGEM.PNG',
+    'TG ALU': 'TG ALU.PNG',
+    'TG COVER': 'TG COVER.PNG',
+    'TG STEEL': 'TG STEEL.PNG',
+    'TG STONE': 'TG STONE.PNG',
+    'TG WOOD': 'TG WOOD.PNG',
+    'STAM': 'STAM.png',
+    'BFO': 'BFO.png',
+    'TGCC IMMOBILIER': 'tgcc-immobilier.png',
+    'TGCC-IMMOBILIER': 'tgcc-immobilier.png'
+}
+
+@st.cache_data
+def load_all_logos_b64():
+    """Charge tous les logos disponibles en base64."""
+    logos_dict = {}
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.dirname(current_dir)
+    logo_dir = os.path.join(root_dir, "LOGO")
+    
+    if os.path.exists(logo_dir):
+        for filename in os.listdir(logo_dir):
+            if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+                try:
+                    path = os.path.join(logo_dir, filename)
+                    with open(path, "rb") as f:
+                        logos_dict[filename] = base64.b64encode(f.read()).decode()
+                except Exception:
+                    pass
+    return logos_dict
+
+def get_entity_display_html(name, logos_dict):
+    """Retourne le HTML (Logo + Suffixe éventuel) pour une entité."""
+    if not name or pd.isna(name): return ""
+    name_str = str(name).strip()
+    name_upper = name_str.upper()
+    
+    logo_file = None
+    if name_upper in ENTITY_LOGO_MAP:
+        logo_file = ENTITY_LOGO_MAP[name_upper]
+    
+    if not logo_file:
+        for filename in logos_dict.keys():
+            if os.path.splitext(filename)[0].upper() == name_upper:
+                logo_file = filename
+                break
+                
+    if not logo_file:
+        for key in sorted(ENTITY_LOGO_MAP.keys(), key=len, reverse=True):
+            if key in name_upper:
+                logo_file = ENTITY_LOGO_MAP[key]
+                break
+
+    if logo_file and logo_file in logos_dict:
+        logo_b64_str = logos_dict[logo_file]
+        # Tailles spécifiques
+        if name_upper in ['TG STEEL', 'TG STONE'] or 'IMMOBILIER' in name_upper:
+            logo_height = 50
+        elif name_upper == 'BFO':
+            logo_height = 80
+        else:
+            logo_height = 63
+            
+        img_tag = f'<img src="data:image/png;base64,{logo_b64_str}" height="{logo_height}" style="vertical-align: middle; display: block; margin: 0 auto;">'
+        
+        # Gestion spécifique suffixe
+        matched_key = next((k for k in sorted(ENTITY_LOGO_MAP.keys(), key=len, reverse=True) if k in name_upper), None)
+        if matched_key:
+            pattern = re.escape(matched_key) + r'\s*-\s*(.*)'
+            match = re.search(pattern, name_str, flags=re.IGNORECASE)
+            if match and match.group(1):
+                return f'{img_tag} <span style="vertical-align: middle; margin-top: 5px; font-weight: bold; display: block; text-align: center;">{match.group(1)}</span>'
+        
+        return img_tag
+    
+    return f'<div style="text-align: center; font-weight: 600;">{name_str}</div>'
 
 def apply_title_style(fig):
     """Applique la police et le style de titre standardisé à une figure Plotly."""
@@ -1476,10 +1555,73 @@ def create_integrations_tab(df_recrutement, global_filters):
             
         df_display_table = df_display.rename(columns=rename_map)
 
-        # Réinitialiser l'index pour enlever les numéros de ligne
-        df_display_table = df_display_table.reset_index(drop=True)
-        # Afficher sans index (hide_index=True)
-        st.dataframe(df_display_table, width="stretch", hide_index=True)
+        # Rendu du tableau en HTML personnalisé avec logos (Style "Besoins en cours")
+        logos_dict = load_all_logos_b64()
+        
+        # Style CSS
+        st.markdown("""
+        <style>
+        .int-table-container {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            margin: 20px 0;
+        }
+        .int-custom-table {
+            border-collapse: collapse;
+            font-family: Arial, sans-serif;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            width: 95%; /* Plus large pour les intégrations */
+            margin: 0 auto;
+        }
+        .int-custom-table th {
+            background-color: #9C182F !important;
+            color: white !important;
+            font-weight: bold !important;
+            text-align: center !important;
+            padding: 10px 8px !important;
+            border: 1px solid white !important;
+            font-size: 1em;
+        }
+        .int-custom-table td {
+            text-align: center !important;
+            padding: 8px 6px !important;
+            border: 1px solid #ddd !important;
+            background-color: white !important;
+            font-size: 0.95em;
+            font-weight: 500;
+        }
+        .int-custom-table .entity-cell {
+            min-width: 100px;
+            max-width: 120px;
+        }
+        .int-custom-table .candidate-cell {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        html_table = '<div class="int-table-container"><table class="int-custom-table"><thead><tr>'
+        for col in df_display_table.columns:
+            html_table += f'<th>{col}</th>'
+        html_table += '</tr></thead><tbody>'
+
+        for _, row in df_display_table.iterrows():
+            html_table += '<tr>'
+            for col in df_display_table.columns:
+                val = row[col]
+                if col == 'Entité demandeuse':
+                    display_val = get_entity_display_html(val, logos_dict)
+                    html_table += f'<td class="entity-cell">{display_val}</td>'
+                elif col == 'Candidat':
+                    html_table += f'<td class="candidate-cell">{val}</td>'
+                else:
+                    html_table += f'<td>{val}</td>'
+            html_table += '</tr>'
+        
+        html_table += '</tbody></table></div>'
+        st.markdown(html_table, unsafe_allow_html=True)
     else:
         st.warning("Colonnes d'affichage non disponibles")
 
@@ -4968,7 +5110,8 @@ def main():
             *   Affinez vos analyses grâce aux filtres par **Entité**, **Direction** ou **Année**.
         4.  **Consultation et Export** :
             *   Naviguez dans les onglets (**Demandes**, **Hebdo**, **Intégrations**) pour visualiser les résultats.
-            *   Pour finir, prenez des captures d'écran des graphiques et tableaux pour les insérer dans votre rapport PowerPoint.
+            *   Pour finir, prenez des captures d'écran des graphiques et tableaux pour les insérer dans le PowerPoint.
+            *   Le reporting des stagaires se prend pour le moment avec Power BI (Lien : https://drive.google.com/file/d/1BF3JNIq11O9FGNzN428r3JiEl3qqYWID/view?usp=drive_link)
 
         💡 *Une fonction permettant d'automatiser totalement la génération périodique du reporting est actuellement en cours de développement (les captures d'écran des graphiques et tableaux y seront automatiquement intégrées).*
         """)

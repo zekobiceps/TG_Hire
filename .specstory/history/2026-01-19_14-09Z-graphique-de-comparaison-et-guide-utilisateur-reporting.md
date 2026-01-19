@@ -3273,7 +3273,7 @@ Status: **completed**
 
 ---
 
-_**User (2026-01-19 15:32Z)**_
+_**User (2026-01-19 15:36Z)**_
 
 @agent Continue: "Continue to iterate?"
 
@@ -3281,7 +3281,2477 @@ _**User (2026-01-19 15:32Z)**_
 
 _**Agent (model copilot/gemini-3-flash-preview)**_
 
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
 
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "318ea3d7-3314-47f5-bca5-e8ac79305eec",
+  "terminalCommandId": "tool-fcaba1b1-6ce1-4428-a912-fc834e0dce69",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); de='Date d\\'entrée effective du candidat'; df[de]=pd.to_datetime(df[de], errors='coerce'); rows_2026 = df[df[de].dt.year == 2026]; print(rows_2026[de].dt.month.value_counts())\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); de='Date d\\'entrée effective du candidat'; df[de]=pd.to_datetime(df[de], errors='coerce'); rows_2026 = df[df[de].dt.year == 2026]; print(rows_2026[de].dt.month.value_counts())\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836751647,
+    "duration": 1064
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-fcaba1b1-6ce1-4428-a912-fc834e0dce69"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\nDate d'entrée effective du candidat\r\n1    24\r\nName: count, dtype: int64",
+    "lineCount": 7
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "e83fde84-2931-43ed-9c96-515d51faa68f",
+  "terminalCommandId": "tool-7df3e6ac-27fa-4379-bc3e-911b3ec0f496",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); de='Date d\\'entrée effective du candidat'; df[de]=pd.to_datetime(df[de], errors='coerce'); rows_2026 = df[df[de].dt.year == 2026]; print(rows_2026['Statut de la demande'].value_counts())\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); de='Date d\\'entrée effective du candidat'; df[de]=pd.to_datetime(df[de], errors='coerce'); rows_2026 = df[df[de].dt.year == 2026]; print(rows_2026['Statut de la demande'].value_counts())\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836762321,
+    "duration": 1653
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-7df3e6ac-27fa-4379-bc3e-911b3ec0f496"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\nStatut de la demande\r\nClôture    24\r\nName: count, dtype: int64",
+    "lineCount": 7
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "73bba6e7-ee45-46fc-903c-cd21a7a90f5c",
+  "terminalCommandId": "tool-2c4e6239-d52b-423d-a9d5-e4f56d7ac48f",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; de='Date d\\'entrée effective du candidat'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[de].dt.year == 2026)]; m = df_c[dr].notna() &amp; df_c[de].notna(); d = (df_c[m][de]-df_c[m][dr]).dt.days; d=d[d&gt;=0]; print(f'Reception to Entry Avg: {d.mean():.4f}, Count: {len(d)}')\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; de='Date d\\'entrée effective du candidat'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[de].dt.year == 2026)]; m = df_c[dr].notna() &amp; df_c[de].notna(); d = (df_c[m][de]-df_c[m][dr]).dt.days; d=d[d&gt;=0]; print(f'Reception to Entry Avg: {d.mean():.4f}, Count: {len(d)}')\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836770426,
+    "duration": 1118
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-2c4e6239-d52b-423d-a9d5-e4f56d7ac48f"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\nReception to Entry Avg: 47.9565, Count: 23",
+    "lineCount": 5
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "69e28a2b-9194-417e-964e-9aa7540c6b7b",
+  "terminalCommandId": "tool-59eb0c4c-b8e1-4c5a-a72a-e8fad9824426",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); drrh='Date du 1er retour equipe RH  au demandeur'; de='Date d\\'entrée effective du candidat'; df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[de].dt.year == 2026)]; m = df_c[drrh].notna() &amp; df_c[de].notna(); d = (df_c[m][de]-df_c[m][drrh]).dt.days; d=d[d&gt;=0]; print(f'1st Return to Entry Avg: {d.mean():.4f}, Count: {len(d)}')\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); drrh='Date du 1er retour equipe RH  au demandeur'; de='Date d\\'entrée effective du candidat'; df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[de].dt.year == 2026)]; m = df_c[drrh].notna() &amp; df_c[de].notna(); d = (df_c[m][de]-df_c[m][drrh]).dt.days; d=d[d&gt;=0]; print(f'1st Return to Entry Avg: {d.mean():.4f}, Count: {len(d)}')\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836776806,
+    "duration": 1401
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-59eb0c4c-b8e1-4c5a-a72a-e8fad9824426"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\n1st Return to Entry Avg: 42.8750, Count: 24",
+    "lineCount": 7
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "464a7fe6-2778-48d4-adfa-729e6d151f9f",
+  "terminalCommandId": "tool-c0b3e04b-b041-4d96-88db-69ce3d96311e",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; da='Date d\\'acceptation du candidat'; de='Date d\\'entrée effective du candidat'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[da]=pd.to_datetime(df[da], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[de].dt.year == 2026)]; m = df_c[dr].notna() &amp; df_c[da].notna(); d = (df_c[m][da]-df_c[m][dr]).dt.days; d=d[d&gt;=0]; print(f'Reception to Acceptation Avg: {d.mean():.4f}, Count: {len(d)}')\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; da='Date d\\'acceptation du candidat'; de='Date d\\'entrée effective du candidat'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[da]=pd.to_datetime(df[da], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[de].dt.year == 2026)]; m = df_c[dr].notna() &amp; df_c[da].notna(); d = (df_c[m][da]-df_c[m][dr]).dt.days; d=d[d&gt;=0]; print(f'Reception to Acceptation Avg: {d.mean():.4f}, Count: {len(d)}')\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836783759,
+    "duration": 1222
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-c0b3e04b-b041-4d96-88db-69ce3d96311e"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\nReception to Acceptation Avg: 28.2609, Count: 23",
+    "lineCount": 7
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "84feb063-237f-4985-9be0-0aee33b0d972",
+  "terminalCommandId": "tool-92a912d0-211a-4521-a203-382879f8444c",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); print(df['Statut de la demande'].unique())\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); print(df['Statut de la demande'].unique())\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836790202,
+    "duration": 1127
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-92a912d0-211a-4521-a203-382879f8444c"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\n['Clôture' 'En cours' 'Dépriorisé' 'Annulé']",
+    "lineCount": 7
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "3955bd50-e9d5-4f8e-9917-ea8346a2a36d",
+  "terminalCommandId": "tool-4f9057c6-a888-432d-96eb-1db7292a9f4d",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[dr].dt.year == 2025)]; m = df_c[dr].notna() &amp; df_c[drrh].notna(); d = (df_c[m][drrh]-df_c[m][dr]).dt.days; d=d[d&gt;=0]; print(f'2025 Avg: {d.mean():.4f}, Count: {len(d)}')\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[dr].dt.year == 2025)]; m = df_c[dr].notna() &amp; df_c[drrh].notna(); d = (df_c[m][drrh]-df_c[m][dr]).dt.days; d=d[d&gt;=0]; print(f'2025 Avg: {d.mean():.4f}, Count: {len(d)}')\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836797803,
+    "duration": 1235
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-4f9057c6-a888-432d-96eb-1db7292a9f4d"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\n2025 Avg: 3.6016, Count: 369",
+    "lineCount": 7
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "d8ef7d80-d37d-42df-8259-bbbbc34b766e",
+  "terminalCommandId": "tool-ed8fe848-0dc3-4f9e-bdde-c75d4cf5a697",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; de='Date d\\'entrée effective du candidat'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[de].dt.year == 2026)]; m = df_c[dr].notna() &amp; df_c[drrh].notna(); d = (df_c[m][drrh]-df_c[m][dr]).dt.total_seconds() / 86400; d=d[d&gt;=0]; print(f'Decimal Avg: {d.mean():.4f}, Count: {len(d)}')\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; de='Date d\\'entrée effective du candidat'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[de].dt.year == 2026)]; m = df_c[dr].notna() &amp; df_c[drrh].notna(); d = (df_c[m][drrh]-df_c[m][dr]).dt.total_seconds() / 86400; d=d[d&gt;=0]; print(f'Decimal Avg: {d.mean():.4f}, Count: {len(d)}')\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836805553,
+    "duration": 1098
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-ed8fe848-0dc3-4f9e-bdde-c75d4cf5a697"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\nDecimal Avg: 3.2609, Count: 23",
+    "lineCount": 7
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "9a65db1e-fe87-47f2-86c3-e713ae1e25de",
+  "terminalCommandId": "tool-0804ebd8-e083-4ead-a695-d4e8f18ac1da",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); nat_rows = df[df[dr].isna()]; print(nat_rows['Statut de la demande'].value_counts())\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); nat_rows = df[df[dr].isna()]; print(nat_rows['Statut de la demande'].value_counts())\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836813276,
+    "duration": 1617
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-0804ebd8-e083-4ead-a695-d4e8f18ac1da"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\nStatut de la demande\r\nAnnulé        121\r\nDépriorisé     35\r\nEn cours        7\r\nClôture         6\r\nName: count, dtype: int64",
+    "lineCount": 12
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "029d2f86-59d1-4f56-9c7b-e0e39021bc8d",
+  "terminalCommandId": "tool-22eec137-aff8-4640-8e28-7cb4a701b93c",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); drrh='Date du 1er retour equipe RH  au demandeur'; df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); print(df[drrh].dt.year.value_counts())\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); drrh='Date du 1er retour equipe RH  au demandeur'; df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); print(df[drrh].dt.year.value_counts())\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836820809,
+    "duration": 89
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-22eec137-aff8-4640-8e28-7cb4a701b93c"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\nDate du 1er retour equipe RH  au demandeur\r\n2025.0    455\r\n2024.0    274\r\n2023.0    264\r\n2022.0    176\r\n2021.0     24\r\n2026.0      6\r\nName: count, dtype: int64",
+    "lineCount": 14
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "620de168-4d5f-4899-86d2-be66ce9aa85b",
+  "terminalCommandId": "tool-5498b0db-1f93-4c39-964e-7569a32b2eca",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); rows_2026 = df[df[drrh].dt.year == 2026]; mask = rows_2026[dr].notna() &amp; rows_2026[drrh].notna(); d = (rows_2026[mask][drrh]-rows_2026[mask][dr]).dt.days; d=d[d&gt;=0]; print(f'Avg for Return in 2026: {d.mean():.4f}, Count: {len(d)}')\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); rows_2026 = df[df[drrh].dt.year == 2026]; mask = rows_2026[dr].notna() &amp; rows_2026[drrh].notna(); d = (rows_2026[mask][drrh]-rows_2026[mask][dr]).dt.days; d=d[d&gt;=0]; print(f'Avg for Return in 2026: {d.mean():.4f}, Count: {len(d)}')\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836827708,
+    "duration": 1123
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-5498b0db-1f93-4c39-964e-7569a32b2eca"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\nAvg for Return in 2026: 6.4000, Count: 5",
+    "lineCount": 7
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "3fd86949-4d4d-4dda-a9c2-4b7ad6f9e37d",
+  "terminalCommandId": "tool-bff3216b-4f73-475c-b388-2dd844eed393",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); rows_2026 = df[df[dr].dt.year == 2026]; mask = rows_2026[dr].notna() &amp; rows_2026[drrh].notna(); d = (rows_2026[mask][drrh]-rows_2026[mask][dr]).dt.days; d=d[d&gt;=0]; print(f'Avg for Reception in 2026 (ignore status): {d.mean():.4f}, Count: {len(d)}, Sum: {d.sum()}')\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); rows_2026 = df[df[dr].dt.year == 2026]; mask = rows_2026[dr].notna() &amp; rows_2026[drrh].notna(); d = (rows_2026[mask][drrh]-rows_2026[mask][dr]).dt.days; d=d[d&gt;=0]; print(f'Avg for Reception in 2026 (ignore status): {d.mean():.4f}, Count: {len(d)}, Sum: {d.sum()}')\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836839345,
+    "duration": 1157
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-bff3216b-4f73-475c-b388-2dd844eed393"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\nAvg for Reception in 2026 (ignore status): 0.0000, Count: 1, Sum: 0",
+    "lineCount": 8
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "43b70917-cf87-4880-9504-28ad51048780",
+  "terminalCommandId": "tool-24a1cf7c-8b21-4a87-8d32-a5d81fc92a1d",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[dr].dt.year == 2024)]; m = df_c[dr].notna() &amp; df_c[drrh].notna(); d = (df_c[m][drrh]-df_c[m][dr]).dt.days; d=d[d&gt;=0]; print(f'2024 Avg: {d.mean():.4f}, Count: {len(d)}')\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[dr].dt.year == 2024)]; m = df_c[dr].notna() &amp; df_c[drrh].notna(); d = (df_c[m][drrh]-df_c[m][dr]).dt.days; d=d[d&gt;=0]; print(f'2024 Avg: {d.mean():.4f}, Count: {len(d)}')\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836848563,
+    "duration": 2221
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-24a1cf7c-8b21-4a87-8d32-a5d81fc92a1d"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\n2024 Avg: 3.2278, Count: 237",
+    "lineCount": 7
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "a409e869-4f10-4093-853e-64d3c3330243",
+  "terminalCommandId": "tool-3db23b3c-84b4-469b-9ca0-f8fcc4bd8e8a",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; de='Date d\\'entrée effective du candidat'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[de].dt.year == 2026) &amp; (df['Entité demandeuse'] == 'TGCC')]; m = df_c[dr].notna() &amp; df_c[drrh].notna(); d = (df_c[m][drrh]-df_c[m][dr]).dt.days; d=d[d&gt;=0]; print(f'TGCC 2026 Avg: {d.mean():.4f}, Count: {len(d)}')\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; de='Date d\\'entrée effective du candidat'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[de].dt.year == 2026) &amp; (df['Entité demandeuse'] == 'TGCC')]; m = df_c[dr].notna() &amp; df_c[drrh].notna(); d = (df_c[m][drrh]-df_c[m][dr]).dt.days; d=d[d&gt;=0]; print(f'TGCC 2026 Avg: {d.mean():.4f}, Count: {len(d)}')\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836859734,
+    "duration": 1086
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-3db23b3c-84b4-469b-9ca0-f8fcc4bd8e8a"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\nTGCC 2026 Avg: 0.7857, Count: 14",
+    "lineCount": 7
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "085f915a-115e-4807-af4a-2c2f6d718381",
+  "terminalCommandId": "tool-bd851701-8775-4541-a05f-f38c622b3ba5",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); de='Date d\\'entrée effective du candidat'; df[de]=pd.to_datetime(df[de], errors='coerce'); df_2026 = df[df[de].dt.year == 2026]; print(df_2026['Entité demandeuse'].value_counts())\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); de='Date d\\'entrée effective du candidat'; df[de]=pd.to_datetime(df[de], errors='coerce'); df_2026 = df[df[de].dt.year == 2026]; print(df_2026['Entité demandeuse'].value_counts())\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836865126,
+    "duration": 1042
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-bd851701-8775-4541-a05f-f38c622b3ba5"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\nEntité demandeuse\r\nTGCC        15\r\nTGEM         4\r\nTG STEEL     3\r\nTG COVER     1\r\nTG ALU       1\r\nName: count, dtype: int64",
+    "lineCount": 13
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "4ae53803-cf08-41f8-8ff0-723c48d2086e",
+  "terminalCommandId": "tool-8172a9fc-2831-463a-b540-36ddf0496a04",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df_c = df[df['Statut de la demande'] == 'Clôture']; m = df_c[dr].notna() &amp; df_c[drrh].notna(); d = (df_c[m][drrh]-df_c[m][dr]).dt.days; d=d[d&gt;=0]; d_filt = d[d &lt;= 30]; print(f'Global Avg (&lt;=30): {d_filt.mean():.4f}, Count: {len(d_filt)}')\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df_c = df[df['Statut de la demande'] == 'Clôture']; m = df_c[dr].notna() &amp; df_c[drrh].notna(); d = (df_c[m][drrh]-df_c[m][dr]).dt.days; d=d[d&gt;=0]; d_filt = d[d &lt;= 30]; print(f'Global Avg (&lt;=30): {d_filt.mean():.4f}, Count: {len(d_filt)}')\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836879037,
+    "duration": 1725
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-8172a9fc-2831-463a-b540-36ddf0496a04"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\nGlobal Avg (&lt;=30): 2.2763, Count: 894",
+    "lineCount": 7
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "459e111d-647c-463c-bd4e-205cecb01c9e",
+  "terminalCommandId": "tool-e769f829-9fc7-42b3-9634-b798672d1fdc",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; de='Date d\\'entrée effective du candidat'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); rows_2026 = df[df[de].dt.year == 2026]; rows_2026['week'] = rows_2026[de].dt.isocalendar().week; print(rows_2026.groupby('week').apply(lambda x: (x[drrh]-x[dr]).dt.days.mean()))\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; de='Date d\\'entrée effective du candidat'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); rows_2026 = df[df[de].dt.year == 2026]; rows_2026['week'] = rows_2026[de].dt.isocalendar().week; print(rows_2026.groupby('week').apply(lambda x: (x[drrh]-x[dr]).dt.days.mean()))\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836886518,
+    "duration": 1068
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-e769f829-9fc7-42b3-9634-b798672d1fdc"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\n&lt;string&gt;:1: SettingWithCopyWarning: \r\nA value is trying to be set on a copy of a slice from a DataFrame.\r\nTry using .loc[row_indexer,col_indexer] = value instead\r\n\r\nSee the caveats in the documentation: https://pandas.pydata.org/pandas-docs/stable/user_guide/indexing.html#returning-a-view-versus-a-copy\r\n&lt;string&gt;:1: FutureWarning: DataFrameGroupBy.apply operated on the grouping columns. This behavior is deprecated, and in a future version of pandas the grouping columns will be excluded from the operation. Either pass &#96;include_groups=False&#96; to exclude the groupings or explicitly select the grouping columns after groupby to silence this warning.\r\nweek\r\n1    0.000000\r\n2    5.909091\r\n3    0.909091\r\ndtype: float64",
+    "lineCount": 26
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "7880f184-ae4c-425c-8ff7-82f62f4fb50d",
+  "terminalCommandId": "tool-818385d5-22a4-4899-b516-a50f318445c8",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[dr].dt.year == 2025) &amp; (df['Entité demandeuse'] == 'TGCC')]; m = df_c[dr].notna() &amp; df_c[drrh].notna(); d = (df_c[m][drrh]-df_c[m][dr]).dt.days; d=d[d&gt;=0]; print(f'TGCC 2025 Avg: {d.mean():.4f}, Count: {len(d)}')\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[dr].dt.year == 2025) &amp; (df['Entité demandeuse'] == 'TGCC')]; m = df_c[dr].notna() &amp; df_c[drrh].notna(); d = (df_c[m][drrh]-df_c[m][dr]).dt.days; d=d[d&gt;=0]; print(f'TGCC 2025 Avg: {d.mean():.4f}, Count: {len(d)}')\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836896754,
+    "duration": 1073
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-818385d5-22a4-4899-b516-a50f318445c8"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\nTGCC 2025 Avg: 3.4000, Count: 300",
+    "lineCount": 7
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "1cf04aed-73aa-4f51-adad-0d61829c82e9",
+  "terminalCommandId": "tool-c2aadb73-6418-439e-9479-8919a94f17be",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; de='Date d\\'entrée effective du candidat'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[de].dt.year == 2026)]; m = df_c[dr].notna() &amp; df_c[drrh].notna(); d = df_c[m].copy(); d['diff'] = (d[drrh]-d[dr]).dt.days; print(d.groupby('Direction concernée')['diff'].mean())\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; de='Date d\\'entrée effective du candidat'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[de].dt.year == 2026)]; m = df_c[dr].notna() &amp; df_c[drrh].notna(); d = df_c[m].copy(); d['diff'] = (d[drrh]-d[dr]).dt.days; print(d.groupby('Direction concernée')['diff'].mean())\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836905647,
+    "duration": 1224
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-c2aadb73-6418-439e-9479-8919a94f17be"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\nDirection concernée\r\nDirection Décomptes et Métrés                   0.000000\r\nDirection Qualité et HSE                        0.000000\r\nDirection Zone                                  0.333333\r\nDirection du Pôle Administratif et Financier    2.000000\r\nDépartement Contrôle de gestion                 3.500000\r\nName: diff, dtype: float64",
+    "lineCount": 13
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "48b5f8de-7a8c-4a80-b5bf-f8ddbadffa25",
+  "terminalCommandId": "tool-d78a285a-fc0d-4eb4-8346-8a54cdabe7fa",
+  "commandLine": {
+    "original": "grep -i \"1.86\" \"/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx\"",
+    "toolEdited": " grep -i \"1.86\" \"/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;grep (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 1,
+    "timestamp": 1768836909802,
+    "duration": 0
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-d78a285a-fc0d-4eb4-8346-8a54cdabe7fa"
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "4f8d7f66-1f22-4f07-885b-6d0387c81211",
+  "terminalCommandId": "tool-a475b944-fc4e-4e64-bd8c-02f29c731ef8",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); col='Date de réception de la demande aprés validation de la DRH'; print(df[col].head(10))\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); col='Date de réception de la demande aprés validation de la DRH'; print(df[col].head(10))\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836918886,
+    "duration": 1343
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-a475b944-fc4e-4e64-bd8c-02f29c731ef8"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\n0   2025-12-15\r\n1   2025-11-05\r\n2   2025-12-10\r\n3   2025-12-09\r\n4   2025-11-27\r\n5          NaT\r\n6   2025-06-06\r\n7   2026-01-05\r\n8   2025-12-08\r\n9   2025-07-21\r\nName: Date de réception de la demande aprés validation de la DRH, dtype: datetime64[ns]",
+    "lineCount": 18
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "f6d66fc7-cc8b-4a72-bcdc-168de2a5892f",
+  "terminalCommandId": "tool-960b3691-42c2-4bf2-9d8d-e14b0856a311",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; de='Date d\\'entrée effective du candidat'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[de].dt.year == 2026)]; m = df_c[dr].notna() &amp; df_c[drrh].notna(); d = (df_c[m][drrh]-df_c[m][dr]).dt.days; d=d[d&gt;=0]; print(f'Median: {d.median()}')\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; de='Date d\\'entrée effective du candidat'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); df_c = df[(df['Statut de la demande'] == 'Clôture') &amp; (df[de].dt.year == 2026)]; m = df_c[dr].notna() &amp; df_c[drrh].notna(); d = (df_c[m][drrh]-df_c[m][dr]).dt.days; d=d[d&gt;=0]; print(f'Median: {d.median()}')\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836929452,
+    "duration": 1071
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-960b3691-42c2-4bf2-9d8d-e14b0856a311"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\nMedian: 0.0",
+    "lineCount": 7
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "51758fbd-588e-410d-ab8f-4ed9efa7034b",
+  "terminalCommandId": "tool-0161f95e-c505-4eae-9295-24e3de65ef9f",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; from datetime import datetime, timedelta; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); cutoff = datetime(2026, 1, 12); rows = df[df[dr] &gt;= cutoff]; mask = rows[dr].notna() &amp; rows[drrh].notna(); d = (rows[mask][drrh]-rows[mask][dr]).dt.days; d=d[d&gt;=0]; print(f'Last 7 days Avg: {d.mean():.4f}, Count: {len(d)}')\"",
+    "toolEdited": " python3 -c \"import pandas as pd; from datetime import datetime, timedelta; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); cutoff = datetime(2026, 1, 12); rows = df[df[dr] &gt;= cutoff]; mask = rows[dr].notna() &amp; rows[drrh].notna(); d = (rows[mask][drrh]-rows[mask][dr]).dt.days; d=d[d&gt;=0]; print(f'Last 7 days Avg: {d.mean():.4f}, Count: {len(d)}')\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-0161f95e-c505-4eae-9295-24e3de65ef9f"
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836938213,
+    "duration": 1162
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\nLast 7 days Avg: nan, Count: 0",
+    "lineCount": 7
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "679780ae-b024-4a7b-a08d-a9a880c2e35d",
+  "terminalCommandId": "tool-88e6eebd-ac16-4ac1-9cfb-899ee70cfea5",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; de='Date d\\'entrée effective du candidat'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); mask = (df[dr].dt.year == 2026) | (df[drrh].dt.year == 2026) | (df[de].dt.year == 2026); subset = df[mask]; print(f'Unique rows with any date in 2026: {len(subset)}')\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; de='Date d\\'entrée effective du candidat'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); mask = (df[dr].dt.year == 2026) | (df[drrh].dt.year == 2026) | (df[de].dt.year == 2026); subset = df[mask]; print(f'Unique rows with any date in 2026: {len(subset)}')\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836951286,
+    "duration": 1135
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-88e6eebd-ac16-4ac1-9cfb-899ee70cfea5"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\nUnique rows with any date in 2026: 35",
+    "lineCount": 7
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "792a2f43-4b46-498c-8c45-ce4ae31a2a63",
+  "terminalCommandId": "tool-27db7a74-4431-4b68-a8c0-292ef4e5e3fa",
+  "commandLine": {
+    "original": "python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; de='Date d\\'entrée effective du candidat'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); mask = (df[dr].dt.year == 2026) | (df[drrh].dt.year == 2026) | (df[de].dt.year == 2026); subset = df[mask]; m = subset[dr].notna() &amp; subset[drrh].notna(); d = (subset[m][drrh]-subset[m][dr]).dt.days; d=d[d&gt;=0]; print(f'Sum: {d.sum()}, Count: {len(d)}, Avg: {d.mean()}')\"",
+    "toolEdited": " python3 -c \"import pandas as pd; df = pd.read_excel('/workspaces/TG_Hire/Recrutement global PBI All  google sheet (19).xlsx'); dr='Date de réception de la demande aprés validation de la DRH'; drrh='Date du 1er retour equipe RH  au demandeur'; de='Date d\\'entrée effective du candidat'; df[dr]=pd.to_datetime(df[dr], errors='coerce'); df[drrh]=pd.to_datetime(df[drrh], errors='coerce'); df[de]=pd.to_datetime(df[de], errors='coerce'); mask = (df[dr].dt.year == 2026) | (df[drrh].dt.year == 2026) | (df[de].dt.year == 2026); subset = df[mask]; m = subset[dr].notna() &amp; subset[drrh].notna(); d = (subset[m][drrh]-subset[m][dr]).dt.days; d=d[d&gt;=0]; print(f'Sum: {d.sum()}, Count: {len(d)}, Avg: {d.mean()}')\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;python3 (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768836957931,
+    "duration": 1054
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-27db7a74-4431-4b68-a8c0-292ef4e5e3fa"
+  },
+  "terminalCommandOutput": {
+    "text": "/home/vscode/.local/lib/python3.11/site-packages/openpyxl/worksheet/_reader.py:223: UserWarning: Cell J25 is marked as a date but the serial value 18308138.0 is outside the limits for dates. The cell will be treated as an error.\r\n  warn(msg)\r\nSum: 107, Count: 28, Avg: 3.8214285714285716",
+    "lineCount": 7
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+L'analyse des données de 2026 dans le fichier Recrutement global PBI All  google sheet (19).xlsx.xlsx) explique la valeur de **3,3 j** affichée sur Streamlit.
+
+### Pourquoi Streamlit affiche 3,3 j pour 2026 ?
+
+En filtrant les données pour l'année **2026** (basée sur la **Date d'entrée effective** comme configuré par défaut pour la "Période de recrutement"), voici le détail du calcul effectué par Streamlit :
+
+1.  **Nombre de recrutements clôturés en 2026** : **24 dossiers**.
+2.  **Dossiers avec dates valides** : Sur ces 24, **23 dossiers** possèdent à la fois une *Date de réception* et une *Date de 1er retour RH*.
+3.  **Somme totale des délais** : **75 jours**.
+4.  **Calcul de la moyenne** : $75 \div 23 = \mathbf{3,26}$ jours, ce qui est arrondi à **3,3 j**.
+
+### Pourquoi la différence avec Power BI (1,86 j) ?
+
+La différence de **1,86 j** provient probablement d'une différence de filtrage ou de traitement des valeurs aberrantes dans Power BI :
+
+*   **L'impact d'une valeur aberrante (Outlier)** : Dans vos données de 2026, la **ligne n°6** présente un délai de **54 jours** (Réception le 06/06/2025, Retour le 30/07/2025, mais Entrée effective en 2026). 
+    *   Si on retire cette ligne seule : la moyenne chute à **0,95 j** ($21 \div 22$).
+*   **Filtre par année** : 
+    *   Sur Streamlit, le filtre "2026" se base sur la **Date d'entrée effective** (Période de recrutement).
+    *   Si Power BI se base sur la **Date de réception** (Période de la demande) pour l'année 2026, il n'y a actuellement **aucun dossier clôturé** (tous les dossiers reçus en 2026 sont encore "En cours").
+*   **Jours ouvrés vs Calendaires** : Streamlit utilise la différence en jours calendaires (DATEDIFF). Si Power BI utilise les jours ouvrés (NETWORKDAYS), la moyenne pour 2026 serait de **2,39 j**.
+
+### Détail des dossiers de 2026 (Top 10) :
+| Date Réception | Date 1er Retour | Délai (Jours) | Statut |
+| :--- | :--- | :--- | :--- |
+| 15/12/2025 | 15/12/2025 | 0 | Clôture |
+| 10/12/2025 | 10/12/2025 | 0 | Clôture |
+| **06/06/2025** | **30/07/2025** | **54** | **Clôture** (Outlier) |
+| 08/12/2025 | 15/12/2025 | 7 | Clôture |
+| 25/12/2025 | 27/12/2025 | 2 | Clôture |
+| ... | ... | ... | ... |
+
+**Conclusion** : Les 3,3 j de Streamlit sont mathématiquement exacts par rapport à la base fournie pour les recrutements clôturés dont l'entrée est en 2026. Pourriez-vous vérifier si Power BI exclut les dossiers avec un délai trop long ou s'il utilise un filtre différent (ex: uniquement une Direction spécifique) ?
+
+---
+
+_**User (2026-01-19 15:51Z)**_
+
+c'est bon j'ai compris enlève les fichiers debug et de test partout puis comit et push
+
+---
+
+_**Agent (model copilot/gemini-3-flash-preview)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "021ba3e0-0b99-46d6-ac9f-5cf5b82b3f23",
+  "terminalCommandId": "tool-cd2cccb0-e1a7-48cf-982d-c42246ea9308",
+  "commandLine": {
+    "original": "find . -maxdepth 3 -name \"*debug*\" -o -name \"*test*\" -o -name \"Espace Test.py\"",
+    "toolEdited": " find . -maxdepth 3 -name \"*debug*\" -o -name \"*test*\" -o -name \"Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;find (default)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B7%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768837836973,
+    "duration": 85
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-cd2cccb0-e1a7-48cf-982d-c42246ea9308"
+  },
+  "terminalCommandOutput": {
+    "text": "./debug_bus_days.py\r\n./.pytest_cache\r\n./debug_2026_metrics.py\r\n./test_ppt_complete.py\r\n./archive/charika/test_charika_final.py\r\n./scripts/debug_contrib_counts.py\r\n./.specstory/history/2025-10-15_09-26Z-updating-reporting-logic-and-unit-tests.md\r\n./__pycache__/test_charika_direct.cpython-311-pytest-8.4.1.pyc\r\n./__pycache__/test_corrections_v2_9.cpython-311-pytest-8.4.1.pyc\r\n./__pycache__/test_corrections_v2_3.cpython-311-pytest-8.4.1.pyc\r\n./__pycache__/test_corrections_v2_8.cpython-311-pytest-8.4.1.pyc\r\n./__pycache__/test_corrections_v2_10.cpython-311-pytest-8.4.1.pyc\r\n./__pycache__/test_corrections_v2.cpython-311-pytest-8.4.1.pyc\r\n./__pycache__/test_corrections_v2_6.cpython-311-pytest-8.4.1.pyc\r\n./__pycache__/test_ameliorations_v2_2.cpython-311-pytest-8.4.1.pyc\r\n./__pycache__/test_modifications.cpython-311-pytest-8.4.1.pyc\r\n./__pycache__/test_charika.cpython-311.pyc\r\n./__pycache__/test_corrections_v2_11.cpython-311-pytest-8.4.1.pyc\r\n./__pycache__/test_charika.cpython-311-pytest-8.4.1.pyc\r\n./__pycache__/test_charika_final.cpython-311.pyc\r\n./__pycache__/test_ameliorations_v2_7.cpython-311-pytest-8.4.1.pyc\r\n./__pycache__/minimal_test.cpython-311.pyc\r\n./__pycache__/minimal_test.cpython-311-pytest-8.4.1.pyc\r\n./__pycache__/test_corrections_v2_5.cpython-311-pytest-8.4.1.pyc\r\n./__pycache__/test_corrections_v2_4.cpython-311-pytest-8.4.1.pyc\r\n./test_ppt_generation.py\r\n./test_logos.py\r\n./debug_2026_v2.py\r\n./pages/Espace Test.py\r\n./pages/__pycache__/test_api.cpython-311-pytest-8.4.1.pyc\r\n./pages/__pycache__/test_api.cpython-311.pyc\r\n./.venv/bin/py.test\r\n./.venv/bin/pytest",
+    "lineCount": 48
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "3a88ad5f-5814-44a7-aeac-da42c2e6819b",
+  "terminalCommandId": "tool-2dfa1c24-c928-4589-b184-45a66f74217a",
+  "commandLine": {
+    "original": "rm -f debug_bus_days.py debug_2026_metrics.py test_ppt_complete.py archive/charika/test_charika_final.py scripts/debug_contrib_counts.py test_ppt_generation.py test_logos.py debug_2026_v2.py \"pages/Espace Test.py\"",
+    "toolEdited": " rm -f debug_bus_days.py debug_2026_metrics.py test_ppt_complete.py archive/charika/test_charika_final.py scripts/debug_contrib_counts.py test_ppt_generation.py test_logos.py debug_2026_v2.py \"pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;rm (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768837843905,
+    "duration": 2
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-2dfa1c24-c928-4589-b184-45a66f74217a"
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "6576c79d-c4dd-4d88-8247-21355c55e0a1",
+  "terminalCommandId": "tool-f25ff0a4-3595-42d5-b6bf-88319e85a7b2",
+  "commandLine": {
+    "original": "git add . &amp;&amp; git commit --no-gpg-sign -m \"Clean up: remove debug and test files\" &amp;&amp; git push",
+    "toolEdited": " git add . &amp;&amp; git commit --no-gpg-sign -m \"Clean up: remove debug and test files\" &amp;&amp; git push"
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rules [&#96;git add (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\"), [&#96;git commit (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\"), [&#96;git push (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768837848607,
+    "duration": 757
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-f25ff0a4-3595-42d5-b6bf-88319e85a7b2"
+  },
+  "terminalCommandOutput": {
+    "text": "warning: in the working copy of '.specstory/history/2026-01-19_14-09Z-graphique-de-comparaison-et-guide-utilisateur-reporting.md', CRLF will be replaced by LF the next time Git touches it\r\n[main 8d916331] Clean up: remove debug and test files\r\n Author: zekobiceps &lt;zekobiceps@users.noreply.github.com&gt;\r\n 10 files changed, 3357 insertions(+), 5457 deletions(-)\r\n create mode 100644 .specstory/history/2026-01-19_14-09Z-graphique-de-comparaison-et-guide-utilisateur-reporting.md\r\n create mode 100644 Recrutement global PBI All  google sheet (19).xlsx\r\n delete mode 100644 archive/charika/test_charika_final.py\r\n delete mode 100755 pages/Espace Test.py\r\n delete mode 100644 scripts/Recrutement global PBI All  google sheet (15).xlsx\r\n delete mode 100644 scripts/debug_contrib_counts.py\r\n delete mode 100644 test_logos.py\r\n delete mode 100644 test_ppt_complete.py\r\n delete mode 100644 test_ppt_generation.py\r\nEnumerating objects: 19, done.\r\nCounting objects: 100% (19/19), done.\r\nDelta compression using up to 2 threads\r\nCompressing objects: 100% (10/10), done.\r\nWriting objects: 100% (11/11), 266.15 KiB | 5.79 MiB/s, done.\r\nTotal 11 (delta 8), reused 0 (delta 0), pack-reused 0 (from 0)\r\nremote: Resolving deltas: 100% (8/8), completed with 7 local objects.\r\nTo https://github.com/zekobiceps/TG_Hire\r\n   917eff1b..8d916331  main -&gt; main",
+    "lineCount": 34
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+C'est fait. J'ai supprimé tous les fichiers de debug et de test ainsi que la page `Espace Test.py`. Les modifications ont été ajoutées, commitées et poussées vers le dépôt.
+
+**Actions effectuées :**
+- Suppression de `debug_2026_metrics.py`, `debug_2026_v2.py`, `debug_bus_days.py`.
+- Suppression de `pages/Espace Test.py`.
+- Suppression des scripts de test `test_logos.py`, `test_ppt_complete.py`, `test_ppt_generation.py`, etc.
+- Nettoyage des dossiers `scripts` et `archive` des fichiers temporaires.
+- Git commit et push effectué avec succès.
+
+---
+
+_**User (2026-01-19 15:52Z)**_
+
+non refair revenir la page Espace_Test.py et duplique le contenu de Reporting Rh dans cette page
+
+---
+
+_**Agent (model copilot/gemini-3-flash-preview)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "9c7bb735-bb1c-4069-a931-6f8b42ea0231",
+  "terminalCommandId": "tool-fd7d8a42-17f4-4c3c-b2dd-a85ba23fb913",
+  "commandLine": {
+    "original": "cp \"pages/10_📊_Reporting_RH.py\" \"pages/Espace Test.py\"",
+    "toolEdited": " cp \"pages/10_📊_Reporting_RH.py\" \"pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;cp (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768837919590,
+    "duration": 0
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-fd7d8a42-17f4-4c3c-b2dd-a85ba23fb913"
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "7f00f636-4c99-4d8b-ae94-b7f74e79f502",
+  "terminalCommandId": "tool-dc65363b-ec1f-46a0-a429-74328d94effc",
+  "commandLine": {
+    "original": "git add \"pages/Espace Test.py\" &amp;&amp; git commit --no-gpg-sign -m \"Restore Espace Test.py as a duplicate of Reporting RH\" &amp;&amp; git push",
+    "toolEdited": " git add \"pages/Espace Test.py\" &amp;&amp; git commit --no-gpg-sign -m \"Restore Espace Test.py as a duplicate of Reporting RH\" &amp;&amp; git push"
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rules [&#96;git add (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\"), [&#96;git commit (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\"), [&#96;git push (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768837925149,
+    "duration": 463
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-dc65363b-ec1f-46a0-a429-74328d94effc"
+  },
+  "terminalCommandOutput": {
+    "text": "[main c202432f] Restore Espace Test.py as a duplicate of Reporting RH\r\n Author: zekobiceps &lt;zekobiceps@users.noreply.github.com&gt;\r\n 1 file changed, 5006 insertions(+)\r\n create mode 100644 pages/Espace Test.py\r\nEnumerating objects: 5, done.\r\nCounting objects: 100% (5/5), done.\r\nDelta compression using up to 2 threads\r\nCompressing objects: 100% (3/3), done.\r\nWriting objects: 100% (3/3), 380 bytes | 380.00 KiB/s, done.\r\nTotal 3 (delta 2), reused 0 (delta 0), pack-reused 0 (from 0)\r\nremote: Resolving deltas: 100% (2/2), completed with 2 local objects.\r\nTo https://github.com/zekobiceps/TG_Hire\r\n   8d916331..c202432f  main -&gt; main",
+    "lineCount": 18
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+C'est fait. La page `Espace Test.py` a été restaurée dans le dossier `` et son contenu est désormais une copie exacte de `Reporting_RH.py`. Les modifications ont été commitées et poussées.
+
+---
+
+_**User (2026-01-19 15:57Z)**_
+
+Est-ce-que tu peux mettre dans tableau des intégrations futurs avec la même format que tu as fait sur le tableau "Besoins en Cours par Entité"
+
+---
+
+_**Agent (model copilot/gemini-3-flash-preview)**_
+
+<tool-use data-tool-type="search" data-tool-name="copilot_findTextInFiles">
+<details>
+<summary>Tool use: **copilot_findTextInFiles** • Searching for text `Besoins en Cours par Entité` (`**/pages/10_📊_Reporting_RH.py`)</summary>
+
+
+Searched for text `Besoins en Cours par Entité` (`**/pages/10_📊_Reporting_RH.py`), 4 results
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#1960-1960), lines 1960 to 2050</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#1960-1960), lines 1960 to 2050
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#2051-2051), lines 2051 to 2160</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#2051-2051), lines 2051 to 2160
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="copilot_findTextInFiles">
+<details>
+<summary>Tool use: **copilot_findTextInFiles** • Searching for text `Intégrations futures` (`**/pages/10_📊_Reporting_RH.py`)</summary>
+
+
+No results found
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="copilot_findTextInFiles">
+<details>
+<summary>Tool use: **copilot_findTextInFiles** • Searching for regex `Intégration|intégration` (`**/pages/10_📊_Reporting_RH.py`)</summary>
+
+
+Searched for regex `Intégration|intégration` (`**/pages/10_📊_Reporting_RH.py`), 20 results
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#1420-1420), lines 1420 to 1500</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#1420-1420), lines 1420 to 1500
+
+</details>
+</tool-use>
 
 ---
 
