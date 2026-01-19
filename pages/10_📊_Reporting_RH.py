@@ -4954,10 +4954,8 @@ def main():
     with tabs[4]:
         st.header("📖 Méthodologie & Guide Utilisateur")
         
-        st.subheader("🚀 Comment générer votre reporting RH ?")
+        st.subheader("Comment générer le reporting ?")
         st.markdown("""
-        Pour obtenir un reporting complet et à jour, suivez ces étapes :
-
         1.  **Chargement des Données** : 
             *   Allez dans l'onglet **"📂 Upload & Téléchargement"**.
             *   **Option A** : Cliquez sur le bouton rouge **"🔁 Synchroniser depuis Google Sheets"** pour récupérer les données les plus récentes.
