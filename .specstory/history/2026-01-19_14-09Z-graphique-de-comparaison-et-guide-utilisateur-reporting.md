@@ -5676,7 +5676,7 @@ C'est fait. La page `Espace Test.py` a été restaurée dans le dossier `` et so
 
 ---
 
-_**User (2026-01-19 15:57Z)**_
+_**User (2026-01-19 15:59Z)**_
 
 Est-ce-que tu peux mettre dans tableau des intégrations futurs avec la même format que tu as fait sur le tableau "Besoins en Cours par Entité"
 
@@ -5752,6 +5752,391 @@ Read [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#1420-14
 
 </details>
 </tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="copilot_findTextInFiles">
+<details>
+<summary>Tool use: **copilot_findTextInFiles** • Searching for text `intégration futurs` (`**/pages/10_📊_Reporting_RH.py`)</summary>
+
+
+No results found
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#1312-1312), lines 1312 to 1500</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#1312-1312), lines 1312 to 1500
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#2161-2161), lines 2161 to 2200</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#2161-2161), lines 2161 to 2200
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#1-1), lines 1 to 100</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#1-1), lines 1 to 100
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#1700-1700), lines 1700 to 1800</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#1700-1700), lines 1700 to 1800
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#1880-1880), lines 1880 to 1950</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#1880-1880), lines 1880 to 1950
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#1951-1951), lines 1951 to 2050</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#1951-1951), lines 1951 to 2050
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#350-350), lines 350 to 410</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#350-350), lines 350 to 410
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="search" data-tool-name="copilot_findTextInFiles">
+<details>
+<summary>Tool use: **copilot_findTextInFiles** • Searching for text `entity_logo_map` (`**/pages/10_📊_Reporting_RH.py`)</summary>
+
+
+Searched for text `entity_logo_map` (`**/pages/10_📊_Reporting_RH.py`), 13 results
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#2890-2890), lines 2890 to 2920</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#2890-2890), lines 2890 to 2920
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#100-100), lines 100 to 150</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#100-100), lines 100 to 150
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="read" data-tool-name="copilot_readFile">
+<details>
+<summary>Tool use: **copilot_readFile** • Reading [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#1460-1460), lines 1460 to 1485</summary>
+
+
+Read [](file:///workspaces/TG_Hire/pages/10_%F0%9F%93%8A_Reporting_RH.py#1460-1460), lines 1460 to 1485
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="copilot_replaceString">
+<details>
+<summary>Tool use: **copilot_replaceString**</summary>
+
+Additional data:
+
+```json
+{
+  "vscodeToolId": "copilot_replaceString",
+  "isHidden": true
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Replace String in File\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "&#96;&#96;&#96;python\n# --- Centralisation des Logos et Affichage Entités ---\nENTITY_LOGO_MAP = {\n    'TGCC': 'TGCC.PNG',\n    'TGEM': 'TGEM.PNG',\n    'TG ALU': 'TG ALU.PNG',\n    'TG COVER': 'TG COVER.PNG',\n    'TG STEEL': 'TG STEEL.PNG',\n    'TG STONE': 'TG STONE.PNG',\n    'TG WOOD': 'TG WOOD.PNG',\n    'STAM': 'STAM.png',\n    'BFO': 'BFO.png',\n    'TGCC IMMOBILIER': 'tgcc-immobilier.png',\n    'TGCC-IMMOBILIER': 'tgcc-immobilier.png'\n}\n\n@st.cache_data\ndef load_all_logos_b64():\n    \"\"\"Charge tous les logos disponibles en base64.\"\"\"\n    logos_dict = {}\n    current_dir = os.path.dirname(os.path.abspath(__file__))\n    root_dir = os.path.dirname(current_dir)\n    logo_dir = os.path.join(root_dir, \"LOGO\")\n    \n    if os.path.exists(logo_dir):\n        for filename in os.listdir(logo_dir):\n            if filename.lower().endswith(('.png', '.jpg', '.jpeg')):\n                try:\n                    path = os.path.join(logo_dir, filename)\n                    with open(path, \"rb\") as f:\n                        logos_dict[filename] = base64.b64encode(f.read()).decode()\n                except Exception:\n                    pass\n    return logos_dict\n\ndef get_entity_display_html(name, logos_dict):\n    \"\"\"Retourne le HTML (Logo + Suffixe éventuel) pour une entité.\"\"\"\n    if not name or pd.isna(name): return \"\"\n    name_str = str(name).strip()\n    name_upper = name_str.upper()\n    \n    logo_file = None\n    if name_upper in ENTITY_LOGO_MAP:\n        logo_file = ENTITY_LOGO_MAP[name_upper]\n    \n    if not logo_file:\n        for filename in logos_dict.keys():\n            if os.path.splitext(filename)[0].upper() == name_upper:\n                logo_file = filename\n                break\n                \n    if not logo_file:\n        for key in sorted(ENTITY_LOGO_MAP.keys(), key=len, reverse=True):\n            if key in name_upper:\n                logo_file = ENTITY_LOGO_MAP[key]\n                break\n\n    if logo_file and logo_file in logos_dict:\n        logo_b64_str = logos_dict[logo_file]\n        # Tailles spécifiques\n        if name_upper in ['TG STEEL', 'TG STONE'] or 'IMMOBILIER' in name_upper:\n            logo_height = 50\n        elif name_upper == 'BFO':\n            logo_height = 80\n        else:\n            logo_height = 63\n            \n        img_tag = f'&lt;img src=\"data:image/png;base64,{logo_b64_str}\" height=\"{logo_height}\" style=\"vertical-align: middle; display: block; margin: 0 auto;\"&gt;'\n        \n        # Gestion spécifique suffixe\n        matched_key = next((k for k in sorted(ENTITY_LOGO_MAP.keys(), key=len, reverse=True) if k in name_upper), None)\n        if matched_key:\n            pattern = re.escape(matched_key) + r'\\s*-\\s*(.*)'\n            match = re.search(pattern, name_str, flags=re.IGNORECASE)\n            if match and match.group(1):\n                return f'{img_tag} &lt;span style=\"vertical-align: middle; margin-top: 5px; font-weight: bold; display: block; text-align: center;\"&gt;{match.group(1)}&lt;/span&gt;'\n        \n        return img_tag\n    \n    return f'&lt;div style=\"text-align: center; font-weight: 600;\"&gt;{name_str}&lt;/div&gt;'\n\n&#96;&#96;&#96;\n\n",
+  "textEditContent": "# --- Centralisation des Logos et Affichage Entités ---\nENTITY_LOGO_MAP = {\n    'TGCC': 'TGCC.PNG',\n    'TGEM': 'TGEM.PNG',\n    'TG ALU': 'TG ALU.PNG',\n    'TG COVER': 'TG COVER.PNG',\n    'TG STEEL': 'TG STEEL.PNG',\n    'TG STONE': 'TG STONE.PNG',\n    'TG WOOD': 'TG WOOD.PNG',\n    'STAM': 'STAM.png',\n    'BFO': 'BFO.png',\n    'TGCC IMMOBILIER': 'tgcc-immobilier.png',\n    'TGCC-IMMOBILIER': 'tgcc-immobilier.png'\n}\n\n@st.cache_data\ndef load_all_logos_b64():\n    \"\"\"Charge tous les logos disponibles en base64.\"\"\"\n    logos_dict = {}\n    current_dir = os.path.dirname(os.path.abspath(__file__))\n    root_dir = os.path.dirname(current_dir)\n    logo_dir = os.path.join(root_dir, \"LOGO\")\n    \n    if os.path.exists(logo_dir):\n        for filename in os.listdir(logo_dir):\n            if filename.lower().endswith(('.png', '.jpg', '.jpeg')):\n                try:\n                    path = os.path.join(logo_dir, filename)\n                    with open(path, \"rb\") as f:\n                        logos_dict[filename] = base64.b64encode(f.read()).decode()\n                except Exception:\n                    pass\n    return logos_dict\n\ndef get_entity_display_html(name, logos_dict):\n    \"\"\"Retourne le HTML (Logo + Suffixe éventuel) pour une entité.\"\"\"\n    if not name or pd.isna(name): return \"\"\n    name_str = str(name).strip()\n    name_upper = name_str.upper()\n    \n    logo_file = None\n    if name_upper in ENTITY_LOGO_MAP:\n        logo_file = ENTITY_LOGO_MAP[name_upper]\n    \n    if not logo_file:\n        for filename in logos_dict.keys():\n            if os.path.splitext(filename)[0].upper() == name_upper:\n                logo_file = filename\n                break\n                \n    if not logo_file:\n        for key in sorted(ENTITY_LOGO_MAP.keys(), key=len, reverse=True):\n            if key in name_upper:\n                logo_file = ENTITY_LOGO_MAP[key]\n                break\n\n    if logo_file and logo_file in logos_dict:\n        logo_b64_str = logos_dict[logo_file]\n        # Tailles spécifiques\n        if name_upper in ['TG STEEL', 'TG STONE'] or 'IMMOBILIER' in name_upper:\n            logo_height = 50\n        elif name_upper == 'BFO':\n            logo_height = 80\n        else:\n            logo_height = 63\n            \n        img_tag = f'&lt;img src=\"data:image/png;base64,{logo_b64_str}\" height=\"{logo_height}\" style=\"vertical-align: middle; display: block; margin: 0 auto;\"&gt;'\n        \n        # Gestion spécifique suffixe\n        matched_key = next((k for k in sorted(ENTITY_LOGO_MAP.keys(), key=len, reverse=True) if k in name_upper), None)\n        if matched_key:\n            pattern = re.escape(matched_key) + r'\\s*-\\s*(.*)'\n            match = re.search(pattern, name_str, flags=re.IGNORECASE)\n            if match and match.group(1):\n                return f'{img_tag} &lt;span style=\"vertical-align: middle; margin-top: 5px; font-weight: bold; display: block; text-align: center;\"&gt;{match.group(1)}&lt;/span&gt;'\n        \n        return img_tag\n    \n    return f'&lt;div style=\"text-align: center; font-weight: 600;\"&gt;{name_str}&lt;/div&gt;'\n",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="copilot_replaceString">
+<details>
+<summary>Tool use: **copilot_replaceString**</summary>
+
+Additional data:
+
+```json
+{
+  "vscodeToolId": "copilot_replaceString",
+  "isHidden": true
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Replace String in File\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "&#96;&#96;&#96;python\nendu du tableau en HTML personnalisé avec logos (Style \"Besoins en cours\")\n        logos_dict = load_all_logos_b64()\n        \n        # Style CSS\n        st.markdown(\"\"\"\n        &lt;style&gt;\n        .int-table-container {\n            display: flex;\n            justify-content: center;\n            width: 100%;\n            margin: 20px 0;\n        }\n        .int-custom-table {\n            border-collapse: collapse;\n            font-family: Arial, sans-serif;\n            box-shadow: 0 1px 4px rgba(0,0,0,0.1);\n            width: 95%; /* Plus large pour les intégrations */\n            margin: 0 auto;\n        }\n        .int-custom-table th {\n            background-color: #9C182F !important;\n            color: white !important;\n            font-weight: bold !important;\n            text-align: center !important;\n            padding: 10px 8px !important;\n            border: 1px solid white !important;\n            font-size: 1em;\n        }\n        .int-custom-table td {\n            text-align: center !important;\n            padding: 8px 6px !important;\n            border: 1px solid #ddd !important;\n            background-color: white !important;\n            font-size: 0.95em;\n            font-weight: 500;\n        }\n        .int-custom-table .entity-cell {\n            min-width: 100px;\n            max-width: 120px;\n        }\n        .int-custom-table .candidate-cell {\n            font-weight: bold;\n            color: #2c3e50;\n        }\n        &lt;/style&gt;\n        \"\"\", unsafe_allow_html=True)\n\n        html_table = '&lt;div class=\"int-table-container\"&gt;&lt;table class=\"int-custom-table\"&gt;&lt;thead&gt;&lt;tr&gt;'\n        for col in df_display_table.columns:\n            html_table += f'&lt;th&gt;{col}&lt;/th&gt;'\n        html_table += '&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;'\n\n        for _, row in df_display_table.iterrows():\n            html_table += '&lt;tr&gt;'\n            for col in df_display_table.columns:\n                val = row[col]\n                if col == 'Entité demandeuse':\n                    display_val = get_entity_display_html(val, logos_dict)\n                    html_table += f'&lt;td class=\"entity-cell\"&gt;{display_val}&lt;/td&gt;'\n                elif col == 'Candidat':\n                    html_table += f'&lt;td class=\"candidate-cell\"&gt;{val}&lt;/td&gt;'\n                else:\n                    html_table += f'&lt;td&gt;{val}&lt;/td&gt;'\n            html_table += '&lt;/tr&gt;'\n        \n        html_table += '&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;'\n        st.markdown(html_table, unsafe_allow_html\n&#96;&#96;&#96;\n\n",
+  "textEditContent": "endu du tableau en HTML personnalisé avec logos (Style \"Besoins en cours\")\n        logos_dict = load_all_logos_b64()\n        \n        # Style CSS\n        st.markdown(\"\"\"\n        &lt;style&gt;\n        .int-table-container {\n            display: flex;\n            justify-content: center;\n            width: 100%;\n            margin: 20px 0;\n        }\n        .int-custom-table {\n            border-collapse: collapse;\n            font-family: Arial, sans-serif;\n            box-shadow: 0 1px 4px rgba(0,0,0,0.1);\n            width: 95%; /* Plus large pour les intégrations */\n            margin: 0 auto;\n        }\n        .int-custom-table th {\n            background-color: #9C182F !important;\n            color: white !important;\n            font-weight: bold !important;\n            text-align: center !important;\n            padding: 10px 8px !important;\n            border: 1px solid white !important;\n            font-size: 1em;\n        }\n        .int-custom-table td {\n            text-align: center !important;\n            padding: 8px 6px !important;\n            border: 1px solid #ddd !important;\n            background-color: white !important;\n            font-size: 0.95em;\n            font-weight: 500;\n        }\n        .int-custom-table .entity-cell {\n            min-width: 100px;\n            max-width: 120px;\n        }\n        .int-custom-table .candidate-cell {\n            font-weight: bold;\n            color: #2c3e50;\n        }\n        &lt;/style&gt;\n        \"\"\", unsafe_allow_html=True)\n\n        html_table = '&lt;div class=\"int-table-container\"&gt;&lt;table class=\"int-custom-table\"&gt;&lt;thead&gt;&lt;tr&gt;'\n        for col in df_display_table.columns:\n            html_table += f'&lt;th&gt;{col}&lt;/th&gt;'\n        html_table += '&lt;/tr&gt;&lt;/thead&gt;&lt;tbody&gt;'\n\n        for _, row in df_display_table.iterrows():\n            html_table += '&lt;tr&gt;'\n            for col in df_display_table.columns:\n                val = row[col]\n                if col == 'Entité demandeuse':\n                    display_val = get_entity_display_html(val, logos_dict)\n                    html_table += f'&lt;td class=\"entity-cell\"&gt;{display_val}&lt;/td&gt;'\n                elif col == 'Candidat':\n                    html_table += f'&lt;td class=\"candidate-cell\"&gt;{val}&lt;/td&gt;'\n                else:\n                    html_table += f'&lt;td&gt;{val}&lt;/td&gt;'\n            html_table += '&lt;/tr&gt;'\n        \n        html_table += '&lt;/tbody&gt;&lt;/table&gt;&lt;/div&gt;'\n        st.markdown(html_table, unsafe_allow_html",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "269b9ced-45be-40d6-bb8f-adc2860badaa",
+  "terminalCommandId": "tool-446fc322-fb78-4576-a716-01e70298ad6f",
+  "commandLine": {
+    "original": "cp \"pages/10_📊_Reporting_RH.py\" \"pages/Espace Test.py\"",
+    "toolEdited": " cp \"pages/10_📊_Reporting_RH.py\" \"pages/Espace Test.py\""
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rule [&#96;cp (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768838360546,
+    "duration": 1
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-446fc322-fb78-4576-a716-01e70298ad6f"
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+<tool-use data-tool-type="unknown" data-tool-name="run_in_terminal">
+<details>
+<summary>Tool use: **run_in_terminal**</summary>
+
+
+Parameters:
+
+```json
+{
+  "kind": "terminal",
+  "terminalToolSessionId": "595997cd-ee48-4a68-b15d-2e5d15e123aa",
+  "terminalCommandId": "tool-cbe87a07-1c5d-4c28-acc9-d7ca11aaad55",
+  "commandLine": {
+    "original": "git add . &amp;&amp; git commit --no-gpg-sign -m \"Format Intégrations futures table with custom HTML and entity logos\" &amp;&amp; git push",
+    "toolEdited": " git add . &amp;&amp; git commit --no-gpg-sign -m \"Format Intégrations futures table with custom HTML and entity logos\" &amp;&amp; git push"
+  },
+  "language": "sh",
+  "autoApproveInfo": {
+    "value": "Auto approved by rules [&#96;git add (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\"), [&#96;git commit (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\"), [&#96;git push (user)&#96;](command:workbench.action.terminal.chat.openTerminalSettingsLink?%255B3%255D \"View rule in settings\")",
+    "isTrusted": {
+      "enabledCommands": [
+        "workbench.action.terminal.chat.openTerminalSettingsLink"
+      ]
+    },
+    "supportThemeIcons": false,
+    "supportHtml": false,
+    "supportAlertSyntax": false
+  },
+  "terminalCommandState": {
+    "exitCode": 0,
+    "timestamp": 1768838365176,
+    "duration": 709
+  },
+  "terminalCommandUri": {
+    "$mid": 1,
+    "path": "/56d00fcfc640069acd46b4f97f8d718c/5",
+    "scheme": "vscode-terminal",
+    "query": "command=tool-cbe87a07-1c5d-4c28-acc9-d7ca11aaad55"
+  },
+  "terminalCommandOutput": {
+    "text": "[main 11b317ca] Format Intégrations futures table with custom HTML and entity logos\r\n Author: zekobiceps &lt;zekobiceps@users.noreply.github.com&gt;\r\n 3 files changed, 2767 insertions(+), 11 deletions(-)\r\nEnumerating objects: 13, done.\r\nCounting objects: 100% (13/13), done.\r\nDelta compression using up to 2 threads\r\nCompressing objects: 100% (6/6), done.\r\nWriting objects: 100% (7/7), 9.83 KiB | 671.00 KiB/s, done.\r\nTotal 7 (delta 5), reused 0 (delta 0), pack-reused 0 (from 0)\r\nremote: Resolving deltas: 100% (5/5), completed with 5 local objects.\r\nTo https://github.com/zekobiceps/TG_Hire\r\n   c202432f..11b317ca  main -&gt; main",
+    "lineCount": 17
+  },
+  "terminalTheme": {
+    "background": "#181818",
+    "foreground": "#cccccc"
+  }
+}
+```
+Additional data:
+
+```json
+{
+  "vscodeToolId": "run_in_terminal",
+  "isHidden": false
+}
+```
+Result:
+
+```json
+{
+  "invocationMessage": "Using \"Run in Terminal\"",
+  "isConfirmed": {
+    "type": 1
+  },
+  "content": "",
+  "textEditContent": "",
+  "toolCallResult": null
+}
+```
+Status: **completed**
+
+
+</details>
+</tool-use>
+
+---
+
+J'ai mis à jour le tableau des **Intégrations en Cours** (futures intégrations) pour qu'il utilise le même formatage que le tableau des "Besoins en Cours par Entité".
+
+### Modifications apportées :
+1.  **Formatage HTML/CSS** : Le tableau utilise désormais des en-têtes rouges (#9C182F), des bordures blanches et un style épuré et professionnel.
+2.  **Logos d'entités** : La colonne **Entité demandeuse** affiche maintenant les logos correspondants (TGCC, TGEM, TG ALU, etc.) avec le nom de l'agence/siège en dessous, exactement comme dans le premier tableau.
+3.  **Mise en page** : Le tableau est optimisé pour occuper 95% de la largeur afin de garantir une bonne lisibilité des colonnes "Candidat" et "Poste demandé".
+4.  **Synchronisation** : Toutes les modifications ont été appliquées à Reporting_RH.py et répliquées sur `Espace Test.py`.
+
+Les changements ont été commités et poussés sur le dépôt.
+
+---
+
+_**User (2026-01-19 16:01Z)**_
+
+Enlève les logo et laisse uniquement les noms text et pour les colonnes il y a bcp d'espace entre eux réduit ses espaces au max
+
+---
+
+_**Agent (model copilot/gemini-3-flash-preview)**_
+
+
 
 ---
 

@@ -138,85 +138,6 @@ def render_generic_metrics(metrics):
 # Shared title font used for all main charts so typography is consistent
 TITLE_FONT = dict(family="Arial, sans-serif", size=18, color="#111111", )
 
-# --- Centralisation des Logos et Affichage Entités ---
-ENTITY_LOGO_MAP = {
-    'TGCC': 'TGCC.PNG',
-    'TGEM': 'TGEM.PNG',
-    'TG ALU': 'TG ALU.PNG',
-    'TG COVER': 'TG COVER.PNG',
-    'TG STEEL': 'TG STEEL.PNG',
-    'TG STONE': 'TG STONE.PNG',
-    'TG WOOD': 'TG WOOD.PNG',
-    'STAM': 'STAM.png',
-    'BFO': 'BFO.png',
-    'TGCC IMMOBILIER': 'tgcc-immobilier.png',
-    'TGCC-IMMOBILIER': 'tgcc-immobilier.png'
-}
-
-@st.cache_data
-def load_all_logos_b64():
-    """Charge tous les logos disponibles en base64."""
-    logos_dict = {}
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    root_dir = os.path.dirname(current_dir)
-    logo_dir = os.path.join(root_dir, "LOGO")
-    
-    if os.path.exists(logo_dir):
-        for filename in os.listdir(logo_dir):
-            if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
-                try:
-                    path = os.path.join(logo_dir, filename)
-                    with open(path, "rb") as f:
-                        logos_dict[filename] = base64.b64encode(f.read()).decode()
-                except Exception:
-                    pass
-    return logos_dict
-
-def get_entity_display_html(name, logos_dict):
-    """Retourne le HTML (Logo + Suffixe éventuel) pour une entité."""
-    if not name or pd.isna(name): return ""
-    name_str = str(name).strip()
-    name_upper = name_str.upper()
-    
-    logo_file = None
-    if name_upper in ENTITY_LOGO_MAP:
-        logo_file = ENTITY_LOGO_MAP[name_upper]
-    
-    if not logo_file:
-        for filename in logos_dict.keys():
-            if os.path.splitext(filename)[0].upper() == name_upper:
-                logo_file = filename
-                break
-                
-    if not logo_file:
-        for key in sorted(ENTITY_LOGO_MAP.keys(), key=len, reverse=True):
-            if key in name_upper:
-                logo_file = ENTITY_LOGO_MAP[key]
-                break
-
-    if logo_file and logo_file in logos_dict:
-        logo_b64_str = logos_dict[logo_file]
-        # Tailles spécifiques
-        if name_upper in ['TG STEEL', 'TG STONE'] or 'IMMOBILIER' in name_upper:
-            logo_height = 50
-        elif name_upper == 'BFO':
-            logo_height = 80
-        else:
-            logo_height = 63
-            
-        img_tag = f'<img src="data:image/png;base64,{logo_b64_str}" height="{logo_height}" style="vertical-align: middle; display: block; margin: 0 auto;">'
-        
-        # Gestion spécifique suffixe
-        matched_key = next((k for k in sorted(ENTITY_LOGO_MAP.keys(), key=len, reverse=True) if k in name_upper), None)
-        if matched_key:
-            pattern = re.escape(matched_key) + r'\s*-\s*(.*)'
-            match = re.search(pattern, name_str, flags=re.IGNORECASE)
-            if match and match.group(1):
-                return f'{img_tag} <span style="vertical-align: middle; margin-top: 5px; font-weight: bold; display: block; text-align: center;">{match.group(1)}</span>'
-        
-        return img_tag
-    
-    return f'<div style="text-align: center; font-weight: 600;">{name_str}</div>'
 
 def apply_title_style(fig):
     """Applique la police et le style de titre standardisé à une figure Plotly."""
@@ -1555,9 +1476,6 @@ def create_integrations_tab(df_recrutement, global_filters):
             
         df_display_table = df_display.rename(columns=rename_map)
 
-        # Rendu du tableau en HTML personnalisé avec logos (Style "Besoins en cours")
-        logos_dict = load_all_logos_b64()
-        
         # Style CSS
         st.markdown("""
         <style>
@@ -1565,13 +1483,14 @@ def create_integrations_tab(df_recrutement, global_filters):
             display: flex;
             justify-content: center;
             width: 100%;
-            margin: 20px 0;
+            margin: 10px 0;
         }
         .int-custom-table {
             border-collapse: collapse;
             font-family: Arial, sans-serif;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-            width: 95%; /* Plus large pour les intégrations */
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            width: auto; /* Largeur automatique pour réduire l'espace */
+            min-width: 60%;
             margin: 0 auto;
         }
         .int-custom-table th {
@@ -1579,25 +1498,24 @@ def create_integrations_tab(df_recrutement, global_filters):
             color: white !important;
             font-weight: bold !important;
             text-align: center !important;
-            padding: 10px 8px !important;
+            padding: 4px 8px !important; /* Padding réduit au max */
             border: 1px solid white !important;
-            font-size: 1em;
+            font-size: 0.9em;
+            white-space: nowrap;
         }
         .int-custom-table td {
             text-align: center !important;
-            padding: 8px 6px !important;
-            border: 1px solid #ddd !important;
+            padding: 3px 6px !important; /* Padding réduit au max */
+            border: 1px solid #eee !important;
             background-color: white !important;
-            font-size: 0.95em;
+            font-size: 0.9em;
             font-weight: 500;
-        }
-        .int-custom-table .entity-cell {
-            min-width: 100px;
-            max-width: 120px;
         }
         .int-custom-table .candidate-cell {
             font-weight: bold;
             color: #2c3e50;
+            text-align: left !important;
+            padding-left: 10px !important;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -1611,10 +1529,7 @@ def create_integrations_tab(df_recrutement, global_filters):
             html_table += '<tr>'
             for col in df_display_table.columns:
                 val = row[col]
-                if col == 'Entité demandeuse':
-                    display_val = get_entity_display_html(val, logos_dict)
-                    html_table += f'<td class="entity-cell">{display_val}</td>'
-                elif col == 'Candidat':
+                if col == 'Candidat':
                     html_table += f'<td class="candidate-cell">{val}</td>'
                 else:
                     html_table += f'<td>{val}</td>'
@@ -2107,107 +2022,9 @@ def create_weekly_report_tab(df_recrutement=None):
         unsafe_allow_html=True
     )
     if metrics and len(metrics) > 0:
-        # Charger tous les logos disponibles dans le dossier LOGO
-        logos_dict = {}
-        # Utiliser un chemin absolu pour éviter les problèmes de répertoire courant
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        root_dir = os.path.dirname(current_dir)
-        logo_dir = os.path.join(root_dir, "LOGO")
-        
-        if os.path.exists(logo_dir):
-            for filename in os.listdir(logo_dir):
-                if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
-                    path = os.path.join(logo_dir, filename)
-                    with open(path, "rb") as f:
-                        logos_dict[filename] = base64.b64encode(f.read()).decode()
-        
-        # Mapping entité -> nom de fichier logo
-        entity_logo_map = {
-            'TGCC': 'TGCC.PNG',
-            'TGEM': 'TGEM.PNG',
-            'TG ALU': 'TG ALU.PNG',
-            'TG COVER': 'TG COVER.PNG',
-            'TG STEEL': 'TG STEEL.PNG',
-            'TG STONE': 'TG STONE.PNG',
-            'TG WOOD': 'TG WOOD.PNG',
-            'STAM': 'STAM.png',
-            'BFO': 'BFO.png',
-            'TGCC IMMOBILIER': 'tgcc-immobilier.png',
-            'TGCC-IMMOBILIER': 'tgcc-immobilier.png'
-        }
-
         def get_entity_display(name):
             name_str = str(name).strip()
-            name_upper = name_str.upper()
-            
-            # Trouver le logo correspondant
-            logo_file = None
-            
-            # 1. Correspondance exacte dans le mapping
-            if name_upper in entity_logo_map:
-                logo_file = entity_logo_map[name_upper]
-            
-            # 2. Si pas trouvé, chercher directement dans les fichiers disponibles (insensible à la casse)
-            if not logo_file:
-                for filename in logos_dict.keys():
-                    # Enlever l'extension et mettre en majuscules pour comparer
-                    base_name = os.path.splitext(filename)[0].upper()
-                    # Correspondance exacte avec le nom de l'entité
-                    if base_name == name_upper:
-                        logo_file = filename
-                        break
-            
-            # 3. Si toujours pas trouvé, recherche de sous-chaîne dans le mapping (ex: "TGCC - SIEGE" contient "TGCC")
-            if not logo_file:
-                for key in sorted(entity_logo_map.keys(), key=len, reverse=True):
-                    if key in name_upper:
-                        logo_file = entity_logo_map[key]
-                        break
-            
-            # 4. Dernière tentative: recherche de sous-chaîne dans les noms de fichiers
-            if not logo_file:
-                for filename in logos_dict.keys():
-                    base_name = os.path.splitext(filename)[0].upper()
-                    if base_name in name_upper or name_upper in base_name:
-                        logo_file = filename
-                        break
-
-            if logo_file and logo_file in logos_dict:
-                logo_b64_str = logos_dict[logo_file]
-                # Tailles spécifiques pour certains logos
-                if name_upper in ['TG STEEL', 'TG STONE'] or 'IMMOBILIER' in name_upper:
-                    logo_height = 50
-                elif name_upper == 'BFO':
-                    logo_height = 80
-                else:
-                    logo_height = 63
-                # Image avec taille optimale et centrée
-                img_tag = f'<img src="data:image/png;base64,{logo_b64_str}" height="{logo_height}" style="vertical-align: middle; display: block; margin: 0 auto;">'
-                
-                # Gestion spécifique pour TGCC avec suffixe (ex: TGCC - SIEGE)
-                # Si on a trouvé via le mapping ou via le nom de fichier
-                matched_key = None
-                if name_upper in entity_logo_map:
-                    matched_key = name_upper
-                else:
-                    # Essayer de trouver la clé correspondante dans le mapping
-                    matched_key = next((k for k in sorted(entity_logo_map.keys(), key=len, reverse=True) if k in name_upper), None)
-                    # Si pas dans le mapping mais trouvé via fichier direct
-                    if not matched_key and logo_file:
-                         matched_key = os.path.splitext(logo_file)[0].upper()
-
-                if matched_key:
-                    # Regex pour trouver le suffixe après la clé (ex: " - SIEGE")
-                    pattern = re.escape(matched_key) + r'\s*-\s*(.*)'
-                    match = re.search(pattern, name_str, flags=re.IGNORECASE)
-                    if match:
-                        suffix = match.group(1)
-                        if suffix:
-                            return f'{img_tag} <span style="vertical-align: middle; margin-left: 5px; font-weight: bold;">{suffix}</span>'
-                
-                return img_tag
-            
-            return name_str
+            return f'<div style="text-align: center; font-weight: 600;">{name_str}</div>'
 
         # Préparer les données pour le HTML
         table_data = []
@@ -2223,7 +2040,7 @@ def create_weekly_report_tab(df_recrutement=None):
 
         # Ajouter la ligne de total
         table_data.append({
-            'Entité': '**Total**',
+            'Entité': '<div style="text-align: center; font-weight: bold;">TOTAL</div>',
             'Nb postes ouverts avant début semaine': f'**{total_avant}**',
             'Nb nouveaux postes ouverts cette semaine': f'**{total_nouveaux}**',
             'Nb postes pourvus cette semaine': f'**{total_pourvus}**',
@@ -2238,68 +2055,39 @@ def create_weekly_report_tab(df_recrutement=None):
             display: flex;
             justify-content: center;
             width: 100%;
-            margin: 15px 0;
+            margin: 10px 0;
         }
         .custom-table {
             border-collapse: collapse;
             font-family: Arial, sans-serif;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-            width: 75%;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+            width: auto;
+            min-width: 70%;
             margin: 0 auto;
         }
         .custom-table th {
-            background-color: #9C182F !important; /* Rouge vif */
+            background-color: #9C182F !important;
             color: white !important;
             font-weight: bold !important;
             text-align: center !important;
-            padding: 6px 4px !important;
+            padding: 4px 8px !important;
             border: 1px solid white !important;
-            font-size: 1.1em;
-            line-height: 1.3;
-            white-space: normal !important;
-            word-wrap: break-word !important;
-            max-width: 150px;
+            font-size: 0.9em;
+            line-height: 1.2;
         }
         .custom-table td {
             text-align: center !important;
-            padding: 6px 4px !important;
-            border: 1px solid #ddd !important;
+            padding: 3px 6px !important;
+            border: 1px solid #eee !important;
             background-color: white !important;
-            font-size: 1.1em;
-            line-height: 1.2;
+            font-size: 0.9em;
             font-weight: 500;
         }
-        .custom-table .entity-cell {
-            text-align: center !important;
-            padding: 4px 2px !important;
-            font-weight: 600;
-            min-width: 80px;
-            max-width: 100px;
-        }
-        .custom-table .total-row {
-            background-color: #9C182F !important; /* Rouge vif */
+        .custom-table .total-row td {
+            background-color: #9C182F !important;
             color: white !important;
             font-weight: bold !important;
-            border-top: 2px solid #9C182F !important;
-        }
-        .custom-table .total-row .entity-cell {
-            text-align: left !important;
-            padding-left: 10px !important;
-            font-weight: bold !important;
-        }
-        .custom-table .total-row td {
-            background-color: #9C182F !important; /* Assurer le fond rouge sur chaque cellule */
-            color: white !important; /* Assurer le texte blanc */
-            font-size: 1.1em !important;
-            font-weight: bold !important;
-            border: 1px solid #9C182F !important; /* Bordures rouges */
-        }
-        .custom-table .total-row .entity-cell {
-            text-align: center !important;
-            padding: 4px 2px !important;
-            font-weight: bold !important;
-            background-color: #9C182F !important; /* Fond rouge pour la cellule entité */
-            color: white !important; /* Texte blanc pour la cellule entité */
+            border: 1px solid #9C182F !important;
         }
         </style>
         """, unsafe_allow_html=True)
