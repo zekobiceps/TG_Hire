@@ -138,6 +138,83 @@ def render_generic_metrics(metrics):
 # Shared title font used for all main charts so typography is consistent
 TITLE_FONT = dict(family="Arial, sans-serif", size=18, color="#111111", )
 
+# --- Centralisation des Logos et Affichage Entités ---
+ENTITY_LOGO_MAP = {
+    'TGCC': 'TGCC.PNG',
+    'TGEM': 'TGEM.PNG',
+    'TG ALU': 'TG ALU.PNG',
+    'TG COVER': 'TG COVER.PNG',
+    'TG STEEL': 'TG STEEL.PNG',
+    'TG STONE': 'TG STONE.PNG',
+    'TG WOOD': 'TG WOOD.PNG',
+    'STAM': 'STAM.png',
+    'BFO': 'BFO.png',
+    'TGCC IMMOBILIER': 'tgcc-immobilier.png',
+    'TGCC-IMMOBILIER': 'tgcc-immobilier.png'
+}
+
+@st.cache_data
+def load_all_logos_b64():
+    """Charge tous les logos disponibles en base64."""
+    logos_dict = {}
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.dirname(current_dir)
+    logo_dir = os.path.join(root_dir, "LOGO")
+    
+    if os.path.exists(logo_dir):
+        for filename in os.listdir(logo_dir):
+            if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+                try:
+                    path = os.path.join(logo_dir, filename)
+                    with open(path, "rb") as f:
+                        logos_dict[filename] = base64.b64encode(f.read()).decode()
+                except Exception:
+                    pass
+    return logos_dict
+
+def get_entity_display_html_with_logo(name, logos_dict):
+    """Retourne le HTML (Logo + Suffixe éventuel) pour l'affichage avec logo."""
+    if not name or pd.isna(name): return ""
+    name_str = str(name).strip()
+    name_upper = name_str.upper()
+    
+    logo_file = None
+    if name_upper in ENTITY_LOGO_MAP:
+        logo_file = ENTITY_LOGO_MAP[name_upper]
+    
+    if not logo_file:
+        for filename in logos_dict.keys():
+            if os.path.splitext(filename)[0].upper() == name_upper:
+                logo_file = filename
+                break
+                
+    if not logo_file:
+        for key in sorted(ENTITY_LOGO_MAP.keys(), key=len, reverse=True):
+            if key in name_upper:
+                logo_file = ENTITY_LOGO_MAP[key]
+                break
+
+    if logo_file and logo_file in logos_dict:
+        logo_b64_str = logos_dict[logo_file]
+        if name_upper in ['TG STEEL', 'TG STONE'] or 'IMMOBILIER' in name_upper:
+            logo_height = 50
+        elif name_upper == 'BFO':
+            logo_height = 80
+        else:
+            logo_height = 63
+            
+        img_tag = f'<img src="data:image/png;base64,{logo_b64_str}" height="{logo_height}" style="vertical-align: middle; display: block; margin: 0 auto;">'
+        
+        matched_key = next((k for k in sorted(ENTITY_LOGO_MAP.keys(), key=len, reverse=True) if k in name_upper), None)
+        if matched_key:
+            pattern = re.escape(matched_key) + r'\s*-\s*(.*)'
+            match = re.search(pattern, name_str, flags=re.IGNORECASE)
+            if match and match.group(1):
+                return f'{img_tag} <span style="vertical-align: middle; margin-top: 5px; font-weight: bold; display: block; text-align: center;">{match.group(1)}</span>'
+        
+        return img_tag
+    
+    return f'<div style="text-align: center; font-weight: 600;">{name_str}</div>'
 
 def apply_title_style(fig):
     """Applique la police et le style de titre standardisé à une figure Plotly."""
@@ -1476,21 +1553,20 @@ def create_integrations_tab(df_recrutement, global_filters):
             
         df_display_table = df_display.rename(columns=rename_map)
 
-        # Style CSS
+        # Style CSS (version texte uniquement, plus aérée)
         st.markdown("""
         <style>
         .int-table-container {
             display: flex;
             justify-content: center;
             width: 100%;
-            margin: 10px 0;
+            margin: 20px 0;
         }
         .int-custom-table {
             border-collapse: collapse;
             font-family: Arial, sans-serif;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-            width: auto; /* Largeur automatique pour réduire l'espace */
-            min-width: 60%;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            width: 85%;
             margin: 0 auto;
         }
         .int-custom-table th {
@@ -1498,24 +1574,24 @@ def create_integrations_tab(df_recrutement, global_filters):
             color: white !important;
             font-weight: bold !important;
             text-align: center !important;
-            padding: 4px 8px !important; /* Padding réduit au max */
+            padding: 10px 15px !important;
             border: 1px solid white !important;
-            font-size: 0.9em;
+            font-size: 1.05em;
             white-space: nowrap;
         }
         .int-custom-table td {
             text-align: center !important;
-            padding: 3px 6px !important; /* Padding réduit au max */
-            border: 1px solid #eee !important;
+            padding: 8px 12px !important;
+            border: 1px solid #ddd !important;
             background-color: white !important;
-            font-size: 0.9em;
+            font-size: 1.0em;
             font-weight: 500;
         }
         .int-custom-table .candidate-cell {
             font-weight: bold;
             color: #2c3e50;
             text-align: left !important;
-            padding-left: 10px !important;
+            padding-left: 15px !important;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -2022,9 +2098,10 @@ def create_weekly_report_tab(df_recrutement=None):
         unsafe_allow_html=True
     )
     if metrics and len(metrics) > 0:
+        logos_dict = load_all_logos_b64()
+        
         def get_entity_display(name):
-            name_str = str(name).strip()
-            return f'<div style="text-align: center; font-weight: 600;">{name_str}</div>'
+            return get_entity_display_html_with_logo(name, logos_dict)
 
         # Préparer les données pour le HTML
         table_data = []
@@ -2048,21 +2125,20 @@ def create_weekly_report_tab(df_recrutement=None):
             'Nb postes en cours cette semaine (sourcing)': f'**{total_en_cours}**'
         })
 
-        # HTML + CSS (repris de la version précédente)
+        # HTML + CSS (RETOUR À LA VERSION ORIGINALE AVEC LOGOS)
         st.markdown("""
         <style>
         .table-container {
             display: flex;
             justify-content: center;
             width: 100%;
-            margin: 10px 0;
+            margin: 15px 0;
         }
         .custom-table {
             border-collapse: collapse;
             font-family: Arial, sans-serif;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-            width: auto;
-            min-width: 70%;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            width: 75%;
             margin: 0 auto;
         }
         .custom-table th {
@@ -2070,18 +2146,29 @@ def create_weekly_report_tab(df_recrutement=None):
             color: white !important;
             font-weight: bold !important;
             text-align: center !important;
-            padding: 4px 8px !important;
+            padding: 6px 4px !important;
             border: 1px solid white !important;
-            font-size: 0.9em;
-            line-height: 1.2;
+            font-size: 1.1em;
+            line-height: 1.3;
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            max-width: 150px;
         }
         .custom-table td {
             text-align: center !important;
-            padding: 3px 6px !important;
-            border: 1px solid #eee !important;
+            padding: 6px 4px !important;
+            border: 1px solid #ddd !important;
             background-color: white !important;
-            font-size: 0.9em;
+            font-size: 1.1em;
+            line-height: 1.2;
             font-weight: 500;
+        }
+        .custom-table .entity-cell {
+            text-align: center !important;
+            padding: 4px 2px !important;
+            font-weight: 600;
+            min-width: 80px;
+            max-width: 100px;
         }
         .custom-table .total-row td {
             background-color: #9C182F !important;
@@ -2105,7 +2192,7 @@ def create_weekly_report_tab(df_recrutement=None):
         html_table += '<tbody>'
 
         # Ajouter les lignes de données (toutes sauf la dernière qui est TOTAL)
-        data_rows = [row for row in table_data[:-1] if row["Entité"] and row["Entité"].strip()]
+        data_rows = table_data[:-1]
         for row in data_rows:
             html_table += '<tr>'
             html_table += f'<td class="entity-cell">{row["Entité"]}</td>'
@@ -2207,8 +2294,12 @@ def create_weekly_report_tab(df_recrutement=None):
         except Exception:
             pass
     else:
-        # Affichage par défaut si pas de metrics
-        default_html = """
+        # Affichage par défaut si pas de metrics (avec logos pour démo)
+        logos_dict = load_all_logos_b64()
+        tgcc_logo = get_entity_display_html_with_logo('TGCC', logos_dict)
+        tgem_logo = get_entity_display_html_with_logo('TGEM', logos_dict)
+        
+        default_html = f"""
 <div class="table-container">
     <table class="custom-table">
         <thead>
@@ -2222,14 +2313,14 @@ def create_weekly_report_tab(df_recrutement=None):
         </thead>
         <tbody>
             <tr>
-                <td class="entity-cell">TGCC</td>
+                <td class="entity-cell">{tgcc_logo}</td>
                 <td>19</td>
                 <td>12</td>
                 <td>5</td>
                 <td>26</td>
             </tr>
             <tr>
-                <td class="entity-cell">TGEM</td>
+                <td class="entity-cell">{tgem_logo}</td>
                 <td>2</td>
                 <td>2</td>
                 <td>0</td>
