@@ -2091,53 +2091,54 @@ def create_weekly_report_tab(df_recrutement=None):
     st.markdown(kpi_cards_html, unsafe_allow_html=True)
 
     # Tableau récapitulatif par entité (HTML personnalisé, rendu centralisé)
-        st.markdown('Avant de générer le reporting, assurez-vous que tous les recrutements sont saisis, que la colonne «Status» de la demande est renseignée et que la colonne «TG Hire» reflète l\'état du recrutement (Nouvelle demande, Sourcing, Signature DRH, ...).<div style="color:red; font-weight:700; margin-top:6px;">NB : au fur et à mesure de l\'évolution des recrutements, mettez à jour leur état, sinon le reporting ne sera pas fiable.</div>', unsafe_allow_html=True)
+    st.markdown('Avant de générer le reporting, assurez-vous que tous les recrutements sont saisis, que la colonne «Status» de la demande est renseignée et que la colonne «TG Hire» reflète l\'état du recrutement (Nouvelle demande, Sourcing, Signature DRH, ...).<div style="color:red; font-weight:700; margin-top:6px;">NB : au fur et à mesure de l\'évolution des recrutements, mettez à jour leur état, sinon le reporting ne sera pas fiable.</div>', unsafe_allow_html=True)
 
-        st.markdown("""
+    st.markdown("""
 1.  **Chargement des Données** : 
 
     *   Allez dans l'onglet **"📂 Upload & Téléchargement"**.
     *   **Option A** : Cliquez sur le bouton rouge **"🔁 Synchroniser depuis Google Sheets"** pour récupérer les données les plus récentes.
     *   **Option B** : Glissez-déposez votre fichier Excel de recrutement dans la zone de chargement.
+""")
 
-        # Préparer les données pour le HTML
-        table_data = []
-        for entite, data in metrics_included.items():
-            table_data.append({
-                'Entité': get_entity_display(entite),
-                'Nb postes ouverts avant début semaine': data['avant'] if data['avant'] > 0 else '-',
-                'Nb nouveaux postes ouverts cette semaine': data['nouveaux'] if data['nouveaux'] > 0 else '-',
-                'Nb postes pourvus cette semaine': data['pourvus'] if data['pourvus'] > 0 else '-',
-                "Nb postes statut 'En cours' (total)": data.get('en_cours_status_count', 0) if data.get('en_cours_status_count', 0) > 0 else '-',
-                'Nb postes en cours cette semaine (sourcing)': data['en_cours'] if data['en_cours'] > 0 else '-'
-            })
-
-        # Ajouter la ligne de total
+    # Préparer les données pour le HTML
+    table_data = []
+    for entite, data in metrics_included.items():
         table_data.append({
-            'Entité': '<div style="text-align: center; font-weight: bold;">TOTAL</div>',
-            'Nb postes ouverts avant début semaine': f'**{total_avant}**',
-            'Nb nouveaux postes ouverts cette semaine': f'**{total_nouveaux}**',
-            'Nb postes pourvus cette semaine': f'**{total_pourvus}**',
-            "Nb postes statut 'En cours' (total)": f'**{total_en_cours_status}**',
-            'Nb postes en cours cette semaine (sourcing)': f'**{total_en_cours}**'
+            'Entité': get_entity_display(entite),
+            'Nb postes ouverts avant début semaine': data['avant'] if data['avant'] > 0 else '-',
+            'Nb nouveaux postes ouverts cette semaine': data['nouveaux'] if data['nouveaux'] > 0 else '-',
+            'Nb postes pourvus cette semaine': data['pourvus'] if data['pourvus'] > 0 else '-',
+            "Nb postes statut 'En cours' (total)": data.get('en_cours_status_count', 0) if data.get('en_cours_status_count', 0) > 0 else '-',
+            'Nb postes en cours cette semaine (sourcing)': data['en_cours'] if data['en_cours'] > 0 else '-'
         })
 
-        # HTML + CSS (RETOUR À LA VERSION ORIGINALE AVEC LOGOS)
-        st.markdown("""
-        <style>
-        .table-container {
-            display: flex;
-            justify-content: center;
-            width: 100%;
-            margin: 15px 0;
-        }
-        .custom-table {
-            border-collapse: collapse;
-            font-family: Arial, sans-serif;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-            width: 75%;
-            margin: 0 auto;
-        }
+    # Ajouter la ligne de total
+    table_data.append({
+        'Entité': '<div style="text-align: center; font-weight: bold;">TOTAL</div>',
+        'Nb postes ouverts avant début semaine': f'**{total_avant}**',
+        'Nb nouveaux postes ouverts cette semaine': f'**{total_nouveaux}**',
+        'Nb postes pourvus cette semaine': f'**{total_pourvus}**',
+        "Nb postes statut 'En cours' (total)": f'**{total_en_cours_status}**',
+        'Nb postes en cours cette semaine (sourcing)': f'**{total_en_cours}**'
+    })
+
+    # HTML + CSS (RETOUR À LA VERSION ORIGINALE AVEC LOGOS)
+    st.markdown("""
+    <style>
+    .table-container {
+        display: flex;
+        justify-content: center;
+        width: 100%;
+        margin: 15px 0;
+    }
+    .custom-table {
+        border-collapse: collapse;
+        font-family: Arial, sans-serif;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        width: 75%;
+        margin: 0 auto;
+    }
         .custom-table th {
             background-color: #9C182F !important;
             color: white !important;
@@ -2172,49 +2173,49 @@ def create_weekly_report_tab(df_recrutement=None):
             color: white !important;
             font-weight: bold !important;
             border: 1px solid #9C182F !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-        # Construire le tableau HTML
-        html_table = '<div class="table-container">'
-        html_table += '<table class="custom-table">'
-        html_table += '<thead><tr>'
-        html_table += '<th>Entité</th>'
-        html_table += '<th>Nb postes ouverts avant début semaine</th>'
-        html_table += '<th>Nb nouveaux postes ouverts cette semaine</th>'
-        html_table += '<th>Nb postes pourvus cette semaine</th>'
-        html_table += '<th>Nb postes en cours cette semaine (sourcing)</th>'
-        html_table += '</tr></thead>'
-        html_table += '<tbody>'
+    # Construire le tableau HTML
+    html_table = '<div class="table-container">'
+    html_table += '<table class="custom-table">'
+    html_table += '<thead><tr>'
+    html_table += '<th>Entité</th>'
+    html_table += '<th>Nb postes ouverts avant début semaine</th>'
+    html_table += '<th>Nb nouveaux postes ouverts cette semaine</th>'
+    html_table += '<th>Nb postes pourvus cette semaine</th>'
+    html_table += '<th>Nb postes en cours cette semaine (sourcing)</th>'
+    html_table += '</tr></thead>'
+    html_table += '<tbody>'
 
-        # Ajouter les lignes de données (toutes sauf la dernière qui est TOTAL)
-        data_rows = table_data[:-1]
-        for row in data_rows:
-            html_table += '<tr>'
-            html_table += f'<td class="entity-cell">{row["Entité"]}</td>'
-            html_table += f'<td>{row["Nb postes ouverts avant début semaine"]}</td>'
-            html_table += f'<td>{row["Nb nouveaux postes ouverts cette semaine"]}</td>'
-            html_table += f'<td>{row["Nb postes pourvus cette semaine"]}</td>'
-            html_table += f'<td>{row["Nb postes en cours cette semaine (sourcing)"]}</td>'
-            html_table += '</tr>'
-
-        # Ligne TOTAL (la dernière)
-        total_row = table_data[-1]
-        html_table += '<tr class="total-row">'
-        html_table += f'<td class="entity-cell">TOTAL</td>'
-        html_table += f'<td>{total_row["Nb postes ouverts avant début semaine"].replace("**", "")}</td>'
-        html_table += f'<td>{total_row["Nb nouveaux postes ouverts cette semaine"].replace("**", "")}</td>'
-        html_table += f'<td>{total_row["Nb postes pourvus cette semaine"].replace("**", "")}</td>'
-        html_table += f'<td>{total_row["Nb postes en cours cette semaine (sourcing)"].replace("**", "")}</td>'
+    # Ajouter les lignes de données (toutes sauf la dernière qui est TOTAL)
+    data_rows = table_data[:-1]
+    for row in data_rows:
+        html_table += '<tr>'
+        html_table += f'<td class="entity-cell">{row["Entité"]}</td>'
+        html_table += f'<td>{row["Nb postes ouverts avant début semaine"]}</td>'
+        html_table += f'<td>{row["Nb nouveaux postes ouverts cette semaine"]}</td>'
+        html_table += f'<td>{row["Nb postes pourvus cette semaine"]}</td>'
+        html_table += f'<td>{row["Nb postes en cours cette semaine (sourcing)"]}</td>'
         html_table += '</tr>'
-        html_table += '</tbody></table></div>'
 
-        st.markdown(html_table, unsafe_allow_html=True)
+    # Ligne TOTAL (la dernière)
+    total_row = table_data[-1]
+    html_table += '<tr class="total-row">'
+    html_table += f'<td class="entity-cell">TOTAL</td>'
+    html_table += f'<td>{total_row["Nb postes ouverts avant début semaine"].replace("**", "")}</td>'
+    html_table += f'<td>{total_row["Nb nouveaux postes ouverts cette semaine"].replace("**", "")}</td>'
+    html_table += f'<td>{total_row["Nb postes pourvus cette semaine"].replace("**", "")}</td>'
+    html_table += f'<td>{total_row["Nb postes en cours cette semaine (sourcing)"].replace("**", "")}</td>'
+    html_table += '</tr>'
+    html_table += '</tbody></table></div>'
 
-        # --- Tableau : Recrutements en cours par recruteur (juste après 'Besoins en Cours par Entité')
-        try:
-            if df_recrutement is not None and 'Colonne TG Hire' in df_recrutement.columns:
+    st.markdown(html_table, unsafe_allow_html=True)
+
+    # --- Tableau : Recrutements en cours par recruteur (juste après 'Besoins en Cours par Entité')
+    try:
+        if df_recrutement is not None and 'Colonne TG Hire' in df_recrutement.columns:
                 # On veut un tableau avec une colonne par statut: Nouvelle demande, Sourcing, Shortlisté, Signature DRH
                 wanted_statuses = ['Nouvelle demande', 'Sourcing', 'Shortlisté', 'Signature DRH']
                 # Construire un pivot complet par recruteur (colonnes = Colonne TG Hire demandées)
@@ -2288,8 +2289,8 @@ def create_weekly_report_tab(df_recrutement=None):
                             st.dataframe(df_rec_debug[cols_avail].reset_index(drop=True), use_container_width=True, hide_index=True)
                         except Exception as e:
                             st.write(f"Erreur debug: {e}")
-        except Exception:
-            pass
+    except Exception:
+        pass
     else:
         # Affichage par défaut si pas de metrics (avec logos pour démo)
         logos_dict = load_all_logos_b64()
