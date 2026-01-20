@@ -2102,16 +2102,6 @@ def create_weekly_report_tab(df_recrutement=None):
     st.markdown(kpi_cards_html, unsafe_allow_html=True)
 
     # Tableau récapitulatif par entité (HTML personnalisé, rendu centralisé)
-    st.markdown('Avant de générer le reporting, assurez-vous que tous les recrutements sont saisis, que la colonne «Status» de la demande est renseignée et que la colonne «TG Hire» reflète l\'état du recrutement (Nouvelle demande, Sourcing, Signature DRH, ...).<div style="color:red; font-weight:700; margin-top:6px;">NB : au fur et à mesure de l\'évolution des recrutements, mettez à jour leur état, sinon le reporting ne sera pas fiable.</div>', unsafe_allow_html=True)
-
-    st.markdown("""
-1.  **Chargement des Données** : 
-
-    *   Allez dans l'onglet **"📂 Upload & Téléchargement"**.
-    *   **Option A** : Cliquez sur le bouton rouge **"🔁 Synchroniser depuis Google Sheets"** pour récupérer les données les plus récentes.
-    *   **Option B** : Glissez-déposez votre fichier Excel de recrutement dans la zone de chargement.
-""")
-
     # Préparer les données pour le HTML
     table_data = []
     for entite, data in metrics_included.items():
