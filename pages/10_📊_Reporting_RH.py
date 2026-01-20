@@ -1636,7 +1636,6 @@ def create_integrations_tab(df_recrutement, global_filters):
                 comments_df = df_display[[candidat_col, comment_col]].copy()
                 comments_df = comments_df[comments_df[comment_col].notna() & (comments_df[comment_col].astype(str).str.strip() != '')]
                 if not comments_df.empty:
-                    st.markdown("<strong>Commentaires d'intégration :</strong>", unsafe_allow_html=True)
                     for _, r in comments_df.iterrows():
                         cand = r.get(candidat_col, '')
                         com = r.get(comment_col, '')
