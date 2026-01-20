@@ -4977,6 +4977,10 @@ def main():
         
         st.subheader("Comment générer le reporting ?")
         st.markdown("""
+        Avant de générer le reporting, assurez-vous que tous les recrutements sont saisis, que la colonne «Status» de la demande est renseignée et que la colonne «TG Hire» reflète l'état du recrutement (Nouvelle demande, Sourcing, Signature DRH, ...). NB : au fur et à mesure de l'évolution des recrutements, mettez à jour leur état, sinon le reporting ne sera pas fiable. Pour l'indicateur «Nb», affichez ce champ avec une couleur différente.
+        """)
+
+        st.markdown("""
         1.  **Chargement des Données** : 
             *   Allez dans l'onglet **"📂 Upload & Téléchargement"**.
             *   **Option A** : Cliquez sur le bouton rouge **"🔁 Synchroniser depuis Google Sheets"** pour récupérer les données les plus récentes.
