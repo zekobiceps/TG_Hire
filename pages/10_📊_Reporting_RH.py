@@ -216,6 +216,17 @@ def get_entity_display_html_with_logo(name, logos_dict):
     
     return f'<div style="text-align: center; font-weight: 600;">{name_str}</div>'
 
+def get_entity_display(name):
+    """Compatibility helper used by older parts of the code: returns HTML (with logo when available) or the plain name."""
+    try:
+        logos = load_all_logos_b64()
+        return get_entity_display_html_with_logo(name, logos)
+    except Exception:
+        # Fallback to a safe string
+        if name is None or (isinstance(name, float) and pd.isna(name)):
+            return ''
+        return str(name)
+
 def apply_title_style(fig):
     """Applique la police et le style de titre standardisé à une figure Plotly."""
     try:
