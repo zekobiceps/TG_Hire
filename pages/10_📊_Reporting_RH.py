@@ -1630,18 +1630,7 @@ def create_integrations_tab(df_recrutement, global_filters):
         html_table += '</tbody></table></div>'
         st.markdown(html_table, unsafe_allow_html=True)
 
-        # Extraire et afficher les commentaires non vides (si la colonne existe)
-        if comment_col in df_display.columns:
-            try:
-                comments_df = df_display[[candidat_col, comment_col]].copy()
-                comments_df = comments_df[comments_df[comment_col].notna() & (comments_df[comment_col].astype(str).str.strip() != '')]
-                if not comments_df.empty:
-                    for _, r in comments_df.iterrows():
-                        cand = r.get(candidat_col, '')
-                        com = r.get(comment_col, '')
-                        st.write(f"- {cand}: {com}")
-            except Exception:
-                pass
+        # (Commentaires d'intégration retirés: ne pas afficher le contenu de la colonne Commentaire ici)
     else:
         st.warning("Colonnes d'affichage non disponibles")
 
