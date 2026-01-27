@@ -589,6 +589,36 @@ def create_global_filters(df_recrutement, prefix="", include_periode_recrutement
         # Ne pas afficher le sélecteur, s'assurer que la valeur reste 'Toutes'
         filters['periode_demande'] = 'Toutes'
 
+    # Filtre Période de désistement (basé sur Date de désistement)
+    # Recherche robuste du nom de colonne
+    with st.sidebar:
+        desist_col = None
+        try:
+            for c in df_recrutement.columns:
+                lc = str(c).lower()
+                if ('désist' in lc or 'desist' in lc) and 'date' in lc:
+                    desist_col = c
+                    break
+        except Exception:
+            desist_col = None
+        if desist_col:
+            try:
+                df_recrutement['Année_Désistement'] = pd.to_datetime(df_recrutement[desist_col], errors='coerce').dt.year
+                annees_des = sorted([int(y) for y in df_recrutement['Année_Désistement'].dropna().unique()])
+                if annees_des:
+                    filters['periode_desistement'] = st.selectbox(
+                        "Période de désistement",
+                        ['Toutes'] + annees_des,
+                        index=len(annees_des),
+                        key=f"{prefix}_periode_desist"
+                    )
+                else:
+                    filters['periode_desistement'] = 'Toutes'
+            except Exception:
+                filters['periode_desistement'] = 'Toutes'
+        else:
+            filters['periode_desistement'] = 'Toutes'
+
     return filters
 
 def apply_global_filters(df, filters):
@@ -608,6 +638,9 @@ def apply_global_filters(df, filters):
     # Appliquer le filtre période de la demande
     if filters.get('periode_demande') != 'Toutes' and 'Année_Demande' in df_filtered.columns:
         df_filtered = df_filtered[df_filtered['Année_Demande'] == filters['periode_demande']]
+    # Appliquer le filtre période de désistement
+    if filters.get('periode_desistement') != 'Toutes' and 'Année_Désistement' in df_filtered.columns:
+        df_filtered = df_filtered[df_filtered['Année_Désistement'] == filters['periode_desistement']]
     
     return df_filtered
 
@@ -1722,6 +1755,7 @@ def create_demandes_recrutement_combined_tab(df_recrutement):
         'entite': shared_filters.get('entite', 'Toutes'),
         'direction': shared_filters.get('direction', 'Toutes'),
         'periode_demande': shared_filters.get('periode_demande', 'Toutes'),
+        'periode_desistement': shared_filters.get('periode_desistement', 'Toutes'),
         # Ne pas filtrer par période de recrutement dans la section Demandes
         'periode_recrutement': 'Toutes'
     }
@@ -1730,6 +1764,7 @@ def create_demandes_recrutement_combined_tab(df_recrutement):
         'entite': shared_filters.get('entite', 'Toutes'),
         'direction': shared_filters.get('direction', 'Toutes'),
         'periode_recrutement': shared_filters.get('periode_recrutement', 'Toutes'),
+        'periode_desistement': shared_filters.get('periode_desistement', 'Toutes'),
         # Ne pas filtrer par période de demande dans la section Clôtures
         'periode_demande': 'Toutes'
     }
