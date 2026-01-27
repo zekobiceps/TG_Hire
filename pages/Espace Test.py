@@ -286,13 +286,21 @@ def get_current_commit_hash(short: bool = True) -> str:
 def get_current_commit_datetime() -> str:
     """Return the current git commit date/time as a string.
 
-    Uses `git show -s --format=%Y-%m-%d %H:%M:%S HEAD` and falls back to
-    an empty string if unavailable (e.g. not a git repo).
+    Format: "DD/MM/YYYY HH:MM" (heure 24h), par exemple
+    "27/01/2026 17:35".
     """
     import subprocess
     try:
+        # Utilise le pretty format de git avec un format explicite
         out = subprocess.check_output(
-            ["git", "show", "-s", "--format=%Y-%m-%d %H:%M:%S", "HEAD"],
+            [
+                "git",
+                "show",
+                "-s",
+                "--format=%cd",
+                "--date=format:%d/%m/%Y %H:%M",
+                "HEAD",
+            ],
             stderr=subprocess.DEVNULL,
         )
         return out.decode().strip()
@@ -1167,6 +1175,13 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 date_ent = pd.to_datetime(df_filtered[date_entree_col], errors='coerce')
                 df_debug_clo['Délai (jours)'] = (date_ent - date_rec).dt.days
             cols_debug = ['Poste demandé', 'Entité demandeuse', 'Direction concernée', 'Date Réception', date_entree_col, 'Délai (jours)', 'Modalité de recrutement']
+
+            # Date de désistement = date du refus de la promesse
+            desist_col = 'Date de désistement'
+            if desist_col in df_debug_clo.columns:
+                df_debug_clo[desist_col] = pd.to_datetime(df_debug_clo[desist_col], errors='coerce').dt.strftime('%d/%m/%Y')
+                if desist_col not in cols_debug:
+                    cols_debug.append(desist_col)
 
             # Ajout des colonnes qui contribuent au KPI "Taux de refus des promesses d'embauche (%)"
             try:
