@@ -1155,8 +1155,41 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         # Taux de refus des promesses d'embauche selon la règle métier:
         # une ligne est refus si promesse réalisée == 1 ET refus == 1 ;
         # dénominateur = lignes où promesse réalisée == 1.
+        # IMPORTANT: le périmètre TEMPOREL doit suivre l'année de DÉSISTEMENT,
+        # pas les périodes Demande/Recrutement. On reconstitue donc un dataframe
+        # dédié au KPI basé sur entité/direction + année de désistement uniquement.
+
+        df_kpi = df_recrutement.copy()
+        # Appliquer entité/direction si présents
+        try:
+            ent = global_filters.get('entite')
+            if ent and ent != 'Toutes' and 'Entité demandeuse' in df_kpi.columns:
+                df_kpi = df_kpi[df_kpi['Entité demandeuse'] == ent]
+        except Exception:
+            pass
+        try:
+            direc = global_filters.get('direction')
+            if direc and direc != 'Toutes' and 'Direction concernée' in df_kpi.columns:
+                df_kpi = df_kpi[df_kpi['Direction concernée'] == direc]
+        except Exception:
+            pass
+
+        # Déterminer la colonne de désistement et dériver l'année si besoin
+        desist_col = next((c for c in df_kpi.columns if 'date' in c.lower() and ('désist' in c.lower() or 'desist' in c.lower())), None)
+        if desist_col:
+            if 'Année_Désistement' not in df_kpi.columns:
+                try:
+                    df_kpi['Année_Désistement'] = pd.to_datetime(df_kpi[desist_col], errors='coerce').dt.year
+                except Exception:
+                    df_kpi['Année_Désistement'] = np.nan
+            # Appliquer uniquement le filtre Année Désistement s'il est choisi
+            an_des = global_filters.get('periode_desistement')
+            if an_des and an_des != 'Toutes':
+                df_kpi = df_kpi[df_kpi['Année_Désistement'] == an_des]
+
+        # Calcul du taux sur df_kpi (pas df_filtered)
         res = compute_promise_refusal_rate_row(
-            df_filtered,
+            df_kpi,
             col_prom="Nb de promesses d'embauche réalisée",
             col_refus="Nb de refus aux promesses d'embauches",
             fallback_search=True
@@ -1176,9 +1209,8 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         st.caption(f"Refus: {res.get('numerator', 0)} / Promesses réalisées: {res.get('denominator', 0)}")
         # Année de désistement (dérivée de la colonne 'Date de désistement')
         try:
-            desist_col = next((c for c in df_filtered.columns if 'désistement' in c.lower() and 'date' in c.lower()), None)
             if desist_col:
-                s = pd.to_datetime(df_filtered[desist_col], errors='coerce')
+                s = pd.to_datetime(df_kpi[desist_col], errors='coerce')
                 years = [int(y) for y in s.dt.year.dropna().unique()]
                 if years:
                     st.caption(f"Années avec désistement détectées (depuis la colonne '{desist_col}') : {', '.join(str(y) for y in sorted(years))}")
