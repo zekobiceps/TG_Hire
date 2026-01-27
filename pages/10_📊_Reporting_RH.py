@@ -18,6 +18,7 @@ import gspread
 from google.oauth2 import service_account
 import unicodedata
 from pptx import Presentation
+from utils import compute_promise_refusal_rate_row
 def _format_long_title(title: str, max_line_length: int = 20) -> str:
     """Insert spaces in very long titles without natural breaks to force wrapping.
     - If the title already contains spaces, return as-is (CSS will wrap).
@@ -1114,23 +1115,11 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         st.plotly_chart(fig_candidats, width="stretch")
 
     with col6:
-        # Taux de refus = (Nb de refus aux promesses / Nb de promesses réalisées) * 100
-        # Recherche robuste des colonnes dans le dataframe
-        prom_col = next((c for c in df_filtered.columns if 'promess' in c.lower() and 'réalis' in c.lower()), None)
-        refus_col = next((c for c in df_filtered.columns if 'refus' in c.lower()), None)
-        prom_sum = 0
-        refus_sum = 0
-        try:
-            if prom_col and prom_col in df_filtered.columns:
-                prom_sum = pd.to_numeric(df_filtered[prom_col], errors='coerce').fillna(0).sum()
-            if refus_col and refus_col in df_filtered.columns:
-                refus_sum = pd.to_numeric(df_filtered[refus_col], errors='coerce').fillna(0).sum()
-        except Exception:
-            prom_sum = 0; refus_sum = 0
-
-        taux_refus = 0.0
-        if prom_sum and prom_sum > 0:
-            taux_refus = float(refus_sum) / float(prom_sum) * 100.0
+        # Taux de refus = lignes où promesse==1 ET refus==1 / lignes où promesse==1
+        res = compute_promise_refusal_rate_row(df_filtered)
+        taux_refus = res['rate'] if res['rate'] is not None else 0.0
+        numer = res['numerator']
+        denom = res['denominator']
 
         st.markdown("<div style='font-family:Arial,sans-serif; font-size:18px; font-weight:700; color:#111111; text-align:left; margin:8px 0 4px 0;'>Taux de refus des promesses d'embauche (%)</div>", unsafe_allow_html=True)
         fig_refus = go.Figure(go.Indicator(
@@ -1141,7 +1130,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         ))
         fig_refus.update_layout(height=280, margin=dict(t=20, b=20, l=20, r=20))
         st.plotly_chart(fig_refus, width='stretch')
-
+        st.caption(f"Numérateur (refus): {numer} | Dénominateur (promesses): {denom}")
     # Debug local pour l'onglet Recrutements Clôturés
     st.markdown("---")
     with st.expander("🔍 Debug - Détails des lignes (Recrutements Clôturés)", expanded=False):
