@@ -1167,6 +1167,27 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 date_ent = pd.to_datetime(df_filtered[date_entree_col], errors='coerce')
                 df_debug_clo['Délai (jours)'] = (date_ent - date_rec).dt.days
             cols_debug = ['Poste demandé', 'Entité demandeuse', 'Direction concernée', 'Date Réception', date_entree_col, 'Délai (jours)', 'Modalité de recrutement']
+
+            # Ajout des colonnes qui contribuent au KPI "Taux de refus des promesses d'embauche (%)"
+            try:
+                prom_col = res.get('columns', {}).get('prom') if isinstance(res, dict) else None
+                refus_col = res.get('columns', {}).get('refus') if isinstance(res, dict) else None
+            except NameError:
+                prom_col = None
+                refus_col = None
+
+            # Colonnes brutes utilisées pour le calcul (promesse réalisée / refus de promesse)
+            for extra_col in [prom_col, refus_col]:
+                if extra_col and extra_col in df_debug_clo.columns and extra_col not in cols_debug:
+                    cols_debug.append(extra_col)
+
+            # Colonne booléenne indiquant si la ligne contribue au numérateur du KPI de refus
+            if prom_col and refus_col and prom_col in df_debug_clo.columns and refus_col in df_debug_clo.columns:
+                prom_vals = pd.to_numeric(df_debug_clo[prom_col], errors='coerce').fillna(0)
+                refus_vals = pd.to_numeric(df_debug_clo[refus_col], errors='coerce').fillna(0)
+                df_debug_clo['Contribue KPI Refus'] = prom_vals.eq(1) & refus_vals.eq(1)
+                cols_debug.append('Contribue KPI Refus')
+
             cols_available = [c for c in cols_debug if c in df_debug_clo.columns]
             if cols_available:
                 st.dataframe(df_debug_clo[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
