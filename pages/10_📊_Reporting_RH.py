@@ -1496,13 +1496,16 @@ def create_integrations_tab(df_recrutement, global_filters):
             monthly_integration = df_filtered.groupby('Mois_Integration').size().reset_index(name='Count')
             # Convertir en nom de mois seulement (ex: "Janvier", "Février")
             monthly_integration['Mois_str'] = monthly_integration['Mois_Integration'].dt.strftime('%B').str.capitalize()
+            # Ajouter une marge de +3 sur l'axe Y pour éviter la coupure des labels
+            y_max = int(monthly_integration['Count'].max()) if not monthly_integration.empty else 0
             
             fig_evolution_int = px.bar(
                 monthly_integration, 
                 x='Mois_str', 
                 y='Count',
                 title="📈 Évolution des Intégrations Prévues",
-                text='Count'
+                text='Count',
+                range_y=[0, y_max + 3]
             )
             fig_evolution_int.update_traces(
                 marker_color='#2ca02c', 
@@ -1510,6 +1513,7 @@ def create_integrations_tab(df_recrutement, global_filters):
                 texttemplate='<b>%{y}</b>',
                 textfont=dict(size=14, color='#333333'),
                 textangle=0,
+                cliponaxis=False,
                 hovertemplate='%{y}<extra></extra>'
             )
             fig_evolution_int.update_layout(height=400, xaxis_title="Mois", yaxis_title="Nombre", margin=dict(t=60, b=40))
@@ -4242,8 +4246,14 @@ def generate_integrations_html_image(df_recrutement):
             s = pd.to_datetime(df[date_integration_col], errors='coerce')
             monthly = s.dt.to_period('M').value_counts().sort_index().rename_axis('Mois').reset_index(name='Count')
             monthly['Label'] = monthly['Mois'].astype(str)
-            fig_month = px.bar(monthly, x='Label', y='Count', title="Évolution des Intégrations Prévues", text='Count')
-            fig_month.update_traces(marker_color='#2ca02c', textposition='outside')
+            # Ajouter un décalage de +3 pour le texte afin d'éviter la coupure
+            monthly['Count_label'] = monthly['Count'] + 3
+            fig_month = px.bar(monthly, x='Label', y='Count', title="Évolution des Intégrations Prévues", text='Count_label')
+            fig_month.update_traces(marker_color='#2ca02c', textposition='outside', cliponaxis=False, texttemplate='%{text}')
+            try:
+                fig_month.update_yaxes(range=[0, float(monthly['Count'].max()) + 3])
+            except Exception:
+                pass
             fig_month.update_layout(height=360, margin=dict(l=20,r=20,t=40,b=10), xaxis_title=None, yaxis_title=None)
             figs_row1.append(fig_month)
     except Exception:
@@ -4961,7 +4971,7 @@ def main():
         st.subheader("Comment générer le reporting ?")
         st.markdown("""
         1.  **Chargement des Données** : 
-            *   Allez dans l'onglet **"📂 Upload & Téléchargement"**.
+            *   Allez dans l'onglet **"📂 Upload & Téléchar"**.
             *   **Option A** : Cliquez sur le bouton rouge **"🔁 Synchroniser depuis Google Sheets"** pour récupérer les données les plus récentes.
             *   **Option B** : Glissez-déposez votre fichier Excel de recrutement dans la zone de chargement.
         2.  **Actualisation** : 
