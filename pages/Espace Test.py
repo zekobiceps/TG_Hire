@@ -1141,10 +1141,31 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
 
     with col6:
         # Pour le taux de refus, on se base sur les lignes avec une date de désistement
-        # (refus effectif de la promesse), filtrées avec les mêmes filtres globaux.
-        df_kpi = apply_global_filters(df_recrutement, global_filters)
-        if 'Date de désistement' in df_kpi.columns:
-            df_kpi = df_kpi[df_kpi['Date de désistement'].notna()].copy()
+        # (refus effectif de la promesse), en appliquant:
+        # - les filtres entité/direction
+        # - un filtre d'année basé sur la Date de désistement (et non sur Date d'entrée)
+        df_kpi = df_recrutement.copy() if df_recrutement is not None else pd.DataFrame()
+
+        # Filtres entité / direction
+        if not df_kpi.empty:
+            entite = global_filters.get('entite') if isinstance(global_filters, dict) else None
+            direction = global_filters.get('direction') if isinstance(global_filters, dict) else None
+
+            if entite and entite != 'Toutes' and 'Entité demandeuse' in df_kpi.columns:
+                df_kpi = df_kpi[df_kpi['Entité demandeuse'] == entite]
+            if direction and direction != 'Toutes' and 'Direction concernée' in df_kpi.columns:
+                df_kpi = df_kpi[df_kpi['Direction concernée'] == direction]
+
+            # Filtre d'année basé sur la Date de désistement
+            if 'Date de désistement' in df_kpi.columns:
+                df_kpi['Année_Désistement'] = df_kpi['Date de désistement'].dt.year
+                annee_sel = global_filters.get('periode_recrutement') if isinstance(global_filters, dict) else 'Toutes'
+                if annee_sel != 'Toutes':
+                    df_kpi = df_kpi[df_kpi['Année_Désistement'] == annee_sel]
+                # Conserver uniquement les lignes ayant effectivement un désistement
+                df_kpi = df_kpi[df_kpi['Date de désistement'].notna()].copy()
+            else:
+                df_kpi = df_kpi.iloc[0:0]
 
         # Taux de refus = lignes où promesse==1 ET refus==1 / lignes où promesse==1
         res = compute_promise_refusal_rate_row(df_kpi)
@@ -1172,7 +1193,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 df_debug_clo = df_kpi.copy()
             except NameError:
                 df_debug_clo = df_filtered.copy()
-            # Colonnes source pour le délai
+            # Colonnes source pour le délai (si disponibles sur ces lignes de désistement)
             date_reception_col = 'Date de réception de la demande aprés validation de la DRH'
             date_entree_col = "Date d'entrée effective du candidat"
             # Formater les dates sans heure
@@ -1180,10 +1201,11 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 df_debug_clo[date_entree_col] = pd.to_datetime(df_debug_clo[date_entree_col], errors='coerce').dt.strftime('%d/%m/%Y')
             if date_reception_col in df_debug_clo.columns:
                 df_debug_clo['Date Réception'] = pd.to_datetime(df_debug_clo[date_reception_col], errors='coerce').dt.strftime('%d/%m/%Y')
-                # Calculer le délai en jours
-                date_rec = pd.to_datetime(df_filtered[date_reception_col], errors='coerce')
-                date_ent = pd.to_datetime(df_filtered[date_entree_col], errors='coerce')
-                df_debug_clo['Délai (jours)'] = (date_ent - date_rec).dt.days
+                # Calculer le délai en jours uniquement à partir des colonnes du debug
+                date_rec = pd.to_datetime(df_debug_clo[date_reception_col], errors='coerce')
+                date_ent = pd.to_datetime(df_debug_clo.get(date_entree_col), errors='coerce') if date_entree_col in df_debug_clo.columns else None
+                if date_ent is not None:
+                    df_debug_clo['Délai (jours)'] = (date_ent - date_rec).dt.days
             cols_debug = ['Poste demandé', 'Entité demandeuse', 'Direction concernée', 'Date Réception', date_entree_col, 'Délai (jours)', 'Modalité de recrutement']
 
             # Date de désistement = date du refus de la promesse
