@@ -106,9 +106,16 @@ def compute_promise_refusal_rate_row(
     if not prom_c or prom_c not in df.columns:
         return { 'denominator': 0, 'numerator': 0, 'rate': None, 'columns': { 'prom': None, 'refus': refus_c } }
 
-    # Conversion sécurisée vers numérique (les non numériques -> NaN -> 0)
-    prom_vals = pd.to_numeric(df[prom_c], errors='coerce').fillna(0)
-    refus_vals = pd.to_numeric(df[refus_c], errors='coerce').fillna(0) if (refus_c and refus_c in df.columns) else pd.Series([0]*len(df), index=df.index)
+    # Conversion sécurisée vers numérique, en gérant aussi les formats "1,0" ou "1,00"
+    def _clean_numeric(series: pd.Series) -> pd.Series:
+        s = series.copy()
+        # Convertir en chaîne, enlever les espaces et remplacer virgule décimale par point
+        s = s.astype(str).str.replace(" ", "", regex=False).str.replace("\u00a0", "", regex=False)
+        s = s.str.replace(",", ".", regex=False)
+        return pd.to_numeric(s, errors='coerce').fillna(0)
+
+    prom_vals = _clean_numeric(df[prom_c])
+    refus_vals = _clean_numeric(df[refus_c]) if (refus_c and refus_c in df.columns) else pd.Series([0]*len(df), index=df.index)
 
     # Dénominateur: promesse réalisée == 1
     denom_mask = prom_vals.eq(1)
