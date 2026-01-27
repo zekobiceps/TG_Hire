@@ -1115,21 +1115,27 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         st.plotly_chart(fig_candidats, width="stretch")
 
     with col6:
-        # Taux de refus: utiliser UNIQUEMENT les lignes avec une Date de désistement
-        # Filtrer df_recrutement (pas df_filtered/df_cloture) par entité/direction uniquement
+        # Taux de refus: lignes avec Date de désistement, promesse==1 ET refus==1
+        # Filtrer df_recrutement par entité/direction + année de désistement
         df_kpi = df_recrutement.copy()
         desist_col = 'Date de désistement'
         
-        # Appliquer uniquement les filtres entité/direction
+        # Appliquer filtres entité/direction
         if global_filters.get('entite') != 'Toutes':
             df_kpi = df_kpi[df_kpi['Entité demandeuse'] == global_filters['entite']]
         if global_filters.get('direction') != 'Toutes':
             df_kpi = df_kpi[df_kpi['Direction concernée'] == global_filters['direction']]
         
-        # Garder seulement les lignes avec une Date de désistement valide
+        # Convertir et filtrer par année de désistement si période sélectionnée
         if desist_col in df_kpi.columns:
             df_kpi[desist_col] = pd.to_datetime(df_kpi[desist_col], errors='coerce')
             df_kpi = df_kpi[df_kpi[desist_col].notna()]
+            df_kpi['Année_Désistement'] = df_kpi[desist_col].dt.year
+            
+            # Appliquer filtre période de recrutement comme année de désistement
+            periode = global_filters.get('periode_recrutement')
+            if periode != 'Toutes' and periode is not None:
+                df_kpi = df_kpi[df_kpi['Année_Désistement'] == int(periode)]
         
         res = compute_promise_refusal_rate_row(df_kpi)
         taux_refus = res['rate'] if res['rate'] is not None else 0.0
@@ -1145,7 +1151,8 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         ))
         fig_refus.update_layout(height=280, margin=dict(t=20, b=20, l=20, r=20))
         st.plotly_chart(fig_refus, width='stretch')
-        st.caption(f"Numérateur (refus): {numer} | Dénominateur (promesses): {denom} | Lignes avec désistement: {len(df_kpi)}")
+        periode_label = global_filters.get('periode_recrutement', 'Toutes')
+        st.caption(f"Numérateur (refus): {numer} | Dénominateur (promesses): {denom} | Année désistement: {periode_label}")
 
     # Debug local pour l'onglet Recrutements Clôturés
     st.markdown("---")
