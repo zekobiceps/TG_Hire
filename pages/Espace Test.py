@@ -2727,6 +2727,15 @@ def create_weekly_report_tab(df_recrutement=None):
             accept_date = r.get(accept_date_col) if accept_date_col else None
             # Ajout de la date de désistement pour le filtrage "Désistement"
             desistement_date = r.get(desistement_date_col) if desistement_date_col else None
+            # Extraire l'année du désistement si disponible
+            annee_desistement = None
+            if desistement_date is not None and str(desistement_date).strip() != "":
+                try:
+                    _dt = pd.to_datetime(desistement_date, errors='coerce')
+                    if pd.notna(_dt):
+                        annee_desistement = int(_dt.year)
+                except Exception:
+                    annee_desistement = None
             postes_data.append({
                 'statut': canon,
                 'titre': titre or '',
@@ -2736,7 +2745,8 @@ def create_weekly_report_tab(df_recrutement=None):
                 'recruteur': str(r.get(recruteur_col, '')).replace('nan', '') if recruteur_col else '',
                 'commentaire': r.get(commentaire_col, '') if commentaire_col else '',
                 'date_acceptation': accept_date,
-                'date_desistement': desistement_date
+                'date_desistement': desistement_date,
+                'annee_desistement': annee_desistement
             })
     
     # Afficher le titre avec le nombre total de cartes
@@ -2859,12 +2869,17 @@ def create_weekly_report_tab(df_recrutement=None):
             for poste in postes_in_col[row_start:row_start+max_cards_per_row]:
                 commentaire = poste.get('commentaire', '')
                 commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
+                # Afficher l'année de désistement sur les cartes de statut 'Désistement'
+                annee_html = ""
+                if poste.get('statut') == 'Désistement' and poste.get('annee_desistement'):
+                    annee_html = f"<p style='margin-top: 4px; color: #333;'>📅 Année désistement: {poste.get('annee_desistement')}</p>"
                 titre_fmt = smart_wrap_title(poste.get('titre', ''))
                 card_div = f"""<div class="kanban-card">
 <h4><b>{titre_fmt}</b></h4>
 <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
 <p>👤 {poste.get('demandeur', 'N/A')}</p>
 <p>✍️ {poste.get('recruteur', 'N/A')}</p>
+{annee_html}
 {commentaire_html}
 </div>"""
                 cards_html += card_div
@@ -2883,7 +2898,7 @@ def create_weekly_report_tab(df_recrutement=None):
                 for s in statuts_kanban_display:
                     df_kanban_debug[f'contrib_{s}'] = df_kanban_debug['statut'] == s
                 # Afficher colonnes pertinentes
-                cols_show = ['titre', 'entite', 'lieu', 'recruteur', 'statut'] + [f'contrib_{s}' for s in statuts_kanban_display]
+                cols_show = ['titre', 'entite', 'lieu', 'recruteur', 'statut', 'date_desistement', 'annee_desistement'] + [f'contrib_{s}' for s in statuts_kanban_display]
                 cols_available = [c for c in cols_show if c in df_kanban_debug.columns]
                 st.dataframe(df_kanban_debug[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
             else:
