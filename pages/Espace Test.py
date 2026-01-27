@@ -283,6 +283,23 @@ def get_current_commit_hash(short: bool = True) -> str:
     return 'unknown'
 
 
+def get_current_commit_datetime() -> str:
+    """Return the current git commit date/time as a string.
+
+    Uses `git show -s --format=%Y-%m-%d %H:%M:%S HEAD` and falls back to
+    an empty string if unavailable (e.g. not a git repo).
+    """
+    import subprocess
+    try:
+        out = subprocess.check_output(
+            ["git", "show", "-s", "--format=%Y-%m-%d %H:%M:%S", "HEAD"],
+            stderr=subprocess.DEVNULL,
+        )
+        return out.decode().strip()
+    except Exception:
+        return ""
+
+
 def _parse_mixed_dates(series):
     """Parse a pandas Series that may contain mixed date representations.
 
@@ -1115,29 +1132,8 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         st.plotly_chart(fig_candidats, width="stretch")
 
     with col6:
-        # Taux de refus: lignes avec Date de désistement, promesse==1 ET refus==1
-        # Filtrer df_recrutement par entité/direction + année de désistement
-        df_kpi = df_recrutement.copy()
-        desist_col = 'Date de désistement'
-        
-        # Appliquer filtres entité/direction
-        if global_filters.get('entite') != 'Toutes':
-            df_kpi = df_kpi[df_kpi['Entité demandeuse'] == global_filters['entite']]
-        if global_filters.get('direction') != 'Toutes':
-            df_kpi = df_kpi[df_kpi['Direction concernée'] == global_filters['direction']]
-        
-        # Convertir et filtrer par année de désistement si période sélectionnée
-        if desist_col in df_kpi.columns:
-            df_kpi[desist_col] = pd.to_datetime(df_kpi[desist_col], errors='coerce')
-            df_kpi = df_kpi[df_kpi[desist_col].notna()]
-            df_kpi['Année_Désistement'] = df_kpi[desist_col].dt.year
-            
-            # Appliquer filtre période de recrutement comme année de désistement
-            periode = global_filters.get('periode_recrutement')
-            if periode != 'Toutes' and periode is not None:
-                df_kpi = df_kpi[df_kpi['Année_Désistement'] == int(periode)]
-        
-        res = compute_promise_refusal_rate_row(df_kpi)
+        # Taux de refus = lignes où promesse==1 ET refus==1 / lignes où promesse==1
+        res = compute_promise_refusal_rate_row(df_filtered)
         taux_refus = res['rate'] if res['rate'] is not None else 0.0
         numer = res['numerator']
         denom = res['denominator']
@@ -1151,9 +1147,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         ))
         fig_refus.update_layout(height=280, margin=dict(t=20, b=20, l=20, r=20))
         st.plotly_chart(fig_refus, width='stretch')
-        periode_label = global_filters.get('periode_recrutement', 'Toutes')
-        st.caption(f"Numérateur (refus): {numer} | Dénominateur (promesses): {denom} | Année désistement: {periode_label}")
-
+        st.caption(f"Numérateur (refus): {numer} | Dénominateur (promesses): {denom}")
     # Debug local pour l'onglet Recrutements Clôturés
     st.markdown("---")
     with st.expander("🔍 Debug - Détails des lignes (Recrutements Clôturés)", expanded=False):
@@ -4616,7 +4610,15 @@ def main():
     # Afficher le hash du commit actuel pour aider au debug des déploiements
     try:
         commit_hash = get_current_commit_hash()
-        st.markdown(f"<div style='font-size:12px;color:#666;margin-top:-8px'>Commit: {commit_hash}</div>", unsafe_allow_html=True)
+        commit_dt = get_current_commit_datetime()
+        if commit_dt:
+            commit_text = f"Commit: {commit_hash} — {commit_dt}"
+        else:
+            commit_text = f"Commit: {commit_hash}"
+        st.markdown(
+            f"<div style='font-size:12px;color:#666;margin-top:-8px'>{commit_text}</div>",
+            unsafe_allow_html=True,
+        )
     except Exception:
         pass
     st.markdown("---")
