@@ -755,6 +755,12 @@ def load_data_from_files(csv_file=None, excel_file=None):
             # Nettoyer les colonnes avec des espaces
             df_recrutement.columns = df_recrutement.columns.str.strip()
             
+            # Nettoyer les valeurs des colonnes critiques pour éviter les problèmes de labels ou d'espaces invisibles
+            critical_cols = ['Poste demandé', 'Direction concernée', 'Entité demandeuse', 'Statut de la demande']
+            for col in critical_cols:
+                if col in df_recrutement.columns:
+                    df_recrutement[col] = df_recrutement[col].astype(str).str.strip()
+            
             # Nettoyer les colonnes numériques pour éviter les erreurs de type
             numeric_columns = ['Nb de candidats pré-selectionnés']
             for col in numeric_columns:
@@ -1069,9 +1075,9 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             textangle=0,  # Forcer l'orientation horizontale des valeurs
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
-        height_poste = max(300, 28 * len(df_poste))
+        height_poste = max(320, 28 * len(df_poste))
         fig_poste.update_layout(
-            height=300 if height_poste < 360 else height_poste,
+            height=height_poste,
             xaxis_title=None,
             yaxis_title=None,
             margin=dict(l=160, t=48, b=30, r=20),
@@ -1353,10 +1359,10 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             textangle=0, # Orientation horizontale des valeurs
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
-        height_poste = 320
+        height_poste = max(320, 28 * len(df_poste))
         category_array_poste = list(df_poste['Label_display'][::-1])
         fig_poste.update_layout(
-            height=320,
+            height=height_poste,
             xaxis_title=None,
             yaxis_title=None,
             margin=dict(l=160, t=48, b=30, r=20),

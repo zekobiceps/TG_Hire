@@ -216,17 +216,6 @@ def get_entity_display_html_with_logo(name, logos_dict):
     
     return f'<div style="text-align: center; font-weight: 600;">{name_str}</div>'
 
-def get_entity_display(name):
-    """Compatibility helper used by older parts of the code: returns HTML (with logo when available) or the plain name."""
-    try:
-        logos = load_all_logos_b64()
-        return get_entity_display_html_with_logo(name, logos)
-    except Exception:
-        # Fallback to a safe string
-        if name is None or (isinstance(name, float) and pd.isna(name)):
-            return ''
-        return str(name)
-
 def apply_title_style(fig):
     """Applique la police et le style de titre standardisé à une figure Plotly."""
     try:
@@ -766,6 +755,12 @@ def load_data_from_files(csv_file=None, excel_file=None):
             # Nettoyer les colonnes avec des espaces
             df_recrutement.columns = df_recrutement.columns.str.strip()
             
+            # Nettoyer les valeurs des colonnes critiques pour éviter les problèmes de labels ou d'espaces invisibles
+            critical_cols = ['Poste demandé', 'Direction concernée', 'Entité demandeuse', 'Statut de la demande']
+            for col in critical_cols:
+                if col in df_recrutement.columns:
+                    df_recrutement[col] = df_recrutement[col].astype(str).str.strip()
+            
             # Nettoyer les colonnes numériques pour éviter les erreurs de type
             numeric_columns = ['Nb de candidats pré-selectionnés']
             for col in numeric_columns:
@@ -1074,27 +1069,23 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         )
         fig_poste.update_traces(
             marker_color='grey',
-            textposition='auto',
+            textposition='outside',
             texttemplate='<b>%{x}</b>',
-            textfont=dict(size=15, color='white'),
+            textfont=dict(size=14, color='#333333'),
             textangle=0,  # Forcer l'orientation horizontale des valeurs
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
-        height_poste = max(300, 28 * len(df_poste))
+        height_poste = max(320, 28 * len(df_poste))
         fig_poste.update_layout(
-            height=300 if height_poste < 360 else height_poste,
+            height=height_poste,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=160, t=48, b=30, r=20),
+            margin=dict(l=160, t=48, b=30, r=50),
             xaxis=dict(tickangle=0),
             yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_poste['Label_display'][::-1])),
             title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT)
         )
         fig_poste = apply_title_style(fig_poste)
-        try:
-            fig_poste.update_traces(textfont=dict(size=15, color='white'))
-        except Exception:
-            pass
         render_plotly_scrollable(fig_poste, max_height=320)
 
 
@@ -1245,9 +1236,9 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             )
             fig_raison.update_traces(
                 marker_color='grey', 
-                textposition='auto',
+                textposition='outside',
                 texttemplate='<b>%{y}</b>',
-                textfont=dict(size=15, color='white'),
+                textfont=dict(size=14, color='#333333'),
                 hovertemplate='%{y}<extra></extra>'
             )
             fig_raison.update_layout(
@@ -1255,6 +1246,8 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
                 xaxis_title=None, 
                 yaxis_title=None,
                 xaxis={'categoryorder':'total descending'},
+                yaxis=dict(range=[0, None]),
+                margin=dict(l=20, r=20, t=48, b=30),
                 title=dict(text="<b>Comparaison par raison du recrutement</b>", x=0, xanchor='left', font=TITLE_FONT)
             )
             fig_raison = apply_title_style(fig_raison)
@@ -1358,19 +1351,19 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         )
         fig_poste.update_traces(
             marker_color='grey',
-            textposition='auto',
+            textposition='outside',
             texttemplate='<b>%{x}</b>',
-            textfont=dict(size=15, color='white'),
+            textfont=dict(size=14, color='#333333'),
             textangle=0, # Orientation horizontale des valeurs
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
-        height_poste = 320
+        height_poste = max(320, 28 * len(df_poste))
         category_array_poste = list(df_poste['Label_display'][::-1])
         fig_poste.update_layout(
-            height=320,
+            height=height_poste,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=160, t=48, b=30, r=20),
+            margin=dict(l=160, t=48, b=30, r=50),
             xaxis=dict(tickangle=0),
             yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_poste),
             title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT)
@@ -1404,7 +1397,6 @@ def create_integrations_tab(df_recrutement, global_filters):
     candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
     date_integration_col = "Date d'entrée prévisionnelle"
     plan_integration_col = "Plan d'intégration à préparer"
-    comment_col = "Commentaire"
     
     # Diagnostic des données disponibles
     total_en_cours = len(df_recrutement[df_recrutement['Statut de la demande'] == 'En cours'])
@@ -1502,12 +1494,13 @@ def create_integrations_tab(df_recrutement, global_filters):
             )
             fig_evolution_int.update_traces(
                 marker_color='#2ca02c', 
-                textposition='inside',
+                textposition='outside',
                 texttemplate='<b>%{y}</b>',
-                textfont=dict(size=15, color='white'),
+                textfont=dict(size=14, color='#333333'),
+                textangle=0,
                 hovertemplate='%{y}<extra></extra>'
             )
-            fig_evolution_int.update_layout(height=400, xaxis_title="Mois", yaxis_title="Nombre")
+            fig_evolution_int.update_layout(height=400, xaxis_title="Mois", yaxis_title="Nombre", margin=dict(t=60, b=40))
             st.plotly_chart(fig_evolution_int, width="stretch")
     
     # Tableau détaillé des intégrations
@@ -1522,8 +1515,7 @@ def create_integrations_tab(df_recrutement, global_filters):
         'Entité demandeuse',
         'Affectation',
         date_integration_col,
-        plan_integration_col,
-        comment_col
+        plan_integration_col
     ]
     # Filtrer les colonnes qui existent
     colonnes_disponibles = [col for col in colonnes_affichage if col in df_filtered.columns]
@@ -1561,9 +1553,6 @@ def create_integrations_tab(df_recrutement, global_filters):
             candidat_col: "Candidat",
             date_integration_col: "Date d'Intégration Prévue"
         }
-        # Ajouter renommage pour la colonne Commentaire si présente
-        if comment_col in df_display.columns:
-            rename_map[comment_col] = "Commentaire"
         if poste_col_detected in df_display.columns:
             rename_map[poste_col_detected] = "Poste demandé"
             
@@ -1609,6 +1598,10 @@ def create_integrations_tab(df_recrutement, global_filters):
             text-align: left !important;
             padding-left: 15px !important;
         }
+        .int-custom-table td:last-child {
+            max-width: 80px;
+            white-space: nowrap;
+        }
         </style>
         """, unsafe_allow_html=True)
 
@@ -1629,8 +1622,6 @@ def create_integrations_tab(df_recrutement, global_filters):
         
         html_table += '</tbody></table></div>'
         st.markdown(html_table, unsafe_allow_html=True)
-
-        # (Commentaires d'intégration retirés: ne pas afficher le contenu de la colonne Commentaire ici)
     else:
         st.warning("Colonnes d'affichage non disponibles")
 
@@ -2109,44 +2100,56 @@ def create_weekly_report_tab(df_recrutement=None):
     st.markdown(kpi_cards_html, unsafe_allow_html=True)
 
     # Tableau récapitulatif par entité (HTML personnalisé, rendu centralisé)
-    # Préparer les données pour le HTML
-    table_data = []
-    for entite, data in metrics_included.items():
+    st.markdown(
+        '<div style="display: flex; align-items: center;">'
+        '<span style="font-size: 1.25em; font-weight: 600;">📊 Besoins en Cours par Entité</span>'
+        '</div>',
+        unsafe_allow_html=True
+    )
+    if metrics and len(metrics) > 0:
+        logos_dict = load_all_logos_b64()
+        
+        def get_entity_display(name):
+            return get_entity_display_html_with_logo(name, logos_dict)
+
+        # Préparer les données pour le HTML
+        table_data = []
+        for entite, data in metrics_included.items():
+            table_data.append({
+                'Entité': get_entity_display(entite),
+                'Nb postes ouverts avant début semaine': data['avant'] if data['avant'] > 0 else '-',
+                'Nb nouveaux postes ouverts cette semaine': data['nouveaux'] if data['nouveaux'] > 0 else '-',
+                'Nb postes pourvus cette semaine': data['pourvus'] if data['pourvus'] > 0 else '-',
+                "Nb postes statut 'En cours' (total)": data.get('en_cours_status_count', 0) if data.get('en_cours_status_count', 0) > 0 else '-',
+                'Nb postes en cours cette semaine (sourcing)': data['en_cours'] if data['en_cours'] > 0 else '-'
+            })
+
+        # Ajouter la ligne de total
         table_data.append({
-            'Entité': get_entity_display(entite),
-            'Nb postes ouverts avant début semaine': data['avant'] if data['avant'] > 0 else '-',
-            'Nb nouveaux postes ouverts cette semaine': data['nouveaux'] if data['nouveaux'] > 0 else '-',
-            'Nb postes pourvus cette semaine': data['pourvus'] if data['pourvus'] > 0 else '-',
-            "Nb postes statut 'En cours' (total)": data.get('en_cours_status_count', 0) if data.get('en_cours_status_count', 0) > 0 else '-',
-            'Nb postes en cours cette semaine (sourcing)': data['en_cours'] if data['en_cours'] > 0 else '-'
+            'Entité': '<div style="text-align: center; font-weight: bold;">TOTAL</div>',
+            'Nb postes ouverts avant début semaine': f'**{total_avant}**',
+            'Nb nouveaux postes ouverts cette semaine': f'**{total_nouveaux}**',
+            'Nb postes pourvus cette semaine': f'**{total_pourvus}**',
+            "Nb postes statut 'En cours' (total)": f'**{total_en_cours_status}**',
+            'Nb postes en cours cette semaine (sourcing)': f'**{total_en_cours}**'
         })
 
-    # Ajouter la ligne de total
-    table_data.append({
-        'Entité': '<div style="text-align: center; font-weight: bold;">TOTAL</div>',
-        'Nb postes ouverts avant début semaine': f'**{total_avant}**',
-        'Nb nouveaux postes ouverts cette semaine': f'**{total_nouveaux}**',
-        'Nb postes pourvus cette semaine': f'**{total_pourvus}**',
-        "Nb postes statut 'En cours' (total)": f'**{total_en_cours_status}**',
-        'Nb postes en cours cette semaine (sourcing)': f'**{total_en_cours}**'
-    })
-
-    # HTML + CSS (RETOUR À LA VERSION ORIGINALE AVEC LOGOS)
-    st.markdown("""
-    <style>
-    .table-container {
-        display: flex;
-        justify-content: center;
-        width: 100%;
-        margin: 15px 0;
-    }
-    .custom-table {
-        border-collapse: collapse;
-        font-family: Arial, sans-serif;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-        width: 75%;
-        margin: 0 auto;
-    }
+        # HTML + CSS (RETOUR À LA VERSION ORIGINALE AVEC LOGOS)
+        st.markdown("""
+        <style>
+        .table-container {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            margin: 15px 0;
+        }
+        .custom-table {
+            border-collapse: collapse;
+            font-family: Arial, sans-serif;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            width: 75%;
+            margin: 0 auto;
+        }
         .custom-table th {
             background-color: #9C182F !important;
             color: white !important;
@@ -2181,49 +2184,49 @@ def create_weekly_report_tab(df_recrutement=None):
             color: white !important;
             font-weight: bold !important;
             border: 1px solid #9C182F !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
-    # Construire le tableau HTML
-    html_table = '<div class="table-container">'
-    html_table += '<table class="custom-table">'
-    html_table += '<thead><tr>'
-    html_table += '<th>Entité</th>'
-    html_table += '<th>Nb postes ouverts avant début semaine</th>'
-    html_table += '<th>Nb nouveaux postes ouverts cette semaine</th>'
-    html_table += '<th>Nb postes pourvus cette semaine</th>'
-    html_table += '<th>Nb postes en cours cette semaine (sourcing)</th>'
-    html_table += '</tr></thead>'
-    html_table += '<tbody>'
+        # Construire le tableau HTML
+        html_table = '<div class="table-container">'
+        html_table += '<table class="custom-table">'
+        html_table += '<thead><tr>'
+        html_table += '<th>Entité</th>'
+        html_table += '<th>Nb postes ouverts avant début semaine</th>'
+        html_table += '<th>Nb nouveaux postes ouverts cette semaine</th>'
+        html_table += '<th>Nb postes pourvus cette semaine</th>'
+        html_table += '<th>Nb postes en cours cette semaine (sourcing)</th>'
+        html_table += '</tr></thead>'
+        html_table += '<tbody>'
 
-    # Ajouter les lignes de données (toutes sauf la dernière qui est TOTAL)
-    data_rows = table_data[:-1]
-    for row in data_rows:
-        html_table += '<tr>'
-        html_table += f'<td class="entity-cell">{row["Entité"]}</td>'
-        html_table += f'<td>{row["Nb postes ouverts avant début semaine"]}</td>'
-        html_table += f'<td>{row["Nb nouveaux postes ouverts cette semaine"]}</td>'
-        html_table += f'<td>{row["Nb postes pourvus cette semaine"]}</td>'
-        html_table += f'<td>{row["Nb postes en cours cette semaine (sourcing)"]}</td>'
+        # Ajouter les lignes de données (toutes sauf la dernière qui est TOTAL)
+        data_rows = table_data[:-1]
+        for row in data_rows:
+            html_table += '<tr>'
+            html_table += f'<td class="entity-cell">{row["Entité"]}</td>'
+            html_table += f'<td>{row["Nb postes ouverts avant début semaine"]}</td>'
+            html_table += f'<td>{row["Nb nouveaux postes ouverts cette semaine"]}</td>'
+            html_table += f'<td>{row["Nb postes pourvus cette semaine"]}</td>'
+            html_table += f'<td>{row["Nb postes en cours cette semaine (sourcing)"]}</td>'
+            html_table += '</tr>'
+
+        # Ligne TOTAL (la dernière)
+        total_row = table_data[-1]
+        html_table += '<tr class="total-row">'
+        html_table += f'<td class="entity-cell">TOTAL</td>'
+        html_table += f'<td>{total_row["Nb postes ouverts avant début semaine"].replace("**", "")}</td>'
+        html_table += f'<td>{total_row["Nb nouveaux postes ouverts cette semaine"].replace("**", "")}</td>'
+        html_table += f'<td>{total_row["Nb postes pourvus cette semaine"].replace("**", "")}</td>'
+        html_table += f'<td>{total_row["Nb postes en cours cette semaine (sourcing)"].replace("**", "")}</td>'
         html_table += '</tr>'
+        html_table += '</tbody></table></div>'
 
-    # Ligne TOTAL (la dernière)
-    total_row = table_data[-1]
-    html_table += '<tr class="total-row">'
-    html_table += f'<td class="entity-cell">TOTAL</td>'
-    html_table += f'<td>{total_row["Nb postes ouverts avant début semaine"].replace("**", "")}</td>'
-    html_table += f'<td>{total_row["Nb nouveaux postes ouverts cette semaine"].replace("**", "")}</td>'
-    html_table += f'<td>{total_row["Nb postes pourvus cette semaine"].replace("**", "")}</td>'
-    html_table += f'<td>{total_row["Nb postes en cours cette semaine (sourcing)"].replace("**", "")}</td>'
-    html_table += '</tr>'
-    html_table += '</tbody></table></div>'
+        st.markdown(html_table, unsafe_allow_html=True)
 
-    st.markdown(html_table, unsafe_allow_html=True)
-
-    # --- Tableau : Recrutements en cours par recruteur (juste après 'Besoins en Cours par Entité')
-    try:
-        if df_recrutement is not None and 'Colonne TG Hire' in df_recrutement.columns:
+        # --- Tableau : Recrutements en cours par recruteur (juste après 'Besoins en Cours par Entité')
+        try:
+            if df_recrutement is not None and 'Colonne TG Hire' in df_recrutement.columns:
                 # On veut un tableau avec une colonne par statut: Nouvelle demande, Sourcing, Shortlisté, Signature DRH
                 wanted_statuses = ['Nouvelle demande', 'Sourcing', 'Shortlisté', 'Signature DRH']
                 # Construire un pivot complet par recruteur (colonnes = Colonne TG Hire demandées)
@@ -2297,53 +2300,8 @@ def create_weekly_report_tab(df_recrutement=None):
                             st.dataframe(df_rec_debug[cols_avail].reset_index(drop=True), use_container_width=True, hide_index=True)
                         except Exception as e:
                             st.write(f"Erreur debug: {e}")
-    except Exception:
-        pass
-    else:
-        # Affichage par défaut si pas de metrics (avec logos pour démo)
-        logos_dict = load_all_logos_b64()
-        tgcc_logo = get_entity_display_html_with_logo('TGCC', logos_dict)
-        tgem_logo = get_entity_display_html_with_logo('TGEM', logos_dict)
-        
-        default_html = f"""
-<div class="table-container">
-    <table class="custom-table">
-        <thead>
-            <tr>
-                <th>Entité</th>
-                <th>Nb postes ouverts avant début semaine</th>
-                <th>Nb nouveaux postes ouverts cette semaine</th>
-                <th>Nb postes pourvus cette semaine</th>
-                <th>Nb postes en cours cette semaine</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td class="entity-cell">{tgcc_logo}</td>
-                <td>19</td>
-                <td>12</td>
-                <td>5</td>
-                <td>26</td>
-            </tr>
-            <tr>
-                <td class="entity-cell">{tgem_logo}</td>
-                <td>2</td>
-                <td>2</td>
-                <td>0</td>
-                <td>4</td>
-            </tr>
-            <tr class="total-row">
-                <td class="entity-cell">TOTAL</td>
-                <td>21</td>
-                <td>14</td>
-                <td>5</td>
-                <td>30</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
-"""
-        st.markdown(default_html, unsafe_allow_html=True)
+        except Exception:
+            pass
 
     # Section Debug (expandable): montrer les lignes et pourquoi elles sont comptées
     with st.expander("🔍 Debug - Détails des lignes", expanded=False):
@@ -4982,11 +4940,6 @@ def main():
         st.header("📖 Méthodologie & Guide Utilisateur")
         
         st.subheader("Comment générer le reporting ?")
-        st.markdown("""
-        Avant de générer le reporting, assurez-vous que tous les recrutements sont saisis, que la colonne «Status» de la demande est renseignée et que la colonne «TG Hire» reflète l'état du recrutement (Nouvelle demande, Sourcing, Signature DRH, ...).
-        """)
-        st.markdown('<div style="color:red; font-weight:700; margin-top:6px;">NB : au fur et à mesure de l\'évolution des recrutements, mettez à jour leur état, sinon le reporting ne sera pas fiable.</div>', unsafe_allow_html=True)
-
         st.markdown("""
         1.  **Chargement des Données** : 
             *   Allez dans l'onglet **"📂 Upload & Téléchargement"**.
