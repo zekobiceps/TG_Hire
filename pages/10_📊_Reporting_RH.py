@@ -1576,47 +1576,38 @@ def create_integrations_tab(df_recrutement, global_filters):
             display: flex;
             justify-content: center;
             width: 100%;
-            margin: 10px 0;
+            margin: 20px 0;
         }
         .int-custom-table {
             border-collapse: collapse;
             font-family: Arial, sans-serif;
             box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-            width: auto;
+            width: 85%;
             margin: 0 auto;
-            table-layout: auto;
         }
         .int-custom-table th {
             background-color: #9C182F !important;
             color: white !important;
             font-weight: bold !important;
             text-align: center !important;
-            padding: 4px 4px !important;
+            padding: 10px 15px !important;
             border: 1px solid white !important;
-            font-size: 0.85em;
+            font-size: 1.05em;
             white-space: nowrap;
         }
         .int-custom-table td {
             text-align: center !important;
-            padding: 4px 4px !important;
+            padding: 8px 12px !important;
             border: 1px solid #ddd !important;
             background-color: white !important;
-            font-size: 0.85em;
+            font-size: 1.0em;
             font-weight: 500;
-            white-space: nowrap;
         }
         .int-custom-table .candidate-cell {
             font-weight: bold;
             color: #2c3e50;
-            text-align: center !important;
-        }
-        .int-custom-table th:last-child,
-        .int-custom-table td:last-child {
-            min-width: 150px;
-            max-width: 250px;
-            white-space: normal;
-            word-wrap: break-word;
-            font-size: 0.8em;
+            text-align: left !important;
+            padding-left: 15px !important;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -2157,43 +2148,43 @@ def create_weekly_report_tab(df_recrutement=None):
             display: flex;
             justify-content: center;
             width: 100%;
-            margin: 10px 0;
+            margin: 15px 0;
         }
         .custom-table {
             border-collapse: collapse;
             font-family: Arial, sans-serif;
             box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-            width: auto;
+            width: 75%;
             margin: 0 auto;
-            table-layout: fixed;
         }
         .custom-table th {
             background-color: #9C182F !important;
             color: white !important;
             font-weight: bold !important;
             text-align: center !important;
-            padding: 4px 3px !important;
+            padding: 6px 4px !important;
             border: 1px solid white !important;
-            font-size: 0.85em;
-            line-height: 1.1;
+            font-size: 1.1em;
+            line-height: 1.3;
             white-space: normal !important;
             word-wrap: break-word !important;
-            width: 90px;
+            max-width: 150px;
         }
         .custom-table td {
             text-align: center !important;
-            padding: 4px 3px !important;
+            padding: 6px 4px !important;
             border: 1px solid #ddd !important;
             background-color: white !important;
-            font-size: 0.9em;
-            line-height: 1.1;
+            font-size: 1.1em;
+            line-height: 1.2;
             font-weight: 500;
         }
         .custom-table .entity-cell {
             text-align: center !important;
             padding: 4px 2px !important;
             font-weight: 600;
-            width: 60px;
+            min-width: 80px;
+            max-width: 100px;
         }
         .custom-table .total-row td {
             background-color: #9C182F !important;
@@ -2279,12 +2270,12 @@ def create_weekly_report_tab(df_recrutement=None):
 
                     # Construire le HTML du tableau
                     html_rec = '<div class="table-container" style="margin-top:8px;">'
-                    html_rec += '<table class="custom-table" style="width:auto; margin:0; table-layout:auto;">'
-                    # Header - reduced widths for status columns
-                    html_rec += '<thead><tr><th style="width:100px; white-space:nowrap;">Recruteur</th>'
+                    html_rec += '<table class="custom-table" style="width:60%; margin:0;">'
+                    # Header
+                    html_rec += '<thead><tr><th>Recruteur</th>'
                     for s in wanted_statuses:
-                        html_rec += f'<th style="width:60px; white-space:normal; word-wrap:break-word; padding:3px 2px !important; font-size:0.8em;">{s}</th>'
-                    html_rec += '<th style="width:40px;">Total</th></tr></thead><tbody>'
+                        html_rec += f'<th>{s}</th>'
+                    html_rec += '<th>Total</th></tr></thead><tbody>'
 
                     # Lignes par recruteur
                     for rec, row in pivot.iterrows():
