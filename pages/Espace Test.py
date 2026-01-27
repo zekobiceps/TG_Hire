@@ -1140,8 +1140,14 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         st.plotly_chart(fig_candidats, width="stretch")
 
     with col6:
+        # Pour le taux de refus, on se base sur les lignes avec une date de désistement
+        # (refus effectif de la promesse), filtrées avec les mêmes filtres globaux.
+        df_kpi = apply_global_filters(df_recrutement, global_filters)
+        if 'Date de désistement' in df_kpi.columns:
+            df_kpi = df_kpi[df_kpi['Date de désistement'].notna()].copy()
+
         # Taux de refus = lignes où promesse==1 ET refus==1 / lignes où promesse==1
-        res = compute_promise_refusal_rate_row(df_filtered)
+        res = compute_promise_refusal_rate_row(df_kpi)
         taux_refus = res['rate'] if res['rate'] is not None else 0.0
         numer = res['numerator']
         denom = res['denominator']
@@ -1156,12 +1162,16 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         fig_refus.update_layout(height=280, margin=dict(t=20, b=20, l=20, r=20))
         st.plotly_chart(fig_refus, width='stretch')
         st.caption(f"Numérateur (refus): {numer} | Dénominateur (promesses): {denom}")
-    # Debug local pour l'onglet Recrutements Clôturés
+    # Debug local pour l'onglet Recrutements Clôturés / refus promesses
     st.markdown("---")
     with st.expander("🔍 Debug - Détails des lignes (Recrutements Clôturés)", expanded=False):
         try:
-            st.markdown("**Lignes contribuant aux graphiques avec calcul du délai:**")
-            df_debug_clo = df_filtered.copy()
+            st.markdown("**Lignes contribuant au KPI de refus des promesses (lignes avec désistement):**")
+            # Utiliser le même jeu de données que pour le KPI de refus
+            try:
+                df_debug_clo = df_kpi.copy()
+            except NameError:
+                df_debug_clo = df_filtered.copy()
             # Colonnes source pour le délai
             date_reception_col = 'Date de réception de la demande aprés validation de la DRH'
             date_entree_col = "Date d'entrée effective du candidat"
