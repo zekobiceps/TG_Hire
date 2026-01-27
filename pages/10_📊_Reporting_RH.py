@@ -4065,8 +4065,10 @@ def generate_demandes_recrutement_html_image(df_recrutement):
             if 'Raison du recrutement' in df.columns:
                 raison_counts = df['Raison du recrutement'].value_counts()
                 df_raison = raison_counts.rename_axis('Raison').reset_index(name='Count')
-                fig_raison = px.bar(df_raison, x='Raison', y='Count', title="Raison du recrutement", text='Count')
-                fig_raison.update_traces(marker_color='grey', textposition='outside')
+                # Ajouter un headroom Y (+3) pour éviter que les valeurs 'outside' soient coupées
+                y_max = int(df_raison['Count'].max()) if not df_raison.empty else 0
+                fig_raison = px.bar(df_raison, x='Raison', y='Count', title="Raison du recrutement", text='Count', range_y=[0, y_max + 3])
+                fig_raison.update_traces(marker_color='grey', textposition='outside', cliponaxis=False)
                 fig_raison.update_layout(height=320, margin=dict(l=20,r=20,t=40,b=10), xaxis_title=None, yaxis_title=None)
                 figs_row1.append(fig_raison)
         except Exception:
@@ -4081,8 +4083,9 @@ def generate_demandes_recrutement_html_image(df_recrutement):
                     all_months = pd.date_range(start=monthly.index.min(), end=monthly.index.max(), freq='MS')
                     monthly = monthly.reindex(all_months, fill_value=0).reset_index().rename(columns={'index':'Mois'})
                     monthly['Label'] = monthly['Mois'].dt.strftime('%b %Y')
-                    fig_evo = px.bar(monthly, x='Label', y='Count', title="Évolution des demandes", text='Count')
-                    fig_evo.update_traces(marker_color='#1f77b4', textposition='outside')
+                    y_max = int(monthly['Count'].max()) if not monthly.empty else 0
+                    fig_evo = px.bar(monthly, x='Label', y='Count', title="Évolution des demandes", text='Count', range_y=[0, y_max + 3])
+                    fig_evo.update_traces(marker_color='#1f77b4', textposition='outside', cliponaxis=False)
                     fig_evo.update_layout(height=320, margin=dict(l=20,r=20,t=40,b=10), xaxis_title=None, yaxis_title=None)
                     figs_row1[-1] = fig_evo
             except Exception:
@@ -4152,8 +4155,9 @@ def generate_recrutements_clotures_html_image(df_recrutement):
             series = s.dt.to_period('M').value_counts().sort_index()
             monthly = series.rename_axis('Mois').reset_index(name='Count')
             monthly['Label'] = monthly['Mois'].astype(str)
-            fig_evo = px.bar(monthly, x='Label', y='Count', title="Évolution des recrutements", text='Count')
-            fig_evo.update_traces(marker_color='#1f77b4', textposition='outside')
+            y_max = int(monthly['Count'].max()) if not monthly.empty else 0
+            fig_evo = px.bar(monthly, x='Label', y='Count', title="Évolution des recrutements", text='Count', range_y=[0, y_max + 3])
+            fig_evo.update_traces(marker_color='#1f77b4', textposition='outside', cliponaxis=False)
             fig_evo.update_layout(height=320, margin=dict(l=20,r=20,t=40,b=10), xaxis_title=None, yaxis_title=None)
             figs_row1.append(fig_evo)
     except Exception:
@@ -4246,14 +4250,10 @@ def generate_integrations_html_image(df_recrutement):
             s = pd.to_datetime(df[date_integration_col], errors='coerce')
             monthly = s.dt.to_period('M').value_counts().sort_index().rename_axis('Mois').reset_index(name='Count')
             monthly['Label'] = monthly['Mois'].astype(str)
-            # Ajouter un décalage de +3 pour le texte afin d'éviter la coupure
-            monthly['Count_label'] = monthly['Count'] + 3
-            fig_month = px.bar(monthly, x='Label', y='Count', title="Évolution des Intégrations Prévues", text='Count_label')
-            fig_month.update_traces(marker_color='#2ca02c', textposition='outside', cliponaxis=False, texttemplate='%{text}')
-            try:
-                fig_month.update_yaxes(range=[0, float(monthly['Count'].max()) + 3])
-            except Exception:
-                pass
+            # Conserver les valeurs d'origine mais ajouter une marge Y de +3 pour éviter la coupure
+            y_max = int(monthly['Count'].max()) if not monthly.empty else 0
+            fig_month = px.bar(monthly, x='Label', y='Count', title="Évolution des Intégrations Prévues", text='Count', range_y=[0, y_max + 3])
+            fig_month.update_traces(marker_color='#2ca02c', textposition='outside', cliponaxis=False)
             fig_month.update_layout(height=360, margin=dict(l=20,r=20,t=40,b=10), xaxis_title=None, yaxis_title=None)
             figs_row1.append(fig_month)
     except Exception:
