@@ -54,6 +54,78 @@ import io
 import random
 from io import BytesIO
 
+def compute_promise_refusal_rate_row(
+    df: pd.DataFrame,
+    col_prom: str | None = "Nb de promesses d'embauche réalisée",
+    col_refus: str | None = "Nb de refus aux promesses d'embauches",
+    fallback_search: bool = True
+) -> dict:
+    """Calcule le taux de refus des promesses d'embauche selon la règle métier demandée.
+
+    Règle: une ligne est considérée "refus" si
+    - col_prom == 1 ET col_refus == 1
+    Dénominateur: toutes les lignes où col_prom == 1
+
+    Paramètres:
+    - df: DataFrame source
+    - col_prom: nom exact de la colonne promesses réalisées (si None, recherche heuristique)
+    - col_refus: nom exact de la colonne refus aux promesses (si None, recherche heuristique)
+    - fallback_search: si True, tente une détection robuste des colonnes via sous-chaînes
+
+    Retourne: { 'denominator': int, 'numerator': int, 'rate': float|None,
+                'columns': { 'prom': str|None, 'refus': str|None } }
+    """
+    if df is None or df.empty:
+        return { 'denominator': 0, 'numerator': 0, 'rate': None, 'columns': { 'prom': None, 'refus': None } }
+
+    def _find_prom_col(data):
+        if col_prom and col_prom in data.columns:
+            return col_prom
+        if not fallback_search:
+            return None
+        lc = [ (c, c.lower()) for c in data.columns ]
+        for c, lcname in lc:
+            if 'promess' in lcname and ('real' in lcname or 'réalis' in lcname or 'realise' in lcname or 'réalisée' in lcname):
+                return c
+        return None
+
+    def _find_refus_col(data):
+        if col_refus and col_refus in data.columns:
+            return col_refus
+        if not fallback_search:
+            return None
+        lc = [ (c, c.lower()) for c in data.columns ]
+        for c, lcname in lc:
+            if 'refus' in lcname:
+                return c
+        return None
+
+    prom_c = _find_prom_col(df)
+    refus_c = _find_refus_col(df)
+
+    if not prom_c or prom_c not in df.columns:
+        return { 'denominator': 0, 'numerator': 0, 'rate': None, 'columns': { 'prom': None, 'refus': refus_c } }
+
+    # Conversion sécurisée vers numérique (les non numériques -> NaN -> 0)
+    prom_vals = pd.to_numeric(df[prom_c], errors='coerce').fillna(0)
+    refus_vals = pd.to_numeric(df[refus_c], errors='coerce').fillna(0) if (refus_c and refus_c in df.columns) else pd.Series([0]*len(df), index=df.index)
+
+    # Dénominateur: promesse réalisée == 1
+    denom_mask = prom_vals.eq(1)
+    denom = int(denom_mask.sum())
+
+    # Numérateur: promesse réalisée == 1 ET refus == 1
+    numer_mask = denom_mask & refus_vals.eq(1)
+    numer = int(numer_mask.sum())
+
+    rate = (numer / denom * 100.0) if denom > 0 else None
+    return {
+        'denominator': denom,
+        'numerator': numer,
+        'rate': None if rate is None else round(rate, 1),
+        'columns': { 'prom': prom_c, 'refus': refus_c }
+    }
+
 # --- IMPORTS CONDITIONNELS (CORRIGÉS) ---
 # Importations standard
 from docx import Document
