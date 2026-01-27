@@ -1115,8 +1115,23 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         st.plotly_chart(fig_candidats, width="stretch")
 
     with col6:
-        # Taux de refus = lignes où promesse==1 ET refus==1 / lignes où promesse==1
-        res = compute_promise_refusal_rate_row(df_filtered)
+        # Taux de refus: utiliser UNIQUEMENT les lignes avec une Date de désistement
+        # Filtrer df_recrutement (pas df_filtered/df_cloture) par entité/direction uniquement
+        df_kpi = df_recrutement.copy()
+        desist_col = 'Date de désistement'
+        
+        # Appliquer uniquement les filtres entité/direction
+        if global_filters.get('entite') != 'Toutes':
+            df_kpi = df_kpi[df_kpi['Entité demandeuse'] == global_filters['entite']]
+        if global_filters.get('direction') != 'Toutes':
+            df_kpi = df_kpi[df_kpi['Direction concernée'] == global_filters['direction']]
+        
+        # Garder seulement les lignes avec une Date de désistement valide
+        if desist_col in df_kpi.columns:
+            df_kpi[desist_col] = pd.to_datetime(df_kpi[desist_col], errors='coerce')
+            df_kpi = df_kpi[df_kpi[desist_col].notna()]
+        
+        res = compute_promise_refusal_rate_row(df_kpi)
         taux_refus = res['rate'] if res['rate'] is not None else 0.0
         numer = res['numerator']
         denom = res['denominator']
@@ -1130,7 +1145,8 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         ))
         fig_refus.update_layout(height=280, margin=dict(t=20, b=20, l=20, r=20))
         st.plotly_chart(fig_refus, width='stretch')
-        st.caption(f"Numérateur (refus): {numer} | Dénominateur (promesses): {denom}")
+        st.caption(f"Numérateur (refus): {numer} | Dénominateur (promesses): {denom} | Lignes avec désistement: {len(df_kpi)}")
+
     # Debug local pour l'onglet Recrutements Clôturés
     st.markdown("---")
     with st.expander("🔍 Debug - Détails des lignes (Recrutements Clôturés)", expanded=False):
