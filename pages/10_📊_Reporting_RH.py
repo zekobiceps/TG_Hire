@@ -1026,11 +1026,12 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         )
         fig_direction.update_traces(
             marker_color='grey',
-            textposition='auto',
+            textposition='inside',
             texttemplate='<b>%{x}</b>',
-            textfont=dict(size=15, color='white'),
+            textfont=dict(size=14, color='white'),
             textangle=0,  # Forcer l'orientation horizontale des valeurs
-            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
+            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>',
+            constraintext='none'
         )
         fig_direction.update_layout(
             height=300,
@@ -1039,13 +1040,10 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             margin=dict(l=160, t=48, b=30, r=20),
             xaxis=dict(tickangle=0),
             yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_direction['Label_display'][::-1])),
-            title=dict(text="<b>Comparaison par direction</b>", x=0, xanchor='left', font=TITLE_FONT)
+            title=dict(text="<b>Comparaison par direction</b>", x=0, xanchor='left', font=TITLE_FONT),
+            uniformtext=dict(minsize=10, mode='show')
         )
         fig_direction = apply_title_style(fig_direction)
-        try:
-            fig_direction.update_traces(textfont=dict(size=15, color='white'))
-        except Exception:
-            pass
         # Use a compact default visible area and allow scrolling when long
         render_plotly_scrollable(fig_direction, max_height=320)
 
@@ -1069,21 +1067,23 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         )
         fig_poste.update_traces(
             marker_color='grey',
-            textposition='outside',
+            textposition='inside',
             texttemplate='<b>%{x}</b>',
-            textfont=dict(size=14, color='#333333'),
+            textfont=dict(size=14, color='white'),
             textangle=0,  # Forcer l'orientation horizontale des valeurs
-            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
+            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>',
+            constraintext='none'
         )
         height_poste = max(320, 28 * len(df_poste))
         fig_poste.update_layout(
             height=height_poste,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=160, t=48, b=30, r=50),
+            margin=dict(l=160, t=48, b=30, r=20),
             xaxis=dict(tickangle=0),
             yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_poste['Label_display'][::-1])),
-            title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT)
+            title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT),
+            uniformtext=dict(minsize=10, mode='show')
         )
         fig_poste = apply_title_style(fig_poste)
         render_plotly_scrollable(fig_poste, max_height=320)
@@ -1216,7 +1216,15 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         fig_statut.update_layout(
             title=dict(text="Répartition par statut de la demande", x=0, xanchor='left', font=TITLE_FONT),
             height=380,
-            legend=dict(orientation="h", yanchor="bottom", y=-0.45, xanchor="center", x=0.5, font=dict(size=13))
+            legend=dict(
+                orientation="v", 
+                yanchor="middle", 
+                y=0.5, 
+                xanchor="left", 
+                x=1.0,
+                font=dict(size=13)
+            ),
+            margin=dict(l=20, r=140, t=60, b=20)
         )
         fig_statut = apply_title_style(fig_statut)
         st.plotly_chart(fig_statut, width="stretch")
@@ -1515,7 +1523,8 @@ def create_integrations_tab(df_recrutement, global_filters):
         'Entité demandeuse',
         'Affectation',
         date_integration_col,
-        plan_integration_col
+        plan_integration_col,
+        'Commentaire'
     ]
     # Filtrer les colonnes qui existent
     colonnes_disponibles = [col for col in colonnes_affichage if col in df_filtered.columns]
@@ -1571,36 +1580,45 @@ def create_integrations_tab(df_recrutement, global_filters):
             border-collapse: collapse;
             font-family: Arial, sans-serif;
             box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-            width: 85%;
+            width: 95%;
             margin: 0 auto;
+            table-layout: fixed;
         }
         .int-custom-table th {
             background-color: #9C182F !important;
             color: white !important;
             font-weight: bold !important;
             text-align: center !important;
-            padding: 10px 15px !important;
+            padding: 8px 6px !important;
             border: 1px solid white !important;
-            font-size: 1.05em;
-            white-space: nowrap;
+            font-size: 0.95em;
+            white-space: normal;
+            word-wrap: break-word;
         }
         .int-custom-table td {
             text-align: center !important;
-            padding: 8px 12px !important;
+            padding: 6px 4px !important;
             border: 1px solid #ddd !important;
             background-color: white !important;
-            font-size: 1.0em;
+            font-size: 0.95em;
             font-weight: 500;
+            white-space: normal;
+            word-wrap: break-word;
         }
         .int-custom-table .candidate-cell {
             font-weight: bold;
             color: #2c3e50;
             text-align: left !important;
-            padding-left: 15px !important;
+            padding-left: 8px !important;
         }
+        .int-custom-table th:nth-child(6),
+        .int-custom-table td:nth-child(6) {
+            max-width: 60px;
+        }
+        .int-custom-table th:last-child,
         .int-custom-table td:last-child {
-            max-width: 80px;
-            white-space: nowrap;
+            max-width: 120px;
+            font-size: 0.85em;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -2155,20 +2173,20 @@ def create_weekly_report_tab(df_recrutement=None):
             color: white !important;
             font-weight: bold !important;
             text-align: center !important;
-            padding: 6px 4px !important;
+            padding: 6px 3px !important;
             border: 1px solid white !important;
-            font-size: 1.1em;
-            line-height: 1.3;
+            font-size: 0.95em;
+            line-height: 1.2;
             white-space: normal !important;
             word-wrap: break-word !important;
-            max-width: 150px;
+            max-width: 100px;
         }
         .custom-table td {
             text-align: center !important;
-            padding: 6px 4px !important;
+            padding: 6px 3px !important;
             border: 1px solid #ddd !important;
             background-color: white !important;
-            font-size: 1.1em;
+            font-size: 1.0em;
             line-height: 1.2;
             font-weight: 500;
         }
@@ -2263,12 +2281,12 @@ def create_weekly_report_tab(df_recrutement=None):
 
                     # Construire le HTML du tableau
                     html_rec = '<div class="table-container" style="margin-top:8px;">'
-                    html_rec += '<table class="custom-table" style="width:60%; margin:0;">'
-                    # Header
-                    html_rec += '<thead><tr><th>Recruteur</th>'
+                    html_rec += '<table class="custom-table" style="width:60%; margin:0; table-layout:auto;">'
+                    # Header - reduced widths for status columns
+                    html_rec += '<thead><tr><th style="min-width:100px;">Recruteur</th>'
                     for s in wanted_statuses:
-                        html_rec += f'<th>{s}</th>'
-                    html_rec += '<th>Total</th></tr></thead><tbody>'
+                        html_rec += f'<th style="max-width:80px; white-space:normal; word-wrap:break-word; padding:4px 2px !important;">{s}</th>'
+                    html_rec += '<th style="max-width:50px;">Total</th></tr></thead><tbody>'
 
                     # Lignes par recruteur
                     for rec, row in pivot.iterrows():
