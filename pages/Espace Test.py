@@ -1141,6 +1141,16 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         st.plotly_chart(fig_refus, width='stretch')
         # Info complémentaire (numérateur/dénominateur)
         st.caption(f"Refus: {res.get('numerator', 0)} / Promesses réalisées: {res.get('denominator', 0)}")
+        # Année de désistement (dérivée de la colonne 'Date de désistement')
+        try:
+            desist_col = next((c for c in df_filtered.columns if 'désistement' in c.lower() and 'date' in c.lower()), None)
+            if desist_col:
+                s = pd.to_datetime(df_filtered[desist_col], errors='coerce')
+                years = [int(y) for y in s.dt.year.dropna().unique()]
+                if years:
+                    st.caption(f"Années avec désistement détectées (depuis la colonne '{desist_col}') : {', '.join(str(y) for y in sorted(years))}")
+        except Exception:
+            pass
 
     # Debug local pour l'onglet Recrutements Clôturés
     st.markdown("---")
