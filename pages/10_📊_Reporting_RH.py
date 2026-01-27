@@ -1361,11 +1361,12 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         )
         fig_poste.update_traces(
             marker_color='grey',
-            textposition='outside',
+            textposition='inside',
             texttemplate='<b>%{x}</b>',
-            textfont=dict(size=14, color='#333333'),
+            textfont=dict(size=14, color='white'),
             textangle=0, # Orientation horizontale des valeurs
-            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
+            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>',
+            constraintext='none'
         )
         height_poste = max(320, 28 * len(df_poste))
         category_array_poste = list(df_poste['Label_display'][::-1])
@@ -1373,10 +1374,11 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             height=height_poste,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=160, t=48, b=30, r=50),
+            margin=dict(l=160, t=48, b=30, r=20),
             xaxis=dict(tickangle=0),
             yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_poste),
-            title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT)
+            title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT),
+            uniformtext=dict(minsize=10, mode='show')
         )
         render_plotly_scrollable(fig_poste, max_height=320)
 
@@ -1608,6 +1610,14 @@ def create_integrations_tab(df_recrutement, global_filters):
             color: #2c3e50;
             text-align: left !important;
             padding-left: 15px !important;
+        }
+        /* Réduire légèrement la largeur de la colonne Commentaire (dernière colonne) */
+        .int-custom-table th:last-child,
+        .int-custom-table td:last-child {
+            min-width: 120px;
+            max-width: 200px;
+            white-space: normal;
+            word-wrap: break-word;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -2270,7 +2280,9 @@ def create_weekly_report_tab(df_recrutement=None):
 
                     # Construire le HTML du tableau
                     html_rec = '<div class="table-container" style="margin-top:8px;">'
-                    html_rec += '<table class="custom-table" style="width:60%; margin:0;">'
+                    # Styles spécifiques pour réduire les colonnes 'Nouvelle demande' (2e) et 'Signature DRH' (5e)
+                    html_rec += '<style>.rec-table th:nth-child(2), .rec-table td:nth-child(2){width:60px;} .rec-table th:nth-child(5), .rec-table td:nth-child(5){width:60px;}</style>'
+                    html_rec += '<table class="custom-table rec-table" style="width:60%; margin:0;">'
                     # Header
                     html_rec += '<thead><tr><th>Recruteur</th>'
                     for s in wanted_statuses:
