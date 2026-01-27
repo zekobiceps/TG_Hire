@@ -1140,35 +1140,23 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         st.plotly_chart(fig_candidats, width="stretch")
 
     with col6:
-        # Pour le taux de refus, on se base sur les lignes avec une date de désistement
-        # (refus effectif de la promesse), en appliquant:
-        # - les filtres entité/direction
-        # - un filtre d'année basé sur la Date de désistement (et non sur Date d'entrée)
-        df_kpi = df_recrutement.copy() if df_recrutement is not None else pd.DataFrame()
+        # Taux de refus basé sur toutes les promesses réalisées (quelle que soit la Colonne TG Hire)
+        # - Dénominateur: lignes où `Nb de promesses d'embauche réalisée` == 1
+        # - Numérateur: lignes où promesse == 1 ET `Nb de refus aux promesses d'embauches` == 1
+        # Les cas "Clôture" avec promesse=1 et refus=0 impactent donc bien l'indicateur (dans le dénominateur uniquement).
 
-        # Filtres entité / direction
-        if not df_kpi.empty:
-            entite = global_filters.get('entite') if isinstance(global_filters, dict) else None
-            direction = global_filters.get('direction') if isinstance(global_filters, dict) else None
-
-            if entite and entite != 'Toutes' and 'Entité demandeuse' in df_kpi.columns:
-                df_kpi = df_kpi[df_kpi['Entité demandeuse'] == entite]
-            if direction and direction != 'Toutes' and 'Direction concernée' in df_kpi.columns:
-                df_kpi = df_kpi[df_kpi['Direction concernée'] == direction]
-
-            # Filtre d'année basé sur la Date de désistement
-            if 'Date de désistement' in df_kpi.columns:
-                df_kpi['Année_Désistement'] = df_kpi['Date de désistement'].dt.year
-                annee_sel = global_filters.get('periode_recrutement') if isinstance(global_filters, dict) else 'Toutes'
-                if annee_sel != 'Toutes':
-                    df_kpi = df_kpi[df_kpi['Année_Désistement'] == annee_sel]
-                # Conserver uniquement les lignes ayant effectivement un désistement
-                df_kpi = df_kpi[df_kpi['Date de désistement'].notna()].copy()
-            else:
-                df_kpi = df_kpi.iloc[0:0]
+        # Base de calcul: données de recrutement filtrées par entité / direction uniquement
+        df_base = df_recrutement.copy() if df_recrutement is not None else pd.DataFrame()
+        if not df_base.empty and isinstance(global_filters, dict):
+            entite = global_filters.get('entite')
+            direction = global_filters.get('direction')
+            if entite and entite != 'Toutes' and 'Entité demandeuse' in df_base.columns:
+                df_base = df_base[df_base['Entité demandeuse'] == entite]
+            if direction and direction != 'Toutes' and 'Direction concernée' in df_base.columns:
+                df_base = df_base[df_base['Direction concernée'] == direction]
 
         # Taux de refus = lignes où promesse==1 ET refus==1 / lignes où promesse==1
-        res = compute_promise_refusal_rate_row(df_kpi)
+        res = compute_promise_refusal_rate_row(df_base)
         taux_refus = res['rate'] if res['rate'] is not None else 0.0
         numer = res['numerator']
         denom = res['denominator']
@@ -1182,38 +1170,42 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         ))
         fig_refus.update_layout(height=280, margin=dict(t=20, b=20, l=20, r=20))
         st.plotly_chart(fig_refus, width='stretch')
-        st.caption(f"Numérateur (refus): {numer} | Dénominateur (promesses): {denom}")
+        st.caption(f"Numérateur (refus): {numer} | Dénominateur (promesses réalisées): {denom}")
     # Debug local pour l'onglet Recrutements Clôturés / refus promesses
     st.markdown("---")
     with st.expander("🔍 Debug - Détails des lignes (Recrutements Clôturés)", expanded=False):
         try:
-            st.markdown("**Lignes contribuant au KPI de refus des promesses (lignes avec désistement):**")
-            # Utiliser le même jeu de données que pour le KPI de refus
+            st.markdown("**Lignes de promesse d'embauche (avec ou sans désistement):**")
+            # Utiliser la même base que pour le KPI (df_base) pour le debug,
+            # en mettant en avant le candidat, la Colonne TG Hire et la date de désistement.
             try:
-                df_debug_clo = df_kpi.copy()
+                df_debug_clo = df_base.copy()
             except NameError:
                 df_debug_clo = df_filtered.copy()
-            # Colonnes source pour le délai (si disponibles sur ces lignes de désistement)
-            date_reception_col = 'Date de réception de la demande aprés validation de la DRH'
-            date_entree_col = "Date d'entrée effective du candidat"
-            # Formater les dates sans heure
-            if date_entree_col in df_debug_clo.columns:
-                df_debug_clo[date_entree_col] = pd.to_datetime(df_debug_clo[date_entree_col], errors='coerce').dt.strftime('%d/%m/%Y')
-            if date_reception_col in df_debug_clo.columns:
-                df_debug_clo['Date Réception'] = pd.to_datetime(df_debug_clo[date_reception_col], errors='coerce').dt.strftime('%d/%m/%Y')
-                # Calculer le délai en jours uniquement à partir des colonnes du debug
-                date_rec = pd.to_datetime(df_debug_clo[date_reception_col], errors='coerce')
-                date_ent = pd.to_datetime(df_debug_clo.get(date_entree_col), errors='coerce') if date_entree_col in df_debug_clo.columns else None
-                if date_ent is not None:
-                    df_debug_clo['Délai (jours)'] = (date_ent - date_rec).dt.days
-            cols_debug = ['Poste demandé', 'Entité demandeuse', 'Direction concernée', 'Date Réception', date_entree_col, 'Délai (jours)', 'Modalité de recrutement']
 
-            # Date de désistement = date du refus de la promesse
+            # Normaliser la date de désistement si présente
             desist_col = 'Date de désistement'
             if desist_col in df_debug_clo.columns:
                 df_debug_clo[desist_col] = pd.to_datetime(df_debug_clo[desist_col], errors='coerce').dt.strftime('%d/%m/%Y')
-                if desist_col not in cols_debug:
-                    cols_debug.append(desist_col)
+
+            # Chercher la colonne Nom Prénom du candidat ayant accepté la promesse
+            candidate_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
+            if candidate_col not in df_debug_clo.columns:
+                for c in df_debug_clo.columns:
+                    if 'candidat retenu' in c.lower() and 'promesse' in c.lower():
+                        candidate_col = c
+                        break
+
+            # Colonnes de base pour le debug (dans l'ordre souhaité)
+            cols_debug = []
+            if candidate_col in df_debug_clo.columns:
+                cols_debug.append(candidate_col)
+            cols_debug.extend([
+                'Poste demandé',
+                'Colonne TG Hire',
+            ])
+            if desist_col in df_debug_clo.columns:
+                cols_debug.append(desist_col)
 
             # Ajout des colonnes qui contribuent au KPI "Taux de refus des promesses d'embauche (%)"
             try:
@@ -5096,7 +5088,10 @@ def main():
         ### 🎯 Indicateurs de Performance (KPIs)
         - **Nombre de candidats présélectionnés** : Somme cumulative de la colonne `Nb de candidats pré-selectionnés`.
         - **Délai de recrutement (Duree de recrutement)** : Calculé selon la formule : `DATEDIFF('Date de réception de la demande','Date du 1er retour equipe RH', day)`. Cet indicateur se base **uniquement** sur les postes ayant le statut **"Clôture"**.
-        - **Taux de refus** : Ratio entre le nombre de refus et le nombre de promesses d'embauche réalisées.
+        - **Taux de refus des promesses d'embauche (%)** :
+            - **Dénominateur** : nombre de lignes où `Nb de promesses d'embauche réalisée` = 1 (toutes les promesses effectivement réalisées, que la `Colonne TG Hire` soit `Clôture` ou `Désistement`).
+            - **Numérateur** : parmi ces mêmes lignes, nombre de cas où `Nb de refus aux promesses d'embauches` = 1 (refus explicite de la promesse).
+            - Les cas `Clôture` avec promesse réalisée = 1 et refus = 0 sont donc bien pris en compte dans le dénominateur mais pas dans le numérateur, ce qui fait mécaniquement baisser le taux.
         """, unsafe_allow_html=True)
 
 if __name__ == "__main__":

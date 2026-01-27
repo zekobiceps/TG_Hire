@@ -9,4 +9,8 @@
         - **Délai de recrutement** : calculé comme la différence en jours entre `Date d'entrée effective du candidat` et `Date de réception de la demande après validation de la DRH`. Affiché dans le debug "Recrutements Clôturés".
         - **Intégrations — explication du signal "⚠️ En retard"** : une intégration est considérée en retard si la `Date d'entrée prévisionnelle` est antérieure à la date de reporting (aujourd'hui ou `reporting_date` sélectionnée). Le compteur `En retard` regroupe ces cas pour vous alerter.
         - **KPIs hebdomadaires** : fenêtre de calcul basée sur la `reporting_date` (Semaine précédente : Lundi->Vendredi). Les métriques `avant`, `nouveaux`, `pourvus`, `en_cours` sont calculées avec des règles décrites dans le debug (onglet Debug) et sont utilisées pour fabriquer le tableau "Besoins en Cours par Entité".
+        - **Taux de refus des promesses d'embauche (%)** :
+            - **Dénominateur** : nombre de lignes où `Nb de promesses d'embauche réalisée` = 1 (toutes les promesses effectivement réalisées, que la `Colonne TG Hire` soit `Clôture` ou `Désistement`).
+            - **Numérateur** : parmi ces mêmes lignes, nombre de cas où `Nb de refus aux promesses d'embauches` = 1 (refus explicite de la promesse).
+            - Les cas `Clôture` avec promesse réalisée = 1 et refus = 0 sont donc bien pris en compte dans le dénominateur mais pas dans le numérateur, ce qui fait mécaniquement baisser le taux.
         """, unsafe_allow_html=True)
