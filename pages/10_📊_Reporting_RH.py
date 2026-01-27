@@ -1113,78 +1113,15 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                     }))
         fig_candidats.update_layout(height=260, margin=dict(t=10, b=10, l=20, r=20))
         st.plotly_chart(fig_candidats, width="stretch")
-
     with col6:
-        # Taux de refus: lignes avec Date de désistement, promesse==1 ET refus==1
-        # Filtrer df_recrutement par entité/direction + année de désistement
-        df_kpi = df_recrutement.copy()
-        desist_col = 'Date de désistement'
-        
-        # Appliquer filtres entité/direction
-        if global_filters.get('entite') != 'Toutes':
-            df_kpi = df_kpi[df_kpi['Entité demandeuse'] == global_filters['entite']]
-        if global_filters.get('direction') != 'Toutes':
-            df_kpi = df_kpi[df_kpi['Direction concernée'] == global_filters['direction']]
-        
-        # Convertir et filtrer par année de désistement si période sélectionnée
-        if desist_col in df_kpi.columns:
-            df_kpi[desist_col] = pd.to_datetime(df_kpi[desist_col], errors='coerce')
-            df_kpi = df_kpi[df_kpi[desist_col].notna()]
-            df_kpi['Année_Désistement'] = df_kpi[desist_col].dt.year
-            
-            # Appliquer filtre période de recrutement comme année de désistement
-            periode = global_filters.get('periode_recrutement')
-            if periode != 'Toutes' and periode is not None:
-                df_kpi = df_kpi[df_kpi['Année_Désistement'] == int(periode)]
-        
-        res = compute_promise_refusal_rate_row(df_kpi)
-        taux_refus = res['rate'] if res['rate'] is not None else 0.0
-        numer = res['numerator']
-        denom = res['denominator']
-
+        # Indicateur de taux de refus laissé vide pour le moment
         st.markdown("<div style='font-family:Arial,sans-serif; font-size:18px; font-weight:700; color:#111111; text-align:left; margin:8px 0 4px 0;'>Taux de refus des promesses d'embauche (%)</div>", unsafe_allow_html=True)
-        fig_refus = go.Figure(go.Indicator(
-            mode='gauge+number',
-            value=round(taux_refus, 1),
-            number={'suffix':' %'},
-            gauge={'axis': {'range':[0,100], 'visible': True}, 'bar': {'color':'#d62728'}}
-        ))
+        # Graphique vide (aucune valeur, aucune légende complémentaire)
+        fig_refus = go.Figure()
         fig_refus.update_layout(height=280, margin=dict(t=20, b=20, l=20, r=20))
         st.plotly_chart(fig_refus, width='stretch')
-        periode_label = global_filters.get('periode_recrutement', 'Toutes')
-        st.caption(f"Numérateur (refus): {numer} | Dénominateur (promesses): {denom} | Année désistement: {periode_label}")
 
-    # Debug local pour l'onglet Recrutements Clôturés
-    st.markdown("---")
-    with st.expander("🔍 Debug - Détails des lignes (Recrutements Clôturés)", expanded=False):
-        try:
-            st.markdown("**Lignes contribuant aux graphiques avec calcul du délai:**")
-            df_debug_clo = df_filtered.copy()
-            # Colonnes source pour le délai
-            date_reception_col = 'Date de réception de la demande aprés validation de la DRH'
-            date_entree_col = "Date d'entrée effective du candidat"
-            # Formater les dates sans heure
-            if date_entree_col in df_debug_clo.columns:
-                df_debug_clo[date_entree_col] = pd.to_datetime(df_debug_clo[date_entree_col], errors='coerce').dt.strftime('%d/%m/%Y')
-            if date_reception_col in df_debug_clo.columns:
-                df_debug_clo['Date Réception'] = pd.to_datetime(df_debug_clo[date_reception_col], errors='coerce').dt.strftime('%d/%m/%Y')
-                # Calculer le délai en jours
-                date_rec = pd.to_datetime(df_filtered[date_reception_col], errors='coerce')
-                date_ent = pd.to_datetime(df_filtered[date_entree_col], errors='coerce')
-                df_debug_clo['Délai (jours)'] = (date_ent - date_rec).dt.days
-            cols_debug = ['Poste demandé', 'Entité demandeuse', 'Direction concernée', 'Date Réception', date_entree_col, 'Délai (jours)', 'Modalité de recrutement']
-            cols_available = [c for c in cols_debug if c in df_debug_clo.columns]
-            if cols_available:
-                st.dataframe(df_debug_clo[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
-            else:
-                st.dataframe(df_debug_clo.reset_index(drop=True), use_container_width=True, hide_index=True)
-        except Exception:
-            st.write("Aucune donnée disponible pour le debug.")
-
-    # ... KPI row now includes Délai moyen de recrutement (moved up)
-
-def create_demandes_recrutement_tab(df_recrutement, global_filters):
-    """Onglet Demandes de Recrutement avec style carte"""
+    # Appliquer les filtres globaux
     
     # Appliquer les filtres globaux
     df_filtered = apply_global_filters(df_recrutement, global_filters)
