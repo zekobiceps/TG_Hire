@@ -589,36 +589,6 @@ def create_global_filters(df_recrutement, prefix="", include_periode_recrutement
         # Ne pas afficher le sélecteur, s'assurer que la valeur reste 'Toutes'
         filters['periode_demande'] = 'Toutes'
 
-    # Filtre Période de désistement (basé sur Date de désistement)
-    # Recherche robuste du nom de colonne
-    with st.sidebar:
-        desist_col = None
-        try:
-            for c in df_recrutement.columns:
-                lc = str(c).lower()
-                if ('désist' in lc or 'desist' in lc) and 'date' in lc:
-                    desist_col = c
-                    break
-        except Exception:
-            desist_col = None
-        if desist_col:
-            try:
-                df_recrutement['Année_Désistement'] = pd.to_datetime(df_recrutement[desist_col], errors='coerce').dt.year
-                annees_des = sorted([int(y) for y in df_recrutement['Année_Désistement'].dropna().unique()])
-                if annees_des:
-                    filters['periode_desistement'] = st.selectbox(
-                        "Période de désistement",
-                        ['Toutes'] + annees_des,
-                        index=len(annees_des),
-                        key=f"{prefix}_periode_desist"
-                    )
-                else:
-                    filters['periode_desistement'] = 'Toutes'
-            except Exception:
-                filters['periode_desistement'] = 'Toutes'
-        else:
-            filters['periode_desistement'] = 'Toutes'
-
     return filters
 
 def apply_global_filters(df, filters):
@@ -638,9 +608,6 @@ def apply_global_filters(df, filters):
     # Appliquer le filtre période de la demande
     if filters.get('periode_demande') != 'Toutes' and 'Année_Demande' in df_filtered.columns:
         df_filtered = df_filtered[df_filtered['Année_Demande'] == filters['periode_demande']]
-    # Appliquer le filtre période de désistement
-    if filters.get('periode_desistement') != 'Toutes' and 'Année_Désistement' in df_filtered.columns:
-        df_filtered = df_filtered[df_filtered['Année_Désistement'] == filters['periode_desistement']]
     
     return df_filtered
 
@@ -1060,11 +1027,12 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         )
         fig_direction.update_traces(
             marker_color='grey',
-            textposition='auto',
+            textposition='inside',
             texttemplate='<b>%{x}</b>',
-            textfont=dict(size=15, color='white'),
+            textfont=dict(size=14, color='white'),
             textangle=0,  # Forcer l'orientation horizontale des valeurs
-            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
+            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>',
+            constraintext='none'
         )
         fig_direction.update_layout(
             height=300,
@@ -1073,13 +1041,10 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             margin=dict(l=160, t=48, b=30, r=20),
             xaxis=dict(tickangle=0),
             yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_direction['Label_display'][::-1])),
-            title=dict(text="<b>Comparaison par direction</b>", x=0, xanchor='left', font=TITLE_FONT)
+            title=dict(text="<b>Comparaison par direction</b>", x=0, xanchor='left', font=TITLE_FONT),
+            uniformtext=dict(minsize=10, mode='show')
         )
         fig_direction = apply_title_style(fig_direction)
-        try:
-            fig_direction.update_traces(textfont=dict(size=15, color='white'))
-        except Exception:
-            pass
         # Use a compact default visible area and allow scrolling when long
         render_plotly_scrollable(fig_direction, max_height=320)
 
@@ -1103,11 +1068,12 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         )
         fig_poste.update_traces(
             marker_color='grey',
-            textposition='auto',
+            textposition='inside',
             texttemplate='<b>%{x}</b>',
-            textfont=dict(size=15, color='white'),
+            textfont=dict(size=14, color='white'),
             textangle=0,  # Forcer l'orientation horizontale des valeurs
-            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
+            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>',
+            constraintext='none'
         )
         height_poste = max(320, 28 * len(df_poste))
         fig_poste.update_layout(
@@ -1117,13 +1083,10 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             margin=dict(l=160, t=48, b=30, r=20),
             xaxis=dict(tickangle=0),
             yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_poste['Label_display'][::-1])),
-            title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT)
+            title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT),
+            uniformtext=dict(minsize=10, mode='show')
         )
         fig_poste = apply_title_style(fig_poste)
-        try:
-            fig_poste.update_traces(textfont=dict(size=15, color='white'))
-        except Exception:
-            pass
         render_plotly_scrollable(fig_poste, max_height=320)
 
 
@@ -1152,49 +1115,32 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         st.plotly_chart(fig_candidats, width="stretch")
 
     with col6:
-        # Taux de refus des promesses d'embauche selon la règle métier:
-        # une ligne est refus si promesse réalisée == 1 ET refus == 1 ;
-        # dénominateur = lignes où promesse réalisée == 1.
-        # IMPORTANT: le périmètre TEMPOREL doit suivre l'année de DÉSISTEMENT,
-        # pas les périodes Demande/Recrutement. On reconstitue donc un dataframe
-        # dédié au KPI basé sur entité/direction + année de désistement uniquement.
-
+        # Taux de refus: lignes avec Date de désistement, promesse==1 ET refus==1
+        # Filtrer df_recrutement par entité/direction + année de désistement
         df_kpi = df_recrutement.copy()
-        # Appliquer entité/direction si présents
-        try:
-            ent = global_filters.get('entite')
-            if ent and ent != 'Toutes' and 'Entité demandeuse' in df_kpi.columns:
-                df_kpi = df_kpi[df_kpi['Entité demandeuse'] == ent]
-        except Exception:
-            pass
-        try:
-            direc = global_filters.get('direction')
-            if direc and direc != 'Toutes' and 'Direction concernée' in df_kpi.columns:
-                df_kpi = df_kpi[df_kpi['Direction concernée'] == direc]
-        except Exception:
-            pass
-
-        # Déterminer la colonne de désistement et dériver l'année si besoin
-        desist_col = next((c for c in df_kpi.columns if 'date' in c.lower() and ('désist' in c.lower() or 'desist' in c.lower())), None)
-        if desist_col:
-            if 'Année_Désistement' not in df_kpi.columns:
-                try:
-                    df_kpi['Année_Désistement'] = pd.to_datetime(df_kpi[desist_col], errors='coerce').dt.year
-                except Exception:
-                    df_kpi['Année_Désistement'] = np.nan
-            # Appliquer uniquement le filtre Année Désistement s'il est choisi
-            an_des = global_filters.get('periode_desistement')
-            if an_des and an_des != 'Toutes':
-                df_kpi = df_kpi[df_kpi['Année_Désistement'] == an_des]
-
-        # Calcul du taux sur df_kpi (pas df_filtered)
-        res = compute_promise_refusal_rate_row(
-            df_kpi,
-            col_prom="Nb de promesses d'embauche réalisée",
-            col_refus="Nb de refus aux promesses d'embauches",
-            fallback_search=True
-        )
-        taux_refus = 0.0 if res.get('rate') is None else float(res['rate'])
+        desist_col = 'Date de désistement'
+        
+        # Appliquer filtres entité/direction
+        if global_filters.get('entite') != 'Toutes':
+            df_kpi = df_kpi[df_kpi['Entité demandeuse'] == global_filters['entite']]
+        if global_filters.get('direction') != 'Toutes':
+            df_kpi = df_kpi[df_kpi['Direction concernée'] == global_filters['direction']]
+        
+        # Convertir et filtrer par année de désistement si période sélectionnée
+        if desist_col in df_kpi.columns:
+            df_kpi[desist_col] = pd.to_datetime(df_kpi[desist_col], errors='coerce')
+            df_kpi = df_kpi[df_kpi[desist_col].notna()]
+            df_kpi['Année_Désistement'] = df_kpi[desist_col].dt.year
+            
+            # Appliquer filtre période de recrutement comme année de désistement
+            periode = global_filters.get('periode_recrutement')
+            if periode != 'Toutes' and periode is not None:
+                df_kpi = df_kpi[df_kpi['Année_Désistement'] == int(periode)]
+        
+        res = compute_promise_refusal_rate_row(df_kpi)
+        taux_refus = res['rate'] if res['rate'] is not None else 0.0
+        numer = res['numerator']
+        denom = res['denominator']
 
         st.markdown("<div style='font-family:Arial,sans-serif; font-size:18px; font-weight:700; color:#111111; text-align:left; margin:8px 0 4px 0;'>Taux de refus des promesses d'embauche (%)</div>", unsafe_allow_html=True)
         fig_refus = go.Figure(go.Indicator(
@@ -1205,17 +1151,8 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         ))
         fig_refus.update_layout(height=280, margin=dict(t=20, b=20, l=20, r=20))
         st.plotly_chart(fig_refus, width='stretch')
-        # Info complémentaire (numérateur/dénominateur)
-        st.caption(f"Refus: {res.get('numerator', 0)} / Promesses réalisées: {res.get('denominator', 0)}")
-        # Année de désistement (dérivée de la colonne 'Date de désistement')
-        try:
-            if desist_col:
-                s = pd.to_datetime(df_kpi[desist_col], errors='coerce')
-                years = [int(y) for y in s.dt.year.dropna().unique()]
-                if years:
-                    st.caption(f"Années avec désistement détectées (depuis la colonne '{desist_col}') : {', '.join(str(y) for y in sorted(years))}")
-        except Exception:
-            pass
+        periode_label = global_filters.get('periode_recrutement', 'Toutes')
+        st.caption(f"Numérateur (refus): {numer} | Dénominateur (promesses): {denom} | Année désistement: {periode_label}")
 
     # Debug local pour l'onglet Recrutements Clôturés
     st.markdown("---")
@@ -1291,7 +1228,15 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         fig_statut.update_layout(
             title=dict(text="Répartition par statut de la demande", x=0, xanchor='left', font=TITLE_FONT),
             height=380,
-            legend=dict(orientation="h", yanchor="bottom", y=-0.45, xanchor="center", x=0.5, font=dict(size=13))
+            legend=dict(
+                orientation="v", 
+                yanchor="middle", 
+                y=0.5, 
+                xanchor="left", 
+                x=1.0,
+                font=dict(size=13)
+            ),
+            margin=dict(l=20, r=140, t=60, b=20)
         )
         fig_statut = apply_title_style(fig_statut)
         st.plotly_chart(fig_statut, width="stretch")
@@ -1311,17 +1256,21 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             )
             fig_raison.update_traces(
                 marker_color='grey', 
-                textposition='auto',
+                textposition='inside',
                 texttemplate='<b>%{y}</b>',
-                textfont=dict(size=15, color='white'),
-                hovertemplate='%{y}<extra></extra>'
+                textfont=dict(size=14, color='white'),
+                hovertemplate='%{y}<extra></extra>',
+                constraintext='none'
             )
             fig_raison.update_layout(
-                height=300, 
+                height=380, 
                 xaxis_title=None, 
                 yaxis_title=None,
                 xaxis={'categoryorder':'total descending'},
-                title=dict(text="<b>Comparaison par raison du recrutement</b>", x=0, xanchor='left', font=TITLE_FONT)
+                yaxis=dict(range=[0, None]),
+                margin=dict(l=20, r=20, t=48, b=80),
+                title=dict(text="<b>Comparaison par raison du recrutement</b>", x=0, xanchor='left', font=TITLE_FONT),
+                uniformtext=dict(minsize=10, mode='show')
             )
             fig_raison = apply_title_style(fig_raison)
             st.plotly_chart(fig_raison, width="stretch")
@@ -1424,11 +1373,12 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
         )
         fig_poste.update_traces(
             marker_color='grey',
-            textposition='auto',
+            textposition='inside',
             texttemplate='<b>%{x}</b>',
-            textfont=dict(size=15, color='white'),
+            textfont=dict(size=14, color='white'),
             textangle=0, # Orientation horizontale des valeurs
-            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
+            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>',
+            constraintext='none'
         )
         height_poste = max(320, 28 * len(df_poste))
         category_array_poste = list(df_poste['Label_display'][::-1])
@@ -1439,7 +1389,8 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             margin=dict(l=160, t=48, b=30, r=20),
             xaxis=dict(tickangle=0),
             yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_poste),
-            title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT)
+            title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT),
+            uniformtext=dict(minsize=10, mode='show')
         )
         render_plotly_scrollable(fig_poste, max_height=320)
 
@@ -1557,22 +1508,27 @@ def create_integrations_tab(df_recrutement, global_filters):
             monthly_integration = df_filtered.groupby('Mois_Integration').size().reset_index(name='Count')
             # Convertir en nom de mois seulement (ex: "Janvier", "Février")
             monthly_integration['Mois_str'] = monthly_integration['Mois_Integration'].dt.strftime('%B').str.capitalize()
+            # Ajouter une marge de +3 sur l'axe Y pour éviter la coupure des labels
+            y_max = int(monthly_integration['Count'].max()) if not monthly_integration.empty else 0
             
             fig_evolution_int = px.bar(
                 monthly_integration, 
                 x='Mois_str', 
                 y='Count',
                 title="📈 Évolution des Intégrations Prévues",
-                text='Count'
+                text='Count',
+                range_y=[0, y_max + 3]
             )
             fig_evolution_int.update_traces(
                 marker_color='#2ca02c', 
-                textposition='inside',
+                textposition='outside',
                 texttemplate='<b>%{y}</b>',
-                textfont=dict(size=15, color='white'),
+                textfont=dict(size=14, color='#333333'),
+                textangle=0,
+                cliponaxis=False,
                 hovertemplate='%{y}<extra></extra>'
             )
-            fig_evolution_int.update_layout(height=400, xaxis_title="Mois", yaxis_title="Nombre")
+            fig_evolution_int.update_layout(height=400, xaxis_title="Mois", yaxis_title="Nombre", margin=dict(t=60, b=40))
             st.plotly_chart(fig_evolution_int, width="stretch")
     
     # Tableau détaillé des intégrations
@@ -1587,7 +1543,8 @@ def create_integrations_tab(df_recrutement, global_filters):
         'Entité demandeuse',
         'Affectation',
         date_integration_col,
-        plan_integration_col
+        plan_integration_col,
+        'Commentaire'
     ]
     # Filtrer les colonnes qui existent
     colonnes_disponibles = [col for col in colonnes_affichage if col in df_filtered.columns]
@@ -1669,6 +1626,14 @@ def create_integrations_tab(df_recrutement, global_filters):
             color: #2c3e50;
             text-align: left !important;
             padding-left: 15px !important;
+        }
+        /* Réduire légèrement la largeur de la colonne Commentaire (dernière colonne) */
+        .int-custom-table th:last-child,
+        .int-custom-table td:last-child {
+            min-width: 120px;
+            max-width: 200px;
+            white-space: normal;
+            word-wrap: break-word;
         }
         </style>
         """, unsafe_allow_html=True)
@@ -1787,7 +1752,6 @@ def create_demandes_recrutement_combined_tab(df_recrutement):
         'entite': shared_filters.get('entite', 'Toutes'),
         'direction': shared_filters.get('direction', 'Toutes'),
         'periode_demande': shared_filters.get('periode_demande', 'Toutes'),
-        'periode_desistement': shared_filters.get('periode_desistement', 'Toutes'),
         # Ne pas filtrer par période de recrutement dans la section Demandes
         'periode_recrutement': 'Toutes'
     }
@@ -1796,7 +1760,6 @@ def create_demandes_recrutement_combined_tab(df_recrutement):
         'entite': shared_filters.get('entite', 'Toutes'),
         'direction': shared_filters.get('direction', 'Toutes'),
         'periode_recrutement': shared_filters.get('periode_recrutement', 'Toutes'),
-        'periode_desistement': shared_filters.get('periode_desistement', 'Toutes'),
         # Ne pas filtrer par période de demande dans la section Clôtures
         'periode_demande': 'Toutes'
     }
@@ -2333,7 +2296,9 @@ def create_weekly_report_tab(df_recrutement=None):
 
                     # Construire le HTML du tableau
                     html_rec = '<div class="table-container" style="margin-top:8px;">'
-                    html_rec += '<table class="custom-table" style="width:60%; margin:0;">'
+                    # Styles spécifiques pour réduire les colonnes 'Nouvelle demande' (2e) et 'Signature DRH' (5e)
+                    html_rec += '<style>.rec-table th:nth-child(2), .rec-table td:nth-child(2){width:60px;} .rec-table th:nth-child(5), .rec-table td:nth-child(5){width:60px;}</style>'
+                    html_rec += '<table class="custom-table rec-table" style="width:60%; margin:0;">'
                     # Header
                     html_rec += '<thead><tr><th>Recruteur</th>'
                     for s in wanted_statuses:
@@ -2372,51 +2337,6 @@ def create_weekly_report_tab(df_recrutement=None):
                             st.write(f"Erreur debug: {e}")
         except Exception:
             pass
-    else:
-        # Affichage par défaut si pas de metrics (avec logos pour démo)
-        logos_dict = load_all_logos_b64()
-        tgcc_logo = get_entity_display_html_with_logo('TGCC', logos_dict)
-        tgem_logo = get_entity_display_html_with_logo('TGEM', logos_dict)
-        
-        default_html = f"""
-<div class="table-container">
-    <table class="custom-table">
-        <thead>
-            <tr>
-                <th>Entité</th>
-                <th>Nb postes ouverts avant début semaine</th>
-                <th>Nb nouveaux postes ouverts cette semaine</th>
-                <th>Nb postes pourvus cette semaine</th>
-                <th>Nb postes en cours cette semaine</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td class="entity-cell">{tgcc_logo}</td>
-                <td>19</td>
-                <td>12</td>
-                <td>5</td>
-                <td>26</td>
-            </tr>
-            <tr>
-                <td class="entity-cell">{tgem_logo}</td>
-                <td>2</td>
-                <td>2</td>
-                <td>0</td>
-                <td>4</td>
-            </tr>
-            <tr class="total-row">
-                <td class="entity-cell">TOTAL</td>
-                <td>21</td>
-                <td>14</td>
-                <td>5</td>
-                <td>30</td>
-            </tr>
-        </tbody>
-    </table>
-</div>
-"""
-        st.markdown(default_html, unsafe_allow_html=True)
 
     # Section Debug (expandable): montrer les lignes et pourquoi elles sont comptées
     with st.expander("🔍 Debug - Détails des lignes", expanded=False):
@@ -2804,15 +2724,6 @@ def create_weekly_report_tab(df_recrutement=None):
             accept_date = r.get(accept_date_col) if accept_date_col else None
             # Ajout de la date de désistement pour le filtrage "Désistement"
             desistement_date = r.get(desistement_date_col) if desistement_date_col else None
-            # Extraire l'année du désistement si disponible
-            annee_desistement = None
-            if desistement_date is not None and str(desistement_date).strip() != "":
-                try:
-                    _dt = pd.to_datetime(desistement_date, errors='coerce')
-                    if pd.notna(_dt):
-                        annee_desistement = int(_dt.year)
-                except Exception:
-                    annee_desistement = None
             postes_data.append({
                 'statut': canon,
                 'titre': titre or '',
@@ -2822,8 +2733,7 @@ def create_weekly_report_tab(df_recrutement=None):
                 'recruteur': str(r.get(recruteur_col, '')).replace('nan', '') if recruteur_col else '',
                 'commentaire': r.get(commentaire_col, '') if commentaire_col else '',
                 'date_acceptation': accept_date,
-                'date_desistement': desistement_date,
-                'annee_desistement': annee_desistement
+                'date_desistement': desistement_date
             })
     
     # Afficher le titre avec le nombre total de cartes
@@ -2946,17 +2856,12 @@ def create_weekly_report_tab(df_recrutement=None):
             for poste in postes_in_col[row_start:row_start+max_cards_per_row]:
                 commentaire = poste.get('commentaire', '')
                 commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
-                # Afficher l'année de désistement sur les cartes de statut 'Désistement'
-                annee_html = ""
-                if poste.get('statut') == 'Désistement' and poste.get('annee_desistement'):
-                    annee_html = f"<p style='margin-top: 4px; color: #333;'>📅 Année désistement: {poste.get('annee_desistement')}</p>"
                 titre_fmt = smart_wrap_title(poste.get('titre', ''))
                 card_div = f"""<div class="kanban-card">
 <h4><b>{titre_fmt}</b></h4>
 <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
 <p>👤 {poste.get('demandeur', 'N/A')}</p>
 <p>✍️ {poste.get('recruteur', 'N/A')}</p>
-{annee_html}
 {commentaire_html}
 </div>"""
                 cards_html += card_div
@@ -2975,7 +2880,7 @@ def create_weekly_report_tab(df_recrutement=None):
                 for s in statuts_kanban_display:
                     df_kanban_debug[f'contrib_{s}'] = df_kanban_debug['statut'] == s
                 # Afficher colonnes pertinentes
-                cols_show = ['titre', 'entite', 'lieu', 'recruteur', 'statut', 'date_desistement', 'annee_desistement'] + [f'contrib_{s}' for s in statuts_kanban_display]
+                cols_show = ['titre', 'entite', 'lieu', 'recruteur', 'statut'] + [f'contrib_{s}' for s in statuts_kanban_display]
                 cols_available = [c for c in cols_show if c in df_kanban_debug.columns]
                 st.dataframe(df_kanban_debug[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
             else:
@@ -4172,8 +4077,10 @@ def generate_demandes_recrutement_html_image(df_recrutement):
             if 'Raison du recrutement' in df.columns:
                 raison_counts = df['Raison du recrutement'].value_counts()
                 df_raison = raison_counts.rename_axis('Raison').reset_index(name='Count')
-                fig_raison = px.bar(df_raison, x='Raison', y='Count', title="Raison du recrutement", text='Count')
-                fig_raison.update_traces(marker_color='grey', textposition='outside')
+                # Ajouter un headroom Y (+3) pour éviter que les valeurs 'outside' soient coupées
+                y_max = int(df_raison['Count'].max()) if not df_raison.empty else 0
+                fig_raison = px.bar(df_raison, x='Raison', y='Count', title="Raison du recrutement", text='Count', range_y=[0, y_max + 3])
+                fig_raison.update_traces(marker_color='grey', textposition='outside', cliponaxis=False)
                 fig_raison.update_layout(height=320, margin=dict(l=20,r=20,t=40,b=10), xaxis_title=None, yaxis_title=None)
                 figs_row1.append(fig_raison)
         except Exception:
@@ -4188,8 +4095,9 @@ def generate_demandes_recrutement_html_image(df_recrutement):
                     all_months = pd.date_range(start=monthly.index.min(), end=monthly.index.max(), freq='MS')
                     monthly = monthly.reindex(all_months, fill_value=0).reset_index().rename(columns={'index':'Mois'})
                     monthly['Label'] = monthly['Mois'].dt.strftime('%b %Y')
-                    fig_evo = px.bar(monthly, x='Label', y='Count', title="Évolution des demandes", text='Count')
-                    fig_evo.update_traces(marker_color='#1f77b4', textposition='outside')
+                    y_max = int(monthly['Count'].max()) if not monthly.empty else 0
+                    fig_evo = px.bar(monthly, x='Label', y='Count', title="Évolution des demandes", text='Count', range_y=[0, y_max + 3])
+                    fig_evo.update_traces(marker_color='#1f77b4', textposition='outside', cliponaxis=False)
                     fig_evo.update_layout(height=320, margin=dict(l=20,r=20,t=40,b=10), xaxis_title=None, yaxis_title=None)
                     figs_row1[-1] = fig_evo
             except Exception:
@@ -4259,8 +4167,9 @@ def generate_recrutements_clotures_html_image(df_recrutement):
             series = s.dt.to_period('M').value_counts().sort_index()
             monthly = series.rename_axis('Mois').reset_index(name='Count')
             monthly['Label'] = monthly['Mois'].astype(str)
-            fig_evo = px.bar(monthly, x='Label', y='Count', title="Évolution des recrutements", text='Count')
-            fig_evo.update_traces(marker_color='#1f77b4', textposition='outside')
+            y_max = int(monthly['Count'].max()) if not monthly.empty else 0
+            fig_evo = px.bar(monthly, x='Label', y='Count', title="Évolution des recrutements", text='Count', range_y=[0, y_max + 3])
+            fig_evo.update_traces(marker_color='#1f77b4', textposition='outside', cliponaxis=False)
             fig_evo.update_layout(height=320, margin=dict(l=20,r=20,t=40,b=10), xaxis_title=None, yaxis_title=None)
             figs_row1.append(fig_evo)
     except Exception:
@@ -4353,8 +4262,10 @@ def generate_integrations_html_image(df_recrutement):
             s = pd.to_datetime(df[date_integration_col], errors='coerce')
             monthly = s.dt.to_period('M').value_counts().sort_index().rename_axis('Mois').reset_index(name='Count')
             monthly['Label'] = monthly['Mois'].astype(str)
-            fig_month = px.bar(monthly, x='Label', y='Count', title="Évolution des Intégrations Prévues", text='Count')
-            fig_month.update_traces(marker_color='#2ca02c', textposition='outside')
+            # Conserver les valeurs d'origine mais ajouter une marge Y de +3 pour éviter la coupure
+            y_max = int(monthly['Count'].max()) if not monthly.empty else 0
+            fig_month = px.bar(monthly, x='Label', y='Count', title="Évolution des Intégrations Prévues", text='Count', range_y=[0, y_max + 3])
+            fig_month.update_traces(marker_color='#2ca02c', textposition='outside', cliponaxis=False)
             fig_month.update_layout(height=360, margin=dict(l=20,r=20,t=40,b=10), xaxis_title=None, yaxis_title=None)
             figs_row1.append(fig_month)
     except Exception:
@@ -5072,7 +4983,7 @@ def main():
         st.subheader("Comment générer le reporting ?")
         st.markdown("""
         1.  **Chargement des Données** : 
-            *   Allez dans l'onglet **"📂 Upload & Téléchargement"**.
+            *   Allez dans l'onglet **"📂 Upload & Téléchar"**.
             *   **Option A** : Cliquez sur le bouton rouge **"🔁 Synchroniser depuis Google Sheets"** pour récupérer les données les plus récentes.
             *   **Option B** : Glissez-déposez votre fichier Excel de recrutement dans la zone de chargement.
         2.  **Actualisation** : 
