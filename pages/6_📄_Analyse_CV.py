@@ -7,6 +7,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import time
 import re
+import os
 from datetime import datetime
 from typing import cast
 import plotly.graph_objects as go
@@ -610,6 +611,118 @@ def get_deepseek_analysis(text):
     except Exception as e:
         return f"Erreur IA : {e}"
 
+
+def get_deepseek_auto_classification(text: str, full_name: str | None) -> dict:
+    """Classe un CV dans une macro-catégorie + sous-catégorie et génère un récap profil.
+
+    Retourne un dict avec les clés:
+    - macro_category: "Fonctions supports" | "Logistique" | "Production/Technique" | "Non classé"
+    - sub_category: sous-direction ou sous-filière (ex: "Direction Finance", "BTP / Génie Civil")
+    - profile_summary: court texte de synthèse commençant par le nom complet.
+    """
+    API_KEY = get_api_key()
+    safe_name = (full_name or "Candidat").strip()
+    if not API_KEY:
+        return {
+            "macro_category": "Non classé",
+            "sub_category": "Autre",
+            "profile_summary": f"{safe_name} : récapitulatif non disponible (clé API manquante).",
+        }
+
+    url = "https://api.deepseek.com/v1/chat/completions"
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
+    prompt = f"""
+    Tu es un expert en recrutement. À partir du texte du CV ci-dessous, tu dois :
+
+    1. Identifier UNE seule macro-catégorie parmi :
+       - "Fonctions supports"
+       - "Logistique"
+       - "Production/Technique"
+
+    2. Proposer une sous-catégorie cohérente avec la typologie suivante :
+       • Fonctions supports :
+         - Direction RH : Recrutement, paie, formation, relations sociales.
+         - Direction Finance : Comptabilité, trésorerie, fiscalité, audit.
+         - Contrôle de Gestion : Analyse de la performance, budgets.
+         - Direction des Achats : Sourcing, négociation, approvisionnements.
+         - Direction Logistique : Gestion des flux, transport, entreposage.
+         - Direction Informatique (DSI) : Infrastructure, support, cybersécurité.
+         - QHSE : Normes ISO, sécurité au travail, environnement.
+         - Direction Juridique : Conformité, contrats.
+         - Communication / Marketing : Image de marque, digital.
+
+       • Logistique :
+         - Gestion des flux, transport, entrepôts, distribution, supply chain.
+
+       • Production/Technique :
+         - BTP / Génie Civil : Études de prix, conduite de travaux.
+         - Industrie : Production, ligne d'assemblage, usinage, électromécanique, automatisme.
+         - R&D / Bureau d'études : Conception, ingénierie.
+         - Commercial / Vente : Développement du chiffre d'affaires lié à une offre technique ou industrielle.
+
+    3. Générer un court récap de profil dans le style des exemples suivants :
+       - "Eladis SA (Actuel) / 10 ans d'expérience en comptabilité et audit. Expert en cash management, audit et conformité fiscale.\n   Profil orienté contrôle et rigueur, idéal pour la fiabilisation des reporting et la sécurisation quotidienne des flux monétaires du holding."
+       - "Experte de la gestion multi-entités, du reporting de performance et de la mise en place de procédures.\n   Profil polyvalent maîtrisant le cycle complet (Finance, Fiscal, RH) et apte à sécuriser le cadre juridique et opérationnel du Family Office."
+
+    Contraintes IMPORTANTES :
+    - Tu renverras UNIQUEMENT un JSON strict de la forme :
+      {{"macro_category": "...", "sub_category": "...", "profile_summary": "..."}}
+    - "macro_category" doit être EXACTEMENT l'une de : "Fonctions supports", "Logistique", "Production/Technique".
+    - "sub_category" doit être une des sous-catégories cohérentes ci-dessus (ou "Autre" si vraiment nécessaire).
+    - Le champ "profile_summary" DOIT commencer EXACTEMENT par le nom suivant : "{safe_name}" puis un bref résumé sur 1 à 3 phrases.
+    - N'ajoute AUCUN texte avant ou après le JSON.
+
+    Texte du CV :
+    {text}
+    """
+
+    payload = {
+        "model": "deepseek-chat",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.2,
+    }
+
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response.raise_for_status()
+        content = response.json()["choices"][0]["message"]["content"].strip()
+
+        # Essayer de parser directement le JSON
+        try:
+            data = json.loads(content)
+        except Exception:
+            # Tenter d'extraire un bloc JSON au milieu du texte
+            start = content.find("{")
+            end = content.rfind("}")
+            if start != -1 and end != -1 and end > start:
+                data = json.loads(content[start : end + 1])
+            else:
+                raise
+
+        macro = data.get("macro_category") or "Non classé"
+        sub = data.get("sub_category") or "Autre"
+        summary = data.get("profile_summary") or f"{safe_name} : récapitulatif non disponible."
+
+        # Nettoyage minimal
+        if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]:
+            macro = "Non classé"
+
+        if not summary.startswith(safe_name):
+            summary = f"{safe_name} - {summary}"
+
+        return {
+            "macro_category": macro,
+            "sub_category": sub,
+            "profile_summary": summary,
+        }
+
+    except Exception:
+        return {
+            "macro_category": "Non classé",
+            "sub_category": "Autre",
+            "profile_summary": f"{safe_name} : récapitulatif non disponible (erreur IA).",
+        }
+
 # -------------------- Extraction de noms des CV --------------------
 def extract_name_from_cv_text(text):
     """
@@ -815,13 +928,14 @@ def create_organized_zip(results, file_list):
                     # Ajouter au ZIP
                     zip_file.writestr(file_path_in_zip, file_content)
                     
-                    # Ajouter au manifest
+                    # Ajouter au manifest (une colonne par champ + récap profil)
                     manifest_data.append({
                         'fichier_original': original_name,
                         'nouveau_nom': final_name,
                         'categorie': category,
                         'confiance_extraction': confidence,
                         'methode_extraction': method,
+                        'recap_profil': result.get('profile_summary', ''),
                         'dossier': folder.rstrip('/')
                     })
                 except Exception as e:
@@ -1578,7 +1692,7 @@ with tab5:
         )
         
         # Bouton de classification primaire
-        if st.button('📂 Lancer l\'auto-classification', type='primary'):
+        if st.button('📂 Lancer l'auto-classification', type='primary'):
             # Réinitialiser les analyses DeepSeek lors d'une nouvelle classification
             st.session_state.deepseek_analyses = []
             
@@ -1600,25 +1714,33 @@ with tab5:
                     except Exception:
                         text = ''
 
-                    # Classification principale 100% via IA DeepSeek
+                    # Extraction du nom (toujours, pour les récap profils)
+                    extracted_name_info = extract_name_from_cv_text(text) if text else None
+                    if extracted_name_info and extracted_name_info.get('name'):
+                        display_name = extracted_name_info['name']
+                    else:
+                        display_name = os.path.splitext(name)[0]
+
+                    # Classification principale 100% via IA DeepSeek (macro + sous-cat + récap)
                     text_for_ai = (text or '')[:3000]
-                    cat = get_deepseek_analysis(text_for_ai)
-                    
-                    # Extraction du nom si l'option est cochée
-                    extracted_name_info = None
-                    if rename_and_organize and text:
-                        extracted_name_info = extract_name_from_cv_text(text)
-                    
+                    classification = get_deepseek_auto_classification(text_for_ai, display_name)
+                    cat = classification.get('macro_category', 'Non classé')
+                    sub_cat = classification.get('sub_category', 'Autre')
+                    profile_summary = classification.get('profile_summary', '')
+
                     result_item = {
-                        'file': name, 
-                        'category': cat, 
+                        'file': name,
+                        'category': cat,
+                        'sub_category': sub_cat,
+                        'profile_summary': profile_summary,
                         'text_snippet': (text or '')[:800],
                         'full_text': text  # Garder le texte complet pour le ZIP
                     }
-                    
-                    if rename_and_organize:
+
+                    # Conserver l'info de nom extrait pour le ZIP si demandé
+                    if extracted_name_info:
                         result_item['extracted_name'] = extracted_name_info
-                    
+
                     results.append(result_item)
                     progress.progress((i+1)/total)
 
@@ -1650,22 +1772,41 @@ with tab5:
             st.success(f"✅ Traitement terminé : {num_total} CV(s) traité(s), dont {num_classified} ({percent_classified}%) classé(s) et {num_unclassified} ({percent_unclassified}%) non classé(s).")
             
             # Utiliser le DataFrame pour l'affichage
-            display_df = df
-                
-            # Affichage en 3 colonnes
+            display_df = df.copy()
+
+            # Préparer un nom d'affichage par ligne (nom extrait si dispo, sinon nom de fichier sans extension)
+            def _get_display_name_for_row(row):
+                extracted = row.get('extracted_name')
+                if isinstance(extracted, dict) and extracted.get('name'):
+                    return extracted['name']
+                return os.path.splitext(row['file'])[0]
+
+            display_df['display_name'] = display_df.apply(_get_display_name_for_row, axis=1)
+
+            # Affichage en 3 colonnes avec onglets par sous-catégorie
             cols = st.columns(3)
             cats = ['Fonctions supports', 'Logistique', 'Production/Technique']
-            for idx, c in enumerate(cats):
+            for idx, cat_label in enumerate(cats):
                 with cols[idx]:
-                    st.subheader(c)
-                    sub = display_df[display_df['category'] == c]
-                    if sub.empty:
+                    st.subheader(cat_label)
+                    sub_df = display_df[display_df['category'] == cat_label]
+                    if sub_df.empty:
                         st.write('Aucun CV classé ici.')
                     else:
-                        # Afficher nom + extrait
-                        for _, r in sub.iterrows():
-                            with st.expander(r['file']):
-                                st.write(r['text_snippet'])
+                        # Regrouper par sous-catégorie (sous-direction / sous-filière)
+                        sub_df = sub_df.copy()
+                        sub_df['sub_category'] = sub_df.get('sub_category', 'Autre').fillna('Autre')
+                        subcats = sorted(sub_df['sub_category'].unique())
+                        tabs = st.tabs(subcats)
+                        for tab_obj, subcat in zip(tabs, subcats):
+                            with tab_obj:
+                                st.markdown(f"**{subcat}**")
+                                filtered = sub_df[sub_df['sub_category'] == subcat]
+                                for _, r in filtered.iterrows():
+                                    card_title = r['display_name']
+                                    recap = r.get('profile_summary') or r.get('text_snippet') or ''
+                                    with st.expander(card_title):
+                                        st.markdown(recap)
 
             # Non classés
             nc = df[df['category'] == 'Non classé']
