@@ -1843,6 +1843,7 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
 def get_average_feedback_score(analysis_method=None):
     """
     Récupère le score moyen de feedback pour une méthode donnée ou pour toutes les méthodes.
+    Lit depuis Google Sheets en priorité, puis fallback sur le fichier local.
     
     Args:
         analysis_method: Méthode d'analyse spécifique (ou None pour toutes les méthodes)
@@ -1850,22 +1851,51 @@ def get_average_feedback_score(analysis_method=None):
     Returns:
         Score moyen et nombre d'évaluations
     """
-    if not os.path.exists(FEEDBACK_DATA_PATH):
+    # Essayer d'abord de lire depuis Google Sheets
+    feedback_data = []
+    try:
+        if GSPREAD_AVAILABLE:
+            gc = get_feedback_gsheet_client()
+            if gc:
+                sh = gc.open_by_url(FEEDBACK_GSHEET_URL)
+                try:
+                    worksheet = sh.worksheet(FEEDBACK_GSHEET_NAME)
+                    records = worksheet.get_all_records()
+                    feedback_data = records
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    
+    # Fallback sur le fichier local si Google Sheets ne fonctionne pas
+    if not feedback_data and os.path.exists(FEEDBACK_DATA_PATH):
+        try:
+            with open(FEEDBACK_DATA_PATH, 'r', encoding='utf-8') as f:
+                feedback_data = json.load(f)
+        except Exception:
+            pass
+    
+    if not feedback_data:
         return 0, 0
     
     try:
-        with open(FEEDBACK_DATA_PATH, 'r', encoding='utf-8') as f:
-            feedback_data = json.load(f)
-        
         if analysis_method:
-            relevant_feedback = [f for f in feedback_data if f["analysis_method"] == analysis_method]
+            relevant_feedback = [f for f in feedback_data if f.get("analysis_method") == analysis_method]
         else:
             relevant_feedback = feedback_data
         
         if not relevant_feedback:
             return 0, 0
         
-        total_score = sum(f["feedback_score"] for f in relevant_feedback)
+        total_score = 0
+        for f in relevant_feedback:
+            try:
+                score = f.get("feedback_score", 0)
+                if isinstance(score, str):
+                    score = float(score) if score else 0
+                total_score += score
+            except (ValueError, TypeError):
+                pass
         return total_score / len(relevant_feedback), len(relevant_feedback)
     
     except Exception as e:

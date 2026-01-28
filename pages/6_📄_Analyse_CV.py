@@ -556,6 +556,67 @@ def rank_resumes_with_ai(job_description, resumes, file_names):
         scores_data.append(get_detailed_score_with_ai(job_description, resume_text))
     return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
 
+
+def get_deepseek_profile_analysis(text: str) -> str:
+    """
+    Génère une analyse de profil générique et concise en français.
+    Retourne un texte structuré avec les points clés du candidat.
+    """
+    API_KEY = get_api_key()
+    if not API_KEY:
+        return "❌ Analyse impossible (clé API manquante)."
+    
+    url = "https://api.deepseek.com/v1/chat/completions"
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
+    
+    prompt = f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
+
+**Format de sortie obligatoire** (utilise exactement ces titres en gras) :
+
+**🎓 Formation**
+- [Diplôme le plus élevé et établissement - 1 ligne max]
+
+**💼 Expérience**  
+- [Nombre d'années d'expérience totale]
+- [Dernier poste occupé et entreprise - 1 ligne]
+- [Secteur(s) d'activité principal/aux]
+
+**🛠️ Compétences clés**
+- [Liste de 4-5 compétences techniques principales, séparées par des virgules]
+
+**💡 Points forts**
+- [2-3 points forts principaux, en une phrase chacun maximum]
+
+**⚠️ Points d'attention**
+- [1-2 éléments à approfondir lors de l'entretien]
+
+**📊 Synthèse**
+[Une phrase de conclusion sur le type de profil : junior/confirmé/senior, spécialiste/généraliste, etc.]
+
+Contraintes :
+- Sois factuel et concis (pas de phrases de politesse)
+- Si une information n'est pas dans le CV, écris "Non précisé"
+- Utilise des bullet points
+- Maximum 15 lignes au total
+
+Texte du CV :
+{text[:4000]}
+"""
+    
+    payload = {
+        "model": "deepseek-chat",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.2,
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        return f"❌ Erreur lors de l'analyse : {e}"
+
+
 def get_deepseek_analysis(text):
     API_KEY = get_api_key()
     if not API_KEY: return "Analyse impossible."
@@ -613,11 +674,12 @@ def get_deepseek_analysis(text):
 
 
 def get_deepseek_auto_classification(text: str, full_name: str | None) -> dict:
-    """Classe un CV dans une macro-catégorie + sous-catégorie et génère un récap profil.
+    """Classe un CV dans une macro-catégorie + sous-catégorie et génère un récap profil avec années d'expérience.
 
     Retourne un dict avec les clés:
     - macro_category: "Fonctions supports" | "Logistique" | "Production/Technique" | "Non classé"
     - sub_category: sous-direction ou sous-filière (ex: "Direction Finance", "BTP / Génie Civil")
+    - years_experience: nombre d'années d'expérience estimé
     - profile_summary: court texte de synthèse commençant par le nom complet.
     """
     API_KEY = get_api_key()
@@ -626,6 +688,7 @@ def get_deepseek_auto_classification(text: str, full_name: str | None) -> dict:
         return {
             "macro_category": "Non classé",
             "sub_category": "Autre",
+            "years_experience": 0,
             "profile_summary": f"{safe_name} : récapitulatif non disponible (clé API manquante).",
         }
 
@@ -660,16 +723,20 @@ def get_deepseek_auto_classification(text: str, full_name: str | None) -> dict:
          - R&D / Bureau d'études : Conception, ingénierie.
          - Commercial / Vente : Développement du chiffre d'affaires lié à une offre technique ou industrielle.
 
-    3. Générer un court récap de profil dans le style des exemples suivants :
-       - "Eladis SA (Actuel) / 10 ans d'expérience en comptabilité et audit. Expert en cash management, audit et conformité fiscale.\n   Profil orienté contrôle et rigueur, idéal pour la fiabilisation des reporting et la sécurisation quotidienne des flux monétaires du holding."
-       - "Experte de la gestion multi-entités, du reporting de performance et de la mise en place de procédures.\n   Profil polyvalent maîtrisant le cycle complet (Finance, Fiscal, RH) et apte à sécuriser le cadre juridique et opérationnel du Family Office."
+    3. Estimer le nombre total d'années d'expérience professionnelle du candidat.
+
+    4. Générer un court récap de profil (2-3 phrases max) qui DOIT inclure :
+       - Le nombre d'années d'expérience
+       - Les compétences clés
+       - Le type de profil (ex: "Profil orienté contrôle et rigueur", "Profil polyvalent")
 
     Contraintes IMPORTANTES :
     - Tu renverras UNIQUEMENT un JSON strict de la forme :
-      {{"macro_category": "...", "sub_category": "...", "profile_summary": "..."}}
+      {{"macro_category": "...", "sub_category": "...", "years_experience": X, "profile_summary": "..."}}
     - "macro_category" doit être EXACTEMENT l'une de : "Fonctions supports", "Logistique", "Production/Technique".
     - "sub_category" doit être une des sous-catégories cohérentes ci-dessus (ou "Autre" si vraiment nécessaire).
-    - Le champ "profile_summary" DOIT commencer EXACTEMENT par le nom suivant : "{safe_name}" puis un bref résumé sur 1 à 3 phrases.
+    - "years_experience" doit être un nombre entier (estimation).
+    - Le champ "profile_summary" DOIT commencer EXACTEMENT par le nom suivant : "{safe_name}" puis un bref résumé incluant les années d'expérience.
     - N'ajoute AUCUN texte avant ou après le JSON.
 
     Texte du CV :
@@ -701,6 +768,11 @@ def get_deepseek_auto_classification(text: str, full_name: str | None) -> dict:
 
         macro = data.get("macro_category") or "Non classé"
         sub = data.get("sub_category") or "Autre"
+        years_exp = data.get("years_experience", 0)
+        try:
+            years_exp = int(years_exp)
+        except (ValueError, TypeError):
+            years_exp = 0
         summary = data.get("profile_summary") or f"{safe_name} : récapitulatif non disponible."
 
         # Nettoyage minimal
@@ -713,6 +785,7 @@ def get_deepseek_auto_classification(text: str, full_name: str | None) -> dict:
         return {
             "macro_category": macro,
             "sub_category": sub,
+            "years_experience": years_exp,
             "profile_summary": summary,
         }
 
@@ -720,6 +793,7 @@ def get_deepseek_auto_classification(text: str, full_name: str | None) -> dict:
         return {
             "macro_category": "Non classé",
             "sub_category": "Autre",
+            "years_experience": 0,
             "profile_summary": f"{safe_name} : récapitulatif non disponible (erreur IA).",
         }
 
@@ -928,11 +1002,13 @@ def create_organized_zip(results, file_list):
                     # Ajouter au ZIP
                     zip_file.writestr(file_path_in_zip, file_content)
                     
-                    # Ajouter au manifest (une colonne par champ + récap profil)
+                    # Ajouter au manifest (une colonne par champ + récap profil + années exp)
                     manifest_data.append({
                         'fichier_original': original_name,
                         'nouveau_nom': final_name,
                         'categorie': category,
+                        'sous_categorie': result.get('sub_category', ''),
+                        'annees_experience': result.get('years_experience', 0),
                         'confiance_extraction': confidence,
                         'methode_extraction': method,
                         'recap_profil': result.get('profile_summary', ''),
@@ -1422,7 +1498,7 @@ with tab2:
                                         st.markdown("**Détail de l'analyse combinée :**")
                                         st.json(logic)
                         else: # Analyse IA
-                            analysis_result = get_deepseek_analysis(text)
+                            analysis_result = get_deepseek_profile_analysis(text)
                             st.markdown(analysis_result)
 
 with tab3:
@@ -1727,11 +1803,13 @@ with tab5:
                     cat = classification.get('macro_category', 'Non classé')
                     sub_cat = classification.get('sub_category', 'Autre')
                     profile_summary = classification.get('profile_summary', '')
+                    years_exp = classification.get('years_experience', 0)
 
                     result_item = {
                         'file': name,
                         'category': cat,
                         'sub_category': sub_cat,
+                        'years_experience': years_exp,
                         'profile_summary': profile_summary,
                         'text_snippet': (text or '')[:800],
                         'full_text': text  # Garder le texte complet pour le ZIP
@@ -1783,13 +1861,14 @@ with tab5:
 
             display_df['display_name'] = display_df.apply(_get_display_name_for_row, axis=1)
 
-            # Affichage en 3 colonnes avec onglets par sous-catégorie
+            # Affichage en 3 colonnes avec panneaux repliables par sous-catégorie
             cols = st.columns(3)
             cats = ['Fonctions supports', 'Logistique', 'Production/Technique']
             for idx, cat_label in enumerate(cats):
                 with cols[idx]:
-                    st.subheader(cat_label)
                     sub_df = display_df[display_df['category'] == cat_label]
+                    count_cat = len(sub_df)
+                    st.subheader(f"{cat_label} ({count_cat})")
                     if sub_df.empty:
                         st.write('Aucun CV classé ici.')
                     else:
@@ -1800,22 +1879,25 @@ with tab5:
                         else:
                             sub_df['sub_category'] = 'Autre'
                         subcats = sorted(sub_df['sub_category'].unique())
-                        tabs = st.tabs(subcats)
-                        for tab_obj, subcat in zip(tabs, subcats):
-                            with tab_obj:
-                                st.markdown(f"**{subcat}**")
-                                filtered = sub_df[sub_df['sub_category'] == subcat]
+                        for subcat in subcats:
+                            filtered = sub_df[sub_df['sub_category'] == subcat]
+                            count_subcat = len(filtered)
+                            with st.expander(f"📂 {subcat} ({count_subcat})"):
                                 for _, r in filtered.iterrows():
                                     card_title = r['display_name']
                                     recap = r.get('profile_summary') or r.get('text_snippet') or ''
-                                    with st.expander(card_title):
+                                    years_exp = r.get('years_experience', 0)
+                                    with st.expander(f"👤 {card_title}"):
+                                        if years_exp and years_exp > 0:
+                                            st.markdown(f"**📅 {years_exp} ans d'expérience**")
                                         st.markdown(recap)
 
-            # Non classés
+            # Catégorie "Autres" pour les non classés
             nc = df[df['category'] == 'Non classé']
             if not nc.empty:
                 st.markdown('---')
-                st.subheader('Non classés')
+                count_nc = len(nc)
+                st.subheader(f'🔍 Autres / Non classés ({count_nc})')
                 st.dataframe(nc[['file', 'text_snippet']], width="stretch")
                 
                 # Bouton pour analyser les CV non classés avec DeepSeek
