@@ -1692,7 +1692,7 @@ with tab5:
         )
         
         # Bouton de classification primaire
-        if st.button('📂 Lancer l'auto-classification', type='primary'):
+        if st.button("📂 Lancer l'auto-classification", type='primary'):
             # Réinitialiser les analyses DeepSeek lors d'une nouvelle classification
             st.session_state.deepseek_analyses = []
             
