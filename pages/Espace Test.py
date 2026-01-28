@@ -4882,14 +4882,7 @@ def main():
         
         with col_ppt1:
             st.info("📊 **Génération automatique de votre rapport PowerPoint**")
-            st.markdown("""
-            Le rapport PowerPoint inclura :
-            - 📊 Tableau des besoins par entité (Hebdomadaire)
-            - 📈 Métriques et statistiques
-            - 📉 Graphiques de Demandes & Recrutement
-            - 🤝 Données d'Intégration
-            """)
-        
+
         with col_ppt2:
             # Vérifier que des données sont disponibles
             if df_recrutement is not None or st.session_state.get('synced_recrutement_df') is not None:
