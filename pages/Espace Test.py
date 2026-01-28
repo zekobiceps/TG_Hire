@@ -561,30 +561,52 @@ def get_deepseek_analysis(text):
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
     prompt = f"""
-    En tant qu'expert en recrutement, analyse le CV suivant et classe-le UNIQUEMENT dans l'une des trois catégories suivantes:
-    - Fonctions supports (RH, Finance, IT, etc.)
-    - Production (Ingénierie, Technique, Opérations, etc.)
-    - Logistique (Supply Chain, Transport, Stockage, etc.)
-    
-    Réponds UNIQUEMENT avec le nom de la catégorie, sans explication ni analyse détaillée.
-    
-    Texte du CV : {text}
-    """
+     Tu es un expert en recrutement. À partir du texte du CV ci-dessous, classe le poste cible dans UNE seule des trois macro-catégories suivantes :
+
+     1. Fonctions supports
+         • Direction RH : Recrutement, paie, formation, relations sociales.
+         • Direction Finance : Comptabilité, trésorerie, fiscalité, audit.
+         • Contrôle de Gestion : Analyse de la performance, budgets.
+         • Direction des Achats : Sourcing, négociation, approvisionnements.
+         • Direction Logistique : Gestion des flux, transport, entreposage.
+         • Direction Informatique (DSI) : Infrastructure, support, cybersécurité.
+         • QHSE : Normes ISO, sécurité au travail, environnement.
+         • Direction Juridique : Conformité, contrats.
+         • Communication / Marketing : Image de marque, digital.
+
+     2. Logistique
+         • Activités centrées sur la gestion des flux physiques, transport, entrepôts, distribution.
+
+     3. Production/Technique
+         • BTP / Génie Civil : Études de prix, conduite de travaux.
+         • Industrie : Production, ligne d'assemblage, usinage, électromécanique, automatisme.
+         • R&D / Bureau d'études : Conception, ingénierie.
+         • Commercial / Vente : Développement du chiffre d'affaires lié à une offre technique ou industrielle.
+
+     Consigne IMPORTANTE :
+     - Réponds UNIQUEMENT par le nom exact d'UNE SEULE des trois macro-catégories ci-dessous :
+        "Fonctions supports" OU "Logistique" OU "Production/Technique".
+     - Ne donne aucune explication supplémentaire.
+
+     Texte du CV :
+     {text}
+     """
     payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.2}
     try:
         response = requests.post(url, headers=headers, data=json.dumps(payload))
         response.raise_for_status()
         # Récupérer uniquement la catégorie (nettoyer la réponse)
         result = response.json()["choices"][0]["message"]["content"].strip()
+        res_low = result.lower()
         # Normaliser la réponse pour s'assurer qu'elle correspond à l'une des trois catégories
-        if "support" in result.lower():
+        if "support" in res_low:
             return "Fonctions supports"
-        elif "product" in result.lower():
-            return "Production"
-        elif "logistique" in result.lower():
+        if "logist" in res_low:
             return "Logistique"
-        else:
-            return result  # Garder la réponse originale si elle ne correspond pas aux patterns
+        if "production" in res_low or "technique" in res_low:
+            return "Production/Technique"
+        # Garder la réponse originale si elle ne correspond pas aux patterns prévus
+        return result
     except Exception as e:
         return f"Erreur IA : {e}"
 
@@ -1514,31 +1536,6 @@ with tab5:
     # Importer des CVs uniquement via upload
     uploaded_files_auto = st.file_uploader("Importer des CVs (PDF)", type=["pdf"], accept_multiple_files=True, key="auto_uploader")
 
-    # Définitions de mots-clés pour chaque catégorie (basées sur votre liste)
-    SUPPORT_KEYS = [
-        r"\b(directeur(?: des)? ressources humaines|drh|responsable(?: des)? ressources humaines|charg(?:e|é)\w* des ressources humaines|hr business partner|gestionnaire de paie|charg(?:e|é) de recrutement|responsable formation|directeur administratif et financier|daf|responsable comptable|comptable|contr(?:ô|o)leur de gestion|trésorier|directeur(?: des)? syst(?:è|e)m?es d'?information|dsi|administrateur syst(?:è|e)m?es et r(?:é|e)seaux|technicien de support|juriste d'entreprise|assistant(?:e)? juridique|responsable qhse|ingénieur qhse|animateur qhse|responsable des services g(?:é|e)n(?:é|e)raux|office manager|assistant(?:e)? de direction|assistant(?:e)? administratif(?:ve)?|charg(?:e|é) d'accueil|standardiste)\b"
-    ]
-    LOGISTICS_KEYS = [
-        r"\b(responsable supply chain|responsable logistique|coordinateur logistique|analyste logistique|planificateur|ordonnanceur|responsable d'entrep[oô]t|chef de d(?:é|e)p[oô]t|gestionnaire de stocks|magasinier|cariste|pr(?:é|e)parateur de commandes|responsable transport|gestionnaire de parc|affr(?:é|e)teur|agent d'exploitation|chauffeur|d(?:é|e)clarant en douane|agent de transit|import\s*/?\s*export|supply chain)\b"
-    ]
-    PRODUCTION_KEYS = [
-        r"\b(directeur de travaux|conducteur de travaux|ingénieur de travaux|ingénieur travaux|chef de projet(?:s)?|chef de projets|ingénieur g(?:é|e)nie civil|ingénieur études de prix|ingénieur m(?:é|e)thodes|dessinateur|projeteur|m(?:é|e)treur|(?:é|e)conomiste de la construction|g(?:é|e)om(?:è|e)tre|topographe|technicien de laboratoire|encadrement|gestion de chantier|maîtrise d'?oeuvre|maîtrise d'œuvre)\b"
-    ]
-
-    def classify_text(text):
-        t = (text or "").lower()
-        # Priorité : Production > Logistique > Support (si plusieurs matches)
-        for pat in PRODUCTION_KEYS:
-            if re.search(pat, t, re.IGNORECASE):
-                return 'Production/Technique'
-        for pat in LOGISTICS_KEYS:
-            if re.search(pat, t, re.IGNORECASE):
-                return 'Logistique'
-        for pat in SUPPORT_KEYS:
-            if re.search(pat, t, re.IGNORECASE):
-                return 'Fonctions supports'
-        return 'Non classé'
-
     # Construire la liste de fichiers uniquement à partir des uploads
     file_list = []
     if uploaded_files_auto:
@@ -1602,7 +1599,10 @@ with tab5:
                         text = extract_text_from_pdf(f)
                     except Exception:
                         text = ''
-                    cat = classify_text(text)
+
+                    # Classification principale 100% via IA DeepSeek
+                    text_for_ai = (text or '')[:3000]
+                    cat = get_deepseek_analysis(text_for_ai)
                     
                     # Extraction du nom si l'option est cochée
                     extracted_name_info = None
