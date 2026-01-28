@@ -1460,15 +1460,19 @@ with tab4:
             best_method = feedback_with_evals.loc[feedback_with_evals["Score moyen"].idxmax()]
             worst_method = feedback_with_evals.loc[feedback_with_evals["Score moyen"].idxmin()]
 
+            # Assurer un scalaire numérique pour l'écart de score
+            best_score = float(best_method["Score moyen"])
+            worst_score = float(worst_method["Score moyen"])
+
             col1, col2 = st.columns(2)
 
             with col1:
-                st.success(f"🏆 **Meilleure méthode** : {best_method['Méthode']} avec un score de {best_method['Score moyen']:.2f}/5")
+                st.success(f"🏆 **Meilleure méthode** : {best_method['Méthode']} avec un score de {best_score:.2f}/5")
                 st.info("💭 **Recommandation** : Priorisez cette méthode pour vos analyses futures.")
 
             with col2:
-                if best_method['Score moyen'] - worst_method['Score moyen'] > 0.5:
-                    st.warning(f"⚠️ **Méthode à améliorer** : {worst_method['Méthode']} (score: {worst_method['Score moyen']:.2f}/5)")
+                if best_score - worst_score > 0.5:
+                    st.warning(f"⚠️ **Méthode à améliorer** : {worst_method['Méthode']} (score: {worst_score:.2f}/5)")
                     st.info("💭 **Suggestion** : Collectez plus de feedbacks pour affiner cette méthode.")
 
         # Évolution temporelle (si assez de données)
