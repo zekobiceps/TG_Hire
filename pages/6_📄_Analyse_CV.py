@@ -3,6 +3,7 @@ import pandas as pd
 import io
 import requests
 import json
+from typing import cast
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import time
@@ -1460,9 +1461,9 @@ with tab4:
             best_method = feedback_with_evals.loc[feedback_with_evals["Score moyen"].idxmax()]
             worst_method = feedback_with_evals.loc[feedback_with_evals["Score moyen"].idxmin()]
 
-            # Assurer un scalaire numérique pour l'écart de score
-            best_score = float(best_method["Score moyen"])
-            worst_score = float(worst_method["Score moyen"])
+            # Assurer un scalaire numérique pour l'écart de score (aide à Pylance)
+            best_score = float(cast(float, best_method["Score moyen"]))
+            worst_score = float(cast(float, worst_method["Score moyen"]))
 
             col1, col2 = st.columns(2)
 
