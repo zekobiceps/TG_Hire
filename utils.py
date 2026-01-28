@@ -1759,7 +1759,7 @@ def save_feedback(analysis_method, job_title, job_description_snippet, cv_count,
         "timestamp": timestamp,
         "analysis_method": analysis_method,
         "job_title": job_title,
-        "job_description_snippet": job_description_snippet[:500] if job_description_snippet else "",  # Étendu à 500 caractères
+        "job_description_snippet": job_description_snippet[:2000] if job_description_snippet else "",  # Étendu à 2000 caractères
         "cv_count": cv_count,
         "feedback_score": feedback_score,
         "feedback_text": feedback_text,
