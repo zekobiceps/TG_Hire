@@ -1164,9 +1164,9 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 des_year = None
                 acc_year = None
                 if 'Date de désistement' in df_base.columns:
-                    des_year = df_base['Date de désistement'].dt.year
+                    des_year = df_base['Date de désistement'].dt.year  # type: ignore[attr-defined]
                 if "Date d'acceptation du candidat" in df_base.columns:
-                    acc_year = df_base["Date d'acceptation du candidat"].dt.year
+                    acc_year = df_base["Date d'acceptation du candidat"].dt.year  # type: ignore[attr-defined]
 
                 if des_year is not None and acc_year is not None:
                     mask = (

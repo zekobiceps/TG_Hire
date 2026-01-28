@@ -62,18 +62,21 @@ def compute_promise_refusal_rate_row(
 ) -> dict:
     """Calcule le taux de refus des promesses d'embauche selon la règle métier demandée.
 
-    Règle: une ligne est considérée "refus" si
-    - col_prom == 1 ET col_refus == 1
-    Dénominateur: toutes les lignes où col_prom == 1
+    Règle actuelle:
+    - Numérateur (refus) : lignes où ``col_refus == 1``.
+    - Dénominateur      : toutes les promesses émises, qu'elles soient acceptées
+      ou refusées, c'est-à-dire les lignes où ``col_prom == 1`` OU ``col_refus == 1``.
 
-    Paramètres:
-    - df: DataFrame source
-    - col_prom: nom exact de la colonne promesses réalisées (si None, recherche heuristique)
-    - col_refus: nom exact de la colonne refus aux promesses (si None, recherche heuristique)
-    - fallback_search: si True, tente une détection robuste des colonnes via sous-chaînes
+    Paramètres
+    ---------
+    - df : DataFrame source
+    - col_prom : nom exact de la colonne "promesses réalisées" (si None, recherche heuristique)
+    - col_refus : nom exact de la colonne "refus aux promesses" (si None, recherche heuristique)
+    - fallback_search : si True, tente une détection robuste des colonnes via sous-chaînes
 
-    Retourne: { 'denominator': int, 'numerator': int, 'rate': float|None,
-                'columns': { 'prom': str|None, 'refus': str|None } }
+    Retourne
+    --------
+    Dict avec les clés ``denominator``, ``numerator``, ``rate`` et ``columns``.
     """
     if df is None or df.empty:
         return { 'denominator': 0, 'numerator': 0, 'rate': None, 'columns': { 'prom': None, 'refus': None } }
@@ -117,12 +120,14 @@ def compute_promise_refusal_rate_row(
     prom_vals = _clean_numeric(df[prom_c])
     refus_vals = _clean_numeric(df[refus_c]) if (refus_c and refus_c in df.columns) else pd.Series([0]*len(df), index=df.index)
 
-    # Dénominateur: promesse réalisée == 1
-    denom_mask = prom_vals.eq(1)
+    # Dénominateur: toutes les promesses émises (acceptées ou refusées)
+    # - prom_vals == 1  : promesse réalisée / acceptée
+    # - refus_vals == 1 : promesse refusée (même si prom_vals = 0 dans le fichier)
+    denom_mask = prom_vals.eq(1) | refus_vals.eq(1)
     denom = int(denom_mask.sum())
 
-    # Numérateur: promesse réalisée == 1 ET refus == 1
-    numer_mask = denom_mask & refus_vals.eq(1)
+    # Numérateur: refus de promesse (refus == 1)
+    numer_mask = refus_vals.eq(1)
     numer = int(numer_mask.sum())
 
     rate = (numer / denom * 100.0) if denom > 0 else None
