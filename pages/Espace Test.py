@@ -1145,7 +1145,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         # - Numérateur: lignes où promesse == 1 ET `Nb de refus aux promesses d'embauches` == 1
         # Les cas "Clôture" avec promesse=1 et refus=0 impactent donc bien l'indicateur (dans le dénominateur uniquement).
 
-        # Base de calcul: données de recrutement filtrées par entité / direction uniquement
+        # Base de calcul: données de recrutement filtrées par entité / direction et par période (année)
         df_base = df_recrutement.copy() if df_recrutement is not None else pd.DataFrame()
         if not df_base.empty and isinstance(global_filters, dict):
             entite = global_filters.get('entite')
@@ -1154,6 +1154,33 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
                 df_base = df_base[df_base['Entité demandeuse'] == entite]
             if direction and direction != 'Toutes' and 'Direction concernée' in df_base.columns:
                 df_base = df_base[df_base['Direction concernée'] == direction]
+
+            # Filtre d'année (période) :
+            # - si Date de désistement est renseignée, on prend son année
+            # - sinon, si Date d'acceptation du candidat est renseignée, on prend son année
+            annee_sel = global_filters.get('periode_recrutement', 'Toutes')
+            if annee_sel != 'Toutes' and not df_base.empty:
+                annee = int(annee_sel)
+                des_year = None
+                acc_year = None
+                if 'Date de désistement' in df_base.columns:
+                    des_year = df_base['Date de désistement'].dt.year
+                if "Date d'acceptation du candidat" in df_base.columns:
+                    acc_year = df_base["Date d'acceptation du candidat"].dt.year
+
+                if des_year is not None and acc_year is not None:
+                    mask = (
+                        (des_year.notna() & (des_year == annee)) |
+                        (des_year.isna() & acc_year.notna() & (acc_year == annee))
+                    )
+                elif des_year is not None:
+                    mask = des_year.notna() & (des_year == annee)
+                elif acc_year is not None:
+                    mask = acc_year.notna() & (acc_year == annee)
+                else:
+                    mask = pd.Series(False, index=df_base.index)
+
+                df_base = df_base[mask].copy()
 
         # Taux de refus = lignes où promesse==1 ET refus==1 / lignes où promesse==1
         res = compute_promise_refusal_rate_row(df_base)
