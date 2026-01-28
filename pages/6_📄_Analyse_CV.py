@@ -1795,7 +1795,10 @@ with tab5:
                     else:
                         # Regrouper par sous-catégorie (sous-direction / sous-filière)
                         sub_df = sub_df.copy()
-                        sub_df['sub_category'] = sub_df.get('sub_category', 'Autre').fillna('Autre')
+                        if 'sub_category' in sub_df.columns:
+                            sub_df['sub_category'] = sub_df['sub_category'].fillna('Autre')
+                        else:
+                            sub_df['sub_category'] = 'Autre'
                         subcats = sorted(sub_df['sub_category'].unique())
                         tabs = st.tabs(subcats)
                         for tab_obj, subcat in zip(tabs, subcats):
