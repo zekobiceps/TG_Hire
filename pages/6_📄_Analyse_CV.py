@@ -869,7 +869,7 @@ def is_valid_name_candidate(text: str) -> bool:
     # Rejets évidents
     if len(text) > 50 and ' ' not in text: return False  # Trop long sans espace
     if re.search(r'\d', text): return False  # Contient des chiffres
-    if re.search(r'[@€$£%]', text): return False  # Caractères spéciaux invalides
+    if re.search(r'[@€$£%&:]', text): return False  # Caractères spéciaux invalides (inclut : et &)
     if text.count('-') > 3: return False  # Trop de tirets
     
     # Doit contenir au moins une voyelle (sauf exceptions très rares)
@@ -935,13 +935,51 @@ def is_likely_name_line(line: str) -> bool:
         'senior', 'junior', 'expert', 'chef', 'actuaire', 'data', 'scientist',
         'chargé', 'chargée', 'officer', 'executive', 'associate', 'partner',
         
+        # Postes et métiers supplémentaires
+        'job', 'étudiant', 'etudiant', 'student', 'intern', 'internship', 'stage',
+        'engineer', 'developer', 'designer', 'analyst', 'specialist', 'coordinator',
+        'ia', 'ai', 'ml', 'machine', 'learning', 'deep',
+        'mécanique', 'mecanique', 'électrique', 'electrique', 'civil', 'industriel',
+        
+        # Termes de documents/réunions
+        'weekly', 'meeting', 'decks', 'deck', 'presentation', 'rapport', 'report',
+        'document', 'documents', 'fichier', 'fichiers', 'dossier', 'dossiers',
+        
         # Verbes d'action (souvent en bullet points)
         'gérer', 'piloter', 'management', 'coordonner', 'développer', 'créer',
-        'réaliser', 'participer', 'contribuer', 'superviser', 'analyser'
+        'réaliser', 'participer', 'contribuer', 'superviser', 'analyser',
+        
+        # Entreprises supplémentaires (faux positifs fréquents)
+        'procter', 'gamble', 'l\'oréal', 'loreal', 'carrefour', 'hsbc', 'edf',
+        
+        # Langues et nationalités
+        'français', 'francais', 'anglais', 'arabe', 'espagnol', 'courant', 'bilingue',
+        'nationality', 'nationalité', 'franco-moroccan', 'franco-marocain',
+        
+        # Termes RH et certifications
+        'gpec', 'gepp', 'hdi', 'certification', 'certifications', 'itil',
+        
+        # Logiciels et outils supplémentaires
+        'diapason', 'ktp', 'summit', 'anaplan', 'swiftnet', 'servicenow', 'remedy',
+        'dynamics', 'confluence', 'slack', 'figma', 'tableau',
+        
+        # Loisirs et intérêts
+        'intérêts', 'interets', 'football', 'natation', 'voyages', 'lecture',
+        'sport', 'voyage', 'bénévolat', 'benevolat', 'danse', 'musique',
+        
+        # Termes scientifiques/académiques
+        'physiologie', 'physiopathologie', 'physiopathologies', 'humaine', 'modélisation',
+        
+        # Mots génériques supplémentaires
+        'soft', 'hard', 'about', 'linkedin', 'trésorier', 'tresorier', 'ingénieure', 'ingenieure'
     ]
     
     # Si un mot de la ligne est interdit -> Rejet
     if any(w in forbidden_words for w in words):
+        return False
+    
+    # Rejet si la ligne contient des caractères spéciaux typiques de labels
+    if ':' in line or '&' in line:
         return False
 
     # 2. Vérifications de structure
@@ -1023,19 +1061,48 @@ def extract_name_from_cv_text(text):
         # On garde l'info de ligne originelle si besoin
         cleaned_lines.append(clean)
         
-        # Gestion des noms espacés (ex: "M a r w a n  L A A N I G R I")
+        # Gestion des noms espacés (ex: "I c h r a k B A K I A" ou "M a r w a n  L A A N I G R I")
         # Si la ligne contient beaucoup d'espaces et des lettres isolées
         if len(clean) > 5 and ' ' in clean:
             # Compte le nombre de tokens de 1 lettre
             single_letter_tokens = [w for w in clean.split() if len(w) == 1 and w.isalpha()]
             if len(single_letter_tokens) > len(clean.split()) / 2:
                 # C'est probablement un texte espacé
-                # Strategie : remplacer >= 2 espaces par un pipe, enlever les espaces simples, remettre pipe
-                temp = re.sub(r'\s{2,}', '|', clean)
-                temp = temp.replace(' ', '')
-                normalized = temp.replace('|', ' ')
-                # Ajouter la version normalisée aux lignes candidates
-                cleaned_lines.append(normalized)
+                # AMÉLIORATION: Reconstituer en se basant sur les transitions de casse
+                # "I c h r a k B A K I A" -> "Ichrak BAKIA"
+                result_parts = []
+                current_word = ""
+                prev_was_lower = False
+                
+                for char in clean:
+                    if char == ' ':
+                        continue  # Ignorer les espaces
+                    
+                    is_upper = char.isupper()
+                    
+                    # Transition minuscule -> majuscule = nouveau mot (prénom terminé, nom commence)
+                    if prev_was_lower and is_upper and current_word:
+                        result_parts.append(current_word)
+                        current_word = char
+                    else:
+                        current_word += char
+                    
+                    prev_was_lower = char.islower()
+                
+                if current_word:
+                    result_parts.append(current_word)
+                
+                # Si on a au moins 2 parties, c'est probablement Prénom NOM
+                if len(result_parts) >= 2:
+                    normalized = ' '.join(result_parts)
+                    cleaned_lines.append(normalized)
+                elif result_parts:
+                    # Sinon fallback sur l'ancienne méthode
+                    temp = re.sub(r'\s{2,}', '|', clean)
+                    temp = temp.replace(' ', '')
+                    normalized = temp.replace('|', ' ')
+                    if normalized != clean:
+                        cleaned_lines.append(normalized)
 
     # --- ÉTAPE 1-BIS : Fusion de lignes (Pour les cas : L1=Prénom, L2=Nom) ---
     # Ex: "Oussama" \n "GARMOUMI"
