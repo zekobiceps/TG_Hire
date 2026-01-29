@@ -178,15 +178,26 @@ embedding_model = load_embedding_model()
 
 # -------------------- Fonctions de traitement --------------------
 def get_api_key():
-    """Récupère la clé API depuis les secrets et gère l'erreur silencieusement."""
+    """Récupère la clé API avec persistance en session state pour éviter les pertes lors du rechargement."""
+    # 1. Vérifier si déjà en session
+    if "DEEPSEEK_API_KEY" in st.session_state:
+        return st.session_state.DEEPSEEK_API_KEY
+        
+    api_key = None
     try:
-        api_key = st.secrets.get("DEEPSEEK_API_KEY", None)
+        # 2. Vérifier st.secrets
+        if "DEEPSEEK_API_KEY" in st.secrets:
+             api_key = st.secrets["DEEPSEEK_API_KEY"]
+        # 3. Vérifier variables d'environnement (fallback)
         if not api_key:
-            # Message déjà affiché au démarrage, ne pas répéter
-            return None
-        return api_key
+             api_key = os.environ.get("DEEPSEEK_API_KEY")
+             
+        if api_key:
+            st.session_state.DEEPSEEK_API_KEY = api_key
+            return api_key
     except Exception:
-        return None
+        pass
+    return None
 
 def extract_text_from_pdf(file):
     try:
@@ -630,10 +641,35 @@ def rank_resumes_with_ai(job_description, resumes, file_names):
 # --- FONCTIONS GEMINI ---
 
 def get_gemini_api_key():
+    """Récupère la clé Gemini avec persistance en session state."""
+    # 1. Vérifier si déjà en session
+    if "Gemini_API_KEY" in st.session_state:
+        return st.session_state.Gemini_API_KEY
+    
+    api_key = None
     try:
-        return st.secrets.get("Gemini_API_KEY", None)
+        # 2. Vérifier st.secrets (attention aux majuscules/minuscules)
+        # On essaie plusieurs variantes courantes
+        keys_to_check = ["Gemini_API_KEY", "GEMINI_API_KEY", "google_api_key", "GOOGLE_API_KEY"]
+        for k in keys_to_check:
+            if k in st.secrets:
+                api_key = st.secrets[k]
+                break
+        
+        # 3. Vérifier variables d'environnement
+        if not api_key:
+            for k in keys_to_check:
+                val = os.environ.get(k)
+                if val:
+                    api_key = val
+                    break
+        
+        if api_key:
+            st.session_state.Gemini_API_KEY = api_key
+            return api_key
     except Exception:
-        return None
+        pass
+    return None
 
 def get_detailed_score_with_gemini(job_description, resume_text):
     API_KEY = get_gemini_api_key()
