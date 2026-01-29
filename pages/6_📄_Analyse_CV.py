@@ -643,7 +643,12 @@ def get_detailed_score_with_gemini(job_description, resume_text):
     if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Gemini manquante."}
     
     genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # Fallback sur gemini-pro si flash n'est pas dispo
+    model_name = 'gemini-1.5-flash'
+    try:
+        model = genai.GenerativeModel(model_name)
+    except:
+        model = genai.GenerativeModel('gemini-pro')
     
     prompt = f"""
     En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
@@ -666,6 +671,17 @@ def get_detailed_score_with_gemini(job_description, resume_text):
         
         return {"score": score, "explanation": text_resp}
     except Exception as e:
+        # Tentative de repli sur gemini-pro si erreur spécifique à flash
+        if "not found" in str(e).lower() or "404" in str(e):
+            try:
+                model = genai.GenerativeModel('gemini-pro')
+                response = model.generate_content(prompt)
+                text_resp = response.text
+                score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
+                score = int(score_match.group(1)) / 100 if score_match else 0.0
+                return {"score": score, "explanation": text_resp}
+            except Exception as e2:
+                 return {"score": 0.0, "explanation": f"Erreur Gemini (Pro): {e2}"}
         return {"score": 0.0, "explanation": f"Erreur Gemini: {e}"}
 
 def rank_resumes_with_gemini(job_description, resumes, file_names):
@@ -696,7 +712,8 @@ def get_gemini_profile_analysis(text: str, candidate_name: str | None = None) ->
     safe_name = safe_name.replace("##", "").replace("**", "").strip()
 
     genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # Utilisation de gemini-pro plus stable si flash échoue
+    model = genai.GenerativeModel('gemini-pro')
     
     prompt = f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
 
@@ -749,7 +766,8 @@ def get_gemini_auto_classification(text: str, full_name: str | None) -> dict:
         }
         
     genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash', generation_config={"response_mime_type": "application/json"})
+    # Switch to gemini-pro by default due to 404 errors on flash for some API keys/regions
+    model = genai.GenerativeModel('gemini-pro', generation_config={"response_mime_type": "application/json"})
     
     prompt = f"""
     Expert recrutement. Analyse CV.
@@ -769,7 +787,12 @@ def get_gemini_auto_classification(text: str, full_name: str | None) -> dict:
     
     try:
         response = model.generate_content(prompt)
-        data = json.loads(response.text)
+        try:
+            data = json.loads(response.text)
+        except:
+             # Fallback JSON parsing simple
+            clean_text = clean_json_string(response.text)
+            data = json.loads(clean_text)
         
         # Fallback values handle
         macro = data.get("macro_category") or "Non classé"
@@ -968,32 +991,27 @@ def get_deepseek_auto_classification(text: str, local_extracted_name: str | None
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
     
-    # Prompt renforcé avec liste noire
+    # Prompt plus permissif pour éviter le filtrage excessif "Non classé"
     prompt = f"""
-    Agis comme un système ATS (Applicant Tracking System) expert. Analyse ce CV brut.
+    Agis comme un expert en recrutement. Analyse ce CV.
 
-    --- TÂCHE 1 : EXTRACTION NOM ---
-    Trouve le "Prénom NOM" du candidat.
-    Indice algorithmique : "{hint_name}".
+    1. IDENTIFICATION NOM:
+    Si "{hint_name}" est vide ou générique, trouve le vrai nom (Prénom NOM). Evite les titres (Manager, CV, Profil).
     
-    RÈGLES CRITIQUES NOM :
-    1. Si l'indice semble correct (un vrai nom), utilise-le.
-    2. Si l'indice est vide, cherche dans l'en-tête.
-    3. INTERDIT : Ne renvoie JAMAIS un titre de poste comme nom (ex: "Ingénieur", "Développeur", "Manager", "Curriculum Vitae", "Profil").
-    4. INTERDIT : Ne renvoie JAMAIS une adresse email ou un numéro de téléphone.
-    5. Format : "Prénom NOM" (Nom en majuscule si possible).
+    2. CLASSIFICATION (Crucial):
+    Classe ce profil dans UNE seule de ces 3 catégories :
+    - "Fonctions supports" (RH, Finance, IT, Juridique...)
+    - "Logistique" (Supply Chain, Transport...)
+    - "Production/Technique" (Ingénierie, BTP, Industrie...)
+    
+    Si tu hésites, choisis la plus proche. Ne mets JAMAIS "Non classé" sauf si c'est illisible.
 
-    --- TÂCHE 2 : CLASSIFICATION ---
-    Macro-catégorie (CHOISIR UNE SEULE) : 
-    - "Fonctions supports" (RH, Finance, Juridique, IT Support, Achats)
-    - "Logistique" (Supply Chain, Transport, Stock)
-    - "Production/Technique" (Ingénierie, BTP, Industrie, R&D)
+    3. EXTRACTION
+    - Sous-catégorie précise.
+    - Années d'expérience (nombre).
+    - Un résumé court (2 phrases).
 
-    --- TÂCHE 3 : INFO ---
-    - Années d'expérience (nombre entier).
-    - Résumé : Une phrase "Punchy" commençant par le nom.
-
-    Réponds UNIQUEMENT ce JSON :
+    Réponds UNIQUEMENT ce JSON valide :
     {{
         "candidate_name": "...",
         "macro_category": "...",
@@ -1002,7 +1020,7 @@ def get_deepseek_auto_classification(text: str, local_extracted_name: str | None
         "profile_summary": "..."
     }}
 
-    CV TEXTE (Début) :
+    CV TEXTE :
     {text[:3000]}
     """
 
@@ -1016,19 +1034,34 @@ def get_deepseek_auto_classification(text: str, local_extracted_name: str | None
         
         # Nettoyage et Parsing
         raw_content = response.json()["choices"][0]["message"]["content"]
+        # Utiliser l'outil de nettoyage JSON que nous avons ajouté
         clean_content = clean_json_string(raw_content)
-        data = json.loads(clean_content)
+        
+        try:
+            data = json.loads(clean_content)
+        except:
+            # Si le JSON est cassé, on essaie de sauver les meubles avec regex
+            data = {}
+            if "Production" in raw_content or "Technique" in raw_content: data["macro_category"] = "Production/Technique"
+            elif "Logistique" in raw_content: data["macro_category"] = "Logistique"
+            elif "support" in raw_content: data["macro_category"] = "Fonctions supports"
 
         # Validation post-traitement (Safety check)
         final_name = data.get("candidate_name", "Candidat")
         
-        # Liste noire de sécurité (si l'IA hallucine encore)
+        # Liste noire de sécurité
         blacklist = ["curriculum", "vitae", "resume", "profil", "ingénieur", "manager", "développeur", "page", "cv"]
         if any(bad in final_name.lower() for bad in blacklist):
             final_name = hint_name if hint_name else "Candidat (Nom non détecté)"
 
         # Normalisation catégorie
         macro = data.get("macro_category")
+        # Si le modèle renvoie une variante bizarre, on normalise
+        if macro:
+            if "support" in macro.lower(): macro = "Fonctions supports"
+            elif "logisti" in macro.lower(): macro = "Logistique"
+            elif "product" in macro.lower() or "technip" in macro.lower() or "btp" in macro.lower(): macro = "Production/Technique"
+        
         if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]:
             macro = "Non classé"
 
@@ -1042,7 +1075,6 @@ def get_deepseek_auto_classification(text: str, local_extracted_name: str | None
 
     except Exception as e:
         print(f"DeepSeek Error: {e}")
-        # En cas d'erreur IA, on renvoie au moins le nom trouvé localement
         default_response["candidate_name"] = hint_name or "Erreur Extraction"
         return default_response
 
