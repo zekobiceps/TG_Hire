@@ -621,6 +621,168 @@ def rank_resumes_with_ai(job_description, resumes, file_names):
     return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
 
 
+
+# --- FONCTIONS GEMINI ---
+
+def get_gemini_api_key():
+    try:
+        return st.secrets.get("Gemini_API_KEY", None)
+    except Exception:
+        return None
+
+def get_detailed_score_with_gemini(job_description, resume_text):
+    API_KEY = get_gemini_api_key()
+    if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Gemini manquante."}
+    
+    genai.configure(api_key=API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    
+    prompt = f"""
+    En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
+    Fournis ta réponse en deux parties :
+    1. Un score de correspondance en pourcentage (ex: "Score: 85%").
+    2. Une analyse détaillée expliquant les points forts et les points à améliorer.
+    ---
+    Description du poste: {job_description}
+    ---
+    Texte du CV: {resume_text}
+    """
+    
+    try:
+        response = model.generate_content(prompt)
+        text_resp = response.text
+        
+        # Extraction du score
+        score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
+        score = int(score_match.group(1)) / 100 if score_match else 0.0
+        
+        return {"score": score, "explanation": text_resp}
+    except Exception as e:
+        return {"score": 0.0, "explanation": f"Erreur Gemini: {e}"}
+
+def rank_resumes_with_gemini(job_description, resumes, file_names):
+    scores_data = []
+    # Placeholder pour barre de progression si intégrée, sinon boucle simple
+    progress_bar = st.progress(0)
+    for i, resume_text in enumerate(resumes):
+        scores_data.append(get_detailed_score_with_gemini(job_description, resume_text))
+        progress_bar.progress((i + 1) / len(resumes))
+        time.sleep(1) # Petit délai pour éviter rate limits tier gratuit
+    progress_bar.empty()
+    return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
+
+def get_gemini_profile_analysis(text: str, candidate_name: str | None = None) -> str:
+    API_KEY = get_gemini_api_key()
+    if not API_KEY: return "❌ Analyse impossible (clé API Gemini manquante)."
+    
+    # Logique Nom
+    if candidate_name and is_valid_name_candidate(candidate_name):
+        safe_name = candidate_name
+    else:
+        extracted = extract_name_from_cv_text(text)
+        if extracted and extracted.get('name'):
+            safe_name = extracted['name']
+        else:
+            safe_name = "Candidat"
+    
+    safe_name = safe_name.replace("##", "").replace("**", "").strip()
+
+    genai.configure(api_key=API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    
+    prompt = f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
+
+Règles NOM :
+- Nom identifié : "{safe_name}".
+- Si "{safe_name}" est inapproprié (Candidat, Permis B...), Trouve le vrai nom dans le texte.
+- Sinon garde "{safe_name}".
+
+**Format de sortie OBLIGATOIRE** :
+
+**👤 [Nom du Candidat]**
+
+**📊 Synthèse**
+[2-3 phrases]
+
+**🎓 Formation**
+[Diplôme le plus élevé]
+
+**💼 Expérience**
+[Dernier poste]
+
+**🛠️ Compétences clés**
+[4-5 compétences]
+
+**💡 Points forts**
+[2-3 points]
+
+**⚠️ Points d'attention**
+[1-2 points]
+
+Texte du CV :
+{text[:4000]}
+"""
+    try:
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        return f"❌ Erreur Gemini : {e}"
+
+def get_gemini_auto_classification(text: str, full_name: str | None) -> dict:
+    API_KEY = get_gemini_api_key()
+    safe_name = (full_name or "Candidat").strip()
+    if not API_KEY:
+        return {
+            "macro_category": "Non classé",
+            "sub_category": "Autre",
+            "years_experience": 0,
+            "profile_summary": f"Erreur config Gemini",
+            "candidate_name": safe_name
+        }
+        
+    genai.configure(api_key=API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash', generation_config={"response_mime_type": "application/json"})
+    
+    prompt = f"""
+    Expert recrutement. Analyse CV.
+    
+    1. Check Nom: "{safe_name}". Corrige si faux (Permis B, etc).
+    2. Macro-catégorie (UNE SEULE) : "Fonctions supports", "Logistique", "Production/Technique".
+    3. Sous-catégorie.
+    4. Années expérience (int).
+    5. Récapitulatif (2-3 phrases).
+
+    JSON output only:
+    {{ "candidate_name": "...", "macro_category": "...", "sub_category": "...", "years_experience": 0, "profile_summary": "..." }}
+    
+    CV:
+    {text[:4000]}
+    """
+    
+    try:
+        response = model.generate_content(prompt)
+        data = json.loads(response.text)
+        
+        # Fallback values handle
+        macro = data.get("macro_category") or "Non classé"
+        if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]: macro = "Non classé"
+        
+        return {
+            "macro_category": macro,
+            "sub_category": data.get("sub_category", "Autre"),
+            "years_experience": int(data.get("years_experience", 0)),
+            "profile_summary": data.get("profile_summary", ""),
+            "candidate_name": data.get("candidate_name", safe_name)
+        }
+    except Exception as e:
+        return {
+            "macro_category": "Non classé",
+            "sub_category": "Autre",
+            "years_experience": 0,
+            "profile_summary": f"Erreur Gemini: {e}",
+            "candidate_name": safe_name
+        }
+
 def get_deepseek_profile_analysis(text: str, candidate_name: str | None = None) -> str:
     """
     Génère une analyse de profil générique et concise en français.
@@ -1648,24 +1810,14 @@ with tab1:
             results, explanations, logic = {}, None, None
             
             
-    if analysis_method == "Analyse par IA (Gemini)":
-        if not st.session_state.last_job_description:
-            st.warning("⚠️ Veuillez entrer une description de poste.")
-        elif not resumes:
-            st.warning("⚠️ Aucun CV importé.")
-        else:
-            if st.button("🚀 Lancer l'analyse Gemini"):
-                with st.spinner("🤖 Analyse Gemini en cours..."):
-                    result = rank_resumes_with_gemini(st.session_state.last_job_description, resumes, file_names)
-                    
-                    # Normalisation scores
-                    st.session_state.last_analysis_result = [{"score": s, "file": f, "explanation": result["explanations"][f]} for f, s in zip(file_names, result["scores"])]
-                    st.session_state.last_analysis_result.sort(key=lambda x: x["score"], reverse=True)
-                    st.session_state.last_analysis_method = "Analyse par IA (Gemini)"
-                    st.success("✅ Analyse terminée !")
-                    st.rerun()
+            if analysis_method == "Analyse par IA (Gemini)":
+                progress_placeholder.info(f"🤖 Analyse Gemini en cours...")
+                result = rank_resumes_with_gemini(job_description, resumes, file_names)
+                results = {"scores": result["scores"], "explanations": result["explanations"]}
+                explanations = result["explanations"]
+                progress_bar.progress(1.0)
 
-    if analysis_method == "Analyse par IA (DeepSeek)":
+            elif analysis_method == "Analyse par IA (DeepSeek)":
                 # Analyse IA avec progression individuelle
                 progress_placeholder.info(f"🤖 Analyse par IA en cours (0/{len(resumes)})...")
                 progress_bar.progress(0.3)
@@ -1678,6 +1830,7 @@ with tab1:
                 
                 results = {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
                 explanations = results.get("explanations")
+
             
             elif analysis_method == "Scoring par Règles (Regex)":
                 progress_placeholder.info(f"📏 Analyse par règles en cours...")
@@ -2339,6 +2492,9 @@ with tab5:
             "📁 Renommer les CV et organiser par dossiers",
             help="Extrait automatiquement les noms des candidats et organise les CV par catégorie dans un fichier ZIP"
         )
+
+        # Choix du modèle IA pour la classification
+        classif_model = st.radio("Modèle IA pour la classification", ["DeepSeek", "Gemini"], horizontal=True)
         
         # Bouton de classification primaire
         if st.button("📂 Lancer l'auto-classification", type='primary'):
@@ -2370,9 +2526,14 @@ with tab5:
                     else:
                         display_name = os.path.splitext(name)[0]
 
-                    # Classification principale 100% via IA DeepSeek (macro + sous-cat + récap)
+                    # Classification principale 100% via IA (macro + sous-cat + récap)
                     text_for_ai = (text or '')[:3000]
-                    classification = get_deepseek_auto_classification(text_for_ai, display_name)
+                    
+                    if classif_model == "Gemini":
+                        classification = get_gemini_auto_classification(text_for_ai, display_name)
+                    else:
+                        classification = get_deepseek_auto_classification(text_for_ai, display_name)
+
                     cat = classification.get('macro_category', 'Non classé')
                     sub_cat = classification.get('sub_category', 'Autre')
                     profile_summary = classification.get('profile_summary', '')
@@ -2621,161 +2782,6 @@ with tab5:
 
 # --- FONCTIONS GEMINI (NOUVEAU) ---
 
-def get_gemini_api_key():
-    try:
-        return st.secrets.get("Gemini_API_KEY", None)
-    except Exception:
-        return None
 
-def get_detailed_score_with_gemini(job_description, resume_text):
-    API_KEY = get_gemini_api_key()
-    if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Gemini manquante."}
-    
-    genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    
-    prompt = f""""
-    En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
-    Fournis ta réponse en deux parties :
-    1. Un score de correspondance en pourcentage (ex: "Score: 85%").
-    2. Une analyse détaillée expliquant les points forts et les points à améliorer.
-    ---
-    Description du poste: {job_description}
-    ---
-    Texte du CV: {resume_text}
-    """
-    
-    try:
-        response = model.generate_content(prompt)
-        text_resp = response.text
-        
-        # Extraction du score
-        score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
-        score = int(score_match.group(1)) / 100 if score_match else 0.0
-        
-        return {"score": score, "explanation": text_resp}
-    except Exception as e:
-        return {"score": 0.0, "explanation": f"Erreur Gemini: {e}"}
+# --- FIN FONCTIONS GEMINI ---
 
-def rank_resumes_with_gemini(job_description, resumes, file_names):
-    scores_data = []
-    # Placeholder pour barre de progression si intégrée, sinon boucle simple
-    progress_bar = st.progress(0)
-    for i, resume_text in enumerate(resumes):
-        scores_data.append(get_detailed_score_with_gemini(job_description, resume_text))
-        progress_bar.progress((i + 1) / len(resumes))
-        time.sleep(1) # Petit délai pour éviter rate limits tier gratuit
-    progress_bar.empty()
-    return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
-
-def get_gemini_profile_analysis(text: str, candidate_name: str | None = None) -> str:
-    API_KEY = get_gemini_api_key()
-    if not API_KEY: return "❌ Analyse impossible (clé API Gemini manquante)."
-    
-    # Logique Nom
-    safe_name = """
-    if candidate_name and is_valid_name_candidate(candidate_name):
-        safe_name = candidate_name
-    else:
-        extracted = extract_name_from_cv_text(text)
-        if extracted and extracted.get('name'):
-            safe_name = extracted['name']
-        else:
-            safe_name = "Candidat"
-    safe_name = safe_name.replace("##", "").replace("**", "").strip()
-
-    genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
-    
-    prompt = f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
-
-Règles NOM :
-- Nom identifié : "{safe_name}".
-- Si "{safe_name}" est inapproprié (Candidat, Permis B...), Trouve le vrai nom dans le texte.
-- Sinon garde "{safe_name}".
-
-**Format de sortie OBLIGATOIRE** :
-
-**👤 [Nom du Candidat]**
-
-**📊 Synthèse**
-[2-3 phrases]
-
-**🎓 Formation**
-[Diplôme le plus élevé]
-
-**💼 Expérience**
-[Dernier poste]
-
-**🛠️ Compétences clés**
-[4-5 compétences]
-
-**💡 Points forts**
-[2-3 points]
-
-**⚠️ Points d'attention**
-[1-2 points]
-
-Texte du CV :
-{text[:4000]}
-"""
-    try:
-        response = model.generate_content(prompt)
-        return response.text.strip()
-    except Exception as e:
-        return f"❌ Erreur Gemini : {e}"
-
-def get_gemini_auto_classification(text: str, full_name: str | None) -> dict:
-    API_KEY = get_gemini_api_key()
-    safe_name = (full_name or "Candidat").strip()
-    if not API_KEY:
-        return {
-            "macro_category": "Non classé",
-            "sub_category": "Autre",
-            "years_experience": 0,
-            "profile_summary": f"Erreur config Gemini",
-            "candidate_name": safe_name
-        }
-        
-    genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash', generation_config={"response_mime_type": "application/json"})
-    
-    prompt = f""""
-    Expert recrutement. Analyse CV.
-    
-    1. Check Nom: "{safe_name}". Corrige si faux (Permis B, etc).
-    2. Macro-catégorie (UNE SEULE) : "Fonctions supports", "Logistique", "Production/Technique".
-    3. Sous-catégorie.
-    4. Années expérience (int).
-    5. Récapitulatif (2-3 phrases).
-
-    JSON output only:
-    {{ "candidate_name": "...", "macro_category": "...", "sub_category": "...", "years_experience": 0, "profile_summary": "..." }}
-    
-    CV:
-    {text[:4000]}
-    """
-    
-    try:
-        response = model.generate_content(prompt)
-        data = json.loads(response.text)
-        
-        # Fallback values handle
-        macro = data.get("macro_category") or "Non classé"
-        if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]: macro = "Non classé"
-        
-        return {
-            "macro_category": macro,
-            "sub_category": data.get("sub_category", "Autre"),
-            "years_experience": int(data.get("years_experience", 0)),
-            "profile_summary": data.get("profile_summary", ""),
-            "candidate_name": data.get("candidate_name", safe_name)
-        }
-    except Exception as e:
-        return {
-            "macro_category": "Non classé",
-            "sub_category": "Autre",
-            "years_experience": 0,
-            "profile_summary": f"Erreur Gemini: {e}",
-            "candidate_name": safe_name
-        }
