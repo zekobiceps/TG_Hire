@@ -73,17 +73,14 @@ if not st.session_state.get("logged_in", False):
     st.stop()
 
 # --- Vérification unique de la clé API DeepSeek au démarrage ---
-# Évite les messages d'erreur multiples lors du redémarrage après un push
+# Cette vérification est silencieuse ici pour éviter de bloquer ou d'afficher des erreurs avant le chargement complet
 _deepseek_api_available = False
 try:
-    _api_key_check = st.secrets.get("DEEPSEEK_API_KEY", None)
-    if _api_key_check:
+    if "DEEPSEEK_API_KEY" in st.secrets:
         _deepseek_api_available = True
 except Exception:
     pass
 
-if not _deepseek_api_available:
-    st.warning("⚠️ Le secret 'DEEPSEEK_API_KEY' n'est pas configuré. Certaines fonctionnalités IA seront désactivées.")
 
 # Initialisation des variables de session
 if "cv_analysis_feedback" not in st.session_state:
@@ -2510,6 +2507,16 @@ with tab4:
 
 with st.sidebar:
     st.markdown("### 🔧 Configuration")
+    
+    # Indicateurs d'état discret
+    ds_status = "✅" if get_api_key() else "⚠️"
+    gem_status = "✅" if get_gemini_api_key() else "⚠️"
+    
+    if ds_status == "⚠️":
+        st.caption("⚠️ DeepSeek API non configurée")
+    if gem_status == "⚠️":
+        st.caption("⚠️ Gemini API non configurée")
+
     if st.button("Test Connexion IA (DeepSeek & Gemini)"):
         # Test DeepSeek
         ds_key = get_api_key()
