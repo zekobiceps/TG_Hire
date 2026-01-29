@@ -2573,6 +2573,13 @@ with st.sidebar:
         if gem_key:
             try:
                 genai.configure(api_key=gem_key)
+                
+                # Récupération et affichage de la liste des modèles disponibles pour diagnostic
+                try:
+                    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+                except Exception as e_list:
+                    available_models = [f"Erreur liste: {e_list}"]
+
                 # Tentative avec gemini-1.5-flash
                 try:
                     model = genai.GenerativeModel('gemini-1.5-flash')
@@ -2580,14 +2587,15 @@ with st.sidebar:
                     if response:
                         st.success("✅ Gemini (Flash) : Connecté")
                 except Exception as e_flash:
-                    # Fallback sur gemini-pro
+                     # Fallback sur gemini-pro
                     try:
                         model = genai.GenerativeModel('gemini-pro')
                         response = model.generate_content("Ping")
                         if response:
                              st.success("✅ Gemini (Pro) : Connecté")
                     except Exception as e_pro:
-                        st.error(f"❌ Gemini : Échec Flash ({e_flash}) et Pro ({e_pro})")
+                        st.error(f"❌ Erreur Gemini. Modèles disponibles pour votre clé : {available_models}")
+                        st.error(f"Détails : {e_flash} | {e_pro}")
             except Exception as e:
                 st.error(f"❌ Gemini : {e}")
         else:
