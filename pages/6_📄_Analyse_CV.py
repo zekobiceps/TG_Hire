@@ -568,15 +568,23 @@ def get_deepseek_profile_analysis(text: str, candidate_name: str | None = None) 
     if not API_KEY:
         return "❌ Analyse impossible (clé API manquante)."
     
-    # Extraction du nom si non fourni
-    safe_name = (candidate_name or "").strip()
-    if not safe_name or not is_valid_name_candidate(safe_name):
-        # Essayer d'extraire depuis le texte
+    # --- LOGIQUE AMÉLIORÉE POUR LE NOM ---
+    safe_name = ""
+    
+    # 1. Priorité au nom passé en argument s'il est valide
+    if candidate_name and is_valid_name_candidate(candidate_name):
+        safe_name = candidate_name
+    else:
+        # 2. Sinon, tentative d'extraction locale robuste
         extracted = extract_name_from_cv_text(text)
-        if extracted and extracted.get('name') and is_valid_name_candidate(extracted.get('name', '')):
+        if extracted and extracted.get('name'):
             safe_name = extracted['name']
         else:
             safe_name = "Candidat"
+    
+    # Nettoyage final du nom (au cas où des ## resteraient)
+    safe_name = safe_name.replace("##", "").replace("**", "").strip()
+    # -------------------------------------
     
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
@@ -810,149 +818,205 @@ def get_deepseek_auto_classification(text: str, full_name: str | None) -> dict:
             "profile_summary": f"{safe_name} : récapitulatif non disponible (erreur IA).",
         }
 
-# -------------------- Extraction de noms des CV --------------------
+# -------------------- Extraction de noms des CV (AMÉLIORÉE) --------------------
+
+def is_valid_name_candidate(text: str) -> bool:
+    """
+    Vérifie si un texte ressemble à un vrai nom.
+    Plus permissif pour accepter les noms composés et formats internationaux.
+    """
+    if not text or len(text) < 2:
+        return False
+    
+    # Nettoyage de base
+    text = text.strip()
+    
+    # Rejets évidents
+    if len(text) > 50 and ' ' not in text: return False  # Trop long sans espace
+    if re.search(r'\d', text): return False  # Contient des chiffres
+    if re.search(r'[@€$£%]', text): return False  # Caractères spéciaux invalides
+    if text.count('-') > 3: return False  # Trop de tirets
+    
+    # Doit contenir au moins une voyelle (sauf exceptions très rares)
+    if not re.search(r'[aeiouyàâäéèêëïîôöùûü]', text.lower()):
+        return False
+    
+    # Ratio de lettres (doit être principalement des lettres)
+    # On enlève espaces et tirets pour le calcul
+    clean_chars = re.sub(r'[\s\-\.]', '', text)
+    if not clean_chars: return False
+    
+    return True
+
+
+def is_likely_name_line(line: str) -> bool:
+    """
+    Détermine si une ligne a de fortes chances d'être un nom (et pas un titre).
+    """
+    line_lower = line.lower().strip()
+    
+    # Liste noire : Mots qui indiquent que ce n'est PAS un nom
+    black_list = [
+        'cv', 'curriculum', 'vitae', 'resume', 'profil', 'profile',
+        'expérience', 'experience', 'formation', 'education', 
+        'compétences', 'skills', 'langues', 'languages',
+        'projet', 'project', 'contact', 'téléphone', 'email', 'adresse',
+        'page', 'date', 'de', 'du', 'des', 'le', 'la', 'les',  # Articles isolés
+        'diplômes', 'formations', 'certifications', 'hobbies', 'loisirs',
+        'centres', 'intérêt', 'projets', 'réalisés', 'professionnelles',
+        'analyste', 'financière', 'contrôleuse', 'gestion', 'ingénieur',
+        'directeur', 'manager', 'consultant', 'développeur', 'responsable'
+    ]
+    
+    # Si la ligne correspond exactement à un mot de la liste noire
+    if line_lower in black_list:
+        return False
+        
+    # Si la ligne contient des indicateurs forts de section
+    if any(x in line_lower for x in ['expérience professionnelle', 'expériences professionnelles',
+                                      'work experience', 'academic background', 
+                                      'diplômes et formations', 'centres d\'intérêt']):
+        return False
+
+    # Doit contenir entre 2 et 5 mots (ex: "Jean Dupont" ou "Jean-Pierre de la Tour")
+    words = line.split()
+    if len(words) < 2 or len(words) > 5:
+        return False
+    
+    # Au moins un mot doit commencer par une majuscule (sauf si tout est en majuscule)
+    if not line.isupper() and not any(w[0].isupper() for w in words if w):
+        return False
+        
+    return True
+
+
+def score_name_candidate(text: str) -> float:
+    """
+    Attribue un score de probabilité (0-1) qu'un texte soit un nom.
+    """
+    score = 0.0
+    words = text.split()
+    
+    # Longueur idéale (2-3 mots)
+    if 2 <= len(words) <= 3: score += 0.3
+    elif len(words) == 4: score += 0.2
+    
+    # Casse (Casing)
+    if text.isupper():  # TOUT EN MAJUSCULES (fréquent pour les noms de famille)
+        score += 0.2
+    elif all(w[0].isupper() for w in words if w):  # Title Case
+        score += 0.2
+    elif len(words) >= 2 and words[-1].isupper() and words[0][0].isupper():  # Prénom NOM
+        score += 0.3
+        
+    # Validation basique
+    if is_valid_name_candidate(text):
+        score += 0.2
+    else:
+        return 0  # Si invalide, score 0 direct
+        
+    return min(score, 1.0)
+
+
 def extract_name_from_cv_text(text):
     """
-    Extrait le nom et prénom d'un CV à partir du texte.
-    Retourne un dictionnaire avec 'name', 'confidence' et 'method_used'
+    Extrait le nom complet d'un CV avec une approche heuristique avancée.
+    Gère les cas comme "## Hiba BELFARJI" ou les mises en page OCR.
     """
     if not text or len(text.strip()) < 10:
         return {"name": None, "confidence": 0, "method_used": "text_too_short"}
     
-    # Prendre les premières lignes (plus probable de contenir le nom)
-    lines = text.split('\n')[:15]  # Premières 15 lignes
-    text_upper = text.upper()
+    lines = text.split('\n')
     
-    # Méthode 1: Chercher des patterns explicites
-    explicit_patterns = [
-        r'(?:nom\s*[:;]\s*)([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)*)',
-        r'(?:prénom\s*[:;]\s*)([A-ZÀ-Ÿ][a-zà-ÿ]+)',
-        r'(?:name\s*[:;]\s*)([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)*)',
-    ]
-    
-    nom, prenom = None, None
-    
-    for line in lines:
-        for pattern in explicit_patterns:
-            match = re.search(pattern, line, re.IGNORECASE)
-            if match:
-                if 'nom' in pattern.lower() and not 'prénom' in pattern.lower():
-                    nom = match.group(1).strip()
-                elif 'prénom' in pattern.lower():
-                    prenom = match.group(1).strip()
-                elif 'name' in pattern.lower():
-                    parts = match.group(1).strip().split()
-                    if len(parts) >= 2:
-                        nom, prenom = parts[0], parts[1]
-    
-    if nom and prenom:
-        formatted_name = f"{nom.upper()} {prenom.capitalize()}"
-        return {"name": formatted_name, "confidence": 0.9, "method_used": "explicit_pattern"}
-    
-    # Méthode 2: Chercher près d'email ou téléphone
-    email_phone_patterns = [
-        r'[\w\.-]+@[\w\.-]+\.\w+',
-        r'(?:\+33|0)[1-9](?:[.\-\s]?\d{2}){4}',
-        r'\d{2}[\.\-\s]?\d{2}[\.\-\s]?\d{2}[\.\-\s]?\d{2}[\.\-\s]?\d{2}'
-    ]
-    
-    for i, line in enumerate(lines):
-        for pattern in email_phone_patterns:
-            if re.search(pattern, line):
-                # Chercher dans les 2 lignes précédentes et suivantes
-                search_lines = lines[max(0, i-2):min(len(lines), i+3)]
-                for search_line in search_lines:
-                    candidate = extract_name_from_line(search_line)
-                    if candidate:
-                        return {"name": candidate, "confidence": 0.7, "method_used": "near_contact"}
-    
-    # Méthode 3: Chercher des mots en majuscules dans les premières lignes
-    for line in lines[:5]:  # Seulement les 5 premières lignes
-        candidate = extract_name_from_line(line)
-        if candidate:
-            return {"name": candidate, "confidence": 0.6, "method_used": "capitalized_words"}
-    
-    return {"name": None, "confidence": 0, "method_used": "not_found"}
+    # --- ÉTAPE 1 : Nettoyage préliminaire des lignes ---
+    # On regarde les 50 premières lignes (car les CV multi-colonnes peuvent avoir le nom plus loin)
+    cleaned_lines = []
+    for line in lines[:50]:
+        # Enlever les caractères de formatage Markdown ou OCR
+        clean = line.strip()
+        clean = re.sub(r'^##\s*', '', clean)  # Enlever "## " au début
+        clean = re.sub(r'^\*\*\s*', '', clean)  # Enlever "** " au début
+        clean = re.sub(r'\s*\*\*$', '', clean)  # Enlever " **" à la fin
+        clean = re.sub(r'^[-•➢]\s*', '', clean)  # Enlever les puces
+        if clean:
+            cleaned_lines.append(clean)
 
-def is_valid_name_candidate(text: str) -> bool:
-    """Vérifie si un texte ressemble à un vrai nom (pas un hash, UUID, etc.)"""
-    if not text or len(text) < 2:
-        return False
-    # Rejeter les chaînes qui ressemblent à des identifiants/hash
-    # (plus de 3 chiffres consécutifs, caractères hexadécimaux, tirets multiples)
-    if re.search(r'\d{3,}', text):  # 3+ chiffres consécutifs
-        return False
-    if re.search(r'^[a-f0-9]{8,}$', text.lower()):  # Hash hexadécimal
-        return False
-    if re.search(r'^[a-zA-Z0-9]{20,}$', text):  # Chaîne alphanum trop longue sans espace
-        return False
-    if text.count('-') > 2:  # Trop de tirets (UUID-like)
-        return False
-    if text.count('_') > 1:  # Underscores multiples (identifiant technique)
-        return False
-    # Doit contenir au moins une voyelle (vrai nom)
-    if not re.search(r'[aeiouyàâäéèêëïîôöùûü]', text.lower()):
-        return False
-    return True
+    # --- ÉTAPE 2 : Recherche de patterns explicites (Regex forte) ---
+    # Pattern : Prénom (Title) NOM (Upper) ou NOM (Upper) Prénom (Title)
+    # Ex: "Hiba BELFARJI" ou "BELFARJI Hiba"
+    regex_strong = r'^([A-ZÀ-Ÿ][a-zà-ÿ]+(?:-[A-ZÀ-Ÿ][a-zà-ÿ]+)?)\s+([A-ZÀ-Ÿ]{2,}(?:\s+[A-ZÀ-Ÿ]{2,})?)$'
+    regex_reverse = r'^([A-ZÀ-Ÿ]{2,}(?:\s+[A-ZÀ-Ÿ]{2,})?)\s+([A-ZÀ-Ÿ][a-zà-ÿ]+(?:-[A-ZÀ-Ÿ][a-zà-ÿ]+)?)$'
+    
+    for line in cleaned_lines:
+        # Test Prénom NOM
+        match = re.match(regex_strong, line)
+        if match and is_likely_name_line(line):
+            return {"name": line, "confidence": 0.95, "method_used": "regex_strong_firstname_lastname"}
+        
+        # Test NOM Prénom
+        match = re.match(regex_reverse, line)
+        if match and is_likely_name_line(line):
+            return {"name": line, "confidence": 0.95, "method_used": "regex_strong_lastname_firstname"}
+
+    # --- ÉTAPE 3 : Système de Scoring (Heuristique) ---
+    best_candidate = None
+    best_score = 0.0
+    
+    for line in cleaned_lines:
+        if not is_likely_name_line(line):
+            continue
+            
+        current_score = score_name_candidate(line)
+        
+        if current_score > best_score:
+            best_score = current_score
+            best_candidate = line
+            
+    # --- ÉTAPE 4 : Fallback Proximité Email/Tel ---
+    # Si le score est faible, on regarde près de l'email
+    if best_score < 0.6:
+        for i, line in enumerate(lines[:50]):
+            # Si on trouve un email ou un tel
+            if re.search(r'@[\w\.-]+', line) or re.search(r'(?:(?:\+|00)33|0)\s*[1-9]', line):
+                # Regarder 10 lignes avant (car le nom peut être plus haut dans le CV)
+                for offset in range(1, 11):
+                    if i - offset >= 0:
+                        prev_line = lines[i - offset].strip()
+                        # Nettoyage léger
+                        prev_line = re.sub(r'^##\s*', '', prev_line)
+                        prev_line = re.sub(r'^\*\*\s*', '', prev_line)
+                        prev_line = re.sub(r'\s*\*\*$', '', prev_line)
+                        if is_likely_name_line(prev_line):
+                            cand_score = score_name_candidate(prev_line)
+                            # On booste le score car proche des contacts
+                            if cand_score + 0.3 > best_score:
+                                best_score = cand_score + 0.3
+                                best_candidate = prev_line
+
+    if best_candidate and best_score > 0.4:
+        return {"name": best_candidate, "confidence": best_score, "method_used": "scoring_best_match"}
+
+    return {"name": None, "confidence": 0, "method_used": "not_found"}
 
 
 def extract_name_from_line(line):
-    """Extrait un nom candidat d'une ligne en utilisant des heuristiques"""
+    """Extrait un nom candidat d'une ligne en utilisant des heuristiques (fonction legacy)"""
     if not line or len(line.strip()) < 5:
         return None
     
     # Nettoyer la ligne
     line = line.strip()
+    line = re.sub(r'^##\s*', '', line)  # Enlever "## " au début
+    line = re.sub(r'^\*\*\s*', '', line)  # Enlever "** " au début
+    line = re.sub(r'\s*\*\*$', '', line)  # Enlever " **" à la fin
     
-    # Mots à ignorer (mots métier courants, titres de sections CV)
-    ignore_words = {
-        # Mots génériques CV
-        'cv', 'curriculum', 'vitae', 'resume', 'profil', 'profile', 'about', 'me', 'moi',
-        # Titres de sections
-        'expérience', 'experiences', 'expériences', 'professionnelle', 'professionnelles',
-        'formation', 'formations', 'diplôme', 'diplômes', 'education', 'éducation',
-        'compétences', 'competences', 'skills', 'aptitudes', 'qualifications',
-        'projet', 'projets', 'project', 'projects', 'réalisations',
-        'langues', 'languages', 'certifications', 'hobbies', 'loisirs', 'centres', 'intérêt',
-        # Postes/Fonctions
-        'directeur', 'directrice', 'direction', 'manager', 'ingénieur', 'engineer',
-        'consultant', 'développeur', 'developer', 'analyst', 'analyste',
-        'chef', 'responsable', 'assistant', 'assistante', 'coordinateur', 'coordinatrice',
-        'senior', 'junior', 'stage', 'stagiaire', 'étudiant', 'étudiante', 'intern',
-        'technicien', 'technicienne', 'spécialiste', 'expert', 'cadre',
-        # Domaines
-        'informatique', 'finance', 'comptabilité', 'marketing', 'commercial', 'rh',
-        'ressources', 'humaines', 'logistique', 'production', 'qualité', 'technique',
-        'immobilier', 'développement', 'development', 'gestion', 'management',
-        # Contact
-        'téléphone', 'email', 'adresse', 'address', 'contact', 'portable', 'mobile',
-        # Divers
-        'né', 'age', 'ans', 'years', 'page', 'pdf', 'document', 'fichier', 'file',
-        'université', 'university', 'école', 'school', 'master', 'licence', 'bachelor',
-        'arc', 'objectif', 'objective', 'summary', 'résumé', 'synthèse'
-    }
+    # Utiliser les nouvelles fonctions
+    if is_likely_name_line(line):
+        score = score_name_candidate(line)
+        if score > 0.4:
+            return line
     
-    # Chercher 2-3 mots consécutifs commençant par une majuscule
-    words = line.split()
-    candidates = []
-    
-    for i in range(len(words) - 1):
-        if i + 1 < len(words):
-            word1, word2 = words[i], words[i + 1]
-            
-            # Vérifier que les mots sont des candidats valides
-            if (word1[0].isupper() and word2[0].isupper() and 
-                len(word1) > 1 and len(word2) > 1 and
-                word1.lower() not in ignore_words and 
-                word2.lower() not in ignore_words and
-                word1.isalpha() and word2.isalpha() and
-                is_valid_name_candidate(word1) and is_valid_name_candidate(word2)):
-                
-                # Format: NOM Prénom
-                formatted = f"{word1.upper()} {word2.capitalize()}"
-                candidates.append(formatted)
-    
-    return candidates[0] if candidates else None
+    return None
 
 # -------------------- Génération du ZIP organisé --------------------
 def merge_results_with_ai_analysis(original_results):
