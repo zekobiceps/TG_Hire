@@ -2573,10 +2573,21 @@ with st.sidebar:
         if gem_key:
             try:
                 genai.configure(api_key=gem_key)
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                response = model.generate_content("Ping")
-                if response:
-                     st.success("✅ Gemini : Connecté")
+                # Tentative avec gemini-1.5-flash
+                try:
+                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    response = model.generate_content("Ping")
+                    if response:
+                        st.success("✅ Gemini (Flash) : Connecté")
+                except Exception as e_flash:
+                    # Fallback sur gemini-pro
+                    try:
+                        model = genai.GenerativeModel('gemini-pro')
+                        response = model.generate_content("Ping")
+                        if response:
+                             st.success("✅ Gemini (Pro) : Connecté")
+                    except Exception as e_pro:
+                        st.error(f"❌ Gemini : Échec Flash ({e_flash}) et Pro ({e_pro})")
             except Exception as e:
                 st.error(f"❌ Gemini : {e}")
         else:
