@@ -170,8 +170,12 @@ div[data-testid="stTabs"] button p {
 # -------------------- Chargement des modèles ML (mis en cache) --------------------
 @st.cache_resource
 def load_embedding_model():
-    """Charge le modèle SentenceTransformer une seule fois."""
-    return SentenceTransformer('all-MiniLM-L6-v2')
+    """Charge le modèle SentenceTransformer une seule fois de manière sécurisée."""
+    try:
+        return SentenceTransformer('all-MiniLM-L6-v2')
+    except Exception as e:
+        st.warning(f"⚠️ Impossible de charger le modèle sémantique (embedding). La méthode 'Sémantique' sera indisponible. Erreur: {e}")
+        return None
 
 embedding_model = load_embedding_model()
 
@@ -315,6 +319,10 @@ def rank_resumes_with_cosine(job_description, resumes, file_names):
 
 # --- MÉTHODE 2 : WORD EMBEDDINGS (AVEC LOGIQUE) ---
 def rank_resumes_with_embeddings(job_description, resumes, file_names):
+    if embedding_model is None:
+        st.error("❌ Le modèle sémantique n'est pas chargé. Impossible d'utiliser cette méthode.")
+        return {"scores": [0] * len(resumes), "logic": {}}
+        
     try:
         jd_embedding = embedding_model.encode(job_description, convert_to_tensor=True)
         resume_embeddings = embedding_model.encode(resumes, convert_to_tensor=True)
