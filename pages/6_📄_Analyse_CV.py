@@ -3,6 +3,8 @@ import pandas as pd
 import io
 import requests
 import google.generativeai as genai
+import anthropic
+import groq
 import json
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -638,6 +640,240 @@ def rank_resumes_with_ai(job_description, resumes, file_names):
 
 
 
+# --- FONCTIONS GROQ ---
+def get_groq_api_key():
+    """Récupère la clé Groq avec persistance en session state."""
+    if "Groq_API_KEY" in st.session_state:
+        return st.session_state.Groq_API_KEY
+    
+    api_key = None
+    try:
+        keys_to_check = ["Groq_API_KEY", "GROQ_API_KEY"]
+        for k in keys_to_check:
+            if k in st.secrets:
+                api_key = st.secrets[k]
+                break
+        
+        if not api_key:
+            for k in keys_to_check:
+                val = os.environ.get(k)
+                if val:
+                    api_key = val
+                    break
+                    
+        if api_key:
+            st.session_state.Groq_API_KEY = api_key
+            return api_key
+    except Exception:
+        pass
+    return None
+
+def get_detailed_score_with_groq(job_description, resume_text):
+    API_KEY = get_groq_api_key()
+    if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Groq manquante."}
+    
+    try:
+        client = groq.Groq(api_key=API_KEY)
+        prompt = f"""
+        En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
+        Fournis ta réponse en deux parties :
+        1. Un score de correspondance en pourcentage (ex: "Score: 85%").
+        2. Une analyse détaillée expliquant les points forts et les points à améliorer.
+        ---
+        Description du poste: {job_description}
+        ---
+        Texte du CV: {resume_text}
+        """
+        
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            max_tokens=4000,
+        )
+        text_resp = chat_completion.choices[0].message.content
+        
+        score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
+        score = int(score_match.group(1)) / 100 if score_match else 0.0
+        
+        return {"score": score, "explanation": text_resp}
+    except Exception as e:
+        return {"score": 0.0, "explanation": f"Erreur Groq: {e}"}
+
+def rank_resumes_with_groq(job_description, resumes, file_names):
+    scores_data = []
+    progress_bar = st.progress(0)
+    for i, resume_text in enumerate(resumes):
+        scores_data.append(get_detailed_score_with_groq(job_description, resume_text))
+        progress_bar.progress((i + 1) / len(resumes))
+    progress_bar.empty()
+    return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
+
+def get_groq_profile_analysis(text: str, candidate_name: str | None = None) -> str:
+    API_KEY = get_groq_api_key()
+    if not API_KEY: return "❌ Analyse Groq impossible (clé manquante)."
+
+    safe_name = (candidate_name or "Candidat").strip()
+
+    try:
+        client = groq.Groq(api_key=API_KEY)
+        prompt = f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
+
+Règles NOM :
+- Nom identifié : "{safe_name}".
+- Si "{safe_name}" est inapproprié (Candidat, Permis B...), Trouve le vrai nom dans le texte.
+- Sinon garde "{safe_name}".
+
+**Format de sortie OBLIGATOIRE** :
+
+**👤 [Nom du Candidat]**
+
+**📊 Synthèse**
+[2-3 phrases]
+
+**🎓 Formation**
+[Diplôme le plus élevé]
+
+**💼 Expérience**
+[Dernier poste]
+
+**🛠️ Compétences clés**
+[4-5 compétences]
+
+**💡 Points forts**
+[2-3 points]
+
+**⚠️ Points d'attention**
+[1-2 points]
+
+Texte du CV :
+{text[:4000]}
+"""
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            max_tokens=2000,
+        )
+        return chat_completion.choices[0].message.content
+    except Exception as e:
+        return f"❌ Erreur Groq : {e}"
+
+# --- FONCTIONS CLAUDE ---
+def get_claude_api_key():
+    """Récupère la clé Claude avec persistance en session state."""
+    if "Claude_API_KEY" in st.session_state:
+        return st.session_state.Claude_API_KEY
+    
+    api_key = None
+    try:
+        keys_to_check = ["Claude_API_KEY", "CLAUDE_API_KEY", "anthropic_api_key", "ANTHROPIC_API_KEY"]
+        for k in keys_to_check:
+            if k in st.secrets:
+                api_key = st.secrets[k]
+                break
+        
+        if not api_key:
+            for k in keys_to_check:
+                val = os.environ.get(k)
+                if val:
+                    api_key = val
+                    break
+                    
+        if api_key:
+            st.session_state.Claude_API_KEY = api_key
+            return api_key
+    except Exception:
+        pass
+    return None
+
+def get_detailed_score_with_claude(job_description, resume_text):
+    API_KEY = get_claude_api_key()
+    if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Claude manquante."}
+    
+    try:
+        client = anthropic.Anthropic(api_key=API_KEY)
+        prompt = f"""
+        En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
+        Fournis ta réponse en deux parties :
+        1. Un score de correspondance en pourcentage (ex: "Score: 85%").
+        2. Une analyse détaillée expliquant les points forts et les points à améliorer.
+        ---
+        Description du poste: {job_description}
+        ---
+        Texte du CV: {resume_text}
+        """
+        
+        message = client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=4000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        # Safely extract text from blocks
+        text_resp = ""
+        for block in message.content:
+            if hasattr(block, 'text'):
+                text_resp += block.text
+        
+        score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
+        score = int(score_match.group(1)) / 100 if score_match else 0.0
+        
+        return {"score": score, "explanation": text_resp}
+    except Exception as e:
+        return {"score": 0.0, "explanation": f"Erreur Claude: {e}"}
+
+def get_claude_profile_analysis(text: str, candidate_name: str | None = None) -> str:
+    API_KEY = get_claude_api_key()
+    if not API_KEY: return "❌ Analyse Claude impossible (clé manquante)."
+
+    safe_name = (candidate_name or "Candidat").strip()
+
+    try:
+        client = anthropic.Anthropic(api_key=API_KEY)
+        prompt = f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
+
+Règles NOM :
+- Nom identifié : "{safe_name}".
+- Si "{safe_name}" est inapproprié (Candidat, Permis B...), Trouve le vrai nom dans le texte.
+- Sinon garde "{safe_name}".
+
+**Format de sortie OBLIGATOIRE** :
+
+**👤 [Nom du Candidat]**
+
+**📊 Synthèse**
+[2-3 phrases]
+
+**🎓 Formation**
+[Diplôme le plus élevé]
+
+**💼 Expérience**
+[Dernier poste]
+
+**🛠️ Compétences clés**
+[4-5 compétences]
+
+**💡 Points forts**
+[2-3 points]
+
+**⚠️ Points d'attention**
+[1-2 points]
+
+Texte du CV :
+{text[:4000]}
+"""
+        message = client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=2000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        # Safely extract text from blocks
+        text_resp = ""
+        for block in message.content:
+            if hasattr(block, 'text'):
+                text_resp += block.text
+        return text_resp
+    except Exception as e:
+        return f"❌ Erreur Claude : {e}"
+
 # --- FONCTIONS GEMINI ---
 
 def get_gemini_api_key():
@@ -676,12 +912,12 @@ def get_detailed_score_with_gemini(job_description, resume_text):
     if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Gemini manquante."}
     
     genai.configure(api_key=API_KEY)
-    # Fallback sur gemini-pro si flash n'est pas dispo
-    model_name = 'gemini-1.5-flash'
+    
+    # Selection du modèle basé sur la disponibilité
     try:
-        model = genai.GenerativeModel(model_name)
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
     except:
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-2.0-flash')
     
     prompt = f"""
     En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
@@ -704,17 +940,18 @@ def get_detailed_score_with_gemini(job_description, resume_text):
         
         return {"score": score, "explanation": text_resp}
     except Exception as e:
-        # Tentative de repli sur gemini-pro si erreur spécifique à flash
+        # Fallback intelligent en cas d'erreur 404
         if "not found" in str(e).lower() or "404" in str(e):
             try:
-                model = genai.GenerativeModel('gemini-pro')
+                # Tentative ultime sur le modèle 'gemini-flash-latest' qui est souvent un alias stable
+                model = genai.GenerativeModel('gemini-flash-latest')
                 response = model.generate_content(prompt)
                 text_resp = response.text
                 score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
                 score = int(score_match.group(1)) / 100 if score_match else 0.0
                 return {"score": score, "explanation": text_resp}
             except Exception as e2:
-                 return {"score": 0.0, "explanation": f"Erreur Gemini (Pro): {e2}"}
+                 return {"score": 0.0, "explanation": f"Erreur Gemini (Fallback): {e2}"}
         return {"score": 0.0, "explanation": f"Erreur Gemini: {e}"}
 
 def rank_resumes_with_gemini(job_description, resumes, file_names):
@@ -745,8 +982,8 @@ def get_gemini_profile_analysis(text: str, candidate_name: str | None = None) ->
     safe_name = safe_name.replace("##", "").replace("**", "").strip()
 
     genai.configure(api_key=API_KEY)
-    # Utilisation de gemini-pro plus stable si flash échoue
-    model = genai.GenerativeModel('gemini-pro')
+    # Utilisation de gemini-2.5-flash-lite
+    model = genai.GenerativeModel('gemini-2.5-flash-lite')
     
     prompt = f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
 
@@ -784,7 +1021,13 @@ Texte du CV :
         response = model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:
-        return f"❌ Erreur Gemini : {e}"
+         # Fallback recursif silencieux si gemini-2.0-flash échoue
+        try:
+             model = genai.GenerativeModel('gemini-flash-latest')
+             response = model.generate_content(prompt)
+             return response.text.strip()
+        except:
+            return f"❌ Erreur Gemini : {e}"
 
 def get_gemini_auto_classification(text: str, full_name: str | None) -> dict:
     API_KEY = get_gemini_api_key()
@@ -799,8 +1042,8 @@ def get_gemini_auto_classification(text: str, full_name: str | None) -> dict:
         }
         
     genai.configure(api_key=API_KEY)
-    # Switch to gemini-pro by default due to 404 errors on flash for some API keys/regions
-    model = genai.GenerativeModel('gemini-pro', generation_config={"response_mime_type": "application/json"})
+    # Update to gemini-2.5-flash-lite which is available
+    model = genai.GenerativeModel('gemini-2.5-flash-lite', generation_config={"response_mime_type": "application/json"})
     
     prompt = f"""
     Expert recrutement. Analyse CV.
@@ -839,13 +1082,34 @@ def get_gemini_auto_classification(text: str, full_name: str | None) -> dict:
             "candidate_name": data.get("candidate_name", safe_name)
         }
     except Exception as e:
-        return {
-            "macro_category": "Non classé",
-            "sub_category": "Autre",
-            "years_experience": 0,
-            "profile_summary": f"Erreur Gemini: {e}",
-            "candidate_name": safe_name
-        }
+        # Fallback silent to gemini-flash-latest
+        try:
+            model = genai.GenerativeModel('gemini-flash-latest', generation_config={"response_mime_type": "application/json"})
+            response = model.generate_content(prompt)
+            try:
+                data = json.loads(response.text)
+            except:
+                clean_text = clean_json_string(response.text)
+                data = json.loads(clean_text)
+            
+            macro = data.get("macro_category") or "Non classé"
+            if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]: macro = "Non classé"
+            
+            return {
+                "macro_category": macro,
+                "sub_category": data.get("sub_category", "Autre"),
+                "years_experience": int(data.get("years_experience", 0)),
+                "profile_summary": data.get("profile_summary", ""),
+                "candidate_name": data.get("candidate_name", safe_name)
+            }
+        except:
+            return {
+                "macro_category": "Non classé",
+                "sub_category": "Autre",
+                "years_experience": 0,
+                "profile_summary": f"Erreur Gemini: {e}",
+                "candidate_name": safe_name
+            }
 
 def get_deepseek_profile_analysis(text: str, candidate_name: str | None = None) -> str:
     """
@@ -1819,7 +2083,7 @@ with tab1:
     analysis_method = st.radio(
         "✨ Choisissez votre méthode de classement",
         ["Méthode Cosinus (Mots-clés)", "Méthode Sémantique (Embeddings)", "Scoring par Règles (Regex)", 
-         "Analyse combinée (Ensemble)", "Analyse par IA (DeepSeek)", "Analyse par IA (Gemini)"],
+         "Analyse combinée (Ensemble)", "Analyse par IA (DeepSeek)", "Analyse par IA (Gemini)", "Analyse par IA (Groq)"],
         index=0, help="Consultez l'onglet 'Guide des Méthodes'."
     )
     
@@ -1923,6 +2187,13 @@ with tab1:
             if analysis_method == "Analyse par IA (Gemini)":
                 progress_placeholder.info(f"🤖 Analyse Gemini en cours...")
                 result = rank_resumes_with_gemini(job_description, resumes, file_names)
+                results = {"scores": result["scores"], "explanations": result["explanations"]}
+                explanations = result["explanations"]
+                progress_bar.progress(1.0)
+
+            elif analysis_method == "Analyse par IA (Groq)":
+                progress_placeholder.info(f"🤖 Analyse Groq en cours...")
+                result = rank_resumes_with_groq(job_description, resumes, file_names)
                 results = {"scores": result["scores"], "explanations": result["explanations"]}
                 explanations = result["explanations"]
                 progress_bar.progress(1.0)
@@ -2574,32 +2845,60 @@ with st.sidebar:
             try:
                 genai.configure(api_key=gem_key)
                 
-                # Récupération et affichage de la liste des modèles disponibles pour diagnostic
+                # Test prioritaires sur les modèles disponibles (2.5-flash-lite)
                 try:
-                    available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-                except Exception as e_list:
-                    available_models = [f"Erreur liste: {e_list}"]
-
-                # Tentative avec gemini-1.5-flash
-                try:
-                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    model = genai.GenerativeModel('gemini-2.5-flash-lite')
                     response = model.generate_content("Ping")
                     if response:
-                        st.success("✅ Gemini (Flash) : Connecté")
+                        st.success("✅ Gemini (2.5 Flash Lite) : Connecté")
                 except Exception as e_flash:
-                     # Fallback sur gemini-pro
+                     # Fallback sur flash-latest
                     try:
-                        model = genai.GenerativeModel('gemini-pro')
+                        model = genai.GenerativeModel('gemini-flash-latest')
                         response = model.generate_content("Ping")
                         if response:
-                             st.success("✅ Gemini (Pro) : Connecté")
-                    except Exception as e_pro:
-                        st.error(f"❌ Erreur Gemini. Modèles disponibles pour votre clé : {available_models}")
-                        st.error(f"Détails : {e_flash} | {e_pro}")
+                             st.success("✅ Gemini (Flash Latest) : Connecté")
+                    except Exception as e_latest:
+                        st.error(f"❌ Gemini indisponible. Erreur : {e_flash} | {e_latest}")
             except Exception as e:
                 st.error(f"❌ Gemini : {e}")
         else:
              st.warning("⚠️ Gemini : Clé manquante")
+
+        # Test Claude
+        claude_key = get_claude_api_key()
+        if claude_key:
+            try:
+                client = anthropic.Anthropic(api_key=claude_key)
+                message = client.messages.create(
+                    model="claude-3-haiku-20240307",
+                    max_tokens=10,
+                    messages=[
+                        {"role": "user", "content": "Ping"}
+                    ]
+                )
+                if message and message.content:
+                    st.success("✅ Claude (Haiku) : Connecté")
+            except Exception as e:
+                st.error(f"❌ Claude : {e}")
+        else:
+             st.warning("⚠️ Claude : Clé manquante")
+
+        # Test Groq
+        groq_key = get_groq_api_key()
+        if groq_key:
+            try:
+                client = groq.Groq(api_key=groq_key)
+                chat_completion = client.chat.completions.create(
+                    messages=[{"role": "user", "content": "Ping"}],
+                    model="llama-3.1-8b-instant",
+                )
+                if chat_completion.choices[0].message.content:
+                    st.success("✅ Groq (Llama 3) : Connecté")
+            except Exception as e:
+                st.error(f"❌ Groq : {e}")
+        else:
+             st.warning("⚠️ Groq : Clé manquante")
 
 with tab5:
     st.header("🗂️ Auto-classification de CVs (3 catégories)")
