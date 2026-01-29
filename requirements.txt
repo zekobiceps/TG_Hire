@@ -36,6 +36,7 @@ GitPython
 google-auth-httplib2
 google-auth-oauthlib
 groq
+anthropic
 google-generativeai
 openai
 gspread

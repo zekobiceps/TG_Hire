@@ -810,7 +810,7 @@ def get_detailed_score_with_claude(job_description, resume_text):
         # Safely extract text from blocks
         text_resp = ""
         for block in message.content:
-            if hasattr(block, 'text'):
+            if block.type == "text":
                 text_resp += block.text
         
         score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
@@ -868,7 +868,7 @@ Texte du CV :
         # Safely extract text from blocks
         text_resp = ""
         for block in message.content:
-            if hasattr(block, 'text'):
+            if block.type == "text":
                 text_resp += block.text
         return text_resp
     except Exception as e:
