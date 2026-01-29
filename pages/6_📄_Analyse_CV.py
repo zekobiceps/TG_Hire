@@ -16,6 +16,16 @@ from utils import display_commit_info
 
 # Imports optionnels pour la manipulation des PDF (s'il manque, le code utilisera des fallbacks)
 try:
+    import fitz  # PyMuPDF
+except Exception:
+    fitz = None
+
+try:
+    import fitz  # PyMuPDF
+except Exception:
+    fitz = None
+
+try:
     import pdfplumber
 except Exception:
     pdfplumber = None
@@ -186,6 +196,23 @@ def extract_text_from_pdf(file):
             bio = io.BytesIO(data)
         except Exception:
             bio = file
+
+        # 0) PyMuPDF (fitz) - PRIORITÉ ABSOLUE pour l'ordre de lecture
+        # sort=True remet le texte dans l'ordre de lecture visuel (haut-gauche -> bas-droite)
+        # C'est CRUCIAL pour les CVs où le nom est dans un en-tête graphique.
+        if fitz:
+            try:
+                bio.seek(0)
+                doc = fitz.open(stream=bio, filetype="pdf")
+                text_parts = []
+                for page in doc:
+                    # sort=True est la clé ici pour éviter que le nom ne finisse à la fin du fichier
+                    text_parts.append(page.get_text("text", sort=True))
+                text = "\n".join(text_parts).strip()
+                if len(text) > 50:  # Validation minimale
+                    return text
+            except Exception as e:
+                print(f"fitz sorting error: {e}")
 
         # 1) pdfplumber (meilleur pour extraction de texte mise en page)
         try:
@@ -905,6 +932,7 @@ def is_likely_name_line(line: str) -> bool:
         'compétences', 'skills', 'langues', 'languages',
         'projet', 'project', 'contact', 'téléphone', 'email', 'adresse',
         'page', 'date', 'diplômes', 'formations', 'certifications', 'hobbies', 'loisirs',
+        'permis', 'vehicule', 'véhicule', 'conduite', 'driver', 'driving', 'b', 'voiture',
         'centres', 'intérêt', 'projets', 'réalisés', 'professionnelles',
         'coordonnées', 'spécialisations', 'management', 'onboarding', 'performance',
         'sommaire', 'summary', 'objectif', 'objective', 'propos', 'about', 'me', 'moi',
