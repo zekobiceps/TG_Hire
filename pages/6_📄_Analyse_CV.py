@@ -626,6 +626,12 @@ def get_deepseek_profile_analysis(text: str, candidate_name: str | None = None) 
     
     prompt = f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
 
+Règles NOM STRICTES (alignées avec l'extraction locale) :
+- Utilise STRICTEMENT le nom fourni ci-dessous s'il est présent.
+- Ne modifie PAS le nom (pas d'ajout de points, parenthèses, intitulés).
+- N'invente PAS de nom, si incertain, garde "Candidat".
+- Ignore toute ligne contenant des mots interdits fréquents (ex: AutoCAD, ORSYS, Secteur, BIM, Owner, PSPO, Client, Missions, Permis, Angleterre, Irlande, Luxembourg, Urbanisme, Agro-alimentaire, Lecture).
+
 **Format de sortie OBLIGATOIRE** - Respecte EXACTEMENT cet ordre et ces titres :
 
 **👤 {safe_name}**
@@ -975,9 +981,9 @@ def is_likely_name_line(line: str) -> bool:
         
         # ====== NOUVEAUX MOTS INTERDITS (Faux positifs observés) ======
         # Termes techniques/métiers
-        'simulation', 'numérique', 'numerique', 'pensée', 'pensee', 'critique',
+        'simulation', 'numérique', 'numerique', 'pensée', 'pensee', 'critique', 'lecture',
         'concept', 'partenaire', 'entreprise', 'entreprises',
-        'charge', 'chargee', 'delivery', 'delivery',
+        'charge', 'chargee', 'delivery', 'delivery', 'secteur', 'agro-alimentaire',
         
         # Sections CV supplémentaires  
         'experiences', 'expériences', 'professionelles', 'professionnelle',
@@ -986,14 +992,15 @@ def is_likely_name_line(line: str) -> bool:
         # Entreprises/Lieux supplémentaires
         'saem', 'corum', 'montpellier', 'groupement', 'mousquetaires', 'intermarché',
         'leclerc', 'auchan', 'lidl', 'casino', 'monoprix',
+        'puteaux', 'orsys', 'angleterre', 'irlande', 'luxembourg',
         
         # Termes anglais courants
-        'delivery', 'manager', 'coordinator', 'specialist', 'officer',
+        'delivery', 'manager', 'coordinator', 'specialist', 'officer', 'owner', 'pspo',
         'technical', 'professional', 'summary', 'overview',
         
         # Logiciels techniques / CAO / Outils scientifiques
-        'logiciels', 'abaqus', 'catia', 'solidworks', 'autocad', 'ansys', 'matlab',
-        'xlstat', 'minitab', 'spss', 'stata', 'r', 'rstudio',
+        'logiciels', 'abaqus', 'catia', 'solidworks', 'autocad', 'ansys', 'matlab', 'bim',
+        'xlstat', 'minitab', 'spss', 'stata', 'r', 'rstudio', 'hive', 'psql',
         'rtgs', 'target', 'swift', 'bpce',
         
         # Soft skills et termes RH
@@ -1003,6 +1010,8 @@ def is_likely_name_line(line: str) -> bool:
         
         # Titres de postes
         'cash', 'flux', 'foncier', 'trésorerie', 'tresorerie',
+        # Termes génériques récurrents à exclure
+        'client', 'missions',
     ]
     
     # Si un mot de la ligne est interdit -> Rejet
@@ -1011,6 +1020,9 @@ def is_likely_name_line(line: str) -> bool:
     
     # Rejet si la ligne contient des caractères spéciaux typiques de labels
     if ':' in line or '&' in line:
+        return False
+    # Rejet si la ligne contient ponctuation indicative de titres/sections
+    if any(p in line for p in ['.', '(', ')', '/', ',']):
         return False
 
     # 2. Vérifications de structure
@@ -1345,7 +1357,13 @@ def create_organized_zip(results, file_list):
             if 'extracted_name' in result and result['extracted_name'] and result['extracted_name']['name']:
                 # Utiliser le nom extrait
                 extracted_name = result['extracted_name']['name']
-                final_name = f"{extracted_name}.pdf"
+                # Normaliser les espaces multiples et nettoyer
+                try:
+                    import re as _re
+                    cleaned_extracted = _re.sub(r"\s+", " ", extracted_name).strip()
+                except Exception:
+                    cleaned_extracted = extracted_name.strip()
+                final_name = f"{cleaned_extracted}.pdf"
                 confidence = result['extracted_name']['confidence']
                 method = result['extracted_name']['method_used']
             else:
