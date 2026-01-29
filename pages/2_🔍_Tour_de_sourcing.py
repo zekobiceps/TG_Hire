@@ -1087,6 +1087,14 @@ with st.sidebar:
     st.markdown("---")
     st.info("💡 Assistant IA pour le sourcing et recrutement")
 
+# -------------------- Titre principal avec commit --------------------
+st.title("🔍 Tour de Sourcing")
+try:
+    from utils import display_commit_info
+    display_commit_info()
+except Exception:
+    pass
+
 # -------------------- Onglets --------------------
 # Restaurer l'affichage en onglets visuels
 tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([

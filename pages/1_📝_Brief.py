@@ -28,6 +28,7 @@ from utils import (
     PDF_AVAILABLE,
     WORD_AVAILABLE,
     save_briefs,
+    display_commit_info,
     load_briefs,
     get_example_for_field,
     export_brief_pdf,
@@ -775,6 +776,7 @@ with st.sidebar:
 
 # ---------------- NAVIGATION PRINCIPALE ----------------
 st.title("Brief de Calibration")
+display_commit_info()
 
 # Use radio button for navigation to allow persistence
 # We hide the radio button style to make it look like tabs using CSS if needed, 

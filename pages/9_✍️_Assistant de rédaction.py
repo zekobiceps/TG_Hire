@@ -5,7 +5,7 @@ import json
 from PIL import Image, ImageDraw, ImageFont
 import io
 import base64
-from utils import deepseek_generate
+from utils import deepseek_generate, display_commit_info
 
 # Configuration de l'outil
 st.set_page_config(
@@ -186,6 +186,7 @@ def generer_document_word(texte_lettre, photo_collaborateur=None):
 
 # Interface principale
 st.title("📝 Générateur de Lettres RH - TGCC")
+display_commit_info()
 st.markdown("---")
 
 # Sidebar avec les statistiques (simple pour l'instant)

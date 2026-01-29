@@ -48,6 +48,7 @@ st.set_page_config(
 )
 
 st.title("📢  Gestion des annonces")
+utils.display_commit_info()
 
 # Bloc Informations générales déplacé ici pour être en haut
 with st.container():

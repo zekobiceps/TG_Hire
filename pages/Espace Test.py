@@ -556,6 +556,79 @@ def rank_resumes_with_ai(job_description, resumes, file_names):
         scores_data.append(get_detailed_score_with_ai(job_description, resume_text))
     return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
 
+
+def get_deepseek_profile_analysis(text: str, candidate_name: str | None = None) -> str:
+    """
+    Génère une analyse de profil générique et concise en français.
+    Retourne un texte structuré avec les points clés du candidat.
+    Format en 2 colonnes pour affichage, commence par synthèse + nom.
+    """
+    API_KEY = get_api_key()
+    if not API_KEY:
+        return "❌ Analyse impossible (clé API manquante)."
+    
+    # Extraction du nom si non fourni
+    safe_name = (candidate_name or "").strip()
+    if not safe_name or not is_valid_name_candidate(safe_name):
+        # Essayer d'extraire depuis le texte
+        extracted = extract_name_from_cv_text(text)
+        if extracted and extracted.get('name') and is_valid_name_candidate(extracted.get('name', '')):
+            safe_name = extracted['name']
+        else:
+            safe_name = "Candidat"
+    
+    url = "https://api.deepseek.com/v1/chat/completions"
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
+    
+    prompt = f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
+
+**Format de sortie OBLIGATOIRE** - Respecte EXACTEMENT cet ordre et ces titres :
+
+**👤 {safe_name}**
+
+**📊 Synthèse**
+[2-3 phrases max : années d'expérience, type de profil (junior/confirmé/senior), domaine d'expertise principal]
+
+**🎓 Formation**
+[Diplôme le plus élevé - établissement - année si disponible]
+
+**💼 Expérience**
+[Dernier poste occupé - entreprise - durée]
+[Secteur(s) d'activité]
+
+**🛠️ Compétences clés**
+[4-5 compétences techniques, séparées par des virgules]
+
+**💡 Points forts**
+[2-3 points forts, une ligne chacun]
+
+**⚠️ Points d'attention**
+[1-2 éléments à vérifier en entretien]
+
+Contraintes STRICTES :
+- Commence TOUJOURS par le nom puis la synthèse
+- Sois factuel et concis (pas de formules de politesse)
+- Si info absente du CV, écris "Non précisé"
+- Maximum 12 lignes au total
+
+Texte du CV :
+{text[:4000]}
+"""
+    
+    payload = {
+        "model": "deepseek-chat",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.2,
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"].strip()
+    except Exception as e:
+        return f"❌ Erreur lors de l'analyse : {e}"
+
+
 def get_deepseek_analysis(text):
     API_KEY = get_api_key()
     if not API_KEY: return "Analyse impossible."
@@ -613,11 +686,12 @@ def get_deepseek_analysis(text):
 
 
 def get_deepseek_auto_classification(text: str, full_name: str | None) -> dict:
-    """Classe un CV dans une macro-catégorie + sous-catégorie et génère un récap profil.
+    """Classe un CV dans une macro-catégorie + sous-catégorie et génère un récap profil avec années d'expérience.
 
     Retourne un dict avec les clés:
     - macro_category: "Fonctions supports" | "Logistique" | "Production/Technique" | "Non classé"
     - sub_category: sous-direction ou sous-filière (ex: "Direction Finance", "BTP / Génie Civil")
+    - years_experience: nombre d'années d'expérience estimé
     - profile_summary: court texte de synthèse commençant par le nom complet.
     """
     API_KEY = get_api_key()
@@ -626,6 +700,7 @@ def get_deepseek_auto_classification(text: str, full_name: str | None) -> dict:
         return {
             "macro_category": "Non classé",
             "sub_category": "Autre",
+            "years_experience": 0,
             "profile_summary": f"{safe_name} : récapitulatif non disponible (clé API manquante).",
         }
 
@@ -660,16 +735,20 @@ def get_deepseek_auto_classification(text: str, full_name: str | None) -> dict:
          - R&D / Bureau d'études : Conception, ingénierie.
          - Commercial / Vente : Développement du chiffre d'affaires lié à une offre technique ou industrielle.
 
-    3. Générer un court récap de profil dans le style des exemples suivants :
-       - "Eladis SA (Actuel) / 10 ans d'expérience en comptabilité et audit. Expert en cash management, audit et conformité fiscale.\n   Profil orienté contrôle et rigueur, idéal pour la fiabilisation des reporting et la sécurisation quotidienne des flux monétaires du holding."
-       - "Experte de la gestion multi-entités, du reporting de performance et de la mise en place de procédures.\n   Profil polyvalent maîtrisant le cycle complet (Finance, Fiscal, RH) et apte à sécuriser le cadre juridique et opérationnel du Family Office."
+    3. Estimer le nombre total d'années d'expérience professionnelle du candidat.
+
+    4. Générer un court récap de profil (2-3 phrases max) qui DOIT inclure :
+       - Le nombre d'années d'expérience
+       - Les compétences clés
+       - Le type de profil (ex: "Profil orienté contrôle et rigueur", "Profil polyvalent")
 
     Contraintes IMPORTANTES :
     - Tu renverras UNIQUEMENT un JSON strict de la forme :
-      {{"macro_category": "...", "sub_category": "...", "profile_summary": "..."}}
+      {{"macro_category": "...", "sub_category": "...", "years_experience": X, "profile_summary": "..."}}
     - "macro_category" doit être EXACTEMENT l'une de : "Fonctions supports", "Logistique", "Production/Technique".
     - "sub_category" doit être une des sous-catégories cohérentes ci-dessus (ou "Autre" si vraiment nécessaire).
-    - Le champ "profile_summary" DOIT commencer EXACTEMENT par le nom suivant : "{safe_name}" puis un bref résumé sur 1 à 3 phrases.
+    - "years_experience" doit être un nombre entier (estimation).
+    - Le champ "profile_summary" DOIT commencer EXACTEMENT par le nom suivant : "{safe_name}" puis un bref résumé incluant les années d'expérience.
     - N'ajoute AUCUN texte avant ou après le JSON.
 
     Texte du CV :
@@ -701,6 +780,11 @@ def get_deepseek_auto_classification(text: str, full_name: str | None) -> dict:
 
         macro = data.get("macro_category") or "Non classé"
         sub = data.get("sub_category") or "Autre"
+        years_exp = data.get("years_experience", 0)
+        try:
+            years_exp = int(years_exp)
+        except (ValueError, TypeError):
+            years_exp = 0
         summary = data.get("profile_summary") or f"{safe_name} : récapitulatif non disponible."
 
         # Nettoyage minimal
@@ -713,6 +797,7 @@ def get_deepseek_auto_classification(text: str, full_name: str | None) -> dict:
         return {
             "macro_category": macro,
             "sub_category": sub,
+            "years_experience": years_exp,
             "profile_summary": summary,
         }
 
@@ -720,6 +805,7 @@ def get_deepseek_auto_classification(text: str, full_name: str | None) -> dict:
         return {
             "macro_category": "Non classé",
             "sub_category": "Autre",
+            "years_experience": 0,
             "profile_summary": f"{safe_name} : récapitulatif non disponible (erreur IA).",
         }
 
@@ -787,6 +873,28 @@ def extract_name_from_cv_text(text):
     
     return {"name": None, "confidence": 0, "method_used": "not_found"}
 
+def is_valid_name_candidate(text: str) -> bool:
+    """Vérifie si un texte ressemble à un vrai nom (pas un hash, UUID, etc.)"""
+    if not text or len(text) < 2:
+        return False
+    # Rejeter les chaînes qui ressemblent à des identifiants/hash
+    # (plus de 3 chiffres consécutifs, caractères hexadécimaux, tirets multiples)
+    if re.search(r'\d{3,}', text):  # 3+ chiffres consécutifs
+        return False
+    if re.search(r'^[a-f0-9]{8,}$', text.lower()):  # Hash hexadécimal
+        return False
+    if re.search(r'^[a-zA-Z0-9]{20,}$', text):  # Chaîne alphanum trop longue sans espace
+        return False
+    if text.count('-') > 2:  # Trop de tirets (UUID-like)
+        return False
+    if text.count('_') > 1:  # Underscores multiples (identifiant technique)
+        return False
+    # Doit contenir au moins une voyelle (vrai nom)
+    if not re.search(r'[aeiouyàâäéèêëïîôöùûü]', text.lower()):
+        return False
+    return True
+
+
 def extract_name_from_line(line):
     """Extrait un nom candidat d'une ligne en utilisant des heuristiques"""
     if not line or len(line.strip()) < 5:
@@ -802,7 +910,7 @@ def extract_name_from_line(line):
         'senior', 'junior', 'stage', 'stagiaire', 'étudiant', 'expérience',
         'formation', 'diplôme', 'université', 'école', 'master', 'licence',
         'téléphone', 'email', 'adresse', 'né', 'age', 'ans', 'contact',
-        'projet', 'projets', 'compétences', 'skills'
+        'projet', 'projets', 'compétences', 'skills', 'page', 'pdf', 'document'
     }
     
     # Chercher 2-3 mots consécutifs commençant par une majuscule
@@ -818,7 +926,8 @@ def extract_name_from_line(line):
                 len(word1) > 1 and len(word2) > 1 and
                 word1.lower() not in ignore_words and 
                 word2.lower() not in ignore_words and
-                word1.isalpha() and word2.isalpha()):
+                word1.isalpha() and word2.isalpha() and
+                is_valid_name_candidate(word1) and is_valid_name_candidate(word2)):
                 
                 # Format: NOM Prénom
                 formatted = f"{word1.upper()} {word2.capitalize()}"
@@ -928,11 +1037,13 @@ def create_organized_zip(results, file_list):
                     # Ajouter au ZIP
                     zip_file.writestr(file_path_in_zip, file_content)
                     
-                    # Ajouter au manifest (une colonne par champ + récap profil)
+                    # Ajouter au manifest (une colonne par champ + récap profil + années exp)
                     manifest_data.append({
                         'fichier_original': original_name,
                         'nouveau_nom': final_name,
                         'categorie': category,
+                        'sous_categorie': result.get('sub_category', ''),
+                        'annees_experience': result.get('years_experience', 0),
                         'confiance_extraction': confidence,
                         'methode_extraction': method,
                         'recap_profil': result.get('profile_summary', ''),
@@ -1076,46 +1187,71 @@ with tab1:
         else:
             # Lecture des fichiers PDF
             resumes, file_names = [], []
-            with st.spinner("Lecture des fichiers PDF..."):
-                for file in uploaded_files_ranking:
-                    text = extract_text_from_pdf(file)
-                    if not "Erreur" in text:
-                        resumes.append(text)
-                        file_names.append(file.name)
+            progress_placeholder = st.empty()
+            progress_bar = st.progress(0)
+            total_files = len(uploaded_files_ranking)
+            
+            for idx, file in enumerate(uploaded_files_ranking):
+                progress_placeholder.info(f"📄 Lecture du fichier ({idx+1}/{total_files}) : {file.name}")
+                progress_bar.progress((idx + 1) / total_files * 0.3)  # 30% pour lecture
+                text = extract_text_from_pdf(file)
+                if not "Erreur" in text:
+                    resumes.append(text)
+                    file_names.append(file.name)
             
             # Analyse selon la méthode choisie
-            loading_text = f"Analyse des CVs en cours par IA..." if analysis_method == "Analyse par IA (DeepSeek)" else f"Analyse des CVs en cours avec {analysis_method}..."
-            with st.spinner(loading_text):
-                results, explanations, logic = {}, None, None
+            results, explanations, logic = {}, None, None
+            
+            if analysis_method == "Analyse par IA (DeepSeek)":
+                # Analyse IA avec progression individuelle
+                progress_placeholder.info(f"🤖 Analyse par IA en cours (0/{len(resumes)})...")
+                progress_bar.progress(0.3)
                 
-                if analysis_method == "Analyse par IA (DeepSeek)":
-                    results = rank_resumes_with_ai(job_description, resumes, file_names)
-                    explanations = results.get("explanations")
+                scores_data = []
+                for i, resume_text in enumerate(resumes):
+                    progress_placeholder.info(f"🤖 Analyse par IA ({i+1}/{len(resumes)}) : {file_names[i]}")
+                    progress_bar.progress(0.3 + (i + 1) / len(resumes) * 0.7)
+                    scores_data.append(get_detailed_score_with_ai(job_description, resume_text))
                 
-                elif analysis_method == "Scoring par Règles (Regex)":
-                    rule_results = rank_resumes_with_rules(job_description, resumes, file_names)
-                    results = {"scores": [r["score"] for r in rule_results]}
-                    logic = {r["file_name"]: r["logic"] for r in rule_results}
-                
-                elif analysis_method == "Méthode Sémantique (Embeddings)":
-                    results = rank_resumes_with_embeddings(job_description, resumes, file_names)
-                    logic = results.get("logic")
-                
-                elif analysis_method == "Analyse combinée (Ensemble)":
-                    results = rank_resumes_with_ensemble(
-                        job_description, resumes, file_names,
-                        cosinus_weight=cosinus_weight,
-                        semantic_weight=semantic_weight,
-                        rules_weight=rules_weight,
-                        cosine_func=rank_resumes_with_cosine,
-                        semantic_func=rank_resumes_with_embeddings,
-                        rules_func=rank_resumes_with_rules
-                    )
-                    logic = results.get("logic")
-                
-                else:  # Méthode Cosinus par défaut
-                    results = rank_resumes_with_cosine(job_description, resumes, file_names)
-                    logic = results.get("logic")
+                results = {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
+                explanations = results.get("explanations")
+            
+            elif analysis_method == "Scoring par Règles (Regex)":
+                progress_placeholder.info(f"📏 Analyse par règles en cours...")
+                rule_results = rank_resumes_with_rules(job_description, resumes, file_names)
+                results = {"scores": [r["score"] for r in rule_results]}
+                logic = {r["file_name"]: r["logic"] for r in rule_results}
+                progress_bar.progress(1.0)
+            
+            elif analysis_method == "Méthode Sémantique (Embeddings)":
+                progress_placeholder.info(f"🧠 Analyse sémantique en cours...")
+                results = rank_resumes_with_embeddings(job_description, resumes, file_names)
+                logic = results.get("logic")
+                progress_bar.progress(1.0)
+            
+            elif analysis_method == "Analyse combinée (Ensemble)":
+                progress_placeholder.info(f"🔗 Analyse combinée en cours...")
+                results = rank_resumes_with_ensemble(
+                    job_description, resumes, file_names,
+                    cosinus_weight=cosinus_weight,
+                    semantic_weight=semantic_weight,
+                    rules_weight=rules_weight,
+                    cosine_func=rank_resumes_with_cosine,
+                    semantic_func=rank_resumes_with_embeddings,
+                    rules_func=rank_resumes_with_rules
+                )
+                logic = results.get("logic")
+                progress_bar.progress(1.0)
+            
+            else:  # Méthode Cosinus par défaut
+                progress_placeholder.info(f"📐 Analyse cosinus en cours...")
+                results = rank_resumes_with_cosine(job_description, resumes, file_names)
+                logic = results.get("logic")
+                progress_bar.progress(1.0)
+
+            # Nettoyer les indicateurs de progression
+            progress_placeholder.empty()
+            progress_bar.empty()
 
             scores = results.get("scores", [])
             if scores is not None and len(scores) > 0:
@@ -1375,55 +1511,94 @@ with tab2:
         job_desc_single = st.text_area("Description de poste pour le calcul du score", height=150, key="jd_single")
 
     if uploaded_files_analysis and st.button("🚀 Lancer l'analyse", type="primary", width="stretch", key="btn_single_analysis"):
-        for uploaded_file in uploaded_files_analysis:
+        total_files = len(uploaded_files_analysis)
+        progress_bar_tab2 = st.progress(0)
+        progress_text_tab2 = st.empty()
+        
+        for file_idx, uploaded_file in enumerate(uploaded_files_analysis):
+            progress_text_tab2.info(f"🤖 Analyse en cours ({file_idx+1}/{total_files}) : {uploaded_file.name}")
+            progress_bar_tab2.progress((file_idx + 1) / total_files)
+            
             with st.expander(f"Résultat pour : **{uploaded_file.name}**", expanded=True):
-                with st.spinner("Analyse en cours..."):
-                    text = extract_text_from_pdf(uploaded_file)
-                    if "Erreur" in text or (text and text.strip().startswith("Aucun texte lisible trouvé")):
-                        # Message clair pour les PDFs scannés ou protégés
-                        if text and text.strip().startswith("Aucun texte lisible trouvé"):
-                            st.error("❌ Aucun texte lisible trouvé dans le PDF. Il s'agit probablement d'un PDF scanné (images) ou protégé.\n💡 Collez manuellement le contenu ou utilisez un OCR externe (ex: tesseract) pour convertir le PDF en texte.")
-                        else:
-                            st.error(f"❌ {text}")
+                text = extract_text_from_pdf(uploaded_file)
+                if "Erreur" in text or (text and text.strip().startswith("Aucun texte lisible trouvé")):
+                    # Message clair pour les PDFs scannés ou protégés
+                    if text and text.strip().startswith("Aucun texte lisible trouvé"):
+                        st.error("❌ Aucun texte lisible trouvé dans le PDF. Il s'agit probablement d'un PDF scanné (images) ou protégé.\n💡 Collez manuellement le contenu ou utilisez un OCR externe (ex: tesseract) pour convertir le PDF en texte.")
                     else:
-                        if analysis_type_single == "Analyse par Regex (Extraction d'entités)":
-                            entities = regex_analysis(text)
-                            st.info("**Entités extraites par la méthode Regex**")
-                            st.json(entities)
-                        elif "Méthode Sémantique" in analysis_type_single:
-                            if not job_desc_single: st.warning("Veuillez fournir une description de poste.")
-                            else:
-                                result = rank_resumes_with_embeddings(job_desc_single, [text], [uploaded_file.name])
-                                score = result["scores"][0]
-                                st.metric("Score de Pertinence Sémantique", f"{score*100:.1f}%")
-                        elif "Méthode Cosinus" in analysis_type_single:
-                            if not job_desc_single: st.warning("Veuillez fournir une description de poste.")
-                            else:
-                                result = rank_resumes_with_cosine(job_desc_single, [text], [uploaded_file.name])
-                                score = result["scores"][0]
-                                st.metric("Score de Pertinence Cosinus", f"{score*100:.1f}%")
-                        elif "Analyse Combinée" in analysis_type_single:
-                            if not job_desc_single: st.warning("Veuillez fournir une description de poste.")
-                            else:
-                                result = rank_resumes_with_ensemble(
-                                    job_desc_single, [text], [uploaded_file.name],
-                                    cosinus_weight=0.2, semantic_weight=0.4, rules_weight=0.4,
-                                    cosine_func=rank_resumes_with_cosine,
-                                    semantic_func=rank_resumes_with_embeddings,
-                                    rules_func=rank_resumes_with_rules
-                                )
-                                score = result["scores"][0]
-                                st.metric("Score de Pertinence Combinée", f"{score*100:.1f}%")
-                                
-                                # Affichage de la logique si disponible
-                                if "logic" in result:
-                                    logic = result["logic"].get(uploaded_file.name, {})
-                                    if logic:
-                                        st.markdown("**Détail de l'analyse combinée :**")
-                                        st.json(logic)
-                        else: # Analyse IA
-                            analysis_result = get_deepseek_analysis(text)
-                            st.markdown(analysis_result)
+                        st.error(f"❌ {text}")
+                else:
+                    if analysis_type_single == "Analyse par Regex (Extraction d'entités)":
+                        entities = regex_analysis(text)
+                        st.info("**Entités extraites par la méthode Regex**")
+                        st.json(entities)
+                    elif "Méthode Sémantique" in analysis_type_single:
+                        if not job_desc_single: st.warning("Veuillez fournir une description de poste.")
+                        else:
+                            result = rank_resumes_with_embeddings(job_desc_single, [text], [uploaded_file.name])
+                            score = result["scores"][0]
+                            st.metric("Score de Pertinence Sémantique", f"{score*100:.1f}%")
+                    elif "Méthode Cosinus" in analysis_type_single:
+                        if not job_desc_single: st.warning("Veuillez fournir une description de poste.")
+                        else:
+                            result = rank_resumes_with_cosine(job_desc_single, [text], [uploaded_file.name])
+                            score = result["scores"][0]
+                            st.metric("Score de Pertinence Cosinus", f"{score*100:.1f}%")
+                    elif "Analyse Combinée" in analysis_type_single:
+                        if not job_desc_single: st.warning("Veuillez fournir une description de poste.")
+                        else:
+                            result = rank_resumes_with_ensemble(
+                                job_desc_single, [text], [uploaded_file.name],
+                                cosinus_weight=0.2, semantic_weight=0.4, rules_weight=0.4,
+                                cosine_func=rank_resumes_with_cosine,
+                                semantic_func=rank_resumes_with_embeddings,
+                                rules_func=rank_resumes_with_rules
+                            )
+                            score = result["scores"][0]
+                            st.metric("Score de Pertinence Combinée", f"{score*100:.1f}%")
+                            
+                            # Affichage de la logique si disponible
+                            if "logic" in result:
+                                logic = result["logic"].get(uploaded_file.name, {})
+                                if logic:
+                                    st.markdown("**Détail de l'analyse combinée :**")
+                                    st.json(logic)
+                    else: # Analyse IA
+                        # Extraire le nom du candidat
+                        extracted = extract_name_from_cv_text(text)
+                        candidate_name = extracted.get('name') if extracted else None
+                        analysis_result = get_deepseek_profile_analysis(text, candidate_name)
+                        
+                        # Affichage en 2 colonnes
+                        col1, col2 = st.columns(2)
+                        # Découper le résultat en sections
+                        sections = analysis_result.split('**')
+                        left_sections = []
+                        right_sections = []
+                        current_section = ""
+                        section_count = 0
+                        
+                        for i, section in enumerate(sections):
+                            if section.strip():
+                                if i % 2 == 1:  # C'est un titre
+                                    current_section = f"**{section}**"
+                                else:  # C'est le contenu
+                                    full_section = current_section + section
+                                    if section_count < 3:
+                                        left_sections.append(full_section)
+                                    else:
+                                        right_sections.append(full_section)
+                                    section_count += 1
+                        
+                        with col1:
+                            st.markdown("".join(left_sections))
+                        with col2:
+                            st.markdown("".join(right_sections))
+        
+        # Nettoyer la progression
+        progress_text_tab2.empty()
+        progress_bar_tab2.empty()
+        st.success(f"✅ Analyse terminée pour {total_files} CV(s).")
 
 with tab3:
     st.header("📖 Comprendre les Méthodes d'Analyse")
@@ -1692,7 +1867,7 @@ with tab5:
         )
         
         # Bouton de classification primaire
-        if st.button('📂 Lancer l'auto-classification', type='primary'):
+        if st.button("📂 Lancer l'auto-classification", type='primary'):
             # Réinitialiser les analyses DeepSeek lors d'une nouvelle classification
             st.session_state.deepseek_analyses = []
             
@@ -1727,11 +1902,13 @@ with tab5:
                     cat = classification.get('macro_category', 'Non classé')
                     sub_cat = classification.get('sub_category', 'Autre')
                     profile_summary = classification.get('profile_summary', '')
+                    years_exp = classification.get('years_experience', 0)
 
                     result_item = {
                         'file': name,
                         'category': cat,
                         'sub_category': sub_cat,
+                        'years_experience': years_exp,
                         'profile_summary': profile_summary,
                         'text_snippet': (text or '')[:800],
                         'full_text': text  # Garder le texte complet pour le ZIP
@@ -1783,36 +1960,43 @@ with tab5:
 
             display_df['display_name'] = display_df.apply(_get_display_name_for_row, axis=1)
 
-            # Affichage en 3 colonnes avec onglets par sous-catégorie
+            # Affichage en 3 colonnes avec panneaux repliables par sous-catégorie
             cols = st.columns(3)
             cats = ['Fonctions supports', 'Logistique', 'Production/Technique']
             for idx, cat_label in enumerate(cats):
                 with cols[idx]:
-                    st.subheader(cat_label)
                     sub_df = display_df[display_df['category'] == cat_label]
+                    count_cat = len(sub_df)
+                    st.subheader(f"{cat_label} ({count_cat})")
                     if sub_df.empty:
                         st.write('Aucun CV classé ici.')
                     else:
                         # Regrouper par sous-catégorie (sous-direction / sous-filière)
                         sub_df = sub_df.copy()
-                        sub_df['sub_category'] = sub_df.get('sub_category', 'Autre').fillna('Autre')
+                        if 'sub_category' in sub_df.columns:
+                            sub_df['sub_category'] = sub_df['sub_category'].fillna('Autre')
+                        else:
+                            sub_df['sub_category'] = 'Autre'
                         subcats = sorted(sub_df['sub_category'].unique())
-                        tabs = st.tabs(subcats)
-                        for tab_obj, subcat in zip(tabs, subcats):
-                            with tab_obj:
-                                st.markdown(f"**{subcat}**")
-                                filtered = sub_df[sub_df['sub_category'] == subcat]
+                        for subcat in subcats:
+                            filtered = sub_df[sub_df['sub_category'] == subcat]
+                            count_subcat = len(filtered)
+                            with st.expander(f"📂 {subcat} ({count_subcat})"):
                                 for _, r in filtered.iterrows():
                                     card_title = r['display_name']
                                     recap = r.get('profile_summary') or r.get('text_snippet') or ''
-                                    with st.expander(card_title):
+                                    years_exp = r.get('years_experience', 0)
+                                    with st.expander(f"👤 {card_title}"):
+                                        if years_exp and years_exp > 0:
+                                            st.markdown(f"**📅 {years_exp} ans d'expérience**")
                                         st.markdown(recap)
 
-            # Non classés
+            # Catégorie "Autres" pour les non classés
             nc = df[df['category'] == 'Non classé']
             if not nc.empty:
                 st.markdown('---')
-                st.subheader('Non classés')
+                count_nc = len(nc)
+                st.subheader(f'🔍 Autres / Non classés ({count_nc})')
                 st.dataframe(nc[['file', 'text_snippet']], width="stretch")
                 
                 # Bouton pour analyser les CV non classés avec DeepSeek
@@ -1918,14 +2102,24 @@ with tab5:
             ai_indicator = " (incluant les analyses IA)" if hasattr(st.session_state, 'deepseek_analyses') and st.session_state.deepseek_analyses else ""
             st.markdown(f"**Résumé{ai_indicator}**: {count_support} en Fonctions supports, {count_logistics} en Logistique, {count_production} en Production/Technique, {count_unclassified} Non classés.")
             
-            csv = export_df.to_csv(index=False).encode('utf-8')
+            # Générer Excel avec séparateur correct (utiliser sep=';' pour Excel FR)
+            csv = export_df.to_csv(index=False, sep=';').encode('utf-8-sig')  # utf-8-sig pour BOM Excel
+            
+            # Générer aussi un fichier Excel natif (.xlsx)
+            from io import BytesIO
+            excel_buffer = BytesIO()
+            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                export_df.to_excel(writer, index=False, sheet_name='Classification')
+            excel_data = excel_buffer.getvalue()
             
             # Boutons de téléchargement
-            col1, col2 = st.columns(2)
+            col1, col2, col3 = st.columns(3)
             with col1:
-                st.download_button(label='⬇️ Télécharger les résultats (CSV)', data=csv, file_name='classification_results.csv', mime='text/csv')
-            
+                st.download_button(label='⬇️ Télécharger Excel (.xlsx)', data=excel_data, file_name='classification_results.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             with col2:
+                st.download_button(label='⬇️ Télécharger CSV (;)', data=csv, file_name='classification_results.csv', mime='text/csv')
+            
+            with col3:
                 # Bouton ZIP disponible si l'option de renommage était cochée
                 if hasattr(st.session_state, 'rename_and_organize_option') and st.session_state.rename_and_organize_option:
                     if st.button('📦 Préparer et télécharger le ZIP organisé'):

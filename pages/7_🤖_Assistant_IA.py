@@ -148,7 +148,12 @@ def get_ai_response(prompt, history, model, length):
 # -------------------- INTERFACE PRINCIPALE --------------------
 # --- NOUVEAUTÉ : Titre mis à jour ---
 st.title("🤖 Assistant IA pour le Recrutement")
-
+# Affichage du commit
+try:
+    from utils import display_commit_info
+    display_commit_info()
+except Exception:
+    pass
 # --- SÉLECTEURS DANS LA BARRE LATÉRALE ---
 with st.sidebar:
     st.subheader("⚙️ Paramètres")

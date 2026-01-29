@@ -1,4 +1,5 @@
 import streamlit as st
+from utils import display_commit_info
 
 st.set_page_config(
     page_title="Gestion des Stagiaires",
@@ -11,5 +12,6 @@ if not st.session_state.get("logged_in", False):
     st.stop()
 
 st.title("🎓 Gestion des Stagiaires")
+display_commit_info()
 
 st.info("🚧 Cette page est en cours de réalisation.")

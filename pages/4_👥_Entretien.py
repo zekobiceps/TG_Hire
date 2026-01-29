@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import datetime
 import json
-from utils import generate_ai_question
+from utils import generate_ai_question, display_commit_info
 
 # Configuration de la page
 st.set_page_config(page_title="HR Eval Pro - Système d'Évaluation", layout="wide", page_icon="🚀")
@@ -107,6 +107,7 @@ if 'evaluation_data' not in st.session_state:
 
 # Titre principal
 st.title("👥 Système d'Évaluation des Candidats - HR Eval Pro")
+display_commit_info()
 
 # Navigation par onglets principaux
 main_tabs = st.tabs([

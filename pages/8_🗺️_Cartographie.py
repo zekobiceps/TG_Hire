@@ -339,6 +339,12 @@ if not st.session_state.get("logged_in", False):
 
 st.title("🗺️ Cartographie des talents")
 
+# Affichage du commit
+try:
+    utils.display_commit_info()
+except Exception:
+    pass
+
 if st.sidebar.button("🔍 Tester les connexions Google (Débug)"):
     st.sidebar.write("=== DÉBOGAGE CONNEXIONS GOOGLE ===")
     st.sidebar.write("1. Test d'authentification Sheets...")

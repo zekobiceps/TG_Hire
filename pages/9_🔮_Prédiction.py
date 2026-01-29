@@ -105,6 +105,14 @@ st.set_page_config(
 if not st.session_state.get("logged_in", False):
     st.stop()
 
+# Titre principal avec commit info
+st.title("🔮 Prédiction de Recrutements")
+try:
+    from utils import display_commit_info
+    display_commit_info()
+except Exception:
+    pass
+
 # CSS personnalisé
 st.markdown("""
 <style>

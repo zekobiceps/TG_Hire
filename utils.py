@@ -53,6 +53,86 @@ from datetime import datetime
 import io
 import random
 from io import BytesIO
+import subprocess
+
+# -------------------- FONCTIONS COMMIT INFO --------------------
+def get_current_commit_hash(short: bool = True) -> str:
+    """Return the current git commit hash (short by default).
+
+    Tries subprocess git first, then falls back to reading .git/HEAD or
+    environment variable GIT_COMMIT. Returns 'unknown' if not available.
+    """
+    try:
+        if short:
+            out = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], stderr=subprocess.DEVNULL)
+        else:
+            out = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL)
+        return out.decode().strip()
+    except Exception:
+        # Try environment variable
+        env = os.environ.get('GIT_COMMIT') or os.environ.get('COMMIT_SHA') or os.environ.get('GITHUB_SHA')
+        if env:
+            return env[:7] if short else env
+        # Try minimal .git reading
+        try:
+            head_path = os.path.join(os.path.dirname(__file__), '.git', 'HEAD')
+            head_path = os.path.abspath(head_path)
+            if os.path.exists(head_path):
+                with open(head_path, 'r') as f:
+                    ref = f.read().strip()
+                if ref.startswith('ref:'):
+                    ref_path = ref.split(' ', 1)[1]
+                    ref_file = os.path.join(os.path.dirname(head_path), ref_path)
+                    if os.path.exists(ref_file):
+                        with open(ref_file, 'r') as rf:
+                            val = rf.read().strip()
+                            return val[:7] if short else val
+                else:
+                    return ref[:7] if short else ref
+        except Exception:
+            pass
+    return 'unknown'
+
+
+def get_current_commit_datetime() -> str:
+    """Return the current git commit date/time as a string.
+
+    Format: "DD/MM/YYYY HH:MM" (heure 24h), par exemple
+    "27/01/2026 17:35".
+    """
+    try:
+        out = subprocess.check_output(
+            [
+                "git",
+                "show",
+                "-s",
+                "--format=%cd",
+                "--date=format:%d/%m/%Y %H:%M",
+                "HEAD",
+            ],
+            stderr=subprocess.DEVNULL,
+        )
+        return out.decode().strip()
+    except Exception:
+        return ""
+
+
+def display_commit_info():
+    """Affiche le numéro de commit et la date/heure sous le titre de la page."""
+    try:
+        commit_hash = get_current_commit_hash()
+        commit_dt = get_current_commit_datetime()
+        if commit_dt:
+            commit_text = f"Commit: {commit_hash} — {commit_dt}"
+        else:
+            commit_text = f"Commit: {commit_hash}"
+        st.markdown(
+            f"<div style='font-size:12px;color:#666;margin-top:-8px'>{commit_text}</div>",
+            unsafe_allow_html=True,
+        )
+    except Exception:
+        pass
+
 
 def compute_promise_refusal_rate_row(
     df: pd.DataFrame,

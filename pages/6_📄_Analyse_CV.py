@@ -12,6 +12,7 @@ from datetime import datetime
 from typing import cast
 import plotly.graph_objects as go
 import plotly.express as px
+from utils import display_commit_info
 
 # Imports optionnels pour la manipulation des PDF (s'il manque, le code utilisera des fallbacks)
 try:
@@ -1063,6 +1064,7 @@ def create_organized_zip(results, file_list):
 
 # -------------------- Interface Utilisateur --------------------
 st.title("📄 Analyseur de CVs Intelligent")
+display_commit_info()
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Classement de CVs", "🎯 Analyse de Profil", "📖 Guide des Méthodes", "📈 Statistiques de Feedback", "🗂️ Auto-classification"])
 
 with tab1:
