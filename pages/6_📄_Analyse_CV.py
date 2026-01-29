@@ -630,7 +630,7 @@ Règles NOM STRICTES (alignées avec l'extraction locale) :
 - Utilise STRICTEMENT le nom fourni ci-dessous s'il est présent.
 - Ne modifie PAS le nom (pas d'ajout de points, parenthèses, intitulés).
 - N'invente PAS de nom, si incertain, garde "Candidat".
-- Ignore toute ligne contenant des mots interdits fréquents (ex: AutoCAD, ORSYS, Secteur, BIM, Owner, PSPO, Client, Missions, Permis, Angleterre, Irlande, Luxembourg, Urbanisme, Agro-alimentaire, Lecture).
+- Ignore toute ligne contenant des mots interdits fréquents (ex: AutoCAD, ORSYS, Secteur, BIM, Owner, PSPO, Client, Missions, Permis, Angleterre, Irlande, Luxembourg, Urbanisme, Agro-alimentaire, Lecture, Multi-disciplinary, Engineering, Studies, Parcours, Professionnel, Ivalua, PRM, AMF, Alerting, Blockchain, Projects, Purposes, Program).
 
 **Format de sortie OBLIGATOIRE** - Respecte EXACTEMENT cet ordre et ces titres :
 
@@ -984,6 +984,8 @@ def is_likely_name_line(line: str) -> bool:
         'simulation', 'numérique', 'numerique', 'pensée', 'pensee', 'critique', 'lecture',
         'concept', 'partenaire', 'entreprise', 'entreprises',
         'charge', 'chargee', 'delivery', 'delivery', 'secteur', 'agro-alimentaire',
+        'multi-disciplinary', 'multidisciplinary', 'engineering', 'studies', 'etudes', 'études',
+        'parcours', 'professionnel', 'profile',
         
         # Sections CV supplémentaires  
         'experiences', 'expériences', 'professionelles', 'professionnelle',
@@ -993,10 +995,12 @@ def is_likely_name_line(line: str) -> bool:
         'saem', 'corum', 'montpellier', 'groupement', 'mousquetaires', 'intermarché',
         'leclerc', 'auchan', 'lidl', 'casino', 'monoprix',
         'puteaux', 'orsys', 'angleterre', 'irlande', 'luxembourg',
+        'ivalua', 'prm',
         
         # Termes anglais courants
         'delivery', 'manager', 'coordinator', 'specialist', 'officer', 'owner', 'pspo',
         'technical', 'professional', 'summary', 'overview',
+        'and', 'alerting', 'blockchain', 'projects', 'purposes', 'program',
         
         # Logiciels techniques / CAO / Outils scientifiques
         'logiciels', 'abaqus', 'catia', 'solidworks', 'autocad', 'ansys', 'matlab', 'bim',
@@ -1012,6 +1016,8 @@ def is_likely_name_line(line: str) -> bool:
         'cash', 'flux', 'foncier', 'trésorerie', 'tresorerie',
         # Termes génériques récurrents à exclure
         'client', 'missions',
+        # Certifications/Accréditations spécifiques
+        'amf',
     ]
     
     # Si un mot de la ligne est interdit -> Rejet
