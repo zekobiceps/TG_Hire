@@ -866,14 +866,42 @@ def is_likely_name_line(line: str) -> bool:
         'page', 'date', 'diplômes', 'formations', 'certifications', 'hobbies', 'loisirs',
         'centres', 'intérêt', 'projets', 'réalisés', 'professionnelles',
         'coordonnées', 'spécialisations', 'management', 'onboarding', 'performance',
-        'sommaire', 'summary', 'objectif', 'objective',
+        'sommaire', 'summary', 'objectif', 'objective', 'propos', 'about', 'me', 'moi',
+        'bac', 'baccalauréat', 'baccalaureate', 'degree', 'niveau', 'level',
         
-        # Titres de postes et fonctions (indique un titre, pas un nom)
+        # Écoles et Universités (Faux positifs fréquents)
+        'école', 'ecole', 'school', 'business', 'university', 'université',
+        'hec', 'essec', 'esc', 'em', 'dauphine', 'polytechnique', 'centrale', 'mines',
+        'master', 'bachelor', 'licence', 'mba', 'diplôme', 'diplome', 'msc',
+        'lycée', 'lycee', 'college', 'collège', 'institut', 'academy',
+        
+        # Compétences techniques & Outils
+        'excel', 'vba', 'power', 'bi', 'crm', 'python', 'java', 'sql', 'office',
+        'pack', 'adobe', 'suite', 'google', 'cloud', 'aws', 'azure', 'sap', 'erp',
+        'photoshop', 'illustrator', 'indesign', 'canva', 'jira', 'trello',
+        
+        # Entreprises connues (pour éviter "BNP Paribas" comme nom)
+        'bnp', 'paribas', 'société', 'générale', 'crédit', 'agricole', 'sncf',
+        'groupe', 'group', 'bank', 'banque', 'service', 'civique', 'unilever',
+        'orange', 'capgemini', 'atos', 'sopra', 'steria', 'accenture', 'deloitte',
+        'kpmg', 'ey', 'pwc', 'mazars',
+        
+        # Pays et Villes (souvent en en-tête)
+        'france', 'paris', 'maroc', 'casablanca', 'rabat', 'lyon', 'marseille',
+        'toulouse', 'bordeaux', 'lille', 'nantes', 'strasbourg', 'rennes',
+        
+        # Blancs ou très courts
+        'non', 'trouvé',
         'analyste', 'financière', 'contrôleuse', 'gestion', 'ingénieur',
         'directeur', 'directrice', 'manager', 'consultant', 'développeur', 'responsable',
         'développement', 'rh', 'sirh', 'assistant', 'assistante', 'stagiaire',
         'technicien', 'commercial', 'vente', 'marketing', 'comptable', 'auditeur',
-        'senior', 'junior', 'expert', 'chef'
+        'senior', 'junior', 'expert', 'chef', 'actuaire', 'data', 'scientist',
+        'chargé', 'chargée', 'officer', 'executive', 'associate', 'partner',
+        
+        # Verbes d'action (souvent en bullet points)
+        'gérer', 'piloter', 'management', 'coordonner', 'développer', 'créer',
+        'réaliser', 'participer', 'contribuer', 'superviser', 'analyser'
     ]
     
     # Si un mot de la ligne est interdit -> Rejet
