@@ -925,129 +925,166 @@ def get_deepseek_analysis(text):
         return f"Erreur IA : {e}"
 
 
-def get_deepseek_auto_classification(text: str, full_name: str | None) -> dict:
-    """Classe un CV dans une macro-catégorie + sous-catégorie et génère un récap profil avec années d'expérience.
 
-    Retourne un dict avec les clés:
-    - macro_category: "Fonctions supports" | "Logistique" | "Production/Technique" | "Non classé"
-    - sub_category: sous-direction ou sous-filière (ex: "Direction Finance", "BTP / Génie Civil")
-    - years_experience: nombre d'années d'expérience estimé
-    - profile_summary: court texte de synthèse commençant par le nom complet.
-    """
+def clean_json_string(json_str):
+    """Nettoie la réponse de l'IA pour extraire uniquement le bloc JSON valide."""
+    import re
+    # Enlever les balises Markdown ```json ... ```
+    if "```" in json_str:
+        json_str = re.sub(r'```json\s*', '', json_str)
+        json_str = re.sub(r'```\s*', '', json_str)
+    
+    # Trouver le premier '{' et le dernier '}'
+    start = json_str.find('{')
+    end = json_str.rfind('}')
+    
+    if start != -1 and end != -1:
+        return json_str[start : end + 1]
+    return json_str
+
+def get_deepseek_auto_classification(text: str, local_extracted_name: str | None) -> dict:
     API_KEY = get_api_key()
-    safe_name = (full_name or "Candidat").strip()
-    if not API_KEY:
-        return {
-            "macro_category": "Non classé",
-            "sub_category": "Autre",
-            "years_experience": 0,
-            "profile_summary": f"{safe_name} : récapitulatif non disponible (clé API manquante).",
-        }
+    hint_name = (local_extracted_name or "").strip()
+    
+    # Fallback immédiat si pas de clé
+    default_response = {
+        "macro_category": "Non classé",
+        "sub_category": "Autre",
+        "years_experience": 0,
+        "candidate_name": hint_name or "Candidat",
+        "profile_summary": "Analyse impossible (clé manquante)."
+    }
+    
+    if not API_KEY: return default_response
 
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
+    
+    # Prompt renforcé avec liste noire
     prompt = f"""
-    Tu es un expert en recrutement. À partir du texte du CV ci-dessous, tu dois :
+    Agis comme un système ATS (Applicant Tracking System) expert. Analyse ce CV brut.
 
-    1. Identifier UNE seule macro-catégorie parmi :
-       - "Fonctions supports"
-       - "Logistique"
-       - "Production/Technique"
+    --- TÂCHE 1 : EXTRACTION NOM ---
+    Trouve le "Prénom NOM" du candidat.
+    Indice algorithmique : "{hint_name}".
+    
+    RÈGLES CRITIQUES NOM :
+    1. Si l'indice semble correct (un vrai nom), utilise-le.
+    2. Si l'indice est vide, cherche dans l'en-tête.
+    3. INTERDIT : Ne renvoie JAMAIS un titre de poste comme nom (ex: "Ingénieur", "Développeur", "Manager", "Curriculum Vitae", "Profil").
+    4. INTERDIT : Ne renvoie JAMAIS une adresse email ou un numéro de téléphone.
+    5. Format : "Prénom NOM" (Nom en majuscule si possible).
 
-    2. Proposer une sous-catégorie cohérente avec la typologie suivante :
-       • Fonctions supports :
-         - Direction RH : Recrutement, paie, formation, relations sociales.
-         - Direction Finance : Comptabilité, trésorerie, fiscalité, audit.
-         - Contrôle de Gestion : Analyse de la performance, budgets.
-         - Direction des Achats : Sourcing, négociation, approvisionnements.
-         - Direction Logistique : Gestion des flux, transport, entreposage.
-         - Direction Informatique (DSI) : Infrastructure, support, cybersécurité.
-         - QHSE : Normes ISO, sécurité au travail, environnement.
-         - Direction Juridique : Conformité, contrats.
-         - Communication / Marketing : Image de marque, digital.
+    --- TÂCHE 2 : CLASSIFICATION ---
+    Macro-catégorie (CHOISIR UNE SEULE) : 
+    - "Fonctions supports" (RH, Finance, Juridique, IT Support, Achats)
+    - "Logistique" (Supply Chain, Transport, Stock)
+    - "Production/Technique" (Ingénierie, BTP, Industrie, R&D)
 
-       • Logistique :
-         - Gestion des flux, transport, entrepôts, distribution, supply chain.
+    --- TÂCHE 3 : INFO ---
+    - Années d'expérience (nombre entier).
+    - Résumé : Une phrase "Punchy" commençant par le nom.
 
-       • Production/Technique :
-         - BTP / Génie Civil : Études de prix, conduite de travaux.
-         - Industrie : Production, ligne d'assemblage, usinage, électromécanique, automatisme.
-         - R&D / Bureau d'études : Conception, ingénierie.
-         - Commercial / Vente : Développement du chiffre d'affaires lié à une offre technique ou industrielle.
+    Réponds UNIQUEMENT ce JSON :
+    {{
+        "candidate_name": "...",
+        "macro_category": "...",
+        "sub_category": "...",
+        "years_experience": 0,
+        "profile_summary": "..."
+    }}
 
-    3. Estimer le nombre total d'années d'expérience professionnelle du candidat.
-
-    4. Générer un court récap de profil (2-3 phrases max) qui DOIT inclure :
-       - Le nombre d'années d'expérience
-       - Les compétences clés
-       - Le type de profil (ex: "Profil orienté contrôle et rigueur", "Profil polyvalent")
-
-    Contraintes IMPORTANTES :
-    - Tu renverras UNIQUEMENT un JSON strict de la forme :
-      {{"macro_category": "...", "sub_category": "...", "years_experience": X, "profile_summary": "..."}}
-    - "macro_category" doit être EXACTEMENT l'une de : "Fonctions supports", "Logistique", "Production/Technique".
-    - "sub_category" doit être une des sous-catégories cohérentes ci-dessus (ou "Autre" si vraiment nécessaire).
-    - "years_experience" doit être un nombre entier (estimation).
-    - Le champ "profile_summary" DOIT commencer EXACTEMENT par le nom suivant : "{safe_name}" puis un bref résumé incluant les années d'expérience.
-    - N'ajoute AUCUN texte avant ou après le JSON.
-
-    Texte du CV :
-    {text}
+    CV TEXTE (Début) :
+    {text[:3000]}
     """
 
-    payload = {
-        "model": "deepseek-chat",
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.2,
-    }
-
     try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response = requests.post(url, headers=headers, data=json.dumps({
+            "model": "deepseek-chat",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.1
+        }))
         response.raise_for_status()
-        content = response.json()["choices"][0]["message"]["content"].strip()
+        
+        # Nettoyage et Parsing
+        raw_content = response.json()["choices"][0]["message"]["content"]
+        clean_content = clean_json_string(raw_content)
+        data = json.loads(clean_content)
 
-        # Essayer de parser directement le JSON
-        try:
-            data = json.loads(content)
-        except Exception:
-            # Tenter d'extraire un bloc JSON au milieu du texte
-            start = content.find("{")
-            end = content.rfind("}")
-            if start != -1 and end != -1 and end > start:
-                data = json.loads(content[start : end + 1])
-            else:
-                raise
+        # Validation post-traitement (Safety check)
+        final_name = data.get("candidate_name", "Candidat")
+        
+        # Liste noire de sécurité (si l'IA hallucine encore)
+        blacklist = ["curriculum", "vitae", "resume", "profil", "ingénieur", "manager", "développeur", "page", "cv"]
+        if any(bad in final_name.lower() for bad in blacklist):
+            final_name = hint_name if hint_name else "Candidat (Nom non détecté)"
 
-        macro = data.get("macro_category") or "Non classé"
-        sub = data.get("sub_category") or "Autre"
-        years_exp = data.get("years_experience", 0)
-        try:
-            years_exp = int(years_exp)
-        except (ValueError, TypeError):
-            years_exp = 0
-        summary = data.get("profile_summary") or f"{safe_name} : récapitulatif non disponible."
-
-        # Nettoyage minimal
+        # Normalisation catégorie
+        macro = data.get("macro_category")
         if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]:
             macro = "Non classé"
 
-        if not summary.startswith(safe_name):
-            summary = f"{safe_name} - {summary}"
-
         return {
             "macro_category": macro,
-            "sub_category": sub,
-            "years_experience": years_exp,
-            "profile_summary": summary,
+            "sub_category": data.get("sub_category", "Autre"),
+            "years_experience": data.get("years_experience", 0),
+            "candidate_name": final_name,
+            "profile_summary": data.get("profile_summary", "")
         }
 
-    except Exception:
-        return {
-            "macro_category": "Non classé",
-            "sub_category": "Autre",
-            "years_experience": 0,
-            "profile_summary": f"{safe_name} : récapitulatif non disponible (erreur IA).",
-        }
+    except Exception as e:
+        print(f"DeepSeek Error: {e}")
+        # En cas d'erreur IA, on renvoie au moins le nom trouvé localement
+        default_response["candidate_name"] = hint_name or "Erreur Extraction"
+        return default_response
+
+
+def extract_name_smart_email(text):
+    """
+    Extrait le nom via l'email ET vérifie sa présence dans le texte pour confirmer.
+    Gère les formats : prenom.nom, prenom_nom, nom.prenom
+    """
+    import re
+    if not text: return None
+    
+    # 1. Trouver les emails
+    email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+    emails = re.findall(email_pattern, text)
+    
+    # Liste d'emails génériques à ignorer
+    ignore_emails = ['contact', 'info', 'recrutement', 'job', 'stages', 'rh', 'email', 'gmail', 'yahoo']
+    
+    for email in emails:
+        user_part = email.split('@')[0]
+        
+        # Si l'email est générique, on saute
+        if any(bad in user_part.lower() for bad in ignore_emails):
+            continue
+            
+        # Séparateurs possibles dans l'email (point, underscore, tiret)
+        parts = re.split(r'[._-]', user_part)
+        
+        # On ne garde que les parties alphabétiques de plus de 2 lettres (évite les chiffres ou initiales)
+        valid_parts = [p for p in parts if p.isalpha() and len(p) >= 3]
+        
+        if len(valid_parts) >= 2:
+            # On a potentiellement Prénom et Nom. On cherche ces mots dans les 1000 premiers caractères du CV
+            header_text = text[:1000]
+            found_parts = []
+            
+            for part in valid_parts:
+                # On cherche le mot exact dans le texte (insensible à la casse)
+                match = re.search(r'\b' + re.escape(part) + r'\b', header_text, re.IGNORECASE)
+                if match:
+                    # On récupère la version écrite dans le CV (ex: "DUPONT" au lieu de "dupont")
+                    found_parts.append(match.group(0))
+            
+            # Si on a retrouvé au moins 2 parties du nom dans le texte, c'est un match solide !
+            if len(found_parts) >= 2:
+                # On retourne les parties trouvées, jointes par un espace
+                return {"name": " ".join(found_parts), "confidence": 0.99, "method_used": "smart_email_cross_check"}
+                
+    return None
 
 # -------------------- Extraction de noms des CV (AMÉLIORÉE) --------------------
 
@@ -2433,17 +2470,34 @@ with tab4:
 
 with st.sidebar:
     st.markdown("### 🔧 Configuration")
-    if st.button("Test Connexion API DeepSeek"):
-        API_KEY = get_api_key()
-        if API_KEY:
+    if st.button("Test Connexion IA (DeepSeek & Gemini)"):
+        # Test DeepSeek
+        ds_key = get_api_key()
+        if ds_key:
             try:
-                response = requests.get("https://api.deepseek.com/v1/models", headers={"Authorization": f"Bearer {API_KEY}"})
+                response = requests.get("https://api.deepseek.com/v1/models", headers={"Authorization": f"Bearer {ds_key}"})
                 if response.status_code == 200:
-                    st.success("✅ Connexion API réussie")
+                    st.success("✅ DeepSeek : Connecté")
                 else:
-                    st.error(f"❌ Erreur de connexion ({response.status_code})")
+                    st.error(f"❌ DeepSeek : Erreur {response.status_code}")
             except Exception as e:
-                st.error(f"❌ Erreur: {e}")
+                st.error(f"❌ DeepSeek : {e}")
+        else:
+            st.warning("⚠️ DeepSeek : Clé manquante")
+            
+        # Test Gemini
+        gem_key = get_gemini_api_key()
+        if gem_key:
+            try:
+                genai.configure(api_key=gem_key)
+                model = genai.GenerativeModel('gemini-1.5-flash')
+                response = model.generate_content("Ping")
+                if response:
+                     st.success("✅ Gemini : Connecté")
+            except Exception as e:
+                st.error(f"❌ Gemini : {e}")
+        else:
+             st.warning("⚠️ Gemini : Clé manquante")
 
 with tab5:
     st.header("🗂️ Auto-classification de CVs (3 catégories)")
@@ -2519,8 +2573,16 @@ with tab5:
                     except Exception:
                         text = ''
 
-                    # Extraction du nom (toujours, pour les récap profils)
-                    extracted_name_info = extract_name_from_cv_text(text) if text else None
+                    # --- NOUVELLE LOGIQUE D'EXTRACTION DE NOM ---
+                    # 1. Extraction locale intelligente (Email Cross-Check)
+                    local_extraction = extract_name_smart_email(text)
+                    extracted_name_info = local_extraction
+                    
+                    if not extracted_name_info:
+                         # Fallback sur l'ancienne méthode regex
+                         extracted_name_info = extract_name_from_cv_text(text) if text else None
+
+                    # Détermination du nom à envoyer à l'IA comme indice
                     if extracted_name_info and extracted_name_info.get('name'):
                         display_name = extracted_name_info['name']
                     else:
@@ -2538,6 +2600,18 @@ with tab5:
                     sub_cat = classification.get('sub_category', 'Autre')
                     profile_summary = classification.get('profile_summary', '')
                     years_exp = classification.get('years_experience', 0)
+                    
+                    # Mise à jour du nom extrait si l'IA en a trouvé un meilleur
+                    ai_name = classification.get('candidate_name')
+                    # On fait confiance à l'IA si elle a trouvé un nom différent de "Candidat" et qu'on n'avait pas de certitude absolue (0.99)
+                    if ai_name and "Candidat" not in ai_name and "Erreur" not in ai_name:
+                         # Si notre méthode locale n'était pas sûre à 99% (smart email), on prend celle de l'IA
+                         if not (extracted_name_info and extracted_name_info.get('confidence', 0) >= 0.99):
+                            extracted_name_info = {
+                                "name": ai_name,
+                                "confidence": 1.0,
+                                "method_used": f"{classif_model}_Refined"
+                            }
 
                     result_item = {
                         'file': name,
