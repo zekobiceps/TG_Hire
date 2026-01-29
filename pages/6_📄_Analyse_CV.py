@@ -30,6 +30,14 @@ try:
 except Exception:
     PypdfReader = None
 
+# Imports pour OCR (Cas des CV scannés)
+try:
+    import pytesseract
+    from pdf2image import convert_from_path, convert_from_bytes
+except Exception:
+    pytesseract = None
+    convert_from_path = None
+
 # Imports pour la méthode sémantique
 from sentence_transformers import SentenceTransformer, util
 import torch
@@ -223,6 +231,21 @@ def extract_text_from_pdf(file):
             print(f"pypdf error: {e}")
 
         # Aucun texte extrait -> PDF probablement scanné (images) ou protégé
+        # Tentative OCR si disponible
+        if pytesseract and convert_from_bytes:
+            try:
+                bio.seek(0)
+                # On convertit le contenu du BytesIO en bytes
+                pdf_bytes = bio.read()
+                # On convertit la première page en image
+                images = convert_from_bytes(pdf_bytes, first_page=1, last_page=1)
+                if images:
+                    ocr_text = pytesseract.image_to_string(images[0], lang='fra+eng')
+                    if len(ocr_text.strip()) > 10:
+                        return ocr_text
+            except Exception as e:
+                print(f"OCR failed: {e}")
+
         return "Aucun texte lisible trouvé. Le PDF est peut-être un scan (images) ou protégé par mot de passe."
     except Exception as e:
         return f"Erreur d'extraction du texte: {str(e)}"
@@ -868,6 +891,7 @@ def is_likely_name_line(line: str) -> bool:
         'coordonnées', 'spécialisations', 'management', 'onboarding', 'performance',
         'sommaire', 'summary', 'objectif', 'objective', 'propos', 'about', 'me', 'moi',
         'bac', 'baccalauréat', 'baccalaureate', 'degree', 'niveau', 'level',
+        'logiciels', 'maîtrisés', 'activités', 'associatives',
         
         # Écoles et Universités (Faux positifs fréquents)
         'école', 'ecole', 'school', 'business', 'university', 'université',
@@ -884,7 +908,7 @@ def is_likely_name_line(line: str) -> bool:
         'bnp', 'paribas', 'société', 'générale', 'crédit', 'agricole', 'sncf',
         'groupe', 'group', 'bank', 'banque', 'service', 'civique', 'unilever',
         'orange', 'capgemini', 'atos', 'sopra', 'steria', 'accenture', 'deloitte',
-        'kpmg', 'ey', 'pwc', 'mazars',
+        'kpmg', 'ey', 'pwc', 'mazars', 'nge', 'mire',
         
         # Pays et Villes (souvent en en-tête)
         'france', 'paris', 'maroc', 'casablanca', 'rabat', 'lyon', 'marseille',
@@ -967,19 +991,24 @@ def extract_name_from_cv_text(text):
     lines = text.split('\n')
     
     # --- ÉTAPE 1 : Nettoyage préliminaire des lignes ---
-    # On regarde les 50 premières lignes (car les CV multi-colonnes peuvent avoir le nom plus loin)
+    # MODIF : Augmentation de la portée d'analyse à 200 lignes pour capturer les noms dans les sidebars (multi-colonnes)
+    SCAN_LIMIT = 200
     cleaned_lines = []
-    for line in lines[:50]:
+    
+    # On itère avec l'index pour pénaliser la position si nécessaire
+    for idx, line in enumerate(lines[:SCAN_LIMIT]):
         # Enlever les caractères de formatage Markdown ou OCR
         clean = line.strip()
         clean = re.sub(r'^##\s*', '', clean)  # Enlever "## " au début
         clean = re.sub(r'^\*\*\s*', '', clean)  # Enlever "** " au début
         clean = re.sub(r'\s*\*\*$', '', clean)  # Enlever " **" à la fin
-        clean = re.sub(r'^[-•➢]\s*', '', clean)  # Enlever les puces
+        clean = re.sub(r'^[-•➢–]\s*', '', clean)  # Enlever les puces
+        clean = re.sub(r'^[o]\s*', '', clean) # Enlever autres puces OCR
         
         if not clean:
             continue
             
+        # On garde l'info de ligne originelle si besoin
         cleaned_lines.append(clean)
         
         # Gestion des noms espacés (ex: "M a r w a n  L A A N I G R I")
@@ -996,57 +1025,116 @@ def extract_name_from_cv_text(text):
                 # Ajouter la version normalisée aux lignes candidates
                 cleaned_lines.append(normalized)
 
+    # --- ÉTAPE 1-BIS : Fusion de lignes (Pour les cas : L1=Prénom, L2=Nom) ---
+    # Ex: "Oussama" \n "GARMOUMI"
+    merged_candidates = []
+    if len(cleaned_lines) > 1:
+        for i in range(len(cleaned_lines) - 1):
+            l1 = cleaned_lines[i]
+            l2 = cleaned_lines[i+1]
+            # Si l1 ressemble à un prénom (Title) et l2 à un nom (Upper) ou vice versa
+            # Et qu'ils ne sont pas trop longs
+            if len(l1.split()) == 1 and len(l2.split()) == 1:
+                # Oussama \n GARMOUMI
+                if l1.istitle() and l2.isupper():
+                    merged_candidates.append(f"{l1} {l2}")
+                # GARMOUMI \n Oussama
+                elif l1.isupper() and l2.istitle():
+                    merged_candidates.append(f"{l1} {l2}")
+
     # --- ÉTAPE 2 : Recherche de patterns explicites (Regex forte) ---
     # Pattern : Prénom (Title) NOM (Upper) ou NOM (Upper) Prénom (Title)
     # Ex: "Hiba BELFARJI" ou "BELFARJI Hiba"
     regex_strong = r'^([A-ZÀ-Ÿ][a-zà-ÿ]+(?:-[A-ZÀ-Ÿ][a-zà-ÿ]+)?)\s+([A-ZÀ-Ÿ]{2,}(?:\s+[A-ZÀ-Ÿ]{2,})?)$'
     regex_reverse = r'^([A-ZÀ-Ÿ]{2,}(?:\s+[A-ZÀ-Ÿ]{2,})?)\s+([A-ZÀ-Ÿ][a-zà-ÿ]+(?:-[A-ZÀ-Ÿ][a-zà-ÿ]+)?)$'
     
+    # Test d'abord sur les candidats mergés
+    for cand in merged_candidates:
+         if re.match(regex_strong, cand) or re.match(regex_reverse, cand):
+             # Vérif extra : pas de mot interdit
+             if is_likely_name_line(cand):
+                 return {"name": cand, "confidence": 0.90, "method_used": "merged_lines_regex"}
+
     for line in cleaned_lines:
+        line_clean = line.strip()
         # Test Prénom NOM
-        match = re.match(regex_strong, line)
-        if match and is_likely_name_line(line):
-            return {"name": line, "confidence": 0.95, "method_used": "regex_strong_firstname_lastname"}
+        match = re.match(regex_strong, line_clean)
+        if match and is_likely_name_line(line_clean):
+            return {"name": line_clean, "confidence": 0.95, "method_used": "regex_strong_firstname_lastname"}
         
         # Test NOM Prénom
-        match = re.match(regex_reverse, line)
-        if match and is_likely_name_line(line):
-            return {"name": line, "confidence": 0.95, "method_used": "regex_strong_lastname_firstname"}
+        match = re.match(regex_reverse, line_clean)
+        if match and is_likely_name_line(line_clean):
+            return {"name": line_clean, "confidence": 0.95, "method_used": "regex_strong_lastname_firstname"}
 
     # --- ÉTAPE 3 : Système de Scoring (Heuristique) ---
     best_candidate = None
     best_score = 0.0
     
     for line in cleaned_lines:
+        # Check rapide anti-spam (si ligne > 6 mots, peu probable que ce soit un nom sauf espacé)
+        if len(line.split()) > 6:
+            continue
+
         if not is_likely_name_line(line):
             continue
             
         current_score = score_name_candidate(line)
         
+        # Bonus si la ligne est isolée (pas de phrase avant/après dans le bloc original ?? Difficile à dire ici)
+        # Mais on peut pénaliser les lignes très bas si elles n'ont pas un score excellent
+        
         if current_score > best_score:
             best_score = current_score
             best_candidate = line
             
-    # --- ÉTAPE 4 : Fallback Proximité Email/Tel ---
-    # Si le score est faible, on regarde près de l'email
+    # --- ÉTAPE 4 : Fallback Proximité Email/Tel (Deep Scan) ---
+    # Recherche étendue jusqu'à SCAN_LIMIT au lieu de 50
     if best_score < 0.6:
-        for i, line in enumerate(lines[:50]):
+        for i, line in enumerate(lines[:SCAN_LIMIT]):
             # Si on trouve un email ou un tel
             if re.search(r'@[\w\.-]+', line) or re.search(r'(?:(?:\+|00)33|0)\s*[1-9]', line):
-                # Regarder 10 lignes avant (car le nom peut être plus haut dans le CV)
-                for offset in range(1, 11):
-                    if i - offset >= 0:
-                        prev_line = lines[i - offset].strip()
-                        # Nettoyage léger
-                        prev_line = re.sub(r'^##\s*', '', prev_line)
-                        prev_line = re.sub(r'^\*\*\s*', '', prev_line)
-                        prev_line = re.sub(r'\s*\*\*$', '', prev_line)
-                        if is_likely_name_line(prev_line):
-                            cand_score = score_name_candidate(prev_line)
-                            # On booste le score car proche des contacts
-                            if cand_score + 0.3 > best_score:
-                                best_score = cand_score + 0.3
-                                best_candidate = prev_line
+                # Regarder 10 lignes AVANT (contexte immédiat)
+                start_range = max(0, i - 10)
+                # Mais aussi 3 lignes APRÈS (parfois le nom est sous l'email dans les sidebars)
+                end_range = min(len(lines), i + 3)
+                
+                context_lines = lines[start_range:i] + lines[i+1:end_range]
+                
+                for ctx_line in context_lines:
+                    ctx_line = ctx_line.strip()
+                    # Nettoyage léger
+                    clean_ctx = re.sub(r'^##\s*', '', ctx_line)
+                    clean_ctx = re.sub(r'^\*\*\s*', '', clean_ctx)
+                    clean_ctx = re.sub(r'\s*\*\*$', '', clean_ctx)
+                    clean_ctx = re.sub(r'^[-•➢–]\s*', '', clean_ctx)
+                    
+                    if not clean_ctx: continue
+
+                    if is_likely_name_line(clean_ctx):
+                        cand_score = score_name_candidate(clean_ctx)
+                        # On booste le score car proche des contacts
+                        boosted_score = cand_score + 0.3
+                        if boosted_score > best_score:
+                            best_score = boosted_score
+                            best_candidate = clean_ctx
+
+    # --- ÉTAPE 5 : Fallback Ultime (Recherche de patterns faibles) ---
+    # Si toujours rien, on cherche n'importe quoi qui ressemble à "Prénom NOM" même sans contexte
+    if not best_candidate or best_score < 0.4:
+        # Regex plus permissive (admet Title Title) pour les cas comme "Elkani Sadia"
+        regex_permissive = r'^([A-ZÀ-Ÿ][a-zà-ÿ]+)\s+([A-ZÀ-Ÿ][a-zà-ÿ]+)$'
+        
+        for line in cleaned_lines:
+             if re.match(regex_permissive, line) and is_likely_name_line(line):
+                 # On vérifie quand même que ce n'est pas un nom de ville ou d'école connu (déjà filtré par is_likely)
+                 score = 0.5 # Score moyen
+                 if score > best_score:
+                     best_score = score
+                     best_candidate = line
+    
+    if best_candidate and best_score > 0.4:
+        return {"name": best_candidate, "confidence": best_score, "method_used": "scoring_best_match"}
 
     if best_candidate and best_score > 0.4:
         return {"name": best_candidate, "confidence": best_score, "method_used": "scoring_best_match"}
