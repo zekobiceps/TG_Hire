@@ -629,7 +629,7 @@ def get_deepseek_profile_analysis(text: str, candidate_name: str | None = None) 
 Règles NOM STRICTES (alignées avec l'extraction locale) :
 - Utilise STRICTEMENT le nom fourni ci-dessous s'il est présent.
 - Ne modifie PAS le nom (pas d'ajout de points, parenthèses, intitulés).
-- N'invente PAS de nom, si incertain, garde "Candidat".
+- N'invente JAMAIS de nom. Si le nom ci-dessus est "Candidat (Nom non détecté)", REPRENDS-LE tel quel.
 - Ignore toute ligne contenant des mots interdits fréquents (ex: AutoCAD, ORSYS, Secteur, BIM, Owner, PSPO, Client, Missions, Permis, Angleterre, Irlande, Luxembourg, Urbanisme, Agro-alimentaire, Lecture, Multi-disciplinary, Engineering, Studies, Parcours, Professionnel, Ivalua, PRM, AMF, Alerting, Blockchain, Projects, Purposes, Program).
 
 **Format de sortie OBLIGATOIRE** - Respecte EXACTEMENT cet ordre et ces titres :
@@ -1003,7 +1003,7 @@ def is_likely_name_line(line: str) -> bool:
         'and', 'alerting', 'blockchain', 'projects', 'purposes', 'program',
         
         # Logiciels techniques / CAO / Outils scientifiques
-        'logiciels', 'abaqus', 'catia', 'solidworks', 'autocad', 'ansys', 'matlab', 'bim',
+        'logiciels', 'abaqus', 'catia', 'solidworks', 'autocad', 'ansys', 'matlab', 'bim', 'software',
         'xlstat', 'minitab', 'spss', 'stata', 'r', 'rstudio', 'hive', 'psql',
         'rtgs', 'target', 'swift', 'bpce',
         
@@ -1028,7 +1028,7 @@ def is_likely_name_line(line: str) -> bool:
     if ':' in line or '&' in line:
         return False
     # Rejet si la ligne contient ponctuation indicative de titres/sections
-    if any(p in line for p in ['.', '(', ')', '/', ',']):
+    if any(p in line for p in ['.', '(', ')', '/', ',']) or any(c.isdigit() for c in line):
         return False
 
     # 2. Vérifications de structure
