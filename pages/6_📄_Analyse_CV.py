@@ -757,6 +757,147 @@ Texte du CV :
     except Exception as e:
         return f"❌ Erreur Groq : {e}"
 
+# --- FONCTIONS OPENROUTER ---
+def get_openrouter_api_key():
+    """Récupère la clé OpenRouter avec persistance en session state."""
+    if "OpenRouter_API_KEY" in st.session_state:
+        return st.session_state.OpenRouter_API_KEY
+    
+    api_key = None
+    try:
+        keys_to_check = ["OpenRouter_API_KEY", "OPENROUTER_API_KEY"]
+        for k in keys_to_check:
+            if k in st.secrets:
+                api_key = st.secrets[k]
+                break
+        
+        if not api_key:
+            for k in keys_to_check:
+                val = os.environ.get(k)
+                if val:
+                    api_key = val
+                    break
+        
+        if api_key:
+            st.session_state.OpenRouter_API_KEY = api_key
+            return api_key
+    except Exception:
+        pass
+    return None
+
+def get_detailed_score_with_openrouter(job_description, resume_text):
+    API_KEY = get_openrouter_api_key()
+    if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé OpenRouter manquante."}
+
+    try:
+        response = requests.post(
+            url="https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://tg-hire.streamlit.app/", # Optionnel
+                "X-Title": "TG Hire" # Optionnel
+            },
+            data=json.dumps({
+                "model": "openai/gpt-3.5-turbo", # Modèle par défaut économique
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": f"""
+                        En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
+                        Fournis ta réponse en deux parties :
+                        1. Un score de correspondance en pourcentage (ex: "Score: 85%").
+                        2. Une analyse détaillée expliquant les points forts et les points à améliorer.
+                        ---
+                        Description du poste: {job_description}
+                        ---
+                        Texte du CV: {resume_text}
+                        """
+                    }
+                ]
+            })
+        )
+        response.raise_for_status()
+        data = response.json()
+        text_resp = data['choices'][0]['message']['content']
+        
+        score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
+        score = int(score_match.group(1)) / 100 if score_match else 0.0
+        
+        return {"score": score, "explanation": text_resp}
+    except Exception as e:
+        return {"score": 0.0, "explanation": f"Erreur OpenRouter: {e}"}
+
+def rank_resumes_with_openrouter(job_description, resumes, file_names):
+    scores_data = []
+    progress_bar = st.progress(0)
+    for i, resume_text in enumerate(resumes):
+        scores_data.append(get_detailed_score_with_openrouter(job_description, resume_text))
+        progress_bar.progress((i + 1) / len(resumes))
+    progress_bar.empty()
+    return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
+
+def get_openrouter_profile_analysis(text: str, candidate_name: str | None = None) -> str:
+    API_KEY = get_openrouter_api_key()
+    if not API_KEY: return "❌ Analyse OpenRouter impossible (clé manquante)."
+
+    safe_name = (candidate_name or "Candidat").strip()
+
+    try:
+        response = requests.post(
+            url="https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {API_KEY}",
+                "Content-Type": "application/json",
+            },
+            data=json.dumps({
+                "model": "openai/gpt-3.5-turbo",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
+
+Règles NOM :
+- Nom identifié : "{safe_name}".
+- Si "{safe_name}" est inapproprié (Candidat, Permis B...), Trouve le vrai nom dans le texte.
+- Sinon garde "{safe_name}".
+
+**Format de sortie OBLIGATOIRE** :
+
+**👤 [Nom du Candidat]**
+
+**📊 Synthèse**
+[2-3 phrases]
+
+**🎓 Formation**
+[Diplôme le plus élevé]
+
+**💼 Expérience**
+[Dernier poste]
+
+**🛠️ Compétences clés**
+[4-5 compétences]
+
+**💡 Points forts**
+[2-3 points]
+
+**⚠️ Points d'attention**
+[1-2 points]
+
+Texte du CV :
+{text[:4000]}
+"""
+                    }
+                ]
+            })
+        )
+        response.raise_for_status()
+        return response.json()['choices'][0]['message']['content']
+    except Exception as e:
+        return f"❌ Erreur OpenRouter : {e}"
+        
+# DELETED DUPLICATE FUNCTION: get_openrouter_auto_classification
+
 # --- FONCTIONS CLAUDE ---
 def get_claude_api_key():
     """Récupère la clé Claude avec persistance en session state."""
@@ -1050,7 +1191,7 @@ def get_gemini_auto_classification(text: str, full_name: str | None) -> dict:
     
     1. Check Nom: "{safe_name}". Corrige si faux (Permis B, etc).
     2. Macro-catégorie (UNE SEULE) : "Fonctions supports", "Logistique", "Production/Technique".
-    3. Sous-catégorie.
+    3. Sous-catégorie (Interdit "Étudiant", "Stagiaire". Indiquer le métier visé).
     4. Années expérience (int).
     5. Récapitulatif (2-3 phrases).
 
@@ -1304,7 +1445,7 @@ def get_deepseek_auto_classification(text: str, local_extracted_name: str | None
     Si tu hésites, choisis la plus proche. Ne mets JAMAIS "Non classé" sauf si c'est illisible.
 
     3. EXTRACTION
-    - Sous-catégorie précise.
+    - Sous-catégorie précise (Interdit: "Étudiant", "Stagiaire". Indiquer le métier visé, ex: "Assistant RH").
     - Années d'expérience (nombre).
     - Un résumé court (2 phrases).
 
@@ -1373,6 +1514,225 @@ def get_deepseek_auto_classification(text: str, local_extracted_name: str | None
     except Exception as e:
         print(f"DeepSeek Error: {e}")
         default_response["candidate_name"] = hint_name or "Erreur Extraction"
+        return default_response
+
+def get_groq_auto_classification(text: str, local_extracted_name: str | None) -> dict:
+    API_KEY = get_groq_api_key()
+    hint_name = (local_extracted_name or "").strip()
+    
+    default_response = {
+        "macro_category": "Non classé",
+        "sub_category": "Autre",
+        "years_experience": 0,
+        "candidate_name": hint_name or "Candidat",
+        "profile_summary": "Analyse impossible (clé manquante)."
+    }
+    
+    if not API_KEY: return default_response
+
+    try:
+        client = groq.Groq(api_key=API_KEY)
+        
+        prompt = f"""
+        Agis comme un expert en recrutement. Analyse ce CV.
+
+        1. IDENTIFICATION NOM:
+        Si "{hint_name}" est vide ou générique, trouve le vrai nom.
+        
+        2. CLASSIFICATION (Crucial):
+        Classe ce profil dans UNE seule de ces 3 catégories :
+        - "Fonctions supports"
+        - "Logistique"
+        - "Production/Technique"
+        
+        3. EXTRACTION
+        - Sous-catégorie précise (Interdit: "Étudiant", "Stagiaire". Indiquer le métier visé).
+        - Années d'expérience (nombre entier).
+        - Un résumé court.
+
+        Réponds UNIQUEMENT ce JSON valide :
+        {{
+            "candidate_name": "...",
+            "macro_category": "...",
+            "sub_category": "...",
+            "years_experience": 0,
+            "profile_summary": "..."
+        }}
+
+        CV TEXTE :
+        {text[:4000]}
+        """
+
+        completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": "Tu es un expert JSON. Tu ne réponds que du JSON valide."},
+                {"role": "user", "content": prompt}
+            ],
+            model="llama-3.1-8b-instant",
+            temperature=0.1,
+            response_format={"type": "json_object"}
+        )
+        
+        content = completion.choices[0].message.content
+        data = json.loads(content)
+        
+        macro = data.get("macro_category")
+        if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]:
+            if "support" in str(macro).lower(): macro = "Fonctions supports"
+            elif "logisti" in str(macro).lower(): macro = "Logistique"
+            elif "product" in str(macro).lower() or "techni" in str(macro).lower(): macro = "Production/Technique"
+            else: macro = "Non classé"
+
+        return {
+            "macro_category": macro,
+            "sub_category": data.get("sub_category", "Autre"),
+            "years_experience": data.get("years_experience", 0),
+            "candidate_name": data.get("candidate_name", hint_name),
+            "profile_summary": data.get("profile_summary", "")
+        }
+    except Exception as e:
+        print(f"Groq Error: {e}")
+        return default_response
+
+def get_claude_auto_classification(text: str, local_extracted_name: str | None) -> dict:
+    API_KEY = get_claude_api_key()
+    hint_name = (local_extracted_name or "").strip()
+    
+    default_response = {
+        "macro_category": "Non classé",
+        "sub_category": "Autre",
+        "years_experience": 0,
+        "candidate_name": hint_name or "Candidat",
+        "profile_summary": "Analyse impossible (clé manquante)."
+    }
+    
+    if not API_KEY: return default_response
+
+    try:
+        client = anthropic.Anthropic(api_key=API_KEY)
+        
+        prompt = f"""
+        Analyse ce CV et extrais les informations au format JSON.
+
+        1. Nom du candidat (utilise "{hint_name}" comme indice).
+        2. Catégorie (CHOIX STRICT): "Fonctions supports", "Logistique", "Production/Technique".
+        3. Sous-catégorie (Interdit "Étudiant", "Stagiaire". Indiquer le métier).
+        4. Années d'expérience (int).
+        5. Résumé (2 phrases).
+
+        Format JSON attendu:
+        {{
+            "candidate_name": "...",
+            "macro_category": "...",
+            "sub_category": "...",
+            "years_experience": 0,
+            "profile_summary": "..."
+        }}
+
+        CV:
+        {text[:4000]}
+        """
+
+        message = client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=1000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        
+        content = ""
+        for block in message.content:
+            if block.type == "text":
+                content += block.text
+        
+        clean_content = clean_json_string(content)
+        data = json.loads(clean_content)
+        
+        macro = data.get("macro_category")
+        if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]:
+             macro = "Non classé"
+
+        return {
+            "macro_category": macro,
+            "sub_category": data.get("sub_category", "Autre"),
+            "years_experience": data.get("years_experience", 0),
+            "candidate_name": data.get("candidate_name", hint_name),
+            "profile_summary": data.get("profile_summary", "")
+        }
+    except Exception as e:
+        print(f"Claude Error: {e}")
+        return default_response
+
+def get_openrouter_auto_classification(text: str, local_extracted_name: str | None) -> dict:
+    API_KEY = get_openrouter_api_key()
+    hint_name = (local_extracted_name or "").strip()
+    
+    default_response = {
+        "macro_category": "Non classé",
+        "sub_category": "Autre",
+        "years_experience": 0,
+        "candidate_name": hint_name or "Candidat",
+        "profile_summary": "Analyse impossible (clé manquante)."
+    }
+    
+    if not API_KEY: return default_response
+
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://tg-hire.streamlit.app/",
+        "X-Title": "TG Hire"
+    }
+    
+    prompt = f"""
+    Act as a recruitment expert. Analyze this resume.
+    
+    1. Name: Find the candidate name. Hint: "{hint_name}".
+    2. Category (STRICTLY ONE OF): "Fonctions supports", "Logistique", "Production/Technique".
+    3. Sub-category (Do NOT use "Student" or "Intern". Use target job title).
+    4. Years of experience (integer).
+    5. Summary (2 sentences).
+
+    Reply ONLY with valid JSON:
+    {{
+        "candidate_name": "...",
+        "macro_category": "...",
+        "sub_category": "...",
+        "years_experience": 0,
+        "profile_summary": "..."
+    }}
+
+    RESUME TEXT:
+    {text[:4000]}
+    """
+
+    try:
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            data=json.dumps({
+                "model": "openai/gpt-3.5-turbo",
+                "messages": [{"role": "user", "content": prompt}]
+            })
+        )
+        response.raise_for_status()
+        
+        content = response.json()['choices'][0]['message']['content']
+        clean_content = clean_json_string(content)
+        data = json.loads(clean_content)
+        
+        macro = data.get("macro_category")
+        if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]:
+             macro = "Non classé"
+
+        return {
+            "macro_category": macro,
+            "sub_category": data.get("sub_category", "Autre"),
+            "years_experience": data.get("years_experience", 0),
+            "candidate_name": data.get("candidate_name", hint_name),
+            "profile_summary": data.get("profile_summary", "")
+        }
+    except Exception as e:
+        print(f"OpenRouter Error: {e}")
         return default_response
 
 
@@ -2083,7 +2443,8 @@ with tab1:
     analysis_method = st.radio(
         "✨ Choisissez votre méthode de classement",
         ["Méthode Cosinus (Mots-clés)", "Méthode Sémantique (Embeddings)", "Scoring par Règles (Regex)", 
-         "Analyse combinée (Ensemble)", "Analyse par IA (DeepSeek)", "Analyse par IA (Gemini)", "Analyse par IA (Groq)"],
+         "Analyse combinée (Ensemble)", "Analyse par IA (DeepSeek)", "Analyse par IA (Gemini)", 
+         "Analyse par IA (Groq)", "Analyse par IA (Claude)", "Analyse par IA (OpenRouter)"],
         index=0, help="Consultez l'onglet 'Guide des Méthodes'."
     )
     
@@ -2194,6 +2555,24 @@ with tab1:
             elif analysis_method == "Analyse par IA (Groq)":
                 progress_placeholder.info(f"🤖 Analyse Groq en cours...")
                 result = rank_resumes_with_groq(job_description, resumes, file_names)
+                results = {"scores": result["scores"], "explanations": result["explanations"]}
+                explanations = result["explanations"]
+                progress_bar.progress(1.0)
+
+            elif analysis_method == "Analyse par IA (Claude)":
+                progress_placeholder.info(f"🤖 Analyse Claude en cours...")
+                # Manque la fonction batch pour Claude, on itère simplement
+                scores_data = []
+                for i, r_text in enumerate(resumes):
+                    progress_placeholder.info(f"🤖 Analyse Claude ({i+1}/{len(resumes)})")
+                    scores_data.append(get_detailed_score_with_claude(job_description, r_text))
+                    progress_bar.progress((i + 1) / len(resumes))
+                results = {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
+                explanations = results.get("explanations")
+
+            elif analysis_method == "Analyse par IA (OpenRouter)":
+                progress_placeholder.info(f"🤖 Analyse OpenRouter en cours...")
+                result = rank_resumes_with_openrouter(job_description, resumes, file_names)
                 results = {"scores": result["scores"], "explanations": result["explanations"]}
                 explanations = result["explanations"]
                 progress_bar.progress(1.0)
@@ -2491,12 +2870,16 @@ with tab2:
     
     analysis_type_single = st.selectbox(
         "Type d'analyse souhaité",
-        ("Analyse par IA (DeepSeek)", "Analyse par IA (Gemini)", "Analyse par Regex (Extraction d'entités)", "Analyse par la Méthode Sémantique", 
+        ("Analyse par IA (DeepSeek)", "Analyse par IA (Gemini)", "Analyse par IA (Groq)", "Analyse par IA (Claude)", "Analyse par IA (OpenRouter)",
+         "Analyse par Regex (Extraction d'entités)", "Analyse par la Méthode Sémantique", 
          "Analyse par la Méthode Cosinus", "Analyse Combinée (Ensemble)")
     )
     captions = {
         "Analyse par IA (DeepSeek)": "Analyse qualitative (points forts/faibles).",
         "Analyse par IA (Gemini)": "Analyse par Google Gemini (Rapide & Performant).",
+        "Analyse par IA (Groq)": "Analyse ultra-rapide via Llama 3.",
+        "Analyse par IA (Claude)": "Analyse nuancée par Claude 3 Haiku.",
+        "Analyse par IA (OpenRouter)": "Analyse flexible via OpenRouter.",
         "Analyse par Regex (Extraction d'entités)": "Extrait des informations structurées (compétences, diplômes, etc.).",
         "Analyse par la Méthode Sémantique": "Calcule un score de pertinence basé sur le sens (nécessite une description de poste).",
         "Analyse par la Méthode Cosinus": "Calcule un score de pertinence basé sur les mots-clés (nécessite une description de poste).",
@@ -2562,16 +2945,36 @@ with tab2:
                                     st.markdown("**Détail de l'analyse combinée :**")
                                     st.json(logic)
                     elif analysis_type_single == "Analyse par IA (Gemini)":
-                        # Extraire le nom du candidat pour Gemini
+                        # Extraire le nom du candidat
                         extracted = extract_name_from_cv_text(text)
                         candidate_name = extracted.get('name') if extracted else None
                         
                         analysis_result = get_gemini_profile_analysis(text, candidate_name)
-                        
                         st.markdown("### 🤖 Résultat de l'analyse Gemini")
                         st.markdown(analysis_result)
 
-                    else: # Analyse IA
+                    elif analysis_type_single == "Analyse par IA (Groq)":
+                        extracted = extract_name_from_cv_text(text)
+                        candidate_name = extracted.get('name') if extracted else None
+                        analysis_result = get_groq_profile_analysis(text, candidate_name)
+                        st.markdown("### 🤖 Résultat de l'analyse Groq")
+                        st.markdown(analysis_result)
+
+                    elif analysis_type_single == "Analyse par IA (Claude)":
+                        extracted = extract_name_from_cv_text(text)
+                        candidate_name = extracted.get('name') if extracted else None
+                        analysis_result = get_claude_profile_analysis(text, candidate_name)
+                        st.markdown("### 🤖 Résultat de l'analyse Claude")
+                        st.markdown(analysis_result)
+
+                    elif analysis_type_single == "Analyse par IA (OpenRouter)":
+                        extracted = extract_name_from_cv_text(text)
+                        candidate_name = extracted.get('name') if extracted else None
+                        analysis_result = get_openrouter_profile_analysis(text, candidate_name)
+                        st.markdown("### 🤖 Résultat de l'analyse OpenRouter")
+                        st.markdown(analysis_result)
+
+                    else: # Analyse IA DeepSeek
                         # Extraire le nom du candidat
                         extracted = extract_name_from_cv_text(text)
                         candidate_name = extracted.get('name') if extracted else None
@@ -2945,11 +3348,12 @@ with tab5:
         # Option pour renommer et organiser les CV
         rename_and_organize = st.checkbox(
             "📁 Renommer les CV et organiser par dossiers",
+            value=True,
             help="Extrait automatiquement les noms des candidats et organise les CV par catégorie dans un fichier ZIP"
         )
 
         # Choix du modèle IA pour la classification
-        classif_model = st.radio("Modèle IA pour la classification", ["DeepSeek", "Gemini"], horizontal=True)
+        classif_model = st.selectbox("Modèle IA pour la classification", ["DeepSeek", "Gemini", "Groq", "Claude", "OpenRouter"])
         
         # Bouton de classification primaire
         if st.button("📂 Lancer l'auto-classification", type='primary'):
@@ -2994,6 +3398,12 @@ with tab5:
                     
                     if classif_model == "Gemini":
                         classification = get_gemini_auto_classification(text_for_ai, display_name)
+                    elif classif_model == "Groq":
+                        classification = get_groq_auto_classification(text_for_ai, display_name)
+                    elif classif_model == "Claude":
+                        classification = get_claude_auto_classification(text_for_ai, display_name)
+                    elif classif_model == "OpenRouter":
+                        classification = get_openrouter_auto_classification(text_for_ai, display_name)
                     else:
                         classification = get_deepseek_auto_classification(text_for_ai, display_name)
 

@@ -11,9 +11,10 @@ import random
 try:
     import groq
     import google.generativeai as genai
+    import anthropic
     from google.oauth2 import service_account 
 except ImportError:
-    st.error("❌ Bibliothèques manquantes. Exécutez : pip install groq google-generativeai google-auth")
+    st.error("❌ Bibliothèques manquantes. Exécutez : pip install groq google-generativeai google-auth anthropic")
     st.stop()
     
 # --- INITIALISATION DU SESSION STATE ---
@@ -111,8 +112,8 @@ def get_groq_response(prompt, history, length):
             messages=messages,
             model="llama-3.1-8b-instant",
         )
-        content = chat_completion.choices[0].message.content
-        usage = chat_completion.usage.total_tokens
+        content = chat_completion.choices[0].message.content or ""
+        usage = chat_completion.usage.total_tokens if chat_completion.usage else 0
         return {"content": content, "usage": usage}
     except Exception as e:
         return {"content": f"❌ Erreur API Groq: {e}", "usage":0}
@@ -126,13 +127,49 @@ def get_gemini_response(prompt, history, length):
     
     try:
         genai.configure(credentials=creds) 
-        model = genai.GenerativeModel('gemini-1.5-pro-latest')
+        # Update to gemini-2.5-flash-lite as it is confirmed available
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
         response = model.generate_content(final_prompt)
         content = response.text
         usage = model.count_tokens(final_prompt).total_tokens
         return {"content": content, "usage": usage}
     except Exception as e:
         return {"content": f"❌ Erreur API Gemini: {e}", "usage": 0}
+
+def get_claude_response(prompt, history, length):
+    api_key = None
+    if "Claude_API_KEY" in st.session_state:
+        api_key = st.session_state.Claude_API_KEY
+    elif "Claude_API_KEY" in st.secrets:
+        api_key = st.secrets["Claude_API_KEY"]
+    elif "ANTHROPIC_API_KEY" in st.secrets:
+        api_key = st.secrets["ANTHROPIC_API_KEY"]
+    
+    if not api_key:
+        return {"content": "❌ Clé API Claude manquante.", "usage": 0}
+
+    final_prompt = f"{SYSTEM_PROMPT}\n\nHistorique:\n{json.dumps(history)}\n\nQuestion:\n{prompt}\n\n(Instruction: Fournir une réponse de longueur '{length}')"
+    
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        message = client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=4000,
+            messages=[{"role": "user", "content": final_prompt}]
+        )
+        content = ""
+        if message.content:
+            for block in message.content:
+                if block.type == "text":
+                    content += block.text
+        
+        usage = 0
+        if message.usage:
+            usage = message.usage.input_tokens + message.usage.output_tokens
+            
+        return {"content": content, "usage": usage}
+    except Exception as e:
+        return {"content": f"❌ Erreur API Claude: {e}", "usage": 0}
 
 # --- ROUTEUR DE MODÈLE ---
 def get_ai_response(prompt, history, model, length):
@@ -142,6 +179,8 @@ def get_ai_response(prompt, history, model, length):
         return get_deepseek_response(prompt, history, length)
     elif model == "Gemini":
         return get_gemini_response(prompt, history, length)
+    elif model == "Claude":
+        return get_claude_response(prompt, history, length)
     else:
         return {"content": "Erreur: Modèle non reconnu.", "usage": 0}
 
@@ -159,7 +198,7 @@ with st.sidebar:
     st.subheader("⚙️ Paramètres")
     st.session_state.selected_model = st.selectbox(
         "🧠 Choisir le modèle IA :",
-        ("Groq", "DeepSeek", "Gemini") # CoGenAI retiré
+        ("Groq", "DeepSeek", "Gemini", "Claude") # CoGenAI retiré
     )
     
     st.session_state.response_length = st.selectbox(
