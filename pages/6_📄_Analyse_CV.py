@@ -1046,7 +1046,32 @@ def is_likely_name_line(line: str) -> bool:
         'client', 'missions',
         # Certifications/Accréditations spécifiques
         'amf',
+        # Mots à bannir (Faux positifs signalés)
+        'formateur', 'cuisine', 'agile', 'scrum', 'méthodologie', 'methodologie',
+        'ocp', 'sa', 'sarl', 'sas', 'inc', 'ltd', 'group', 'groupe', 'holding',
+        'résidence', 'residence', 'immeuble', 'apt', 'app', 'étage',
+        'compétence', 'competence', 'professionnelle', 'limitée',
+        
+        # Mots à bannir (Faux positifs signalés)
+        'formateur', 'cuisine', 'agile', 'scrum', 'méthodologie', 'methodologie',
+        'ocp', 'sa', 'sarl', 'sas', 'inc', 'ltd', 'group', 'groupe', 'holding',
+        'résidence', 'residence', 'immeuble', 'apt', 'app', 'étage',
+        'compétence', 'competence', 'professionnelle', 'limitée',
     ]
+
+    # --- 1.1 FILTRAGE AGRESSIF (Substrings) ---
+    # Certains mots invalident TOUTE la ligne même s'ils sont collés
+    # Ex: "GestionDeProjet", "CompétenceProfessionnelle"
+    fatal_substrings = [
+        'compétence', 'competence', 'formation', 'education', 
+        'projets', 'réalisés', 'experience', 'expérience', 
+        'sommaire', 'summary', 'profil', 'profile',
+        'soft', 'hard', 'skills', 'outils', 'logiciels',
+        'management', 'agile', 'scrum', 'methodologie', 'méthodologie'
+    ]
+    if any(fs in line_lower for fs in fatal_substrings):
+        return False
+
     
     # Si un mot de la ligne est interdit -> Rejet
     if any(w in forbidden_words for w in words):
@@ -1107,6 +1132,40 @@ def score_name_candidate(text: str) -> float:
     return min(score, 1.0)
 
 
+def clean_merged_text_pdf(text: str) -> str:
+    """
+    Corrige les problèmes de parsing PDF où les mots sont collés.
+    Ex: 'Verneuil enABDALLAH' -> 'Verneuil en ABDALLAH'
+    Ex: '0787860895HADDOUCHI' -> '0787860895 HADDOUCHI'
+    """
+    if not text: return ""
+    
+    # 1. Séparer minuscule/Majuscule (ex: enABDALLAH) - Attention aux 'MacDonald'
+    # On cible spécifiquement les cas où la majuscule est suivie d'autres majuscules (Nom de famille)
+    text = re.sub(r'([a-z])([A-Z]{2,})', r'\1 \2', text)
+    
+    # 2. Séparer Chiffre/Lettre (ex: 95HADDOUCHI)
+    text = re.sub(r'([0-9])([a-zA-Z]{2,})', r'\1 \2', text)
+    
+    return text
+
+def clean_merged_text_pdf(text: str) -> str:
+    """
+    Corrige les problèmes de parsing PDF où les mots sont collés.
+    Ex: 'Verneuil enABDALLAH' -> 'Verneuil en ABDALLAH'
+    Ex: '0787860895HADDOUCHI' -> '0787860895 HADDOUCHI'
+    """
+    if not text: return ""
+    
+    # 1. Séparer minuscule/Majuscule (ex: enABDALLAH) - Attention aux 'MacDonald'
+    # On cible spécifiquement les cas où la majuscule est suivie d'autres majuscules (Nom de famille)
+    text = re.sub(r'([a-z])([A-Z]{2,})', r'\1 \2', text)
+    
+    # 2. Séparer Chiffre/Lettre (ex: 95HADDOUCHI)
+    text = re.sub(r'([0-9])([a-zA-Z]{2,})', r'\1 \2', text)
+    
+    return text
+
 def extract_name_from_cv_text(text):
     """
     Extrait le nom complet d'un CV avec une approche heuristique avancée.
@@ -1114,6 +1173,9 @@ def extract_name_from_cv_text(text):
     """
     if not text or len(text.strip()) < 10:
         return {"name": None, "confidence": 0, "method_used": "text_too_short"}
+    
+    # NETTOYAGE CRITIQUE : Séparation des mots collés (OCR/PDF mal formés)
+    text = clean_merged_text_pdf(text)
     
     lines = text.split('\n')
     
