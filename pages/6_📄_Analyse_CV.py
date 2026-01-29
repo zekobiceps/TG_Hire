@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import io
 import requests
+import google.generativeai as genai
 import json
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -1137,29 +1138,14 @@ def clean_merged_text_pdf(text: str) -> str:
     Corrige les problèmes de parsing PDF où les mots sont collés.
     Ex: 'Verneuil enABDALLAH' -> 'Verneuil en ABDALLAH'
     Ex: '0787860895HADDOUCHI' -> '0787860895 HADDOUCHI'
+    Ex: 'CompétenceProfessionnelle' -> 'Compétence Professionnelle'
     """
     if not text: return ""
     
-    # 1. Séparer minuscule/Majuscule (ex: enABDALLAH) - Attention aux 'MacDonald'
-    # On cible spécifiquement les cas où la majuscule est suivie d'autres majuscules (Nom de famille)
-    text = re.sub(r'([a-z])([A-Z]{2,})', r'\1 \2', text)
-    
-    # 2. Séparer Chiffre/Lettre (ex: 95HADDOUCHI)
-    text = re.sub(r'([0-9])([a-zA-Z]{2,})', r'\1 \2', text)
-    
-    return text
-
-def clean_merged_text_pdf(text: str) -> str:
-    """
-    Corrige les problèmes de parsing PDF où les mots sont collés.
-    Ex: 'Verneuil enABDALLAH' -> 'Verneuil en ABDALLAH'
-    Ex: '0787860895HADDOUCHI' -> '0787860895 HADDOUCHI'
-    """
-    if not text: return ""
-    
-    # 1. Séparer minuscule/Majuscule (ex: enABDALLAH) - Attention aux 'MacDonald'
-    # On cible spécifiquement les cas où la majuscule est suivie d'autres majuscules (Nom de famille)
-    text = re.sub(r'([a-z])([A-Z]{2,})', r'\1 \2', text)
+    # 1. Séparer minuscule/Majuscule (CamelCase strict)
+    # Ex: 'CompétenceProfessionnelle' -> 'Compétence Professionnelle'
+    # Attention: 'McDonald' -> 'Mc Donald' (Acceptable pour l'analyse)
+    text = re.sub(r'([a-zà-ÿ])([A-ZÀ-Ÿ])', r'\1 \2', text)
     
     # 2. Séparer Chiffre/Lettre (ex: 95HADDOUCHI)
     text = re.sub(r'([0-9])([a-zA-Z]{2,})', r'\1 \2', text)
@@ -1561,7 +1547,7 @@ with tab1:
     analysis_method = st.radio(
         "✨ Choisissez votre méthode de classement",
         ["Méthode Cosinus (Mots-clés)", "Méthode Sémantique (Embeddings)", "Scoring par Règles (Regex)", 
-         "Analyse combinée (Ensemble)", "Analyse par IA (DeepSeek)"],
+         "Analyse combinée (Ensemble)", "Analyse par IA (DeepSeek)", "Analyse par IA (Gemini)"],
         index=0, help="Consultez l'onglet 'Guide des Méthodes'."
     )
     
@@ -1661,7 +1647,25 @@ with tab1:
             # Analyse selon la méthode choisie
             results, explanations, logic = {}, None, None
             
-            if analysis_method == "Analyse par IA (DeepSeek)":
+            
+    if analysis_method == "Analyse par IA (Gemini)":
+        if not st.session_state.last_job_description:
+            st.warning("⚠️ Veuillez entrer une description de poste.")
+        elif not resumes:
+            st.warning("⚠️ Aucun CV importé.")
+        else:
+            if st.button("🚀 Lancer l'analyse Gemini"):
+                with st.spinner("🤖 Analyse Gemini en cours..."):
+                    result = rank_resumes_with_gemini(st.session_state.last_job_description, resumes, file_names)
+                    
+                    # Normalisation scores
+                    st.session_state.last_analysis_result = [{"score": s, "file": f, "explanation": result["explanations"][f]} for f, s in zip(file_names, result["scores"])]
+                    st.session_state.last_analysis_result.sort(key=lambda x: x["score"], reverse=True)
+                    st.session_state.last_analysis_method = "Analyse par IA (Gemini)"
+                    st.success("✅ Analyse terminée !")
+                    st.rerun()
+
+    if analysis_method == "Analyse par IA (DeepSeek)":
                 # Analyse IA avec progression individuelle
                 progress_placeholder.info(f"🤖 Analyse par IA en cours (0/{len(resumes)})...")
                 progress_bar.progress(0.3)
@@ -1953,11 +1957,12 @@ with tab2:
     
     analysis_type_single = st.selectbox(
         "Type d'analyse souhaité",
-        ("Analyse par IA (DeepSeek)", "Analyse par Regex (Extraction d'entités)", "Analyse par la Méthode Sémantique", 
+        ("Analyse par IA (DeepSeek)", "Analyse par IA (Gemini)", "Analyse par Regex (Extraction d'entités)", "Analyse par la Méthode Sémantique", 
          "Analyse par la Méthode Cosinus", "Analyse Combinée (Ensemble)")
     )
     captions = {
-        "Analyse par IA (DeepSeek)": "Analyse qualitative (points forts/faibles). Consomme vos tokens !",
+        "Analyse par IA (DeepSeek)": "Analyse qualitative (points forts/faibles).",
+        "Analyse par IA (Gemini)": "Analyse par Google Gemini (Rapide & Performant).",
         "Analyse par Regex (Extraction d'entités)": "Extrait des informations structurées (compétences, diplômes, etc.).",
         "Analyse par la Méthode Sémantique": "Calcule un score de pertinence basé sur le sens (nécessite une description de poste).",
         "Analyse par la Méthode Cosinus": "Calcule un score de pertinence basé sur les mots-clés (nécessite une description de poste).",
@@ -2022,6 +2027,16 @@ with tab2:
                                 if logic:
                                     st.markdown("**Détail de l'analyse combinée :**")
                                     st.json(logic)
+                    elif analysis_type_single == "Analyse par IA (Gemini)":
+                        # Extraire le nom du candidat pour Gemini
+                        extracted = extract_name_from_cv_text(text)
+                        candidate_name = extracted.get('name') if extracted else None
+                        
+                        analysis_result = get_gemini_profile_analysis(text, candidate_name)
+                        
+                        st.markdown("### 🤖 Résultat de l'analyse Gemini")
+                        st.markdown(analysis_result)
+
                     else: # Analyse IA
                         # Extraire le nom du candidat
                         extracted = extract_name_from_cv_text(text)
@@ -2602,3 +2617,165 @@ with tab5:
                                 st.error(f"❌ Erreur lors de la création du ZIP : {e}")
                 else:
                     st.info("💡 Cochez l'option 'Renommer les CV' lors du prochain traitement pour activer le téléchargement ZIP organisé.")
+
+
+# --- FONCTIONS GEMINI (NOUVEAU) ---
+
+def get_gemini_api_key():
+    try:
+        return st.secrets.get("Gemini_API_KEY", None)
+    except Exception:
+        return None
+
+def get_detailed_score_with_gemini(job_description, resume_text):
+    API_KEY = get_gemini_api_key()
+    if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Gemini manquante."}
+    
+    genai.configure(api_key=API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    
+    prompt = f""""
+    En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
+    Fournis ta réponse en deux parties :
+    1. Un score de correspondance en pourcentage (ex: "Score: 85%").
+    2. Une analyse détaillée expliquant les points forts et les points à améliorer.
+    ---
+    Description du poste: {job_description}
+    ---
+    Texte du CV: {resume_text}
+    """
+    
+    try:
+        response = model.generate_content(prompt)
+        text_resp = response.text
+        
+        # Extraction du score
+        score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
+        score = int(score_match.group(1)) / 100 if score_match else 0.0
+        
+        return {"score": score, "explanation": text_resp}
+    except Exception as e:
+        return {"score": 0.0, "explanation": f"Erreur Gemini: {e}"}
+
+def rank_resumes_with_gemini(job_description, resumes, file_names):
+    scores_data = []
+    # Placeholder pour barre de progression si intégrée, sinon boucle simple
+    progress_bar = st.progress(0)
+    for i, resume_text in enumerate(resumes):
+        scores_data.append(get_detailed_score_with_gemini(job_description, resume_text))
+        progress_bar.progress((i + 1) / len(resumes))
+        time.sleep(1) # Petit délai pour éviter rate limits tier gratuit
+    progress_bar.empty()
+    return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
+
+def get_gemini_profile_analysis(text: str, candidate_name: str | None = None) -> str:
+    API_KEY = get_gemini_api_key()
+    if not API_KEY: return "❌ Analyse impossible (clé API Gemini manquante)."
+    
+    # Logique Nom
+    safe_name = """
+    if candidate_name and is_valid_name_candidate(candidate_name):
+        safe_name = candidate_name
+    else:
+        extracted = extract_name_from_cv_text(text)
+        if extracted and extracted.get('name'):
+            safe_name = extracted['name']
+        else:
+            safe_name = "Candidat"
+    safe_name = safe_name.replace("##", "").replace("**", "").strip()
+
+    genai.configure(api_key=API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    
+    prompt = f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
+
+Règles NOM :
+- Nom identifié : "{safe_name}".
+- Si "{safe_name}" est inapproprié (Candidat, Permis B...), Trouve le vrai nom dans le texte.
+- Sinon garde "{safe_name}".
+
+**Format de sortie OBLIGATOIRE** :
+
+**👤 [Nom du Candidat]**
+
+**📊 Synthèse**
+[2-3 phrases]
+
+**🎓 Formation**
+[Diplôme le plus élevé]
+
+**💼 Expérience**
+[Dernier poste]
+
+**🛠️ Compétences clés**
+[4-5 compétences]
+
+**💡 Points forts**
+[2-3 points]
+
+**⚠️ Points d'attention**
+[1-2 points]
+
+Texte du CV :
+{text[:4000]}
+"""
+    try:
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+        return f"❌ Erreur Gemini : {e}"
+
+def get_gemini_auto_classification(text: str, full_name: str | None) -> dict:
+    API_KEY = get_gemini_api_key()
+    safe_name = (full_name or "Candidat").strip()
+    if not API_KEY:
+        return {
+            "macro_category": "Non classé",
+            "sub_category": "Autre",
+            "years_experience": 0,
+            "profile_summary": f"Erreur config Gemini",
+            "candidate_name": safe_name
+        }
+        
+    genai.configure(api_key=API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash', generation_config={"response_mime_type": "application/json"})
+    
+    prompt = f""""
+    Expert recrutement. Analyse CV.
+    
+    1. Check Nom: "{safe_name}". Corrige si faux (Permis B, etc).
+    2. Macro-catégorie (UNE SEULE) : "Fonctions supports", "Logistique", "Production/Technique".
+    3. Sous-catégorie.
+    4. Années expérience (int).
+    5. Récapitulatif (2-3 phrases).
+
+    JSON output only:
+    {{ "candidate_name": "...", "macro_category": "...", "sub_category": "...", "years_experience": 0, "profile_summary": "..." }}
+    
+    CV:
+    {text[:4000]}
+    """
+    
+    try:
+        response = model.generate_content(prompt)
+        data = json.loads(response.text)
+        
+        # Fallback values handle
+        macro = data.get("macro_category") or "Non classé"
+        if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]: macro = "Non classé"
+        
+        return {
+            "macro_category": macro,
+            "sub_category": data.get("sub_category", "Autre"),
+            "years_experience": int(data.get("years_experience", 0)),
+            "profile_summary": data.get("profile_summary", ""),
+            "candidate_name": data.get("candidate_name", safe_name)
+        }
+    except Exception as e:
+        return {
+            "macro_category": "Non classé",
+            "sub_category": "Autre",
+            "years_experience": 0,
+            "profile_summary": f"Erreur Gemini: {e}",
+            "candidate_name": safe_name
+        }
