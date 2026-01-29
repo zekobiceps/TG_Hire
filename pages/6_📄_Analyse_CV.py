@@ -904,14 +904,32 @@ def extract_name_from_line(line):
     # Nettoyer la ligne
     line = line.strip()
     
-    # Mots à ignorer (mots métier courants)
+    # Mots à ignorer (mots métier courants, titres de sections CV)
     ignore_words = {
-        'cv', 'curriculum', 'vitae', 'resume', 'directeur', 'manager', 'ingénieur', 
-        'consultant', 'développeur', 'analyst', 'chef', 'responsable', 'assistant',
-        'senior', 'junior', 'stage', 'stagiaire', 'étudiant', 'expérience',
-        'formation', 'diplôme', 'université', 'école', 'master', 'licence',
-        'téléphone', 'email', 'adresse', 'né', 'age', 'ans', 'contact',
-        'projet', 'projets', 'compétences', 'skills', 'page', 'pdf', 'document'
+        # Mots génériques CV
+        'cv', 'curriculum', 'vitae', 'resume', 'profil', 'profile', 'about', 'me', 'moi',
+        # Titres de sections
+        'expérience', 'experiences', 'expériences', 'professionnelle', 'professionnelles',
+        'formation', 'formations', 'diplôme', 'diplômes', 'education', 'éducation',
+        'compétences', 'competences', 'skills', 'aptitudes', 'qualifications',
+        'projet', 'projets', 'project', 'projects', 'réalisations',
+        'langues', 'languages', 'certifications', 'hobbies', 'loisirs', 'centres', 'intérêt',
+        # Postes/Fonctions
+        'directeur', 'directrice', 'direction', 'manager', 'ingénieur', 'engineer',
+        'consultant', 'développeur', 'developer', 'analyst', 'analyste',
+        'chef', 'responsable', 'assistant', 'assistante', 'coordinateur', 'coordinatrice',
+        'senior', 'junior', 'stage', 'stagiaire', 'étudiant', 'étudiante', 'intern',
+        'technicien', 'technicienne', 'spécialiste', 'expert', 'cadre',
+        # Domaines
+        'informatique', 'finance', 'comptabilité', 'marketing', 'commercial', 'rh',
+        'ressources', 'humaines', 'logistique', 'production', 'qualité', 'technique',
+        'immobilier', 'développement', 'development', 'gestion', 'management',
+        # Contact
+        'téléphone', 'email', 'adresse', 'address', 'contact', 'portable', 'mobile',
+        # Divers
+        'né', 'age', 'ans', 'years', 'page', 'pdf', 'document', 'fichier', 'file',
+        'université', 'university', 'école', 'school', 'master', 'licence', 'bachelor',
+        'arc', 'objectif', 'objective', 'summary', 'résumé', 'synthèse'
     }
     
     # Chercher 2-3 mots consécutifs commençant par une majuscule
@@ -1053,11 +1071,19 @@ def create_organized_zip(results, file_list):
                 except Exception as e:
                     st.warning(f"Erreur lors du traitement de {original_name}: {e}")
         
-        # Créer et ajouter le manifest CSV
+        # Créer et ajouter le manifest CSV (avec point-virgule pour Excel FR) + Excel natif
         if manifest_data:
             manifest_df = pd.DataFrame(manifest_data)
-            manifest_csv = manifest_df.to_csv(index=False, encoding='utf-8')
-            zip_file.writestr('manifest.csv', manifest_csv)
+            # CSV avec point-virgule pour Excel FR et encodage utf-8-sig (BOM)
+            manifest_csv = manifest_df.to_csv(index=False, sep=';', encoding='utf-8-sig')
+            zip_file.writestr('manifest.csv', manifest_csv.encode('utf-8-sig'))
+            
+            # Ajouter aussi un fichier Excel natif (.xlsx) pour compatibilité Excel 2010
+            excel_buffer = io.BytesIO()
+            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                manifest_df.to_excel(writer, index=False, sheet_name='Manifest')
+            excel_buffer.seek(0)
+            zip_file.writestr('manifest.xlsx', excel_buffer.getvalue())
     
     zip_buffer.seek(0)
     return zip_buffer.getvalue(), pd.DataFrame(manifest_data)
