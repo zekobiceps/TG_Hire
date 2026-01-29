@@ -971,7 +971,38 @@ def is_likely_name_line(line: str) -> bool:
         'physiologie', 'physiopathologie', 'physiopathologies', 'humaine', 'modélisation',
         
         # Mots génériques supplémentaires
-        'soft', 'hard', 'about', 'linkedin', 'trésorier', 'tresorier', 'ingénieure', 'ingenieure'
+        'soft', 'hard', 'about', 'linkedin', 'trésorier', 'tresorier', 'ingénieure', 'ingenieure',
+        
+        # ====== NOUVEAUX MOTS INTERDITS (Faux positifs observés) ======
+        # Termes techniques/métiers
+        'simulation', 'numérique', 'numerique', 'pensée', 'pensee', 'critique',
+        'concept', 'partenaire', 'entreprise', 'entreprises',
+        'charge', 'chargee', 'delivery', 'delivery',
+        
+        # Sections CV supplémentaires  
+        'experiences', 'expériences', 'professionelles', 'professionnelle',
+        'competences', 'realisations', 'réalisations',
+        
+        # Entreprises/Lieux supplémentaires
+        'saem', 'corum', 'montpellier', 'groupement', 'mousquetaires', 'intermarché',
+        'leclerc', 'auchan', 'lidl', 'casino', 'monoprix',
+        
+        # Termes anglais courants
+        'delivery', 'manager', 'coordinator', 'specialist', 'officer',
+        'technical', 'professional', 'summary', 'overview',
+        
+        # Logiciels techniques / CAO / Outils scientifiques
+        'logiciels', 'abaqus', 'catia', 'solidworks', 'autocad', 'ansys', 'matlab',
+        'xlstat', 'minitab', 'spss', 'stata', 'r', 'rstudio',
+        'rtgs', 'target', 'swift', 'bpce',
+        
+        # Soft skills et termes RH
+        'stress', 'équipe', 'equipe', 'organisation', 'esprit', 'sens',
+        'gestion', 'autonomie', 'rigueur', 'adaptabilité', 'adaptabilite',
+        'dynamisme', 'motivation', 'travail', 'team', 'leadership',
+        
+        # Titres de postes
+        'cash', 'flux', 'foncier', 'trésorerie', 'tresorerie',
     ]
     
     # Si un mot de la ligne est interdit -> Rejet
