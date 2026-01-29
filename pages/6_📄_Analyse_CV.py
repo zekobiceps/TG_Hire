@@ -61,6 +61,19 @@ st.set_page_config(
 if not st.session_state.get("logged_in", False):
     st.stop()
 
+# --- Vérification unique de la clé API DeepSeek au démarrage ---
+# Évite les messages d'erreur multiples lors du redémarrage après un push
+_deepseek_api_available = False
+try:
+    _api_key_check = st.secrets.get("DEEPSEEK_API_KEY", None)
+    if _api_key_check:
+        _deepseek_api_available = True
+except Exception:
+    pass
+
+if not _deepseek_api_available:
+    st.warning("⚠️ Le secret 'DEEPSEEK_API_KEY' n'est pas configuré. Certaines fonctionnalités IA seront désactivées.")
+
 # Initialisation des variables de session
 if "cv_analysis_feedback" not in st.session_state:
     st.session_state.cv_analysis_feedback = False
@@ -153,15 +166,14 @@ embedding_model = load_embedding_model()
 
 # -------------------- Fonctions de traitement --------------------
 def get_api_key():
-    """Récupère la clé API depuis les secrets et gère l'erreur."""
+    """Récupère la clé API depuis les secrets et gère l'erreur silencieusement."""
     try:
-        api_key = st.secrets["DEEPSEEK_API_KEY"]
+        api_key = st.secrets.get("DEEPSEEK_API_KEY", None)
         if not api_key:
-            st.error("❌ La clé API DeepSeek est vide dans les secrets. Veuillez la vérifier.")
+            # Message déjà affiché au démarrage, ne pas répéter
             return None
         return api_key
-    except KeyError:
-        st.error("❌ Le secret 'DEEPSEEK_API_KEY' est introuvable. Veuillez le configurer dans les paramètres de votre application Streamlit.")
+    except Exception:
         return None
 
 def extract_text_from_pdf(file):
