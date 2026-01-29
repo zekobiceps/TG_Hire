@@ -854,37 +854,47 @@ def is_likely_name_line(line: str) -> bool:
     Détermine si une ligne a de fortes chances d'être un nom (et pas un titre).
     """
     line_lower = line.lower().strip()
+    words = line_lower.split()
     
-    # Liste noire : Mots qui indiquent que ce n'est PAS un nom
-    black_list = [
+    # 1. Mots INTERDITS : S'ils sont présents, ce n'est PAS un nom
+    forbidden_words = [
+        # Mots génériques et titres de sections
         'cv', 'curriculum', 'vitae', 'resume', 'profil', 'profile',
         'expérience', 'experience', 'formation', 'education', 
         'compétences', 'skills', 'langues', 'languages',
         'projet', 'project', 'contact', 'téléphone', 'email', 'adresse',
-        'page', 'date', 'de', 'du', 'des', 'le', 'la', 'les',  # Articles isolés
-        'diplômes', 'formations', 'certifications', 'hobbies', 'loisirs',
+        'page', 'date', 'diplômes', 'formations', 'certifications', 'hobbies', 'loisirs',
         'centres', 'intérêt', 'projets', 'réalisés', 'professionnelles',
+        'coordonnées', 'spécialisations', 'management', 'onboarding', 'performance',
+        'sommaire', 'summary', 'objectif', 'objective',
+        
+        # Titres de postes et fonctions (indique un titre, pas un nom)
         'analyste', 'financière', 'contrôleuse', 'gestion', 'ingénieur',
-        'directeur', 'manager', 'consultant', 'développeur', 'responsable'
+        'directeur', 'directrice', 'manager', 'consultant', 'développeur', 'responsable',
+        'développement', 'rh', 'sirh', 'assistant', 'assistante', 'stagiaire',
+        'technicien', 'commercial', 'vente', 'marketing', 'comptable', 'auditeur',
+        'senior', 'junior', 'expert', 'chef'
     ]
     
-    # Si la ligne correspond exactement à un mot de la liste noire
-    if line_lower in black_list:
-        return False
-        
-    # Si la ligne contient des indicateurs forts de section
-    if any(x in line_lower for x in ['expérience professionnelle', 'expériences professionnelles',
-                                      'work experience', 'academic background', 
-                                      'diplômes et formations', 'centres d\'intérêt']):
+    # Si un mot de la ligne est interdit -> Rejet
+    if any(w in forbidden_words for w in words):
         return False
 
+    # 2. Vérifications de structure
     # Doit contenir entre 2 et 5 mots (ex: "Jean Dupont" ou "Jean-Pierre de la Tour")
-    words = line.split()
     if len(words) < 2 or len(words) > 5:
         return False
     
+    # Mots d'arrêt (Articles) : acceptés dans un nom compos, mais ne doivent pas constituer tout le nom
+    stop_words = ['de', 'du', 'des', 'le', 'la', 'les', 'van', 'von', 'da', 'di']
+    
+    # Si tous les mots sont des stop words -> Rejet
+    if all(w in stop_words for w in words):
+        return False
+    
     # Au moins un mot doit commencer par une majuscule (sauf si tout est en majuscule)
-    if not line.isupper() and not any(w[0].isupper() for w in words if w):
+    # Note: line.isupper() gère les noms tout en majuscule
+    if not line.isupper() and not any(w[0].isupper() for w in line.split() if w):
         return False
         
     return True
@@ -938,8 +948,25 @@ def extract_name_from_cv_text(text):
         clean = re.sub(r'^\*\*\s*', '', clean)  # Enlever "** " au début
         clean = re.sub(r'\s*\*\*$', '', clean)  # Enlever " **" à la fin
         clean = re.sub(r'^[-•➢]\s*', '', clean)  # Enlever les puces
-        if clean:
-            cleaned_lines.append(clean)
+        
+        if not clean:
+            continue
+            
+        cleaned_lines.append(clean)
+        
+        # Gestion des noms espacés (ex: "M a r w a n  L A A N I G R I")
+        # Si la ligne contient beaucoup d'espaces et des lettres isolées
+        if len(clean) > 5 and ' ' in clean:
+            # Compte le nombre de tokens de 1 lettre
+            single_letter_tokens = [w for w in clean.split() if len(w) == 1 and w.isalpha()]
+            if len(single_letter_tokens) > len(clean.split()) / 2:
+                # C'est probablement un texte espacé
+                # Strategie : remplacer >= 2 espaces par un pipe, enlever les espaces simples, remettre pipe
+                temp = re.sub(r'\s{2,}', '|', clean)
+                temp = temp.replace(' ', '')
+                normalized = temp.replace('|', ' ')
+                # Ajouter la version normalisée aux lignes candidates
+                cleaned_lines.append(normalized)
 
     # --- ÉTAPE 2 : Recherche de patterns explicites (Regex forte) ---
     # Pattern : Prénom (Title) NOM (Upper) ou NOM (Upper) Prénom (Title)
