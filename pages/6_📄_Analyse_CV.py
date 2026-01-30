@@ -762,27 +762,52 @@ def get_openrouter_api_key():
     """Récupère la clé OpenRouter avec persistance en session state."""
     if "OpenRouter_API_KEY" in st.session_state:
         return st.session_state.OpenRouter_API_KEY
-    
+
     api_key = None
     try:
-        keys_to_check = ["OpenRouter_API_KEY", "OPENROUTER_API_KEY"]
-        for k in keys_to_check:
-            if k in st.secrets:
-                api_key = st.secrets[k]
-                break
-        
+        # Try multiple possible secret keys and nested structures
+        # 1) Direct keys in st.secrets
+        try:
+            # st.secrets behaves like a dict-like object
+            secret_keys = [
+                "OpenRouter_API_KEY", "OPENROUTER_API_KEY", "openrouter_api_key",
+                "openrouter", "OPENROUTER"
+            ]
+            for k in secret_keys:
+                if k in st.secrets:
+                    candidate = st.secrets[k]
+                    if isinstance(candidate, dict):
+                        # common nested fields
+                        for nk in ["api_key", "OpenRouter_API_KEY", "openrouter_api_key", "key"]:
+                            if nk in candidate and candidate[nk]:
+                                api_key = candidate[nk]
+                                break
+                        if api_key:
+                            break
+                    elif candidate:
+                        api_key = candidate
+                        break
+        except Exception:
+            # If st.secrets access fails, continue to env fallback
+            pass
+
+        # 2) Environment variables fallback
         if not api_key:
-            for k in keys_to_check:
+            for k in ["OPENROUTER_API_KEY", "OpenRouter_API_KEY", "openrouter_api_key"]:
                 val = os.environ.get(k)
                 if val:
                     api_key = val
                     break
-        
+
+        # Final normalization and caching in session_state
         if api_key:
-            st.session_state.OpenRouter_API_KEY = api_key
-            return api_key
-    except Exception:
-        pass
+            api_key = str(api_key).strip()
+            if api_key:
+                st.session_state.OpenRouter_API_KEY = api_key
+                return api_key
+    except Exception as e:
+        print(f"Erreur get_openrouter_api_key: {e}")
+
     return None
 
 def get_detailed_score_with_openrouter(job_description, resume_text):
