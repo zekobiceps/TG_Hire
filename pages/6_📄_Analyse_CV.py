@@ -2350,18 +2350,24 @@ def merge_results_with_ai_analysis(original_results):
     
     # Si des analyses IA existent, intégrer les résultats
     if hasattr(st.session_state, 'deepseek_analyses') and st.session_state.deepseek_analyses:
-        ai_results = {result['Fichier']: result['Catégorie'] for result in st.session_state.deepseek_analyses}
-        
+        ai_results = {}
+        for result in st.session_state.deepseek_analyses:
+            file_key = result.get('Fichier') or result.get('file')
+            category_value = result.get('Catégorie') or result.get('category')
+            if file_key and category_value:
+                ai_results[file_key] = category_value
+
         for i, result in enumerate(updated_results):
             filename = result['file']
             if filename in ai_results:
                 ai_category = ai_results[filename]
                 # Normaliser la catégorie IA selon nos catégories standard
-                if "support" in ai_category.lower():
+                ai_category_lower = ai_category.lower()
+                if "support" in ai_category_lower:
                     updated_results[i]['category'] = 'Fonctions supports'
-                elif "logistique" in ai_category.lower():
+                elif "logistique" in ai_category_lower:
                     updated_results[i]['category'] = 'Logistique'
-                elif "production" in ai_category.lower() or "technique" in ai_category.lower():
+                elif "production" in ai_category_lower or "technique" in ai_category_lower:
                     updated_results[i]['category'] = 'Production/Technique'
                 # Si la catégorie IA n'est pas reconnue, on garde "Non classé"
     
