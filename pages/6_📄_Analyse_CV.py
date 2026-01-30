@@ -3356,6 +3356,18 @@ with tab5:
             num_classified = sum(stats.values())
             
             display_df = df.copy()
+            # Normaliser les catégories (trim + uppercase) pour éviter les comptages à 0
+            if 'category' in display_df.columns:
+                display_df['category'] = display_df['category'].astype(str).str.strip().str.upper()
+            else:
+                display_df['category'] = 'NON CLASSE'
+
+            # Option debug pour voir les comptes réels (désactivé par défaut)
+            if st.checkbox("Afficher debug catégories (temp)", value=False):
+                try:
+                    st.write(display_df['category'].value_counts().to_dict())
+                except Exception:
+                    st.write('Debug categories unavailable')
 
             def _get_display_name_for_row(row):
                 extracted = row.get('extracted_name')
