@@ -1464,7 +1464,27 @@ def classify_resume_with_model(text, model_name, hint_name=""):
             if not api_key: return default_result
             client = anthropic.Anthropic(api_key=api_key)
             msg = client.messages.create(model="claude-3-haiku-20240307", max_tokens=1000, messages=[{"role": "user", "content": prompt}])
-            response_text = msg.content[0].text
+            # Cast response to Any to avoid static-typing attribute access issues with Pylance
+            from typing import Any, cast
+            msg_any = cast(Any, msg)
+            # Safely extract text from the response (handles both object-like and dict-like responses)
+            response_text = ""
+            content = getattr(msg_any, "content", None)
+            if content and isinstance(content, (list, tuple)):
+                first = content[0]
+                if isinstance(first, dict):
+                    response_text = first.get("text", "") or first.get("content", "")
+                else:
+                    response_text = getattr(first, "text", "") or getattr(first, "content", "")
+            else:
+                # Fallback for dict-like responses
+                try:
+                    response_text = msg_any.get("content", [])[0].get("text", "")
+                except Exception:
+                    try:
+                        response_text = str(msg_any)
+                    except Exception:
+                        response_text = ""
 
         elif model_name == "OpenRouter":
             api_key = get_openrouter_api_key()
