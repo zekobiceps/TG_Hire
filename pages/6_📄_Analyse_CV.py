@@ -3555,15 +3555,9 @@ with tab5:
             except Exception:
                 pass
             st.experimental_rerun()
-                                    recap = r.get('profile_summary') or r.get('text_snippet') or ''
-                                    years_exp = r.get('years_experience', 0)
-                                    with st.expander(f"👤 {card_title}"):
-                                        if years_exp and years_exp > 0:
-                                            st.markdown(f"**📅 {years_exp} ans d'expérience**")
-                                        st.markdown(recap)
 
-            # Catégorie "Autres" pour les non classés
-            nc = df[df['category'] == 'Non classé']
+            # Catégorie "Autres" pour les non classés (calculée ensuite à partir du dataframe fusionné)
+            nc = None
             if not nc.empty:
                 st.markdown('---')
                 count_nc = len(nc)
