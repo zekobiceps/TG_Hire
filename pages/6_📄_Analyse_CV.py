@@ -1309,7 +1309,10 @@ Texte du CV :
 
 def get_classification_prompt(text: str, hint_name: str | None) -> str:
     hint = (hint_name or "").strip()
-    return CATEGORIES_PROMPT.format(hint_name=hint, text=text[:4000])
+    # Avoid using str.format on the template because it contains JSON braces which
+    # would be interpreted as format placeholders. Use simple replacement for the
+    # two intended placeholders instead.
+    return CATEGORIES_PROMPT.replace('{hint_name}', hint).replace('{text}', text[:4000])
 
 def get_deepseek_profile_analysis(text: str, candidate_name: str | None = None) -> str:
     """
