@@ -3537,44 +3537,60 @@ with tab5:
             st.session_state.classification_results = None
         if 'deepseek_analyses' not in st.session_state:
             st.session_state.deepseek_analyses = []
-        if 'last_action' not in st.session_state:
-            st.session_state.last_action = None
-
-        # --- BOUTONS D'ACTION ---
+        # --- SÉLECTION DU MODÈLE ET BOUTONS D'ACTION ---
         st.markdown("---")
-        col1, col2 = st.columns(2)
+        
+        col1, col2 = st.columns([2, 3])
         with col1:
+            selected_model = st.selectbox(
+                "🤖 Choisir le modèle d'IA pour la classification",
+                ("Gemini (Recommandé)", "Groq", "Claude", "DeepSeek"),
+                key="classification_model_selector"
+            )
+        
+        with col2:
+            st.write("") # Spacer
+            st.write("") # Spacer
             if st.button("🚀 Lancer la Classification", type="primary", width="stretch"):
                 st.session_state.last_action = "classify"
 
-        with col2:
-            if st.button("🤖 Lancer l'Analyse Détaillée (DeepSeek)", width="stretch"):
-                st.session_state.last_action = "deepseek"
-        
         # --- LOGIQUE DE TRAITEMENT ---
         if st.session_state.last_action == "classify":
-            with st.spinner("🤖 Classification en cours..."):
-                # Logique de classification
+            with st.spinner(f"🤖 Classification avec {selected_model} en cours..."):
                 classification_results = []
                 progress_bar = st.progress(0)
+                
                 for i, f in enumerate(file_list):
                     text = extract_text_from_pdf(f['file'])
                     if "Erreur" not in text:
-                        # Essayer Gemini d'abord
-                        if get_gemini_api_key():
+                        res = {}
+                        # Logique de classification basée sur la sélection
+                        if selected_model == "Gemini (Recommandé)" and get_gemini_api_key():
                             res = get_gemini_auto_classification(text, f['name'])
-                        # Fallback sur Groq si Gemini échoue ou n'est pas dispo
-                        elif get_groq_api_key():
+                        elif selected_model == "Groq" and get_groq_api_key():
                             res = get_groq_auto_classification(text, f['name'])
-                        # Fallback sur Claude
-                        elif get_claude_api_key():
+                        elif selected_model == "Claude" and get_claude_api_key():
                             res = get_claude_auto_classification(text, f['name'])
-                        # Fallback sur Deepseek
-                        else:
+                        elif selected_model == "DeepSeek" and get_api_key():
                             res = get_deepseek_auto_classification(text, f['name'])
-                        
+                        else:
+                            # Fallback intelligent si la clé API manque
+                            st.warning(f"Clé API pour {selected_model} non trouvée. Tentative avec un autre modèle disponible...")
+                            if get_gemini_api_key():
+                                res = get_gemini_auto_classification(text, f['name'])
+                            elif get_groq_api_key():
+                                res = get_groq_auto_classification(text, f['name'])
+                            elif get_claude_api_key():
+                                res = get_claude_auto_classification(text, f['name'])
+                            elif get_api_key():
+                                res = get_deepseek_auto_classification(text, f['name'])
+                            else:
+                                st.error("Aucune clé API valide trouvée pour la classification.")
+                                continue
+
                         res['file'] = f['name']
                         classification_results.append(res)
+                    
                     progress_bar.progress((i + 1) / len(file_list))
                 
                 st.session_state.classification_results = classification_results
@@ -3583,26 +3599,9 @@ with tab5:
                 st.session_state.last_action = None # Reset action
                 st.rerun()
 
-        elif st.session_state.last_action == "deepseek":
-            with st.spinner("🤖 Analyse DeepSeek en cours..."):
-                # Logique d'analyse Deepseek
-                analyses = []
-                progress_bar = st.progress(0)
-                for i, f in enumerate(file_list):
-                    text = extract_text_from_pdf(f['file'])
-                    if "Erreur" not in text:
-                        analysis = get_deepseek_profile_analysis(text, f['name'])
-                        analyses.append({'file': f['name'], 'analysis': analysis})
-                    progress_bar.progress((i + 1) / len(file_list))
-                
-                st.session_state.deepseek_analyses = analyses
-                st.success("✅ Analyse DeepSeek terminée !")
-                st.session_state.last_action = None # Reset action
-                st.rerun()
-
         # --- AFFICHAGE DES RÉSULTATS ---
         if st.session_state.classification_results:
-            # Génération Excel Personnalisé
+            # Le reste du code pour l'affichage et l'export reste identique
             merged_results = merge_results_with_ai_analysis(st.session_state.classification_results)
             df = pd.DataFrame(merged_results)
 
