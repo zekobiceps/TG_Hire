@@ -573,46 +573,78 @@ def regex_analysis(text):
     }
 
 # --- SCORING PAR RÈGLES AVEC REGEX AMÉLIORÉ ---
-def rank_resumes_with_rules(job_description, resumes, file_names):
+def rank_resumes_with_rules(job_description, resumes, file_names, job_title: str | None = None):
+    """Scoring par règles (regex) avec priorité sur l'intitulé du poste.
+
+    On ajoute un poids élevé pour la présence explicite de l'intitulé du poste
+    (ou sa variation) dans le CV. Si `job_title` n'est pas fourni, on utilise
+    `st.session_state.last_job_title` comme fallback.
+    """
     jd_entities = regex_analysis(job_description)
     results = []
-    
+
+    # Poids configurables
+    JOB_TITLE_WEIGHT = 50  # Poids fort pour l'intitulé du poste
     SKILL_WEIGHT = 5
     EDUCATION_WEIGHT = 30
     EXPERIENCE_WEIGHT = 20
-    
+
+    # Normalisation / fallback du titre recherché
+    job_title_param = (job_title or st.session_state.get('last_job_title', '') or '').strip()
+    job_title_norm = job_title_param.lower()
+
     for i, resume_text in enumerate(resumes):
         resume_entities = regex_analysis(resume_text)
         current_score = 0
         logic = {}
-        
+
+        # 1) Vérifier l'intitulé du poste (fort signal)
+        title_score = 0
+        resume_lower = resume_text.lower()
+        if job_title_norm:
+            # Correspondance exacte simple
+            if re.search(re.escape(job_title_norm), resume_lower):
+                title_score = JOB_TITLE_WEIGHT
+            else:
+                # Tentative plus flexible: vérifier la séquence de tokens
+                tokens = [t for t in re.findall(r"\w+", job_title_norm) if len(t) > 1]
+                if tokens:
+                    seq_pattern = r"\b" + r"\s+".join(map(re.escape, tokens)) + r"\b"
+                    if re.search(seq_pattern, resume_lower):
+                        title_score = int(JOB_TITLE_WEIGHT * 0.9)
+        current_score += title_score
+        logic['Intitulé poste'] = f"Recherche '{job_title_param}' -> {'trouvé' if title_score>0 else 'non trouvé'} (+{title_score} pts)"
+
+        # 2) Compétences
         jd_skills = jd_entities["Compétences clés extraites"]
-        common_skills = [skill for skill in jd_skills if re.search(r'\b' + re.escape(skill) + r'\b', resume_text.lower())]
-        
+        common_skills = [skill for skill in jd_skills if re.search(r'\b' + re.escape(skill) + r'\b', resume_lower)]
         score_from_skills = len(common_skills) * SKILL_WEIGHT
         current_score += score_from_skills
         logic['Compétences correspondantes'] = f"{common_skills} (+{score_from_skills} pts)"
 
+        # 3) Éducation
         score_from_edu = 0
         if resume_entities["Niveau d'études"] >= jd_entities["Niveau d'études"]:
             score_from_edu = EDUCATION_WEIGHT
             current_score += score_from_edu
         logic['Niveau d\'études'] = "Candidat: Bac+{} vs Requis: Bac+{} (+{} pts)".format(resume_entities["Niveau d'études"], jd_entities["Niveau d'études"], score_from_edu)
-        
+
+        # 4) Expérience
         score_from_exp = 0
         if resume_entities["Années d'expérience"] >= jd_entities["Années d'expérience"]:
             score_from_exp = EXPERIENCE_WEIGHT
             current_score += score_from_exp
         logic['Expérience'] = "Candidat: {} ans vs Requis: {} ans (+{} pts)".format(resume_entities["Années d'expérience"], jd_entities["Années d'expérience"], score_from_exp)
-        
+
         results.append({"file_name": file_names[i], "score": current_score, "logic": logic})
 
-    max_score = (len(jd_entities["Compétences clés extraites"]) * SKILL_WEIGHT) + EDUCATION_WEIGHT + EXPERIENCE_WEIGHT
-    
+    # Calcul du score maximal possible (inclut le poids du titre)
+    max_score = JOB_TITLE_WEIGHT + (len(jd_entities["Compétences clés extraites"]) * SKILL_WEIGHT) + EDUCATION_WEIGHT + EXPERIENCE_WEIGHT
+
     if max_score > 0:
         for res in results:
             res["score"] = min(res["score"] / max_score, 1.0)
-            
+
     return results
 
 # --- MÉTHODE 4 : ANALYSE PAR IA (PARSING CORRIGÉ) ---
