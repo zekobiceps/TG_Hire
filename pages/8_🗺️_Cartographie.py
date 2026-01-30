@@ -161,7 +161,8 @@ def load_data_from_sheet():
                     "entreprise": row.get("Entreprise", "N/A"),
                     "linkedin": row.get("Linkedin", "N/A"),
                     "notes": row.get("Notes", ""),
-                    "cv_link": row.get("CV_Link", None)
+                    "cv_link": row.get("CV_Link", None),
+                    "years_experience": row.get("Annees_Experience", 0)
                 })
         
         total_candidats = sum(len(v) for v in data.values())
@@ -184,7 +185,8 @@ def save_to_google_sheet(quadrant, entry):
         row_data = [
             quadrant, entry["date"], entry["nom"], entry["poste"],
             entry["entreprise"], entry["linkedin"], entry["notes"],
-            entry["cv_link"] if entry["cv_link"] else "N/A"
+            entry["cv_link"] if entry["cv_link"] else "N/A",
+            entry.get("years_experience", 0)
         ]
         
         worksheet.append_row(row_data)
@@ -378,11 +380,12 @@ with tab1:
     
     left_col, right_col = st.columns([2,1])
     with left_col:
-        col1, col2, col3, col4 = st.columns(4)
+        col1, col2, col3, col4, col5 = st.columns(5)
         with col1: nom = st.text_input("Nom du candidat", key="carto_nom")
         with col2: poste = st.text_input("Poste", key="carto_poste")
         with col3: entreprise = st.text_input("Entreprise", key="carto_entreprise")
         with col4: linkedin = st.text_input("Lien LinkedIn", key="carto_linkedin")
+        with col5: years_exp = st.number_input("Années d'exp.", min_value=0, max_value=50, value=0, key="carto_years_exp")
         # Deuxième rangée: Notes | Upload CV | Quadrant d'ajout
         c_notes, c_cv, c_quad = st.columns([2,1,1])
         with c_notes:
@@ -406,7 +409,8 @@ with tab1:
                 
                 entry = {
                     "date": datetime.now().strftime("%Y-%m-%d %H:%M"), "nom": nom, "poste": poste,
-                    "entreprise": entreprise, "linkedin": linkedin, "notes": notes, "cv_link": cv_link
+                    "entreprise": entreprise, "linkedin": linkedin, "notes": notes, "cv_link": cv_link,
+                    "years_experience": years_exp
                 }
                 
                 if save_to_google_sheet(quadrant_ajout, entry):
@@ -455,7 +459,7 @@ with tab1:
         quadrants = ["Tout"] + list(st.session_state.cartographie_data.keys())
         quadrant_recherche = st.selectbox("Quadrant à rechercher", quadrants, key="carto_quadrant_search")
     with search_cols[1]:
-        # Liste des entreprises uniques pour le filtre
+        # Liste des entreprises uniques pour le filtre avec recherche
         all_entreprises = set()
         for quad, cands in st.session_state.cartographie_data.items():
             for cand in cands:
@@ -463,7 +467,14 @@ with tab1:
                 if ent and ent.lower() != 'non spécifiée':
                     all_entreprises.add(ent)
         entreprise_list = ["Toutes"] + sorted(list(all_entreprises))
-        entreprise_filter = st.selectbox("Filtrer par entreprise", entreprise_list, key="carto_entreprise_filter")
+        # Utilisation de text_input avec suggestion pour la recherche
+        entreprise_search = st.text_input("🔍 Rechercher entreprise", key="carto_entreprise_search", placeholder="Tapez pour filtrer...")
+        # Filtrer la liste des entreprises selon la saisie
+        if entreprise_search:
+            matching_entreprises = [e for e in entreprise_list if entreprise_search.lower() in e.lower()]
+        else:
+            matching_entreprises = entreprise_list
+        entreprise_filter = st.selectbox("Filtrer par entreprise", matching_entreprises, key="carto_entreprise_filter")
     with search_cols[2]:
         search_term = st.text_input("Rechercher par nom ou poste", key="carto_search")
 
@@ -517,6 +528,9 @@ with tab1:
                     with st.expander(f"{cand['nom']} - {cand['poste'][:20]}{'...' if len(cand['poste']) > 20 else ''}", expanded=st.session_state.get(edit_key, False)):
                         st.caption(f"📅 {cand['date']}")
                         st.write(f"**Entreprise :** {cand.get('entreprise', 'Non spécifiée')}")
+                        years_exp = cand.get('years_experience', 0)
+                        if years_exp and int(years_exp) > 0:
+                            st.write(f"**Expérience :** {years_exp} ans")
                         st.write(f"**LinkedIn :** {cand.get('linkedin', 'Non spécifié')}")
                         if cand.get('notes'):
                             st.write(f"**Notes :** {cand.get('notes', '')[:100]}{'...' if len(cand.get('notes', '')) > 100 else ''}")
