@@ -1423,7 +1423,8 @@ def classify_resume_with_model(text, model_name, hint_name=""):
         "sub_category": "Autre",
         "years_experience": 0,
         "candidate_name": hint_name or "Candidat Inconnu",
-        "profile_summary": "Erreur d'analyse."
+        "profile_summary": "Erreur d'analyse.",
+        "raw_response": ""
     }
 
     try:
@@ -1519,7 +1520,8 @@ def classify_resume_with_model(text, model_name, hint_name=""):
             "sub_category": data.get("sub_category", "Autre"),
             "years_experience": int(data.get("years_experience", 0)),
             "candidate_name": data.get("candidate_name", hint_name),
-            "profile_summary": data.get("profile_summary", "")
+            "profile_summary": data.get("profile_summary", ""),
+            "raw_response": response_text
         }
 
     except Exception as e:
@@ -3487,6 +3489,22 @@ with tab5:
                 'Logistique': logistics,
                 'Production': production
             })
+
+            # Afficher les CV non classés (catégories inattendues) pour debugging
+            valid_set = set([
+                'FONCTIONS SUPPORTS', 'LOGISTIQUE', 'PRODUCTION - ÉTUDES (BUREAU)',
+                'PRODUCTION - TRAVAUX (CHANTIER)', 'PRODUCTION - QUALITÉ', 'DIVERS / HORS PÉRIMÈTRE'
+            ])
+            nc_df = display_df[~display_df['category'].isin(valid_set)]
+            if not nc_df.empty:
+                st.markdown('---')
+                st.subheader('🔍 Non classés (debug)')
+                for _, row in nc_df.iterrows():
+                    name = row.get('display_name') or row.get('file')
+                    st.markdown(f"- **{name}** — catégorie reçue: `{row.get('category')}`")
+                    raw = row.get('raw_response', '')
+                    if raw:
+                        st.caption(raw[:800].replace('\n', ' '))
 
             # Générer Excel avec séparateur correct (utiliser sep=';' pour Excel FR)
             csv = export_df.to_csv(index=False, sep=';').encode('utf-8-sig')
