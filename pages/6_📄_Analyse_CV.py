@@ -3699,31 +3699,95 @@ with tab5:
             ai_indicator = " (incluant les analyses IA)" if hasattr(st.session_state, 'deepseek_analyses') and st.session_state.deepseek_analyses else ""
             st.markdown(f"**Résumé{ai_indicator}**: {count_support} Fonctions supports • {count_logistics} Logistique • {count_production} Production/Technique • {count_unclassified} Non classés.")
 
-            # Affichage 2x2 (deux colonnes, deux lignes) des listes par catégorie
-            supports_list = [s for s in supports if s]
-            logistics_list = [s for s in logistics if s]
-            production_list = [s for s in production if s]
-            unclassified_list = [s for s in unclassified if s]
+            # Affichage 3 colonnes (une par macro-catégorie) — à l'intérieur, regrouper par direction
+            def infer_direction_from_row(r):
+                s = (r.get('sub_category') or '').lower() if isinstance(r, dict) or hasattr(r, 'get') else ''
+                t = (r.get('full_text') or '').lower() if isinstance(r, dict) or hasattr(r, 'get') else ''
+                mapping = {
+                    'RH': ['rh', 'recrut', 'talent', 'pay', 'paie', 'ressources humaines', 'recruteur', 'recrutement'],
+                    'Finance': ['compta', 'finance', 'trésor', 'tresor', 'audit', 'contrôle de gestion', 'controle de gestion', 'contrôle'],
+                    'Achats': ['achat', 'achats', 'sourcing'],
+                    'DSI': ['dsi', 'informat', 'it', 'support', 'devops', 'développeur', 'developpeur', 'ingenieur logiciel'],
+                    'QHSE / Sécurité': ['qhse', 'sécurité', 'securité', 'qhs', 'hse'],
+                    'Juridique': ['jurid', 'juriste', 'conformité', 'compliance'],
+                    'Communication / Marketing': ['communication', 'marketing', 'content', 'digital', 'community'],
+                    'Logistique': ['logisti', 'supply', 'entrepôt', 'transport', 'stock', 'préparation'],
+                    'Production / Technique': ['ingénieur', 'ingenieur', 'technicien', 'btp', 'chantier', 'maintenance', 'industrie', 'usinat', 'electromec', 'électromec']
+                }
+                for direction, keys in mapping.items():
+                    for k in keys:
+                        if k in s:
+                            return direction
+                for direction, keys in mapping.items():
+                    for k in keys:
+                        if k in t:
+                            return direction
+                return 'Autre'
 
-            row1_col1, row1_col2 = st.columns(2)
-            with row1_col1:
-                st.subheader(f"Fonctions supports ({count_support})")
-                for s in supports_list[:200]:
-                    st.markdown(f"- {s}")
-            with row1_col2:
-                st.subheader(f"Logistique ({count_logistics})")
-                for s in logistics_list[:200]:
-                    st.markdown(f"- {s}")
+            col1, col2, col3 = st.columns(3)
 
-            row2_col1, row2_col2 = st.columns(2)
-            with row2_col1:
-                st.subheader(f"Production/Technique ({count_production})")
-                for s in production_list[:200]:
-                    st.markdown(f"- {s}")
-            with row2_col2:
-                st.subheader(f"Non classés ({count_unclassified})")
-                for s in unclassified_list[:200]:
-                    st.markdown(f"- {s}")
+            def render_category(col, cat_label):
+                with col:
+                    df_cat = df_merged[df_merged['category'] == cat_label]
+                    st.header(f"{cat_label} ({len(df_cat)})")
+                    # group rows by direction
+                    groups = {}
+                    for _, row in df_cat.iterrows():
+                        # convert row to dict-like access
+                        direction = infer_direction_from_row(row)
+                        groups.setdefault(direction, []).append(row)
+
+                    for direction, items in sorted(groups.items(), key=lambda x: (-len(x[1]), x[0])):
+                        st.subheader(f"{direction} ({len(items)})")
+                        for r in items:
+                            name_display = get_display_name(r)
+                            try:
+                                years_exp = int(r.get('years_experience', 0) if hasattr(r, 'get') else (r['years_experience'] if 'years_experience' in r else 0))
+                            except Exception:
+                                years_exp = 0
+                            profile = r.get('profile_summary') if hasattr(r, 'get') else (r['profile_summary'] if 'profile_summary' in r else '')
+                            # Fallback to text_snippet if no profile summary provided
+                            if not profile:
+                                profile = (r.get('text_snippet') if hasattr(r, 'get') else (r['text_snippet'] if 'text_snippet' in r else '')) or ''
+                            subcat = r.get('sub_category') if hasattr(r, 'get') else (r['sub_category'] if 'sub_category' in r else '')
+                            exp_title = f"👤 {name_display} — {subcat}"
+                            if years_exp and years_exp > 0:
+                                exp_title += f" — {years_exp} ans"
+                            with st.expander(exp_title):
+                                if profile:
+                                    st.markdown(f"**📝 Synthèse du profil :**\n\n{profile}")
+                                else:
+                                    st.info("Aucune synthèse disponible.")
+                                st.write(f"Fichier: {r.get('file') if hasattr(r, 'get') else (r['file'] if 'file' in r else '')}")
+
+            render_category(col1, 'Fonctions supports')
+            render_category(col2, 'Logistique')
+            render_category(col3, 'Production/Technique')
+
+            # Afficher les Non classés en dessous si présent
+            df_nc = df_merged[df_merged['category'] == 'Non classé']
+            if not df_nc.empty:
+                st.markdown('---')
+                st.subheader(f'🔍 Non classés ({len(df_nc)})')
+                for _, r in df_nc.iterrows():
+                    name_display = get_display_name(r)
+                    try:
+                        years_exp = int(r.get('years_experience', 0) if hasattr(r, 'get') else (r['years_experience'] if 'years_experience' in r else 0))
+                    except Exception:
+                        years_exp = 0
+                    profile = r.get('profile_summary') if hasattr(r, 'get') else (r['profile_summary'] if 'profile_summary' in r else '')
+                    if not profile:
+                        profile = (r.get('text_snippet') if hasattr(r, 'get') else (r['text_snippet'] if 'text_snippet' in r else '')) or ''
+                    subcat = r.get('sub_category') if hasattr(r, 'get') else (r['sub_category'] if 'sub_category' in r else '')
+                    exp_title = f"👤 {name_display} — {subcat}"
+                    if years_exp and years_exp > 0:
+                        exp_title += f" — {years_exp} ans"
+                    with st.expander(exp_title):
+                        if profile:
+                            st.markdown(f"**📝 Synthèse du profil :**\n\n{profile}")
+                        else:
+                            st.info("Aucune synthèse disponible.")
+                        st.write(f"Fichier: {r.get('file') if hasattr(r, 'get') else (r['file'] if 'file' in r else '')}")
 
             # Générer Excel et CSV pour export (inchangés)
             csv = export_df.to_csv(index=False, sep=';').encode('utf-8-sig')
