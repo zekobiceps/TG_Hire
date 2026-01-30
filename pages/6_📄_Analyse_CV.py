@@ -3647,19 +3647,19 @@ with tab5:
                     processing_ai_placeholder = st.empty()
                     
                     with st.spinner('Analyse des CVs non classés avec Intelligence Artificielle...'):
-                            for i, (_, row) in enumerate(nc.iterrows()):
+                        for i, (_, row) in enumerate(nc.iterrows()):
                             name = row['file']
                             text_snippet = row['text_snippet']
                             # Mettre à jour le fichier en cours
                             processing_ai_placeholder.info(f"Analyse par IA ({i+1}/{unclassified_total}) : {name}")
-                            
+
                             try:
                                 # Utiliser l'API DeepSeek pour analyser le CV
                                 category = get_deepseek_analysis(text_snippet)
                                 unclassified_results.append({'Fichier': name, 'Catégorie': category})
                             except Exception as e:
                                 unclassified_results.append({'Fichier': name, 'Catégorie': f"Erreur: {str(e)}"})
-                            
+
                             unclassified_progress.progress((i+1)/unclassified_total)
                     
                     # Nettoyer le placeholder
