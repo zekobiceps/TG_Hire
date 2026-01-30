@@ -3539,7 +3539,68 @@ with tab5:
             st.session_state.deepseek_analyses = []
         if 'last_action' not in st.session_state:
             st.session_state.last_action = None
+
+        # --- BOUTONS D'ACTION ---
+        st.markdown("---")
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🚀 Lancer la Classification", type="primary", width="stretch"):
+                st.session_state.last_action = "classify"
+
+        with col2:
+            if st.button("🤖 Lancer l'Analyse Détaillée (DeepSeek)", width="stretch"):
+                st.session_state.last_action = "deepseek"
         
+        # --- LOGIQUE DE TRAITEMENT ---
+        if st.session_state.last_action == "classify":
+            with st.spinner("🤖 Classification en cours..."):
+                # Logique de classification
+                classification_results = []
+                progress_bar = st.progress(0)
+                for i, f in enumerate(file_list):
+                    text = extract_text_from_pdf(f['file'])
+                    if "Erreur" not in text:
+                        # Essayer Gemini d'abord
+                        if get_gemini_api_key():
+                            res = get_gemini_auto_classification(text, f['name'])
+                        # Fallback sur Groq si Gemini échoue ou n'est pas dispo
+                        elif get_groq_api_key():
+                            res = get_groq_auto_classification(text, f['name'])
+                        # Fallback sur Claude
+                        elif get_claude_api_key():
+                            res = get_claude_auto_classification(text, f['name'])
+                        # Fallback sur Deepseek
+                        else:
+                            res = get_deepseek_auto_classification(text, f['name'])
+                        
+                        res['file'] = f['name']
+                        classification_results.append(res)
+                    progress_bar.progress((i + 1) / len(file_list))
+                
+                st.session_state.classification_results = classification_results
+                st.session_state.uploaded_files_list = file_list # Sauvegarder la liste pour le ZIP
+                st.success("✅ Classification terminée !")
+                st.session_state.last_action = None # Reset action
+                st.rerun()
+
+        elif st.session_state.last_action == "deepseek":
+            with st.spinner("🤖 Analyse DeepSeek en cours..."):
+                # Logique d'analyse Deepseek
+                analyses = []
+                progress_bar = st.progress(0)
+                for i, f in enumerate(file_list):
+                    text = extract_text_from_pdf(f['file'])
+                    if "Erreur" not in text:
+                        analysis = get_deepseek_profile_analysis(text, f['name'])
+                        analyses.append({'file': f['name'], 'analysis': analysis})
+                    progress_bar.progress((i + 1) / len(file_list))
+                
+                st.session_state.deepseek_analyses = analyses
+                st.success("✅ Analyse DeepSeek terminée !")
+                st.session_state.last_action = None # Reset action
+                st.rerun()
+
+        # --- AFFICHAGE DES RÉSULTATS ---
         if st.session_state.classification_results:
             # Génération Excel Personnalisé
             merged_results = merge_results_with_ai_analysis(st.session_state.classification_results)
