@@ -1268,7 +1268,7 @@ def get_gemini_auto_classification(text: str, full_name: str | None) -> dict:
         
         # Fallback values handle
         macro = data.get("macro_category") or "Non classé"
-        if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]: macro = "Non classé"
+        if macro not in ["Fonctions supports", "Logistique", "Production/Technique", "Divers / Hors périmètre"]: macro = "Non classé"
         
         return {
             "macro_category": macro,
@@ -1289,7 +1289,7 @@ def get_gemini_auto_classification(text: str, full_name: str | None) -> dict:
                 data = json.loads(clean_text)
             
             macro = data.get("macro_category") or "Non classé"
-            if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]: macro = "Non classé"
+            if macro not in ["Fonctions supports", "Logistique", "Production/Technique", "Divers / Hors périmètre"]: macro = "Non classé"
             
             return {
                 "macro_category": macro,
@@ -1317,18 +1317,22 @@ Agis comme un expert en recrutement. Tu dois classer STRICTEMENT le CV dans UNE 
 
 2) Production/Technique
     - Exemples / mots-clés : Ingénieur, Technicien, BTP, Conduite de travaux, Chantier, Maintenance, Industrie, Usinage, Électromécanique, Automatismes, R&D, Bureau d'études, Méthodes, Qualité, Production, Ligne, Opérateur.
+    - Sous-catégories attendues (si applicable) :
+      a) PRODUCTION - TRAVAUX (CHANTIER) : profils chantier / exécution. Dans ce cas, précise si possible "Encadrement" (Directeur de Projet, Chef de Projet, Directeur de Travaux) ou "Exécution" (Conducteur de Travaux, Ingénieur Travaux, Chef de Chantier, Chef d'équipe, OPC).
+      b) PRODUCTION - ÉTUDES (BUREAU) : métrés, études de prix (chiffrage), méthodes & planning, technique (synthèse/projeteur), BIM, études structure, bureau d'études.
+      c) PRODUCTION - QUALITÉ : contrôle qualité sur projet, Responsable Qualité Chantier, Ingénieur Qualité, Superviseur Qualité.
 
 3) Logistique
     - Exemples / mots-clés : Supply Chain, Approvisionnement, Transport, Entrepôt, Préparation de commandes, Gestion des stocks, Planification, Distribution, Transit, Douane, Transporteurs.
 
-4) Non classé
-    - Utilise cette catégorie seulement si le CV est illisible, hors sujet, ou ne permet pas d'identifier l'une des trois catégories ci-dessus.
+4) Divers / Hors périmètre
+    - Utilise cette catégorie seulement si le CV est clairement hors du périmètre métier défini (ex: CV non professionnel, profils très atypiques), ou si aucun des trois domaines ci-dessus n'est pertinent.
 
 Consignes de sortie STRICTES :
 - Tu réponds UNIQUEMENT par un JSON valide (seul contenu de la réponse) avec les clés :
   {"candidate_name": "...", "macro_category": "...", "sub_category": "...", "years_experience": 0, "profile_summary": "..."}
-- "macro_category" doit être EXACTEMENT l'un des libellés : "Fonctions supports", "Production/Technique", "Logistique", "Non classé".
-- La "sub_category" doit être concise (métier visé), n'utilise pas "Étudiant" ni "Stagiaire".
+- "macro_category" doit être EXACTEMENT l'un des libellés : "Fonctions supports", "Production/Technique", "Logistique", "Divers / Hors périmètre".
+- La "sub_category" doit être concise (métier visé), n'utilise pas "Étudiant" ni "Stagiaire". Pour "Production/Technique", privilégie l'un des libellés indiqués (PRODUCTION - TRAVAUX (CHANTIER) / PRODUCTION - ÉTUDES (BUREAU) / PRODUCTION - QUALITÉ) et précise "Encadrement" ou "Exécution" si possible.
 - "years_experience" doit être un entier (0 si inconnu).
 - "profile_summary" : 1-2 phrases en français.
 
@@ -3561,6 +3565,42 @@ with tab5:
                     sub_cat = classification.get('sub_category', 'Autre')
                     profile_summary = classification.get('profile_summary', '')
                     years_exp = classification.get('years_experience', 0)
+
+                    # Post-traitement local : si macro==Production/Technique, forcer
+                    # une sous-catégorie standardisée basée sur mots-clés.
+                    if cat == "Production/Technique":
+                        ltext = (text or "").lower()
+                        # Définitions mots-clés
+                        quality_kw = ["qualit", "contrôle qualité", "responsable qualité", "superviseur qualité", "ingénieur qualité", "qaqc"]
+                        etudes_kw = ["métré", "métrés", "étude", "études de prix", "chiffrage", "méthode", "méthodes", "planning", "projeteur", "bim", "synthèse", "bureau d'études", "calcul"]
+                        travaux_encadrement_kw = ["directeur de projet", "chef de projet", "directeur de travaux", "encadrement", "responsable travaux"]
+                        travaux_execution_kw = ["conducteur de travaux", "ingénieur travaux", "chef de chantier", "chef d'équipe", "opc", "chantier", "exécution", "ouvrier", "maçon", "terrass", "gros œuvre"]
+
+                        def any_kw_match(keywords):
+                            for k in keywords:
+                                if k in ltext:
+                                    return True
+                            return False
+
+                        new_sub = None
+                        if any_kw_match(quality_kw):
+                            new_sub = "PRODUCTION - QUALITÉ"
+                        elif any_kw_match(etudes_kw):
+                            new_sub = "PRODUCTION - ÉTUDES (BUREAU)"
+                        else:
+                            # Prioriser encadrement si présent
+                            if any_kw_match(travaux_encadrement_kw):
+                                new_sub = "PRODUCTION - TRAVAUX (CHANTIER) - Encadrement"
+                            elif any_kw_match(travaux_execution_kw):
+                                new_sub = "PRODUCTION - TRAVAUX (CHANTIER) - Exécution"
+                            else:
+                                # Si l'IA a donné quelque chose de précis, le garder, sinon généraliser
+                                if sub_cat and sub_cat.lower() not in ["autre", "", "n/a"]:
+                                    new_sub = sub_cat
+                                else:
+                                    new_sub = "PRODUCTION - TRAVAUX (CHANTIER)"
+
+                        sub_cat = new_sub
                     
                     # Mise à jour du nom extrait si l'IA en a trouvé un meilleur
                     ai_name = classification.get('candidate_name')
