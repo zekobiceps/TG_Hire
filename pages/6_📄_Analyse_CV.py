@@ -3590,36 +3590,75 @@ with tab5:
                     profile_summary = classification.get('profile_summary', '')
                     years_exp = classification.get('years_experience', 0)
 
-                    # Post-traitement local : si macro==Production/Technique, forcer
-                    # une sous-catégorie standardisée basée sur mots-clés.
-                    if cat == "Production/Technique":
-                        ltext = (text or "").lower()
-                        # Définitions mots-clés
-                        quality_kw = ["qualit", "contrôle qualité", "responsable qualité", "superviseur qualité", "ingénieur qualité", "qaqc"]
-                        etudes_kw = ["métré", "métrés", "étude", "études de prix", "chiffrage", "méthode", "méthodes", "planning", "projeteur", "bim", "synthèse", "bureau d'études", "calcul"]
-                        travaux_encadrement_kw = ["directeur de projet", "chef de projet", "directeur de travaux", "encadrement", "responsable travaux"]
-                        travaux_execution_kw = ["conducteur de travaux", "ingénieur travaux", "chef de chantier", "chef d'équipe", "opc", "chantier", "exécution", "ouvrier", "maçon", "terrass", "gros œuvre"]
+                    # ============================================================
+                    # POST-TRAITEMENT LOCAL : CORRECTION DES ERREURS DE CLASSIFICATION
+                    # ============================================================
+                    ltext = (text or "").lower()
+                    sub_cat_lower = (sub_cat or "").lower()
 
-                        def any_kw_match(keywords):
-                            for k in keywords:
-                                if k in ltext:
-                                    return True
-                            return False
+                    # --- Liste de mots-clés "Fonctions supports" ---
+                    support_keywords_in_sub = ["rh", "ressources humaines", "recrutement", "paie", "formation",
+                                               "finance", "comptab", "trésorerie", "audit", "contrôle de gestion",
+                                               "dsi", "informatique", "it", "systèmes d'information", "support",
+                                               "juridique", "droit", "communication", "marketing", "administration",
+                                               "assistante", "secrétariat", "office", "achats", "qhse interne"]
+
+                    # --- Liste de mots-clés "Logistique" ---
+                    logistique_keywords_in_sub = ["supply chain", "approvisionnement", "transport", "entrepôt",
+                                                   "stock", "préparation de commandes", "distribution", "transit",
+                                                   "douane", "logistique"]
+
+                    def any_kw_in_text(keywords, txt):
+                        for k in keywords:
+                            if k in txt:
+                                return True
+                        return False
+
+                    # CORRECTION 1 : Si macro == Production/Technique mais sub_cat contient des termes support
+                    # => Corriger la macro vers "Fonctions supports"
+                    if cat == "Production/Technique":
+                        if any_kw_in_text(support_keywords_in_sub, sub_cat_lower):
+                            cat = "Fonctions supports"
+                            # Garder la sub_cat telle quelle (ex: "RH", "Finance", "DSI")
+                        elif any_kw_in_text(logistique_keywords_in_sub, sub_cat_lower):
+                            cat = "Logistique"
+
+                    # CORRECTION 2 : Si macro == Production/Technique, vérifier le texte du CV
+                    # pour détecter si c'est vraiment un profil support mal classé
+                    if cat == "Production/Technique":
+                        # Mots-clés forts indiquant un profil support (dans le texte complet)
+                        strong_support_kw = ["responsable rh", "directeur rh", "drh", "gestionnaire paie",
+                                             "comptable", "contrôleur de gestion", "directeur financier", "daf",
+                                             "directeur des systèmes", "responsable informatique", "dsi",
+                                             "chef de projet it", "développeur", "administrateur réseau",
+                                             "juriste", "responsable juridique", "chargé de communication",
+                                             "responsable marketing", "office manager", "assistante de direction"]
+                        if any_kw_in_text(strong_support_kw, ltext):
+                            cat = "Fonctions supports"
+
+                    # CORRECTION 3 : Si macro == Production/Technique et c'est bien correct,
+                    # standardiser la sous-catégorie vers les 3 sous-catégories attendues
+                    if cat == "Production/Technique":
+                        # Définitions mots-clés Production
+                        quality_kw = ["qualit", "contrôle qualité", "responsable qualité", "superviseur qualité", "ingénieur qualité", "qaqc"]
+                        etudes_kw = ["métré", "métrés", "étude de prix", "études de prix", "chiffrage", "méthode", "méthodes", "planning", "projeteur", "bim", "synthèse", "bureau d'études", "bureau d'étude", "calcul structure", "ingénieur structure"]
+                        travaux_encadrement_kw = ["directeur de projet", "chef de projet", "directeur de travaux", "directeur travaux", "encadrement", "responsable travaux"]
+                        travaux_execution_kw = ["conducteur de travaux", "ingénieur travaux", "chef de chantier", "chef d'équipe", "opc", "chantier", "exécution", "ouvrier", "maçon", "terrass", "gros œuvre", "génie civil", "btp", "bâtiment", "travaux publics"]
 
                         new_sub = None
-                        if any_kw_match(quality_kw):
+                        if any_kw_in_text(quality_kw, ltext):
                             new_sub = "PRODUCTION - QUALITÉ"
-                        elif any_kw_match(etudes_kw):
+                        elif any_kw_in_text(etudes_kw, ltext):
                             new_sub = "PRODUCTION - ÉTUDES (BUREAU)"
                         else:
                             # Prioriser encadrement si présent
-                            if any_kw_match(travaux_encadrement_kw):
+                            if any_kw_in_text(travaux_encadrement_kw, ltext):
                                 new_sub = "PRODUCTION - TRAVAUX (CHANTIER) - Encadrement"
-                            elif any_kw_match(travaux_execution_kw):
+                            elif any_kw_in_text(travaux_execution_kw, ltext):
                                 new_sub = "PRODUCTION - TRAVAUX (CHANTIER) - Exécution"
                             else:
-                                # Si l'IA a donné quelque chose de précis, le garder, sinon généraliser
-                                if sub_cat and sub_cat.lower() not in ["autre", "", "n/a"]:
+                                # Si l'IA a donné quelque chose de précis et pas un terme support, le garder
+                                if sub_cat and sub_cat_lower not in ["autre", "", "n/a"] and not any_kw_in_text(support_keywords_in_sub, sub_cat_lower):
                                     new_sub = sub_cat
                                 else:
                                     new_sub = "PRODUCTION - TRAVAUX (CHANTIER)"
