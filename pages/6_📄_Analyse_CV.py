@@ -3545,72 +3545,16 @@ with tab5:
                     results.append(result_item)
                     progress.progress((i+1)/total)
 
-            # Affichage des compteurs par catégorie (sans le mot "Résumé")
-            ai_indicator = " (incluant les analyses IA)" if hasattr(st.session_state, 'deepseek_analyses') and st.session_state.deepseek_analyses else ""
-            st.markdown(f"{count_support} Fonctions supports • {count_logistics} Logistique • {count_production} Production/Technique • {count_unclassified} Non classés{ai_indicator}.")
-
-            # Helper: inférer la direction à partir de la sous-catégorie ou du texte
-            def infer_direction(sub_cat: str | None, text: str | None) -> str:
-                s = (sub_cat or "").lower()
-                t = (text or "").lower()
-                # mapping keywords -> directions
-                mapping = {
-                    'RH': ['rh', 'recrut', 'talent', 'pay', 'paie', 'ressources humaines', 'recruteur', 'recrutement'],
-                    'Finance': ['compta', 'finance', 'trésor', 'tresor', 'audit', 'contrôle de gestion', 'controle de gestion', 'contrôle'],
-                    'Achats': ['achat', 'achats', 'sourcing'],
-                    'DSI': ['dsi', 'informat', 'it', 'support', 'devops', 'développeur', 'developpeur', 'ingenieur logiciel'],
-                    'QHSE / Sécurité': ['qhse', 'sécurité', 'securité', 'qhs', 'hse'],
-                    'Juridique': ['jurid', 'juriste', 'conformité', 'compliance'],
-                    'Communication / Marketing': ['communication', 'marketing', 'content', 'digital', 'community'],
-                    'Logistique': ['logisti', 'supply', 'entrepôt', 'transport', 'stock', 'préparation'],
-                    'Production / Technique': ['ingénieur', 'ingenieur', 'technicien', 'btp', 'chantier', 'maintenance', 'industrie', 'usinat', 'electromec', 'électromec']
-                }
-                # check sub_cat first
-                for direction, keys in mapping.items():
-                    for k in keys:
-                        if k in s:
-                            return direction
-                # fallback to text
-                for direction, keys in mapping.items():
-                    for k in keys:
-                        if k in t:
-                            return direction
-                return 'Autre'
-
-            # Function to display grouped items per category
-            def display_grouped(category_name, rows):
-                st.subheader(f"{category_name} ({len(rows)})")
-                # group by direction
-                groups = {}
-                for r in rows:
-                    # r may be a pandas Series; use .get if possible
-                    sub_cat = r.get('sub_category') if hasattr(r, 'get') else r['sub_category']
-                    full_text = r.get('full_text') if hasattr(r, 'get') else r['full_text']
-                    direction = infer_direction(sub_cat, full_text)
-                    groups.setdefault(direction, []).append(get_display_name(r))
-
-                for direction, items in sorted(groups.items(), key=lambda x: (-len(x[1]), x[0])):
-                    st.markdown(f"**{direction}** ({len(items)})")
-                    for name in items:
-                        st.markdown(f"- {name}")
-
-            # Préparer les lignes (résultats intégrés déjà dans df_merged)
-            supports_rows = [row for _, row in df_merged[df_merged['category'] == 'Fonctions supports'].iterrows()]
-            logistics_rows = [row for _, row in df_merged[df_merged['category'] == 'Logistique'].iterrows()]
-            production_rows = [row for _, row in df_merged[df_merged['category'] == 'Production/Technique'].iterrows()]
-            unclassified_rows = [row for _, row in df_merged[df_merged['category'] == 'Non classé'].iterrows()]
-
-            # Display as a 2x2 grid
-            r1c1, r1c2 = st.columns(2)
-            with r1c1:
-                display_grouped('Fonctions supports', supports_rows)
-            with r1c2:
-                display_grouped('Logistique', logistics_rows)
-            r2c1, r2c2 = st.columns(2)
-            with r2c1:
-                display_grouped('Production/Technique', production_rows)
-            with r2c2:
-                display_grouped('Non classé', unclassified_rows)
+            # Stocker les résultats et relancer l'affichage global (le rendu principal s'appuiera
+            # sur la logique de rendu déjà présente en dehors de ce bloc). Cela évite les variables
+            # non initialisées et permet d'avoir un rendu cohérent après classification.
+            try:
+                st.session_state.classification_results = results
+                st.session_state.rename_and_organize_option = rename_and_organize
+                st.session_state.last_action = 'classified'
+            except Exception:
+                pass
+            st.experimental_rerun()
                                     recap = r.get('profile_summary') or r.get('text_snippet') or ''
                                     years_exp = r.get('years_experience', 0)
                                     with st.expander(f"👤 {card_title}"):
