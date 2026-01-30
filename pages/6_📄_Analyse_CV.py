@@ -171,9 +171,20 @@ div[data-testid="stTabs"] button p {
 def load_embedding_model():
     """Charge le modèle SentenceTransformer une seule fois de manière sécurisée."""
     try:
-        return SentenceTransformer('all-MiniLM-L6-v2')
+        # Try the full HF repo path first, then the short name for backwards compatibility
+        try:
+            return SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
+        except Exception:
+            return SentenceTransformer('all-MiniLM-L6-v2')
     except Exception as e:
-        st.warning(f"⚠️ Impossible de charger le modèle sémantique (embedding). La méthode 'Sémantique' sera indisponible. Erreur: {e}")
+        # Provide a clearer diagnostic for common causes (local dir with same name, missing weights)
+        msg = str(e)
+        hint = (
+            "Vérifiez que le package 'sentence-transformers' est installé et que vous avez accès au modèle. "
+            "Si vous chargez depuis Hugging Face, assurez-vous que le chemin est 'sentence-transformers/all-MiniLM-L6-v2' "
+            "et qu'il n'existe pas de dossier local avec le même nom qui pourrait masquer le modèle."
+        )
+        st.warning(f"⚠️ Impossible de charger le modèle sémantique (embedding). La méthode 'Sémantique' sera indisponible. Erreur: {msg} {hint}")
         return None
 
 embedding_model = load_embedding_model()
@@ -3554,7 +3565,6 @@ with tab5:
                 st.session_state.last_action = 'classified'
             except Exception:
                 pass
-            st.experimental_rerun()
 
             # Catégorie "Autres" pour les non classés (calculée ensuite à partir du dataframe fusionné)
             nc = None
