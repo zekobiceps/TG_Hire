@@ -450,11 +450,21 @@ with tab1:
 
     st.divider()
     st.subheader("🔍 Rechercher un candidat")
-    search_cols = st.columns([1,2])
+    search_cols = st.columns([1, 1, 2])
     with search_cols[0]:
         quadrants = ["Tout"] + list(st.session_state.cartographie_data.keys())
         quadrant_recherche = st.selectbox("Quadrant à rechercher", quadrants, key="carto_quadrant_search")
     with search_cols[1]:
+        # Liste des entreprises uniques pour le filtre
+        all_entreprises = set()
+        for quad, cands in st.session_state.cartographie_data.items():
+            for cand in cands:
+                ent = cand.get('entreprise', '').strip()
+                if ent and ent.lower() != 'non spécifiée':
+                    all_entreprises.add(ent)
+        entreprise_list = ["Toutes"] + sorted(list(all_entreprises))
+        entreprise_filter = st.selectbox("Filtrer par entreprise", entreprise_list, key="carto_entreprise_filter")
+    with search_cols[2]:
         search_term = st.text_input("Rechercher par nom ou poste", key="carto_search")
 
     # Construire la source de recherche (supporte "Tout") et inclure le quadrant d'origine
@@ -472,96 +482,103 @@ with tab1:
             c['quadrant'] = quadrant_recherche
             source_list.append(c)
 
-    filtered_cands = [
-        cand for cand in source_list
-        if not search_term or search_term.lower() in cand['nom'].lower() or search_term.lower() in cand['poste'].lower()
-    ]
+    # Appliquer les filtres: nom/poste + entreprise
+    filtered_cands = []
+    for cand in source_list:
+        # Filtre par nom ou poste
+        if search_term and search_term.lower() not in cand['nom'].lower() and search_term.lower() not in cand['poste'].lower():
+            continue
+        # Filtre par entreprise
+        if entreprise_filter != "Toutes":
+            cand_entreprise = cand.get('entreprise', '').strip()
+            if cand_entreprise.lower() != entreprise_filter.lower():
+                continue
+        filtered_cands.append(cand)
 
     st.subheader(f"📋 Candidats dans : {quadrant_recherche} ({len(filtered_cands)})")
     
     if not filtered_cands:
         st.info("Aucun candidat correspondant dans ce quadrant.")
     else:
-        for i, cand in enumerate(filtered_cands):
-            edit_key = f"edit_carto_flag_{quadrant_recherche}_{i}"
-            anchor_id = f"cand_{quadrant_recherche}_{i}"
-            st.markdown(f"<div id='{anchor_id}'></div>", unsafe_allow_html=True)
-            with st.expander(f"{cand['nom']} - {cand['poste']} ({cand['date']})", expanded=st.session_state.get(edit_key, False)):
-                st.write(f"**Entreprise :** {cand.get('entreprise', 'Non spécifiée')}")
-                st.write(f"**LinkedIn :** {cand.get('linkedin', 'Non spécifié')}")
-                st.write(f"**Notes :** {cand.get('notes', '')}")
+        # Affichage en 3 colonnes pour optimiser l'espace
+        num_cols = 3
+        for row_start in range(0, len(filtered_cands), num_cols):
+            cols = st.columns(num_cols)
+            for col_idx, col in enumerate(cols):
+                i = row_start + col_idx
+                if i >= len(filtered_cands):
+                    break
+                cand = filtered_cands[i]
+                edit_key = f"edit_carto_flag_{quadrant_recherche}_{i}"
+                anchor_id = f"cand_{quadrant_recherche}_{i}"
                 
-                cv_drive_link = cand.get('cv_link')
-                if cv_drive_link and cv_drive_link.startswith('http'):
-                    st.markdown(f"**CV :** [Ouvrir depuis Google Drive]({cv_drive_link})", unsafe_allow_html=True)
-                
-                # Bouton de suppression à la place de l'export texte
-                col_a, col_b = st.columns([1,1])
-                with col_a:
-                    if st.button("🗑️ Supprimer ce candidat", key=f"delete_carto_{quadrant_recherche}_{i}"):
-                        origin_quad = cand.get('quadrant', quadrant_recherche)
-                        ok = delete_from_google_sheet(origin_quad, cand)
-                        if ok:
-                            st.success("✅ Candidat supprimé de la cartographie.")
-                            st.cache_data.clear()
-                            st.session_state.cartographie_data = load_data_from_sheet()
-                            rerun_fn = getattr(st, "experimental_rerun", None)
-                            if callable(rerun_fn):
-                                rerun_fn()
-                            else:
-                                st.rerun()
-                        else:
-                            st.error("❌ Impossible de trouver/supprimer ce candidat dans Google Sheets.")
-                with col_b:
-                    if st.button("✏️ Modifier ce candidat", key=f"edit_carto_btn_{quadrant_recherche}_{i}"):
-                        st.session_state[edit_key] = True
-                        st.session_state['scroll_to'] = anchor_id
-
-                # Afficher le formulaire de modification directement sous le bloc, et ouvrir l'expander
-                if st.session_state.get(edit_key, False):
-                    st.markdown("**Modifier les informations du candidat**")
-                    with st.form(f"form_edit_{quadrant_recherche}_{i}", clear_on_submit=False):
-                        # Disposition en 3 colonnes pour les champs principaux
-                        ec1, ec2, ec3 = st.columns(3)
-                        with ec1:
-                            nom_edit = st.text_input("Nom", value=str(cand.get('nom','')), key=f"edit_nom_{quadrant_recherche}_{i}")
-                            linkedin_edit = st.text_input("Lien LinkedIn", value=str(cand.get('linkedin','')), key=f"edit_linkedin_{quadrant_recherche}_{i}")
-                        with ec2:
-                            poste_edit = st.text_input("Poste", value=str(cand.get('poste','')), key=f"edit_poste_{quadrant_recherche}_{i}")
-                            notes_edit = st.text_area("Notes", value=str(cand.get('notes','')), height=100, key=f"edit_notes_{quadrant_recherche}_{i}")
-                        with ec3:
-                            entreprise_edit = st.text_input("Entreprise", value=str(cand.get('entreprise','')), key=f"edit_entreprise_{quadrant_recherche}_{i}")
-                            cv_edit_file = st.file_uploader("Nouveau CV (PDF ou DOCX)", type=["pdf","docx"], key=f"edit_cv_{quadrant_recherche}_{i}")
-                        submitted = st.form_submit_button("💾 Enregistrer les modifications")
-                        if submitted:
-                            updated = {
-                                'Nom': nom_edit,
-                                'Poste': poste_edit,
-                                'Entreprise': entreprise_edit,
-                                'Linkedin': linkedin_edit,
-                                'Notes': notes_edit,
-                            }
-                            # Upload CV si fourni
-                            if cv_edit_file is not None:
-                                _, file_extension = os.path.splitext(cv_edit_file.name)
-                                cv_filename = f"{nom_edit}{file_extension}"
-                                new_link = upload_cv_to_drive(cv_filename, cv_edit_file)
-                                if new_link:
-                                    updated['CV_Link'] = new_link
-                            origin_quad = cand.get('quadrant', quadrant_recherche)
-                            ok = update_in_google_sheet(origin_quad, cand, updated)
-                            if ok:
-                                st.success("✅ Candidat mis à jour.")
-                                st.session_state[edit_key] = False
-                                st.cache_data.clear()
-                                st.session_state.cartographie_data = load_data_from_sheet()
-                                rerun_fn = getattr(st, "experimental_rerun", None)
-                                if callable(rerun_fn):
-                                    rerun_fn()
-                                else:
+                with col:
+                    st.markdown(f"<div id='{anchor_id}'></div>", unsafe_allow_html=True)
+                    with st.expander(f"{cand['nom']} - {cand['poste'][:20]}{'...' if len(cand['poste']) > 20 else ''}", expanded=st.session_state.get(edit_key, False)):
+                        st.caption(f"📅 {cand['date']}")
+                        st.write(f"**Entreprise :** {cand.get('entreprise', 'Non spécifiée')}")
+                        st.write(f"**LinkedIn :** {cand.get('linkedin', 'Non spécifié')}")
+                        if cand.get('notes'):
+                            st.write(f"**Notes :** {cand.get('notes', '')[:100]}{'...' if len(cand.get('notes', '')) > 100 else ''}")
+                        
+                        cv_drive_link = cand.get('cv_link')
+                        if cv_drive_link and cv_drive_link.startswith('http'):
+                            st.markdown(f"**CV :** [Ouvrir]({cv_drive_link})", unsafe_allow_html=True)
+                        
+                        # Boutons d'action
+                        btn_col1, btn_col2 = st.columns(2)
+                        with btn_col1:
+                            if st.button("🗑️", key=f"delete_carto_{quadrant_recherche}_{i}", help="Supprimer"):
+                                origin_quad = cand.get('quadrant', quadrant_recherche)
+                                ok = delete_from_google_sheet(origin_quad, cand)
+                                if ok:
+                                    st.success("✅ Supprimé")
+                                    st.cache_data.clear()
+                                    st.session_state.cartographie_data = load_data_from_sheet()
                                     st.rerun()
-                            else:
-                                st.error("❌ Mise à jour impossible (ligne introuvable ou erreur).")
+                                else:
+                                    st.error("❌ Échec")
+                        with btn_col2:
+                            if st.button("✏️", key=f"edit_carto_btn_{quadrant_recherche}_{i}", help="Modifier"):
+                                st.session_state[edit_key] = True
+                                st.session_state['scroll_to'] = anchor_id
+                                st.rerun()
+
+                        # Formulaire de modification
+                        if st.session_state.get(edit_key, False):
+                            st.markdown("**Modifier le candidat**")
+                            with st.form(f"form_edit_{quadrant_recherche}_{i}", clear_on_submit=False):
+                                nom_edit = st.text_input("Nom", value=str(cand.get('nom','')), key=f"edit_nom_{quadrant_recherche}_{i}")
+                                poste_edit = st.text_input("Poste", value=str(cand.get('poste','')), key=f"edit_poste_{quadrant_recherche}_{i}")
+                                entreprise_edit = st.text_input("Entreprise", value=str(cand.get('entreprise','')), key=f"edit_entreprise_{quadrant_recherche}_{i}")
+                                linkedin_edit = st.text_input("LinkedIn", value=str(cand.get('linkedin','')), key=f"edit_linkedin_{quadrant_recherche}_{i}")
+                                notes_edit = st.text_area("Notes", value=str(cand.get('notes','')), height=80, key=f"edit_notes_{quadrant_recherche}_{i}")
+                                cv_edit_file = st.file_uploader("Nouveau CV", type=["pdf","docx"], key=f"edit_cv_{quadrant_recherche}_{i}")
+                                submitted = st.form_submit_button("💾 Enregistrer")
+                                if submitted:
+                                    updated = {
+                                        'Nom': nom_edit,
+                                        'Poste': poste_edit,
+                                        'Entreprise': entreprise_edit,
+                                        'Linkedin': linkedin_edit,
+                                        'Notes': notes_edit,
+                                    }
+                                    if cv_edit_file is not None:
+                                        _, file_extension = os.path.splitext(cv_edit_file.name)
+                                        cv_filename = f"{nom_edit}{file_extension}"
+                                        new_link = upload_cv_to_drive(cv_filename, cv_edit_file)
+                                        if new_link:
+                                            updated['CV_Link'] = new_link
+                                    origin_quad = cand.get('quadrant', quadrant_recherche)
+                                    ok = update_in_google_sheet(origin_quad, cand, updated)
+                                    if ok:
+                                        st.success("✅ Mis à jour")
+                                        st.session_state[edit_key] = False
+                                        st.cache_data.clear()
+                                        st.session_state.cartographie_data = load_data_from_sheet()
+                                        st.rerun()
+                                    else:
+                                        st.error("❌ Échec")
 
     st.subheader("📤 Exporter toute la cartographie")
     if st.button("⬇️ Exporter en CSV (Global)"):

@@ -1799,19 +1799,38 @@ def get_feedback_google_credentials():
         return None
 
 def get_feedback_gsheet_client():
-    """Authentification pour Google Sheets."""
+    """Authentification pour Google Sheets (méthode compatible avec Cartographie)."""
     try:
         creds = get_feedback_google_credentials()
         if creds and GSPREAD_AVAILABLE:
             scoped_creds = creds.with_scopes([
                 "https://www.googleapis.com/auth/spreadsheets",
-                "https://www.googleapis.com/auth/drive",
+                "https://www.googleapis.com/auth/drive.readonly",
             ])
-            gc = gspread.authorize(scoped_creds)
+            gc = gspread.Client(auth=scoped_creds)
+            # Test de connexion
+            gc.open_by_url(FEEDBACK_GSHEET_URL)
             return gc
     except Exception as e:
-        st.error(f"❌ Erreur d'authentification Google Sheets: {str(e)}")
+        # Silencieux pour éviter les erreurs répétées au démarrage
+        print(f"Erreur d'authentification Google Sheets Feedback: {str(e)}")
     return None
+
+@st.cache_data(ttl=300)  # Cache de 5 minutes pour les feedbacks
+def load_feedback_from_gsheet():
+    """Charge les feedbacks depuis Google Sheets avec cache."""
+    try:
+        gc = get_feedback_gsheet_client()
+        if not gc:
+            return []
+        
+        sh = gc.open_by_url(FEEDBACK_GSHEET_URL)
+        worksheet = sh.worksheet(FEEDBACK_GSHEET_NAME)
+        records = worksheet.get_all_records()
+        return records
+    except Exception as e:
+        print(f"Erreur lors du chargement des feedbacks depuis Google Sheets: {e}")
+        return []
 
 def save_feedback(analysis_method, job_title, job_description_snippet, cv_count, feedback_score, feedback_text="",
                  user_criteria=None, improvement_suggestions=None):
@@ -1931,19 +1950,11 @@ def get_average_feedback_score(analysis_method=None):
     Returns:
         Score moyen et nombre d'évaluations
     """
-    # Essayer d'abord de lire depuis Google Sheets
+    # Essayer d'abord de lire depuis Google Sheets avec cache
     feedback_data = []
     try:
         if GSPREAD_AVAILABLE:
-            gc = get_feedback_gsheet_client()
-            if gc:
-                sh = gc.open_by_url(FEEDBACK_GSHEET_URL)
-                try:
-                    worksheet = sh.worksheet(FEEDBACK_GSHEET_NAME)
-                    records = worksheet.get_all_records()
-                    feedback_data = records
-                except Exception:
-                    pass
+            feedback_data = load_feedback_from_gsheet()
     except Exception:
         pass
     

@@ -2,6 +2,9 @@ import streamlit as st
 import pandas as pd
 import io
 import requests
+import google.generativeai as genai
+import anthropic
+import groq
 import json
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -12,8 +15,19 @@ from datetime import datetime
 from typing import cast
 import plotly.graph_objects as go
 import plotly.express as px
+from utils import display_commit_info
 
 # Imports optionnels pour la manipulation des PDF (s'il manque, le code utilisera des fallbacks)
+try:
+    import fitz  # PyMuPDF
+except Exception:
+    fitz = None
+
+try:
+    import fitz  # PyMuPDF
+except Exception:
+    fitz = None
+
 try:
     import pdfplumber
 except Exception:
@@ -28,6 +42,14 @@ try:
     from pypdf import PdfReader as PypdfReader
 except Exception:
     PypdfReader = None
+
+# Imports pour OCR (Cas des CV scannés)
+try:
+    import pytesseract
+    from pdf2image import convert_from_path, convert_from_bytes
+except Exception:
+    pytesseract = None
+    convert_from_path = None
 
 # Imports pour la méthode sémantique
 from sentence_transformers import SentenceTransformer, util
@@ -51,6 +73,16 @@ st.set_page_config(
 # Vérification de la connexion
 if not st.session_state.get("logged_in", False):
     st.stop()
+
+# --- Vérification unique de la clé API DeepSeek au démarrage ---
+# Cette vérification est silencieuse ici pour éviter de bloquer ou d'afficher des erreurs avant le chargement complet
+_deepseek_api_available = False
+try:
+    if "DEEPSEEK_API_KEY" in st.secrets:
+        _deepseek_api_available = True
+except Exception:
+    pass
+
 
 # Initialisation des variables de session
 if "cv_analysis_feedback" not in st.session_state:
@@ -137,23 +169,37 @@ div[data-testid="stTabs"] button p {
 # -------------------- Chargement des modèles ML (mis en cache) --------------------
 @st.cache_resource
 def load_embedding_model():
-    """Charge le modèle SentenceTransformer une seule fois."""
-    return SentenceTransformer('all-MiniLM-L6-v2')
+    """Charge le modèle SentenceTransformer une seule fois de manière sécurisée."""
+    try:
+        return SentenceTransformer('all-MiniLM-L6-v2')
+    except Exception as e:
+        st.warning(f"⚠️ Impossible de charger le modèle sémantique (embedding). La méthode 'Sémantique' sera indisponible. Erreur: {e}")
+        return None
 
 embedding_model = load_embedding_model()
 
 # -------------------- Fonctions de traitement --------------------
 def get_api_key():
-    """Récupère la clé API depuis les secrets et gère l'erreur."""
+    """Récupère la clé API avec persistance en session state pour éviter les pertes lors du rechargement."""
+    # 1. Vérifier si déjà en session
+    if "DEEPSEEK_API_KEY" in st.session_state:
+        return st.session_state.DEEPSEEK_API_KEY
+        
+    api_key = None
     try:
-        api_key = st.secrets["DEEPSEEK_API_KEY"]
+        # 2. Vérifier st.secrets
+        if "DEEPSEEK_API_KEY" in st.secrets:
+             api_key = st.secrets["DEEPSEEK_API_KEY"]
+        # 3. Vérifier variables d'environnement (fallback)
         if not api_key:
-            st.error("❌ La clé API DeepSeek est vide dans les secrets. Veuillez la vérifier.")
-            return None
-        return api_key
-    except KeyError:
-        st.error("❌ Le secret 'DEEPSEEK_API_KEY' est introuvable. Veuillez le configurer dans les paramètres de votre application Streamlit.")
-        return None
+             api_key = os.environ.get("DEEPSEEK_API_KEY")
+             
+        if api_key:
+            st.session_state.DEEPSEEK_API_KEY = api_key
+            return api_key
+    except Exception:
+        pass
+    return None
 
 def extract_text_from_pdf(file):
     try:
@@ -165,6 +211,23 @@ def extract_text_from_pdf(file):
             bio = io.BytesIO(data)
         except Exception:
             bio = file
+
+        # 0) PyMuPDF (fitz) - PRIORITÉ ABSOLUE pour l'ordre de lecture
+        # sort=True remet le texte dans l'ordre de lecture visuel (haut-gauche -> bas-droite)
+        # C'est CRUCIAL pour les CVs où le nom est dans un en-tête graphique.
+        if fitz:
+            try:
+                bio.seek(0)
+                doc = fitz.open(stream=bio, filetype="pdf")
+                text_parts = []
+                for page in doc:
+                    # sort=True est la clé ici pour éviter que le nom ne finisse à la fin du fichier
+                    text_parts.append(page.get_text("text", sort=True))
+                text = "\n".join(text_parts).strip()
+                if len(text) > 50:  # Validation minimale
+                    return text
+            except Exception as e:
+                print(f"fitz sorting error: {e}")
 
         # 1) pdfplumber (meilleur pour extraction de texte mise en page)
         try:
@@ -222,6 +285,21 @@ def extract_text_from_pdf(file):
             print(f"pypdf error: {e}")
 
         # Aucun texte extrait -> PDF probablement scanné (images) ou protégé
+        # Tentative OCR si disponible
+        if pytesseract and convert_from_bytes:
+            try:
+                bio.seek(0)
+                # On convertit le contenu du BytesIO en bytes
+                pdf_bytes = bio.read()
+                # On convertit la première page en image
+                images = convert_from_bytes(pdf_bytes, first_page=1, last_page=1)
+                if images:
+                    ocr_text = pytesseract.image_to_string(images[0], lang='fra+eng')
+                    if len(ocr_text.strip()) > 10:
+                        return ocr_text
+            except Exception as e:
+                print(f"OCR failed: {e}")
+
         return "Aucun texte lisible trouvé. Le PDF est peut-être un scan (images) ou protégé par mot de passe."
     except Exception as e:
         return f"Erreur d'extraction du texte: {str(e)}"
@@ -251,6 +329,10 @@ def rank_resumes_with_cosine(job_description, resumes, file_names):
 
 # --- MÉTHODE 2 : WORD EMBEDDINGS (AVEC LOGIQUE) ---
 def rank_resumes_with_embeddings(job_description, resumes, file_names):
+    if embedding_model is None:
+        st.error("❌ Le modèle sémantique n'est pas chargé. Impossible d'utiliser cette méthode.")
+        return {"scores": [0] * len(resumes), "logic": {}}
+        
     try:
         jd_embedding = embedding_model.encode(job_description, convert_to_tensor=True)
         resume_embeddings = embedding_model.encode(resumes, convert_to_tensor=True)
@@ -557,6 +639,619 @@ def rank_resumes_with_ai(job_description, resumes, file_names):
     return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
 
 
+
+# --- FONCTIONS GROQ ---
+def get_groq_api_key():
+    """Récupère la clé Groq avec persistance en session state."""
+    if "Groq_API_KEY" in st.session_state:
+        return st.session_state.Groq_API_KEY
+    
+    api_key = None
+    try:
+        keys_to_check = ["Groq_API_KEY", "GROQ_API_KEY"]
+        for k in keys_to_check:
+            if k in st.secrets:
+                api_key = st.secrets[k]
+                break
+        
+        if not api_key:
+            for k in keys_to_check:
+                val = os.environ.get(k)
+                if val:
+                    api_key = val
+                    break
+                    
+        if api_key:
+            st.session_state.Groq_API_KEY = api_key
+            return api_key
+    except Exception:
+        pass
+    return None
+
+def get_detailed_score_with_groq(job_description, resume_text):
+    API_KEY = get_groq_api_key()
+    if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Groq manquante."}
+    
+    try:
+        client = groq.Groq(api_key=API_KEY)
+        prompt = f"""
+        En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
+        Fournis ta réponse en deux parties :
+        1. Un score de correspondance en pourcentage (ex: "Score: 85%").
+        2. Une analyse détaillée expliquant les points forts et les points à améliorer.
+        ---
+        Description du poste: {job_description}
+        ---
+        Texte du CV: {resume_text}
+        """
+        
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            max_tokens=4000,
+        )
+        text_resp = chat_completion.choices[0].message.content
+        
+        score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
+        score = int(score_match.group(1)) / 100 if score_match else 0.0
+        
+        return {"score": score, "explanation": text_resp}
+    except Exception as e:
+        return {"score": 0.0, "explanation": f"Erreur Groq: {e}"}
+
+def rank_resumes_with_groq(job_description, resumes, file_names):
+    scores_data = []
+    progress_bar = st.progress(0)
+    for i, resume_text in enumerate(resumes):
+        scores_data.append(get_detailed_score_with_groq(job_description, resume_text))
+        progress_bar.progress((i + 1) / len(resumes))
+    progress_bar.empty()
+    return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
+
+def get_groq_profile_analysis(text: str, candidate_name: str | None = None) -> str:
+    API_KEY = get_groq_api_key()
+    if not API_KEY: return "❌ Analyse Groq impossible (clé manquante)."
+
+    safe_name = (candidate_name or "Candidat").strip()
+
+    try:
+        client = groq.Groq(api_key=API_KEY)
+        prompt = f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
+
+Règles NOM :
+- Nom identifié : "{safe_name}".
+- Si "{safe_name}" est inapproprié (Candidat, Permis B...), Trouve le vrai nom dans le texte.
+- Sinon garde "{safe_name}".
+
+**Format de sortie OBLIGATOIRE** :
+
+**👤 [Nom du Candidat]**
+
+**📊 Synthèse**
+[2-3 phrases]
+
+**🎓 Formation**
+[Diplôme le plus élevé]
+
+**💼 Expérience**
+[Dernier poste]
+
+**🛠️ Compétences clés**
+[4-5 compétences]
+
+**💡 Points forts**
+[2-3 points]
+
+**⚠️ Points d'attention**
+[1-2 points]
+
+Texte du CV :
+{text[:4000]}
+"""
+        chat_completion = client.chat.completions.create(
+            messages=[{"role": "user", "content": prompt}],
+            model="llama-3.3-70b-versatile",
+            max_tokens=2000,
+        )
+        return chat_completion.choices[0].message.content
+    except Exception as e:
+        return f"❌ Erreur Groq : {e}"
+
+# --- FONCTIONS OPENROUTER ---
+def get_openrouter_api_key():
+    """Récupère la clé OpenRouter avec persistance en session state."""
+    if "OpenRouter_API_KEY" in st.session_state:
+        return st.session_state.OpenRouter_API_KEY
+    
+    api_key = None
+    try:
+        keys_to_check = ["OpenRouter_API_KEY", "OPENROUTER_API_KEY"]
+        for k in keys_to_check:
+            if k in st.secrets:
+                api_key = st.secrets[k]
+                break
+        
+        if not api_key:
+            for k in keys_to_check:
+                val = os.environ.get(k)
+                if val:
+                    api_key = val
+                    break
+        
+        if api_key:
+            st.session_state.OpenRouter_API_KEY = api_key
+            return api_key
+    except Exception:
+        pass
+    return None
+
+def get_detailed_score_with_openrouter(job_description, resume_text):
+    API_KEY = get_openrouter_api_key()
+    if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé OpenRouter manquante."}
+
+    try:
+        response = requests.post(
+            url="https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {API_KEY}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://tg-hire.streamlit.app/", # Optionnel
+                "X-Title": "TG Hire" # Optionnel
+            },
+            data=json.dumps({
+                "model": "openai/gpt-3.5-turbo", # Modèle par défaut économique
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": f"""
+                        En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
+                        Fournis ta réponse en deux parties :
+                        1. Un score de correspondance en pourcentage (ex: "Score: 85%").
+                        2. Une analyse détaillée expliquant les points forts et les points à améliorer.
+                        ---
+                        Description du poste: {job_description}
+                        ---
+                        Texte du CV: {resume_text}
+                        """
+                    }
+                ]
+            })
+        )
+        response.raise_for_status()
+        data = response.json()
+        text_resp = data['choices'][0]['message']['content']
+        
+        score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
+        score = int(score_match.group(1)) / 100 if score_match else 0.0
+        
+        return {"score": score, "explanation": text_resp}
+    except Exception as e:
+        return {"score": 0.0, "explanation": f"Erreur OpenRouter: {e}"}
+
+def rank_resumes_with_openrouter(job_description, resumes, file_names):
+    scores_data = []
+    progress_bar = st.progress(0)
+    for i, resume_text in enumerate(resumes):
+        scores_data.append(get_detailed_score_with_openrouter(job_description, resume_text))
+        progress_bar.progress((i + 1) / len(resumes))
+    progress_bar.empty()
+    return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
+
+def get_openrouter_profile_analysis(text: str, candidate_name: str | None = None) -> str:
+    API_KEY = get_openrouter_api_key()
+    if not API_KEY: return "❌ Analyse OpenRouter impossible (clé manquante)."
+
+    safe_name = (candidate_name or "Candidat").strip()
+
+    try:
+        response = requests.post(
+            url="https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {API_KEY}",
+                "Content-Type": "application/json",
+            },
+            data=json.dumps({
+                "model": "openai/gpt-3.5-turbo",
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
+
+Règles NOM :
+- Nom identifié : "{safe_name}".
+- Si "{safe_name}" est inapproprié (Candidat, Permis B...), Trouve le vrai nom dans le texte.
+- Sinon garde "{safe_name}".
+
+**Format de sortie OBLIGATOIRE** :
+
+**👤 [Nom du Candidat]**
+
+**📊 Synthèse**
+[2-3 phrases]
+
+**🎓 Formation**
+[Diplôme le plus élevé]
+
+**💼 Expérience**
+[Dernier poste]
+
+**🛠️ Compétences clés**
+[4-5 compétences]
+
+**💡 Points forts**
+[2-3 points]
+
+**⚠️ Points d'attention**
+[1-2 points]
+
+Texte du CV :
+{text[:4000]}
+"""
+                    }
+                ]
+            })
+        )
+        response.raise_for_status()
+        return response.json()['choices'][0]['message']['content']
+    except Exception as e:
+        return f"❌ Erreur OpenRouter : {e}"
+        
+# DELETED DUPLICATE FUNCTION: get_openrouter_auto_classification
+
+# --- FONCTIONS CLAUDE ---
+def get_claude_api_key():
+    """Récupère la clé Claude avec persistance en session state."""
+    if "Claude_API_KEY" in st.session_state:
+        return st.session_state.Claude_API_KEY
+    
+    api_key = None
+    try:
+        keys_to_check = ["Claude_API_KEY", "CLAUDE_API_KEY", "anthropic_api_key", "ANTHROPIC_API_KEY"]
+        for k in keys_to_check:
+            if k in st.secrets:
+                api_key = st.secrets[k]
+                break
+        
+        if not api_key:
+            for k in keys_to_check:
+                val = os.environ.get(k)
+                if val:
+                    api_key = val
+                    break
+                    
+        if api_key:
+            st.session_state.Claude_API_KEY = api_key
+            return api_key
+    except Exception:
+        pass
+    return None
+
+def get_detailed_score_with_claude(job_description, resume_text):
+    API_KEY = get_claude_api_key()
+    if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Claude manquante."}
+    
+    try:
+        client = anthropic.Anthropic(api_key=API_KEY)
+        prompt = f"""
+        En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
+        Fournis ta réponse en deux parties :
+        1. Un score de correspondance en pourcentage (ex: "Score: 85%").
+        2. Une analyse détaillée expliquant les points forts et les points à améliorer.
+        ---
+        Description du poste: {job_description}
+        ---
+        Texte du CV: {resume_text}
+        """
+        
+        message = client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=4000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        # Safely extract text from blocks
+        text_resp = ""
+        for block in message.content:
+            if block.type == "text":
+                text_resp += block.text
+        
+        score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
+        score = int(score_match.group(1)) / 100 if score_match else 0.0
+        
+        return {"score": score, "explanation": text_resp}
+    except Exception as e:
+        return {"score": 0.0, "explanation": f"Erreur Claude: {e}"}
+
+def get_claude_profile_analysis(text: str, candidate_name: str | None = None) -> str:
+    API_KEY = get_claude_api_key()
+    if not API_KEY: return "❌ Analyse Claude impossible (clé manquante)."
+
+    safe_name = (candidate_name or "Candidat").strip()
+
+    try:
+        client = anthropic.Anthropic(api_key=API_KEY)
+        prompt = f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
+
+Règles NOM :
+- Nom identifié : "{safe_name}".
+- Si "{safe_name}" est inapproprié (Candidat, Permis B...), Trouve le vrai nom dans le texte.
+- Sinon garde "{safe_name}".
+
+**Format de sortie OBLIGATOIRE** :
+
+**👤 [Nom du Candidat]**
+
+**📊 Synthèse**
+[2-3 phrases]
+
+**🎓 Formation**
+[Diplôme le plus élevé]
+
+**💼 Expérience**
+[Dernier poste]
+
+**🛠️ Compétences clés**
+[4-5 compétences]
+
+**💡 Points forts**
+[2-3 points]
+
+**⚠️ Points d'attention**
+[1-2 points]
+
+Texte du CV :
+{text[:4000]}
+"""
+        message = client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=2000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        # Safely extract text from blocks
+        text_resp = ""
+        for block in message.content:
+            if block.type == "text":
+                text_resp += block.text
+        return text_resp
+    except Exception as e:
+        return f"❌ Erreur Claude : {e}"
+
+# --- FONCTIONS GEMINI ---
+
+def get_gemini_api_key():
+    """Récupère la clé Gemini avec persistance en session state."""
+    # 1. Vérifier si déjà en session
+    if "Gemini_API_KEY" in st.session_state:
+        return st.session_state.Gemini_API_KEY
+    
+    api_key = None
+    try:
+        # 2. Vérifier st.secrets (attention aux majuscules/minuscules)
+        # On essaie plusieurs variantes courantes
+        keys_to_check = ["Gemini_API_KEY", "GEMINI_API_KEY", "google_api_key", "GOOGLE_API_KEY"]
+        for k in keys_to_check:
+            if k in st.secrets:
+                api_key = st.secrets[k]
+                break
+        
+        # 3. Vérifier variables d'environnement
+        if not api_key:
+            for k in keys_to_check:
+                val = os.environ.get(k)
+                if val:
+                    api_key = val
+                    break
+        
+        if api_key:
+            st.session_state.Gemini_API_KEY = api_key
+            return api_key
+    except Exception:
+        pass
+    return None
+
+def get_detailed_score_with_gemini(job_description, resume_text):
+    API_KEY = get_gemini_api_key()
+    if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Gemini manquante."}
+    
+    genai.configure(api_key=API_KEY)
+    
+    # Selection du modèle basé sur la disponibilité
+    try:
+        model = genai.GenerativeModel('gemini-2.5-flash-lite')
+    except:
+        model = genai.GenerativeModel('gemini-2.0-flash')
+    
+    prompt = f"""
+    En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
+    Fournis ta réponse en deux parties :
+    1. Un score de correspondance en pourcentage (ex: "Score: 85%").
+    2. Une analyse détaillée expliquant les points forts et les points à améliorer.
+    ---
+    Description du poste: {job_description}
+    ---
+    Texte du CV: {resume_text}
+    """
+    
+    try:
+        response = model.generate_content(prompt)
+        text_resp = response.text
+        
+        # Extraction du score
+        score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
+        score = int(score_match.group(1)) / 100 if score_match else 0.0
+        
+        return {"score": score, "explanation": text_resp}
+    except Exception as e:
+        # Fallback intelligent en cas d'erreur 404
+        if "not found" in str(e).lower() or "404" in str(e):
+            try:
+                # Tentative ultime sur le modèle 'gemini-flash-latest' qui est souvent un alias stable
+                model = genai.GenerativeModel('gemini-flash-latest')
+                response = model.generate_content(prompt)
+                text_resp = response.text
+                score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
+                score = int(score_match.group(1)) / 100 if score_match else 0.0
+                return {"score": score, "explanation": text_resp}
+            except Exception as e2:
+                 return {"score": 0.0, "explanation": f"Erreur Gemini (Fallback): {e2}"}
+        return {"score": 0.0, "explanation": f"Erreur Gemini: {e}"}
+
+def rank_resumes_with_gemini(job_description, resumes, file_names):
+    scores_data = []
+    # Placeholder pour barre de progression si intégrée, sinon boucle simple
+    progress_bar = st.progress(0)
+    for i, resume_text in enumerate(resumes):
+        scores_data.append(get_detailed_score_with_gemini(job_description, resume_text))
+        progress_bar.progress((i + 1) / len(resumes))
+        time.sleep(1) # Petit délai pour éviter rate limits tier gratuit
+    progress_bar.empty()
+    return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
+
+def get_gemini_profile_analysis(text: str, candidate_name: str | None = None) -> str:
+    API_KEY = get_gemini_api_key()
+    if not API_KEY: return "❌ Analyse impossible (clé API Gemini manquante)."
+    
+    # Logique Nom
+    if candidate_name and is_valid_name_candidate(candidate_name):
+        safe_name = candidate_name
+    else:
+        extracted = extract_name_from_cv_text(text)
+        if extracted and extracted.get('name'):
+            safe_name = extracted['name']
+        else:
+            safe_name = "Candidat"
+    
+    safe_name = safe_name.replace("##", "").replace("**", "").strip()
+
+    genai.configure(api_key=API_KEY)
+    # Utilisation de gemini-2.5-flash-lite
+    model = genai.GenerativeModel('gemini-2.5-flash-lite')
+    
+    prompt = f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
+
+Règles NOM :
+- Nom identifié : "{safe_name}".
+- Si "{safe_name}" est inapproprié (Candidat, Permis B...), Trouve le vrai nom dans le texte.
+- Sinon garde "{safe_name}".
+
+**Format de sortie OBLIGATOIRE** :
+
+**👤 [Nom du Candidat]**
+
+**📊 Synthèse**
+[2-3 phrases]
+
+**🎓 Formation**
+[Diplôme le plus élevé]
+
+**💼 Expérience**
+[Dernier poste]
+
+**🛠️ Compétences clés**
+[4-5 compétences]
+
+**💡 Points forts**
+[2-3 points]
+
+**⚠️ Points d'attention**
+[1-2 points]
+
+Texte du CV :
+{text[:4000]}
+"""
+    try:
+        response = model.generate_content(prompt)
+        return response.text.strip()
+    except Exception as e:
+         # Fallback recursif silencieux si gemini-2.0-flash échoue
+        try:
+             model = genai.GenerativeModel('gemini-flash-latest')
+             response = model.generate_content(prompt)
+             return response.text.strip()
+        except:
+            return f"❌ Erreur Gemini : {e}"
+
+def get_gemini_auto_classification(text: str, full_name: str | None) -> dict:
+    API_KEY = get_gemini_api_key()
+    safe_name = (full_name or "Candidat").strip()
+    if not API_KEY:
+        return {
+            "macro_category": "Non classé",
+            "sub_category": "Autre",
+            "years_experience": 0,
+            "profile_summary": f"Erreur config Gemini",
+            "candidate_name": safe_name
+        }
+        
+    genai.configure(api_key=API_KEY)
+    # Update to gemini-2.5-flash-lite which is available
+    model = genai.GenerativeModel('gemini-2.5-flash-lite', generation_config={"response_mime_type": "application/json"})
+    
+    prompt = f"""
+    Expert recrutement. Analyse CV.
+    
+    1. Check Nom: "{safe_name}". Corrige si faux (Permis B, etc).
+    2. Macro-catégorie (UNE SEULE) : "Fonctions supports", "Logistique", "Production/Technique".
+    3. Sous-catégorie (Interdit "Étudiant", "Stagiaire". Indiquer le métier visé).
+    4. Années expérience (int).
+    5. Récapitulatif (2-3 phrases).
+
+    JSON output only:
+    {{ "candidate_name": "...", "macro_category": "...", "sub_category": "...", "years_experience": 0, "profile_summary": "..." }}
+    
+    CV:
+    {text[:4000]}
+    """
+    
+    try:
+        response = model.generate_content(prompt)
+        try:
+            data = json.loads(response.text)
+        except:
+             # Fallback JSON parsing simple
+            clean_text = clean_json_string(response.text)
+            data = json.loads(clean_text)
+        
+        # Fallback values handle
+        macro = data.get("macro_category") or "Non classé"
+        if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]: macro = "Non classé"
+        
+        return {
+            "macro_category": macro,
+            "sub_category": data.get("sub_category", "Autre"),
+            "years_experience": int(data.get("years_experience", 0)),
+            "profile_summary": data.get("profile_summary", ""),
+            "candidate_name": data.get("candidate_name", safe_name)
+        }
+    except Exception as e:
+        # Fallback silent to gemini-flash-latest
+        try:
+            model = genai.GenerativeModel('gemini-flash-latest', generation_config={"response_mime_type": "application/json"})
+            response = model.generate_content(prompt)
+            try:
+                data = json.loads(response.text)
+            except:
+                clean_text = clean_json_string(response.text)
+                data = json.loads(clean_text)
+            
+            macro = data.get("macro_category") or "Non classé"
+            if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]: macro = "Non classé"
+            
+            return {
+                "macro_category": macro,
+                "sub_category": data.get("sub_category", "Autre"),
+                "years_experience": int(data.get("years_experience", 0)),
+                "profile_summary": data.get("profile_summary", ""),
+                "candidate_name": data.get("candidate_name", safe_name)
+            }
+        except:
+            return {
+                "macro_category": "Non classé",
+                "sub_category": "Autre",
+                "years_experience": 0,
+                "profile_summary": f"Erreur Gemini: {e}",
+                "candidate_name": safe_name
+            }
+
 def get_deepseek_profile_analysis(text: str, candidate_name: str | None = None) -> str:
     """
     Génère une analyse de profil générique et concise en français.
@@ -567,20 +1262,34 @@ def get_deepseek_profile_analysis(text: str, candidate_name: str | None = None) 
     if not API_KEY:
         return "❌ Analyse impossible (clé API manquante)."
     
-    # Extraction du nom si non fourni
-    safe_name = (candidate_name or "").strip()
-    if not safe_name or not is_valid_name_candidate(safe_name):
-        # Essayer d'extraire depuis le texte
+    # --- LOGIQUE AMÉLIORÉE POUR LE NOM ---
+    safe_name = ""
+    
+    # 1. Priorité au nom passé en argument s'il est valide
+    if candidate_name and is_valid_name_candidate(candidate_name):
+        safe_name = candidate_name
+    else:
+        # 2. Sinon, tentative d'extraction locale robuste
         extracted = extract_name_from_cv_text(text)
-        if extracted and extracted.get('name') and is_valid_name_candidate(extracted.get('name', '')):
+        if extracted and extracted.get('name'):
             safe_name = extracted['name']
         else:
             safe_name = "Candidat"
+    
+    # Nettoyage final du nom (au cas où des ## resteraient)
+    safe_name = safe_name.replace("##", "").replace("**", "").strip()
+    # -------------------------------------
     
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
     
     prompt = f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
+
+Règles NOM STRICTES (alignées avec l'extraction locale) :
+- Utilise STRICTEMENT le nom fourni ci-dessous s'il est présent.
+- Ne modifie PAS le nom (pas d'ajout de points, parenthèses, intitulés).
+- N'invente JAMAIS de nom. Si le nom ci-dessus est "Candidat (Nom non détecté)", REPRENDS-LE tel quel.
+- Ignore toute ligne contenant des mots interdits fréquents (ex: AutoCAD, ORSYS, Secteur, BIM, Owner, PSPO, Client, Missions, Permis, Angleterre, Irlande, Luxembourg, Urbanisme, Agro-alimentaire, Lecture, Multi-disciplinary, Engineering, Studies, Parcours, Professionnel, Ivalua, PRM, AMF, Alerting, Blockchain, Projects, Purposes, Program).
 
 **Format de sortie OBLIGATOIRE** - Respecte EXACTEMENT cet ordre et ces titres :
 
@@ -685,255 +1394,872 @@ def get_deepseek_analysis(text):
         return f"Erreur IA : {e}"
 
 
-def get_deepseek_auto_classification(text: str, full_name: str | None) -> dict:
-    """Classe un CV dans une macro-catégorie + sous-catégorie et génère un récap profil avec années d'expérience.
 
-    Retourne un dict avec les clés:
-    - macro_category: "Fonctions supports" | "Logistique" | "Production/Technique" | "Non classé"
-    - sub_category: sous-direction ou sous-filière (ex: "Direction Finance", "BTP / Génie Civil")
-    - years_experience: nombre d'années d'expérience estimé
-    - profile_summary: court texte de synthèse commençant par le nom complet.
-    """
+def clean_json_string(json_str):
+    """Nettoie la réponse de l'IA pour extraire uniquement le bloc JSON valide."""
+    import re
+    # Enlever les balises Markdown ```json ... ```
+    if "```" in json_str:
+        json_str = re.sub(r'```json\s*', '', json_str)
+        json_str = re.sub(r'```\s*', '', json_str)
+    
+    # Trouver le premier '{' et le dernier '}'
+    start = json_str.find('{')
+    end = json_str.rfind('}')
+    
+    if start != -1 and end != -1:
+        return json_str[start : end + 1]
+    return json_str
+
+def get_deepseek_auto_classification(text: str, local_extracted_name: str | None) -> dict:
     API_KEY = get_api_key()
-    safe_name = (full_name or "Candidat").strip()
-    if not API_KEY:
-        return {
-            "macro_category": "Non classé",
-            "sub_category": "Autre",
-            "years_experience": 0,
-            "profile_summary": f"{safe_name} : récapitulatif non disponible (clé API manquante).",
-        }
+    hint_name = (local_extracted_name or "").strip()
+    
+    # Fallback immédiat si pas de clé
+    default_response = {
+        "macro_category": "Non classé",
+        "sub_category": "Autre",
+        "years_experience": 0,
+        "candidate_name": hint_name or "Candidat",
+        "profile_summary": "Analyse impossible (clé manquante)."
+    }
+    
+    if not API_KEY: return default_response
 
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
+    
+    # Prompt plus permissif pour éviter le filtrage excessif "Non classé"
     prompt = f"""
-    Tu es un expert en recrutement. À partir du texte du CV ci-dessous, tu dois :
+    Agis comme un expert en recrutement. Analyse ce CV.
 
-    1. Identifier UNE seule macro-catégorie parmi :
-       - "Fonctions supports"
-       - "Logistique"
-       - "Production/Technique"
+    1. IDENTIFICATION NOM:
+    Si "{hint_name}" est vide ou générique, trouve le vrai nom (Prénom NOM). Evite les titres (Manager, CV, Profil).
+    
+    2. CLASSIFICATION (Crucial):
+    Classe ce profil dans UNE seule de ces 3 catégories :
+    - "Fonctions supports" (RH, Finance, IT, Juridique...)
+    - "Logistique" (Supply Chain, Transport...)
+    - "Production/Technique" (Ingénierie, BTP, Industrie...)
+    
+    Si tu hésites, choisis la plus proche. Ne mets JAMAIS "Non classé" sauf si c'est illisible.
 
-    2. Proposer une sous-catégorie cohérente avec la typologie suivante :
-       • Fonctions supports :
-         - Direction RH : Recrutement, paie, formation, relations sociales.
-         - Direction Finance : Comptabilité, trésorerie, fiscalité, audit.
-         - Contrôle de Gestion : Analyse de la performance, budgets.
-         - Direction des Achats : Sourcing, négociation, approvisionnements.
-         - Direction Logistique : Gestion des flux, transport, entreposage.
-         - Direction Informatique (DSI) : Infrastructure, support, cybersécurité.
-         - QHSE : Normes ISO, sécurité au travail, environnement.
-         - Direction Juridique : Conformité, contrats.
-         - Communication / Marketing : Image de marque, digital.
+    3. EXTRACTION
+    - Sous-catégorie précise (Interdit: "Étudiant", "Stagiaire". Indiquer le métier visé, ex: "Assistant RH").
+    - Années d'expérience (nombre).
+    - Un résumé court (2 phrases).
 
-       • Logistique :
-         - Gestion des flux, transport, entrepôts, distribution, supply chain.
+    Réponds UNIQUEMENT ce JSON valide :
+    {{
+        "candidate_name": "...",
+        "macro_category": "...",
+        "sub_category": "...",
+        "years_experience": 0,
+        "profile_summary": "..."
+    }}
 
-       • Production/Technique :
-         - BTP / Génie Civil : Études de prix, conduite de travaux.
-         - Industrie : Production, ligne d'assemblage, usinage, électromécanique, automatisme.
-         - R&D / Bureau d'études : Conception, ingénierie.
-         - Commercial / Vente : Développement du chiffre d'affaires lié à une offre technique ou industrielle.
-
-    3. Estimer le nombre total d'années d'expérience professionnelle du candidat.
-
-    4. Générer un court récap de profil (2-3 phrases max) qui DOIT inclure :
-       - Le nombre d'années d'expérience
-       - Les compétences clés
-       - Le type de profil (ex: "Profil orienté contrôle et rigueur", "Profil polyvalent")
-
-    Contraintes IMPORTANTES :
-    - Tu renverras UNIQUEMENT un JSON strict de la forme :
-      {{"macro_category": "...", "sub_category": "...", "years_experience": X, "profile_summary": "..."}}
-    - "macro_category" doit être EXACTEMENT l'une de : "Fonctions supports", "Logistique", "Production/Technique".
-    - "sub_category" doit être une des sous-catégories cohérentes ci-dessus (ou "Autre" si vraiment nécessaire).
-    - "years_experience" doit être un nombre entier (estimation).
-    - Le champ "profile_summary" DOIT commencer EXACTEMENT par le nom suivant : "{safe_name}" puis un bref résumé incluant les années d'expérience.
-    - N'ajoute AUCUN texte avant ou après le JSON.
-
-    Texte du CV :
-    {text}
+    CV TEXTE :
+    {text[:3000]}
     """
 
-    payload = {
-        "model": "deepseek-chat",
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.2,
-    }
-
     try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
+        response = requests.post(url, headers=headers, data=json.dumps({
+            "model": "deepseek-chat",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.1
+        }))
         response.raise_for_status()
-        content = response.json()["choices"][0]["message"]["content"].strip()
-
-        # Essayer de parser directement le JSON
+        
+        # Nettoyage et Parsing
+        raw_content = response.json()["choices"][0]["message"]["content"]
+        # Utiliser l'outil de nettoyage JSON que nous avons ajouté
+        clean_content = clean_json_string(raw_content)
+        
         try:
-            data = json.loads(content)
-        except Exception:
-            # Tenter d'extraire un bloc JSON au milieu du texte
-            start = content.find("{")
-            end = content.rfind("}")
-            if start != -1 and end != -1 and end > start:
-                data = json.loads(content[start : end + 1])
-            else:
-                raise
+            data = json.loads(clean_content)
+        except:
+            # Si le JSON est cassé, on essaie de sauver les meubles avec regex
+            data = {}
+            if "Production" in raw_content or "Technique" in raw_content: data["macro_category"] = "Production/Technique"
+            elif "Logistique" in raw_content: data["macro_category"] = "Logistique"
+            elif "support" in raw_content: data["macro_category"] = "Fonctions supports"
 
-        macro = data.get("macro_category") or "Non classé"
-        sub = data.get("sub_category") or "Autre"
-        years_exp = data.get("years_experience", 0)
-        try:
-            years_exp = int(years_exp)
-        except (ValueError, TypeError):
-            years_exp = 0
-        summary = data.get("profile_summary") or f"{safe_name} : récapitulatif non disponible."
+        # Validation post-traitement (Safety check)
+        final_name = data.get("candidate_name", "Candidat")
+        
+        # Liste noire de sécurité
+        blacklist = ["curriculum", "vitae", "resume", "profil", "ingénieur", "manager", "développeur", "page", "cv"]
+        if any(bad in final_name.lower() for bad in blacklist):
+            final_name = hint_name if hint_name else "Candidat (Nom non détecté)"
 
-        # Nettoyage minimal
+        # Normalisation catégorie
+        macro = data.get("macro_category")
+        # Si le modèle renvoie une variante bizarre, on normalise
+        if macro:
+            if "support" in macro.lower(): macro = "Fonctions supports"
+            elif "logisti" in macro.lower(): macro = "Logistique"
+            elif "product" in macro.lower() or "technip" in macro.lower() or "btp" in macro.lower(): macro = "Production/Technique"
+        
         if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]:
             macro = "Non classé"
 
-        if not summary.startswith(safe_name):
-            summary = f"{safe_name} - {summary}"
+        return {
+            "macro_category": macro,
+            "sub_category": data.get("sub_category", "Autre"),
+            "years_experience": data.get("years_experience", 0),
+            "candidate_name": final_name,
+            "profile_summary": data.get("profile_summary", "")
+        }
+
+    except Exception as e:
+        print(f"DeepSeek Error: {e}")
+        default_response["candidate_name"] = hint_name or "Erreur Extraction"
+        return default_response
+
+def get_groq_auto_classification(text: str, local_extracted_name: str | None) -> dict:
+    API_KEY = get_groq_api_key()
+    hint_name = (local_extracted_name or "").strip()
+    
+    default_response = {
+        "macro_category": "Non classé",
+        "sub_category": "Autre",
+        "years_experience": 0,
+        "candidate_name": hint_name or "Candidat",
+        "profile_summary": "Analyse impossible (clé manquante)."
+    }
+    
+    if not API_KEY: return default_response
+
+    try:
+        client = groq.Groq(api_key=API_KEY)
+        
+        prompt = f"""
+        Agis comme un expert en recrutement. Analyse ce CV.
+
+        1. IDENTIFICATION NOM:
+        Si "{hint_name}" est vide ou générique, trouve le vrai nom.
+        
+        2. CLASSIFICATION (Crucial):
+        Classe ce profil dans UNE seule de ces 3 catégories :
+        - "Fonctions supports"
+        - "Logistique"
+        - "Production/Technique"
+        
+        3. EXTRACTION
+        - Sous-catégorie précise (Interdit: "Étudiant", "Stagiaire". Indiquer le métier visé).
+        - Années d'expérience (nombre entier).
+        - Un résumé court.
+
+        Réponds UNIQUEMENT ce JSON valide :
+        {{
+            "candidate_name": "...",
+            "macro_category": "...",
+            "sub_category": "...",
+            "years_experience": 0,
+            "profile_summary": "..."
+        }}
+
+        CV TEXTE :
+        {text[:4000]}
+        """
+
+        completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": "Tu es un expert JSON. Tu ne réponds que du JSON valide."},
+                {"role": "user", "content": prompt}
+            ],
+            model="llama-3.1-8b-instant",
+            temperature=0.1,
+            response_format={"type": "json_object"}
+        )
+        
+        content = completion.choices[0].message.content
+        data = json.loads(content)
+        
+        macro = data.get("macro_category")
+        if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]:
+            if "support" in str(macro).lower(): macro = "Fonctions supports"
+            elif "logisti" in str(macro).lower(): macro = "Logistique"
+            elif "product" in str(macro).lower() or "techni" in str(macro).lower(): macro = "Production/Technique"
+            else: macro = "Non classé"
 
         return {
             "macro_category": macro,
-            "sub_category": sub,
-            "years_experience": years_exp,
-            "profile_summary": summary,
+            "sub_category": data.get("sub_category", "Autre"),
+            "years_experience": data.get("years_experience", 0),
+            "candidate_name": data.get("candidate_name", hint_name),
+            "profile_summary": data.get("profile_summary", "")
         }
+    except Exception as e:
+        print(f"Groq Error: {e}")
+        return default_response
 
-    except Exception:
-        return {
-            "macro_category": "Non classé",
-            "sub_category": "Autre",
+def get_claude_auto_classification(text: str, local_extracted_name: str | None) -> dict:
+    API_KEY = get_claude_api_key()
+    hint_name = (local_extracted_name or "").strip()
+    
+    default_response = {
+        "macro_category": "Non classé",
+        "sub_category": "Autre",
+        "years_experience": 0,
+        "candidate_name": hint_name or "Candidat",
+        "profile_summary": "Analyse impossible (clé manquante)."
+    }
+    
+    if not API_KEY: return default_response
+
+    try:
+        client = anthropic.Anthropic(api_key=API_KEY)
+        
+        prompt = f"""
+        Analyse ce CV et extrais les informations au format JSON.
+
+        1. Nom du candidat (utilise "{hint_name}" comme indice).
+        2. Catégorie (CHOIX STRICT): "Fonctions supports", "Logistique", "Production/Technique".
+        3. Sous-catégorie (Interdit "Étudiant", "Stagiaire". Indiquer le métier).
+        4. Années d'expérience (int).
+        5. Résumé (2 phrases).
+
+        Format JSON attendu:
+        {{
+            "candidate_name": "...",
+            "macro_category": "...",
+            "sub_category": "...",
             "years_experience": 0,
-            "profile_summary": f"{safe_name} : récapitulatif non disponible (erreur IA).",
-        }
+            "profile_summary": "..."
+        }}
 
-# -------------------- Extraction de noms des CV --------------------
+        CV:
+        {text[:4000]}
+        """
+
+        message = client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=1000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        
+        content = ""
+        for block in message.content:
+            if block.type == "text":
+                content += block.text
+        
+        clean_content = clean_json_string(content)
+        data = json.loads(clean_content)
+        
+        macro = data.get("macro_category")
+        if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]:
+             macro = "Non classé"
+
+        return {
+            "macro_category": macro,
+            "sub_category": data.get("sub_category", "Autre"),
+            "years_experience": data.get("years_experience", 0),
+            "candidate_name": data.get("candidate_name", hint_name),
+            "profile_summary": data.get("profile_summary", "")
+        }
+    except Exception as e:
+        print(f"Claude Error: {e}")
+        return default_response
+
+def get_openrouter_auto_classification(text: str, local_extracted_name: str | None) -> dict:
+    API_KEY = get_openrouter_api_key()
+    hint_name = (local_extracted_name or "").strip()
+    
+    default_response = {
+        "macro_category": "Non classé",
+        "sub_category": "Autre",
+        "years_experience": 0,
+        "candidate_name": hint_name or "Candidat",
+        "profile_summary": "Analyse impossible (clé manquante)."
+    }
+    
+    if not API_KEY: return default_response
+
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://tg-hire.streamlit.app/",
+        "X-Title": "TG Hire"
+    }
+    
+    prompt = f"""
+    Act as a recruitment expert. Analyze this resume.
+    
+    1. Name: Find the candidate name. Hint: "{hint_name}".
+    2. Category (STRICTLY ONE OF): "Fonctions supports", "Logistique", "Production/Technique".
+    3. Sub-category (Do NOT use "Student" or "Intern". Use target job title).
+    4. Years of experience (integer).
+    5. Summary (2 sentences).
+
+    Reply ONLY with valid JSON:
+    {{
+        "candidate_name": "...",
+        "macro_category": "...",
+        "sub_category": "...",
+        "years_experience": 0,
+        "profile_summary": "..."
+    }}
+
+    RESUME TEXT:
+    {text[:4000]}
+    """
+
+    try:
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            data=json.dumps({
+                "model": "openai/gpt-3.5-turbo",
+                "messages": [{"role": "user", "content": prompt}]
+            })
+        )
+        response.raise_for_status()
+        
+        content = response.json()['choices'][0]['message']['content']
+        clean_content = clean_json_string(content)
+        data = json.loads(clean_content)
+        
+        macro = data.get("macro_category")
+        if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]:
+             macro = "Non classé"
+
+        return {
+            "macro_category": macro,
+            "sub_category": data.get("sub_category", "Autre"),
+            "years_experience": data.get("years_experience", 0),
+            "candidate_name": data.get("candidate_name", hint_name),
+            "profile_summary": data.get("profile_summary", "")
+        }
+    except Exception as e:
+        print(f"OpenRouter Error: {e}")
+        return default_response
+
+
+def extract_name_smart_email(text):
+    """
+    Extrait le nom via l'email ET vérifie sa présence dans le texte pour confirmer.
+    Gère les formats : prenom.nom, prenom_nom, nom.prenom
+    """
+    import re
+    if not text: return None
+    
+    # 1. Trouver les emails
+    email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+    emails = re.findall(email_pattern, text)
+    
+    # Liste d'emails génériques à ignorer
+    ignore_emails = ['contact', 'info', 'recrutement', 'job', 'stages', 'rh', 'email', 'gmail', 'yahoo']
+    
+    for email in emails:
+        user_part = email.split('@')[0]
+        
+        # Si l'email est générique, on saute
+        if any(bad in user_part.lower() for bad in ignore_emails):
+            continue
+            
+        # Séparateurs possibles dans l'email (point, underscore, tiret)
+        parts = re.split(r'[._-]', user_part)
+        
+        # On ne garde que les parties alphabétiques de plus de 2 lettres (évite les chiffres ou initiales)
+        valid_parts = [p for p in parts if p.isalpha() and len(p) >= 3]
+        
+        if len(valid_parts) >= 2:
+            # On a potentiellement Prénom et Nom. On cherche ces mots dans les 1000 premiers caractères du CV
+            header_text = text[:1000]
+            found_parts = []
+            
+            for part in valid_parts:
+                # On cherche le mot exact dans le texte (insensible à la casse)
+                match = re.search(r'\b' + re.escape(part) + r'\b', header_text, re.IGNORECASE)
+                if match:
+                    # On récupère la version écrite dans le CV (ex: "DUPONT" au lieu de "dupont")
+                    found_parts.append(match.group(0))
+            
+            # Si on a retrouvé au moins 2 parties du nom dans le texte, c'est un match solide !
+            if len(found_parts) >= 2:
+                # On retourne les parties trouvées, jointes par un espace
+                return {"name": " ".join(found_parts), "confidence": 0.99, "method_used": "smart_email_cross_check"}
+                
+    return None
+
+# -------------------- Extraction de noms des CV (AMÉLIORÉE) --------------------
+
+def is_valid_name_candidate(text: str) -> bool:
+    """
+    Vérifie si un texte ressemble à un vrai nom.
+    Plus permissif pour accepter les noms composés et formats internationaux.
+    """
+    if not text or len(text) < 2:
+        return False
+    
+    # Nettoyage de base
+    text = text.strip()
+    
+    # Rejets évidents
+    if len(text) > 50 and ' ' not in text: return False  # Trop long sans espace
+    if re.search(r'\d', text): return False  # Contient des chiffres
+    if re.search(r'[@€$£%&:]', text): return False  # Caractères spéciaux invalides (inclut : et &)
+    if text.count('-') > 3: return False  # Trop de tirets
+    
+    # Doit contenir au moins une voyelle (sauf exceptions très rares)
+    if not re.search(r'[aeiouyàâäéèêëïîôöùûü]', text.lower()):
+        return False
+    
+    # Ratio de lettres (doit être principalement des lettres)
+    # On enlève espaces et tirets pour le calcul
+    clean_chars = re.sub(r'[\s\-\.]', '', text)
+    if not clean_chars: return False
+    
+    return True
+
+
+def is_likely_name_line(line: str) -> bool:
+    """
+    Détermine si une ligne a de fortes chances d'être un nom (et pas un titre).
+    """
+    line_lower = line.lower().strip()
+    words = line_lower.split()
+    
+    # 1. Mots INTERDITS : S'ils sont présents, ce n'est PAS un nom
+    forbidden_words = [
+        # Mots génériques et titres de sections
+        'cv', 'curriculum', 'vitae', 'resume', 'profil', 'profile',
+        'expérience', 'experience', 'formation', 'education', 
+        'compétences', 'skills', 'langues', 'languages',
+        'projet', 'project', 'contact', 'téléphone', 'email', 'adresse',
+        'page', 'date', 'diplômes', 'formations', 'certifications', 'hobbies', 'loisirs',
+        'permis', 'vehicule', 'véhicule', 'conduite', 'driver', 'driving', 'b', 'voiture',
+        'centres', 'intérêt', 'projets', 'réalisés', 'professionnelles',
+        'coordonnées', 'spécialisations', 'management', 'onboarding', 'performance',
+        'sommaire', 'summary', 'objectif', 'objective', 'propos', 'about', 'me', 'moi',
+        'bac', 'baccalauréat', 'baccalaureate', 'degree', 'niveau', 'level',
+        'logiciels', 'maîtrisés', 'activités', 'associatives',
+        
+        # Écoles et Universités (Faux positifs fréquents)
+        'école', 'ecole', 'school', 'business', 'university', 'université',
+        'hec', 'essec', 'esc', 'em', 'dauphine', 'polytechnique', 'centrale', 'mines',
+        'master', 'bachelor', 'licence', 'mba', 'diplôme', 'diplome', 'msc',
+        'lycée', 'lycee', 'college', 'collège', 'institut', 'academy',
+        
+        # Compétences techniques & Outils
+        'excel', 'vba', 'power', 'bi', 'crm', 'python', 'java', 'sql', 'office',
+        'pack', 'adobe', 'suite', 'google', 'cloud', 'aws', 'azure', 'sap', 'erp',
+        'photoshop', 'illustrator', 'indesign', 'canva', 'jira', 'trello',
+        
+        # Entreprises connues (pour éviter "BNP Paribas" comme nom)
+        'bnp', 'paribas', 'société', 'générale', 'crédit', 'agricole', 'sncf',
+        'groupe', 'group', 'bank', 'banque', 'service', 'civique', 'unilever',
+        'orange', 'capgemini', 'atos', 'sopra', 'steria', 'accenture', 'deloitte',
+        'kpmg', 'ey', 'pwc', 'mazars', 'nge', 'mire',
+        
+        # Pays et Villes (souvent en en-tête)
+        'france', 'paris', 'maroc', 'casablanca', 'rabat', 'lyon', 'marseille',
+        'toulouse', 'bordeaux', 'lille', 'nantes', 'strasbourg', 'rennes',
+        
+        # Blancs ou très courts
+        'non', 'trouvé',
+        'analyste', 'financière', 'contrôleuse', 'gestion', 'ingénieur',
+        'directeur', 'directrice', 'manager', 'consultant', 'développeur', 'responsable',
+        'développement', 'rh', 'sirh', 'assistant', 'assistante', 'stagiaire',
+        'technicien', 'commercial', 'vente', 'marketing', 'comptable', 'auditeur',
+        'senior', 'junior', 'expert', 'chef', 'actuaire', 'data', 'scientist',
+        'chargé', 'chargée', 'officer', 'executive', 'associate', 'partner',
+        
+        # Postes et métiers supplémentaires
+        'job', 'étudiant', 'etudiant', 'student', 'intern', 'internship', 'stage',
+        'engineer', 'developer', 'designer', 'analyst', 'specialist', 'coordinator',
+        'ia', 'ai', 'ml', 'machine', 'learning', 'deep',
+        'mécanique', 'mecanique', 'électrique', 'electrique', 'civil', 'industriel',
+        
+        # Termes de documents/réunions
+        'weekly', 'meeting', 'decks', 'deck', 'presentation', 'rapport', 'report',
+        'document', 'documents', 'fichier', 'fichiers', 'dossier', 'dossiers',
+        
+        # Verbes d'action (souvent en bullet points)
+        'gérer', 'piloter', 'management', 'coordonner', 'développer', 'créer',
+        'réaliser', 'participer', 'contribuer', 'superviser', 'analyser',
+        
+        # Entreprises supplémentaires (faux positifs fréquents)
+        'procter', 'gamble', 'l\'oréal', 'loreal', 'carrefour', 'hsbc', 'edf',
+        
+        # Langues et nationalités
+        'français', 'francais', 'anglais', 'arabe', 'espagnol', 'courant', 'bilingue',
+        'nationality', 'nationalité', 'franco-moroccan', 'franco-marocain',
+        
+        # Termes RH et certifications
+        'gpec', 'gepp', 'hdi', 'certification', 'certifications', 'itil',
+        
+        # Logiciels et outils supplémentaires
+        'diapason', 'ktp', 'summit', 'anaplan', 'swiftnet', 'servicenow', 'remedy',
+        'dynamics', 'confluence', 'slack', 'figma', 'tableau',
+        
+        # Loisirs et intérêts
+        'intérêts', 'interets', 'football', 'natation', 'voyages', 'lecture',
+        'sport', 'voyage', 'bénévolat', 'benevolat', 'danse', 'musique',
+        
+        # Termes scientifiques/académiques
+        'physiologie', 'physiopathologie', 'physiopathologies', 'humaine', 'modélisation',
+        
+        # Mots génériques supplémentaires
+        'soft', 'hard', 'about', 'linkedin', 'trésorier', 'tresorier', 'ingénieure', 'ingenieure',
+        
+        # ====== NOUVEAUX MOTS INTERDITS (Faux positifs observés) ======
+        # Termes techniques/métiers
+        'simulation', 'numérique', 'numerique', 'pensée', 'pensee', 'critique', 'lecture',
+        'concept', 'partenaire', 'entreprise', 'entreprises',
+        'charge', 'chargee', 'delivery', 'delivery', 'secteur', 'agro-alimentaire',
+        'multi-disciplinary', 'multidisciplinary', 'engineering', 'studies', 'etudes', 'études',
+        'parcours', 'professionnel', 'profile',
+        
+        # Sections CV supplémentaires  
+        'experiences', 'expériences', 'professionelles', 'professionnelle',
+        'competences', 'realisations', 'réalisations',
+        
+        # Entreprises/Lieux supplémentaires
+        'saem', 'corum', 'montpellier', 'groupement', 'mousquetaires', 'intermarché',
+        'leclerc', 'auchan', 'lidl', 'casino', 'monoprix',
+        'puteaux', 'orsys', 'angleterre', 'irlande', 'luxembourg',
+        'ivalua', 'prm',
+        
+        # Termes anglais courants
+        'delivery', 'manager', 'coordinator', 'specialist', 'officer', 'owner', 'pspo',
+        'technical', 'professional', 'summary', 'overview',
+        'and', 'alerting', 'blockchain', 'projects', 'purposes', 'program',
+        
+        # Logiciels techniques / CAO / Outils scientifiques
+        'logiciels', 'abaqus', 'catia', 'solidworks', 'autocad', 'ansys', 'matlab', 'bim', 'software',
+        'xlstat', 'minitab', 'spss', 'stata', 'r', 'rstudio', 'hive', 'psql',
+        'rtgs', 'target', 'swift', 'bpce',
+        
+        # Soft skills et termes RH
+        'stress', 'équipe', 'equipe', 'organisation', 'esprit', 'sens',
+        'gestion', 'autonomie', 'rigueur', 'adaptabilité', 'adaptabilite',
+        'dynamisme', 'motivation', 'travail', 'team', 'leadership',
+        
+        # Titres de postes
+        'cash', 'flux', 'foncier', 'trésorerie', 'tresorerie',
+        # Termes génériques récurrents à exclure
+        'client', 'missions',
+        # Certifications/Accréditations spécifiques
+        'amf',
+        # Mots à bannir (Faux positifs signalés)
+        'formateur', 'cuisine', 'agile', 'scrum', 'méthodologie', 'methodologie',
+        'ocp', 'sa', 'sarl', 'sas', 'inc', 'ltd', 'group', 'groupe', 'holding',
+        'résidence', 'residence', 'immeuble', 'apt', 'app', 'étage',
+        'compétence', 'competence', 'professionnelle', 'limitée',
+        
+        # Mots à bannir (Faux positifs signalés)
+        'formateur', 'cuisine', 'agile', 'scrum', 'méthodologie', 'methodologie',
+        'ocp', 'sa', 'sarl', 'sas', 'inc', 'ltd', 'group', 'groupe', 'holding',
+        'résidence', 'residence', 'immeuble', 'apt', 'app', 'étage',
+        'compétence', 'competence', 'professionnelle', 'limitée',
+    ]
+
+    # --- 1.1 FILTRAGE AGRESSIF (Substrings) ---
+    # Certains mots invalident TOUTE la ligne même s'ils sont collés
+    # Ex: "GestionDeProjet", "CompétenceProfessionnelle"
+    fatal_substrings = [
+        'compétence', 'competence', 'formation', 'education', 
+        'projets', 'réalisés', 'experience', 'expérience', 
+        'sommaire', 'summary', 'profil', 'profile',
+        'soft', 'hard', 'skills', 'outils', 'logiciels',
+        'management', 'agile', 'scrum', 'methodologie', 'méthodologie'
+    ]
+    if any(fs in line_lower for fs in fatal_substrings):
+        return False
+
+    
+    # Si un mot de la ligne est interdit -> Rejet
+    if any(w in forbidden_words for w in words):
+        return False
+    
+    # Rejet si la ligne contient des caractères spéciaux typiques de labels
+    if ':' in line or '&' in line:
+        return False
+    # Rejet si la ligne contient ponctuation indicative de titres/sections
+    if any(p in line for p in ['.', '(', ')', '/', ',']) or any(c.isdigit() for c in line):
+        return False
+
+    # 2. Vérifications de structure
+    # Doit contenir entre 2 et 5 mots (ex: "Jean Dupont" ou "Jean-Pierre de la Tour")
+    if len(words) < 2 or len(words) > 5:
+        return False
+    
+    # Mots d'arrêt (Articles) : acceptés dans un nom compos, mais ne doivent pas constituer tout le nom
+    stop_words = ['de', 'du', 'des', 'le', 'la', 'les', 'van', 'von', 'da', 'di']
+    
+    # Si tous les mots sont des stop words -> Rejet
+    if all(w in stop_words for w in words):
+        return False
+    
+    # Au moins un mot doit commencer par une majuscule (sauf si tout est en majuscule)
+    # Note: line.isupper() gère les noms tout en majuscule
+    if not line.isupper() and not any(w[0].isupper() for w in line.split() if w):
+        return False
+        
+    return True
+
+
+def score_name_candidate(text: str) -> float:
+    """
+    Attribue un score de probabilité (0-1) qu'un texte soit un nom.
+    """
+    score = 0.0
+    words = text.split()
+    
+    # Longueur idéale (2-3 mots)
+    if 2 <= len(words) <= 3: score += 0.3
+    elif len(words) == 4: score += 0.2
+    
+    # Casse (Casing)
+    if text.isupper():  # TOUT EN MAJUSCULES (fréquent pour les noms de famille)
+        score += 0.2
+    elif all(w[0].isupper() for w in words if w):  # Title Case
+        score += 0.2
+    elif len(words) >= 2 and words[-1].isupper() and words[0][0].isupper():  # Prénom NOM
+        score += 0.3
+        
+    # Validation basique
+    if is_valid_name_candidate(text):
+        score += 0.2
+    else:
+        return 0  # Si invalide, score 0 direct
+        
+    return min(score, 1.0)
+
+
+def clean_merged_text_pdf(text: str) -> str:
+    """
+    Corrige les problèmes de parsing PDF où les mots sont collés.
+    Ex: 'Verneuil enABDALLAH' -> 'Verneuil en ABDALLAH'
+    Ex: '0787860895HADDOUCHI' -> '0787860895 HADDOUCHI'
+    Ex: 'CompétenceProfessionnelle' -> 'Compétence Professionnelle'
+    """
+    if not text: return ""
+    
+    # 1. Séparer minuscule/Majuscule (CamelCase strict)
+    # Ex: 'CompétenceProfessionnelle' -> 'Compétence Professionnelle'
+    # Attention: 'McDonald' -> 'Mc Donald' (Acceptable pour l'analyse)
+    text = re.sub(r'([a-zà-ÿ])([A-ZÀ-Ÿ])', r'\1 \2', text)
+    
+    # 2. Séparer Chiffre/Lettre (ex: 95HADDOUCHI)
+    text = re.sub(r'([0-9])([a-zA-Z]{2,})', r'\1 \2', text)
+    
+    return text
+
 def extract_name_from_cv_text(text):
     """
-    Extrait le nom et prénom d'un CV à partir du texte.
-    Retourne un dictionnaire avec 'name', 'confidence' et 'method_used'
+    Extrait le nom complet d'un CV avec une approche heuristique avancée.
+    Gère les cas comme "## Hiba BELFARJI" ou les mises en page OCR.
     """
     if not text or len(text.strip()) < 10:
         return {"name": None, "confidence": 0, "method_used": "text_too_short"}
     
-    # Prendre les premières lignes (plus probable de contenir le nom)
-    lines = text.split('\n')[:15]  # Premières 15 lignes
-    text_upper = text.upper()
+    # NETTOYAGE CRITIQUE : Séparation des mots collés (OCR/PDF mal formés)
+    text = clean_merged_text_pdf(text)
     
-    # Méthode 1: Chercher des patterns explicites
-    explicit_patterns = [
-        r'(?:nom\s*[:;]\s*)([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)*)',
-        r'(?:prénom\s*[:;]\s*)([A-ZÀ-Ÿ][a-zà-ÿ]+)',
-        r'(?:name\s*[:;]\s*)([A-ZÀ-Ÿ][a-zà-ÿ]+(?:\s+[A-ZÀ-Ÿ][a-zà-ÿ]+)*)',
-    ]
+    lines = text.split('\n')
     
-    nom, prenom = None, None
+    # --- ÉTAPE 1 : Nettoyage préliminaire des lignes ---
+    # MODIF : Augmentation de la portée d'analyse à 200 lignes pour capturer les noms dans les sidebars (multi-colonnes)
+    SCAN_LIMIT = 200
+    cleaned_lines = []
     
-    for line in lines:
-        for pattern in explicit_patterns:
-            match = re.search(pattern, line, re.IGNORECASE)
-            if match:
-                if 'nom' in pattern.lower() and not 'prénom' in pattern.lower():
-                    nom = match.group(1).strip()
-                elif 'prénom' in pattern.lower():
-                    prenom = match.group(1).strip()
-                elif 'name' in pattern.lower():
-                    parts = match.group(1).strip().split()
-                    if len(parts) >= 2:
-                        nom, prenom = parts[0], parts[1]
-    
-    if nom and prenom:
-        formatted_name = f"{nom.upper()} {prenom.capitalize()}"
-        return {"name": formatted_name, "confidence": 0.9, "method_used": "explicit_pattern"}
-    
-    # Méthode 2: Chercher près d'email ou téléphone
-    email_phone_patterns = [
-        r'[\w\.-]+@[\w\.-]+\.\w+',
-        r'(?:\+33|0)[1-9](?:[.\-\s]?\d{2}){4}',
-        r'\d{2}[\.\-\s]?\d{2}[\.\-\s]?\d{2}[\.\-\s]?\d{2}[\.\-\s]?\d{2}'
-    ]
-    
-    for i, line in enumerate(lines):
-        for pattern in email_phone_patterns:
-            if re.search(pattern, line):
-                # Chercher dans les 2 lignes précédentes et suivantes
-                search_lines = lines[max(0, i-2):min(len(lines), i+3)]
-                for search_line in search_lines:
-                    candidate = extract_name_from_line(search_line)
-                    if candidate:
-                        return {"name": candidate, "confidence": 0.7, "method_used": "near_contact"}
-    
-    # Méthode 3: Chercher des mots en majuscules dans les premières lignes
-    for line in lines[:5]:  # Seulement les 5 premières lignes
-        candidate = extract_name_from_line(line)
-        if candidate:
-            return {"name": candidate, "confidence": 0.6, "method_used": "capitalized_words"}
-    
-    return {"name": None, "confidence": 0, "method_used": "not_found"}
+    # On itère avec l'index pour pénaliser la position si nécessaire
+    for idx, line in enumerate(lines[:SCAN_LIMIT]):
+        # Enlever les caractères de formatage Markdown ou OCR
+        clean = line.strip()
+        clean = re.sub(r'^##\s*', '', clean)  # Enlever "## " au début
+        clean = re.sub(r'^\*\*\s*', '', clean)  # Enlever "** " au début
+        clean = re.sub(r'\s*\*\*$', '', clean)  # Enlever " **" à la fin
+        clean = re.sub(r'^[-•➢–]\s*', '', clean)  # Enlever les puces
+        clean = re.sub(r'^[o]\s*', '', clean) # Enlever autres puces OCR
+        
+        if not clean:
+            continue
+            
+        # On garde l'info de ligne originelle si besoin
+        cleaned_lines.append(clean)
+        
+        # Gestion des noms espacés (ex: "I c h r a k B A K I A" ou "M a r w a n  L A A N I G R I")
+        # Si la ligne contient beaucoup d'espaces et des lettres isolées
+        if len(clean) > 5 and ' ' in clean:
+            # Compte le nombre de tokens de 1 lettre
+            single_letter_tokens = [w for w in clean.split() if len(w) == 1 and w.isalpha()]
+            if len(single_letter_tokens) > len(clean.split()) / 2:
+                # C'est probablement un texte espacé
+                # AMÉLIORATION: Reconstituer en se basant sur les transitions de casse
+                # "I c h r a k B A K I A" -> "Ichrak BAKIA"
+                result_parts = []
+                current_word = ""
+                prev_was_lower = False
+                
+                for char in clean:
+                    if char == ' ':
+                        continue  # Ignorer les espaces
+                    
+                    is_upper = char.isupper()
+                    
+                    # Transition minuscule -> majuscule = nouveau mot (prénom terminé, nom commence)
+                    if prev_was_lower and is_upper and current_word:
+                        result_parts.append(current_word)
+                        current_word = char
+                    else:
+                        current_word += char
+                    
+                    prev_was_lower = char.islower()
+                
+                if current_word:
+                    result_parts.append(current_word)
+                
+                # Si on a au moins 2 parties, c'est probablement Prénom NOM
+                if len(result_parts) >= 2:
+                    normalized = ' '.join(result_parts)
+                    cleaned_lines.append(normalized)
+                elif result_parts:
+                    # Sinon fallback sur l'ancienne méthode
+                    temp = re.sub(r'\s{2,}', '|', clean)
+                    temp = temp.replace(' ', '')
+                    normalized = temp.replace('|', ' ')
+                    if normalized != clean:
+                        cleaned_lines.append(normalized)
 
-def is_valid_name_candidate(text: str) -> bool:
-    """Vérifie si un texte ressemble à un vrai nom (pas un hash, UUID, etc.)"""
-    if not text or len(text) < 2:
-        return False
-    # Rejeter les chaînes qui ressemblent à des identifiants/hash
-    # (plus de 3 chiffres consécutifs, caractères hexadécimaux, tirets multiples)
-    if re.search(r'\d{3,}', text):  # 3+ chiffres consécutifs
-        return False
-    if re.search(r'^[a-f0-9]{8,}$', text.lower()):  # Hash hexadécimal
-        return False
-    if re.search(r'^[a-zA-Z0-9]{20,}$', text):  # Chaîne alphanum trop longue sans espace
-        return False
-    if text.count('-') > 2:  # Trop de tirets (UUID-like)
-        return False
-    if text.count('_') > 1:  # Underscores multiples (identifiant technique)
-        return False
-    # Doit contenir au moins une voyelle (vrai nom)
-    if not re.search(r'[aeiouyàâäéèêëïîôöùûü]', text.lower()):
-        return False
-    return True
+    # --- ÉTAPE 1-BIS : Fusion de lignes (Pour les cas : L1=Prénom, L2=Nom) ---
+    # Ex: "Oussama" \n "GARMOUMI"
+    merged_candidates = []
+    if len(cleaned_lines) > 1:
+        for i in range(len(cleaned_lines) - 1):
+            l1 = cleaned_lines[i]
+            l2 = cleaned_lines[i+1]
+            # Si l1 ressemble à un prénom (Title) et l2 à un nom (Upper) ou vice versa
+            # Et qu'ils ne sont pas trop longs
+            if len(l1.split()) == 1 and len(l2.split()) == 1:
+                # Oussama \n GARMOUMI
+                if l1.istitle() and l2.isupper():
+                    merged_candidates.append(f"{l1} {l2}")
+                # GARMOUMI \n Oussama
+                elif l1.isupper() and l2.istitle():
+                    merged_candidates.append(f"{l1} {l2}")
+
+    # --- ÉTAPE 2 : Recherche de patterns explicites (Regex forte) ---
+    # Pattern : Prénom (Title) NOM (Upper) ou NOM (Upper) Prénom (Title)
+    # Ex: "Hiba BELFARJI" ou "BELFARJI Hiba"
+    regex_strong = r'^([A-ZÀ-Ÿ][a-zà-ÿ]+(?:-[A-ZÀ-Ÿ][a-zà-ÿ]+)?)\s+([A-ZÀ-Ÿ]{2,}(?:\s+[A-ZÀ-Ÿ]{2,})?)$'
+    regex_reverse = r'^([A-ZÀ-Ÿ]{2,}(?:\s+[A-ZÀ-Ÿ]{2,})?)\s+([A-ZÀ-Ÿ][a-zà-ÿ]+(?:-[A-ZÀ-Ÿ][a-zà-ÿ]+)?)$'
+    
+    # Test d'abord sur les candidats mergés
+    for cand in merged_candidates:
+         if re.match(regex_strong, cand) or re.match(regex_reverse, cand):
+             # Vérif extra : pas de mot interdit
+             if is_likely_name_line(cand):
+                 return {"name": cand, "confidence": 0.90, "method_used": "merged_lines_regex"}
+
+    for line in cleaned_lines:
+        line_clean = line.strip()
+        # Test Prénom NOM
+        match = re.match(regex_strong, line_clean)
+        if match and is_likely_name_line(line_clean):
+            return {"name": line_clean, "confidence": 0.95, "method_used": "regex_strong_firstname_lastname"}
+        
+        # Test NOM Prénom
+        match = re.match(regex_reverse, line_clean)
+        if match and is_likely_name_line(line_clean):
+            return {"name": line_clean, "confidence": 0.95, "method_used": "regex_strong_lastname_firstname"}
+
+    # --- ÉTAPE 3 : Système de Scoring (Heuristique) ---
+    best_candidate = None
+    best_score = 0.0
+    
+    for line in cleaned_lines:
+        # Check rapide anti-spam (si ligne > 6 mots, peu probable que ce soit un nom sauf espacé)
+        if len(line.split()) > 6:
+            continue
+
+        if not is_likely_name_line(line):
+            continue
+            
+        current_score = score_name_candidate(line)
+        
+        # Bonus si la ligne est isolée (pas de phrase avant/après dans le bloc original ?? Difficile à dire ici)
+        # Mais on peut pénaliser les lignes très bas si elles n'ont pas un score excellent
+        
+        if current_score > best_score:
+            best_score = current_score
+            best_candidate = line
+            
+    # --- ÉTAPE 4 : Fallback Proximité Email/Tel (Deep Scan) ---
+    # Recherche étendue jusqu'à SCAN_LIMIT au lieu de 50
+    if best_score < 0.6:
+        for i, line in enumerate(lines[:SCAN_LIMIT]):
+            # Si on trouve un email ou un tel
+            if re.search(r'@[\w\.-]+', line) or re.search(r'(?:(?:\+|00)33|0)\s*[1-9]', line):
+                # Regarder 10 lignes AVANT (contexte immédiat)
+                start_range = max(0, i - 10)
+                # Mais aussi 3 lignes APRÈS (parfois le nom est sous l'email dans les sidebars)
+                end_range = min(len(lines), i + 3)
+                
+                context_lines = lines[start_range:i] + lines[i+1:end_range]
+                
+                for ctx_line in context_lines:
+                    ctx_line = ctx_line.strip()
+                    # Nettoyage léger
+                    clean_ctx = re.sub(r'^##\s*', '', ctx_line)
+                    clean_ctx = re.sub(r'^\*\*\s*', '', clean_ctx)
+                    clean_ctx = re.sub(r'\s*\*\*$', '', clean_ctx)
+                    clean_ctx = re.sub(r'^[-•➢–]\s*', '', clean_ctx)
+                    
+                    if not clean_ctx: continue
+
+                    if is_likely_name_line(clean_ctx):
+                        cand_score = score_name_candidate(clean_ctx)
+                        # On booste le score car proche des contacts
+                        boosted_score = cand_score + 0.3
+                        if boosted_score > best_score:
+                            best_score = boosted_score
+                            best_candidate = clean_ctx
+
+    # --- ÉTAPE 5 : Fallback Ultime (Recherche de patterns faibles) ---
+    # Si toujours rien, on cherche n'importe quoi qui ressemble à "Prénom NOM" même sans contexte
+    if not best_candidate or best_score < 0.4:
+        # Regex plus permissive (admet Title Title) pour les cas comme "Elkani Sadia"
+        regex_permissive = r'^([A-ZÀ-Ÿ][a-zà-ÿ]+)\s+([A-ZÀ-Ÿ][a-zà-ÿ]+)$'
+        
+        for line in cleaned_lines:
+             if re.match(regex_permissive, line) and is_likely_name_line(line):
+                 # On vérifie quand même que ce n'est pas un nom de ville ou d'école connu (déjà filtré par is_likely)
+                 score = 0.5 # Score moyen
+                 if score > best_score:
+                     best_score = score
+                     best_candidate = line
+    
+    if best_candidate and best_score > 0.4:
+        return {"name": best_candidate, "confidence": best_score, "method_used": "scoring_best_match"}
+
+    if best_candidate and best_score > 0.4:
+        return {"name": best_candidate, "confidence": best_score, "method_used": "scoring_best_match"}
+
+    return {"name": None, "confidence": 0, "method_used": "not_found"}
 
 
 def extract_name_from_line(line):
-    """Extrait un nom candidat d'une ligne en utilisant des heuristiques"""
+    """Extrait un nom candidat d'une ligne en utilisant des heuristiques (fonction legacy)"""
     if not line or len(line.strip()) < 5:
         return None
     
     # Nettoyer la ligne
     line = line.strip()
+    line = re.sub(r'^##\s*', '', line)  # Enlever "## " au début
+    line = re.sub(r'^\*\*\s*', '', line)  # Enlever "** " au début
+    line = re.sub(r'\s*\*\*$', '', line)  # Enlever " **" à la fin
     
-    # Mots à ignorer (mots métier courants)
-    ignore_words = {
-        'cv', 'curriculum', 'vitae', 'resume', 'directeur', 'manager', 'ingénieur', 
-        'consultant', 'développeur', 'analyst', 'chef', 'responsable', 'assistant',
-        'senior', 'junior', 'stage', 'stagiaire', 'étudiant', 'expérience',
-        'formation', 'diplôme', 'université', 'école', 'master', 'licence',
-        'téléphone', 'email', 'adresse', 'né', 'age', 'ans', 'contact',
-        'projet', 'projets', 'compétences', 'skills', 'page', 'pdf', 'document'
-    }
+    # Utiliser les nouvelles fonctions
+    if is_likely_name_line(line):
+        score = score_name_candidate(line)
+        if score > 0.4:
+            return line
     
-    # Chercher 2-3 mots consécutifs commençant par une majuscule
-    words = line.split()
-    candidates = []
-    
-    for i in range(len(words) - 1):
-        if i + 1 < len(words):
-            word1, word2 = words[i], words[i + 1]
-            
-            # Vérifier que les mots sont des candidats valides
-            if (word1[0].isupper() and word2[0].isupper() and 
-                len(word1) > 1 and len(word2) > 1 and
-                word1.lower() not in ignore_words and 
-                word2.lower() not in ignore_words and
-                word1.isalpha() and word2.isalpha() and
-                is_valid_name_candidate(word1) and is_valid_name_candidate(word2)):
-                
-                # Format: NOM Prénom
-                formatted = f"{word1.upper()} {word2.capitalize()}"
-                candidates.append(formatted)
-    
-    return candidates[0] if candidates else None
+    return None
 
 # -------------------- Génération du ZIP organisé --------------------
 def merge_results_with_ai_analysis(original_results):
@@ -1009,7 +2335,13 @@ def create_organized_zip(results, file_list):
             if 'extracted_name' in result and result['extracted_name'] and result['extracted_name']['name']:
                 # Utiliser le nom extrait
                 extracted_name = result['extracted_name']['name']
-                final_name = f"{extracted_name}.pdf"
+                # Normaliser les espaces multiples et nettoyer
+                try:
+                    import re as _re
+                    cleaned_extracted = _re.sub(r"\s+", " ", extracted_name).strip()
+                except Exception:
+                    cleaned_extracted = extracted_name.strip()
+                final_name = f"{cleaned_extracted}.pdf"
                 confidence = result['extracted_name']['confidence']
                 method = result['extracted_name']['method_used']
             else:
@@ -1052,17 +2384,26 @@ def create_organized_zip(results, file_list):
                 except Exception as e:
                     st.warning(f"Erreur lors du traitement de {original_name}: {e}")
         
-        # Créer et ajouter le manifest CSV
+        # Créer et ajouter le manifest CSV (avec point-virgule pour Excel FR) + Excel natif
         if manifest_data:
             manifest_df = pd.DataFrame(manifest_data)
-            manifest_csv = manifest_df.to_csv(index=False, encoding='utf-8')
-            zip_file.writestr('manifest.csv', manifest_csv)
+            # CSV avec point-virgule pour Excel FR et encodage utf-8-sig (BOM)
+            manifest_csv = manifest_df.to_csv(index=False, sep=';', encoding='utf-8-sig')
+            zip_file.writestr('manifest.csv', manifest_csv.encode('utf-8-sig'))
+            
+            # Ajouter aussi un fichier Excel natif (.xlsx) pour compatibilité Excel 2010
+            excel_buffer = io.BytesIO()
+            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                manifest_df.to_excel(writer, index=False, sheet_name='Manifest')
+            excel_buffer.seek(0)
+            zip_file.writestr('manifest.xlsx', excel_buffer.getvalue())
     
     zip_buffer.seek(0)
     return zip_buffer.getvalue(), pd.DataFrame(manifest_data)
 
 # -------------------- Interface Utilisateur --------------------
 st.title("📄 Analyseur de CVs Intelligent")
+display_commit_info()
 tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Classement de CVs", "🎯 Analyse de Profil", "📖 Guide des Méthodes", "📈 Statistiques de Feedback", "🗂️ Auto-classification"])
 
 with tab1:
@@ -1102,7 +2443,8 @@ with tab1:
     analysis_method = st.radio(
         "✨ Choisissez votre méthode de classement",
         ["Méthode Cosinus (Mots-clés)", "Méthode Sémantique (Embeddings)", "Scoring par Règles (Regex)", 
-         "Analyse combinée (Ensemble)", "Analyse par IA (DeepSeek)"],
+         "Analyse combinée (Ensemble)", "Analyse par IA (DeepSeek)", "Analyse par IA (Gemini)", 
+         "Analyse par IA (Groq)", "Analyse par IA (Claude)", "Analyse par IA (OpenRouter)"],
         index=0, help="Consultez l'onglet 'Guide des Méthodes'."
     )
     
@@ -1202,7 +2544,40 @@ with tab1:
             # Analyse selon la méthode choisie
             results, explanations, logic = {}, None, None
             
-            if analysis_method == "Analyse par IA (DeepSeek)":
+            
+            if analysis_method == "Analyse par IA (Gemini)":
+                progress_placeholder.info(f"🤖 Analyse Gemini en cours...")
+                result = rank_resumes_with_gemini(job_description, resumes, file_names)
+                results = {"scores": result["scores"], "explanations": result["explanations"]}
+                explanations = result["explanations"]
+                progress_bar.progress(1.0)
+
+            elif analysis_method == "Analyse par IA (Groq)":
+                progress_placeholder.info(f"🤖 Analyse Groq en cours...")
+                result = rank_resumes_with_groq(job_description, resumes, file_names)
+                results = {"scores": result["scores"], "explanations": result["explanations"]}
+                explanations = result["explanations"]
+                progress_bar.progress(1.0)
+
+            elif analysis_method == "Analyse par IA (Claude)":
+                progress_placeholder.info(f"🤖 Analyse Claude en cours...")
+                # Manque la fonction batch pour Claude, on itère simplement
+                scores_data = []
+                for i, r_text in enumerate(resumes):
+                    progress_placeholder.info(f"🤖 Analyse Claude ({i+1}/{len(resumes)})")
+                    scores_data.append(get_detailed_score_with_claude(job_description, r_text))
+                    progress_bar.progress((i + 1) / len(resumes))
+                results = {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
+                explanations = results.get("explanations")
+
+            elif analysis_method == "Analyse par IA (OpenRouter)":
+                progress_placeholder.info(f"🤖 Analyse OpenRouter en cours...")
+                result = rank_resumes_with_openrouter(job_description, resumes, file_names)
+                results = {"scores": result["scores"], "explanations": result["explanations"]}
+                explanations = result["explanations"]
+                progress_bar.progress(1.0)
+
+            elif analysis_method == "Analyse par IA (DeepSeek)":
                 # Analyse IA avec progression individuelle
                 progress_placeholder.info(f"🤖 Analyse par IA en cours (0/{len(resumes)})...")
                 progress_bar.progress(0.3)
@@ -1215,6 +2590,7 @@ with tab1:
                 
                 results = {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
                 explanations = results.get("explanations")
+
             
             elif analysis_method == "Scoring par Règles (Regex)":
                 progress_placeholder.info(f"📏 Analyse par règles en cours...")
@@ -1494,11 +2870,16 @@ with tab2:
     
     analysis_type_single = st.selectbox(
         "Type d'analyse souhaité",
-        ("Analyse par IA (DeepSeek)", "Analyse par Regex (Extraction d'entités)", "Analyse par la Méthode Sémantique", 
+        ("Analyse par IA (DeepSeek)", "Analyse par IA (Gemini)", "Analyse par IA (Groq)", "Analyse par IA (Claude)", "Analyse par IA (OpenRouter)",
+         "Analyse par Regex (Extraction d'entités)", "Analyse par la Méthode Sémantique", 
          "Analyse par la Méthode Cosinus", "Analyse Combinée (Ensemble)")
     )
     captions = {
-        "Analyse par IA (DeepSeek)": "Analyse qualitative (points forts/faibles). Consomme vos tokens !",
+        "Analyse par IA (DeepSeek)": "Analyse qualitative (points forts/faibles).",
+        "Analyse par IA (Gemini)": "Analyse par Google Gemini (Rapide & Performant).",
+        "Analyse par IA (Groq)": "Analyse ultra-rapide via Llama 3.",
+        "Analyse par IA (Claude)": "Analyse nuancée par Claude 3 Haiku.",
+        "Analyse par IA (OpenRouter)": "Analyse flexible via OpenRouter.",
         "Analyse par Regex (Extraction d'entités)": "Extrait des informations structurées (compétences, diplômes, etc.).",
         "Analyse par la Méthode Sémantique": "Calcule un score de pertinence basé sur le sens (nécessite une description de poste).",
         "Analyse par la Méthode Cosinus": "Calcule un score de pertinence basé sur les mots-clés (nécessite une description de poste).",
@@ -1563,7 +2944,37 @@ with tab2:
                                 if logic:
                                     st.markdown("**Détail de l'analyse combinée :**")
                                     st.json(logic)
-                    else: # Analyse IA
+                    elif analysis_type_single == "Analyse par IA (Gemini)":
+                        # Extraire le nom du candidat
+                        extracted = extract_name_from_cv_text(text)
+                        candidate_name = extracted.get('name') if extracted else None
+                        
+                        analysis_result = get_gemini_profile_analysis(text, candidate_name)
+                        st.markdown("### 🤖 Résultat de l'analyse Gemini")
+                        st.markdown(analysis_result)
+
+                    elif analysis_type_single == "Analyse par IA (Groq)":
+                        extracted = extract_name_from_cv_text(text)
+                        candidate_name = extracted.get('name') if extracted else None
+                        analysis_result = get_groq_profile_analysis(text, candidate_name)
+                        st.markdown("### 🤖 Résultat de l'analyse Groq")
+                        st.markdown(analysis_result)
+
+                    elif analysis_type_single == "Analyse par IA (Claude)":
+                        extracted = extract_name_from_cv_text(text)
+                        candidate_name = extracted.get('name') if extracted else None
+                        analysis_result = get_claude_profile_analysis(text, candidate_name)
+                        st.markdown("### 🤖 Résultat de l'analyse Claude")
+                        st.markdown(analysis_result)
+
+                    elif analysis_type_single == "Analyse par IA (OpenRouter)":
+                        extracted = extract_name_from_cv_text(text)
+                        candidate_name = extracted.get('name') if extracted else None
+                        analysis_result = get_openrouter_profile_analysis(text, candidate_name)
+                        st.markdown("### 🤖 Résultat de l'analyse OpenRouter")
+                        st.markdown(analysis_result)
+
+                    else: # Analyse IA DeepSeek
                         # Extraire le nom du candidat
                         extracted = extract_name_from_cv_text(text)
                         candidate_name = extracted.get('name') if extracted else None
@@ -1806,17 +3217,91 @@ with tab4:
 
 with st.sidebar:
     st.markdown("### 🔧 Configuration")
-    if st.button("Test Connexion API DeepSeek"):
-        API_KEY = get_api_key()
-        if API_KEY:
+    
+    # Indicateurs d'état discret
+    ds_status = "✅" if get_api_key() else "⚠️"
+    gem_status = "✅" if get_gemini_api_key() else "⚠️"
+    
+    if ds_status == "⚠️":
+        st.caption("⚠️ DeepSeek API non configurée")
+    if gem_status == "⚠️":
+        st.caption("⚠️ Gemini API non configurée")
+
+    if st.button("Test Connexion IA (DeepSeek & Gemini)"):
+        # Test DeepSeek
+        ds_key = get_api_key()
+        if ds_key:
             try:
-                response = requests.get("https://api.deepseek.com/v1/models", headers={"Authorization": f"Bearer {API_KEY}"})
+                response = requests.get("https://api.deepseek.com/v1/models", headers={"Authorization": f"Bearer {ds_key}"})
                 if response.status_code == 200:
-                    st.success("✅ Connexion API réussie")
+                    st.success("✅ DeepSeek : Connecté")
                 else:
-                    st.error(f"❌ Erreur de connexion ({response.status_code})")
+                    st.error(f"❌ DeepSeek : Erreur {response.status_code}")
             except Exception as e:
-                st.error(f"❌ Erreur: {e}")
+                st.error(f"❌ DeepSeek : {e}")
+        else:
+            st.warning("⚠️ DeepSeek : Clé manquante")
+            
+        # Test Gemini
+        gem_key = get_gemini_api_key()
+        if gem_key:
+            try:
+                genai.configure(api_key=gem_key)
+                
+                # Test prioritaires sur les modèles disponibles (2.5-flash-lite)
+                try:
+                    model = genai.GenerativeModel('gemini-2.5-flash-lite')
+                    response = model.generate_content("Ping")
+                    if response:
+                        st.success("✅ Gemini (2.5 Flash Lite) : Connecté")
+                except Exception as e_flash:
+                     # Fallback sur flash-latest
+                    try:
+                        model = genai.GenerativeModel('gemini-flash-latest')
+                        response = model.generate_content("Ping")
+                        if response:
+                             st.success("✅ Gemini (Flash Latest) : Connecté")
+                    except Exception as e_latest:
+                        st.error(f"❌ Gemini indisponible. Erreur : {e_flash} | {e_latest}")
+            except Exception as e:
+                st.error(f"❌ Gemini : {e}")
+        else:
+             st.warning("⚠️ Gemini : Clé manquante")
+
+        # Test Claude
+        claude_key = get_claude_api_key()
+        if claude_key:
+            try:
+                client = anthropic.Anthropic(api_key=claude_key)
+                message = client.messages.create(
+                    model="claude-3-haiku-20240307",
+                    max_tokens=10,
+                    messages=[
+                        {"role": "user", "content": "Ping"}
+                    ]
+                )
+                if message and message.content:
+                    st.success("✅ Claude (Haiku) : Connecté")
+            except Exception as e:
+                st.error(f"❌ Claude : {e}")
+        else:
+             st.warning("⚠️ Claude : Clé manquante")
+
+        # Test Groq
+        groq_key = get_groq_api_key()
+        if groq_key:
+            try:
+                client = groq.Groq(api_key=groq_key)
+                chat_completion = client.chat.completions.create(
+                    messages=[{"role": "user", "content": "Ping"}],
+                    model="llama-3.1-8b-instant",
+                )
+                if chat_completion.choices[0].message.content:
+                    st.success("✅ Groq (Llama 3) : Connecté")
+            except Exception as e:
+                st.error(f"❌ Groq : {e}")
+        else:
+             st.warning("⚠️ Groq : Clé manquante")
 
 with tab5:
     st.header("🗂️ Auto-classification de CVs (3 catégories)")
@@ -1863,8 +3348,12 @@ with tab5:
         # Option pour renommer et organiser les CV
         rename_and_organize = st.checkbox(
             "📁 Renommer les CV et organiser par dossiers",
+            value=True,
             help="Extrait automatiquement les noms des candidats et organise les CV par catégorie dans un fichier ZIP"
         )
+
+        # Choix du modèle IA pour la classification
+        classif_model = st.selectbox("Modèle IA pour la classification", ["DeepSeek", "Gemini", "Groq", "Claude", "OpenRouter"])
         
         # Bouton de classification primaire
         if st.button("📂 Lancer l'auto-classification", type='primary'):
@@ -1889,20 +3378,51 @@ with tab5:
                     except Exception:
                         text = ''
 
-                    # Extraction du nom (toujours, pour les récap profils)
-                    extracted_name_info = extract_name_from_cv_text(text) if text else None
+                    # --- NOUVELLE LOGIQUE D'EXTRACTION DE NOM ---
+                    # 1. Extraction locale intelligente (Email Cross-Check)
+                    local_extraction = extract_name_smart_email(text)
+                    extracted_name_info = local_extraction
+                    
+                    if not extracted_name_info:
+                         # Fallback sur l'ancienne méthode regex
+                         extracted_name_info = extract_name_from_cv_text(text) if text else None
+
+                    # Détermination du nom à envoyer à l'IA comme indice
                     if extracted_name_info and extracted_name_info.get('name'):
                         display_name = extracted_name_info['name']
                     else:
                         display_name = os.path.splitext(name)[0]
 
-                    # Classification principale 100% via IA DeepSeek (macro + sous-cat + récap)
+                    # Classification principale 100% via IA (macro + sous-cat + récap)
                     text_for_ai = (text or '')[:3000]
-                    classification = get_deepseek_auto_classification(text_for_ai, display_name)
+                    
+                    if classif_model == "Gemini":
+                        classification = get_gemini_auto_classification(text_for_ai, display_name)
+                    elif classif_model == "Groq":
+                        classification = get_groq_auto_classification(text_for_ai, display_name)
+                    elif classif_model == "Claude":
+                        classification = get_claude_auto_classification(text_for_ai, display_name)
+                    elif classif_model == "OpenRouter":
+                        classification = get_openrouter_auto_classification(text_for_ai, display_name)
+                    else:
+                        classification = get_deepseek_auto_classification(text_for_ai, display_name)
+
                     cat = classification.get('macro_category', 'Non classé')
                     sub_cat = classification.get('sub_category', 'Autre')
                     profile_summary = classification.get('profile_summary', '')
                     years_exp = classification.get('years_experience', 0)
+                    
+                    # Mise à jour du nom extrait si l'IA en a trouvé un meilleur
+                    ai_name = classification.get('candidate_name')
+                    # On fait confiance à l'IA si elle a trouvé un nom différent de "Candidat" et qu'on n'avait pas de certitude absolue (0.99)
+                    if ai_name and "Candidat" not in ai_name and "Erreur" not in ai_name:
+                         # Si notre méthode locale n'était pas sûre à 99% (smart email), on prend celle de l'IA
+                         if not (extracted_name_info and extracted_name_info.get('confidence', 0) >= 0.99):
+                            extracted_name_info = {
+                                "name": ai_name,
+                                "confidence": 1.0,
+                                "method_used": f"{classif_model}_Refined"
+                            }
 
                     result_item = {
                         'file': name,
@@ -2143,3 +3663,10 @@ with tab5:
                                 st.error(f"❌ Erreur lors de la création du ZIP : {e}")
                 else:
                     st.info("💡 Cochez l'option 'Renommer les CV' lors du prochain traitement pour activer le téléchargement ZIP organisé.")
+
+
+# --- FONCTIONS GEMINI (NOUVEAU) ---
+
+
+# --- FIN FONCTIONS GEMINI ---
+

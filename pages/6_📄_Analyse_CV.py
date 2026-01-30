@@ -2440,7 +2440,7 @@ with tab1:
     
     st.markdown("---")
     
-    analysis_method = st.radio(
+    analysis_method = st.selectbox(
         "✨ Choisissez votre méthode de classement",
         ["Méthode Cosinus (Mots-clés)", "Méthode Sémantique (Embeddings)", "Scoring par Règles (Regex)", 
          "Analyse combinée (Ensemble)", "Analyse par IA (DeepSeek)", "Analyse par IA (Gemini)", 
@@ -2951,28 +2951,112 @@ with tab2:
                         
                         analysis_result = get_gemini_profile_analysis(text, candidate_name)
                         st.markdown("### 🤖 Résultat de l'analyse Gemini")
-                        st.markdown(analysis_result)
+                        # Affichage en 2 colonnes
+                        col1, col2 = st.columns(2)
+                        sections = analysis_result.split('**')
+                        left_sections = []
+                        right_sections = []
+                        current_section = ""
+                        section_count = 0
+                        for i, section in enumerate(sections):
+                            if section.strip():
+                                if i % 2 == 1:
+                                    current_section = f"**{section}**"
+                                else:
+                                    full_section = current_section + section
+                                    if section_count < 3:
+                                        left_sections.append(full_section)
+                                    else:
+                                        right_sections.append(full_section)
+                                    section_count += 1
+                        with col1:
+                            st.markdown("".join(left_sections))
+                        with col2:
+                            st.markdown("".join(right_sections))
 
                     elif analysis_type_single == "Analyse par IA (Groq)":
                         extracted = extract_name_from_cv_text(text)
                         candidate_name = extracted.get('name') if extracted else None
                         analysis_result = get_groq_profile_analysis(text, candidate_name)
                         st.markdown("### 🤖 Résultat de l'analyse Groq")
-                        st.markdown(analysis_result)
+                        # Affichage en 2 colonnes
+                        col1, col2 = st.columns(2)
+                        sections = analysis_result.split('**')
+                        left_sections = []
+                        right_sections = []
+                        current_section = ""
+                        section_count = 0
+                        for i, section in enumerate(sections):
+                            if section.strip():
+                                if i % 2 == 1:
+                                    current_section = f"**{section}**"
+                                else:
+                                    full_section = current_section + section
+                                    if section_count < 3:
+                                        left_sections.append(full_section)
+                                    else:
+                                        right_sections.append(full_section)
+                                    section_count += 1
+                        with col1:
+                            st.markdown("".join(left_sections))
+                        with col2:
+                            st.markdown("".join(right_sections))
 
                     elif analysis_type_single == "Analyse par IA (Claude)":
                         extracted = extract_name_from_cv_text(text)
                         candidate_name = extracted.get('name') if extracted else None
                         analysis_result = get_claude_profile_analysis(text, candidate_name)
                         st.markdown("### 🤖 Résultat de l'analyse Claude")
-                        st.markdown(analysis_result)
+                        # Affichage en 2 colonnes
+                        col1, col2 = st.columns(2)
+                        sections = analysis_result.split('**')
+                        left_sections = []
+                        right_sections = []
+                        current_section = ""
+                        section_count = 0
+                        for i, section in enumerate(sections):
+                            if section.strip():
+                                if i % 2 == 1:
+                                    current_section = f"**{section}**"
+                                else:
+                                    full_section = current_section + section
+                                    if section_count < 3:
+                                        left_sections.append(full_section)
+                                    else:
+                                        right_sections.append(full_section)
+                                    section_count += 1
+                        with col1:
+                            st.markdown("".join(left_sections))
+                        with col2:
+                            st.markdown("".join(right_sections))
 
                     elif analysis_type_single == "Analyse par IA (OpenRouter)":
                         extracted = extract_name_from_cv_text(text)
                         candidate_name = extracted.get('name') if extracted else None
                         analysis_result = get_openrouter_profile_analysis(text, candidate_name)
                         st.markdown("### 🤖 Résultat de l'analyse OpenRouter")
-                        st.markdown(analysis_result)
+                        # Affichage en 2 colonnes
+                        col1, col2 = st.columns(2)
+                        sections = analysis_result.split('**')
+                        left_sections = []
+                        right_sections = []
+                        current_section = ""
+                        section_count = 0
+                        for i, section in enumerate(sections):
+                            if section.strip():
+                                if i % 2 == 1:
+                                    current_section = f"**{section}**"
+                                else:
+                                    full_section = current_section + section
+                                    if section_count < 3:
+                                        left_sections.append(full_section)
+                                    else:
+                                        right_sections.append(full_section)
+                                    section_count += 1
+                        with col1:
+                            st.markdown("".join(left_sections))
+                        with col2:
+                            st.markdown("".join(right_sections))
 
                     else: # Analyse IA DeepSeek
                         # Extraire le nom du candidat
@@ -3227,7 +3311,7 @@ with st.sidebar:
     if gem_status == "⚠️":
         st.caption("⚠️ Gemini API non configurée")
 
-    if st.button("Test Connexion IA (DeepSeek & Gemini)"):
+    if st.button("Test connexion API"):
         # Test DeepSeek
         ds_key = get_api_key()
         if ds_key:
