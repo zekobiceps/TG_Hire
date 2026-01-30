@@ -3451,11 +3451,13 @@ with tab5:
         # Afficher un indicateur de statut si une action a été effectuée précédemment
         if st.session_state.last_action:
             action_message = {
-                "classified": "✅ CVs classifiés avec succès ! Vous pouvez maintenant analyser les CVs non classés avec l'IA.",
+                # 'classified' message intentionally removed per user request
                 "analyzed": "✅ CVs non classés analysés avec DeepSeek IA !",
                 "reset": "🔄 Analyses IA réinitialisées."
             }
-            st.success(action_message.get(st.session_state.last_action, ""))
+            msg = action_message.get(st.session_state.last_action, "")
+            if msg:
+                st.success(msg)
             # Réinitialiser pour ne pas afficher le message à chaque rechargement
             st.session_state.last_action = None
         
@@ -3645,7 +3647,7 @@ with tab5:
                     processing_ai_placeholder = st.empty()
                     
                     with st.spinner('Analyse des CVs non classés avec Intelligence Artificielle...'):
-                        for i, (_, row) in enumerate(nc.iterrows()):
+                            for i, (_, row) in enumerate(nc.iterrows()):
                             name = row['file']
                             text_snippet = row['text_snippet']
                             # Mettre à jour le fichier en cours
@@ -3665,6 +3667,25 @@ with tab5:
                     
                     # Stocker les résultats dans la session state
                     st.session_state.deepseek_analyses = unclassified_results
+
+                    # Intégrer les catégories renvoyées par l'IA dans les résultats de classification
+                    # (mettre à jour st.session_state.classification_results où 'file' correspond)
+                    try:
+                        if 'classification_results' in st.session_state and st.session_state.classification_results:
+                            for res in unclassified_results:
+                                fname = res.get('Fichier') or res.get('file')
+                                cat = res.get('Catégorie') or res.get('Catégorie')
+                                # Chercher l'entrée correspondante
+                                for entry in st.session_state.classification_results:
+                                    if entry.get('file') == fname:
+                                        # Normaliser la catégorie si nécessaire
+                                        if cat and cat.strip():
+                                            entry['category'] = cat
+                                        break
+                    except Exception:
+                        # En cas d'erreur, ne pas interrompre le flux — les analyses IA restent disponibles séparément
+                        pass
+
                     st.session_state.last_action = "analyzed"
             
             # Afficher les analyses IA s'il y en a
