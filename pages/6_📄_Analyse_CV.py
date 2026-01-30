@@ -1493,15 +1493,49 @@ def classify_resume_with_model(text, model_name, hint_name=""):
             resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers={"Authorization": f"Bearer {api_key}"}, json={"model": "openai/gpt-3.5-turbo", "messages": [{"role": "user", "content": prompt}]})
             response_text = resp.json()['choices'][0]['message']['content']
 
-        # Parsing
+        # Parsing : essayer JSON puis fallback d'inférence depuis la réponse brute
         clean_text = clean_json_string(response_text)
-        data = json.loads(clean_text)
-        
+        data = None
+        try:
+            data = json.loads(clean_text)
+        except Exception:
+            data = None
+
+        def infer_from_text(txt):
+            t = (txt or "").lower()
+            # recherches simples de mots-clés
+            if any(k in t for k in ["rh", "recrut", "paie", "comptable", "finance", "jurid", "it", "ds i", "marketing", "achats"]):
+                return "FONCTIONS SUPPORTS"
+            if any(k in t for k in ["logist", "transport", "magasin", "atelier", "parc"]):
+                return "LOGISTIQUE"
+            if any(k in t for k in ["métr", "metre", "étude", "etude", "métré", "etudes", "dessinateur", "ingénieur études", "méthodes"]):
+                return "PRODUCTION - ÉTUDES (BUREAU)"
+            if any(k in t for k in ["chantier", "travaux", "conducteur", "chef chantier", "chef de chantier", "opérateur"]):
+                return "PRODUCTION - TRAVAUX (CHANTIER)"
+            if any(k in t for k in ["qualit", "qse", "hse", "contrôle qualité", "inspecteur"]):
+                return "PRODUCTION - QUALITÉ"
+            if any(k in t for k in ["nuclé", "nucle", "aéron", "aero", "médic", "medic", "infirm", "enseign" ]):
+                return "DIVERS / HORS PÉRIMÈTRE"
+            return "NON CLASSÉ"
+
+        if data is None:
+            # tenter d'inférer depuis la réponse brute et le prompt original
+            inferred = infer_from_text(response_text) if response_text else infer_from_text(prompt)
+            return {
+                "macro_category": inferred,
+                "sub_category": "Autre",
+                "years_experience": 0,
+                "candidate_name": hint_name or "Candidat Inconnu",
+                "profile_summary": "",
+                "raw_response": response_text
+            }
+
+        # Si on a un JSON valide
         macro = data.get("macro_category", "Non classé")
         # Validation basique et normalisation
         valid_categories = ["FONCTIONS SUPPORTS", "LOGISTIQUE", "PRODUCTION - ÉTUDES (BUREAU)", 
                           "PRODUCTION - TRAVAUX (CHANTIER)", "PRODUCTION - QUALITÉ", "DIVERS / HORS PÉRIMÈTRE"]
-        
+
         macro_upper = macro.upper() if macro else ""
         if macro_upper not in valid_categories:
             # Tentative de récupération souple depuis la valeur retournée
@@ -1519,27 +1553,15 @@ def classify_resume_with_model(text, model_name, hint_name=""):
             elif "divers" in m_low or "hors" in m_low:
                 macro = "DIVERS / HORS PÉRIMÈTRE"
             else:
-                # Si l'IA a répondu explicitement "non classé", tenter d'inférer depuis la réponse brute
-                raw = (response_text or "").lower()
-                if "support" in raw or "rh" in raw or "finance" in raw:
-                    macro = "FONCTIONS SUPPORTS"
-                elif "logist" in raw or "transport" in raw or "magasin" in raw:
-                    macro = "LOGISTIQUE"
-                elif "étude" in raw or "etude" in raw or "métr" in raw or "metre" in raw or "bureau" in raw:
-                    macro = "PRODUCTION - ÉTUDES (BUREAU)"
-                elif "travaux" in raw or "chantier" in raw or "conducteur" in raw or "chef chantier" in raw:
-                    macro = "PRODUCTION - TRAVAUX (CHANTIER)"
-                elif "qualit" in raw or "qse" in raw or "hse" in raw:
-                    macro = "PRODUCTION - QUALITÉ"
-                else:
-                    macro = "NON CLASSÉ"
+                # Si toujours inconnu, tenter depuis raw
+                macro = infer_from_text(response_text)
         else:
             macro = macro_upper
 
         return {
             "macro_category": macro,
             "sub_category": data.get("sub_category", "Autre"),
-            "years_experience": int(data.get("years_experience", 0)),
+            "years_experience": int(data.get("years_experience", 0) or 0),
             "candidate_name": data.get("candidate_name", hint_name),
             "profile_summary": data.get("profile_summary", ""),
             "raw_response": response_text
