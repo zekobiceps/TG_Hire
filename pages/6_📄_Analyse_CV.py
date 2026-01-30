@@ -3558,7 +3558,7 @@ with tab5:
 
             # Catégorie "Autres" pour les non classés (calculée ensuite à partir du dataframe fusionné)
             nc = None
-            if not nc.empty:
+            if nc is not None and not nc.empty:
                 st.markdown('---')
                 count_nc = len(nc)
                 st.subheader(f'🔍 Autres / Non classés ({count_nc})')
@@ -3568,11 +3568,11 @@ with tab5:
                 analyze_button = st.button('🔍 Analyser les CV non classés avec Intelligence Artificielle', type='secondary')
                 
                 # Si on clique sur le bouton
-                if analyze_button:
+                if analyze_button and nc is not None and not nc.empty:
                     # Exécuter l'analyse
                     unclassified_results = []
                     unclassified_progress = st.progress(0)
-                    unclassified_total = len(nc)
+                    unclassified_total = len(nc) if nc is not None else 0
                     processing_ai_placeholder = st.empty()
                     
                     with st.spinner('Analyse des CVs non classés avec Intelligence Artificielle...'):
