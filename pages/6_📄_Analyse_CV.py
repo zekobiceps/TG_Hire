@@ -1547,6 +1547,15 @@ def classify_resume_with_model(text, model_name, hint_name=""):
 
     except Exception as e:
         print(f"Erreur classification ({model_name}): {e}")
+        # Attacher le raw_response et l'erreur pour debug
+        try:
+            default_result['raw_response'] = response_text
+        except Exception:
+            default_result['raw_response'] = ''
+        try:
+            default_result['error'] = str(e)
+        except Exception:
+            default_result['error'] = 'unknown'
         return default_result
 
 # -------------------- ANCIENNES FONCTIONS (conservées pour compatibilité) --------------------
