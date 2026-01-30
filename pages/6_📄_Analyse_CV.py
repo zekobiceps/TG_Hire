@@ -3404,14 +3404,29 @@ with tab5:
             file_list.append({'name': uf.name, 'file': uf})
 
     # Afficher immédiatement combien de CVs ont été uploadés
-    if len(file_list) > 0:
-        st.success(f"✅ {len(file_list)} CV(s) uploadé(s) et prêts pour traitement.")
-        # Message d'instruction supprimé
+    if uploaded_files_auto:
+        # Show upload status with a small progress indicator
+        total_uploads = len(uploaded_files_auto)
+        # Build file_list while updating a visible progress bar so users see upload progression
+        upload_col, progress_col = st.columns([3, 1])
+        upload_col.success(f"✅ {total_uploads} CV(s) uploadé(s) et prêts pour traitement.")
+        upload_progress = progress_col.progress(0)
 
         # Limiter à 200 pour sécurité
-        if len(file_list) > 200:
+        if total_uploads > 200:
             st.warning('Plus de 200 CVs trouvés. Seuls les 200 premiers seront traités.')
-            file_list = file_list[:200]
+            uploaded_files_auto = uploaded_files_auto[:200]
+            total_uploads = len(uploaded_files_auto)
+
+        file_list = []
+        for i, uf in enumerate(uploaded_files_auto):
+            file_list.append({'name': uf.name, 'file': uf})
+            # update progress (nice UX next to page indicator)
+            try:
+                upload_progress.progress(int((i + 1) / total_uploads * 100))
+            except Exception:
+                # some streamlit versions accept float in [0,1]
+                upload_progress.progress((i + 1) / total_uploads)
 
         # Initialiser les variables de session pour la classification et l'analyse DeepSeek
         if 'classification_results' not in st.session_state:
@@ -3530,69 +3545,72 @@ with tab5:
                     results.append(result_item)
                     progress.progress((i+1)/total)
 
-            # Nettoyer le placeholder
-            processing_placeholder.empty()
+            # Affichage des compteurs par catégorie (sans le mot "Résumé")
+            ai_indicator = " (incluant les analyses IA)" if hasattr(st.session_state, 'deepseek_analyses') and st.session_state.deepseek_analyses else ""
+            st.markdown(f"{count_support} Fonctions supports • {count_logistics} Logistique • {count_production} Production/Technique • {count_unclassified} Non classés{ai_indicator}.")
 
-            # Stocker les résultats de classification dans la session state
-            st.session_state.classification_results = results
-            st.session_state.rename_and_organize_option = rename_and_organize
-            st.session_state.uploaded_files_list = file_list  # Stocker pour le ZIP
-            st.session_state.last_action = "classified"
-        
-        # Si des résultats de classification existent (soit de l'action actuelle ou précédente), les afficher
-        if st.session_state.classification_results:
-            # Convertir les résultats en DataFrame
-            df = pd.DataFrame(st.session_state.classification_results)
-            
-            # Calcul des statistiques pour le message de résumé
-            num_total = len(df)
-            num_supports = len(df[df['category'] == 'Fonctions supports'])
-            num_logistics = len(df[df['category'] == 'Logistique'])
-            num_production = len(df[df['category'] == 'Production/Technique'])
-            num_unclassified = len(df[df['category'] == 'Non classé'])
-            num_classified = num_total - num_unclassified
-            
-            # Message de succès avec statistiques et pourcentages
-            percent_classified = int(round(num_classified / num_total * 100)) if num_total > 0 else 0
-            percent_unclassified = int(round(num_unclassified / num_total * 100)) if num_total > 0 else 0
-            st.success(f"✅ Traitement terminé : {num_total} CV(s) traité(s), dont {num_classified} ({percent_classified}%) classé(s) et {num_unclassified} ({percent_unclassified}%) non classé(s).")
-            
-            # Utiliser le DataFrame pour l'affichage
-            display_df = df.copy()
+            # Helper: inférer la direction à partir de la sous-catégorie ou du texte
+            def infer_direction(sub_cat: str | None, text: str | None) -> str:
+                s = (sub_cat or "").lower()
+                t = (text or "").lower()
+                # mapping keywords -> directions
+                mapping = {
+                    'RH': ['rh', 'recrut', 'talent', 'pay', 'paie', 'ressources humaines', 'recruteur', 'recrutement'],
+                    'Finance': ['compta', 'finance', 'trésor', 'tresor', 'audit', 'contrôle de gestion', 'controle de gestion', 'contrôle'],
+                    'Achats': ['achat', 'achats', 'sourcing'],
+                    'DSI': ['dsi', 'informat', 'it', 'support', 'devops', 'développeur', 'developpeur', 'ingenieur logiciel'],
+                    'QHSE / Sécurité': ['qhse', 'sécurité', 'securité', 'qhs', 'hse'],
+                    'Juridique': ['jurid', 'juriste', 'conformité', 'compliance'],
+                    'Communication / Marketing': ['communication', 'marketing', 'content', 'digital', 'community'],
+                    'Logistique': ['logisti', 'supply', 'entrepôt', 'transport', 'stock', 'préparation'],
+                    'Production / Technique': ['ingénieur', 'ingenieur', 'technicien', 'btp', 'chantier', 'maintenance', 'industrie', 'usinat', 'electromec', 'électromec']
+                }
+                # check sub_cat first
+                for direction, keys in mapping.items():
+                    for k in keys:
+                        if k in s:
+                            return direction
+                # fallback to text
+                for direction, keys in mapping.items():
+                    for k in keys:
+                        if k in t:
+                            return direction
+                return 'Autre'
 
-            # Préparer un nom d'affichage par ligne (nom extrait si dispo, sinon nom de fichier sans extension)
-            def _get_display_name_for_row(row):
-                extracted = row.get('extracted_name')
-                if isinstance(extracted, dict) and extracted.get('name'):
-                    return extracted['name']
-                return os.path.splitext(row['file'])[0]
+            # Function to display grouped items per category
+            def display_grouped(category_name, rows):
+                st.subheader(f"{category_name} ({len(rows)})")
+                # group by direction
+                groups = {}
+                for r in rows:
+                    # r may be a pandas Series; use .get if possible
+                    sub_cat = r.get('sub_category') if hasattr(r, 'get') else r['sub_category']
+                    full_text = r.get('full_text') if hasattr(r, 'get') else r['full_text']
+                    direction = infer_direction(sub_cat, full_text)
+                    groups.setdefault(direction, []).append(get_display_name(r))
 
-            display_df['display_name'] = display_df.apply(_get_display_name_for_row, axis=1)
+                for direction, items in sorted(groups.items(), key=lambda x: (-len(x[1]), x[0])):
+                    st.markdown(f"**{direction}** ({len(items)})")
+                    for name in items:
+                        st.markdown(f"- {name}")
 
-            # Affichage en 3 colonnes avec panneaux repliables par sous-catégorie
-            cols = st.columns(3)
-            cats = ['Fonctions supports', 'Logistique', 'Production/Technique']
-            for idx, cat_label in enumerate(cats):
-                with cols[idx]:
-                    sub_df = display_df[display_df['category'] == cat_label]
-                    count_cat = len(sub_df)
-                    st.subheader(f"{cat_label} ({count_cat})")
-                    if sub_df.empty:
-                        st.write('Aucun CV classé ici.')
-                    else:
-                        # Regrouper par sous-catégorie (sous-direction / sous-filière)
-                        sub_df = sub_df.copy()
-                        if 'sub_category' in sub_df.columns:
-                            sub_df['sub_category'] = sub_df['sub_category'].fillna('Autre')
-                        else:
-                            sub_df['sub_category'] = 'Autre'
-                        subcats = sorted(sub_df['sub_category'].unique())
-                        for subcat in subcats:
-                            filtered = sub_df[sub_df['sub_category'] == subcat]
-                            count_subcat = len(filtered)
-                            with st.expander(f"📂 {subcat} ({count_subcat})"):
-                                for _, r in filtered.iterrows():
-                                    card_title = r['display_name']
+            # Préparer les lignes (résultats intégrés déjà dans df_merged)
+            supports_rows = [row for _, row in df_merged[df_merged['category'] == 'Fonctions supports'].iterrows()]
+            logistics_rows = [row for _, row in df_merged[df_merged['category'] == 'Logistique'].iterrows()]
+            production_rows = [row for _, row in df_merged[df_merged['category'] == 'Production/Technique'].iterrows()]
+            unclassified_rows = [row for _, row in df_merged[df_merged['category'] == 'Non classé'].iterrows()]
+
+            # Display as a 2x2 grid
+            r1c1, r1c2 = st.columns(2)
+            with r1c1:
+                display_grouped('Fonctions supports', supports_rows)
+            with r1c2:
+                display_grouped('Logistique', logistics_rows)
+            r2c1, r2c2 = st.columns(2)
+            with r2c1:
+                display_grouped('Production/Technique', production_rows)
+            with r2c2:
+                display_grouped('Non classé', unclassified_rows)
                                     recap = r.get('profile_summary') or r.get('text_snippet') or ''
                                     years_exp = r.get('years_experience', 0)
                                     with st.expander(f"👤 {card_title}"):
