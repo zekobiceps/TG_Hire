@@ -1170,8 +1170,87 @@ Texte du CV :
         except:
             return f"❌ Erreur Gemini : {e}"
 
-# L'ancienne fonction get_gemini_auto_classification a été supprimée 
-# au profit de classify_resume_with_model et des wrappers ci-dessous
+def get_gemini_auto_classification(text: str, full_name: str | None) -> dict:
+    API_KEY = get_gemini_api_key()
+    safe_name = (full_name or "Candidat").strip()
+    if not API_KEY:
+        return {
+            "macro_category": "Non classé",
+            "sub_category": "Autre",
+            "years_experience": 0,
+            "profile_summary": f"Erreur config Gemini",
+            "candidate_name": safe_name
+        }
+        
+    genai.configure(api_key=API_KEY)
+    # Update to gemini-2.5-flash-lite which is available
+    model = genai.GenerativeModel('gemini-2.5-flash-lite', generation_config={"response_mime_type": "application/json"})
+    
+    prompt = f"""
+    Expert recrutement. Analyse CV.
+    
+    1. Check Nom: "{safe_name}". Corrige si faux (Permis B, etc).
+    2. Macro-catégorie (UNE SEULE) : "Fonctions supports", "Logistique", "Production/Technique".
+    3. Sous-catégorie (Interdit "Étudiant", "Stagiaire". Indiquer le métier visé).
+    4. Années expérience (int).
+    5. Récapitulatif (2-3 phrases).
+
+    JSON output only:
+    {{ "candidate_name": "...", "macro_category": "...", "sub_category": "...", "years_experience": 0, "profile_summary": "..." }}
+    
+    CV:
+    {text[:4000]}
+    """
+    
+    try:
+        response = model.generate_content(prompt)
+        try:
+            data = json.loads(response.text)
+        except:
+             # Fallback JSON parsing simple
+            clean_text = clean_json_string(response.text)
+            data = json.loads(clean_text)
+        
+        # Fallback values handle
+        macro = data.get("macro_category") or "Non classé"
+        if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]: macro = "Non classé"
+        
+        return {
+            "macro_category": macro,
+            "sub_category": data.get("sub_category", "Autre"),
+            "years_experience": int(data.get("years_experience", 0)),
+            "profile_summary": data.get("profile_summary", ""),
+            "candidate_name": data.get("candidate_name", safe_name)
+        }
+    except Exception as e:
+        # Fallback silent to gemini-flash-latest
+        try:
+            model = genai.GenerativeModel('gemini-flash-latest', generation_config={"response_mime_type": "application/json"})
+            response = model.generate_content(prompt)
+            try:
+                data = json.loads(response.text)
+            except:
+                clean_text = clean_json_string(response.text)
+                data = json.loads(clean_text)
+            
+            macro = data.get("macro_category") or "Non classé"
+            if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]: macro = "Non classé"
+            
+            return {
+                "macro_category": macro,
+                "sub_category": data.get("sub_category", "Autre"),
+                "years_experience": int(data.get("years_experience", 0)),
+                "profile_summary": data.get("profile_summary", ""),
+                "candidate_name": data.get("candidate_name", safe_name)
+            }
+        except:
+            return {
+                "macro_category": "Non classé",
+                "sub_category": "Autre",
+                "years_experience": 0,
+                "profile_summary": f"Erreur Gemini: {e}",
+                "candidate_name": safe_name
+            }
 
 def get_deepseek_profile_analysis(text: str, candidate_name: str | None = None) -> str:
     """
@@ -1332,75 +1411,45 @@ def clean_json_string(json_str):
         return json_str[start : end + 1]
     return json_str
 
-# -------------------- NOUVEAU PROMPT TGCC ORGANIGRAMME --------------------
-CATEGORIES_PROMPT = """
-    ANALYSE LE CV ET CLASSE-LE DANS UNE SEULE DES 6 CATÉGORIES CI-DESSOUS :
+def get_deepseek_auto_classification(text: str, local_extracted_name: str | None) -> dict:
+    API_KEY = get_api_key()
+    hint_name = (local_extracted_name or "").strip()
+    
+    # Fallback immédiat si pas de clé
+    default_response = {
+        "macro_category": "Non classé",
+        "sub_category": "Autre",
+        "years_experience": 0,
+        "candidate_name": hint_name or "Candidat",
+        "profile_summary": "Analyse impossible (clé manquante)."
+    }
+    
+    if not API_KEY: return default_response
 
-    1. "FONCTIONS SUPPORTS"
-       Regroupe toutes les directions du siège hors production directe.
-       - RH : Directeur Capital Humain, Responsable Recrutement, Chargé de développement RH, Gestionnaire de paie, Formation (TGCC Academy).
-       - Finance (DAF) : Comptable, Trésorier, Contrôleur de Gestion, Fiscalité.
-       - Juridique : Juriste, Responsable contentieux.
-       - IT & Transformation : DSI, Chef de projet SI, Technicien Réseaux, PMO, Directeur Transformation.
-       - Marketing : Communication, Espace d'Art.
-       - Achats & Sous-traitance : Acheteur, Ingénieur Achats (Génie Civil), Gestionnaire sous-traitance.
-       - Audit & Contrôle : Auditeur interne, Contrôleur interne.
-       - Performance Opérationnelle : Responsable CDG Perf Opérationnelle, Data Analyst.
-       - Services Généraux : Moyens généraux, Accueil, Coursier.
-       - QHSE : Responsable HSE, Superviseur HSE, Responsable QSE (Classé ici selon organigramme).
+    url = "https://api.deepseek.com/v1/chat/completions"
+    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
+    
+    # Prompt plus permissif pour éviter le filtrage excessif "Non classé"
+    prompt = f"""
+    Agis comme un expert en recrutement. Analyse ce CV.
 
-    2. "LOGISTIQUE"
-       - Gestion Matériel : Responsable Matériel, Gestionnaire flotte.
-       - Parc & Atelier : Chef d'atelier (Mécanique/Électrique), Magasinier.
-       - Transport : Responsable Transport, Planificateur.
+    1. IDENTIFICATION NOM:
+    Si "{hint_name}" est vide ou générique, trouve le vrai nom (Prénom NOM). Evite les titres (Manager, CV, Profil).
+    
+    2. CLASSIFICATION (Crucial):
+    Classe ce profil dans UNE seule de ces 3 catégories :
+    - "Fonctions supports" (RH, Finance, IT, Juridique...)
+    - "Logistique" (Supply Chain, Transport...)
+    - "Production/Technique" (Ingénierie, BTP, Industrie...)
+    
+    Si tu hésites, choisis la plus proche. Ne mets JAMAIS "Non classé" sauf si c'est illisible.
 
-    3. "PRODUCTION - ÉTUDES (BUREAU)"
-       Regroupe les directions "Études & Marchés", "Décomptes & Métrés" et "Technique".
-       - Métrés : Responsable Métrés, Métreur, Métreur vérificateur.
-       - Études de Prix : Ingénieur Étude de Prix, Chiffrage.
-       - Méthodes & Planning : Ingénieur Méthodes, Ingénieur Planning, Planificateur.
-       - Technique : Directeur Technique, Ingénieur Synthèse, Projeteur.
+    3. EXTRACTION
+    - Sous-catégorie précise (Interdit: "Étudiant", "Stagiaire". Indiquer le métier visé, ex: "Assistant RH").
+    - Années d'expérience (nombre).
+    - Un résumé court (2 phrases).
 
-    4. "PRODUCTION - TRAVAUX (CHANTIER)"
-       Le cœur du BTP sur le terrain.
-       - Encadrement : Directeur de Projet, Chef de Projet, Directeur de Travaux.
-       - Exécution : Conducteur de Travaux, Ingénieur Travaux, Chef de Chantier, Chef d'équipe, OPC.
-
-    5. "PRODUCTION - QUALITÉ"
-       Spécifique au contrôle qualité sur projet.
-       - Postes : Responsable Qualité Chantier, Ingénieur Qualité, Contrôle Qualité.
-
-    6. "DIVERS / HORS PÉRIMÈTRE"
-       - Tout profil qui ne correspond pas au secteur du BTP/Construction ou aux fonctions supports citées.
-       - Exemples : Ingénierie Nucléaire, Aéronautique, Médical (Médecin/Infirmier hors travail), Enseignement scolaire, etc.
-"""
-
-def get_classification_prompt(text, hint_name):
-    """Génère le prompt de classification TGCC."""
-    return f"""
-    Agis comme le Responsable Recrutement d'une grande entreprise de BTP (type TGCC).
-    Analyse le CV ci-dessous et extrais les informations selon nos standards internes.
-
-    --- TÂCHE 1 : IDENTITÉ ---
-    Trouve le "Prénom NOM" (Indice: "{hint_name}").
-
-    --- TÂCHE 2 : CLASSIFICATION MÉTIER (CRITIQUE) ---
-    Classe le profil dans UNE seule des catégories suivantes en respectant scrupuleusement la liste des postes ci-dessus :
-    - "FONCTIONS SUPPORTS"
-    - "LOGISTIQUE"
-    - "PRODUCTION - ÉTUDES (BUREAU)"
-    - "PRODUCTION - TRAVAUX (CHANTIER)"
-    - "PRODUCTION - QUALITÉ"
-    - "DIVERS / HORS PÉRIMÈTRE"
-
-    {CATEGORIES_PROMPT}
-
-    --- TÂCHE 3 : DÉTAILS ---
-    - Sous-catégorie : Le titre du poste exact visé.
-    - Expérience : Nombre d'années (int).
-    - Résumé : Une phrase de synthèse.
-
-    Réponds UNIQUEMENT avec ce JSON :
+    Réponds UNIQUEMENT ce JSON valide :
     {{
         "candidate_name": "...",
         "macro_category": "...",
@@ -1410,196 +1459,281 @@ def get_classification_prompt(text, hint_name):
     }}
 
     CV TEXTE :
-    {text[:4000]}
+    {text[:3000]}
     """
 
-def classify_resume_with_model(text, model_name, hint_name=""):
-    """Fonction générique unifiée pour classer un CV avec n'importe quel modèle IA."""
-    prompt = get_classification_prompt(text, hint_name)
-    
-    # Valeurs par défaut
-    default_result = {
-        "macro_category": "Non classé",
-        "sub_category": "Autre",
-        "years_experience": 0,
-        "candidate_name": hint_name or "Candidat Inconnu",
-        "profile_summary": "Erreur d'analyse.",
-        "raw_response": ""
-    }
-
     try:
-        response_text = ""
+        response = requests.post(url, headers=headers, data=json.dumps({
+            "model": "deepseek-chat",
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.1
+        }))
+        response.raise_for_status()
         
-        # Logique d'appel API centralisée
-        if model_name == "Gemini":
-            api_key = get_gemini_api_key()
-            if not api_key: return default_result
-            genai.configure(api_key=api_key)
-            try:
-                model = genai.GenerativeModel('gemini-2.5-flash-lite', generation_config={"response_mime_type": "application/json"})
-                response = model.generate_content(prompt)
-                response_text = response.text
-            except:
-                model = genai.GenerativeModel('gemini-flash-latest')
-                response = model.generate_content(prompt)
-                response_text = response.text
-
-        elif model_name == "DeepSeek":
-            api_key = get_api_key()
-            if not api_key: return default_result
-            headers = {"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"}
-            payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.1}
-            resp = requests.post("https://api.deepseek.com/v1/chat/completions", headers=headers, json=payload)
-            resp.raise_for_status()
-            response_text = resp.json()["choices"][0]["message"]["content"]
-
-        elif model_name == "Groq":
-            api_key = get_groq_api_key()
-            if not api_key: return default_result
-            client = groq.Groq(api_key=api_key)
-            completion = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model="llama-3.1-8b-instant", temperature=0.1, response_format={"type": "json_object"})
-            response_text = completion.choices[0].message.content
-
-        elif model_name == "Claude":
-            api_key = get_claude_api_key()
-            if not api_key: return default_result
-            client = anthropic.Anthropic(api_key=api_key)
-            msg = client.messages.create(model="claude-3-haiku-20240307", max_tokens=1000, messages=[{"role": "user", "content": prompt}])
-            # Cast response to Any to avoid static-typing attribute access issues with Pylance
-            from typing import Any, cast
-            msg_any = cast(Any, msg)
-            # Safely extract text from the response (handles both object-like and dict-like responses)
-            response_text = ""
-            content = getattr(msg_any, "content", None)
-            if content and isinstance(content, (list, tuple)):
-                first = content[0]
-                if isinstance(first, dict):
-                    response_text = first.get("text", "") or first.get("content", "")
-                else:
-                    response_text = getattr(first, "text", "") or getattr(first, "content", "")
-            else:
-                # Fallback for dict-like responses
-                try:
-                    response_text = msg_any.get("content", [])[0].get("text", "")
-                except Exception:
-                    try:
-                        response_text = str(msg_any)
-                    except Exception:
-                        response_text = ""
-
-        elif model_name == "OpenRouter":
-            api_key = get_openrouter_api_key()
-            if not api_key: return default_result
-            resp = requests.post("https://openrouter.ai/api/v1/chat/completions", headers={"Authorization": f"Bearer {api_key}"}, json={"model": "openai/gpt-3.5-turbo", "messages": [{"role": "user", "content": prompt}]})
-            response_text = resp.json()['choices'][0]['message']['content']
-
-        # Parsing : essayer JSON puis fallback d'inférence depuis la réponse brute
-        clean_text = clean_json_string(response_text)
-        data = None
+        # Nettoyage et Parsing
+        raw_content = response.json()["choices"][0]["message"]["content"]
+        # Utiliser l'outil de nettoyage JSON que nous avons ajouté
+        clean_content = clean_json_string(raw_content)
+        
         try:
-            data = json.loads(clean_text)
-        except Exception:
-            data = None
+            data = json.loads(clean_content)
+        except:
+            # Si le JSON est cassé, on essaie de sauver les meubles avec regex
+            data = {}
+            if "Production" in raw_content or "Technique" in raw_content: data["macro_category"] = "Production/Technique"
+            elif "Logistique" in raw_content: data["macro_category"] = "Logistique"
+            elif "support" in raw_content: data["macro_category"] = "Fonctions supports"
 
-        def infer_from_text(txt):
-            t = (txt or "").lower()
-            # recherches simples de mots-clés
-            if any(k in t for k in ["rh", "recrut", "paie", "comptable", "finance", "jurid", "it", "ds i", "marketing", "achats"]):
-                return "FONCTIONS SUPPORTS"
-            if any(k in t for k in ["logist", "transport", "magasin", "atelier", "parc"]):
-                return "LOGISTIQUE"
-            if any(k in t for k in ["métr", "metre", "étude", "etude", "métré", "etudes", "dessinateur", "ingénieur études", "méthodes"]):
-                return "PRODUCTION - ÉTUDES (BUREAU)"
-            if any(k in t for k in ["chantier", "travaux", "conducteur", "chef chantier", "chef de chantier", "opérateur"]):
-                return "PRODUCTION - TRAVAUX (CHANTIER)"
-            if any(k in t for k in ["qualit", "qse", "hse", "contrôle qualité", "inspecteur"]):
-                return "PRODUCTION - QUALITÉ"
-            if any(k in t for k in ["nuclé", "nucle", "aéron", "aero", "médic", "medic", "infirm", "enseign" ]):
-                return "DIVERS / HORS PÉRIMÈTRE"
-            return "NON CLASSÉ"
+        # Validation post-traitement (Safety check)
+        final_name = data.get("candidate_name", "Candidat")
+        
+        # Liste noire de sécurité
+        blacklist = ["curriculum", "vitae", "resume", "profil", "ingénieur", "manager", "développeur", "page", "cv"]
+        if any(bad in final_name.lower() for bad in blacklist):
+            final_name = hint_name if hint_name else "Candidat (Nom non détecté)"
 
-        if data is None:
-            # tenter d'inférer depuis la réponse brute et le prompt original
-            inferred = infer_from_text(response_text) if response_text else infer_from_text(prompt)
-            return {
-                "macro_category": inferred,
-                "sub_category": "Autre",
-                "years_experience": 0,
-                "candidate_name": hint_name or "Candidat Inconnu",
-                "profile_summary": "",
-                "raw_response": response_text
-            }
-
-        # Si on a un JSON valide
-        macro = data.get("macro_category", "Non classé")
-        # Validation basique et normalisation
-        valid_categories = ["FONCTIONS SUPPORTS", "LOGISTIQUE", "PRODUCTION - ÉTUDES (BUREAU)", 
-                          "PRODUCTION - TRAVAUX (CHANTIER)", "PRODUCTION - QUALITÉ", "DIVERS / HORS PÉRIMÈTRE"]
-
-        macro_upper = macro.upper() if macro else ""
-        if macro_upper not in valid_categories:
-            # Tentative de récupération souple depuis la valeur retournée
-            m_low = (macro or "").lower()
-            if "support" in m_low or "rh" in m_low or "finance" in m_low or "jurid" in m_low or "it" in m_low:
-                macro = "FONCTIONS SUPPORTS"
-            elif "logist" in m_low or "transport" in m_low or "magasin" in m_low:
-                macro = "LOGISTIQUE"
-            elif "étude" in m_low or "etude" in m_low or "métr" in m_low or "metre" in m_low or "bureau" in m_low:
-                macro = "PRODUCTION - ÉTUDES (BUREAU)"
-            elif "travaux" in m_low or "chantier" in m_low or "conducteur" in m_low or "chef" in m_low:
-                macro = "PRODUCTION - TRAVAUX (CHANTIER)"
-            elif "qualit" in m_low or "qse" in m_low or "hse" in m_low:
-                macro = "PRODUCTION - QUALITÉ"
-            elif "divers" in m_low or "hors" in m_low:
-                macro = "DIVERS / HORS PÉRIMÈTRE"
-            else:
-                # Si toujours inconnu, tenter depuis raw
-                macro = infer_from_text(response_text)
-        else:
-            macro = macro_upper
+        # Normalisation catégorie
+        macro = data.get("macro_category")
+        # Si le modèle renvoie une variante bizarre, on normalise
+        if macro:
+            if "support" in macro.lower(): macro = "Fonctions supports"
+            elif "logisti" in macro.lower(): macro = "Logistique"
+            elif "product" in macro.lower() or "technip" in macro.lower() or "btp" in macro.lower(): macro = "Production/Technique"
+        
+        if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]:
+            macro = "Non classé"
 
         return {
             "macro_category": macro,
             "sub_category": data.get("sub_category", "Autre"),
-            "years_experience": int(data.get("years_experience", 0) or 0),
-            "candidate_name": data.get("candidate_name", hint_name),
-            "profile_summary": data.get("profile_summary", ""),
-            "raw_response": response_text
+            "years_experience": data.get("years_experience", 0),
+            "candidate_name": final_name,
+            "profile_summary": data.get("profile_summary", "")
         }
 
     except Exception as e:
-        print(f"Erreur classification ({model_name}): {e}")
-        # Attacher le raw_response et l'erreur pour debug
-        try:
-            default_result['raw_response'] = response_text
-        except Exception:
-            default_result['raw_response'] = ''
-        try:
-            default_result['error'] = str(e)
-        except Exception:
-            default_result['error'] = 'unknown'
-        return default_result
-
-# -------------------- ANCIENNES FONCTIONS (conservées pour compatibilité) --------------------
-def get_deepseek_auto_classification(text: str, local_extracted_name: str | None) -> dict:
-    """Wrapper pour compatibilité - utilise la fonction unifiée."""
-    return classify_resume_with_model(text, "DeepSeek", local_extracted_name or "")
-
-def get_gemini_auto_classification(text: str, full_name: str | None) -> dict:
-    """Wrapper pour compatibilité - utilise la fonction unifiée."""
-    return classify_resume_with_model(text, "Gemini", full_name or "")
+        print(f"DeepSeek Error: {e}")
+        default_response["candidate_name"] = hint_name or "Erreur Extraction"
+        return default_response
 
 def get_groq_auto_classification(text: str, local_extracted_name: str | None) -> dict:
-    """Wrapper pour compatibilité - utilise la fonction unifiée."""
-    return classify_resume_with_model(text, "Groq", local_extracted_name or "")
+    API_KEY = get_groq_api_key()
+    hint_name = (local_extracted_name or "").strip()
+    
+    default_response = {
+        "macro_category": "Non classé",
+        "sub_category": "Autre",
+        "years_experience": 0,
+        "candidate_name": hint_name or "Candidat",
+        "profile_summary": "Analyse impossible (clé manquante)."
+    }
+    
+    if not API_KEY: return default_response
+
+    try:
+        client = groq.Groq(api_key=API_KEY)
+        
+        prompt = f"""
+        Agis comme un expert en recrutement. Analyse ce CV.
+
+        1. IDENTIFICATION NOM:
+        Si "{hint_name}" est vide ou générique, trouve le vrai nom.
+        
+        2. CLASSIFICATION (Crucial):
+        Classe ce profil dans UNE seule de ces 3 catégories :
+        - "Fonctions supports"
+        - "Logistique"
+        - "Production/Technique"
+        
+        3. EXTRACTION
+        - Sous-catégorie précise (Interdit: "Étudiant", "Stagiaire". Indiquer le métier visé).
+        - Années d'expérience (nombre entier).
+        - Un résumé court.
+
+        Réponds UNIQUEMENT ce JSON valide :
+        {{
+            "candidate_name": "...",
+            "macro_category": "...",
+            "sub_category": "...",
+            "years_experience": 0,
+            "profile_summary": "..."
+        }}
+
+        CV TEXTE :
+        {text[:4000]}
+        """
+
+        completion = client.chat.completions.create(
+            messages=[
+                {"role": "system", "content": "Tu es un expert JSON. Tu ne réponds que du JSON valide."},
+                {"role": "user", "content": prompt}
+            ],
+            model="llama-3.1-8b-instant",
+            temperature=0.1,
+            response_format={"type": "json_object"}
+        )
+        
+        content = completion.choices[0].message.content
+        data = json.loads(content)
+        
+        macro = data.get("macro_category")
+        if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]:
+            if "support" in str(macro).lower(): macro = "Fonctions supports"
+            elif "logisti" in str(macro).lower(): macro = "Logistique"
+            elif "product" in str(macro).lower() or "techni" in str(macro).lower(): macro = "Production/Technique"
+            else: macro = "Non classé"
+
+        return {
+            "macro_category": macro,
+            "sub_category": data.get("sub_category", "Autre"),
+            "years_experience": data.get("years_experience", 0),
+            "candidate_name": data.get("candidate_name", hint_name),
+            "profile_summary": data.get("profile_summary", "")
+        }
+    except Exception as e:
+        print(f"Groq Error: {e}")
+        return default_response
 
 def get_claude_auto_classification(text: str, local_extracted_name: str | None) -> dict:
-    """Wrapper pour compatibilité - utilise la fonction unifiée."""
-    return classify_resume_with_model(text, "Claude", local_extracted_name or "")
+    API_KEY = get_claude_api_key()
+    hint_name = (local_extracted_name or "").strip()
+    
+    default_response = {
+        "macro_category": "Non classé",
+        "sub_category": "Autre",
+        "years_experience": 0,
+        "candidate_name": hint_name or "Candidat",
+        "profile_summary": "Analyse impossible (clé manquante)."
+    }
+    
+    if not API_KEY: return default_response
+
+    try:
+        client = anthropic.Anthropic(api_key=API_KEY)
+        
+        prompt = f"""
+        Analyse ce CV et extrais les informations au format JSON.
+
+        1. Nom du candidat (utilise "{hint_name}" comme indice).
+        2. Catégorie (CHOIX STRICT): "Fonctions supports", "Logistique", "Production/Technique".
+        3. Sous-catégorie (Interdit "Étudiant", "Stagiaire". Indiquer le métier).
+        4. Années d'expérience (int).
+        5. Résumé (2 phrases).
+
+        Format JSON attendu:
+        {{
+            "candidate_name": "...",
+            "macro_category": "...",
+            "sub_category": "...",
+            "years_experience": 0,
+            "profile_summary": "..."
+        }}
+
+        CV:
+        {text[:4000]}
+        """
+
+        message = client.messages.create(
+            model="claude-3-haiku-20240307",
+            max_tokens=1000,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        
+        content = ""
+        for block in message.content:
+            if block.type == "text":
+                content += block.text
+        
+        clean_content = clean_json_string(content)
+        data = json.loads(clean_content)
+        
+        macro = data.get("macro_category")
+        if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]:
+             macro = "Non classé"
+
+        return {
+            "macro_category": macro,
+            "sub_category": data.get("sub_category", "Autre"),
+            "years_experience": data.get("years_experience", 0),
+            "candidate_name": data.get("candidate_name", hint_name),
+            "profile_summary": data.get("profile_summary", "")
+        }
+    except Exception as e:
+        print(f"Claude Error: {e}")
+        return default_response
 
 def get_openrouter_auto_classification(text: str, local_extracted_name: str | None) -> dict:
-    """Wrapper pour compatibilité - utilise la fonction unifiée."""
-    return classify_resume_with_model(text, "OpenRouter", local_extracted_name or "")
+    API_KEY = get_openrouter_api_key()
+    hint_name = (local_extracted_name or "").strip()
+    
+    default_response = {
+        "macro_category": "Non classé",
+        "sub_category": "Autre",
+        "years_experience": 0,
+        "candidate_name": hint_name or "Candidat",
+        "profile_summary": "Analyse impossible (clé manquante)."
+    }
+    
+    if not API_KEY: return default_response
+
+    headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://tg-hire.streamlit.app/",
+        "X-Title": "TG Hire"
+    }
+    
+    prompt = f"""
+    Act as a recruitment expert. Analyze this resume.
+    
+    1. Name: Find the candidate name. Hint: "{hint_name}".
+    2. Category (STRICTLY ONE OF): "Fonctions supports", "Logistique", "Production/Technique".
+    3. Sub-category (Do NOT use "Student" or "Intern". Use target job title).
+    4. Years of experience (integer).
+    5. Summary (2 sentences).
+
+    Reply ONLY with valid JSON:
+    {{
+        "candidate_name": "...",
+        "macro_category": "...",
+        "sub_category": "...",
+        "years_experience": 0,
+        "profile_summary": "..."
+    }}
+
+    RESUME TEXT:
+    {text[:4000]}
+    """
+
+    try:
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers=headers,
+            data=json.dumps({
+                "model": "openai/gpt-3.5-turbo",
+                "messages": [{"role": "user", "content": prompt}]
+            })
+        )
+        response.raise_for_status()
+        
+        content = response.json()['choices'][0]['message']['content']
+        clean_content = clean_json_string(content)
+        data = json.loads(clean_content)
+        
+        macro = data.get("macro_category")
+        if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]:
+             macro = "Non classé"
+
+        return {
+            "macro_category": macro,
+            "sub_category": data.get("sub_category", "Autre"),
+            "years_experience": data.get("years_experience", 0),
+            "candidate_name": data.get("candidate_name", hint_name),
+            "profile_summary": data.get("profile_summary", "")
+        }
+    except Exception as e:
+        print(f"OpenRouter Error: {e}")
+        return default_response
 
 
 def extract_name_smart_email(text):
@@ -2171,20 +2305,13 @@ def create_organized_zip(results, file_list):
     zip_buffer = BytesIO()
     manifest_data = []
     
-    # Nouvelle structure de dossiers selon organigramme TGCC
+    # Créer les dossiers par catégorie
     folders = {
-        'FONCTIONS SUPPORTS': '1_Fonctions_Supports/',
-        'LOGISTIQUE': '2_Logistique/',
-        'PRODUCTION - ÉTUDES (BUREAU)': '3_Production/Etudes_Metres_Technique/',
-        'PRODUCTION - TRAVAUX (CHANTIER)': '3_Production/Travaux_Chantier/',
-        'PRODUCTION - QUALITÉ': '3_Production/Qualite/',
-        'DIVERS / HORS PÉRIMÈTRE': '4_Divers_Hors_Perimetre/',
-        'Non classé': '5_Non_Classe/',
-        # Ancienne compatibilité
-        'Production': '3_Production/',
-        'Production/Technique': '3_Production/',
-        'Fonctions supports': '1_Fonctions_Supports/',
-        'Logistique': '2_Logistique/'
+        'Production': 'Production/',
+        'Production/Technique': 'Production/',
+        'Fonctions supports': 'Fonctions_supports/',
+        'Logistique': 'Logistique/',
+        'Non classé': 'Non_classe/'
     }
     
     # Déterminer quelles catégories sont réellement présentes
@@ -3260,17 +3387,39 @@ with st.sidebar:
         else:
              st.warning("⚠️ Groq : Clé manquante")
 
+        # Test OpenRouter
+        openrouter_key = get_openrouter_api_key()
+        if openrouter_key:
+            try:
+                resp = requests.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {openrouter_key}"},
+                    json={
+                        "model": "openai/gpt-3.5-turbo",
+                        "messages": [{"role": "user", "content": "Ping"}]
+                    },
+                    timeout=10
+                )
+                if resp.status_code == 200:
+                    # basic validation of response structure
+                    try:
+                        jr = resp.json()
+                        if jr.get('choices') and jr['choices'][0].get('message'):
+                            st.success("✅ OpenRouter : Connecté")
+                        else:
+                            st.error(f"❌ OpenRouter : réponse inattendue")
+                    except Exception:
+                        st.error("❌ OpenRouter : réponse non JSON")
+                else:
+                    st.error(f"❌ OpenRouter : Erreur {resp.status_code}")
+            except Exception as e:
+                st.error(f"❌ OpenRouter : {e}")
+        else:
+            st.warning("⚠️ OpenRouter : Clé manquante")
+
 with tab5:
-    st.header("🗂️ Auto-classification de CVs (6 catégories TGCC)")
-    st.markdown("""
-    Chargez vos CVs (PDF). L'outil extrait le texte et classe automatiquement chaque CV dans l'une des 6 catégories :
-    - **FONCTIONS SUPPORTS** : RH, Finance, SI, Juridique, Communication, Qualité/HSE, Achats, Assistanat/Administratif
-    - **LOGISTIQUE** : Transport, Stockage, Approvisionnement, Magasinier, Logisticien
-    - **PRODUCTION - ÉTUDES (BUREAU)** : Ingénieur études, Métreur, Dessinateur projeteur, BIM Manager, Chef projet technique
-    - **PRODUCTION - TRAVAUX (CHANTIER)** : Chef chantier, Conducteur travaux, Directeur travaux, Ingénieur travaux, OPC, Préparateur méthodes
-    - **PRODUCTION - QUALITÉ** : Responsable QSE, Contrôleur qualité, Inspecteur HSE
-    - **DIVERS / HORS PÉRIMÈTRE** : Profils hors scope BTP ou inclassables
-    """)
+    st.header("🗂️ Auto-classification de CVs (3 catégories)")
+    st.markdown("Chargez jusqu'à 100 CVs (PDF). L'outil extrait le texte et classe automatiquement chaque CV dans l'une des 3 catégories : Fonctions supports, Logistique, Production/Technique.")
 
     # Importer des CVs uniquement via upload
     uploaded_files_auto = st.file_uploader("Importer des CVs (PDF)", type=["pdf"], accept_multiple_files=True, key="auto_uploader")
@@ -3284,26 +3433,30 @@ with tab5:
     # Afficher immédiatement combien de CVs ont été uploadés
     if len(file_list) > 0:
         st.success(f"✅ {len(file_list)} CV(s) uploadé(s) et prêts pour traitement.")
+        # Message d'instruction supprimé
 
         # Limiter à 200 pour sécurité
         if len(file_list) > 200:
             st.warning('Plus de 200 CVs trouvés. Seuls les 200 premiers seront traités.')
             file_list = file_list[:200]
 
-        # Initialiser les variables de session
+        # Initialiser les variables de session pour la classification et l'analyse DeepSeek
         if 'classification_results' not in st.session_state:
             st.session_state.classification_results = None
+        if 'deepseek_analyses' not in st.session_state:
+            st.session_state.deepseek_analyses = []
         if 'last_action' not in st.session_state:
             st.session_state.last_action = None
         
         # Afficher un indicateur de statut si une action a été effectuée précédemment
         if st.session_state.last_action:
             action_message = {
-                "classified": "✅ CVs classifiés avec succès !",
-                "reset": "🔄 Résultats réinitialisés."
+                "classified": "✅ CVs classifiés avec succès ! Vous pouvez maintenant analyser les CVs non classés avec l'IA.",
+                "analyzed": "✅ CVs non classés analysés avec DeepSeek IA !",
+                "reset": "🔄 Analyses IA réinitialisées."
             }
-            if st.session_state.last_action in action_message:
-                st.success(action_message[st.session_state.last_action])
+            st.success(action_message.get(st.session_state.last_action, ""))
+            # Réinitialiser pour ne pas afficher le message à chaque rechargement
             st.session_state.last_action = None
         
         # Option pour renommer et organiser les CV
@@ -3314,13 +3467,17 @@ with tab5:
         )
 
         # Choix du modèle IA pour la classification
-        classif_model = st.selectbox("Modèle IA pour la classification", ["DeepSeek", "Gemini", "Groq", "Claude", "OpenRouter"], key="classif_model_tab5")
+        classif_model = st.selectbox("Modèle IA pour la classification", ["DeepSeek", "Gemini", "Groq", "Claude", "OpenRouter"])
         
         # Bouton de classification primaire
-        if st.button("📂 Lancer l'auto-classification", type='primary', key="btn_classify_tab5"):
+        if st.button("📂 Lancer l'auto-classification", type='primary'):
+            # Réinitialiser les analyses DeepSeek lors d'une nouvelle classification
+            st.session_state.deepseek_analyses = []
+            
             results = []
             progress = st.progress(0)
             total = len(file_list)
+            # placeholder pour afficher le fichier en cours de traitement
             processing_placeholder = st.empty()
             spinner_text = 'Extraction, classification et extraction des noms en cours...' if rename_and_organize else 'Extraction et classification en cours...'
             
@@ -3328,38 +3485,53 @@ with tab5:
                 for i, item in enumerate(file_list):
                     f = item['file']
                     name = item['name']
+                    # Mettre à jour le fichier en cours
                     processing_placeholder.info(f"Traitement ({i+1}/{total}) : {name}")
-                    
                     try:
                         text = extract_text_from_pdf(f)
                     except Exception:
                         text = ''
 
-                    # Extraction du nom du candidat
+                    # --- NOUVELLE LOGIQUE D'EXTRACTION DE NOM ---
+                    # 1. Extraction locale intelligente (Email Cross-Check)
                     local_extraction = extract_name_smart_email(text)
                     extracted_name_info = local_extraction
                     
                     if not extracted_name_info:
-                        extracted_name_info = extract_name_from_cv_text(text) if text else None
+                         # Fallback sur l'ancienne méthode regex
+                         extracted_name_info = extract_name_from_cv_text(text) if text else None
 
+                    # Détermination du nom à envoyer à l'IA comme indice
                     if extracted_name_info and extracted_name_info.get('name'):
                         display_name = extracted_name_info['name']
                     else:
                         display_name = os.path.splitext(name)[0]
 
-                    # Classification via la fonction unifiée
+                    # Classification principale 100% via IA (macro + sous-cat + récap)
                     text_for_ai = (text or '')[:3000]
-                    classification = classify_resume_with_model(text_for_ai, display_name, classif_model)
+                    
+                    if classif_model == "Gemini":
+                        classification = get_gemini_auto_classification(text_for_ai, display_name)
+                    elif classif_model == "Groq":
+                        classification = get_groq_auto_classification(text_for_ai, display_name)
+                    elif classif_model == "Claude":
+                        classification = get_claude_auto_classification(text_for_ai, display_name)
+                    elif classif_model == "OpenRouter":
+                        classification = get_openrouter_auto_classification(text_for_ai, display_name)
+                    else:
+                        classification = get_deepseek_auto_classification(text_for_ai, display_name)
 
-                    cat = classification.get('macro_category', 'DIVERS / HORS PÉRIMÈTRE')
+                    cat = classification.get('macro_category', 'Non classé')
                     sub_cat = classification.get('sub_category', 'Autre')
                     profile_summary = classification.get('profile_summary', '')
                     years_exp = classification.get('years_experience', 0)
                     
                     # Mise à jour du nom extrait si l'IA en a trouvé un meilleur
                     ai_name = classification.get('candidate_name')
+                    # On fait confiance à l'IA si elle a trouvé un nom différent de "Candidat" et qu'on n'avait pas de certitude absolue (0.99)
                     if ai_name and "Candidat" not in ai_name and "Erreur" not in ai_name:
-                        if not (extracted_name_info and extracted_name_info.get('confidence', 0) >= 0.99):
+                         # Si notre méthode locale n'était pas sûre à 99% (smart email), on prend celle de l'IA
+                         if not (extracted_name_info and extracted_name_info.get('confidence', 0) >= 0.99):
                             extracted_name_info = {
                                 "name": ai_name,
                                 "confidence": 1.0,
@@ -3373,52 +3545,47 @@ with tab5:
                         'years_experience': years_exp,
                         'profile_summary': profile_summary,
                         'text_snippet': (text or '')[:800],
-                        'full_text': text
+                        'full_text': text  # Garder le texte complet pour le ZIP
                     }
 
+                    # Conserver l'info de nom extrait pour le ZIP si demandé
                     if extracted_name_info:
                         result_item['extracted_name'] = extracted_name_info
 
                     results.append(result_item)
                     progress.progress((i+1)/total)
 
+            # Nettoyer le placeholder
             processing_placeholder.empty()
+
+            # Stocker les résultats de classification dans la session state
             st.session_state.classification_results = results
             st.session_state.rename_and_organize_option = rename_and_organize
-            st.session_state.uploaded_files_list = file_list
+            st.session_state.uploaded_files_list = file_list  # Stocker pour le ZIP
             st.session_state.last_action = "classified"
         
-        # Afficher les résultats si disponibles
+        # Si des résultats de classification existent (soit de l'action actuelle ou précédente), les afficher
         if st.session_state.classification_results:
+            # Convertir les résultats en DataFrame
             df = pd.DataFrame(st.session_state.classification_results)
             
-            # Statistiques par catégorie TGCC
+            # Calcul des statistiques pour le message de résumé
             num_total = len(df)
-            categories_tgcc = [
-                'FONCTIONS SUPPORTS',
-                'LOGISTIQUE', 
-                'PRODUCTION - ÉTUDES (BUREAU)',
-                'PRODUCTION - TRAVAUX (CHANTIER)',
-                'PRODUCTION - QUALITÉ',
-                'DIVERS / HORS PÉRIMÈTRE'
-            ]
-            stats = {cat: len(df[df['category'] == cat]) for cat in categories_tgcc}
-            num_classified = sum(stats.values())
+            num_supports = len(df[df['category'] == 'Fonctions supports'])
+            num_logistics = len(df[df['category'] == 'Logistique'])
+            num_production = len(df[df['category'] == 'Production/Technique'])
+            num_unclassified = len(df[df['category'] == 'Non classé'])
+            num_classified = num_total - num_unclassified
             
+            # Message de succès avec statistiques et pourcentages
+            percent_classified = int(round(num_classified / num_total * 100)) if num_total > 0 else 0
+            percent_unclassified = int(round(num_unclassified / num_total * 100)) if num_total > 0 else 0
+            st.success(f"✅ Traitement terminé : {num_total} CV(s) traité(s), dont {num_classified} ({percent_classified}%) classé(s) et {num_unclassified} ({percent_unclassified}%) non classé(s).")
+            
+            # Utiliser le DataFrame pour l'affichage
             display_df = df.copy()
-            # Normaliser les catégories (trim + uppercase) pour éviter les comptages à 0
-            if 'category' in display_df.columns:
-                display_df['category'] = display_df['category'].astype(str).str.strip().str.upper()
-            else:
-                display_df['category'] = 'NON CLASSE'
 
-            # Option debug pour voir les comptes réels (désactivé par défaut)
-            if st.checkbox("Afficher debug catégories (temp)", value=False):
-                try:
-                    st.write(display_df['category'].value_counts().to_dict())
-                except Exception:
-                    st.write('Debug categories unavailable')
-
+            # Préparer un nom d'affichage par ligne (nom extrait si dispo, sinon nom de fichier sans extension)
             def _get_display_name_for_row(row):
                 extracted = row.get('extracted_name')
                 if isinstance(extracted, dict) and extracted.get('name'):
@@ -3427,87 +3594,102 @@ with tab5:
 
             display_df['display_name'] = display_df.apply(_get_display_name_for_row, axis=1)
 
-            # Affichage en 3 colonnes pour les catégories principales
-            st.markdown("---")
-            st.subheader("📊 Résultats par catégorie")
-            
+            # Affichage en 3 colonnes avec panneaux repliables par sous-catégorie
             cols = st.columns(3)
-            # Affichage en 3 colonnes : Fonction support | Logistique | Production (inclut 'Divers')
-            cols = st.columns(3)
-            # Première colonne : FONCTIONS SUPPORTS
-            with cols[0]:
-                cat_label = 'FONCTIONS SUPPORTS'
-                sub_df = display_df[display_df['category'] == cat_label]
-                count_cat = len(sub_df)
-                with st.expander(f"📁 {cat_label} ({count_cat})", expanded=count_cat > 0):
+            cats = ['Fonctions supports', 'Logistique', 'Production/Technique']
+            for idx, cat_label in enumerate(cats):
+                with cols[idx]:
+                    sub_df = display_df[display_df['category'] == cat_label]
+                    count_cat = len(sub_df)
+                    st.subheader(f"{cat_label} ({count_cat})")
                     if sub_df.empty:
                         st.write('Aucun CV classé ici.')
                     else:
+                        # Regrouper par sous-catégorie (sous-direction / sous-filière)
                         sub_df = sub_df.copy()
-                        sub_df['sub_category'] = sub_df['sub_category'].fillna('Autre')
-                        subcats = sorted(sub_df['sub_category'].unique())
-                        for subcat in subcats:
-                            filtered = sub_df[sub_df['sub_category'] == subcat]
-                            count_subcat = len(filtered)
-                            st.markdown(f"**{subcat}** ({count_subcat})")
-                            for _, r in filtered.iterrows():
-                                card_title = r['display_name']
-                                years_exp = r.get('years_experience', 0)
-                                exp_info = f" - {years_exp} ans" if years_exp and years_exp > 0 else ""
-                                st.write(f"• {card_title}{exp_info}")
-
-            # Deuxième colonne : LOGISTIQUE
-            with cols[1]:
-                cat_label = 'LOGISTIQUE'
-                sub_df = display_df[display_df['category'] == cat_label]
-                count_cat = len(sub_df)
-                with st.expander(f"📁 {cat_label} ({count_cat})", expanded=count_cat > 0):
-                    if sub_df.empty:
-                        st.write('Aucun CV classé ici.')
-                    else:
-                        sub_df = sub_df.copy()
-                        sub_df['sub_category'] = sub_df['sub_category'].fillna('Autre')
-                        subcats = sorted(sub_df['sub_category'].unique())
-                        for subcat in subcats:
-                            filtered = sub_df[sub_df['sub_category'] == subcat]
-                            count_subcat = len(filtered)
-                            st.markdown(f"**{subcat}** ({count_subcat})")
-                            for _, r in filtered.iterrows():
-                                card_title = r['display_name']
-                                years_exp = r.get('years_experience', 0)
-                                exp_info = f" - {years_exp} ans" if years_exp and years_exp > 0 else ""
-                                st.write(f"• {card_title}{exp_info}")
-
-            # Troisième colonne : PRODUCTION (inclut toutes les production sous-cats + DIVERS)
-            with cols[2]:
-                production_groups = ['PRODUCTION - ÉTUDES (BUREAU)', 'PRODUCTION - TRAVAUX (CHANTIER)', 'PRODUCTION - QUALITÉ', 'DIVERS / HORS PÉRIMÈTRE']
-                total_prod = len(display_df[display_df['category'].isin(production_groups)])
-                with st.expander(f"📁 Production ({total_prod})", expanded=total_prod > 0):
-                    if total_prod == 0:
-                        st.write('Aucun CV classé ici.')
-                    else:
-                        for cat_label in production_groups:
-                            sub_df = display_df[display_df['category'] == cat_label]
-                            if sub_df.empty:
-                                continue
-                            st.markdown(f"**{cat_label}** ({len(sub_df)})")
-                            sub_df = sub_df.copy()
+                        if 'sub_category' in sub_df.columns:
                             sub_df['sub_category'] = sub_df['sub_category'].fillna('Autre')
-                            subcats = sorted(sub_df['sub_category'].unique())
-                            for subcat in subcats:
-                                filtered = sub_df[sub_df['sub_category'] == subcat]
-                                count_subcat = len(filtered)
-                                st.markdown(f"- {subcat} ({count_subcat})")
+                        else:
+                            sub_df['sub_category'] = 'Autre'
+                        subcats = sorted(sub_df['sub_category'].unique())
+                        for subcat in subcats:
+                            filtered = sub_df[sub_df['sub_category'] == subcat]
+                            count_subcat = len(filtered)
+                            with st.expander(f"📂 {subcat} ({count_subcat})"):
                                 for _, r in filtered.iterrows():
                                     card_title = r['display_name']
+                                    recap = r.get('profile_summary') or r.get('text_snippet') or ''
                                     years_exp = r.get('years_experience', 0)
-                                    exp_info = f" - {years_exp} ans" if years_exp and years_exp > 0 else ""
-                                    st.write(f"• {card_title}{exp_info}")
+                                    with st.expander(f"👤 {card_title}"):
+                                        if years_exp and years_exp > 0:
+                                            st.markdown(f"**📅 {years_exp} ans d'expérience**")
+                                        st.markdown(recap)
 
-            # Export Excel avec les 6 colonnes TGCC
-            st.markdown("---")
-            st.subheader("📥 Export des résultats")
+            # Catégorie "Autres" pour les non classés
+            nc = df[df['category'] == 'Non classé']
+            if not nc.empty:
+                st.markdown('---')
+                count_nc = len(nc)
+                st.subheader(f'🔍 Autres / Non classés ({count_nc})')
+                st.dataframe(nc[['file', 'text_snippet']], width="stretch")
+                
+                # Bouton pour analyser les CV non classés avec DeepSeek
+                analyze_button = st.button('🔍 Analyser les CV non classés avec Intelligence Artificielle', type='secondary')
+                
+                # Si on clique sur le bouton
+                if analyze_button:
+                    # Exécuter l'analyse
+                    unclassified_results = []
+                    unclassified_progress = st.progress(0)
+                    unclassified_total = len(nc)
+                    processing_ai_placeholder = st.empty()
+                    
+                    with st.spinner('Analyse des CVs non classés avec Intelligence Artificielle...'):
+                        for i, (_, row) in enumerate(nc.iterrows()):
+                            name = row['file']
+                            text_snippet = row['text_snippet']
+                            # Mettre à jour le fichier en cours
+                            processing_ai_placeholder.info(f"Analyse par IA ({i+1}/{unclassified_total}) : {name}")
+                            
+                            try:
+                                # Utiliser l'API DeepSeek pour analyser le CV
+                                category = get_deepseek_analysis(text_snippet)
+                                unclassified_results.append({'Fichier': name, 'Catégorie': category})
+                            except Exception as e:
+                                unclassified_results.append({'Fichier': name, 'Catégorie': f"Erreur: {str(e)}"})
+                            
+                            unclassified_progress.progress((i+1)/unclassified_total)
+                    
+                    # Nettoyer le placeholder
+                    processing_ai_placeholder.empty()
+                    
+                    # Stocker les résultats dans la session state
+                    st.session_state.deepseek_analyses = unclassified_results
+                    st.session_state.last_action = "analyzed"
             
+            # Afficher les analyses IA s'il y en a
+            if st.session_state.deepseek_analyses:
+                st.markdown('---')
+                st.subheader("📝 Analyses par Intelligence Artificielle des CV non classés")
+                
+                # Ajouter un bouton pour réinitialiser les analyses si nécessaire
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.success(f"✅ Analyse par Intelligence Artificielle pour {len(st.session_state.deepseek_analyses)} CV(s) non classés.")
+                with col2:
+                    if st.button("🔄 Réinitialiser analyses", key="reset_deepseek"):
+                        st.session_state.deepseek_analyses = []
+                        st.session_state.last_action = "reset"
+                        st.experimental_rerun()
+                
+                # Créer un tableau pour afficher les résultats de manière plus organisée
+                ai_results_df = pd.DataFrame(st.session_state.deepseek_analyses)
+                
+                # Afficher le tableau avec les catégories attribuées
+                st.dataframe(ai_results_df, width="stretch", hide_index=True)
+
+            # Préparer un CSV à 4 colonnes en prenant en compte les analyses IA
+            # Déterminer les noms à utiliser (extraits ou originaux)
             def get_display_name(row):
                 original_name = row['file']
                 if (hasattr(st.session_state, 'rename_and_organize_option') and 
@@ -3517,49 +3699,45 @@ with tab5:
                     return row['extracted_name']['name']
                 return original_name
             
-            # Préparer les listes par catégorie et construire un export à 3 colonnes
-            cat_data = {}
-            for cat in categories_tgcc:
-                cat_data[cat] = [get_display_name(row) for _, row in df[df['category'] == cat].iterrows()]
+            # Créer un DataFrame avec les résultats intégrés (incluant les analyses IA)
+            merged_results_for_csv = merge_results_with_ai_analysis(st.session_state.classification_results)
+            df_merged = pd.DataFrame(merged_results_for_csv)
+            
+            # Récupérer les classifications finales (après IA) avec les bons noms
+            supports = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Fonctions supports'].iterrows()]
+            logistics = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Logistique'].iterrows()]
+            production = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Production/Technique'].iterrows()]
+            unclassified = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Non classé'].iterrows()]
 
-            supports = cat_data.get('FONCTIONS SUPPORTS', [])
-            logistics = cat_data.get('LOGISTIQUE', [])
-            # Production regroupe toutes les sous-catégories production + divers
-            production = []
-            production += cat_data.get('PRODUCTION - ÉTUDES (BUREAU)', [])
-            production += cat_data.get('PRODUCTION - TRAVAUX (CHANTIER)', [])
-            production += cat_data.get('PRODUCTION - QUALITÉ', [])
-            production += cat_data.get('DIVERS / HORS PÉRIMÈTRE', [])
-
-            max_len = max(len(supports), len(logistics), len(production)) if (supports or logistics or production) else 0
+            max_len = max(len(supports), len(logistics), len(production), len(unclassified)) if max(len(supports), len(logistics), len(production), len(unclassified)) > 0 else 0
+            # Pad lists
             supports += [''] * (max_len - len(supports))
             logistics += [''] * (max_len - len(logistics))
             production += [''] * (max_len - len(production))
+            unclassified += [''] * (max_len - len(unclassified))
 
             export_df = pd.DataFrame({
-                'Fonction support': supports,
+                'Fonctions supports': supports,
                 'Logistique': logistics,
-                'Production': production
+                'Production/Technique': production,
+                'Non classés': unclassified
             })
 
-            # Afficher les CV non classés (catégories inattendues) pour debugging
-            valid_set = set([
-                'FONCTIONS SUPPORTS', 'LOGISTIQUE', 'PRODUCTION - ÉTUDES (BUREAU)',
-                'PRODUCTION - TRAVAUX (CHANTIER)', 'PRODUCTION - QUALITÉ', 'DIVERS / HORS PÉRIMÈTRE'
-            ])
-            nc_df = display_df[~display_df['category'].isin(valid_set)]
-            if not nc_df.empty:
-                st.markdown('---')
-                st.subheader('🔍 Non classés (debug)')
-                for _, row in nc_df.iterrows():
-                    name = row.get('display_name') or row.get('file')
-                    st.markdown(f"- **{name}** — catégorie reçue: `{row.get('category')}`")
-                    raw = row.get('raw_response', '')
-                    if raw:
-                        st.caption(raw[:800].replace('\n', ' '))
-
+            # Séparateur visuel
+            st.markdown("---")
+            
+            # Comptage des CVs par catégorie pour l'affichage
+            count_support = len([x for x in supports if x])
+            count_logistics = len([x for x in logistics if x]) 
+            count_production = len([x for x in production if x])
+            count_unclassified = len([x for x in unclassified if x])
+            
+            # Ajouter un indicateur pour montrer que les analyses IA sont incluses
+            ai_indicator = " (incluant les analyses IA)" if hasattr(st.session_state, 'deepseek_analyses') and st.session_state.deepseek_analyses else ""
+            st.markdown(f"**Résumé{ai_indicator}**: {count_support} en Fonctions supports, {count_logistics} en Logistique, {count_production} en Production/Technique, {count_unclassified} Non classés.")
+            
             # Générer Excel avec séparateur correct (utiliser sep=';' pour Excel FR)
-            csv = export_df.to_csv(index=False, sep=';').encode('utf-8-sig')
+            csv = export_df.to_csv(index=False, sep=';').encode('utf-8-sig')  # utf-8-sig pour BOM Excel
             
             # Générer aussi un fichier Excel natif (.xlsx)
             from io import BytesIO
