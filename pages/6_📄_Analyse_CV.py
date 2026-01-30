@@ -171,18 +171,42 @@ div[data-testid="stTabs"] button p {
 def load_embedding_model():
     """Charge le modèle SentenceTransformer une seule fois de manière sécurisée."""
     try:
+        # If the user provided a Hugging Face token in Streamlit secrets or env, expose it
+        hf_token = None
+        try:
+            hf_token = st.secrets.get("HUGGINGFACEHUB_API_TOKEN") or st.secrets.get("HF_TOKEN")
+        except Exception:
+            hf_token = None
+
+        # Also accept common env var names
+        if not hf_token:
+            hf_token = os.environ.get("HUGGINGFACEHUB_API_TOKEN") or os.environ.get("HF_TOKEN") or os.environ.get("HUGGINGFACE_TOKEN") or os.environ.get("HF_HUB_TOKEN")
+
+        if hf_token:
+            # Ensure huggingface hub sees the token
+            os.environ.setdefault("HUGGINGFACEHUB_API_TOKEN", hf_token)
+            os.environ.setdefault("HF_TOKEN", hf_token)
+
         # Try the full HF repo path first, then the short name for backwards compatibility
         try:
             return SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2')
         except Exception:
-            return SentenceTransformer('all-MiniLM-L6-v2')
+            try:
+                return SentenceTransformer('all-MiniLM-L6-v2')
+            except Exception as e2:
+                # If we hit rate limiting, give a clearer message
+                msg = str(e2)
+                hint = (
+                    "Vérifiez que le package 'sentence-transformers' est installé et que vous avez accès au modèle. "
+                    "Si Hugging Face rate-limite votre IP, créez un token HF et mettez-le dans Streamlit secrets sous 'HUGGINGFACEHUB_API_TOKEN' ou en variable d'environnement 'HUGGINGFACEHUB_API_TOKEN'."
+                )
+                st.warning(f"⚠️ Impossible de charger le modèle sémantique (embedding). La méthode 'Sémantique' sera indisponible. Erreur: {msg} {hint}")
+                return None
     except Exception as e:
-        # Provide a clearer diagnostic for common causes (local dir with same name, missing weights)
         msg = str(e)
         hint = (
             "Vérifiez que le package 'sentence-transformers' est installé et que vous avez accès au modèle. "
             "Si vous chargez depuis Hugging Face, assurez-vous que le chemin est 'sentence-transformers/all-MiniLM-L6-v2' "
-            "et qu'il n'existe pas de dossier local avec le même nom qui pourrait masquer le modèle."
         )
         st.warning(f"⚠️ Impossible de charger le modèle sémantique (embedding). La méthode 'Sémantique' sera indisponible. Erreur: {msg} {hint}")
         return None
