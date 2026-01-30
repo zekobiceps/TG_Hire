@@ -3218,8 +3218,12 @@ with tab5:
     - **DIVERS / HORS PÉRIMÈTRE** : Profils hors scope BTP ou inclassables
     """)
 
-    # Importer des CVs uniquement via upload
-    uploaded_files_auto = st.file_uploader("Importer des CVs (PDF)", type=["pdf"], accept_multiple_files=True, key="auto_uploader")
+    # Importer des CVs uniquement via upload (label left, uploader right)
+    col_label, col_uploader = st.columns([1, 3])
+    with col_label:
+        st.write("Importer des CVs (PDF)")
+    with col_uploader:
+        uploaded_files_auto = st.file_uploader("", type=["pdf"], accept_multiple_files=True, key="auto_uploader")
 
     # Construire la liste de fichiers uniquement à partir des uploads
     file_list = []
@@ -3351,14 +3355,6 @@ with tab5:
             stats = {cat: len(df[df['category'] == cat]) for cat in categories_tgcc}
             num_classified = sum(stats.values())
             
-            st.success(f"✅ Traitement terminé : {num_total} CV(s) traité(s)")
-            
-            # Afficher stats par catégorie
-            stat_cols = st.columns(len(categories_tgcc))
-            for idx, cat in enumerate(categories_tgcc):
-                with stat_cols[idx]:
-                    st.metric(cat.split(' - ')[0][:15], stats[cat])
-            
             display_df = df.copy()
 
             def _get_display_name_for_row(row):
@@ -3374,65 +3370,77 @@ with tab5:
             st.subheader("📊 Résultats par catégorie")
             
             cols = st.columns(3)
-            # Première colonne : FONCTIONS SUPPORTS + LOGISTIQUE
+            # Affichage en 3 colonnes : Fonction support | Logistique | Production (inclut 'Divers')
+            cols = st.columns(3)
+            # Première colonne : FONCTIONS SUPPORTS
             with cols[0]:
-                for cat_label in ['FONCTIONS SUPPORTS', 'LOGISTIQUE']:
-                    sub_df = display_df[display_df['category'] == cat_label]
-                    count_cat = len(sub_df)
-                    with st.expander(f"📁 {cat_label} ({count_cat})", expanded=count_cat > 0):
-                        if sub_df.empty:
-                            st.write('Aucun CV classé ici.')
-                        else:
-                            sub_df = sub_df.copy()
-                            sub_df['sub_category'] = sub_df['sub_category'].fillna('Autre')
-                            subcats = sorted(sub_df['sub_category'].unique())
-                            for subcat in subcats:
-                                filtered = sub_df[sub_df['sub_category'] == subcat]
-                                count_subcat = len(filtered)
-                                st.markdown(f"**{subcat}** ({count_subcat})")
-                                for _, r in filtered.iterrows():
-                                    card_title = r['display_name']
-                                    years_exp = r.get('years_experience', 0)
-                                    exp_info = f" - {years_exp} ans" if years_exp and years_exp > 0 else ""
-                                    st.write(f"• {card_title}{exp_info}")
-
-            # Deuxième colonne : PRODUCTION
-            with cols[1]:
-                for cat_label in ['PRODUCTION - ÉTUDES (BUREAU)', 'PRODUCTION - TRAVAUX (CHANTIER)', 'PRODUCTION - QUALITÉ']:
-                    sub_df = display_df[display_df['category'] == cat_label]
-                    count_cat = len(sub_df)
-                    cat_short = cat_label.replace('PRODUCTION - ', '')
-                    with st.expander(f"🏗️ {cat_short} ({count_cat})", expanded=count_cat > 0):
-                        if sub_df.empty:
-                            st.write('Aucun CV classé ici.')
-                        else:
-                            sub_df = sub_df.copy()
-                            sub_df['sub_category'] = sub_df['sub_category'].fillna('Autre')
-                            subcats = sorted(sub_df['sub_category'].unique())
-                            for subcat in subcats:
-                                filtered = sub_df[sub_df['sub_category'] == subcat]
-                                count_subcat = len(filtered)
-                                st.markdown(f"**{subcat}** ({count_subcat})")
-                                for _, r in filtered.iterrows():
-                                    card_title = r['display_name']
-                                    years_exp = r.get('years_experience', 0)
-                                    exp_info = f" - {years_exp} ans" if years_exp and years_exp > 0 else ""
-                                    st.write(f"• {card_title}{exp_info}")
-
-            # Troisième colonne : DIVERS
-            with cols[2]:
-                sub_df = display_df[display_df['category'] == 'DIVERS / HORS PÉRIMÈTRE']
+                cat_label = 'FONCTIONS SUPPORTS'
+                sub_df = display_df[display_df['category'] == cat_label]
                 count_cat = len(sub_df)
-                with st.expander(f"📂 DIVERS / HORS PÉRIMÈTRE ({count_cat})", expanded=count_cat > 0):
+                with st.expander(f"📁 {cat_label} ({count_cat})", expanded=count_cat > 0):
                     if sub_df.empty:
                         st.write('Aucun CV classé ici.')
                     else:
-                        for _, r in sub_df.iterrows():
-                            card_title = r['display_name']
-                            recap = r.get('profile_summary') or r.get('text_snippet') or ''
-                            st.write(f"• {card_title}")
-                            if recap:
-                                st.caption(recap[:100] + "..." if len(recap) > 100 else recap)
+                        sub_df = sub_df.copy()
+                        sub_df['sub_category'] = sub_df['sub_category'].fillna('Autre')
+                        subcats = sorted(sub_df['sub_category'].unique())
+                        for subcat in subcats:
+                            filtered = sub_df[sub_df['sub_category'] == subcat]
+                            count_subcat = len(filtered)
+                            st.markdown(f"**{subcat}** ({count_subcat})")
+                            for _, r in filtered.iterrows():
+                                card_title = r['display_name']
+                                years_exp = r.get('years_experience', 0)
+                                exp_info = f" - {years_exp} ans" if years_exp and years_exp > 0 else ""
+                                st.write(f"• {card_title}{exp_info}")
+
+            # Deuxième colonne : LOGISTIQUE
+            with cols[1]:
+                cat_label = 'LOGISTIQUE'
+                sub_df = display_df[display_df['category'] == cat_label]
+                count_cat = len(sub_df)
+                with st.expander(f"📁 {cat_label} ({count_cat})", expanded=count_cat > 0):
+                    if sub_df.empty:
+                        st.write('Aucun CV classé ici.')
+                    else:
+                        sub_df = sub_df.copy()
+                        sub_df['sub_category'] = sub_df['sub_category'].fillna('Autre')
+                        subcats = sorted(sub_df['sub_category'].unique())
+                        for subcat in subcats:
+                            filtered = sub_df[sub_df['sub_category'] == subcat]
+                            count_subcat = len(filtered)
+                            st.markdown(f"**{subcat}** ({count_subcat})")
+                            for _, r in filtered.iterrows():
+                                card_title = r['display_name']
+                                years_exp = r.get('years_experience', 0)
+                                exp_info = f" - {years_exp} ans" if years_exp and years_exp > 0 else ""
+                                st.write(f"• {card_title}{exp_info}")
+
+            # Troisième colonne : PRODUCTION (inclut toutes les production sous-cats + DIVERS)
+            with cols[2]:
+                production_groups = ['PRODUCTION - ÉTUDES (BUREAU)', 'PRODUCTION - TRAVAUX (CHANTIER)', 'PRODUCTION - QUALITÉ', 'DIVERS / HORS PÉRIMÈTRE']
+                total_prod = len(display_df[display_df['category'].isin(production_groups)])
+                with st.expander(f"📁 Production ({total_prod})", expanded=total_prod > 0):
+                    if total_prod == 0:
+                        st.write('Aucun CV classé ici.')
+                    else:
+                        for cat_label in production_groups:
+                            sub_df = display_df[display_df['category'] == cat_label]
+                            if sub_df.empty:
+                                continue
+                            st.markdown(f"**{cat_label}** ({len(sub_df)})")
+                            sub_df = sub_df.copy()
+                            sub_df['sub_category'] = sub_df['sub_category'].fillna('Autre')
+                            subcats = sorted(sub_df['sub_category'].unique())
+                            for subcat in subcats:
+                                filtered = sub_df[sub_df['sub_category'] == subcat]
+                                count_subcat = len(filtered)
+                                st.markdown(f"- {subcat} ({count_subcat})")
+                                for _, r in filtered.iterrows():
+                                    card_title = r['display_name']
+                                    years_exp = r.get('years_experience', 0)
+                                    exp_info = f" - {years_exp} ans" if years_exp and years_exp > 0 else ""
+                                    st.write(f"• {card_title}{exp_info}")
 
             # Export Excel avec les 6 colonnes TGCC
             st.markdown("---")
@@ -3447,22 +3455,29 @@ with tab5:
                     return row['extracted_name']['name']
                 return original_name
             
-            # Préparer les listes par catégorie
+            # Préparer les listes par catégorie et construire un export à 3 colonnes
             cat_data = {}
             for cat in categories_tgcc:
                 cat_data[cat] = [get_display_name(row) for _, row in df[df['category'] == cat].iterrows()]
-            
-            max_len = max(len(v) for v in cat_data.values()) if cat_data else 0
-            for cat in cat_data:
-                cat_data[cat] += [''] * (max_len - len(cat_data[cat]))
-            
+
+            supports = cat_data.get('FONCTIONS SUPPORTS', [])
+            logistics = cat_data.get('LOGISTIQUE', [])
+            # Production regroupe toutes les sous-catégories production + divers
+            production = []
+            production += cat_data.get('PRODUCTION - ÉTUDES (BUREAU)', [])
+            production += cat_data.get('PRODUCTION - TRAVAUX (CHANTIER)', [])
+            production += cat_data.get('PRODUCTION - QUALITÉ', [])
+            production += cat_data.get('DIVERS / HORS PÉRIMÈTRE', [])
+
+            max_len = max(len(supports), len(logistics), len(production)) if (supports or logistics or production) else 0
+            supports += [''] * (max_len - len(supports))
+            logistics += [''] * (max_len - len(logistics))
+            production += [''] * (max_len - len(production))
+
             export_df = pd.DataFrame({
-                'Fonctions Supports': cat_data.get('FONCTIONS SUPPORTS', []),
-                'Logistique': cat_data.get('LOGISTIQUE', []),
-                'Production Études': cat_data.get('PRODUCTION - ÉTUDES (BUREAU)', []),
-                'Production Travaux': cat_data.get('PRODUCTION - TRAVAUX (CHANTIER)', []),
-                'Production Qualité': cat_data.get('PRODUCTION - QUALITÉ', []),
-                'Divers': cat_data.get('DIVERS / HORS PÉRIMÈTRE', [])
+                'Fonction support': supports,
+                'Logistique': logistics,
+                'Production': production
             })
 
             # Générer Excel avec séparateur correct (utiliser sep=';' pour Excel FR)
