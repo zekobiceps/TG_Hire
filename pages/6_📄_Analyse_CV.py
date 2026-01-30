@@ -1211,21 +1211,8 @@ def get_gemini_auto_classification(text: str, full_name: str | None) -> dict:
     # Update to gemini-2.5-flash-lite which is available
     model = genai.GenerativeModel('gemini-2.5-flash-lite', generation_config={"response_mime_type": "application/json"})
     
-    prompt = f"""
-    Expert recrutement. Analyse CV.
-    
-    1. Check Nom: "{safe_name}". Corrige si faux (Permis B, etc).
-    2. Macro-catégorie (UNE SEULE) : "Fonctions supports", "Logistique", "Production/Technique".
-    3. Sous-catégorie (Interdit "Étudiant", "Stagiaire". Indiquer le métier visé).
-    4. Années expérience (int).
-    5. Récapitulatif (2-3 phrases).
-
-    JSON output only:
-    {{ "candidate_name": "...", "macro_category": "...", "sub_category": "...", "years_experience": 0, "profile_summary": "..." }}
-    
-    CV:
-    {text[:4000]}
-    """
+    # Use centralized classification prompt to ensure exactly 4 categories
+    prompt = get_classification_prompt(text, safe_name)
     
     try:
         response = model.generate_content(prompt)
@@ -1276,6 +1263,42 @@ def get_gemini_auto_classification(text: str, full_name: str | None) -> dict:
                 "profile_summary": f"Erreur Gemini: {e}",
                 "candidate_name": safe_name
             }
+
+
+### Centralized classification prompt (ENFORCE 4 categories) ###
+CATEGORIES_PROMPT = '''
+Agis comme un expert en recrutement. Tu dois classer STRICTEMENT le CV dans UNE et UNE SEULE des quatre macro-catégories suivantes :
+
+1) Fonctions supports
+    - Exemples / mots-clés : RH, Recrutement, Paie, Formation, Relations sociales, Comptabilité, Trésorerie, Audit, Contrôle de gestion, Achats, DSI, Support, QHSE, Juridique, Communication, Marketing, Administration, Assistante, Office, Secrétariat.
+
+2) Production/Technique
+    - Exemples / mots-clés : Ingénieur, Technicien, BTP, Conduite de travaux, Chantier, Maintenance, Industrie, Usinage, Électromécanique, Automatismes, R&D, Bureau d'études, Méthodes, Qualité, Production, Ligne, Opérateur.
+
+3) Logistique
+    - Exemples / mots-clés : Supply Chain, Approvisionnement, Transport, Entrepôt, Préparation de commandes, Gestion des stocks, Planification, Distribution, Transit, Douane, Transporteurs.
+
+4) Non classé
+    - Utilise cette catégorie seulement si le CV est illisible, hors sujet, ou ne permet pas d'identifier l'une des trois catégories ci-dessus.
+
+Consignes de sortie STRICTES :
+- Tu réponds UNIQUEMENT par un JSON valide (seul contenu de la réponse) avec les clés :
+  {"candidate_name": "...", "macro_category": "...", "sub_category": "...", "years_experience": 0, "profile_summary": "..."}
+- "macro_category" doit être EXACTEMENT l'un des libellés : "Fonctions supports", "Production/Technique", "Logistique", "Non classé".
+- La "sub_category" doit être concise (métier visé), n'utilise pas "Étudiant" ni "Stagiaire".
+- "years_experience" doit être un entier (0 si inconnu).
+- "profile_summary" : 1-2 phrases en français.
+
+Indice pour le nom du candidat (ne pas inventer) : "{hint_name}".
+
+Texte du CV :
+{text}
+'''
+
+
+def get_classification_prompt(text: str, hint_name: str | None) -> str:
+    hint = (hint_name or "").strip()
+    return CATEGORIES_PROMPT.format(hint_name=hint, text=text[:4000])
 
 def get_deepseek_profile_analysis(text: str, candidate_name: str | None = None) -> str:
     """
@@ -1391,10 +1414,10 @@ def get_deepseek_analysis(text):
          • R&D / Bureau d'études : Conception, ingénierie.
          • Commercial / Vente : Développement du chiffre d'affaires lié à une offre technique ou industrielle.
 
-     Consigne IMPORTANTE :
-     - Réponds UNIQUEMENT par le nom exact d'UNE SEULE des trois macro-catégories ci-dessous :
-        "Fonctions supports" OU "Logistique" OU "Production/Technique".
-     - Ne donne aucune explication supplémentaire.
+      Consigne IMPORTANTE :
+      - Réponds UNIQUEMENT par le nom exact d'UNE SEULE des quatre macro-catégories ci-dessous :
+          "Fonctions supports" OU "Logistique" OU "Production/Technique" OU "Non classé".
+      - Ne donne aucune explication supplémentaire.
 
      Texte du CV :
      {text}
@@ -1406,13 +1429,15 @@ def get_deepseek_analysis(text):
         # Récupérer uniquement la catégorie (nettoyer la réponse)
         result = response.json()["choices"][0]["message"]["content"].strip()
         res_low = result.lower()
-        # Normaliser la réponse pour s'assurer qu'elle correspond à l'une des trois catégories
+        # Normaliser la réponse pour s'assurer qu'elle correspond à l'une des quatre catégories
         if "support" in res_low:
             return "Fonctions supports"
         if "logist" in res_low:
             return "Logistique"
         if "production" in res_low or "technique" in res_low:
             return "Production/Technique"
+        if "non class" in res_low or "non-class" in res_low or "non classé" in res_low:
+            return "Non classé"
         # Garder la réponse originale si elle ne correspond pas aux patterns prévus
         return result
     except Exception as e:
@@ -1454,38 +1479,8 @@ def get_deepseek_auto_classification(text: str, local_extracted_name: str | None
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
     
-    # Prompt plus permissif pour éviter le filtrage excessif "Non classé"
-    prompt = f"""
-    Agis comme un expert en recrutement. Analyse ce CV.
-
-    1. IDENTIFICATION NOM:
-    Si "{hint_name}" est vide ou générique, trouve le vrai nom (Prénom NOM). Evite les titres (Manager, CV, Profil).
-    
-    2. CLASSIFICATION (Crucial):
-    Classe ce profil dans UNE seule de ces 3 catégories :
-    - "Fonctions supports" (RH, Finance, IT, Juridique...)
-    - "Logistique" (Supply Chain, Transport...)
-    - "Production/Technique" (Ingénierie, BTP, Industrie...)
-    
-    Si tu hésites, choisis la plus proche. Ne mets JAMAIS "Non classé" sauf si c'est illisible.
-
-    3. EXTRACTION
-    - Sous-catégorie précise (Interdit: "Étudiant", "Stagiaire". Indiquer le métier visé, ex: "Assistant RH").
-    - Années d'expérience (nombre).
-    - Un résumé court (2 phrases).
-
-    Réponds UNIQUEMENT ce JSON valide :
-    {{
-        "candidate_name": "...",
-        "macro_category": "...",
-        "sub_category": "...",
-        "years_experience": 0,
-        "profile_summary": "..."
-    }}
-
-    CV TEXTE :
-    {text[:3000]}
-    """
+    # Use centralized classification prompt to ensure exactly 4 categories
+    prompt = get_classification_prompt(text, hint_name)
 
     try:
         response = requests.post(url, headers=headers, data=json.dumps({
@@ -1558,35 +1553,8 @@ def get_groq_auto_classification(text: str, local_extracted_name: str | None) ->
     try:
         client = groq.Groq(api_key=API_KEY)
         
-        prompt = f"""
-        Agis comme un expert en recrutement. Analyse ce CV.
-
-        1. IDENTIFICATION NOM:
-        Si "{hint_name}" est vide ou générique, trouve le vrai nom.
-        
-        2. CLASSIFICATION (Crucial):
-        Classe ce profil dans UNE seule de ces 3 catégories :
-        - "Fonctions supports"
-        - "Logistique"
-        - "Production/Technique"
-        
-        3. EXTRACTION
-        - Sous-catégorie précise (Interdit: "Étudiant", "Stagiaire". Indiquer le métier visé).
-        - Années d'expérience (nombre entier).
-        - Un résumé court.
-
-        Réponds UNIQUEMENT ce JSON valide :
-        {{
-            "candidate_name": "...",
-            "macro_category": "...",
-            "sub_category": "...",
-            "years_experience": 0,
-            "profile_summary": "..."
-        }}
-
-        CV TEXTE :
-        {text[:4000]}
-        """
+        # Use centralized classification prompt to ensure exactly 4 categories
+        prompt = get_classification_prompt(text, hint_name)
 
         completion = client.chat.completions.create(
             messages=[
@@ -1636,27 +1604,8 @@ def get_claude_auto_classification(text: str, local_extracted_name: str | None) 
     try:
         client = anthropic.Anthropic(api_key=API_KEY)
         
-        prompt = f"""
-        Analyse ce CV et extrais les informations au format JSON.
-
-        1. Nom du candidat (utilise "{hint_name}" comme indice).
-        2. Catégorie (CHOIX STRICT): "Fonctions supports", "Logistique", "Production/Technique".
-        3. Sous-catégorie (Interdit "Étudiant", "Stagiaire". Indiquer le métier).
-        4. Années d'expérience (int).
-        5. Résumé (2 phrases).
-
-        Format JSON attendu:
-        {{
-            "candidate_name": "...",
-            "macro_category": "...",
-            "sub_category": "...",
-            "years_experience": 0,
-            "profile_summary": "..."
-        }}
-
-        CV:
-        {text[:4000]}
-        """
+        # Use centralized classification prompt to ensure exactly 4 categories
+        prompt = get_classification_prompt(text, hint_name)
 
         message = client.messages.create(
             model="claude-3-haiku-20240307",
@@ -2332,8 +2281,7 @@ def create_organized_zip(results, file_list):
     
     # Créer les dossiers par catégorie
     folders = {
-        'Production': 'Production/',
-        'Production/Technique': 'Production/',
+        'Production/Technique': 'Production_Technique/',
         'Fonctions supports': 'Fonctions_supports/',
         'Logistique': 'Logistique/',
         'Non classé': 'Non_classe/'
@@ -3443,8 +3391,8 @@ with st.sidebar:
             st.warning("⚠️ OpenRouter : Clé manquante")
 
 with tab5:
-    st.header("🗂️ Auto-classification de CVs (3 catégories)")
-    st.markdown("Chargez jusqu'à 100 CVs (PDF). L'outil extrait le texte et classe automatiquement chaque CV dans l'une des 3 catégories : Fonctions supports, Logistique, Production/Technique.")
+    st.header("🗂️ Auto-classification de CVs (4 catégories)")
+    st.markdown("Chargez jusqu'à 100 CVs (PDF). L'outil extrait le texte et classe automatiquement chaque CV dans l'une des 4 catégories : Fonctions supports, Logistique, Production/Technique, Non classé.")
 
     # Importer des CVs uniquement via upload
     uploaded_files_auto = st.file_uploader("Importer des CVs (PDF)", type=["pdf"], accept_multiple_files=True, key="auto_uploader")
@@ -3771,34 +3719,58 @@ with tab5:
 
             # Séparateur visuel
             st.markdown("---")
-            
+
             # Comptage des CVs par catégorie pour l'affichage
             count_support = len([x for x in supports if x])
-            count_logistics = len([x for x in logistics if x]) 
+            count_logistics = len([x for x in logistics if x])
             count_production = len([x for x in production if x])
             count_unclassified = len([x for x in unclassified if x])
-            
-            # Ajouter un indicateur pour montrer que les analyses IA sont incluses
+
+            # Indicateur IA
             ai_indicator = " (incluant les analyses IA)" if hasattr(st.session_state, 'deepseek_analyses') and st.session_state.deepseek_analyses else ""
-            st.markdown(f"**Résumé{ai_indicator}**: {count_support} en Fonctions supports, {count_logistics} en Logistique, {count_production} en Production/Technique, {count_unclassified} Non classés.")
-            
-            # Générer Excel avec séparateur correct (utiliser sep=';' pour Excel FR)
-            csv = export_df.to_csv(index=False, sep=';').encode('utf-8-sig')  # utf-8-sig pour BOM Excel
-            
-            # Générer aussi un fichier Excel natif (.xlsx)
+            st.markdown(f"**Résumé{ai_indicator}**: {count_support} Fonctions supports • {count_logistics} Logistique • {count_production} Production/Technique • {count_unclassified} Non classés.")
+
+            # Affichage 2x2 (deux colonnes, deux lignes) des listes par catégorie
+            supports_list = [s for s in supports if s]
+            logistics_list = [s for s in logistics if s]
+            production_list = [s for s in production if s]
+            unclassified_list = [s for s in unclassified if s]
+
+            row1_col1, row1_col2 = st.columns(2)
+            with row1_col1:
+                st.subheader(f"Fonctions supports ({count_support})")
+                for s in supports_list[:200]:
+                    st.markdown(f"- {s}")
+            with row1_col2:
+                st.subheader(f"Logistique ({count_logistics})")
+                for s in logistics_list[:200]:
+                    st.markdown(f"- {s}")
+
+            row2_col1, row2_col2 = st.columns(2)
+            with row2_col1:
+                st.subheader(f"Production/Technique ({count_production})")
+                for s in production_list[:200]:
+                    st.markdown(f"- {s}")
+            with row2_col2:
+                st.subheader(f"Non classés ({count_unclassified})")
+                for s in unclassified_list[:200]:
+                    st.markdown(f"- {s}")
+
+            # Générer Excel et CSV pour export (inchangés)
+            csv = export_df.to_csv(index=False, sep=';').encode('utf-8-sig')
             from io import BytesIO
             excel_buffer = BytesIO()
             with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
                 export_df.to_excel(writer, index=False, sheet_name='Classification')
             excel_data = excel_buffer.getvalue()
-            
-            # Boutons de téléchargement
+
+            # Boutons de téléchargement (export)
             col1, col2, col3 = st.columns(3)
             with col1:
                 st.download_button(label='⬇️ Télécharger Excel (.xlsx)', data=excel_data, file_name='classification_results.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
             with col2:
                 st.download_button(label='⬇️ Télécharger CSV (;)', data=csv, file_name='classification_results.csv', mime='text/csv')
-            
+
             with col3:
                 # Bouton ZIP disponible si l'option de renommage était cochée
                 if hasattr(st.session_state, 'rename_and_organize_option') and st.session_state.rename_and_organize_option:
@@ -3807,11 +3779,11 @@ with tab5:
                             try:
                                 zip_data, manifest_df = create_organized_zip(st.session_state.classification_results, st.session_state.uploaded_files_list)
                                 st.success('✅ ZIP créé avec succès !')
-                                
+
                                 # Afficher un aperçu du manifest
                                 with st.expander("📋 Aperçu du contenu du ZIP"):
                                     st.dataframe(manifest_df, width="stretch")
-                                
+
                                 # Bouton de téléchargement du ZIP
                                 st.download_button(
                                     label='⬇️ Télécharger le ZIP organisé',
