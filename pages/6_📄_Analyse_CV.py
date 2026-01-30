@@ -3502,7 +3502,7 @@ with st.sidebar:
 
 with tab5:
     st.header("🗂️ Auto-classification de CVs (4 catégories)")
-    st.markdown("Chargez jusqu'à 100 CVs (PDF). L'outil extrait le texte et classe automatiquement chaque CV dans l'une des 4 catégories : Fonctions supports, Logistique, Production/Technique, Non classé.")
+    st.markdown("Chargez jusqu'à 100 CVs. L'outil extrait le texte et classe automatiquement chaque CV dans l'une des 4 catégories : Fonctions supports, Logistique, Production/Technique, Non classé.")
 
     # Importer des CVs uniquement via upload
     uploaded_files_auto = st.file_uploader("Importer des CVs (PDF)", type=["pdf"], accept_multiple_files=True, key="auto_uploader")
