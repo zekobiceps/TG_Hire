@@ -3218,12 +3218,8 @@ with tab5:
     - **DIVERS / HORS PÉRIMÈTRE** : Profils hors scope BTP ou inclassables
     """)
 
-    # Importer des CVs uniquement via upload (label left, uploader right)
-    col_label, col_uploader = st.columns([1, 3])
-    with col_label:
-        st.write("Importer des CVs (PDF)")
-    with col_uploader:
-        uploaded_files_auto = st.file_uploader("", type=["pdf"], accept_multiple_files=True, key="auto_uploader")
+    # Importer des CVs uniquement via upload
+    uploaded_files_auto = st.file_uploader("Importer des CVs (PDF)", type=["pdf"], accept_multiple_files=True, key="auto_uploader")
 
     # Construire la liste de fichiers uniquement à partir des uploads
     file_list = []
