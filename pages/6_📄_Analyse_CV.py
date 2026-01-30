@@ -1504,14 +1504,35 @@ def classify_resume_with_model(text, model_name, hint_name=""):
         
         macro_upper = macro.upper() if macro else ""
         if macro_upper not in valid_categories:
-            # Tentative de récupération souple
-            if "support" in macro.lower(): macro = "FONCTIONS SUPPORTS"
-            elif "logist" in macro.lower(): macro = "LOGISTIQUE"
-            elif "études" in macro.lower() or "bureau" in macro.lower() or "métré" in macro.lower(): macro = "PRODUCTION - ÉTUDES (BUREAU)"
-            elif "travaux" in macro.lower() or "chantier" in macro.lower(): macro = "PRODUCTION - TRAVAUX (CHANTIER)"
-            elif "qualité" in macro.lower(): macro = "PRODUCTION - QUALITÉ"
-            elif "divers" in macro.lower() or "hors" in macro.lower(): macro = "DIVERS / HORS PÉRIMÈTRE"
-            else: macro = "Non classé"
+            # Tentative de récupération souple depuis la valeur retournée
+            m_low = (macro or "").lower()
+            if "support" in m_low or "rh" in m_low or "finance" in m_low or "jurid" in m_low or "it" in m_low:
+                macro = "FONCTIONS SUPPORTS"
+            elif "logist" in m_low or "transport" in m_low or "magasin" in m_low:
+                macro = "LOGISTIQUE"
+            elif "étude" in m_low or "etude" in m_low or "métr" in m_low or "metre" in m_low or "bureau" in m_low:
+                macro = "PRODUCTION - ÉTUDES (BUREAU)"
+            elif "travaux" in m_low or "chantier" in m_low or "conducteur" in m_low or "chef" in m_low:
+                macro = "PRODUCTION - TRAVAUX (CHANTIER)"
+            elif "qualit" in m_low or "qse" in m_low or "hse" in m_low:
+                macro = "PRODUCTION - QUALITÉ"
+            elif "divers" in m_low or "hors" in m_low:
+                macro = "DIVERS / HORS PÉRIMÈTRE"
+            else:
+                # Si l'IA a répondu explicitement "non classé", tenter d'inférer depuis la réponse brute
+                raw = (response_text or "").lower()
+                if "support" in raw or "rh" in raw or "finance" in raw:
+                    macro = "FONCTIONS SUPPORTS"
+                elif "logist" in raw or "transport" in raw or "magasin" in raw:
+                    macro = "LOGISTIQUE"
+                elif "étude" in raw or "etude" in raw or "métr" in raw or "metre" in raw or "bureau" in raw:
+                    macro = "PRODUCTION - ÉTUDES (BUREAU)"
+                elif "travaux" in raw or "chantier" in raw or "conducteur" in raw or "chef chantier" in raw:
+                    macro = "PRODUCTION - TRAVAUX (CHANTIER)"
+                elif "qualit" in raw or "qse" in raw or "hse" in raw:
+                    macro = "PRODUCTION - QUALITÉ"
+                else:
+                    macro = "NON CLASSÉ"
         else:
             macro = macro_upper
 
