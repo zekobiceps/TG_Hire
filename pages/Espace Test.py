@@ -3658,9 +3658,6 @@ with tab5:
     st.header("🗂️ Auto-classification de CVs (4 catégories)")
     st.markdown("Chargez et analysez jusqu'à 101 CVs (PDF). L'outil extrait le texte et classe automatiquement chaque CV dans l'une des 4 catégories : Fonctions supports, Logistique, Production/Technique, Non classé.")
 
-    # Compteur global pour upload et traitement (visible en permanence en haut de la page)
-    global_status_container = st.container()
-
     # Importer des CVs uniquement via upload
     uploaded_files_auto = st.file_uploader("Importer des CVs (PDF)", type=["pdf"], accept_multiple_files=True, key="auto_uploader")
     
@@ -3675,15 +3672,9 @@ with tab5:
         cache = st.session_state.setdefault('uploaded_files_cache', {})
         seen_cache_keys: set[str] = set()
 
-        # Afficher l'état d'avancement global de l'upload
-        with global_status_container:
-            global_upload_placeholder = st.empty()
-            global_upload_placeholder.info(f"📤 Upload en cours : 0/{total_uploads} CVs")
-        
-        upload_col, progress_col = st.columns([3, 1])
-        upload_status_placeholder = upload_col.empty()
-        upload_status_placeholder.info(f"Téléversement des CVs : 0/{total_uploads}")
-        upload_progress = progress_col.progress(0)
+        # Afficher l'état d'avancement de l'upload (texte uniquement)
+        upload_status_placeholder = st.empty()
+        upload_status_placeholder.info(f"📤 Upload en cours : 0/{total_uploads} CVs")
 
         for i, uf in enumerate(uploaded_files_auto):
             size_guess = getattr(uf, "size", None)
@@ -3714,23 +3705,15 @@ with tab5:
 
             file_list.append(file_entry)
 
-            progress_value = (i + 1) / total_uploads
-            try:
-                upload_progress.progress(int(progress_value * 100))
-            except Exception:
-                upload_progress.progress(progress_value)
-            upload_status_placeholder.info(f"Téléversement des CVs : {i + 1}/{total_uploads}")
-            with global_status_container:
-                global_upload_placeholder.info(f"📤 Upload en cours : {i + 1}/{total_uploads} CVs")
+            # Mettre à jour le compteur d'upload
+            upload_status_placeholder.info(f"📤 Upload en cours : {i + 1}/{total_uploads} CVs")
 
         stale_keys = [key for key in list(cache.keys()) if key not in seen_cache_keys]
         for key in stale_keys:
             cache.pop(key, None)
 
         # Afficher la confirmation finale de l'upload
-        with global_status_container:
-            global_upload_placeholder.success(f"✅ {total_uploads} CV(s) uploadé(s) et prêts pour traitement.")
-        upload_status_placeholder.empty()
+        upload_status_placeholder.success(f"✅ {total_uploads} CV(s) uploadé(s) et prêts pour traitement.")
 
         st.session_state.uploaded_files_list = [dict(item) for item in file_list]
     else:
@@ -3774,17 +3757,13 @@ with tab5:
             st.session_state.deepseek_analyses = []
             
             results = []
-            progress = st.progress(0)
             total = len(file_list)
             
-            # Compteur global pour le traitement IA
-            with global_status_container:
-                global_processing_placeholder = st.empty()
-                global_processing_placeholder.info(f"🤖 Traitement IA en cours : 0/{total} CVs")
+            # Compteur pour le traitement IA (texte uniquement)
+            processing_status_placeholder = st.empty()
+            processing_status_placeholder.info(f"🤖 Traitement IA en cours : 0/{total} CVs")
             
-            processing_counter_placeholder = st.empty()
             processing_detail_placeholder = st.empty()
-            processing_counter_placeholder.info(f"Traitement des CVs : 0/{total}")
             spinner_text = 'Extraction, classification et extraction des noms en cours...' if rename_and_organize else 'Extraction et classification en cours...'
             
             with st.spinner(spinner_text):
@@ -3793,11 +3772,8 @@ with tab5:
                     f = item['file']
                     name = item['name']
                     
-                    # Mettre à jour le compteur global
-                    with global_status_container:
-                        global_processing_placeholder.info(f"🤖 Traitement IA en cours : {i + 1}/{total} CVs")
-                    
-                    processing_counter_placeholder.info(f"Traitement des CVs : {i + 1}/{total}")
+                    # Mettre à jour le compteur de traitement
+                    processing_status_placeholder.info(f"🤖 Traitement IA en cours : {i + 1}/{total} CVs")
                     processing_detail_placeholder.info(f"CV en cours : {name}")
                     cache_key = item.get('cache_key') or f"{name}|{i}"
                     cache_entry = cache.setdefault(cache_key, {}) if cache is not None else {}
@@ -3971,15 +3947,12 @@ with tab5:
                         result_item['extracted_name'] = extracted_name_info
 
                         results.append(result_item)
-                        progress.progress((i+1)/total)
 
                     if cache is not None:
                         st.session_state.uploaded_files_cache = cache
 
             # Afficher la confirmation finale du traitement
-            with global_status_container:
-                global_processing_placeholder.success(f"✅ Traitement IA terminé : {total} CVs classés avec succès !")
-            processing_counter_placeholder.empty()
+            processing_status_placeholder.success(f"✅ Traitement IA terminé : {total} CVs classés avec succès !")
             processing_detail_placeholder.empty()
             
             # Stocker les résultats et relancer l'affichage global (le rendu principal s'appuiera
