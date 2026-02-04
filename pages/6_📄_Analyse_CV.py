@@ -1313,94 +1313,23 @@ PRODUCTION_ALLOWED_SUBCATEGORIES = [
 
 NON_CLASSE_SUBCATEGORY = "Divers / Hors périmètre"
 
-# Mapping strict : sous-direction → macro-catégorie obligatoire
-# Utilisé pour forcer la bonne catégorie même si l'IA se trompe
-SUBDIRECTION_TO_MACRO = {
-    # Fonctions supports - sous-directions métier
-    "RH": "Fonctions supports",
-    "RESSOURCES HUMAINES": "Fonctions supports",
-    "RECRUTEMENT": "Fonctions supports",
-    "PAIE": "Fonctions supports",
-    "FORMATION": "Fonctions supports",
-    "FINANCE": "Fonctions supports",
-    "COMPTABILITÉ": "Fonctions supports",
-    "COMPTABILITE": "Fonctions supports",
-    "TRÉSORERIE": "Fonctions supports",
-    "TRESORERIE": "Fonctions supports",
-    "CONTRÔLE DE GESTION": "Fonctions supports",
-    "CONTROLE DE GESTION": "Fonctions supports",
-    "AUDIT": "Fonctions supports",
-    "ACHATS": "Fonctions supports",
-    "ACHAT": "Fonctions supports",
-    "DSI": "Fonctions supports",
-    "INFORMATIQUE": "Fonctions supports",
-    "IT": "Fonctions supports",
-    "SUPPORT IT": "Fonctions supports",
-    "QHSE": "Fonctions supports",
-    "QUALITÉ": "Fonctions supports",
-    "QUALITE": "Fonctions supports",
-    "HSE": "Fonctions supports",
-    "JURIDIQUE": "Fonctions supports",
-    "LEGAL": "Fonctions supports",
-    "COMMUNICATION": "Fonctions supports",
-    "MARKETING": "Fonctions supports",
-    "ADMINISTRATION": "Fonctions supports",
-    "ASSISTANAT": "Fonctions supports",
-    "SECRÉTARIAT": "Fonctions supports",
-    "SECRETARIAT": "Fonctions supports",
-    
-    # Logistique - sous-directions
-    "SUPPLY CHAIN": "Logistique",
-    "APPROVISIONNEMENT": "Fonctions supports",  # Achats = support
-    "TRANSPORT": "Logistique",
-    "ENTREPÔT": "Logistique",
-    "ENTREPOT": "Logistique",
-    "STOCKS": "Logistique",
-    "PRÉPARATION": "Logistique",
-    "PREPARATION": "Logistique",
-    "DISTRIBUTION": "Logistique",
-    
-    # Production - forcées si vraiment production
-    "PRODUCTION - ÉTUDES (BUREAU)": "Production/Technique",
-    "PRODUCTION - TRAVAUX (CHANTIER)": "Production/Technique",
-    "PRODUCTION - QUALITÉ": "Production/Technique",
-}
-
 CATEGORIES_PROMPT = '''
 Agis comme un expert en recrutement. Tu dois classer STRICTEMENT le CV dans UNE et UNE SEULE des quatre macro-catégories suivantes :
 
 1) Fonctions supports
-    - Ce sont les fonctions transverses qui soutiennent l'activité opérationnelle.
-    - ⚠️ ATTENTION : La sous-catégorie doit être le NOM de la SOUS-DIRECTION (pas l'intitulé du poste) !
-    
-    **Sous-directions disponibles :**
-    • **DSI** : Développeur, Business Analyst IT, Data Analyst, Product Owner, Chef de projet IT/digital, Consultant IT, AMOA, Transformation digitale, Administrateur système, Support IT, Ingénieur réseau, RSSI...
-    • **Finance** : Comptable, Contrôleur de gestion, DAF, Auditeur, Trésorier, M&A, Corporate Finance, Consultant Finance, Financement...
-    • **Achats** : Acheteur, Ingénieur achats, Directeur achats, Approvisionneur, Sourcing...
-    • **RH** : Recruteur, Responsable RH, DRH, Gestionnaire paie, Chargé de formation, Relations sociales...
-    • **QHSE** : Responsable qualité, Coordinateur HSE, Ingénieur sécurité, Auditeur qualité...
-    • **Juridique** : Juriste, Avocat, Directeur juridique, Compliance...
-    • **Communication** : Chargé de communication, Community manager, Responsable marketing, Chef de produit...
-    • **Administration** : Assistant, Secrétaire, Office manager...
-    
-    - ⚠️ RÈGLE ABSOLUE : DSI, Informatique, IT, Développement, Data = TOUJOURS Fonctions supports (jamais Production).
-    - ⚠️ RÈGLE ABSOLUE : Achats, Approvisionnement = TOUJOURS Fonctions supports.
-    - **La sous-catégorie doit être UNIQUEMENT : "DSI", "RH", "Finance", "Achats", "QHSE", "Juridique", "Communication" ou "Administration".**
-    - **NE RETOURNE JAMAIS l'intitulé du poste comme sous-catégorie !**
+    - Exemples / mots-clés : RH, Recrutement, Paie, Formation, Relations sociales, Comptabilité, Trésorerie, Audit, Contrôle de gestion, Achats, DSI, Support, QHSE, Juridique, Communication, Marketing, Administration, Assistante, Office, Secrétariat.
+    - La sous-catégorie doit refléter la direction support ciblée (ex : "RH", "Finance", "Achats").
 
 2) Production/Technique
-    - Métiers de la production, du BTP, de l'industrie, de la maintenance, du bureau d'études.
-    - ⚠️ Exclut TOUS les métiers IT/Digital (ceux-là vont en Fonctions supports - DSI).
-    - Exemples : Ingénieur BTP, Conducteur de travaux, Chef de chantier, Technicien maintenance, Opérateur production, Ingénieur méthodes, Dessinateur projeteur.
+    - Exemples / mots-clés : Ingénieur, Technicien, BTP, Conduite de travaux, Chantier, Maintenance, Industrie, Usinage, Électromécanique, Automatismes, R&D, Bureau d'études, Méthodes, Qualité, Production, Ligne, Opérateur.
     - TU DOIS choisir UNE SEULE sous-catégorie parmi :
-        • "PRODUCTION - ÉTUDES (BUREAU)" → Bureau d'études, méthodes, prix, planification technique
-        • "PRODUCTION - TRAVAUX (CHANTIER)" → Chantier, conduite de travaux, chef de chantier, conducteur d'engins
-        • "PRODUCTION - QUALITÉ" → Qualité production, contrôle qualité sur site
+        • "PRODUCTION - ÉTUDES (BUREAU)"
+        • "PRODUCTION - TRAVAUX (CHANTIER)"
+        • "PRODUCTION - QUALITÉ"
 
 3) Logistique
-    - Métiers centrés sur la gestion des flux physiques : transport, entrepôt, stocks, distribution.
-    - Exemples : Responsable entrepôt, Préparateur de commandes, Gestionnaire de stocks, Responsable transport, Supply chain (flux physiques).
-    - Sous-catégorie : le type de métier logistique (ex : "Transport", "Entrepôt", "Stocks").
+    - Exemples / mots-clés : Supply Chain, Approvisionnement, Transport, Entrepôt, Préparation de commandes, Gestion des stocks, Planification, Distribution, Transit, Douane, Transporteurs.
+    - Sous-catégorie : type de métier logistique (ex : "Gestion des stocks", "Approvisionnement").
 
 4) Non classé
     - Utilise cette catégorie seulement si le CV est hors périmètre (autre secteur) ou illisible.
@@ -1410,7 +1339,7 @@ Consignes de sortie STRICTES :
 - Tu réponds UNIQUEMENT par un JSON valide (seul contenu de la réponse) avec les clés :
   {"candidate_name": "...", "macro_category": "...", "sub_category": "...", "years_experience": 0, "profile_summary": "..."}
 - "macro_category" doit être EXACTEMENT l'un des libellés : "Fonctions supports", "Production/Technique", "Logistique", "Non classé".
-- "sub_category" doit respecter les règles ci-dessus.
+- "sub_category" doit respecter les règles ci-dessus. Aucune autre valeur n'est permise.
 - "years_experience" doit être un entier (0 si inconnu).
 - "profile_summary" : 1-2 phrases en français.
 
@@ -1421,88 +1350,12 @@ Texte du CV :
 '''
 
 def normalize_classification_labels(raw_macro: str | None, raw_sub: str | None, full_text: str | None = "") -> tuple[str, str]:
-    """Normalise les libellés renvoyés par l'IA pour garantir la cohérence métier.
-    
-    RÈGLE CLÉE : Les sous-directions forcent la macro-catégorie.
-    Ex: si sub="DSI" → macro DOIT être "Fonctions supports" même si l'IA a dit Production.
-    """
+    """Normalise les libellés renvoyés par l'IA pour garantir la cohérence métier."""
     macro = (raw_macro or "").strip()
     sub = (raw_sub or "").strip()
     text_lower = (full_text or "").lower()
-    sub_upper = sub.upper()
 
-    # ÉTAPE 1 : Vérifier si la sous-direction impose une macro-catégorie spécifique
-    # Cela corrige les erreurs de l'IA (ex: DSI classée en Production)
-    if sub_upper in SUBDIRECTION_TO_MACRO:
-        forced_macro = SUBDIRECTION_TO_MACRO[sub_upper]
-        # Si la macro forcée diffère de celle proposée, on la corrige
-        if forced_macro != macro:
-            macro = forced_macro
-        # Pour Production, on doit encore vérifier la sous-catégorie
-        if macro != "Production/Technique":
-            return macro, sub  # Retourner directement pour les autres
-
-    # ÉTAPE 2 : Détection de mots-clés métier dans la sous-direction ou le texte
-    # pour affiner automatiquement même si l'IA n'a pas donné la bonne sous-direction
-    
-    # Détection DSI / Informatique → TOUJOURS Fonctions supports
-    # Élargie pour capturer développeur, data analyst, product owner, business analyst IT, etc.
-    if any(kw in sub_upper for kw in ["DSI", "INFORMATIQUE", "IT", "SUPPORT IT", "SYSTÈME", "SYSTEME", "RÉSEAU", "RESEAU", "CYBER", 
-                                        "DÉVELOPPEUR", "DEVELOPPEUR", "DEV ", "FULL-STACK", "FULL STACK", "BACKEND", "FRONTEND",
-                                        "DATA ANALYST", "DATA ENGINEER", "DATA SCIENTIST", "BI", "BUSINESS INTELLIGENCE",
-                                        "PRODUCT OWNER", "SCRUM MASTER", "CHEF DE PROJET IT", "CHEF DE PROJET DIGITAL",
-                                        "DIGITALISATION", "DIGITAL", "TRANSFORMATION DIGITALE", "NUMÉRIQUE", "NUMERIQUE",
-                                        "BUSINESS ANALYST IT", "ANALYSTE IT", "CONSULTANT IT", "AMOA", "MOA"]):
-        return "Fonctions supports", "DSI"
-    if any(kw in text_lower for kw in [" dsi ", "direction des systèmes", "direction système", "infrastructure it", "support informatique", 
-                                         "administrateur système", "ingénieur système", "développeur", "developpeur", "full stack", "full-stack",
-                                         "data analyst", "data engineer", "data scientist", "business intelligence", "product owner", 
-                                         "scrum master", "chef de projet it", "digitalisation", "transformation digitale", "business analyst it"]):
-        return "Fonctions supports", "DSI"
-    
-    # Détection RH
-    if any(kw in sub_upper for kw in ["RH", "RESSOURCES HUMAINES", "RECRUTEMENT", "PAIE", "FORMATION"]):
-        return "Fonctions supports", "RH"
-    if any(kw in text_lower for kw in ["ressources humaines", "recruteur", "chargé de recrutement", "gestionnaire paie", "responsable formation"]):
-        return "Fonctions supports", "RH"
-    
-    # Détection Finance / Compta
-    # Élargie pour M&A, Corporate Finance, Financement, Contrôle de gestion
-    if any(kw in sub_upper for kw in ["FINANCE", "COMPTAB", "TRÉSOR", "AUDIT", "CONTRÔLE DE GESTION", "CONTROLE DE GESTION",
-                                        "M&A", "CORPORATE FINANCE", "FINANCEMENT", "INVESTISSEMENT", "GESTION FINANCIÈRE", "GESTION FINANCIERE",
-                                        "CONTRÔLEU", "CONTROLEU", "DAF", "RAF"]):
-        return "Fonctions supports", "Finance"
-    if any(kw in text_lower for kw in ["comptable", "contrôleur de gestion", "controleur de gestion", "auditeur", "trésorier", 
-                                         "directeur financier", "daf", "m&a", "corporate finance", "financement", "finance manager",
-                                         "consultant finance", "consultante finance"]):
-        return "Fonctions supports", "Finance"
-    
-    # Détection Achats
-    if any(kw in sub_upper for kw in ["ACHAT", "APPROVISIONNEMENT", "SOURCING"]):
-        return "Fonctions supports", "Achats"
-    if any(kw in text_lower for kw in ["acheteur", "ingénieur achats", "directeur achats", "responsable achats", "approvisionneur"]):
-        return "Fonctions supports", "Achats"
-    
-    # Détection Juridique
-    if any(kw in sub_upper for kw in ["JURIDIQUE", "LEGAL", "DROIT"]):
-        return "Fonctions supports", "Juridique"
-    if any(kw in text_lower for kw in ["juriste", "avocat", "directeur juridique", "conseil juridique"]):
-        return "Fonctions supports", "Juridique"
-    
-    # Détection Communication / Marketing
-    if any(kw in sub_upper for kw in ["COMMUNICATION", "MARKETING", "COM ", "RESPONSABLE MARKETING", "CHARGÉ COM", "CHARGE COM"]):
-        return "Fonctions supports", "Communication"
-    if any(kw in text_lower for kw in ["chargé de communication", "charge de communication", "community manager", "responsable marketing", 
-                                         "chef de produit", "responsable communication"]):
-        return "Fonctions supports", "Communication"
-    
-    # Détection Administration / Assistanat
-    if any(kw in sub_upper for kw in ["ADMINISTRATION", "ASSISTANAT", "SECRÉTARIAT", "SECRETARIAT", "ASSISTANT"]):
-        return "Fonctions supports", "Administration"
-    if any(kw in text_lower for kw in ["assistant", "secrétaire", "office manager", "assistant de direction"]):
-        return "Fonctions supports", "Administration"
-
-    # ÉTAPE 3 : Normalisation stricte des macro catégories si pas encore fait
+    # Normalisation stricte des macro catégories
     if "support" in macro.lower():
         macro = "Fonctions supports"
     elif "logist" in macro.lower():
@@ -1512,8 +1365,8 @@ def normalize_classification_labels(raw_macro: str | None, raw_sub: str | None, 
     else:
         macro = "Non classé"
 
-    # ÉTAPE 4 : Traitement spécifique Production/Technique
     if macro == "Production/Technique":
+        sub_upper = sub.upper()
         # Respect strict des sous-directions autorisées
         for allowed in PRODUCTION_ALLOWED_SUBCATEGORIES:
             if allowed.upper() == sub_upper:
