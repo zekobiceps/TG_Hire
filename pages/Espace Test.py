@@ -2431,35 +2431,51 @@ def create_organized_zip(results, file_list):
             folder = folders.get(category, 'Non_classe/')
             file_path_in_zip = folder + final_name
             
-            # Trouver le fichier original dans file_list
-            original_file = None
-            for item in file_list:
-                if item['name'] == original_name:
-                    original_file = item['file']
-                    break
-            
-            if original_file:
-                try:
-                    # Lire le contenu du fichier original
-                    original_file.seek(0)
-                    file_content = original_file.read()
-                    # Ajouter au ZIP
-                    zip_file.writestr(file_path_in_zip, file_content)
-                    
-                    # Ajouter au manifest (une colonne par champ + récap profil + années exp)
-                    manifest_data.append({
-                        'fichier_original': original_name,
-                        'nouveau_nom': final_name,
-                        'categorie': category if category != 'Non classé' else 'Divers / Hors périmètre',
-                        'sous_categorie': result.get('sub_category', ''),
-                        'annees_experience': result.get('years_experience', 0),
-                        'confiance_extraction': confidence,
-                        'methode_extraction': method,
-                        'recap_profil': result.get('profile_summary', ''),
-                        'dossier': folder.rstrip('/')
-                    })
-                except Exception as e:
-                    st.warning(f"Erreur lors du traitement de {original_name}: {e}")
+            cache = st.session_state.get('uploaded_files_cache', {}) if hasattr(st.session_state, 'uploaded_files_cache') else {}
+            cache_key = result.get('cache_key')
+            cache_entry = cache.get(cache_key) if cache_key else None
+
+            file_content = None
+            if cache_entry and cache_entry.get('bytes') is not None:
+                file_content = cache_entry['bytes']
+            else:
+                matching_item = None
+                for item in file_list:
+                    if item.get('name') == original_name:
+                        matching_item = item
+                        break
+                if matching_item:
+                    if matching_item.get('content') is not None:
+                        file_content = matching_item['content']
+                    else:
+                        original_file = matching_item.get('file')
+                        if original_file:
+                            try:
+                                original_file.seek(0)
+                                file_content = original_file.read()
+                            except Exception:
+                                file_content = None
+
+            if file_content is None:
+                st.warning(f"Impossible de récupérer le fichier original pour {original_name}.")
+                continue
+
+            try:
+                zip_file.writestr(file_path_in_zip, file_content)
+
+                manifest_data.append({
+                    'fichier_original': original_name,
+                    'nouveau_nom': final_name,
+                    'categorie': category if category != 'Non classé' else 'Divers / Hors périmètre',
+                    'sous_categorie': result.get('sub_category', ''),
+                    'annees_experience': result.get('years_experience', 0),
+                    'confiance_extraction': confidence,
+                    'methode_extraction': method,
+                    'recap_profil': result.get('profile_summary', ''),
+                    'dossier': folder.rstrip('/')
+                })
+            except Exception as e:
+                st.warning(f"Erreur lors du traitement de {original_name}: {e}")
         
         # Créer et ajouter le manifest CSV (avec point-virgule pour Excel FR) + Excel natif
         if manifest_data:
@@ -3504,67 +3520,99 @@ with tab5:
     # Importer des CVs uniquement via upload
     uploaded_files_auto = st.file_uploader("Importer des CVs (PDF)", type=["pdf"], accept_multiple_files=True, key="auto_uploader")
 
-    # Construire la liste de fichiers uniquement à partir des uploads
-    file_list = []
+    file_list: list[dict] = []
     if uploaded_files_auto:
-        for uf in uploaded_files_auto:
-            file_list.append({'name': uf.name, 'file': uf})
-
-    # Afficher immédiatement combien de CVs ont été uploadés
-    if uploaded_files_auto:
-        # Show upload status with a small progress indicator
         total_uploads = len(uploaded_files_auto)
-        # Build file_list while updating a visible progress bar so users see upload progression
-        upload_col, progress_col = st.columns([3, 1])
-        upload_col.success(f"✅ {total_uploads} CV(s) uploadé(s) et prêts pour traitement.")
-        upload_progress = progress_col.progress(0)
-
-        # Limiter à 200 pour sécurité
         if total_uploads > 200:
             st.warning('Plus de 200 CVs trouvés. Seuls les 200 premiers seront traités.')
             uploaded_files_auto = uploaded_files_auto[:200]
             total_uploads = len(uploaded_files_auto)
 
-        file_list = []
+        cache = st.session_state.setdefault('uploaded_files_cache', {})
+        seen_cache_keys: set[str] = set()
+
+        upload_col, progress_col = st.columns([3, 1])
+        upload_status_placeholder = upload_col.empty()
+        upload_status_placeholder.info(f"Téléversement des CVs : 0/{total_uploads}")
+        upload_progress = progress_col.progress(0)
+
         for i, uf in enumerate(uploaded_files_auto):
-            file_list.append({'name': uf.name, 'file': uf})
-            # update progress (nice UX next to page indicator)
+            size_guess = getattr(uf, "size", None)
+            file_bytes = None
             try:
-                upload_progress.progress(int((i + 1) / total_uploads * 100))
+                file_bytes = uf.read()
+                uf.seek(0)
+                if size_guess is None and file_bytes is not None:
+                    size_guess = len(file_bytes)
             except Exception:
-                # some streamlit versions accept float in [0,1]
-                upload_progress.progress((i + 1) / total_uploads)
+                file_bytes = None
 
-        # Initialiser les variables de session pour la classification et l'analyse DeepSeek
-        if 'classification_results' not in st.session_state:
-            st.session_state.classification_results = None
-        if 'deepseek_analyses' not in st.session_state:
-            st.session_state.deepseek_analyses = []
-        if 'last_action' not in st.session_state:
-            st.session_state.last_action = None
-        
-        # Afficher un indicateur de statut si une action a été effectuée précédemment
-        if st.session_state.last_action:
-            action_message = {
-                # 'classified' message intentionally removed per user request
-                "analyzed": "✅ CVs non classés analysés avec DeepSeek IA !",
-                "reset": "🔄 Analyses IA réinitialisées."
+            cache_key = f"{uf.name}|{i}|{size_guess if size_guess is not None else 'na'}"
+            seen_cache_keys.add(cache_key)
+
+            file_entry: dict = {
+                'name': uf.name,
+                'file': uf,
+                'cache_key': cache_key,
             }
-            msg = action_message.get(st.session_state.last_action, "")
-            if msg:
-                st.success(msg)
-            # Réinitialiser pour ne pas afficher le message à chaque rechargement
-            st.session_state.last_action = None
-        
-        # Option pour renommer et organiser les CV
-        rename_and_organize = st.checkbox(
-            "📁 Renommer les CV et organiser par dossiers",
-            value=True,
-            help="Extrait automatiquement les noms des candidats et organise les CV par catégorie dans un fichier ZIP"
-        )
+            if size_guess is not None:
+                file_entry['size'] = size_guess
+            if file_bytes is not None:
+                file_entry['content'] = file_bytes
+                cache_entry = cache.setdefault(cache_key, {})
+                if 'bytes' not in cache_entry:
+                    cache_entry['bytes'] = file_bytes
 
-        # Choix du modèle IA pour la classification
-        classif_model = st.selectbox("Modèle IA pour la classification", ["DeepSeek", "Gemini", "Groq", "Claude", "OpenRouter"])
+            file_list.append(file_entry)
+
+            progress_value = (i + 1) / total_uploads
+            try:
+                upload_progress.progress(int(progress_value * 100))
+            except Exception:
+                upload_progress.progress(progress_value)
+            upload_status_placeholder.info(f"Téléversement des CVs : {i + 1}/{total_uploads}")
+
+        stale_keys = [key for key in list(cache.keys()) if key not in seen_cache_keys]
+        for key in stale_keys:
+            cache.pop(key, None)
+
+        upload_status_placeholder.success(f"✅ {total_uploads} CV(s) uploadé(s) et prêts pour traitement.")
+
+        st.session_state.uploaded_files_list = [dict(item) for item in file_list]
+    else:
+        st.session_state.pop('uploaded_files_list', None)
+        st.session_state.pop('uploaded_files_cache', None)
+
+    # Initialiser les variables de session pour la classification et l'analyse DeepSeek
+    if 'classification_results' not in st.session_state:
+        st.session_state.classification_results = None
+    if 'deepseek_analyses' not in st.session_state:
+        st.session_state.deepseek_analyses = []
+    if 'last_action' not in st.session_state:
+        st.session_state.last_action = None
+    
+    # Afficher un indicateur de statut si une action a été effectuée précédemment
+    if st.session_state.last_action:
+        action_message = {
+            # 'classified' message intentionally removed per user request
+            "analyzed": "✅ CVs non classés analysés avec DeepSeek IA !",
+            "reset": "🔄 Analyses IA réinitialisées."
+        }
+        msg = action_message.get(st.session_state.last_action, "")
+        if msg:
+            st.success(msg)
+        # Réinitialiser pour ne pas afficher le message à chaque rechargement
+        st.session_state.last_action = None
+    
+    # Option pour renommer et organiser les CV
+    rename_and_organize = st.checkbox(
+        "📁 Renommer les CV et organiser par dossiers",
+        value=True,
+        help="Extrait automatiquement les noms des candidats et organise les CV par catégorie dans un fichier ZIP"
+    )
+
+    # Choix du modèle IA pour la classification
+    classif_model = st.selectbox("Modèle IA pour la classification", ["DeepSeek", "Gemini", "Groq", "Claude", "OpenRouter"])
         
         # Bouton de classification primaire
         if st.button("📂 Lancer l'auto-classification", type='primary'):
@@ -3574,20 +3622,48 @@ with tab5:
             results = []
             progress = st.progress(0)
             total = len(file_list)
-            # placeholder pour afficher le fichier en cours de traitement
-            processing_placeholder = st.empty()
+            processing_counter_placeholder = st.empty()
+            processing_detail_placeholder = st.empty()
+            processing_counter_placeholder.info(f"Traitement des CVs : 0/{total}")
             spinner_text = 'Extraction, classification et extraction des noms en cours...' if rename_and_organize else 'Extraction et classification en cours...'
             
             with st.spinner(spinner_text):
+                cache = st.session_state.get('uploaded_files_cache', {})
                 for i, item in enumerate(file_list):
                     f = item['file']
                     name = item['name']
-                    # Mettre à jour le fichier en cours
-                    processing_placeholder.info(f"Traitement ({i+1}/{total}) : {name}")
-                    try:
-                        text = extract_text_from_pdf(f)
-                    except Exception:
-                        text = ''
+                    processing_counter_placeholder.info(f"Traitement des CVs : {i + 1}/{total}")
+                    processing_detail_placeholder.info(f"CV en cours : {name}")
+                    cache_key = item.get('cache_key') or f"{name}|{i}"
+                    cache_entry = cache.setdefault(cache_key, {}) if cache is not None else {}
+
+                    file_bytes = cache_entry.get('bytes') if cache_entry else None
+                    if file_bytes is None and 'content' in item and item['content'] is not None:
+                        file_bytes = item['content']
+                        if cache_entry is not None:
+                            cache_entry['bytes'] = file_bytes
+
+                    text = ''
+                    if cache_entry and 'text' in cache_entry:
+                        text = cache_entry['text']
+                    else:
+                        try:
+                            if file_bytes is not None:
+                                text = extract_text_from_pdf(io.BytesIO(file_bytes))
+                            else:
+                                text = extract_text_from_pdf(f)
+                                if cache_entry is not None:
+                                    try:
+                                        f.seek(0)
+                                        file_bytes = f.read()
+                                        cache_entry['bytes'] = file_bytes
+                                    except Exception:
+                                        pass
+                        except Exception:
+                            text = ''
+                        if cache_entry is not None:
+                            cache_entry['text'] = text
+                            cache[cache_key] = cache_entry
 
                     # --- NOUVELLE LOGIQUE D'EXTRACTION DE NOM ---
                     # 1. Extraction locale intelligente (Email Cross-Check)
@@ -3722,14 +3798,18 @@ with tab5:
                         'years_experience': years_exp,
                         'profile_summary': profile_summary,
                         'text_snippet': (text or '')[:800],
-                        'full_text': text
+                        'full_text': text,
+                        'cache_key': cache_key
                     }
 
                     if extracted_name_info:
                         result_item['extracted_name'] = extracted_name_info
 
-                    results.append(result_item)
-                    progress.progress((i+1)/total)
+                        results.append(result_item)
+                        progress.progress((i+1)/total)
+
+                    if cache is not None:
+                        st.session_state.uploaded_files_cache = cache
 
             # Stocker les résultats et relancer l'affichage global (le rendu principal s'appuiera
             # sur la logique de rendu déjà présente en dehors de ce bloc). Cela évite les variables
