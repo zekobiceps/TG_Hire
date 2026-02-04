@@ -27,6 +27,7 @@ from utils import (
     init_session_state,
     PDF_AVAILABLE,
     WORD_AVAILABLE,
+    require_login,
     save_briefs,
     display_commit_info,
     load_briefs,
@@ -55,8 +56,7 @@ st.set_page_config(
 )
 
 # Vérification de la connexion
-if not st.session_state.get("logged_in", False):
-    st.stop()
+require_login()
 
 import time
 import traceback

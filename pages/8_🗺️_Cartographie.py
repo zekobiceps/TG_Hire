@@ -334,8 +334,7 @@ if "cartographie_data" not in st.session_state:
 st.set_page_config(page_title="TG-Hire IA - Cartographie", page_icon="🗺️", layout="wide", initial_sidebar_state="expanded")
 
 # Vérification de la connexion
-if not st.session_state.get("logged_in", False):
-    st.stop()
+utils.require_login()
 
 st.title("🗺️ Cartographie des talents")
 

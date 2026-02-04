@@ -5,7 +5,7 @@ import json
 from PIL import Image, ImageDraw, ImageFont
 import io
 import base64
-from utils import deepseek_generate, display_commit_info
+from utils import deepseek_generate, display_commit_info, require_login
 
 # Configuration de l'outil
 st.set_page_config(
@@ -16,8 +16,7 @@ st.set_page_config(
 )
 
 # Vérification de la connexion
-if not st.session_state.get("logged_in", False):
-    st.stop()
+require_login()
 
 # Configuration pour l'appel à l'IA DeepSeek
 SYSTEM_PROMPT = """

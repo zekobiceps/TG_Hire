@@ -1,4 +1,5 @@
 import streamlit as st
+from utils import require_login
 import pandas as pd
 import io
 import json 
@@ -35,8 +36,7 @@ st.set_page_config(
 )
 
 # Vérification de la connexion
-if not st.session_state.get("logged_in", False):
-    st.stop()
+require_login()
 
 # Titre principal avec commit info
 st.title("📋 Suivi des Dossiers RH")

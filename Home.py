@@ -2,6 +2,7 @@ import streamlit as st
 import gspread
 from google.oauth2 import service_account
 from datetime import datetime
+import time
 import pandas as pd
 
 # --- CONFIGURATION ---
@@ -32,6 +33,14 @@ if "logged_in" not in st.session_state: st.session_state.logged_in = False
 if "current_user" not in st.session_state: st.session_state.current_user = ""
 if "users" not in st.session_state: st.session_state.users = {}
 if 'data_loaded' not in st.session_state: st.session_state.data_loaded = False
+if "last_activity_ts" not in st.session_state: st.session_state.last_activity_ts = None
+if "session_expired" not in st.session_state: st.session_state.session_expired = False
+
+SESSION_TIMEOUT_SECONDS = 2 * 60 * 60  # 2 heures
+
+def _is_session_expired() -> bool:
+    last_ts = st.session_state.get("last_activity_ts")
+    return bool(last_ts) and (time.time() - last_ts > SESSION_TIMEOUT_SECONDS)
 
 # --- FONCTIONS DE GESTION DES DONNÉES ---
 def load_users_from_gsheet():
@@ -124,11 +133,21 @@ if not st.session_state.users:
     st.session_state.users = load_users_from_gsheet()
 
 # --- PAGE DE CONNEXION ---
+if st.session_state.logged_in and _is_session_expired():
+    st.session_state.logged_in = False
+    st.session_state.current_user = ""
+    st.session_state.data_loaded = False
+    st.session_state.last_activity_ts = None
+    st.session_state.session_expired = True
+
 if not st.session_state.logged_in:
     st.set_page_config(page_title="TG-Hire IA - Connexion", layout="centered")
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.image("tgcc.png", width="stretch")
+        if st.session_state.session_expired:
+            st.warning("⏳ Session expirée. Veuillez vous reconnecter.")
+            st.session_state.session_expired = False
         with st.form("login_form"):
             st.subheader("Connexion")
             email = st.text_input("Adresse Email").lower().strip()
@@ -137,6 +156,7 @@ if not st.session_state.logged_in:
                 if email in st.session_state.users and st.session_state.users[email]["password"] == password:
                     st.session_state.logged_in = True
                     st.session_state.current_user = st.session_state.users[email]["name"]
+                    st.session_state.last_activity_ts = time.time()
                     st.rerun()
                 else:
                     st.error("Email ou mot de passe incorrect.")
@@ -144,6 +164,7 @@ if not st.session_state.logged_in:
 
 # --- PAGE PRINCIPALE (APRÈS CONNEXION) ---
 else:
+    st.session_state.last_activity_ts = time.time()
     if not st.session_state.data_loaded:
         with st.spinner("Chargement des fonctionnalités..."):
             st.session_state.features = load_features_from_gsheet()
@@ -168,6 +189,7 @@ else:
             st.session_state.logged_in = False
             st.session_state.current_user = ""
             st.session_state.data_loaded = False
+            st.session_state.last_activity_ts = None
             st.rerun()
 
     # --- CONTENU PRINCIPAL ---

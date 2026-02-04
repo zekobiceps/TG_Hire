@@ -3656,7 +3656,7 @@ with st.sidebar:
 
 with tab5:
     st.header("🗂️ Auto-classification de CVs (4 catégories)")
-    st.markdown("Chargez et analysez jusqu'à 101 CVs (PDF). L'outil extrait le texte et classe automatiquement chaque CV dans l'une des 4 catégories : Fonctions supports, Logistique, Production/Technique, Non classé.")
+    st.markdown("Chargez et analysez jusqu'à 500 CVs (PDF). L'outil extrait le texte et classe automatiquement chaque CV dans l'une des 4 catégories : Fonctions supports, Logistique, Production/Technique, Non classé.")
 
     # Importer des CVs uniquement via upload
     uploaded_files_auto = st.file_uploader("Importer des CVs (PDF)", type=["pdf"], accept_multiple_files=True, key="auto_uploader")
@@ -3666,39 +3666,18 @@ with tab5:
     if uploaded_files_auto:
         total_uploads = len(uploaded_files_auto)
 
-        # 1. Création des indicateurs visuels (Texte + Barre)
-        upload_status = st.empty()
-        upload_bar = st.progress(0)
-
-        # Message initial
-        upload_status.info(f"📥 Réception terminée. Lecture de {total_uploads} fichiers en cours...")
-
-        # Limiter à 200 pour sécurité
-        if total_uploads > 200:
-            st.warning('⚠️ Limite de 200 CVs atteinte. Seuls les 200 premiers seront traités.')
-            uploaded_files_auto = uploaded_files_auto[:200]
+        # Limiter à 500 pour sécurité
+        if total_uploads > 500:
+            st.warning('⚠️ Limite de 500 CVs atteinte. Seuls les 500 premiers seront traités.')
+            uploaded_files_auto = uploaded_files_auto[:500]
             total_uploads = len(uploaded_files_auto)
 
         file_list = []
-
-        # 2. Boucle de lecture avec mise à jour en temps réel
-        import time
-        for i, uf in enumerate(uploaded_files_auto):
-            # Mise à jour du texte : "Lecture : 5/100 CVs"
-            upload_status.info(f"📂 Lecture en mémoire : {i + 1}/{total_uploads} CVs ({uf.name})")
-
-            # Mise à jour de la barre de progression
-            upload_bar.progress((i + 1) / total_uploads)
-
-            # Construction de la liste
+        for uf in uploaded_files_auto:
             file_list.append({'name': uf.name, 'file': uf})
 
-            # Petit délai imperceptible (10ms) pour forcer le rafraîchissement visuel de l'interface
-            time.sleep(0.01)
-
-        # 3. Nettoyage et Confirmation
-        upload_bar.empty()
-        upload_status.success(f"✅ {total_uploads} CVs chargés avec succès et prêts pour l'IA !")
+        # Message de confirmation unique
+        st.success(f"✅ {total_uploads} CVs chargés avec succès et prêts pour l'IA !")
 
         st.session_state.uploaded_files_list = [dict(item) for item in file_list]
     else:

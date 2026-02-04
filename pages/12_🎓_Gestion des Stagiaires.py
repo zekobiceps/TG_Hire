@@ -1,5 +1,5 @@
 import streamlit as st
-from utils import display_commit_info
+from utils import display_commit_info, require_login
 
 st.set_page_config(
     page_title="Gestion des Stagiaires",
@@ -8,8 +8,7 @@ st.set_page_config(
 )
 
 # Vérification de la connexion
-if not st.session_state.get("logged_in", False):
-    st.stop()
+require_login()
 
 st.title("🎓 Gestion des Stagiaires")
 display_commit_info()

@@ -1,4 +1,25 @@
 import streamlit as st
+import time
+
+# -------------------- AUTH / SESSION TIMEOUT --------------------
+SESSION_TIMEOUT_SECONDS = 2 * 60 * 60  # 2 heures
+
+def require_login():
+    """Bloque l'accès si l'utilisateur n'est pas connecté ou si la session a expiré."""
+    if not st.session_state.get("logged_in", False):
+        st.warning("🔒 Veuillez vous connecter d'abord dans la page Home.")
+        st.stop()
+
+    now_ts = time.time()
+    last_ts = st.session_state.get("last_activity_ts")
+    if last_ts and now_ts - last_ts > SESSION_TIMEOUT_SECONDS:
+        st.session_state.logged_in = False
+        st.session_state.current_user = ""
+        st.session_state.last_activity_ts = None
+        st.warning("⏳ Session expirée. Veuillez vous reconnecter dans la page Home.")
+        st.stop()
+
+    st.session_state.last_activity_ts = now_ts
 # -------------------- CONFIGURATION GOOGLE SHEETS pour la Bibliothèque Sourcing --------------------
 SOURCING_SHEET_URL = "https://docs.google.com/spreadsheets/d/1Yw99SS4vU5v0DuD7S1AwaEispJCo-cwioxSsAYnzRkE/edit"
 SOURCING_WORKSHEET_NAME = "Sourcing DB"

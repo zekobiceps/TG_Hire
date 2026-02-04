@@ -1,4 +1,5 @@
 import streamlit as st
+from utils import require_login
 import importlib.util
 import os
 import requests
@@ -44,8 +45,7 @@ st.set_page_config(
 )
 
 # Vérification de la connexion
-if not st.session_state.get("logged_in", False):
-    st.stop()
+require_login()
 
 # -------------------- CONFIGURATION DES APIS --------------------
 SYSTEM_PROMPT = """

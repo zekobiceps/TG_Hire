@@ -3,14 +3,13 @@ import pandas as pd
 import os
 import datetime
 import json
-from utils import generate_ai_question, display_commit_info
+from utils import generate_ai_question, display_commit_info, require_login
 
 # Configuration de la page
 st.set_page_config(page_title="HR Eval Pro - Système d'Évaluation", layout="wide", page_icon="🚀")
 
 # Vérification de la connexion
-if not st.session_state.get("logged_in", False):
-    st.stop()
+require_login()
 
 # Fonctions de base
 def load_data(file_path):

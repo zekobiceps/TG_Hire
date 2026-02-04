@@ -1,5 +1,5 @@
 import streamlit as st
-from utils import save_sourcing_entry_to_gsheet, load_sourcing_entries_from_gsheet
+from utils import save_sourcing_entry_to_gsheet, load_sourcing_entries_from_gsheet, require_login
 
 import streamlit as st
 import requests
@@ -1066,8 +1066,7 @@ st.set_page_config(
 )
 
 # Vérification de la connexion
-if not st.session_state.get("logged_in", False):
-    st.stop()
+require_login()
 
 # -------------------- Sidebar --------------------
 with st.sidebar:
