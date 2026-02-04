@@ -3674,7 +3674,9 @@ with tab5:
 
         # Afficher le statut d'upload avec compteur progressif
         upload_status_placeholder = st.empty()
-        upload_status_placeholder.info(f"📤 Upload en cours : 0/{total_uploads} CVs")
+        upload_status_placeholder.info(f"📤 Traitement des fichiers : 0/{total_uploads} CVs")
+        
+        import time
 
         for i, uf in enumerate(uploaded_files_auto):
             size_guess = getattr(uf, "size", None)
@@ -3705,8 +3707,10 @@ with tab5:
 
             file_list.append(file_entry)
             
-            # Mettre à jour le compteur d'upload
-            upload_status_placeholder.info(f"📤 Upload en cours : {i + 1}/{total_uploads} CVs")
+            # Mettre à jour le compteur avec un micro-délai pour le rendre visible
+            upload_status_placeholder.info(f"📤 Traitement des fichiers : {i + 1}/{total_uploads} CVs")
+            if i < total_uploads - 1:  # Pas de délai sur le dernier
+                time.sleep(0.05)  # 50ms pour rendre visible
 
         stale_keys = [key for key in list(cache.keys()) if key not in seen_cache_keys]
         for key in stale_keys:
