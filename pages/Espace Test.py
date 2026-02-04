@@ -3662,63 +3662,43 @@ with tab5:
     uploaded_files_auto = st.file_uploader("Importer des CVs (PDF)", type=["pdf"], accept_multiple_files=True, key="auto_uploader")
     
     file_list: list[dict] = []
+    # Afficher immédiatement combien de CVs ont été uploadés
     if uploaded_files_auto:
         total_uploads = len(uploaded_files_auto)
+        
+        # Limiter à 200 pour sécurité
         if total_uploads > 200:
             st.warning('Plus de 200 CVs trouvés. Seuls les 200 premiers seront traités.')
             uploaded_files_auto = uploaded_files_auto[:200]
             total_uploads = len(uploaded_files_auto)
 
-        # Afficher immédiatement le message de traitement en cours
+        # Placeholder pour le message de progression textuel (ex: "5/40")
         upload_status_placeholder = st.empty()
-        upload_status_placeholder.info(f"📤 Préparation des fichiers : 0/{total_uploads} CVs")
-
-        cache = st.session_state.setdefault('uploaded_files_cache', {})
-        seen_cache_keys: set[str] = set()
+        upload_status_placeholder.info(f"⏳ Démarrage du traitement des {total_uploads} fichiers...")
         
+        # Barre de progression visuelle
+        progress_bar = st.progress(0)
+
+        file_list = []
+        
+        # Boucle de lecture avec mise à jour du compteur texte
         import time
-
         for i, uf in enumerate(uploaded_files_auto):
-            # Mettre à jour le compteur AVANT de traiter le fichier
-            upload_status_placeholder.info(f"📤 Préparation des fichiers : {i + 1}/{total_uploads} CVs")
+            # Mise à jour du message texte (C'est ce que je veux voir)
+            upload_status_placeholder.info(f"📤 Chargement en mémoire : {i + 1}/{total_uploads} CVs")
             
-            size_guess = getattr(uf, "size", None)
-            file_bytes = None
-            try:
-                file_bytes = uf.read()
-                uf.seek(0)
-                if size_guess is None and file_bytes is not None:
-                    size_guess = len(file_bytes)
-            except Exception:
-                file_bytes = None
-
-            cache_key = f"{uf.name}|{i}|{size_guess if size_guess is not None else 'na'}"
-            seen_cache_keys.add(cache_key)
-
-            file_entry: dict = {
-                'name': uf.name,
-                'file': uf,
-                'cache_key': cache_key,
-            }
-            if size_guess is not None:
-                file_entry['size'] = size_guess
-            if file_bytes is not None:
-                file_entry['content'] = file_bytes
-                cache_entry = cache.setdefault(cache_key, {})
-                if 'bytes' not in cache_entry:
-                    cache_entry['bytes'] = file_bytes
-
-            file_list.append(file_entry)
+            file_list.append({'name': uf.name, 'file': uf})
             
-            # Délai suffisant pour rendre le compteur visible (comme pour le traitement IA)
-            time.sleep(0.3)  # 300ms par fichier pour rendre la progression visible
+            # Mise à jour de la barre
+            progress_bar.progress((i + 1) / total_uploads)
+            
+            # Petit délai pour rendre le compteur lisible
+            # (Sans ça, la boucle va trop vite pour que l'œil humain suive sur des petits volumes)
+            time.sleep(0.02)
 
-        stale_keys = [key for key in list(cache.keys()) if key not in seen_cache_keys]
-        for key in stale_keys:
-            cache.pop(key, None)
-
-        # Afficher le message de confirmation finale
-        upload_status_placeholder.success(f"✅ {total_uploads} CV(s) uploadé(s) et prêts pour traitement.")
+        # Une fois fini
+        progress_bar.empty()
+        upload_status_placeholder.success(f"✅ {total_uploads} CV(s) chargés et prêts pour l'analyse.")
 
         st.session_state.uploaded_files_list = [dict(item) for item in file_list]
     else:
