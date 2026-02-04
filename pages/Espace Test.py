@@ -3665,40 +3665,40 @@ with tab5:
     # Afficher immédiatement combien de CVs ont été uploadés
     if uploaded_files_auto:
         total_uploads = len(uploaded_files_auto)
-        
+
+        # 1. Création des indicateurs visuels (Texte + Barre)
+        upload_status = st.empty()
+        upload_bar = st.progress(0)
+
+        # Message initial
+        upload_status.info(f"📥 Réception terminée. Lecture de {total_uploads} fichiers en cours...")
+
         # Limiter à 200 pour sécurité
         if total_uploads > 200:
-            st.warning('Plus de 200 CVs trouvés. Seuls les 200 premiers seront traités.')
+            st.warning('⚠️ Limite de 200 CVs atteinte. Seuls les 200 premiers seront traités.')
             uploaded_files_auto = uploaded_files_auto[:200]
             total_uploads = len(uploaded_files_auto)
 
-        # Placeholder pour le message de progression textuel (ex: "5/40")
-        upload_status_placeholder = st.empty()
-        upload_status_placeholder.info(f"⏳ Démarrage du traitement des {total_uploads} fichiers...")
-        
-        # Barre de progression visuelle
-        progress_bar = st.progress(0)
-
         file_list = []
-        
-        # Boucle de lecture avec mise à jour du compteur texte
+
+        # 2. Boucle de lecture avec mise à jour en temps réel
         import time
         for i, uf in enumerate(uploaded_files_auto):
-            # Mise à jour du message texte (C'est ce que je veux voir)
-            upload_status_placeholder.info(f"📤 Chargement en mémoire : {i + 1}/{total_uploads} CVs")
-            
-            file_list.append({'name': uf.name, 'file': uf})
-            
-            # Mise à jour de la barre
-            progress_bar.progress((i + 1) / total_uploads)
-            
-            # Petit délai pour rendre le compteur lisible
-            # (Sans ça, la boucle va trop vite pour que l'œil humain suive sur des petits volumes)
-            time.sleep(0.02)
+            # Mise à jour du texte : "Lecture : 5/100 CVs"
+            upload_status.info(f"📂 Lecture en mémoire : {i + 1}/{total_uploads} CVs ({uf.name})")
 
-        # Une fois fini
-        progress_bar.empty()
-        upload_status_placeholder.success(f"✅ {total_uploads} CV(s) chargés et prêts pour l'analyse.")
+            # Mise à jour de la barre de progression
+            upload_bar.progress((i + 1) / total_uploads)
+
+            # Construction de la liste
+            file_list.append({'name': uf.name, 'file': uf})
+
+            # Petit délai imperceptible (10ms) pour forcer le rafraîchissement visuel de l'interface
+            time.sleep(0.01)
+
+        # 3. Nettoyage et Confirmation
+        upload_bar.empty()
+        upload_status.success(f"✅ {total_uploads} CVs chargés avec succès et prêts pour l'IA !")
 
         st.session_state.uploaded_files_list = [dict(item) for item in file_list]
     else:
