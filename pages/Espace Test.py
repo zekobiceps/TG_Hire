@@ -3613,9 +3613,9 @@ with tab5:
 
     # Choix du modèle IA pour la classification
     classif_model = st.selectbox("Modèle IA pour la classification", ["DeepSeek", "Gemini", "Groq", "Claude", "OpenRouter"])
-        
-        # Bouton de classification primaire
-        if st.button("📂 Lancer l'auto-classification", type='primary'):
+
+    # Bouton de classification primaire
+    if st.button("📂 Lancer l'auto-classification", type='primary'):
             # Réinitialiser les analyses DeepSeek lors d'une nouvelle classification
             st.session_state.deepseek_analyses = []
             
