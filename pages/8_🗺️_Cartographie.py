@@ -1,4 +1,11 @@
 import streamlit as st
+from utils import require_login
+
+st.set_page_config(page_title="TG-Hire IA - Cartographie", page_icon="🗺️", layout="wide", initial_sidebar_state="expanded")
+
+# Vérification de la connexion (avant imports lourds)
+require_login()
+
 import streamlit.components.v1 as components
 import os
 import io
@@ -331,10 +338,6 @@ if "cartographie_data" not in st.session_state:
     st.session_state.cartographie_data = load_data_from_sheet()
 
 # -------------------- INTERFACE UTILISATEUR --------------------
-st.set_page_config(page_title="TG-Hire IA - Cartographie", page_icon="🗺️", layout="wide", initial_sidebar_state="expanded")
-
-# Vérification de la connexion
-utils.require_login()
 
 st.title("🗺️ Cartographie des talents")
 

@@ -1,4 +1,17 @@
 import streamlit as st
+from utils import require_login
+
+# -------------------- Streamlit Page Config --------------------
+st.set_page_config(
+    page_title="Analyse CV AI",
+    page_icon="📄",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Vérification de la connexion (avant imports lourds)
+require_login()
+
 import pandas as pd
 import io
 import json
@@ -24,10 +37,6 @@ except Exception:
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import plotly.graph_objects as go
-
-# Vérification de la connexion
-from utils import require_login
-require_login()
     
 # Imports pour OCR (Cas des CV scannés)
 try:
@@ -53,15 +62,6 @@ from utils import (
 
 # -------------------- Configuration de la clé API DeepSeek --------------------
 # --- CORRECTION : Déplacé à l'intérieur des fonctions pour éviter l'erreur au démarrage ---
-
-# -------------------- Streamlit Page Config --------------------
-st.set_page_config(
-    page_title="Analyse CV AI",
-    page_icon="📄",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
 
 # --- Vérification unique de la clé API DeepSeek au démarrage ---
 # Cette vérification est silencieuse ici pour éviter de bloquer ou d'afficher des erreurs avant le chargement complet

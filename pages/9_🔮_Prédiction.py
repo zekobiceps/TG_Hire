@@ -1,5 +1,17 @@
 import streamlit as st
 from utils import require_login
+
+# Configuration de la page (avant imports lourds)
+st.set_page_config(
+    page_title="Prédiction de Recrutements - TGCC",
+    page_icon="🔮",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Vérification de la connexion (avant imports lourds)
+require_login()
+
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
@@ -93,17 +105,6 @@ def load_data_from_google_sheets(sheet_url):
             pass
 
         raise e
-
-# Configuration de la page
-st.set_page_config(
-    page_title="Prédiction de Recrutements - TGCC",
-    page_icon="🔮",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# Vérification de la connexion
-require_login()
 
 # Titre principal avec commit info
 st.title("🔮 Prédiction de Recrutements")

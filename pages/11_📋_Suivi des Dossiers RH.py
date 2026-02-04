@@ -1,5 +1,17 @@
 import streamlit as st
 from utils import require_login
+
+# Configuration de la page (avant imports lourds)
+st.set_page_config(
+    page_title="Suivi des Dossiers RH - TGCC",
+    page_icon="📋",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Vérification de la connexion (avant imports lourds)
+require_login()
+
 import pandas as pd
 import io
 import json 
@@ -26,17 +38,6 @@ GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/1p8gSC84LZllAaTT6F88x
 WORKSHEET_NAME = "HR_Dossiers"
 HISTORY_SHEET_NAME = "Relance_History"
 SCHEDULED_SHEET_NAME = "Scheduled_Relances"
-
-# Configuration de la page
-st.set_page_config(
-    page_title="Suivi des Dossiers RH - TGCC",
-    page_icon="📋",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# Vérification de la connexion
-require_login()
 
 # Titre principal avec commit info
 st.title("📋 Suivi des Dossiers RH")

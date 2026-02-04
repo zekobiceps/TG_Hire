@@ -1,5 +1,15 @@
 import streamlit as st
 from utils import require_login
+
+st.set_page_config(
+    page_title="📊 Reporting RH Complet",
+    page_icon="📊",
+    layout="wide"
+)
+
+# Vérification de la connexion (avant imports lourds)
+require_login()
+
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -93,15 +103,6 @@ def _normalize_text(text):
 def _norm(x):
     """Robust text normalization for status/keywords matching."""
     return _normalize_text(x)
-
-st.set_page_config(
-    page_title="📊 Reporting RH Complet",
-    page_icon="📊",
-    layout="wide"
-)
-
-# Vérification de la connexion
-require_login()
 
 
 def _truncate_label(label: str, max_len: int = 20) -> str:
