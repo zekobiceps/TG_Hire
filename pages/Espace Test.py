@@ -3669,12 +3669,12 @@ with tab5:
             uploaded_files_auto = uploaded_files_auto[:200]
             total_uploads = len(uploaded_files_auto)
 
+        # Afficher immédiatement le message de traitement en cours
+        upload_status_placeholder = st.empty()
+        upload_status_placeholder.info(f"📤 Traitement en cours : {total_uploads} fichiers détectés...")
+
         cache = st.session_state.setdefault('uploaded_files_cache', {})
         seen_cache_keys: set[str] = set()
-
-        # Afficher le statut d'upload avec compteur progressif
-        upload_status_placeholder = st.empty()
-        upload_status_placeholder.info(f"📤 Traitement des fichiers : 0/{total_uploads} CVs")
         
         import time
 
