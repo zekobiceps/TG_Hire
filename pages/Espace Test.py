@@ -3669,11 +3669,12 @@ with tab5:
             uploaded_files_auto = uploaded_files_auto[:200]
             total_uploads = len(uploaded_files_auto)
 
-        # Afficher immédiatement le statut d'upload
-        st.success(f"✅ {total_uploads} CV(s) uploadé(s) et prêts pour traitement.")
-
         cache = st.session_state.setdefault('uploaded_files_cache', {})
         seen_cache_keys: set[str] = set()
+
+        # Afficher le statut d'upload avec compteur progressif
+        upload_status_placeholder = st.empty()
+        upload_status_placeholder.info(f"📤 Upload en cours : 0/{total_uploads} CVs")
 
         for i, uf in enumerate(uploaded_files_auto):
             size_guess = getattr(uf, "size", None)
@@ -3703,10 +3704,16 @@ with tab5:
                     cache_entry['bytes'] = file_bytes
 
             file_list.append(file_entry)
+            
+            # Mettre à jour le compteur d'upload
+            upload_status_placeholder.info(f"📤 Upload en cours : {i + 1}/{total_uploads} CVs")
 
         stale_keys = [key for key in list(cache.keys()) if key not in seen_cache_keys]
         for key in stale_keys:
             cache.pop(key, None)
+
+        # Afficher le message de confirmation finale
+        upload_status_placeholder.success(f"✅ {total_uploads} CV(s) uploadé(s) et prêts pour traitement.")
 
         st.session_state.uploaded_files_list = [dict(item) for item in file_list]
     else:
