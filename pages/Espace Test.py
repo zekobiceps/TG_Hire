@@ -58,9 +58,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Vérification de la connexion
-if not st.session_state.get("logged_in", False):
-    st.stop()
 
 # --- Vérification unique de la clé API DeepSeek au démarrage ---
 # Cette vérification est silencieuse ici pour éviter de bloquer ou d'afficher des erreurs avant le chargement complet
@@ -3664,6 +3661,9 @@ with tab5:
     # Importer des CVs uniquement via upload
     uploaded_files_auto = st.file_uploader("Importer des CVs (PDF)", type=["pdf"], accept_multiple_files=True, key="auto_uploader")
 
+    # Compteur global pour upload et traitement (visible en permanence)
+    global_status_container = st.container()
+    
     file_list: list[dict] = []
     if uploaded_files_auto:
         total_uploads = len(uploaded_files_auto)
@@ -3675,9 +3675,10 @@ with tab5:
         cache = st.session_state.setdefault('uploaded_files_cache', {})
         seen_cache_keys: set[str] = set()
 
-        # Afficher l'état d'avancement global
-        global_upload_container = st.empty()
-        global_upload_container.info(f"📤 Upload en cours : 0/{total_uploads} CVs")
+        # Afficher l'état d'avancement global de l'upload
+        with global_status_container:
+            global_upload_placeholder = st.empty()
+            global_upload_placeholder.info(f"📤 Upload en cours : 0/{total_uploads} CVs")
         
         upload_col, progress_col = st.columns([3, 1])
         upload_status_placeholder = upload_col.empty()
@@ -3719,14 +3720,17 @@ with tab5:
             except Exception:
                 upload_progress.progress(progress_value)
             upload_status_placeholder.info(f"Téléversement des CVs : {i + 1}/{total_uploads}")
-            global_upload_container.info(f"📤 Upload en cours : {i + 1}/{total_uploads} CVs")
+            with global_status_container:
+                global_upload_placeholder.info(f"📤 Upload en cours : {i + 1}/{total_uploads} CVs")
 
         stale_keys = [key for key in list(cache.keys()) if key not in seen_cache_keys]
         for key in stale_keys:
             cache.pop(key, None)
 
-        global_upload_container.empty()  # Effacer le compteur global
-        upload_status_placeholder.success(f"✅ {total_uploads} CV(s) uploadé(s) et prêts pour traitement.")
+        # Afficher la confirmation finale de l'upload
+        with global_status_container:
+            global_upload_placeholder.success(f"✅ {total_uploads} CV(s) uploadé(s) et prêts pour traitement.")
+        upload_status_placeholder.empty()
 
         st.session_state.uploaded_files_list = [dict(item) for item in file_list]
     else:
@@ -3772,6 +3776,12 @@ with tab5:
             results = []
             progress = st.progress(0)
             total = len(file_list)
+            
+            # Compteur global pour le traitement IA
+            with global_status_container:
+                global_processing_placeholder = st.empty()
+                global_processing_placeholder.info(f"🤖 Traitement IA en cours : 0/{total} CVs")
+            
             processing_counter_placeholder = st.empty()
             processing_detail_placeholder = st.empty()
             processing_counter_placeholder.info(f"Traitement des CVs : 0/{total}")
@@ -3782,6 +3792,11 @@ with tab5:
                 for i, item in enumerate(file_list):
                     f = item['file']
                     name = item['name']
+                    
+                    # Mettre à jour le compteur global
+                    with global_status_container:
+                        global_processing_placeholder.info(f"🤖 Traitement IA en cours : {i + 1}/{total} CVs")
+                    
                     processing_counter_placeholder.info(f"Traitement des CVs : {i + 1}/{total}")
                     processing_detail_placeholder.info(f"CV en cours : {name}")
                     cache_key = item.get('cache_key') or f"{name}|{i}"
@@ -3961,6 +3976,12 @@ with tab5:
                     if cache is not None:
                         st.session_state.uploaded_files_cache = cache
 
+            # Afficher la confirmation finale du traitement
+            with global_status_container:
+                global_processing_placeholder.success(f"✅ Traitement IA terminé : {total} CVs classés avec succès !")
+            processing_counter_placeholder.empty()
+            processing_detail_placeholder.empty()
+            
             # Stocker les résultats et relancer l'affichage global (le rendu principal s'appuiera
             # sur la logique de rendu déjà présente en dehors de ce bloc). Cela évite les variables
             # non initialisées et permet d'avoir un rendu cohérent après classification.
