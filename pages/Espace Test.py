@@ -3671,7 +3671,7 @@ with tab5:
 
         # Afficher immédiatement le message de traitement en cours
         upload_status_placeholder = st.empty()
-        upload_status_placeholder.info(f"📤 Traitement en cours : {total_uploads} fichiers détectés...")
+        upload_status_placeholder.info(f"📤 Préparation des fichiers : 0/{total_uploads} CVs")
 
         cache = st.session_state.setdefault('uploaded_files_cache', {})
         seen_cache_keys: set[str] = set()
@@ -3679,6 +3679,9 @@ with tab5:
         import time
 
         for i, uf in enumerate(uploaded_files_auto):
+            # Mettre à jour le compteur AVANT de traiter le fichier
+            upload_status_placeholder.info(f"📤 Préparation des fichiers : {i + 1}/{total_uploads} CVs")
+            
             size_guess = getattr(uf, "size", None)
             file_bytes = None
             try:
@@ -3707,10 +3710,8 @@ with tab5:
 
             file_list.append(file_entry)
             
-            # Mettre à jour le compteur avec un micro-délai pour le rendre visible
-            upload_status_placeholder.info(f"📤 Traitement des fichiers : {i + 1}/{total_uploads} CVs")
-            if i < total_uploads - 1:  # Pas de délai sur le dernier
-                time.sleep(0.05)  # 50ms pour rendre visible
+            # Petit délai pour rendre le compteur visible
+            time.sleep(0.1)  # 100ms par fichier
 
         stale_keys = [key for key in list(cache.keys()) if key not in seen_cache_keys]
         for key in stale_keys:
