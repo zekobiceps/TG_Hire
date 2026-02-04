@@ -3658,11 +3658,11 @@ with tab5:
     st.header("🗂️ Auto-classification de CVs (4 catégories)")
     st.markdown("Chargez et analysez jusqu'à 101 CVs (PDF). L'outil extrait le texte et classe automatiquement chaque CV dans l'une des 4 catégories : Fonctions supports, Logistique, Production/Technique, Non classé.")
 
+    # Compteur global pour upload et traitement (visible en permanence en haut de la page)
+    global_status_container = st.container()
+
     # Importer des CVs uniquement via upload
     uploaded_files_auto = st.file_uploader("Importer des CVs (PDF)", type=["pdf"], accept_multiple_files=True, key="auto_uploader")
-
-    # Compteur global pour upload et traitement (visible en permanence)
-    global_status_container = st.container()
     
     file_list: list[dict] = []
     if uploaded_files_auto:
