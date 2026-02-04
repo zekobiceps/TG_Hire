@@ -3715,6 +3715,16 @@ with tab5:
     # Choix du modèle IA pour la classification
     classif_model = st.selectbox("Modèle IA pour la classification", ["DeepSeek", "Gemini", "Groq", "Claude", "OpenRouter"])
 
+    # Traitement par lots pour éviter les crashes mémoire
+    batch_size = st.number_input(
+        "Taille des lots (CVs)",
+        min_value=10,
+        max_value=200,
+        value=100,
+        step=10,
+        help="Traite les CVs par lots pour réduire la charge mémoire."
+    )
+
     # Bouton de classification primaire
     if st.button("📂 Lancer l'auto-classification", type='primary'):
             # Réinitialiser les analyses DeepSeek lors d'une nouvelle classification
@@ -3722,24 +3732,31 @@ with tab5:
             
             results = []
             total = len(file_list)
+            total_batches = (total + int(batch_size) - 1) // int(batch_size) if total else 0
             
             # Compteur pour le traitement IA (texte uniquement)
             processing_status_placeholder = st.empty()
             processing_status_placeholder.info(f"🤖 Traitement IA en cours : 0/{total} CVs")
             
             processing_detail_placeholder = st.empty()
+            batch_status_placeholder = st.empty()
             spinner_text = 'Extraction, classification et extraction des noms en cours...' if rename_and_organize else 'Extraction et classification en cours...'
             
             with st.spinner(spinner_text):
                 cache = st.session_state.get('uploaded_files_cache', {})
-                for i, item in enumerate(file_list):
-                    f = item['file']
-                    name = item['name']
-                    
-                    # Mettre à jour le compteur de traitement
-                    processing_status_placeholder.info(f"🤖 Traitement IA en cours : {i + 1}/{total} CVs")
-                    processing_detail_placeholder.info(f"CV en cours : {name}")
-                    cache_key = item.get('cache_key') or f"{name}|{i}"
+                processed = 0
+                for batch_index, start in enumerate(range(0, total, int(batch_size)), start=1):
+                    batch = file_list[start:start + int(batch_size)]
+                    batch_status_placeholder.info(f"Lot {batch_index}/{total_batches} — {len(batch)} CVs")
+                    for i, item in enumerate(batch, start=start):
+                        f = item['file']
+                        name = item['name']
+                        processed += 1
+                        
+                        # Mettre à jour le compteur de traitement
+                        processing_status_placeholder.info(f"🤖 Traitement IA en cours : {processed}/{total} CVs")
+                        processing_detail_placeholder.info(f"CV en cours : {name}")
+                        cache_key = item.get('cache_key') or f"{name}|{i}"
                     cache_entry = cache.setdefault(cache_key, {}) if cache is not None else {}
 
                     file_bytes = cache_entry.get('bytes') if cache_entry else None
@@ -3912,12 +3929,17 @@ with tab5:
 
                         results.append(result_item)
 
-                    if cache is not None:
-                        st.session_state.uploaded_files_cache = cache
+                        if cache is not None:
+                            st.session_state.uploaded_files_cache = cache
+
+                        # Libérer la mémoire cache après traitement du CV
+                        if cache is not None and cache_key in cache:
+                            cache.pop(cache_key, None)
 
             # Afficher la confirmation finale du traitement
             processing_status_placeholder.success(f"✅ Traitement IA terminé : {total} CVs classés avec succès !")
             processing_detail_placeholder.empty()
+            batch_status_placeholder.empty()
             
             # Stocker les résultats et relancer l'affichage global (le rendu principal s'appuiera
             # sur la logique de rendu déjà présente en dehors de ce bloc). Cela évite les variables
