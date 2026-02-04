@@ -3710,8 +3710,8 @@ with tab5:
 
             file_list.append(file_entry)
             
-            # Petit délai pour rendre le compteur visible
-            time.sleep(0.1)  # 100ms par fichier
+            # Délai suffisant pour rendre le compteur visible (comme pour le traitement IA)
+            time.sleep(0.3)  # 300ms par fichier pour rendre la progression visible
 
         stale_keys = [key for key in list(cache.keys()) if key not in seen_cache_keys]
         for key in stale_keys:
