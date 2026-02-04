@@ -3968,287 +3968,296 @@ with tab5:
                 st.session_state.classification_results = results
                 st.session_state.rename_and_organize_option = rename_and_organize
                 st.session_state.last_action = 'classified'
+                # Forcer le rerun pour afficher les résultats
+                st.rerun()
             except Exception:
                 pass
 
-            # Catégorie "Autres" pour les non classés (calculée ensuite à partir du dataframe fusionné)
-            nc = None
-            if nc is not None and not nc.empty:
-                st.markdown('---')
-                count_nc = len(nc)
-                st.subheader(f'🔍 Autres / Non classés ({count_nc})')
-                st.dataframe(nc[['file', 'text_snippet']], width="stretch")
-                
-                # Bouton pour analyser les CV non classés avec DeepSeek
-                analyze_button = st.button('🔍 Analyser les CV non classés avec Intelligence Artificielle', type='secondary')
-                
-                # Si on clique sur le bouton
-                if analyze_button and nc is not None and not nc.empty:
-                    # Exécuter l'analyse
-                    unclassified_results = []
-                    unclassified_progress = st.progress(0)
-                    unclassified_total = len(nc) if nc is not None else 0
-                    processing_ai_placeholder = st.empty()
-                    
-                    with st.spinner('Analyse des CVs non classés avec Intelligence Artificielle...'):
-                        for i, (_, row) in enumerate(nc.iterrows()):
-                            name = row['file']
-                            text_snippet = row['text_snippet']
-                            # Mettre à jour le fichier en cours
-                            processing_ai_placeholder.info(f"Analyse par IA ({i+1}/{unclassified_total}) : {name}")
-
-                            try:
-                                # Utiliser l'API DeepSeek pour analyser le CV
-                                category = get_deepseek_analysis(text_snippet)
-                                unclassified_results.append({'Fichier': name, 'Catégorie': category})
-                            except Exception as e:
-                                unclassified_results.append({'Fichier': name, 'Catégorie': f"Erreur: {str(e)}"})
-
-                            unclassified_progress.progress((i+1)/unclassified_total)
-                    
-                    # Nettoyer le placeholder
-                    processing_ai_placeholder.empty()
-                    
-                    # Stocker les résultats dans la session state
-                    st.session_state.deepseek_analyses = unclassified_results
-
-                    # Intégrer les catégories renvoyées par l'IA dans les résultats de classification
-                    # (mettre à jour st.session_state.classification_results où 'file' correspond)
-                    try:
-                        if 'classification_results' in st.session_state and st.session_state.classification_results:
-                            for res in unclassified_results:
-                                fname = res.get('Fichier') or res.get('file')
-                                cat = res.get('Catégorie') or res.get('Catégorie')
-                                # Chercher l'entrée correspondante
-                                for entry in st.session_state.classification_results:
-                                    if entry.get('file') == fname:
-                                        # Normaliser la catégorie si nécessaire
-                                        if cat and cat.strip():
-                                            entry['category'] = cat
-                                        break
-                    except Exception:
-                        # En cas d'erreur, ne pas interrompre le flux — les analyses IA restent disponibles séparément
-                        pass
-
-                    st.session_state.last_action = "analyzed"
+    # =============================================================================
+    # AFFICHAGE DES RÉSULTATS (EN DEHORS DU BOUTON)
+    # Ce code s'exécute dès que classification_results existe dans session_state
+    # =============================================================================
+    if st.session_state.classification_results:
+        results = st.session_state.classification_results
+        
+        # Catégorie "Autres" pour les non classés (calculée ensuite à partir du dataframe fusionné)
+        nc = None
+        nc = None
+        if nc is not None and not nc.empty:
+            st.markdown('---')
+            count_nc = len(nc)
+            st.subheader(f'🔍 Autres / Non classés ({count_nc})')
+            st.dataframe(nc[['file', 'text_snippet']], width="stretch")
             
-            # Afficher les analyses IA s'il y en a
-            if st.session_state.deepseek_analyses:
-                st.markdown('---')
-                st.subheader("📝 Analyses par Intelligence Artificielle des CV non classés")
-                
-                # Ajouter un bouton pour réinitialiser les analyses si nécessaire
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.success(f"✅ Analyse par Intelligence Artificielle pour {len(st.session_state.deepseek_analyses)} CV(s) non classés.")
-                with col2:
-                    if st.button("🔄 Réinitialiser analyses", key="reset_deepseek"):
-                        st.session_state.deepseek_analyses = []
-                        st.session_state.last_action = "reset"
-                        st.experimental_rerun()
-                
-                # Créer un tableau pour afficher les résultats de manière plus organisée
-                ai_results_df = pd.DataFrame(st.session_state.deepseek_analyses)
-                
-                # Afficher le tableau avec les catégories attribuées
-                st.dataframe(ai_results_df, width="stretch", hide_index=True)
-
-            # Préparer un CSV à 4 colonnes en prenant en compte les analyses IA
-            # Déterminer les noms à utiliser (extraits ou originaux)
-            def get_display_name(row):
-                original_name = row['file']
-                if (hasattr(st.session_state, 'rename_and_organize_option') and 
-                    st.session_state.rename_and_organize_option and 
-                    'extracted_name' in row and row['extracted_name'] and 
-                    row['extracted_name']['name']):
-                    return row['extracted_name']['name']
-                return original_name
+            # Bouton pour analyser les CV non classés avec DeepSeek
+            analyze_button = st.button('🔍 Analyser les CV non classés avec Intelligence Artificielle', type='secondary')
             
-            # Créer un DataFrame avec les résultats intégrés (incluant les analyses IA)
-            merged_results_for_csv = merge_results_with_ai_analysis(st.session_state.classification_results)
-            df_merged = pd.DataFrame(merged_results_for_csv)
+            # Si on clique sur le bouton
+            if analyze_button and nc is not None and not nc.empty:
+                # Exécuter l'analyse
+                unclassified_results = []
+                unclassified_progress = st.progress(0)
+                unclassified_total = len(nc) if nc is not None else 0
+                processing_ai_placeholder = st.empty()
+                
+                with st.spinner('Analyse des CVs non classés avec Intelligence Artificielle...'):
+                    for i, (_, row) in enumerate(nc.iterrows()):
+                        name = row['file']
+                        text_snippet = row['text_snippet']
+                        # Mettre à jour le fichier en cours
+                        processing_ai_placeholder.info(f"Analyse par IA ({i+1}/{unclassified_total}) : {name}")
+
+                        try:
+                            # Utiliser l'API DeepSeek pour analyser le CV
+                            category = get_deepseek_analysis(text_snippet)
+                            unclassified_results.append({'Fichier': name, 'Catégorie': category})
+                        except Exception as e:
+                            unclassified_results.append({'Fichier': name, 'Catégorie': f"Erreur: {str(e)}"})
+
+                        unclassified_progress.progress((i+1)/unclassified_total)
+                
+                # Nettoyer le placeholder
+                processing_ai_placeholder.empty()
+                
+                # Stocker les résultats dans la session state
+                st.session_state.deepseek_analyses = unclassified_results
+
+                # Intégrer les catégories renvoyées par l'IA dans les résultats de classification
+                # (mettre à jour st.session_state.classification_results où 'file' correspond)
+                try:
+                    if 'classification_results' in st.session_state and st.session_state.classification_results:
+                        for res in unclassified_results:
+                            fname = res.get('Fichier') or res.get('file')
+                            cat = res.get('Catégorie') or res.get('Catégorie')
+                            # Chercher l'entrée correspondante
+                            for entry in st.session_state.classification_results:
+                                if entry.get('file') == fname:
+                                    # Normaliser la catégorie si nécessaire
+                                    if cat and cat.strip():
+                                        entry['category'] = cat
+                                    break
+                except Exception:
+                    # En cas d'erreur, ne pas interrompre le flux — les analyses IA restent disponibles séparément
+                    pass
+
+                st.session_state.last_action = "analyzed"
+        
+        # Afficher les analyses IA s'il y en a
+        if st.session_state.deepseek_analyses:
+            st.markdown('---')
+            st.subheader("📝 Analyses par Intelligence Artificielle des CV non classés")
             
-            # Récupérer les classifications finales (après IA) avec les bons noms
-            supports = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Fonctions supports'].iterrows()]
-            logistics = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Logistique'].iterrows()]
-            production = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Production/Technique'].iterrows()]
-            unclassified = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Non classé'].iterrows()]
-
-            max_len = max(len(supports), len(logistics), len(production), len(unclassified)) if max(len(supports), len(logistics), len(production), len(unclassified)) > 0 else 0
-            # Pad lists
-            supports += [''] * (max_len - len(supports))
-            logistics += [''] * (max_len - len(logistics))
-            production += [''] * (max_len - len(production))
-            unclassified += [''] * (max_len - len(unclassified))
-
-            export_df = pd.DataFrame({
-                'Fonctions supports': supports,
-                'Logistique': logistics,
-                'Production/Technique': production,
-                'Divers / Hors périmètre': unclassified
-            })
-
-            # Séparateur visuel
-            st.markdown("---")
-
-            # Comptage des CVs par catégorie pour l'affichage
-            count_support = len([x for x in supports if x])
-            count_logistics = len([x for x in logistics if x])
-            count_production = len([x for x in production if x])
-            count_unclassified = len([x for x in unclassified if x])
-
-            # Indicateur IA
-            ai_indicator = " (incluant les analyses IA)" if hasattr(st.session_state, 'deepseek_analyses') and st.session_state.deepseek_analyses else ""
-            st.markdown(f"**Résumé{ai_indicator}**: {count_support} Fonctions supports • {count_logistics} Logistique • {count_production} Production/Technique • {count_unclassified} Divers / Hors périmètre.")
-
-            col1, col2, col3 = st.columns(3)
-
-            def render_category(col, cat_label):
-                with col:
-                    df_cat = df_merged[df_merged['category'] == cat_label]
-                    header_label = 'Divers / Hors périmètre' if cat_label == 'Non classé' else cat_label
-                    st.header(f"{header_label} ({len(df_cat)})")
-
-                    if cat_label == 'Production/Technique':
-                        for sub_label in PRODUCTION_ALLOWED_SUBCATEGORIES:
-                            items = df_cat[df_cat['sub_category'] == sub_label]
-                            st.subheader(f"{sub_label} ({len(items)})")
-                            for _, r in items.iterrows():
-                                name_display = get_display_name(r)
-                                try:
-                                    years_exp = int(r.get('years_experience', 0))
-                                except Exception:
-                                    years_exp = 0
-                                profile = r.get('profile_summary') or (r.get('text_snippet') or '')
-                                exp_title = f"👤 {name_display} — {sub_label}"
-                                if years_exp and years_exp > 0:
-                                    exp_title += f" — {years_exp} ans"
-                                with st.expander(exp_title):
-                                    if profile:
-                                        st.markdown(f"**📝 Synthèse du profil :**\n\n{profile}")
-                                    else:
-                                        st.info("Aucune synthèse disponible.")
-                                    st.write(f"Fichier: {r['file']}")
-
-                        extras = df_cat[~df_cat['sub_category'].isin(PRODUCTION_ALLOWED_SUBCATEGORIES)]
-                        if not extras.empty:
-                            st.subheader(f"À vérifier ({len(extras)})")
-                            for _, r in extras.iterrows():
-                                name_display = get_display_name(r)
-                                try:
-                                    years_exp = int(r.get('years_experience', 0))
-                                except Exception:
-                                    years_exp = 0
-                                profile = r.get('profile_summary') or (r.get('text_snippet') or '')
-                                raw_sub = r.get('sub_category')
-                                cleaned_sub = raw_sub.strip() if isinstance(raw_sub, str) and raw_sub.strip() else "Sous-catégorie à préciser"
-                                exp_title = f"👤 {name_display} — {cleaned_sub}"
-                                if years_exp and years_exp > 0:
-                                    exp_title += f" — {years_exp} ans"
-                                with st.expander(exp_title):
-                                    if profile:
-                                        st.markdown(f"**📝 Synthèse du profil :**\n\n{profile}")
-                                    else:
-                                        st.info("Aucune synthèse disponible.")
-                                    st.write(f"Fichier: {r['file']}")
-                    else:
-                        if df_cat.empty:
-                            return
-                        for subcat, items in df_cat.groupby('sub_category', dropna=False):
-                            is_missing = pd.isna(subcat) or (isinstance(subcat, str) and not subcat.strip())
-                            label = subcat.strip() if isinstance(subcat, str) and not is_missing else ("Direction" if cat_label == 'Fonctions supports' else "Logistique")
-                            st.subheader(f"{label} ({len(items)})")
-                            for _, r in items.iterrows():
-                                name_display = get_display_name(r)
-                                try:
-                                    years_exp = int(r.get('years_experience', 0))
-                                except Exception:
-                                    years_exp = 0
-                                profile = r.get('profile_summary') or (r.get('text_snippet') or '')
-                                raw_sub = r.get('sub_category')
-                                sub_label = raw_sub.strip() if isinstance(raw_sub, str) and raw_sub.strip() else label
-                                exp_title = f"👤 {name_display} — {sub_label}"
-                                if years_exp and years_exp > 0:
-                                    exp_title += f" — {years_exp} ans"
-                                with st.expander(exp_title):
-                                    if profile:
-                                        st.markdown(f"**📝 Synthèse du profil :**\n\n{profile}")
-                                    else:
-                                        st.info("Aucune synthèse disponible.")
-                                    st.write(f"Fichier: {r['file']}")
-
-            render_category(col1, 'Fonctions supports')
-            render_category(col2, 'Logistique')
-            render_category(col3, 'Production/Technique')
-
-            # Afficher les Non classés en dessous si présent
-            df_nc = df_merged[df_merged['category'] == 'Non classé']
-            if not df_nc.empty:
-                st.markdown('---')
-                st.subheader(f'🔍 Divers / Hors périmètre ({len(df_nc)})')
-                for _, r in df_nc.iterrows():
-                    name_display = get_display_name(r)
-                    try:
-                        years_exp = int(r.get('years_experience', 0) if hasattr(r, 'get') else (r['years_experience'] if 'years_experience' in r else 0))
-                    except Exception:
-                        years_exp = 0
-                    profile = r.get('profile_summary') if hasattr(r, 'get') else (r['profile_summary'] if 'profile_summary' in r else '')
-                    if not profile:
-                        profile = (r.get('text_snippet') if hasattr(r, 'get') else (r['text_snippet'] if 'text_snippet' in r else '')) or ''
-                    subcat = r.get('sub_category') if hasattr(r, 'get') else (r['sub_category'] if 'sub_category' in r else '')
-                    exp_title = f"👤 {name_display} — {subcat}"
-                    if years_exp and years_exp > 0:
-                        exp_title += f" — {years_exp} ans"
-                    with st.expander(exp_title):
-                        if profile:
-                            st.markdown(f"**📝 Synthèse du profil :**\n\n{profile}")
-                        else:
-                            st.info("Aucune synthèse disponible.")
-                        st.write(f"Fichier: {r['file']}")
-
-            # Générer Excel et CSV pour export (inchangés)
-            csv = export_df.to_csv(index=False, sep=';').encode('utf-8-sig')
-            from io import BytesIO
-            excel_buffer = BytesIO()
-            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-                export_df.to_excel(writer, index=False, sheet_name='Classification')
-            excel_data = excel_buffer.getvalue()
-
-            # Boutons de téléchargement (export)
-            col1, col2, col3 = st.columns(3)
+            # Ajouter un bouton pour réinitialiser les analyses si nécessaire
+            col1, col2 = st.columns([3, 1])
             with col1:
-                st.download_button(label='⬇️ Télécharger Excel (.xlsx)', data=excel_data, file_name='classification_results.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+                st.success(f"✅ Analyse par Intelligence Artificielle pour {len(st.session_state.deepseek_analyses)} CV(s) non classés.")
             with col2:
-                st.download_button(label='⬇️ Télécharger CSV (;)', data=csv, file_name='classification_results.csv', mime='text/csv')
+                if st.button("🔄 Réinitialiser analyses", key="reset_deepseek"):
+                    st.session_state.deepseek_analyses = []
+                    st.session_state.last_action = "reset"
+                    st.rerun()
+            
+            # Créer un tableau pour afficher les résultats de manière plus organisée
+            ai_results_df = pd.DataFrame(st.session_state.deepseek_analyses)
+            
+            # Afficher le tableau avec les catégories attribuées
+            st.dataframe(ai_results_df, width="stretch", hide_index=True)
 
-            with col3:
-                # Bouton ZIP disponible si l'option de renommage était cochée
-                if hasattr(st.session_state, 'rename_and_organize_option') and st.session_state.rename_and_organize_option:
-                    if st.button('📦 Préparer et télécharger le ZIP organisé'):
-                        with st.spinner('Création du fichier ZIP organisé...'):
+        # Préparer un CSV à 4 colonnes en prenant en compte les analyses IA
+        # Déterminer les noms à utiliser (extraits ou originaux)
+        def get_display_name(row):
+            original_name = row['file']
+            if (hasattr(st.session_state, 'rename_and_organize_option') and 
+                st.session_state.rename_and_organize_option and 
+                'extracted_name' in row and row['extracted_name'] and 
+                row['extracted_name']['name']):
+                return row['extracted_name']['name']
+            return original_name
+        
+        # Créer un DataFrame avec les résultats intégrés (incluant les analyses IA)
+        merged_results_for_csv = merge_results_with_ai_analysis(st.session_state.classification_results)
+        df_merged = pd.DataFrame(merged_results_for_csv)
+        
+        # Récupérer les classifications finales (après IA) avec les bons noms
+        supports = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Fonctions supports'].iterrows()]
+        logistics = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Logistique'].iterrows()]
+        production = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Production/Technique'].iterrows()]
+        unclassified = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Non classé'].iterrows()]
+
+        max_len = max(len(supports), len(logistics), len(production), len(unclassified)) if max(len(supports), len(logistics), len(production), len(unclassified)) > 0 else 0
+        # Pad lists
+        supports += [''] * (max_len - len(supports))
+        logistics += [''] * (max_len - len(logistics))
+        production += [''] * (max_len - len(production))
+        unclassified += [''] * (max_len - len(unclassified))
+
+        export_df = pd.DataFrame({
+            'Fonctions supports': supports,
+            'Logistique': logistics,
+            'Production/Technique': production,
+            'Divers / Hors périmètre': unclassified
+        })
+
+        # Séparateur visuel
+        st.markdown("---")
+
+        # Comptage des CVs par catégorie pour l'affichage
+        count_support = len([x for x in supports if x])
+        count_logistics = len([x for x in logistics if x])
+        count_production = len([x for x in production if x])
+        count_unclassified = len([x for x in unclassified if x])
+
+        # Indicateur IA
+        ai_indicator = " (incluant les analyses IA)" if hasattr(st.session_state, 'deepseek_analyses') and st.session_state.deepseek_analyses else ""
+        st.markdown(f"**Résumé{ai_indicator}**: {count_support} Fonctions supports • {count_logistics} Logistique • {count_production} Production/Technique • {count_unclassified} Divers / Hors périmètre.")
+
+        col1, col2, col3 = st.columns(3)
+
+        def render_category(col, cat_label):
+            with col:
+                df_cat = df_merged[df_merged['category'] == cat_label]
+                header_label = 'Divers / Hors périmètre' if cat_label == 'Non classé' else cat_label
+                st.header(f"{header_label} ({len(df_cat)})")
+
+                if cat_label == 'Production/Technique':
+                    for sub_label in PRODUCTION_ALLOWED_SUBCATEGORIES:
+                        items = df_cat[df_cat['sub_category'] == sub_label]
+                        st.subheader(f"{sub_label} ({len(items)})")
+                        for _, r in items.iterrows():
+                            name_display = get_display_name(r)
                             try:
-                                zip_data, manifest_df = create_organized_zip(st.session_state.classification_results, st.session_state.uploaded_files_list)
-                                st.success('✅ ZIP créé avec succès !')
+                                years_exp = int(r.get('years_experience', 0))
+                            except Exception:
+                                years_exp = 0
+                            profile = r.get('profile_summary') or (r.get('text_snippet') or '')
+                            exp_title = f"👤 {name_display} — {sub_label}"
+                            if years_exp and years_exp > 0:
+                                exp_title += f" — {years_exp} ans"
+                            with st.expander(exp_title):
+                                if profile:
+                                    st.markdown(f"**📝 Synthèse du profil :**\n\n{profile}")
+                                else:
+                                    st.info("Aucune synthèse disponible.")
+                                st.write(f"Fichier: {r['file']}")
 
-                                # Afficher un aperçu du manifest
-                                with st.expander("📋 Aperçu du contenu du ZIP"):
-                                    st.dataframe(manifest_df, width="stretch")
-
-                                # Bouton de téléchargement du ZIP
-                                st.download_button(
-                                    label='⬇️ Télécharger le ZIP organisé',
-                                    data=zip_data,
-                                    file_name='CVs_Classes_Organises.zip',
-                                    mime='application/zip',
-                                    key='download_zip_btn'
-                                )
-                                # NE PAS effacer les résultats après le téléchargement du ZIP
-                                # Les résultats restent affichés pour permettre d'autres exports
-                            except Exception as e:
-                                st.error(f"❌ Erreur lors de la création du ZIP : {e}")
+                    extras = df_cat[~df_cat['sub_category'].isin(PRODUCTION_ALLOWED_SUBCATEGORIES)]
+                    if not extras.empty:
+                        st.subheader(f"À vérifier ({len(extras)})")
+                        for _, r in extras.iterrows():
+                            name_display = get_display_name(r)
+                            try:
+                                years_exp = int(r.get('years_experience', 0))
+                            except Exception:
+                                years_exp = 0
+                            profile = r.get('profile_summary') or (r.get('text_snippet') or '')
+                            raw_sub = r.get('sub_category')
+                            cleaned_sub = raw_sub.strip() if isinstance(raw_sub, str) and raw_sub.strip() else "Sous-catégorie à préciser"
+                            exp_title = f"👤 {name_display} — {cleaned_sub}"
+                            if years_exp and years_exp > 0:
+                                exp_title += f" — {years_exp} ans"
+                            with st.expander(exp_title):
+                                if profile:
+                                    st.markdown(f"**📝 Synthèse du profil :**\n\n{profile}")
+                                else:
+                                    st.info("Aucune synthèse disponible.")
+                                st.write(f"Fichier: {r['file']}")
                 else:
-                    st.info("💡 Cochez l'option 'Renommer les CV' lors du prochain traitement pour activer le téléchargement ZIP organisé.")
+                    if df_cat.empty:
+                        return
+                    for subcat, items in df_cat.groupby('sub_category', dropna=False):
+                        is_missing = pd.isna(subcat) or (isinstance(subcat, str) and not subcat.strip())
+                        label = subcat.strip() if isinstance(subcat, str) and not is_missing else ("Direction" if cat_label == 'Fonctions supports' else "Logistique")
+                        st.subheader(f"{label} ({len(items)})")
+                        for _, r in items.iterrows():
+                            name_display = get_display_name(r)
+                            try:
+                                years_exp = int(r.get('years_experience', 0))
+                            except Exception:
+                                years_exp = 0
+                            profile = r.get('profile_summary') or (r.get('text_snippet') or '')
+                            raw_sub = r.get('sub_category')
+                            sub_label = raw_sub.strip() if isinstance(raw_sub, str) and raw_sub.strip() else label
+                            exp_title = f"👤 {name_display} — {sub_label}"
+                            if years_exp and years_exp > 0:
+                                exp_title += f" — {years_exp} ans"
+                            with st.expander(exp_title):
+                                if profile:
+                                    st.markdown(f"**📝 Synthèse du profil :**\n\n{profile}")
+                                else:
+                                    st.info("Aucune synthèse disponible.")
+                                st.write(f"Fichier: {r['file']}")
 
+        render_category(col1, 'Fonctions supports')
+        render_category(col2, 'Logistique')
+        render_category(col3, 'Production/Technique')
+
+        # Afficher les Non classés en dessous si présent
+        df_nc = df_merged[df_merged['category'] == 'Non classé']
+        if not df_nc.empty:
+            st.markdown('---')
+            st.subheader(f'🔍 Divers / Hors périmètre ({len(df_nc)})')
+            for _, r in df_nc.iterrows():
+                name_display = get_display_name(r)
+                try:
+                    years_exp = int(r.get('years_experience', 0) if hasattr(r, 'get') else (r['years_experience'] if 'years_experience' in r else 0))
+                except Exception:
+                    years_exp = 0
+                profile = r.get('profile_summary') if hasattr(r, 'get') else (r['profile_summary'] if 'profile_summary' in r else '')
+                if not profile:
+                    profile = (r.get('text_snippet') if hasattr(r, 'get') else (r['text_snippet'] if 'text_snippet' in r else '')) or ''
+                subcat = r.get('sub_category') if hasattr(r, 'get') else (r['sub_category'] if 'sub_category' in r else '')
+                exp_title = f"👤 {name_display} — {subcat}"
+                if years_exp and years_exp > 0:
+                    exp_title += f" — {years_exp} ans"
+                with st.expander(exp_title):
+                    if profile:
+                        st.markdown(f"**📝 Synthèse du profil :**\n\n{profile}")
+                    else:
+                        st.info("Aucune synthèse disponible.")
+                    st.write(f"Fichier: {r['file']}")
+
+        # Générer Excel et CSV pour export (inchangés)
+        csv = export_df.to_csv(index=False, sep=';').encode('utf-8-sig')
+        from io import BytesIO
+        excel_buffer = BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+            export_df.to_excel(writer, index=False, sheet_name='Classification')
+        excel_data = excel_buffer.getvalue()
+
+        # Boutons de téléchargement (export)
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.download_button(label='⬇️ Télécharger Excel (.xlsx)', data=excel_data, file_name='classification_results.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        with col2:
+            st.download_button(label='⬇️ Télécharger CSV (;)', data=csv, file_name='classification_results.csv', mime='text/csv')
+
+        with col3:
+            # Bouton ZIP disponible si l'option de renommage était cochée
+            if hasattr(st.session_state, 'rename_and_organize_option') and st.session_state.rename_and_organize_option:
+                if st.button('📦 Préparer et télécharger le ZIP organisé'):
+                    with st.spinner('Création du fichier ZIP organisé...'):
+                        try:
+                            zip_data, manifest_df = create_organized_zip(st.session_state.classification_results, st.session_state.uploaded_files_list)
+                            st.success('✅ ZIP créé avec succès !')
+
+                            # Afficher un aperçu du manifest
+                            with st.expander("📋 Aperçu du contenu du ZIP"):
+                                st.dataframe(manifest_df, width="stretch")
+
+                            # Bouton de téléchargement du ZIP
+                            st.download_button(
+                                label='⬇️ Télécharger le ZIP organisé',
+                                data=zip_data,
+                                file_name='CVs_Classes_Organises.zip',
+                                mime='application/zip',
+                                key='download_zip_btn'
+                            )
+                            # NE PAS effacer les résultats après le téléchargement du ZIP
+                            # Les résultats restent affichés pour permettre d'autres exports
+                        except Exception as e:
+                            st.error(f"❌ Erreur lors de la création du ZIP : {e}")
+            else:
+                st.info("💡 Cochez l'option 'Renommer les CV' lors du prochain traitement pour activer le téléchargement ZIP organisé.")
 
 # --- FONCTIONS GEMINI (NOUVEAU) ---
 
