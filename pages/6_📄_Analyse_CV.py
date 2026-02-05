@@ -652,7 +652,7 @@ def rank_resumes_with_rules(job_description, resumes, file_names):
     return results
 
 # --- MÉTHODE 4 : ANALYSE PAR IA (PARSING CORRIGÉ) ---
-def get_detailed_score_with_ai(job_description, resume_text, candidate_name):
+def get_detailed_score_with_ai(job_description, resume_text, candidate_name, short_mode=False):
     API_KEY = get_api_key()
     if not API_KEY: return {"score": 0.0, "explanation": "❌ Analyse IA impossible."}
     url = "https://api.deepseek.com/v1/chat/completions"
@@ -660,39 +660,68 @@ def get_detailed_score_with_ai(job_description, resume_text, candidate_name):
     
     safe_name = (candidate_name or "Candidat").strip()
 
-    prompt = f"""
-    En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
-    Produis une analyse comparative détaillée.
+    if short_mode:
+        prompt = f"""
+        En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
+        Produis une analyse très concise.
 
-    **Format de sortie OBLIGATOIRE :**
+        **Format de sortie OBLIGATOIRE :**
 
-    **👤 {safe_name}**
+        **👤 {safe_name}**
 
-    **📊 Synthèse d'adéquation**
-    [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
-    
-    **🎓 Formation**
-    [Analyse de la formation du candidat par rapport aux exigences du poste.]
+        **📊 Synthèse d'adéquation**
+        [Score en pourcentage, puis 1 phrase sur l'adéquation globale.]
+        
+        **💡 Points forts :**
+        [1-2 points forts maximum]
 
-    **💼 Expérience**
-    [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
+        **⚠️ Points à améliorer / Écarts avec le poste :**
+        [1 point maximum]
+        
+        ---
+        **Description du poste :**
+        {job_description}
+        ---
+        **Texte du CV :**
+        {resume_text}
+        """
+    else:
+        prompt = f"""
+        En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
+        Produis une analyse comparative détaillée.
 
-    **🛠️ Compétences clés**
-    [Liste des compétences du candidat qui correspondent aux compétences requises.]
+        **Format de sortie OBLIGATOIRE :**
 
-    **💡 Points forts pour ce poste**
-    [2-3 points forts spécifiques du candidat pour ce poste.]
+        **👤 {safe_name}**
 
-    **⚠️ Points d'attention pour ce poste**
-    [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
-    
-    ---
-    **Description du poste :**
-    {job_description}
-    ---
-    **Texte du CV :**
-    {resume_text}
-    """
+        **📊 Synthèse d'adéquation**
+        [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
+        
+        **🎓 Formation**
+        [Analyse de la formation du candidat par rapport aux exigences du poste.]
+
+        **💼 Expérience**
+        [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
+
+        **🛠️ Compétences clés**
+        [Liste des compétences du candidat qui correspondent aux compétences requises.]
+
+        **💡 Points forts :**
+        [2-3 points forts spécifiques du candidat pour ce poste.]
+
+        **⚠️ Points à améliorer / Écarts avec le poste :**
+        [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
+
+        **Conclusion**
+        [Brève conclusion sur la pertinence du candidat.]
+        
+        ---
+        **Description du poste :**
+        {job_description}
+        ---
+        **Texte du CV :**
+        {resume_text}
+        """
     
     payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.1}
     try:
@@ -714,13 +743,13 @@ def get_detailed_score_with_ai(job_description, resume_text, candidate_name):
         st.warning(f"⚠️ Erreur IA : {e}")
         return {"score": 0.0, "explanation": "Erreur"}
 
-def rank_resumes_with_ai(job_description, resumes, file_names):
+def rank_resumes_with_ai(job_description, resumes, file_names, short_mode=False):
     scores_data = []
     for i, resume_text in enumerate(resumes):
         # Extraire le nom pour le passer à la fonction d'analyse
         extracted = extract_name_from_cv_text(resume_text)
         candidate_name = extracted.get('name') if extracted else file_names[i]
-        scores_data.append(get_detailed_score_with_ai(job_description, resume_text, candidate_name))
+        scores_data.append(get_detailed_score_with_ai(job_description, resume_text, candidate_name, short_mode))
     return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
 
 
@@ -750,7 +779,7 @@ def get_groq_api_key():
         pass
     return None
 
-def get_detailed_score_with_groq(job_description, resume_text, candidate_name):
+def get_detailed_score_with_groq(job_description, resume_text, candidate_name, short_mode=False):
     API_KEY = get_groq_api_key()
     if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Groq manquante."}
     if groq is None:
@@ -761,39 +790,69 @@ def get_detailed_score_with_groq(job_description, resume_text, candidate_name):
     try:
         assert groq is not None
         client = groq.Groq(api_key=API_KEY)
-        prompt = f"""
-        En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
-        Produis une analyse comparative détaillée.
 
-        **Format de sortie OBLIGATOIRE :**
+        if short_mode:
+            prompt = f"""
+            En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
+            Produis une analyse très concise.
 
-        **👤 {safe_name}**
+            **Format de sortie OBLIGATOIRE :**
 
-        **📊 Synthèse d'adéquation**
-        [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
-        
-        **🎓 Formation**
-        [Analyse de la formation du candidat par rapport aux exigences du poste.]
+            **👤 {safe_name}**
 
-        **💼 Expérience**
-        [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
+            **📊 Synthèse d'adéquation**
+            [Score en pourcentage, puis 1 phrase sur l'adéquation globale.]
+            
+            **💡 Points forts :**
+            [1-2 points forts maximum]
 
-        **🛠️ Compétences clés**
-        [Liste des compétences du candidat qui correspondent aux compétences requises.]
+            **⚠️ Points à améliorer / Écarts avec le poste :**
+            [1 point maximum]
+            
+            ---
+            **Description du poste :**
+            {job_description}
+            ---
+            **Texte du CV :**
+            {resume_text}
+            """
+        else:
+            prompt = f"""
+            En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
+            Produis une analyse comparative détaillée.
 
-        **💡 Points forts pour ce poste**
-        [2-3 points forts spécifiques du candidat pour ce poste.]
+            **Format de sortie OBLIGATOIRE :**
 
-        **⚠️ Points d'attention pour ce poste**
-        [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
-        
-        ---
-        **Description du poste :**
-        {job_description}
-        ---
-        **Texte du CV :**
-        {resume_text}
-        """
+            **👤 {safe_name}**
+
+            **📊 Synthèse d'adéquation**
+            [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
+            
+            **🎓 Formation**
+            [Analyse de la formation du candidat par rapport aux exigences du poste.]
+
+            **💼 Expérience**
+            [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
+
+            **🛠️ Compétences clés**
+            [Liste des compétences du candidat qui correspondent aux compétences requises.]
+
+            **💡 Points forts :**
+            [2-3 points forts spécifiques du candidat pour ce poste.]
+
+            **⚠️ Points à améliorer / Écarts avec le poste :**
+            [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
+, short_mode=False):
+    scores_data = []
+    progress_bar = st.progress(0)
+    for i, resume_text in enumerate(resumes):
+        extracted = extract_name_from_cv_text(resume_text)
+        candidate_name = extracted.get('name') if extracted else file_names[i]
+        scores_data.append(get_detailed_score_with_groq(job_description, resume_text, candidate_name, short_mod
+            ---
+            **Texte du CV :**
+            {resume_text}
+            """
         
         chat_completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
@@ -928,59 +987,90 @@ def get_openrouter_api_key():
 
     return None
 
-def get_detailed_score_with_openrouter(job_description, resume_text, candidate_name):
+def get_detailed_score_with_openrouter(job_description, resume_text, candidate_name, short_mode=False):
     API_KEY = get_openrouter_api_key()
     if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé OpenRouter manquante."}
 
     safe_name = (candidate_name or "Candidat").strip()
 
+    if short_mode:
+        prompt_content = f"""
+        En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
+        Produis une analyse très concise.
+
+        **Format de sortie OBLIGATOIRE :**
+
+        **👤 {safe_name}**
+
+        **📊 Synthèse d'adéquation**
+        [Score en pourcentage, puis 1 phrase sur l'adéquation globale.]
+        
+        **💡 Points forts :**
+        [1-2 points forts maximum]
+
+        **⚠️ Points à améliorer / Écarts avec le poste :**
+        [1 point maximum]
+        
+        ---
+        **Description du poste :**
+        {job_description}
+        ---
+        **Texte du CV :**
+        {resume_text}
+        """
+    else:
+        prompt_content = f"""
+        En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
+        Produis une analyse comparative détaillée.
+
+        **Format de sortie OBLIGATOIRE :**
+
+        **👤 {safe_name}**
+
+        **📊 Synthèse d'adéquation**
+        [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
+        
+        **🎓 Formation**
+        [Analyse de la formation du candidat par rapport aux exigences du poste.]
+
+        **💼 Expérience**
+        [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
+
+        **🛠️ Compétences clés**
+        [Liste des compétences du candidat qui correspondent aux compétences requises.]
+
+        **💡 Points forts :**
+        [2-3 points forts spécifiques du candidat pour ce poste.]
+
+        **⚠️ Points à améliorer / Écarts avec le poste :**
+        [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
+
+        **Conclusion**
+        [Brève conclusion sur la pertinence du candidat.]
+        
+        ---
+        **Description du poste :**
+        {job_description}
+        ---
+        **Texte du CV :**
+        {resume_text}
+        """
+
     try:
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://tg-hire.streamlit.app/", 
-                "X-Title": "TG Hire"
-            },
-            data=json.dumps({
+            headers={, short_mode=False):
+    scores_data = []
+    progress_bar = st.progress(0)
+    for i, resume_text in enumerate(resumes):
+        extracted = extract_name_from_cv_text(resume_text)
+        candidate_name = extracted.get('name') if extracted else file_names[i]
+        scores_data.append(get_detailed_score_with_openrouter(job_description, resume_text, candidate_name, short_mod
                 "model": "openai/gpt-4o", 
                 "messages": [
                     {
                         "role": "user",
-                        "content": f"""
-                        En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
-                        Produis une analyse comparative détaillée.
-
-                        **Format de sortie OBLIGATOIRE :**
-
-                        **👤 {safe_name}**
-
-                        **📊 Synthèse d'adéquation**
-                        [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
-                        
-                        **🎓 Formation**
-                        [Analyse de la formation du candidat par rapport aux exigences du poste.]
-
-                        **💼 Expérience**
-                        [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
-
-                        **🛠️ Compétences clés**
-                        [Liste des compétences du candidat qui correspondent aux compétences requises.]
-
-                        **💡 Points forts pour ce poste**
-                        [2-3 points forts spécifiques du candidat pour ce poste.]
-
-                        **⚠️ Points d'attention pour ce poste**
-                        [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
-                        
-                        ---
-                        **Description du poste :**
-                        {job_description}
-                        ---
-                        **Texte du CV :**
-                        {resume_text}
-                        """
+                        "content": prompt_content
                     }
                 ]
             })
@@ -1097,7 +1187,7 @@ def get_claude_api_key():
         pass
     return None
 
-def get_detailed_score_with_claude(job_description, resume_text, candidate_name):
+def get_detailed_score_with_claude(job_description, resume_text, candidate_name, short_mode=False):
     API_KEY = get_claude_api_key()
     if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Claude manquante."}
     
@@ -1105,39 +1195,68 @@ def get_detailed_score_with_claude(job_description, resume_text, candidate_name)
 
     try:
         client = anthropic.Anthropic(api_key=API_KEY)
-        prompt = f"""
-        En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
-        Produis une analyse comparative détaillée.
+        if short_mode:
+            prompt = f"""
+            En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
+            Produis une analyse très concise.
 
-        **Format de sortie OBLIGATOIRE :**
+            **Format de sortie OBLIGATOIRE :**
 
-        **👤 {safe_name}**
+            **👤 {safe_name}**
 
-        **📊 Synthèse d'adéquation**
-        [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
-        
-        **🎓 Formation**
-        [Analyse de la formation du candidat par rapport aux exigences du poste.]
+            **📊 Synthèse d'adéquation**
+            [Score en pourcentage, puis 1 phrase sur l'adéquation globale.]
+            
+            **💡 Points forts :**
+            [1-2 points forts maximum]
 
-        **💼 Expérience**
-        [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
+            **⚠️ Points à améliorer / Écarts avec le poste :**
+            [1 point maximum]
+            
+            ---
+            **Description du poste :**
+            {job_description}
+            ---
+            **Texte du CV :**
+            {resume_text}
+            """
+        else:
+            prompt = f"""
+            En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
+            Produis une analyse comparative détaillée.
 
-        **🛠️ Compétences clés**
-        [Liste des compétences du candidat qui correspondent aux compétences requises.]
+            **Format de sortie OBLIGATOIRE :**
 
-        **💡 Points forts pour ce poste**
-        [2-3 points forts spécifiques du candidat pour ce poste.]
+            **👤 {safe_name}**
 
-        **⚠️ Points d'attention pour ce poste**
-        [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
-        
-        ---
-        **Description du poste :**
-        {job_description}
-        ---
-        **Texte du CV :**
-        {resume_text}
-        """
+            **📊 Synthèse d'adéquation**
+            [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
+            
+            **🎓 Formation**
+            [Analyse de la formation du candidat par rapport aux exigences du poste.]
+
+            **💼 Expérience**
+            [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
+
+            **🛠️ Compétences clés**
+            [Liste des compétences du candidat qui correspondent aux compétences requises.]
+
+            **💡 Points forts :**
+            [2-3 points forts spécifiques du candidat pour ce poste.]
+
+            **⚠️ Points à améliorer / Écarts avec le poste :**
+            [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
+
+            **Conclusion**
+            [Brève conclusion sur la pertinence du candidat.]
+            
+            ---
+            **Description du poste :**
+            {job_description}
+            ---
+            **Texte du CV :**
+            {resume_text}
+            """
         
         message = client.messages.create(
             model="claude-3-sonnet-20240229",
@@ -1212,36 +1331,7 @@ Texte du CV :
                 text_resp += block.text
         return text_resp
     except Exception as e:
-        return f"❌ Erreur Claude : {e}"
-
-# --- FONCTIONS GEMINI ---
-
-def get_gemini_api_key():
-    """Récupère la clé Gemini avec persistance en session state."""
-    # 1. Vérifier si déjà en session
-    if "Gemini_API_KEY" in st.session_state:
-        return st.session_state.Gemini_API_KEY
-    
-    api_key = None
-    try:
-        keys_to_check = ["Gemini_API_KEY", "GEMINI_API_KEY", "google_api_key", "GOOGLE_API_KEY"]
-        api_key = _retrieve_api_secret(keys_to_check + ["gemini", "Gemini", "google", "Google"], nested_keys=["api_key", "API_KEY", "token", "TOKEN"])
-
-        if not api_key:
-            for k in keys_to_check:
-                val = os.environ.get(k)
-                if val:
-                    api_key = val.strip()
-                    break
-        
-        if api_key:
-            st.session_state.Gemini_API_KEY = api_key
-            return api_key
-    except Exception:
-        pass
-    return None
-
-def get_detailed_score_with_gemini(job_description, resume_text, candidate_name):
+        return f"❌ Erreur Claude : {e}", short_mode=False):
     API_KEY = get_gemini_api_key()
     if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Gemini manquante."}
     
@@ -1258,10 +1348,68 @@ def get_detailed_score_with_gemini(job_description, resume_text, candidate_name)
             st.error("Impossible de charger un modèle Gemini compatible.")
             return {"score": 0.0, "explanation": "Erreur de chargement du modèle Gemini."}
 
-    prompt = f"""
-    En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
-    Produis une analyse comparative détaillée.
+    if short_mode:
+        prompt = f"""
+        En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
+        Produis une analyse très concise.
 
+        **Format de sortie OBLIGATOIRE :**
+
+        **👤 {safe_name}**
+
+        **📊 Synthèse d'adéquation**
+        [Score en pourcentage, puis 1 phrase sur l'adéquation globale.]
+        
+        **💡 Points forts :**
+        [1-2 points forts maximum]
+
+        **⚠️ Points à améliorer / Écarts avec le poste :**
+        [1 point maximum]
+        
+        ---
+        **Description du poste :**
+        {job_description}
+        ---
+        **Texte du CV :**
+        {resume_text}
+        """
+    else:
+        prompt = f"""
+        En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
+        Produis une analyse comparative détaillée.
+
+        **Format de sortie OBLIGATOIRE :**
+
+        **👤 {safe_name}**
+
+        **📊 Synthèse d'adéquation**
+        [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
+        
+        **🎓 Formation**
+        [Analyse de la formation du candidat par rapport aux exigences du poste.]
+
+        **💼 Expérience**
+        [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
+
+        **🛠️ Compétences clés**
+        [Liste des compétences du candidat qui correspondent aux compétences requises.]
+
+        **💡 Points forts :**
+        [2-3 points forts spécifiques du candidat pour ce poste.]
+
+        **⚠️ Points à améliorer / Écarts avec le poste :**
+        [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
+
+        **Conclusion**
+        [Brève conclusion sur la pertinence du candidat.]
+        
+        ---
+        **Description du poste :**
+        {job_description}
+        ---
+        **Texte du CV :**
+        {resume_text}
+    
     **Format de sortie OBLIGATOIRE :**
 
     **👤 {safe_name}**
@@ -1278,13 +1426,13 @@ def get_detailed_score_with_gemini(job_description, resume_text, candidate_name)
     **🛠️ Compétences clés**
     [Liste des compétences du candidat qui correspondent aux compétences requises.]
 
-    **💡 Points forts pour ce poste**
-    [2-3 points forts spécifiques du candidat pour ce poste.]
-
-    **⚠️ Points d'attention pour ce poste**
-    [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
-    
-    ---
+    **💡 Points forts pour ce poste**, short_mode=False):
+    scores_data = []
+    progress_bar = st.progress(0)
+    for i, resume_text in enumerate(resumes):
+        extracted = extract_name_from_cv_text(resume_text)
+        candidate_name = extracted.get('name') if extracted else file_names[i]
+        scores_data.append(get_detailed_score_with_gemini(job_description, resume_text, candidate_name, short_mod
     **Description du poste :**
     {job_description}
     ---
@@ -2827,6 +2975,8 @@ with tab1:
     
     st.markdown("---")
     
+    short_mode = st.checkbox("Mode court", help="Si coché, l'analyse IA génère un résumé plus concis.")
+
     analysis_method = st.selectbox(
         "✨ Choisissez votre méthode de classement",
         ["Méthode Cosinus (Mots-clés)", "Méthode Sémantique (Embeddings)", "Scoring par Règles (Regex)", 
@@ -2932,16 +3082,14 @@ with tab1:
             results, explanations, logic = {}, None, None
             
             
-            if analysis_method == "Analyse par IA (Gemini)":
-                progress_placeholder.info(f"🤖 Analyse Gemini en cours...")
-                result = rank_resumes_with_gemini(job_description, resumes, file_names)
+            if analysis_method == "Analyse par IA (Gemini)":, short_mode)
                 results = {"scores": result["scores"], "explanations": result["explanations"]}
                 explanations = result["explanations"]
                 progress_bar.progress(1.0)
 
             elif analysis_method == "Analyse par IA (Groq)":
                 progress_placeholder.info(f"🤖 Analyse Groq en cours...")
-                result = rank_resumes_with_groq(job_description, resumes, file_names)
+                result = rank_resumes_with_groq(job_description, resumes, file_names, short_mode)
                 results = {"scores": result["scores"], "explanations": result["explanations"]}
                 explanations = result["explanations"]
                 progress_bar.progress(1.0)
@@ -2953,14 +3101,14 @@ with tab1:
                     progress_placeholder.info(f"🤖 Analyse Claude ({i+1}/{len(resumes)})")
                     extracted = extract_name_from_cv_text(r_text)
                     candidate_name = extracted.get('name') if extracted else file_names[i]
-                    scores_data.append(get_detailed_score_with_claude(job_description, r_text, candidate_name))
+                    scores_data.append(get_detailed_score_with_claude(job_description, r_text, candidate_name, short_mode))
                     progress_bar.progress(0.3 + (i + 1) / len(resumes) * 0.7)
                 results = {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
                 explanations = results.get("explanations")
 
             elif analysis_method == "Analyse par IA (OpenRouter)":
                 progress_placeholder.info(f"🤖 Analyse OpenRouter en cours...")
-                result = rank_resumes_with_openrouter(job_description, resumes, file_names)
+                result = rank_resumes_with_openrouter(job_description, resumes, file_names, short_mode)
                 results = {"scores": result["scores"], "explanations": result["explanations"]}
                 explanations = result["explanations"]
                 progress_bar.progress(1.0)
@@ -2973,6 +3121,8 @@ with tab1:
                 scores_data = []
                 for i, resume_text in enumerate(resumes):
                     progress_placeholder.info(f"🤖 Analyse par IA ({i+1}/{len(resumes)}) : {file_names[i]}")
+                    progress_bar.progress(0.3 + (i + 1) / len(resumes) * 0.7)
+                    scores_data.append(get_detailed_score_with_ai(job_description, resume_text, candidate_name, short_mode, short_mode
                     progress_bar.progress(0.3 + (i + 1) / len(resumes) * 0.7)
                     scores_data.append(get_detailed_score_with_ai(job_description, resume_text, file_names[i]))
                 
