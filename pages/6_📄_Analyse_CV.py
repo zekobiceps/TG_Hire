@@ -266,7 +266,8 @@ def extract_text_from_pdf(file):
                 bio.seek(0)
                 doc = fitz.open(stream=bio, filetype="pdf")
                 text_parts = []
-                for page in doc:
+                for page_num in range(len(doc)):
+                    page = doc[page_num]
                     # sort=True est la clé ici pour éviter que le nom ne finisse à la fin du fichier
                     text_parts.append(page.get_text("text", sort=True))
                 text = "\n".join(text_parts).strip()
@@ -651,28 +652,63 @@ def rank_resumes_with_rules(job_description, resumes, file_names):
     return results
 
 # --- MÉTHODE 4 : ANALYSE PAR IA (PARSING CORRIGÉ) ---
-def get_detailed_score_with_ai(job_description, resume_text):
+def get_detailed_score_with_ai(job_description, resume_text, candidate_name):
     API_KEY = get_api_key()
     if not API_KEY: return {"score": 0.0, "explanation": "❌ Analyse IA impossible."}
     url = "https://api.deepseek.com/v1/chat/completions"
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
+    
+    safe_name = (candidate_name or "Candidat").strip()
+
     prompt = f"""
-    En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
-    Fournis ta réponse en deux parties :
-    1. Un score de correspondance en pourcentage (ex: "Score: 85%").
-    2. Une analyse détaillée expliquant les points forts et les points à améliorer.
+    En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
+    Produis une analyse comparative détaillée.
+
+    **Format de sortie OBLIGATOIRE :**
+
+    **👤 {safe_name}**
+
+    **📊 Synthèse d'adéquation**
+    [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
+    
+    **🎓 Formation**
+    [Analyse de la formation du candidat par rapport aux exigences du poste.]
+
+    **💼 Expérience**
+    [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
+
+    **🛠️ Compétences clés**
+    [Liste des compétences du candidat qui correspondent aux compétences requises.]
+
+    **💡 Points forts pour ce poste**
+    [2-3 points forts spécifiques du candidat pour ce poste.]
+
+    **⚠️ Points d'attention pour ce poste**
+    [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
+    
     ---
-    Description du poste: {job_description}
+    **Description du poste :**
+    {job_description}
     ---
-    Texte du CV: {resume_text}
+    **Texte du CV :**
+    {resume_text}
     """
-    payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.0}
+    
+    payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.1}
     try:
         response = requests.post(url, headers=headers, data=json.dumps(payload))
         response.raise_for_status()
         full_response_text = response.json()["choices"][0]["message"]["content"]
-        score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", full_response_text, re.IGNORECASE)
-        score = int(score_match.group(1)) / 100 if score_match else 0.0
+        
+        # Extraction du score améliorée pour être plus flexible
+        score_match = re.search(r"score.*?\s*:\s*(\d+)\s*%|(\d+)\s*%", full_response_text, re.IGNORECASE)
+        score = 0.0
+        if score_match:
+            # Le pattern peut capturer dans le groupe 1 ou 2
+            score_str = score_match.group(1) or score_match.group(2)
+            if score_str:
+                score = int(score_str) / 100.0
+                
         return {"score": score, "explanation": full_response_text}
     except Exception as e:
         st.warning(f"⚠️ Erreur IA : {e}")
@@ -680,8 +716,11 @@ def get_detailed_score_with_ai(job_description, resume_text):
 
 def rank_resumes_with_ai(job_description, resumes, file_names):
     scores_data = []
-    for resume_text in resumes:
-        scores_data.append(get_detailed_score_with_ai(job_description, resume_text))
+    for i, resume_text in enumerate(resumes):
+        # Extraire le nom pour le passer à la fonction d'analyse
+        extracted = extract_name_from_cv_text(resume_text)
+        candidate_name = extracted.get('name') if extracted else file_names[i]
+        scores_data.append(get_detailed_score_with_ai(job_description, resume_text, candidate_name))
     return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
 
 
@@ -711,35 +750,64 @@ def get_groq_api_key():
         pass
     return None
 
-def get_detailed_score_with_groq(job_description, resume_text):
+def get_detailed_score_with_groq(job_description, resume_text, candidate_name):
     API_KEY = get_groq_api_key()
     if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Groq manquante."}
     if groq is None:
         return {"score": 0.0, "explanation": "❌ SDK Groq non installé."}
     
+    safe_name = (candidate_name or "Candidat").strip()
+
     try:
         assert groq is not None
         client = groq.Groq(api_key=API_KEY)
         prompt = f"""
-        En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
-        Fournis ta réponse en deux parties :
-        1. Un score de correspondance en pourcentage (ex: "Score: 85%").
-        2. Une analyse détaillée expliquant les points forts et les points à améliorer.
+        En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
+        Produis une analyse comparative détaillée.
+
+        **Format de sortie OBLIGATOIRE :**
+
+        **👤 {safe_name}**
+
+        **📊 Synthèse d'adéquation**
+        [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
+        
+        **🎓 Formation**
+        [Analyse de la formation du candidat par rapport aux exigences du poste.]
+
+        **💼 Expérience**
+        [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
+
+        **🛠️ Compétences clés**
+        [Liste des compétences du candidat qui correspondent aux compétences requises.]
+
+        **💡 Points forts pour ce poste**
+        [2-3 points forts spécifiques du candidat pour ce poste.]
+
+        **⚠️ Points d'attention pour ce poste**
+        [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
+        
         ---
-        Description du poste: {job_description}
+        **Description du poste :**
+        {job_description}
         ---
-        Texte du CV: {resume_text}
+        **Texte du CV :**
+        {resume_text}
         """
         
         chat_completion = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama-3.3-70b-versatile",
+            model="llama-3.1-70b-versatile",
             max_tokens=4000,
         )
         text_resp = chat_completion.choices[0].message.content
         
-        score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
-        score = int(score_match.group(1)) / 100 if score_match else 0.0
+        score_match = re.search(r"score.*?\s*:\s*(\d+)\s*%|(\d+)\s*%", text_resp, re.IGNORECASE)
+        score = 0.0
+        if score_match:
+            score_str = score_match.group(1) or score_match.group(2)
+            if score_str:
+                score = int(score_str) / 100.0
         
         return {"score": score, "explanation": text_resp}
     except Exception as e:
@@ -749,7 +817,9 @@ def rank_resumes_with_groq(job_description, resumes, file_names):
     scores_data = []
     progress_bar = st.progress(0)
     for i, resume_text in enumerate(resumes):
-        scores_data.append(get_detailed_score_with_groq(job_description, resume_text))
+        extracted = extract_name_from_cv_text(resume_text)
+        candidate_name = extracted.get('name') if extracted else file_names[i]
+        scores_data.append(get_detailed_score_with_groq(job_description, resume_text, candidate_name))
         progress_bar.progress((i + 1) / len(resumes))
     progress_bar.empty()
     return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
@@ -858,9 +928,11 @@ def get_openrouter_api_key():
 
     return None
 
-def get_detailed_score_with_openrouter(job_description, resume_text):
+def get_detailed_score_with_openrouter(job_description, resume_text, candidate_name):
     API_KEY = get_openrouter_api_key()
     if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé OpenRouter manquante."}
+
+    safe_name = (candidate_name or "Candidat").strip()
 
     try:
         response = requests.post(
@@ -868,23 +940,46 @@ def get_detailed_score_with_openrouter(job_description, resume_text):
             headers={
                 "Authorization": f"Bearer {API_KEY}",
                 "Content-Type": "application/json",
-                "HTTP-Referer": "https://tg-hire.streamlit.app/", # Optionnel
-                "X-Title": "TG Hire" # Optionnel
+                "HTTP-Referer": "https://tg-hire.streamlit.app/", 
+                "X-Title": "TG Hire"
             },
             data=json.dumps({
-                "model": "openai/gpt-3.5-turbo", # Modèle par défaut économique
+                "model": "openai/gpt-4o", 
                 "messages": [
                     {
                         "role": "user",
                         "content": f"""
-                        En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
-                        Fournis ta réponse en deux parties :
-                        1. Un score de correspondance en pourcentage (ex: "Score: 85%").
-                        2. Une analyse détaillée expliquant les points forts et les points à améliorer.
+                        En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
+                        Produis une analyse comparative détaillée.
+
+                        **Format de sortie OBLIGATOIRE :**
+
+                        **👤 {safe_name}**
+
+                        **📊 Synthèse d'adéquation**
+                        [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
+                        
+                        **🎓 Formation**
+                        [Analyse de la formation du candidat par rapport aux exigences du poste.]
+
+                        **💼 Expérience**
+                        [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
+
+                        **🛠️ Compétences clés**
+                        [Liste des compétences du candidat qui correspondent aux compétences requises.]
+
+                        **💡 Points forts pour ce poste**
+                        [2-3 points forts spécifiques du candidat pour ce poste.]
+
+                        **⚠️ Points d'attention pour ce poste**
+                        [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
+                        
                         ---
-                        Description du poste: {job_description}
+                        **Description du poste :**
+                        {job_description}
                         ---
-                        Texte du CV: {resume_text}
+                        **Texte du CV :**
+                        {resume_text}
                         """
                     }
                 ]
@@ -894,8 +989,12 @@ def get_detailed_score_with_openrouter(job_description, resume_text):
         data = response.json()
         text_resp = data['choices'][0]['message']['content']
         
-        score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
-        score = int(score_match.group(1)) / 100 if score_match else 0.0
+        score_match = re.search(r"score.*?\s*:\s*(\d+)\s*%|(\d+)\s*%", text_resp, re.IGNORECASE)
+        score = 0.0
+        if score_match:
+            score_str = score_match.group(1) or score_match.group(2)
+            if score_str:
+                score = int(score_str) / 100.0
         
         return {"score": score, "explanation": text_resp}
     except Exception as e:
@@ -905,7 +1004,9 @@ def rank_resumes_with_openrouter(job_description, resumes, file_names):
     scores_data = []
     progress_bar = st.progress(0)
     for i, resume_text in enumerate(resumes):
-        scores_data.append(get_detailed_score_with_openrouter(job_description, resume_text))
+        extracted = extract_name_from_cv_text(resume_text)
+        candidate_name = extracted.get('name') if extracted else file_names[i]
+        scores_data.append(get_detailed_score_with_openrouter(job_description, resume_text, candidate_name))
         progress_bar.progress((i + 1) / len(resumes))
     progress_bar.empty()
     return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
@@ -996,36 +1097,64 @@ def get_claude_api_key():
         pass
     return None
 
-def get_detailed_score_with_claude(job_description, resume_text):
+def get_detailed_score_with_claude(job_description, resume_text, candidate_name):
     API_KEY = get_claude_api_key()
     if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Claude manquante."}
     
+    safe_name = (candidate_name or "Candidat").strip()
+
     try:
         client = anthropic.Anthropic(api_key=API_KEY)
         prompt = f"""
-        En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
-        Fournis ta réponse en deux parties :
-        1. Un score de correspondance en pourcentage (ex: "Score: 85%").
-        2. Une analyse détaillée expliquant les points forts et les points à améliorer.
+        En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
+        Produis une analyse comparative détaillée.
+
+        **Format de sortie OBLIGATOIRE :**
+
+        **👤 {safe_name}**
+
+        **📊 Synthèse d'adéquation**
+        [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
+        
+        **🎓 Formation**
+        [Analyse de la formation du candidat par rapport aux exigences du poste.]
+
+        **💼 Expérience**
+        [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
+
+        **🛠️ Compétences clés**
+        [Liste des compétences du candidat qui correspondent aux compétences requises.]
+
+        **💡 Points forts pour ce poste**
+        [2-3 points forts spécifiques du candidat pour ce poste.]
+
+        **⚠️ Points d'attention pour ce poste**
+        [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
+        
         ---
-        Description du poste: {job_description}
+        **Description du poste :**
+        {job_description}
         ---
-        Texte du CV: {resume_text}
+        **Texte du CV :**
+        {resume_text}
         """
         
         message = client.messages.create(
-            model="claude-3-haiku-20240307",
+            model="claude-3-sonnet-20240229",
             max_tokens=4000,
             messages=[{"role": "user", "content": prompt}]
         )
-        # Safely extract text from blocks
         text_resp = ""
         for block in message.content:
             if block.type == "text":
                 text_resp += block.text
         
-        score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
-        score = int(score_match.group(1)) / 100 if score_match else 0.0
+        score_match = re.search(r"score.*?\s*:\s*(\d+)\s*%|(\d+)\s*%", text_resp, re.IGNORECASE)
+        score = 0.0
+        if score_match:
+            score_str = score_match.group(1) or score_match.group(2)
+            if score_str:
+                score = int(score_str) / 100.0
         
         return {"score": score, "explanation": text_resp}
     except Exception as e:
@@ -1112,61 +1241,81 @@ def get_gemini_api_key():
         pass
     return None
 
-def get_detailed_score_with_gemini(job_description, resume_text):
+def get_detailed_score_with_gemini(job_description, resume_text, candidate_name):
     API_KEY = get_gemini_api_key()
     if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Gemini manquante."}
     
     genai.configure(api_key=API_KEY)
     
-    # Selection du modèle basé sur la disponibilité
+    safe_name = (candidate_name or "Candidat").strip()
+
     try:
-        model = genai.GenerativeModel('gemini-2.5-flash-lite')
-    except:
-        model = genai.GenerativeModel('gemini-2.0-flash')
-    
+        model = genai.GenerativeModel('gemini-1.5-flash')
+    except Exception:
+        try:
+            model = genai.GenerativeModel('gemini-1.5-pro')
+        except Exception:
+            st.error("Impossible de charger un modèle Gemini compatible.")
+            return {"score": 0.0, "explanation": "Erreur de chargement du modèle Gemini."}
+
     prompt = f"""
-    En tant qu'expert en recrutement, évalue la pertinence du CV suivant pour la description de poste donnée.
-    Fournis ta réponse en deux parties :
-    1. Un score de correspondance en pourcentage (ex: "Score: 85%").
-    2. Une analyse détaillée expliquant les points forts et les points à améliorer.
+    En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
+    Produis une analyse comparative détaillée.
+
+    **Format de sortie OBLIGATOIRE :**
+
+    **👤 {safe_name}**
+
+    **📊 Synthèse d'adéquation**
+    [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
+    
+    **🎓 Formation**
+    [Analyse de la formation du candidat par rapport aux exigences du poste.]
+
+    **💼 Expérience**
+    [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
+
+    **🛠️ Compétences clés**
+    [Liste des compétences du candidat qui correspondent aux compétences requises.]
+
+    **💡 Points forts pour ce poste**
+    [2-3 points forts spécifiques du candidat pour ce poste.]
+
+    **⚠️ Points d'attention pour ce poste**
+    [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
+    
     ---
-    Description du poste: {job_description}
+    **Description du poste :**
+    {job_description}
     ---
-    Texte du CV: {resume_text}
+    **Texte du CV :**
+    {resume_text}
     """
     
     try:
         response = model.generate_content(prompt)
         text_resp = response.text
         
-        # Extraction du score
-        score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
-        score = int(score_match.group(1)) / 100 if score_match else 0.0
+        score_match = re.search(r"score.*?\s*:\s*(\d+)\s*%|(\d+)\s*%", text_resp, re.IGNORECASE)
+        score = 0.0
+        if score_match:
+            score_str = score_match.group(1) or score_match.group(2)
+            if score_str:
+                score = int(score_str) / 100.0
         
         return {"score": score, "explanation": text_resp}
     except Exception as e:
-        # Fallback intelligent en cas d'erreur 404
-        if "not found" in str(e).lower() or "404" in str(e):
-            try:
-                # Tentative ultime sur le modèle 'gemini-flash-latest' qui est souvent un alias stable
-                model = genai.GenerativeModel('gemini-flash-latest')
-                response = model.generate_content(prompt)
-                text_resp = response.text
-                score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", text_resp, re.IGNORECASE)
-                score = int(score_match.group(1)) / 100 if score_match else 0.0
-                return {"score": score, "explanation": text_resp}
-            except Exception as e2:
-                 return {"score": 0.0, "explanation": f"Erreur Gemini (Fallback): {e2}"}
         return {"score": 0.0, "explanation": f"Erreur Gemini: {e}"}
 
 def rank_resumes_with_gemini(job_description, resumes, file_names):
     scores_data = []
-    # Placeholder pour barre de progression si intégrée, sinon boucle simple
     progress_bar = st.progress(0)
     for i, resume_text in enumerate(resumes):
-        scores_data.append(get_detailed_score_with_gemini(job_description, resume_text))
+        extracted = extract_name_from_cv_text(resume_text)
+        candidate_name = extracted.get('name') if extracted else file_names[i]
+        scores_data.append(get_detailed_score_with_gemini(job_description, resume_text, candidate_name))
         progress_bar.progress((i + 1) / len(resumes))
-        time.sleep(1) # Petit délai pour éviter rate limits tier gratuit
+        time.sleep(1) 
     progress_bar.empty()
     return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
 
@@ -2799,12 +2948,13 @@ with tab1:
 
             elif analysis_method == "Analyse par IA (Claude)":
                 progress_placeholder.info(f"🤖 Analyse Claude en cours...")
-                # Manque la fonction batch pour Claude, on itère simplement
                 scores_data = []
                 for i, r_text in enumerate(resumes):
                     progress_placeholder.info(f"🤖 Analyse Claude ({i+1}/{len(resumes)})")
-                    scores_data.append(get_detailed_score_with_claude(job_description, r_text))
-                    progress_bar.progress((i + 1) / len(resumes))
+                    extracted = extract_name_from_cv_text(r_text)
+                    candidate_name = extracted.get('name') if extracted else file_names[i]
+                    scores_data.append(get_detailed_score_with_claude(job_description, r_text, candidate_name))
+                    progress_bar.progress(0.3 + (i + 1) / len(resumes) * 0.7)
                 results = {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
                 explanations = results.get("explanations")
 
@@ -2824,7 +2974,7 @@ with tab1:
                 for i, resume_text in enumerate(resumes):
                     progress_placeholder.info(f"🤖 Analyse par IA ({i+1}/{len(resumes)}) : {file_names[i]}")
                     progress_bar.progress(0.3 + (i + 1) / len(resumes) * 0.7)
-                    scores_data.append(get_detailed_score_with_ai(job_description, resume_text))
+                    scores_data.append(get_detailed_score_with_ai(job_description, resume_text, file_names[i]))
                 
                 results = {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
                 explanations = results.get("explanations")
@@ -2916,29 +3066,8 @@ with tab1:
                     explanation = explanations.get(file_name, "N/A")
                     import re
                     
-                    # Extraction et affichage du score
-                    score_match = re.search(r"score(?: de correspondance)?\s*:\s*(\d+)\s*%", explanation, re.IGNORECASE)
-                    if score_match:
-                        st.markdown(f"**Score : {score_match.group(1)}%**")
-                    
-                    # Nouvelle approche : affichage complet avec troncature intelligente
-                    def smart_truncate(text, max_length=1000):
-                        """Tronque intelligemment le texte en gardant le sens"""
-                        if len(text) <= max_length:
-                            return text
-                        
-                        # Cherche le dernier point, point d'exclamation ou d'interrogation avant la limite
-                        truncate_pos = max_length
-                        for i in range(max_length, max(0, max_length-200), -1):
-                            if text[i] in '.!?':
-                                truncate_pos = i + 1
-                                break
-                        
-                        return text[:truncate_pos].strip() + "..."
-                    
-                    # Afficher l'explication complète avec troncature intelligente
-                    cleaned_explanation = explanation.replace("Score:", "").replace(f"{score_match.group(1)}%" if score_match else "", "").strip()
-                    st.markdown(smart_truncate(cleaned_explanation))
+                    # Afficher l'explication complète, qui est maintenant formatée
+                    st.markdown(explanation)
         
         # Système de feedback par CV avec formulaires pour éviter les rechargements
         st.markdown("---")
