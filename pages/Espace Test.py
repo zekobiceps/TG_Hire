@@ -262,7 +262,8 @@ def extract_text_from_pdf(file):
                 bio.seek(0)
                 doc = fitz.open(stream=bio, filetype="pdf")
                 text_parts = []
-                for page in doc:
+                for page_num in range(len(doc)):
+                    page = doc[page_num]
                     # sort=True est la clé ici pour éviter que le nom ne finisse à la fin du fichier
                     text_parts.append(page.get_text("text", sort=True))
                 text = "\n".join(text_parts).strip()
