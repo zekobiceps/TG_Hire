@@ -5076,8 +5076,40 @@ def main():
         fig_trend = apply_title_style(fig_trend)
 
         # Barres consommation par direction
-        dirs = ["Direction RH", "Pôle Admin & Fin.", "Encadrement Chantier", "Direction SI", "Autres"]
-        perc = [30, 25, 18, 8, 5]
+        # Source pour l'agrégation : préférer df_recrutement s'il existe (colonne 'Direction concernée'), sinon df_budget
+        df_dir_source = None
+        if 'df_recrutement' in locals() and df_recrutement is not None:
+            df_dir_source = df_recrutement
+        elif df_budget is not None and 'Direction concernée' in df_budget.columns:
+            df_dir_source = df_budget
+
+        dirs = []
+        perc = []
+        if df_dir_source is not None and 'Direction concernée' in df_dir_source.columns:
+            src = df_dir_source.copy()
+            # detect numeric budget-like column in source
+            budget_cols = [c for c in src.columns if re.search(r'engag|consomm|montant|budget|depens', str(c), re.I)]
+            if budget_cols:
+                agg_col = budget_cols[0]
+                by_dir = src.groupby('Direction concernée')[agg_col].apply(lambda s: pd.to_numeric(s.astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()).reset_index(name='val')
+                total = by_dir['val'].sum() if by_dir['val'].sum() != 0 else 1
+                by_dir['pct'] = (by_dir['val'] / total * 100).round(1)
+                dirs = by_dir['Direction concernée'].tolist()
+                perc = by_dir['pct'].tolist()
+            else:
+                # fallback : use counts of closed recrutements by direction
+                if 'Statut de la demande' in src.columns:
+                    df_tmp = src.copy()
+                    df_tmp['is_closed'] = df_tmp['Statut de la demande'].astype(str).str.contains(r'clos|pourvu|réalisé|terminé', case=False, na=False)
+                    by_dir = df_tmp.groupby('Direction concernée')['is_closed'].agg(['sum','count']).reset_index()
+                    by_dir['pct'] = (by_dir['sum'] / by_dir['count'] * 100).round(1)
+                    dirs = by_dir['Direction concernée'].tolist()
+                    perc = by_dir['pct'].tolist()
+
+        if not dirs:
+            dirs = ["Direction RH", "Pôle Admin & Fin.", "Encadrement Chantier", "Direction SI", "Autres"]
+            perc = [30, 25, 18, 8, 5]
+
         fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'% consommation', 'y':''}, text=[f"{p}%" for p in perc], height=400)
         fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=14)))
         fig_bar = apply_title_style(fig_bar)
@@ -5089,29 +5121,100 @@ def main():
 
         # Tableau d'analyse détaillée (bas)
         st.subheader("Analyse détaillée par direction")
-        table_rows = [
-            {"Direction": "Encadrement Chantier", "Clos": "8 / 76", "Budget engagé (DH)": 1_480_000, "Écart (DH)": -22_000, "Pastille": "green"},
-            {"Direction": "Pôle Admin & Fin.", "Clos": "2 / 4", "Budget engagé (DH)": 310_000, "Écart (DH)": 15_000, "Pastille": "yellow"},
-            {"Direction": "Direction RH", "Clos": "3 / 5", "Budget engagé (DH)": 160_000, "Écart (DH)": 0, "Pastille": "green"},
-            {"Direction": "Autres (SI, Jur,...)", "Clos": "0 / 20", "Budget engagé (DH)": 0, "Écart (DH)": 0, "Pastille": "grey"},
-        ]
-        # Reprendre le style du tableau 'Besoins en Cours par Entité'
-        df_detail = pd.DataFrame(table_rows)
-        df_detail["Budget engagé (DH)"] = df_detail["Budget engagé (DH)"].apply(lambda v: f"{v:,.0f} DH")
-        df_detail["Écart (DH)"] = df_detail["Écart (DH)"].apply(lambda v: f"{v:+,d} DH")
+
+        # Construire le tableau de façon dynamique en utilisant df_recrutement si disponible
+        detail_rows = []
+        if 'df_recrutement' in locals() and df_recrutement is not None and 'Direction concernée' in df_recrutement.columns:
+            dfr = df_recrutement.copy()
+            dfr['is_closed'] = dfr['Statut de la demande'].astype(str).str.contains(r'clos|pourvu|réalisé|terminé', case=False, na=False)
+            dirs_list = sorted(dfr['Direction concernée'].dropna().unique())
+            for d in dirs_list:
+                group = dfr[dfr['Direction concernée'] == d]
+                total = len(group)
+                closed = int(group['is_closed'].sum())
+                clos_str = f"{closed} / {total}"
+
+                # Budget prévue: attempt to sum a 'prévu' column if exists in df_budget
+                budget_prevue = None
+                if df_budget is not None and 'Direction concernée' in df_budget.columns:
+                    try:
+                        cols_prevu = [c for c in df_budget.columns if re.search(r'prévu|prevision|prévision|prevision|prevu', str(c), re.I)]
+                        if cols_prevu:
+                            budget_prevue = pd.to_numeric(df_budget[df_budget['Direction concernée'] == d][cols_prevu[0]].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
+                        else:
+                            budget_prevue = None
+                    except Exception:
+                        budget_prevue = None
+
+                # Budget engagé: sum of engaged-like column from df_budget or df_recrutement
+                budget_engaged_dir = 0
+                found_engage = False
+                if df_budget is not None and 'Direction concernée' in df_budget.columns:
+                    eng_cols = [c for c in df_budget.columns if re.search(r'engag|montant|depens|consomm', str(c), re.I)]
+                    if eng_cols:
+                        try:
+                            budget_engaged_dir = pd.to_numeric(df_budget[df_budget['Direction concernée'] == d][eng_cols[0]].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
+                            found_engage = True
+                        except Exception:
+                            budget_engaged_dir = 0
+
+                if not found_engage:
+                    eng_cols_r = [c for c in df_recrutement.columns if re.search(r'engag|montant|depens|budget', str(c), re.I)]
+                    if eng_cols_r:
+                        try:
+                            budget_engaged_dir = pd.to_numeric(group[eng_cols_r[0]].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
+                        except Exception:
+                            budget_engaged_dir = 0
+
+                slipping = None
+                if budget_prevue is not None:
+                    try:
+                        slipping = float(budget_prevue) - float(budget_engaged_dir)
+                    except Exception:
+                        slipping = None
+
+                detail_rows.append({
+                    'Direction': d,
+                    'Clos': clos_str,
+                    'Budget prévue (DH)': budget_prevue if budget_prevue is not None else 0,
+                    'Budget engagé (DH)': int(budget_engaged_dir),
+                    'slipping (écart)': slipping if slipping is not None else 0
+                })
+        else:
+            detail_rows = [
+                { 'Direction': 'Encadrement Chantier', 'Clos': '8 / 76', 'Budget prévue (DH)': 1_500_000, 'Budget engagé (DH)': 1_480_000, 'slipping (écart)': -20_000 },
+                { 'Direction': 'Pôle Admin & Fin.', 'Clos': '2 / 4', 'Budget prévue (DH)': 300_000, 'Budget engagé (DH)': 310_000, 'slipping (écart)': -10_000 },
+            ]
+
+        df_detail = pd.DataFrame(detail_rows)
+        if 'Budget prévue (DH)' in df_detail.columns:
+            df_detail['Budget prévue (DH)'] = df_detail['Budget prévue (DH)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
+        if 'Budget engagé (DH)' in df_detail.columns:
+            df_detail['Budget engagé (DH)'] = df_detail['Budget engagé (DH)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
+        if 'slipping (écart)' in df_detail.columns:
+            df_detail['slipping (écart)'] = df_detail['slipping (écart)'].apply(lambda v: f"{int(v):+,d} DH" if pd.notna(v) else "-")
 
         st.markdown("""
         <style>
         .custom-table-small {border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05);}
         .custom-table-small th {background:#9C182F;color:white;padding:8px;text-align:left}
         .custom-table-small td {padding:8px;border-bottom:1px solid #eee; font-size:1.06em}
-        .custom-table-small .pastille {font-weight:700}
         </style>
         """, unsafe_allow_html=True)
 
-        html = '<table class="custom-table-small"><thead><tr><th>Direction</th><th>Clos</th><th>Budget engagé</th><th>Écart</th></tr></thead><tbody>'
-        for r in table_rows:
-            html += f"<tr><td style='font-weight:600'>{r['Direction']}</td><td>{r['Clos']}</td><td>{r['Budget engagé (DH)']:,}</td><td>{r['Écart (DH)']:,}</td></tr>"
+        cols_display = ['Direction', 'Clos', 'Budget prévue (DH)', 'Budget engagé (DH)', 'slipping (écart)']
+        html = '<table class="custom-table-small"><thead><tr>'
+        for c in cols_display:
+            html += f"<th>{c}</th>"
+        html += '</tr></thead><tbody>'
+        for _, r in df_detail.iterrows():
+            html += '<tr>'
+            html += f"<td style='font-weight:600'>{r['Direction']}</td>"
+            html += f"<td>{r['Clos']}</td>"
+            html += f"<td>{r['Budget prévue (DH)']}</td>"
+            html += f"<td>{r['Budget engagé (DH)']}</td>"
+            html += f"<td>{r['slipping (écart)']}</td>"
+            html += '</tr>'
         html += '</tbody></table>'
         st.markdown(html, unsafe_allow_html=True)
     
