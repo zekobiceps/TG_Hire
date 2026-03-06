@@ -1,71 +1,106 @@
 import pandas as pd
 import sys
+import re
 
+# Load the CSV
 try:
-    df = pd.read_csv('LOGO/CVS/classification_results.csv')
+    df = pd.read_csv('/workspaces/TG_Hire/LOGO/CVS/classification_results.csv')
 except Exception as e:
     print(f"Error reading CSV: {e}")
     sys.exit(1)
 
-# Clean and filter experience
-def safe_exp(x):
+# Clean up experience column
+def clean_experience(x):
     try:
-        return float(str(x).replace('ans', '').strip())
+        val = str(x).lower().replace('ans', '').strip()
+        if not val or val == 'nan': return 0.0
+        return float(val)
     except:
         return 0.0
 
-df['years_experience_clean'] = df['years_experience'].apply(safe_exp)
+df['years_experience_cleaned'] = df['years_experience'].apply(clean_experience)
 
-# Strict criteria: 4 <= exp <= 12
-df_filtered = df[
-    (df['years_experience_clean'] >= 4) & 
-    (df['years_experience_clean'] <= 12)
-].copy()
+# Define regex patterns for scoring
+patterns_raf = [
+    r"responsable administratif et financier",
+    r"\braf\b",
+]
 
-# Scoring keywords based on Job Description
-# "Responsable Administratif et Financier", "RAF", "Finance", "Comptabilité", "Contrôle de gestion"
-keywords = {
-    "raf": 5,
-    "responsable administratif et financier": 5,
-    "finance": 2,
-    "financier": 2,
-    "comptab": 3,
-    "contrôle de gestion": 3,
-    "controle de gestion": 3,
-    "trésorerie": 2,
-    "audit": 2,
-    "administratif": 1,
-    "gestion": 1
-}
+patterns_finance_strong = [
+    r"comptabilit", r"finance", r"contrôle de gestion", r"audit", 
+    r"trésorerie", r"consolidation", r"expert comptable", r"dscg", r"daf"
+]
+
+patterns_bonus = [
+    r"family office", r"holding", r"multi-entit", r"immobilier", 
+    r"investissements", r"spv", r"private equity", 
+]
+
+patterns_negative = [
+    r"java", r"python", r"devops", r"fullstack", r"react", r"angular", 
+    r"administrateur syst", r"technicien support", r"helpdesk", r"développeur"
+]
 
 def calculate_score(row):
-    text = f"{row['candidate_name']} {row['sub_category']} {row['profile_summary']}".lower()
-    score = 0
-    matches = []
+    summary = str(row['profile_summary']).lower() if pd.notna(row['profile_summary']) else ""
+    sub_category = str(row['sub_category']).lower() if pd.notna(row['sub_category']) else ""
     
-    for kw, points in keywords.items():
-        if kw in text:
-            score += points
-            matches.append(kw)
+    score = 0
+    matched_terms = []
+
+    # Check for RAF titles (High value)
+    for pat in patterns_raf:
+        if re.search(pat, summary):
+            score += 30
+            matched_terms.append(f"TITLE:{pat}")
             
-    return score
+    # Check for Strong Finance keywords
+    for pat in patterns_finance_strong:
+        if re.search(pat, summary):
+            score += 10
+            matched_terms.append(f"STRONG:{pat}")
 
-df_filtered['score'] = df_filtered.apply(calculate_score, axis=1)
+    # Check for Bonus keywords
+    for pat in patterns_bonus:
+        if re.search(pat, summary):
+            score += 15
+            matched_terms.append(f"BONUS:{pat}")
+            
+    # IMPORTANT: Apply negative penalty AFTER positive matches calculation
+    # Only verify negative patterns if the score is somewhat relevant, or just always apply.
+    for pat in patterns_negative:
+        if re.search(pat, summary):
+            # If it's a strong IT profile, nuke the score
+            score = -100
+            matched_terms.append("NEGATIVE_MATCH")
+            break
 
-# Sort by score
-results = df_filtered[df_filtered['score'] > 0].sort_values(by='score', ascending=False)
+    return score, matched_terms
 
-print(f"Analyse terminée. {len(results)} profils trouvés correspondant aux critères (4-12 ans d'expérience + mots-clés).")
+# Apply scoring
+results = df.apply(calculate_score, axis=1)
+df['score'] = results.apply(lambda x: x[0])
+df['matched_terms'] = results.apply(lambda x: x[1])
 
-if len(results) == 0:
-    print("Aucun candidat trouvé.")
-else:
-    print("Top candidats :\n")
-    for i, (_, row) in enumerate(results.head(10).iterrows(), 1):
-        print(f"#{i} NOM: {row['candidate_name']}")
-        print(f"   FICHIER: {row['file']}")
-        print(f"   EXPÉRIENCE: {row['years_experience']} ans")
-        print(f"   SCORE: {row['score']}")
-        print(f"   CATÉGORIE: {row['macro_category']} > {row['sub_category']}")
-        print(f"   RÉSUMÉ: {row['profile_summary']}")
+# Filter based on score and experience
+# Needs reasonable experience (3+) and decent match score
+candidates = df[
+    (df['years_experience_cleaned'] >= 3) & 
+    (df['score'] >= 20)  # Must have some finance relevance
+].copy()
+
+# Sort by score desc
+candidates = candidates.sort_values(by=['score', 'years_experience_cleaned'], ascending=False)
+
+print(f"Found {len(candidates)} candidates matching criteria out of {len(df)} total files.\n")
+
+if not candidates.empty:
+    for idx, row in candidates.head(10).iterrows():
+        print(f"--- CANDIDATE: {row['candidate_name']} ({row['years_experience_cleaned']} ans) ---")
+        print(f"File: {row['file']}")
+        print(f"Score: {row['score']}")
+        print(f"Matched terms: {', '.join(str(x) for x in row['matched_terms'])}")
+        print(f"Summary: {str(row['profile_summary'])[:400]}...")
         print("-" * 50)
+else:
+    print("No strong matches found. Check keywords or criteria.")
