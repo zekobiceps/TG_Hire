@@ -4755,6 +4755,16 @@ def main():
             key='reporting_date',
             format='DD/MM/YYYY'
         )
+        # Small hover-help icon next to the date picker (shows text when hovering)
+        try:
+            c1, c2 = st.columns([9,1])
+            with c2:
+                st.markdown(
+                    "<div style='text-align:center; margin-top:6px'><span title=\"Choisissez la date de reporting hebdomadaire. La date sert de référence pour tous les calculs et filtres du dashboard.\">ℹ️</span></div>",
+                    unsafe_allow_html=True,
+                )
+        except Exception:
+            pass
     
     # Créer les onglets (Demandes et Recrutement regroupés)
     # CSS pour agrandir le texte des onglets
@@ -5112,8 +5122,11 @@ def main():
         ))
         # Make trend chart taller to show variation and hide legend
         try:
-            ymin = float(min(np.min(planned), np.min(actual)))
-            ymax = float(max(np.max(planned), np.max(actual)))
+            arr_planned = np.asarray(planned, dtype=float)
+            arr_actual = np.asarray(actual, dtype=float)
+            combined = np.concatenate([arr_planned, arr_actual]) if (len(arr_planned) + len(arr_actual)) > 0 else np.array([0.0])
+            ymin = float(np.nanmin(combined))
+            ymax = float(np.nanmax(combined))
             pad = max(1.0, (ymax - ymin) * 0.05)
             y_range = [ymin - pad, ymax + pad] if ymax > ymin else None
         except Exception:
@@ -5157,17 +5170,17 @@ def main():
             dirs = ["Direction RH", "Pôle Admin & Fin.", "Encadrement Chantier", "Direction SI", "Autres"]
             perc = [30, 25, 18, 8, 5]
 
-        # Sort by percentage descending for clearer visualization
+        # Sort by percentage ascending (user requested) and remove axis label
         try:
             df_bar = pd.DataFrame({'dir': dirs, 'pct': perc})
-            df_bar = df_bar.sort_values('pct', ascending=False)
+            df_bar = df_bar.sort_values('pct', ascending=True)
             dirs = df_bar['dir'].tolist()
             perc = df_bar['pct'].tolist()
         except Exception:
             pass
 
         # Increase bar chart size slightly
-        fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'% consommation', 'y':''}, text=[f"{p}%" for p in perc], height=520)
+        fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'', 'y':''}, text=[f"{p}%" for p in perc], height=520)
         fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=16)), showlegend=False)
         fig_bar = apply_title_style(fig_bar)
 
@@ -5180,49 +5193,63 @@ def main():
         # Tableau d'analyse détaillée (bas)
         st.subheader("Analyse détaillée par direction")
 
-        # Construire le tableau de façon dynamique en utilisant df_recrutement si disponible
+        # Construire le tableau de façon dynamique en utilisant les directions du fichier Pilotage (df_budget)
+        # Les compteurs "Clos" sont calculés à partir des données de recrutement (df_recrutement) mais
+        # seules les directions présentes dans la feuille Pilotage sont affichées (demande de l'utilisateur).
         detail_rows = []
-        if 'df_recrutement' in locals() and df_recrutement is not None and 'Direction concernée' in df_recrutement.columns:
-            dfr = df_recrutement.copy()
-            dfr['is_closed'] = dfr['Statut de la demande'].astype(str).str.contains(r'clos|pourvu|réalisé|terminé', case=False, na=False)
-            dirs_list = sorted(dfr['Direction concernée'].dropna().unique())
+        # Preferer les directions provenant du Pilotage budgétaire
+        if df_budget is not None and isinstance(df_budget, pd.DataFrame) and 'Direction concernée' in df_budget.columns:
+            dirs_list = sorted(df_budget['Direction concernée'].dropna().unique())
+            # Precompute recruitment closure flags if recrutement df exists
+            recr_exists = 'df_recrutement' in locals() and df_recrutement is not None and 'Direction concernée' in df_recrutement.columns
+            if recr_exists:
+                dfr = df_recrutement.copy()
+                dfr['is_closed'] = dfr['Statut de la demande'].astype(str).str.contains(r'clos|pourvu|réalisé|terminé', case=False, na=False)
+
             for d in dirs_list:
-                group = dfr[dfr['Direction concernée'] == d]
-                total = len(group)
-                closed = int(group['is_closed'].sum())
-                clos_str = f"{closed} / {total}"
+                if recr_exists:
+                    group = dfr[dfr['Direction concernée'] == d]
+                    total = len(group)
+                    closed = int(group['is_closed'].sum())
+                    clos_str = f"{closed} / {total}"
+                else:
+                    clos_str = "0 / 0"
 
                 # Budget prévue: attempt to sum a 'prévu' column if exists in df_budget
                 budget_prevue = None
-                if df_budget is not None and 'Direction concernée' in df_budget.columns:
-                    try:
-                        cols_prevu = [c for c in df_budget.columns if re.search(r'prévu|prevision|prévision|prevision|prevu', str(c), re.I)]
-                        if cols_prevu:
-                            budget_prevue = pd.to_numeric(df_budget[df_budget['Direction concernée'] == d][cols_prevu[0]].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
-                        else:
-                            budget_prevue = None
-                    except Exception:
-                        budget_prevue = None
+                try:
+                    cols_prevu = [c for c in df_budget.columns if re.search(r'prévu|prevision|prévision|prevision|prevu', str(c), re.I)]
+                    if cols_prevu:
+                        budget_prevue = pd.to_numeric(
+                            df_budget[df_budget['Direction concernée'] == d][cols_prevu[0]].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."),
+                            errors='coerce'
+                        ).fillna(0).sum()
+                except Exception:
+                    budget_prevue = None
 
-                # Budget engagé: sum of engaged-like column from df_budget or df_recrutement
+                # Budget engagé: sum of engaged-like column from df_budget first
                 budget_engaged_dir = 0
-                found_engage = False
-                if df_budget is not None and 'Direction concernée' in df_budget.columns:
+                try:
                     eng_cols = [c for c in df_budget.columns if re.search(r'engag|montant|depens|consomm', str(c), re.I)]
                     if eng_cols:
-                        try:
-                            budget_engaged_dir = pd.to_numeric(df_budget[df_budget['Direction concernée'] == d][eng_cols[0]].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
-                            found_engage = True
-                        except Exception:
-                            budget_engaged_dir = 0
+                        budget_engaged_dir = pd.to_numeric(
+                            df_budget[df_budget['Direction concernée'] == d][eng_cols[0]].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."),
+                            errors='coerce'
+                        ).fillna(0).sum()
+                except Exception:
+                    budget_engaged_dir = 0
 
-                if not found_engage:
-                    eng_cols_r = [c for c in df_recrutement.columns if re.search(r'engag|montant|depens|budget', str(c), re.I)]
-                    if eng_cols_r:
-                        try:
-                            budget_engaged_dir = pd.to_numeric(group[eng_cols_r[0]].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
-                        except Exception:
-                            budget_engaged_dir = 0
+                # If no engaged value found in pilotage, try to fallback on recruitment group if present
+                if (not budget_engaged_dir) and ('df_recrutement' in locals() and df_recrutement is not None):
+                    try:
+                        eng_cols_r = [c for c in df_recrutement.columns if re.search(r'engag|montant|depens|budget', str(c), re.I)]
+                        if eng_cols_r:
+                            budget_engaged_dir = pd.to_numeric(
+                                df_recrutement[df_recrutement['Direction concernée'] == d][eng_cols_r[0]].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."),
+                                errors='coerce'
+                            ).fillna(0).sum()
+                    except Exception:
+                        budget_engaged_dir = 0
 
                 slipping = None
                 if budget_prevue is not None:
@@ -5235,7 +5262,7 @@ def main():
                     'Direction': d,
                     'Clos': clos_str,
                     'Budget prévue (DH)': budget_prevue if budget_prevue is not None else 0,
-                    'Budget engagé (DH)': int(budget_engaged_dir),
+                    'Budget engagé (DH)': int(budget_engaged_dir) if pd.notna(budget_engaged_dir) else 0,
                     'slipping (écart)': slipping if slipping is not None else 0
                 })
         else:
