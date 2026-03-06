@@ -5049,25 +5049,53 @@ def main():
             ("Statut budgétaire global", statut_global, "#2ca02c"),
         ]
         st.markdown(render_generic_metrics(metrics), unsafe_allow_html=True)
+        # Helper expliquant le calcul du statut budgétaire
+        try:
+            st.markdown("<div style='font-size:12px;color:#666;margin-top:6px'>ℹ️ Statut calculé comme : taux = (Budget engagé / Budget annuel total) × 100. "
+                        "CONFORME si taux ≤ 100%, DÉPASSÉ si taux > 100%.</div>", unsafe_allow_html=True)
+        except Exception:
+            pass
 
         # Graphiques de tendance et consommation par direction
         col_left, col_right = st.columns([2,1])
 
-        # Données synthétiques pour la courbe Jan-Dec
+        # Tendance de consommation : utiliser les colonnes 'Budget Net' (Prévu) et 'Salaire net négocié' (Réel) depuis df_budget
         months = pd.date_range(start="2026-01-01", periods=12, freq='MS').strftime('%b')
-        # Guarder contre budget_annuel_total == None
-        if budget_annuel_total is not None and isinstance(budget_annuel_total, (int, float)):
-            planned = np.linspace(0, budget_annuel_total, 12)
-            # dépenses réelles = un peu en dessous jusqu'à mars
-            actual = planned * 0.95
-            actual[3:] = planned[3:] * 0.98
-        else:
-            # Pas de données : séries vides (zéros) et annotation gérée plus bas
-            planned = np.zeros(12)
-            actual = np.zeros(12)
+        planned = np.zeros(12)
+        actual = np.zeros(12)
+        # Try to build series from df_budget when possible
+        try:
+            if df_budget is not None and isinstance(df_budget, pd.DataFrame):
+                # prefer columns named exactly
+                if 'Budget Net' in df_budget.columns and 'Salaire net négocié' in df_budget.columns:
+                    df_tmp = df_budget.copy()
+                    # try to find a month/date column
+                    date_col = None
+                    for c in df_tmp.columns:
+                        if re.search(r'mois|date', str(c), re.I):
+                            date_col = c
+                            break
+                    if date_col is not None:
+                        try:
+                            df_tmp[date_col] = pd.to_datetime(df_tmp[date_col], errors='coerce')
+                            df_tmp['month'] = df_tmp[date_col].dt.month
+                            by_month = df_tmp.groupby('month').agg({'Budget Net': 'sum', 'Salaire net négocié': 'sum'}).reindex(range(1,13), fill_value=0)
+                            months = pd.date_range(start="2026-01-01", periods=12, freq='MS').strftime('%b')
+                            planned = by_month['Budget Net'].fillna(0).values
+                            actual = by_month['Salaire net négocié'].fillna(0).values
+                        except Exception:
+                            pass
+                    else:
+                        # if there are 12 rows assume they are ordered months
+                        if len(df_tmp) >= 12:
+                            planned = pd.to_numeric(df_tmp['Budget Net'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).values[:12]
+                            actual = pd.to_numeric(df_tmp['Salaire net négocié'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).values[:12]
+        except Exception:
+            # leave synthetic zeros
+            pass
 
         fig_trend = go.Figure()
-        # annotate only the last point with the series name to avoid a separate legend
+        # annotate end labels
         text_planned = ["" for _ in months]
         text_actual = ["" for _ in months]
         if len(months) > 0:
@@ -5082,8 +5110,18 @@ def main():
             x=months, y=actual, mode='lines+markers+text', text=text_actual,
             textposition='middle right', name='Réel', line=dict(color='green')
         ))
-        # Reduce trend chart size by half and hide legend; annotate series labels on lines
-        fig_trend.update_layout(title='Tendance de consommation (Jan - Déc)', yaxis_title='Montant (DH)', height=160, showlegend=False)
+        # Make trend chart taller to show variation and hide legend
+        try:
+            ymin = float(min(np.min(planned), np.min(actual)))
+            ymax = float(max(np.max(planned), np.max(actual)))
+            pad = max(1.0, (ymax - ymin) * 0.05)
+            y_range = [ymin - pad, ymax + pad] if ymax > ymin else None
+        except Exception:
+            y_range = None
+        layout_kwargs = {'title': 'Tendance de consommation (Jan - Déc)', 'yaxis_title': 'Montant (DH)', 'height': 420, 'showlegend': False}
+        if y_range is not None:
+            layout_kwargs['yaxis'] = dict(range=y_range)
+        fig_trend.update_layout(**layout_kwargs)
         fig_trend = apply_title_style(fig_trend)
 
         # Barres consommation par direction
@@ -5130,7 +5168,7 @@ def main():
 
         # Increase bar chart size slightly
         fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'% consommation', 'y':''}, text=[f"{p}%" for p in perc], height=520)
-        fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=16)))
+        fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=16)), showlegend=False)
         fig_bar = apply_title_style(fig_bar)
 
         with col_left:
