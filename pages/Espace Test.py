@@ -4953,30 +4953,84 @@ def main():
         statut_global = "--"
 
         if df_budget is not None and isinstance(df_budget, pd.DataFrame) and len(df_budget) > 0:
-            # Chercher colonnes pertinentes
-            # Budget engagé: somme de la première colonne numérique
-            num_cols = [c for c in df_budget.columns if pd.api.types.is_numeric_dtype(df_budget[c])]
-            if num_cols:
+            # Préparer et nettoyer les colonnes pour la détection automatique des KPI
+            dfb = df_budget.copy()
+            for c in dfb.columns:
                 try:
-                    budget_engage = int(df_budget[num_cols[0]].sum())
+                    dfb[c] = pd.to_numeric(
+                        dfb[c].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."),
+                        errors='coerce'
+                    )
+                except Exception:
+                    pass
+
+            # Fonctions utilitaires de recherche de colonne par motifs
+            def find_col(patterns):
+                for p in patterns:
+                    for c in dfb.columns:
+                        try:
+                            if re.search(p, str(c), re.I):
+                                return c
+                        except Exception:
+                            continue
+                return None
+
+            # Détecter budget annuel
+            budget_annuel_total = None
+            col_budget_total = find_col([r'budget.*ann', r'annuel', r'budget.*total', r'total.*budget', r'budget'])
+            if col_budget_total is not None:
+                vals = dfb[col_budget_total].dropna()
+                if len(vals) == 1:
+                    try:
+                        budget_annuel_total = float(vals.iloc[0])
+                    except Exception:
+                        budget_annuel_total = None
+                elif len(vals) > 1:
+                    try:
+                        budget_annuel_total = float(vals.sum())
+                    except Exception:
+                        budget_annuel_total = None
+
+            # Détecter budget engagé / consommation
+            budget_engage = None
+            col_engage = find_col([r'engag', r'consomm', r'depens', r'montant'])
+            if col_engage is not None:
+                try:
+                    budget_engage = int(dfb[col_engage].dropna().sum())
                 except Exception:
                     budget_engage = None
-
-            for cand in ['Budget Annuel', 'budget_annuel', 'Budget', 'budget_total', 'budget']:
-                if cand in df_budget.columns:
+            else:
+                # fallback: première colonne numérique non vide
+                numeric_cols = [c for c in dfb.columns if pd.api.types.is_numeric_dtype(dfb[c])]
+                if numeric_cols:
                     try:
-                        budget_annuel_total = int(pd.to_numeric(df_budget[cand], errors='coerce').dropna().iloc[0])
-                        break
+                        budget_engage = int(dfb[numeric_cols[0]].dropna().sum())
                     except Exception:
-                        pass
+                        budget_engage = None
 
-            if budget_annuel_total and budget_engage:
-                try:
-                    taux_consommation = 100.0 * float(budget_engage) / float(budget_annuel_total)
-                except Exception:
+            # Calcul du taux
+            try:
+                if budget_annuel_total and budget_engage is not None and float(budget_annuel_total) > 0:
+                    taux_consommation = (budget_engage / float(budget_annuel_total)) * 100
+                else:
                     taux_consommation = None
+            except Exception:
+                taux_consommation = None
 
-            statut_global = "CONFORME" if (taux_consommation is None or (taux_consommation < 80)) else "A/R"
+            # Statut global
+            if taux_consommation is not None:
+                statut_global = "CONFORME" if taux_consommation <= 100 else "DÉPASSÉ"
+            else:
+                statut_global = "--"
+
+            # Nombre de recrutements clos (heuristique)
+            nb_recrutements_clos = None
+            col_statut = find_col([r'statut', r'clos', r'pourvu', r'recrut'])
+            if col_statut is not None:
+                try:
+                    nb_recrutements_clos = int(dfb[col_statut].astype(str).str.contains(r'clos|pourvu|réalisé|terminé', case=False, na=False).sum())
+                except Exception:
+                    nb_recrutements_clos = None
 
         metrics = [
             ("Budget Annuel Total", f"{budget_annuel_total:,.0f} DH" if budget_annuel_total else "-", "#1f77b4"),
