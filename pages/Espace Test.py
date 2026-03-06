@@ -4938,6 +4938,9 @@ def main():
     with tabs[1]:
         st.header("📈 Pilotage budgétaire")
 
+        # Ensure df_detail exists to avoid UnboundLocalError on later checks
+        df_detail = pd.DataFrame()
+
         # Récupérer les données de pilotage synchronisées (remplies depuis l'onglet Upload)
         synced = st.session_state.get('synced_budget_df')
         local = st.session_state.get('local_budget_df')
