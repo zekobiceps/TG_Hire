@@ -4755,16 +4755,7 @@ def main():
             key='reporting_date',
             format='DD/MM/YYYY'
         )
-        # Small hover-help icon next to the date picker (shows text when hovering)
-        try:
-            c1, c2 = st.columns([9,1])
-            with c2:
-                st.markdown(
-                    "<div style='text-align:center; margin-top:6px'><span title=\"Choisissez la date de reporting hebdomadaire. La date sert de référence pour tous les calculs et filtres du dashboard.\">ℹ️</span></div>",
-                    unsafe_allow_html=True,
-                )
-        except Exception:
-            pass
+        # (helper icon removed per user request)
     
     # Créer les onglets (Demandes et Recrutement regroupés)
     # CSS pour agrandir le texte des onglets
@@ -5059,83 +5050,71 @@ def main():
             ("Statut budgétaire global", statut_global, "#2ca02c"),
         ]
         st.markdown(render_generic_metrics(metrics), unsafe_allow_html=True)
-        # Helper expliquant le calcul du statut budgétaire
-        try:
-            st.markdown("<div style='font-size:12px;color:#666;margin-top:6px'>ℹ️ Statut calculé comme : taux = (Budget engagé / Budget annuel total) × 100. "
-                        "CONFORME si taux ≤ 100%, DÉPASSÉ si taux > 100%.</div>", unsafe_allow_html=True)
-        except Exception:
-            pass
+        # Helper removed by user request
 
         # Graphiques de tendance et consommation par direction
         col_left, col_right = st.columns([2,1])
 
-        # Tendance de consommation : utiliser les colonnes 'Budget Net' (Prévu) et 'Salaire net négocié' (Réel) depuis df_budget
-        months = pd.date_range(start="2026-01-01", periods=12, freq='MS').strftime('%b')
-        planned = np.zeros(12)
-        actual = np.zeros(12)
-        # Try to build series from df_budget when possible
+        # Graphique de Productivité du Budget (Efficacité) demandé par l'utilisateur
+        # X : Directions (issues de df_budget)
+        # Barre 1 : Coût moyen prévu par poste = (Budget Net par direction) / (nombre de postes dans cette direction)
+        # Barre 2 : Coût moyen réel constaté = (Salaire net négocié par direction) / (nombre de postes dans cette direction)
+        prod_rows = []
         try:
-            if df_budget is not None and isinstance(df_budget, pd.DataFrame):
-                # prefer columns named exactly
-                if 'Budget Net' in df_budget.columns and 'Salaire net négocié' in df_budget.columns:
-                    df_tmp = df_budget.copy()
-                    # try to find a month/date column
-                    date_col = None
-                    for c in df_tmp.columns:
-                        if re.search(r'mois|date', str(c), re.I):
-                            date_col = c
-                            break
-                    if date_col is not None:
+            if df_budget is not None and isinstance(df_budget, pd.DataFrame) and 'Direction concernée' in df_budget.columns:
+                # create normalized keys for matching
+                df_budget['_dir_norm'] = df_budget['Direction concernée'].astype(str).apply(_normalize_text)
+                if 'df_recrutement' in locals() and df_recrutement is not None and 'Direction concernée' in df_recrutement.columns:
+                    df_recrutement['_dir_norm'] = df_recrutement['Direction concernée'].astype(str).apply(_normalize_text)
+
+                unique_dirs = sorted(df_budget['Direction concernée'].dropna().unique())
+                for d in unique_dirs:
+                    dir_norm = _normalize_text(d)
+                    # number of posts from recrutement matching normalized direction
+                    n_posts = 0
+                    if 'df_recrutement' in locals() and df_recrutement is not None and '_dir_norm' in df_recrutement.columns:
                         try:
-                            df_tmp[date_col] = pd.to_datetime(df_tmp[date_col], errors='coerce')
-                            df_tmp['month'] = df_tmp[date_col].dt.month
-                            by_month = df_tmp.groupby('month').agg({'Budget Net': 'sum', 'Salaire net négocié': 'sum'}).reindex(range(1,13), fill_value=0)
-                            months = pd.date_range(start="2026-01-01", periods=12, freq='MS').strftime('%b')
-                            planned = by_month['Budget Net'].fillna(0).values
-                            actual = by_month['Salaire net négocié'].fillna(0).values
+                            n_posts = int(df_recrutement[df_recrutement['_dir_norm'] == dir_norm].shape[0])
                         except Exception:
-                            pass
-                    else:
-                        # if there are 12 rows assume they are ordered months
-                        if len(df_tmp) >= 12:
-                            planned = pd.to_numeric(df_tmp['Budget Net'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).values[:12]
-                            actual = pd.to_numeric(df_tmp['Salaire net négocié'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).values[:12]
-        except Exception:
-            # leave synthetic zeros
-            pass
+                            n_posts = 0
 
-        fig_trend = go.Figure()
-        # annotate end labels
-        text_planned = ["" for _ in months]
-        text_actual = ["" for _ in months]
-        if len(months) > 0:
-            text_planned[-1] = 'Prévu'
-            text_actual[-1] = 'Réel'
+                    # budget prévu (Budget Net) for this direction
+                    try:
+                        if 'Budget Net' in df_budget.columns:
+                            budget_prevue_dir = pd.to_numeric(df_budget[df_budget['_dir_norm'] == dir_norm]['Budget Net'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
+                        else:
+                            budget_prevue_dir = 0
+                    except Exception:
+                        budget_prevue_dir = 0
 
-        fig_trend.add_trace(go.Scatter(
-            x=months, y=planned, mode='lines+markers+text', text=text_planned,
-            textposition='middle right', name='Prévu', line=dict(dash='dash', color='royalblue')
-        ))
-        fig_trend.add_trace(go.Scatter(
-            x=months, y=actual, mode='lines+markers+text', text=text_actual,
-            textposition='middle right', name='Réel', line=dict(color='green')
-        ))
-        # Make trend chart taller to show variation and hide legend
-        try:
-            arr_planned = np.asarray(planned, dtype=float)
-            arr_actual = np.asarray(actual, dtype=float)
-            combined = np.concatenate([arr_planned, arr_actual]) if (len(arr_planned) + len(arr_actual)) > 0 else np.array([0.0])
-            ymin = float(np.nanmin(combined))
-            ymax = float(np.nanmax(combined))
-            pad = max(1.0, (ymax - ymin) * 0.05)
-            y_range = [ymin - pad, ymax + pad] if ymax > ymin else None
+                    # budget engagé (Salaire net négocié) for this direction
+                    try:
+                        if 'Salaire net négocié' in df_budget.columns:
+                            budget_engage_dir = pd.to_numeric(df_budget[df_budget['_dir_norm'] == dir_norm]['Salaire net négocié'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
+                        else:
+                            # fallback to recrutement column if available
+                            budget_engage_dir = 0
+                            if 'df_recrutement' in locals() and df_recrutement is not None:
+                                cols_r = [c for c in df_recrutement.columns if re.search(r'salaire net négocié|salaire|montant', str(c), re.I)]
+                                if cols_r:
+                                    budget_engage_dir = pd.to_numeric(df_recrutement[df_recrutement['_dir_norm'] == dir_norm][cols_r[0]].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
+                    except Exception:
+                        budget_engage_dir = 0
+
+                    cost_prevu = float(budget_prevue_dir) / n_posts if n_posts > 0 else 0.0
+                    cost_reel = float(budget_engage_dir) / n_posts if n_posts > 0 else 0.0
+                    prod_rows.append({'Direction': d, 'Coût moyen prévu': cost_prevu, 'Coût moyen réel': cost_reel})
         except Exception:
-            y_range = None
-        layout_kwargs = {'title': 'Tendance de consommation (Jan - Déc)', 'yaxis_title': 'Montant (DH)', 'height': 420, 'showlegend': False}
-        if y_range is not None:
-            layout_kwargs['yaxis'] = dict(range=y_range)
-        fig_trend.update_layout(**layout_kwargs)
-        fig_trend = apply_title_style(fig_trend)
+            prod_rows = []
+
+        if prod_rows:
+            df_prod = pd.DataFrame(prod_rows)
+        else:
+            df_prod = pd.DataFrame({'Direction': ['Direction RH', 'Pôle Admin & Fin.'], 'Coût moyen prévu': [0,0], 'Coût moyen réel':[0,0]})
+
+        fig_prod = px.bar(df_prod, x='Direction', y=['Coût moyen prévu', 'Coût moyen réel'], barmode='group', labels={'value':'Montant (DH)'}, height=420)
+        fig_prod.update_layout(title='Productivité du Budget (coût moyen par poste)', xaxis_tickangle=-45)
+        fig_prod = apply_title_style(fig_prod)
 
         # Barres consommation par direction
         # Source pour l'agrégation : utiliser uniquement le fichier Pilotage (`df_budget`) qui contient les directions attendues
@@ -5185,7 +5164,7 @@ def main():
         fig_bar = apply_title_style(fig_bar)
 
         with col_left:
-            st.plotly_chart(fig_trend, use_container_width=True)
+            st.plotly_chart(fig_prod, use_container_width=True)
         with col_right:
             st.plotly_chart(fig_bar, use_container_width=True)
 
@@ -5199,69 +5178,93 @@ def main():
         detail_rows = []
         # Preferer les directions provenant du Pilotage budgétaire
         if df_budget is not None and isinstance(df_budget, pd.DataFrame) and 'Direction concernée' in df_budget.columns:
+            # normalize pilotage directions
+            df_budget['_dir_norm'] = df_budget['Direction concernée'].astype(str).apply(_normalize_text)
             dirs_list = sorted(df_budget['Direction concernée'].dropna().unique())
-            # Precompute recruitment closure flags if recrutement df exists
-            recr_exists = 'df_recrutement' in locals() and df_recrutement is not None and 'Direction concernée' in df_recrutement.columns
+
+            # Identify recruitment columns (direction + statut)
+            recr_exists = 'df_recrutement' in locals() and df_recrutement is not None
+            dir_col_r = None
+            status_col_r = None
             if recr_exists:
-                dfr = df_recrutement.copy()
-                dfr['is_closed'] = dfr['Statut de la demande'].astype(str).str.contains(r'clos|pourvu|réalisé|terminé', case=False, na=False)
+                # try find direction column in recruitment table
+                for c in df_recrutement.columns:
+                    if re.search(r'direction', str(c), re.I):
+                        dir_col_r = c
+                        break
+                # try find statut recrutement column (prefer explicit name)
+                for c in df_recrutement.columns:
+                    if re.search(r'statut\s*recrut|statut', str(c), re.I):
+                        status_col_r = c
+                        break
+                # create normalized dir key in recrutement df for matching
+                if dir_col_r is not None:
+                    dfr = df_recrutement.copy()
+                    dfr['_dir_norm'] = dfr[dir_col_r].astype(str).apply(_normalize_text)
+                else:
+                    dfr = df_recrutement.copy()
+                    dfr['_dir_norm'] = dfr['Direction concernée'].astype(str).apply(_normalize_text) if 'Direction concernée' in dfr.columns else dfr.iloc[:,0].astype(str).apply(_normalize_text)
 
             for d in dirs_list:
+                dir_norm = _normalize_text(d)
+                # count posts and closed posts from recruitment using normalized matching
                 if recr_exists:
-                    group = dfr[dfr['Direction concernée'] == d]
-                    total = len(group)
-                    closed = int(group['is_closed'].sum())
-                    clos_str = f"{closed} / {total}"
+                    try:
+                        group = dfr[dfr['_dir_norm'] == dir_norm]
+                        total = int(group.shape[0])
+                        if status_col_r is not None:
+                            closed = int(group[status_col_r].astype(str).str.contains(r'clôtur|clotur|clos|pourvu|réalisé|terminé', case=False, na=False).sum())
+                        else:
+                            # fallback using a broad statut column if present
+                            match_col = next((c for c in dfr.columns if re.search(r'statut', str(c), re.I)), None)
+                            if match_col is not None:
+                                closed = int(group[match_col].astype(str).str.contains(r'clôtur|clotur|clos|pourvu|réalisé|terminé', case=False, na=False).sum())
+                            else:
+                                closed = 0
+                        clos_str = f"{closed} / {total}"
+                    except Exception:
+                        clos_str = "0 / 0"
+                        total = 0
                 else:
                     clos_str = "0 / 0"
+                    total = 0
 
-                # Budget prévue: attempt to sum a 'prévu' column if exists in df_budget
-                budget_prevue = None
+                # Budget prévue: use 'Budget Net' from df_budget for the direction
                 try:
-                    cols_prevu = [c for c in df_budget.columns if re.search(r'prévu|prevision|prévision|prevision|prevu', str(c), re.I)]
-                    if cols_prevu:
-                        budget_prevue = pd.to_numeric(
-                            df_budget[df_budget['Direction concernée'] == d][cols_prevu[0]].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."),
-                            errors='coerce'
-                        ).fillna(0).sum()
+                    if 'Budget Net' in df_budget.columns:
+                        budget_prevue = pd.to_numeric(df_budget[df_budget['_dir_norm'] == dir_norm]['Budget Net'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
+                    else:
+                        budget_prevue = 0
                 except Exception:
-                    budget_prevue = None
+                    budget_prevue = 0
 
-                # Budget engagé: sum of engaged-like column from df_budget first
-                budget_engaged_dir = 0
+                # Budget engagé: prefer 'Salaire net négocié' from df_budget, else fallback to recrutement
                 try:
-                    eng_cols = [c for c in df_budget.columns if re.search(r'engag|montant|depens|consomm', str(c), re.I)]
-                    if eng_cols:
-                        budget_engaged_dir = pd.to_numeric(
-                            df_budget[df_budget['Direction concernée'] == d][eng_cols[0]].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."),
-                            errors='coerce'
-                        ).fillna(0).sum()
+                    if 'Salaire net négocié' in df_budget.columns:
+                        budget_engaged_dir = pd.to_numeric(df_budget[df_budget['_dir_norm'] == dir_norm]['Salaire net négocié'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
+                    else:
+                        budget_engaged_dir = 0
                 except Exception:
                     budget_engaged_dir = 0
 
-                # If no engaged value found in pilotage, try to fallback on recruitment group if present
-                if (not budget_engaged_dir) and ('df_recrutement' in locals() and df_recrutement is not None):
+                if (not budget_engaged_dir) and recr_exists:
                     try:
-                        eng_cols_r = [c for c in df_recrutement.columns if re.search(r'engag|montant|depens|budget', str(c), re.I)]
-                        if eng_cols_r:
-                            budget_engaged_dir = pd.to_numeric(
-                                df_recrutement[df_recrutement['Direction concernée'] == d][eng_cols_r[0]].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."),
-                                errors='coerce'
-                            ).fillna(0).sum()
+                        cols_r = [c for c in dfr.columns if re.search(r'salaire net négocié|salaire|montant', str(c), re.I)]
+                        if cols_r:
+                            budget_engaged_dir = pd.to_numeric(group[cols_r[0]].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
                     except Exception:
                         budget_engaged_dir = 0
 
                 slipping = None
-                if budget_prevue is not None:
-                    try:
-                        slipping = float(budget_prevue) - float(budget_engaged_dir)
-                    except Exception:
-                        slipping = None
+                try:
+                    slipping = float(budget_prevue) - float(budget_engaged_dir)
+                except Exception:
+                    slipping = 0
 
                 detail_rows.append({
                     'Direction': d,
                     'Clos': clos_str,
-                    'Budget prévue (DH)': budget_prevue if budget_prevue is not None else 0,
+                    'Budget prévue (DH)': budget_prevue if pd.notna(budget_prevue) else 0,
                     'Budget engagé (DH)': int(budget_engaged_dir) if pd.notna(budget_engaged_dir) else 0,
                     'slipping (écart)': slipping if slipping is not None else 0
                 })
