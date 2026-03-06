@@ -4907,11 +4907,13 @@ def main():
         st.markdown("---")
         if st.button("🔄 Actualiser les Graphiques", type="primary", width="stretch"):
             # If the user uploaded Excel files in this session, prefer them as the source
-            if st.session_state.get('local_recrutement_df') is not None:
-                st.session_state.synced_recrutement_df = st.session_state.local_recrutement_df.copy()
-            if st.session_state.get('local_budget_df') is not None:
+            tmp_recr = st.session_state.get('local_recrutement_df')
+            if tmp_recr is not None:
+                st.session_state.synced_recrutement_df = tmp_recr.copy()
+            tmp_budget = st.session_state.get('local_budget_df')
+            if tmp_budget is not None:
                 # Mirror local pilotage upload into the synced_budget slot so Pilotage tab reads it
-                st.session_state.synced_budget_df = st.session_state.local_budget_df.copy()
+                st.session_state.synced_budget_df = tmp_budget.copy()
             # Toggle update flag used by Pilotage tab to recompute charts
             st.session_state.data_updated = True
             st.success("Données mises à jour ! Consultez les autres onglets.")
@@ -5114,6 +5116,15 @@ def main():
             dirs = ["Direction RH", "Pôle Admin & Fin.", "Encadrement Chantier", "Direction SI", "Autres"]
             perc = [30, 25, 18, 8, 5]
 
+        # Sort by percentage descending for clearer visualization
+        try:
+            df_bar = pd.DataFrame({'dir': dirs, 'pct': perc})
+            df_bar = df_bar.sort_values('pct', ascending=False)
+            dirs = df_bar['dir'].tolist()
+            perc = df_bar['pct'].tolist()
+        except Exception:
+            pass
+
         # Increase bar chart size slightly
         fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'% consommation', 'y':''}, text=[f"{p}%" for p in perc], height=520)
         fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=16)))
@@ -5192,19 +5203,20 @@ def main():
                 { 'Direction': 'Pôle Admin & Fin.', 'Clos': '2 / 4', 'Budget prévue (DH)': 300_000, 'Budget engagé (DH)': 310_000, 'slipping (écart)': -10_000 },
             ]
 
-        df_detail = pd.DataFrame(detail_rows)
-        # Ajouter une ligne Totaux pour les colonnes numériques
-        if not df_detail.empty:
-            total_prevue = df_detail['Budget prévue (DH)'].replace('', 0).fillna(0).astype(float).sum()
-            total_engage = df_detail['Budget engagé (DH)'].replace('', 0).fillna(0).astype(float).sum()
-            total_slip = df_detail['slipping (écart)'].replace('', 0).fillna(0).astype(float).sum()
-            df_detail = df_detail.append({
-                'Direction': 'TOTAL',
-                'Clos': '',
-                'Budget prévue (DH)': total_prevue,
-                'Budget engagé (DH)': int(total_engage),
-                'slipping (écart)': total_slip
-            }, ignore_index=True)
+            df_detail = pd.DataFrame(detail_rows)
+            # Ajouter une ligne Totaux pour les colonnes numériques
+            if not df_detail.empty:
+                total_prevue = df_detail['Budget prévue (DH)'].replace('', 0).fillna(0).astype(float).sum()
+                total_engage = df_detail['Budget engagé (DH)'].replace('', 0).fillna(0).astype(float).sum()
+                total_slip = df_detail['slipping (écart)'].replace('', 0).fillna(0).astype(float).sum()
+                totals_row = pd.DataFrame([{
+                    'Direction': 'TOTAL',
+                    'Clos': '',
+                    'Budget prévue (DH)': total_prevue,
+                    'Budget engagé (DH)': int(total_engage),
+                    'slipping (écart)': total_slip
+                }])
+                df_detail = pd.concat([df_detail, totals_row], ignore_index=True)
         if 'Budget prévue (DH)' in df_detail.columns:
             df_detail['Budget prévue (DH)'] = df_detail['Budget prévue (DH)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
         if 'Budget engagé (DH)' in df_detail.columns:
