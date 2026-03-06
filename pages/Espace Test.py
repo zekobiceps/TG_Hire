@@ -4803,45 +4803,72 @@ def main():
             
             if 'synced_recrutement_df' not in st.session_state:
                 st.session_state.synced_recrutement_df = None
-            
-            if st.button("🔁 Synchroniser depuis Google Sheets", 
-                        help="Synchroniser les données depuis Google Sheets",
+            if 'synced_budget_df' not in st.session_state:
+                st.session_state.synced_budget_df = None
+            if 'local_budget_df' not in st.session_state:
+                st.session_state.local_budget_df = None
+
+            # Input pour la feuille Pilotage budgétaire (sera synchronisée avec le même bouton)
+            default_budget_sheet = "https://docs.google.com/spreadsheets/d/1a3_SuZ5udezO-pJNjD1a5ugE1e_NeKuO/edit?gid=2071824040#gid=2071824040"
+            gs_budget_url_input = st.text_input("URL Google Sheet - Pilotage budgétaire (optionnel)", value=default_budget_sheet, key="gsheet_budget_url_upload")
+
+            if st.button("🔁 Synchroniser depuis Google Sheets (Recrutement + Pilotage)", 
+                        help="Synchroniser les deux feuilles Google Sheets (recrutement et pilotage)",
                         width="stretch"):
-                
+                any_success = False
+                # Recrutement
                 try:
-                    # Utiliser la fonction de connexion automatique (comme dans Home.py)
                     df_synced = load_data_from_google_sheets(gs_url)
-                    
                     if df_synced is not None and len(df_synced) > 0:
                         st.session_state.synced_recrutement_df = df_synced
-                        st.session_state.data_updated = True
-                        nb_lignes = len(df_synced)
-                        nb_colonnes = len(df_synced.columns)
-                        st.success(f"✅ Synchronisation Google Sheets réussie ! Les onglets ont été mis à jour. ({nb_lignes} lignes, {nb_colonnes} colonnes)")
+                        any_success = True
+                        st.success(f"✅ Synchronisation Recrutement réussie ({len(df_synced)} lignes, {len(df_synced.columns)} colonnes)")
                     else:
-                        st.warning("⚠️ Aucune donnée trouvée dans la feuille Google Sheets.")
-                        
+                        st.warning("⚠️ Aucune donnée trouvée dans la feuille Recrutement.")
                 except Exception as e:
-                    err_str = str(e)
-                    st.error(f"Erreur lors de la synchronisation: {err_str}")
-                    
-                    if '401' in err_str or 'Unauthorized' in err_str or 'HTTP Error 401' in err_str:
-                        st.error("❌ **Feuille Google privée** - Vérifiez que:")
-                        st.markdown("""
-                        1. La feuille est partagée avec: `your-service-account@your-project.iam.gserviceaccount.com`
-                        2. Les secrets Streamlit sont correctement configurés
-                        3. L'URL de la feuille est correcte
-                        """)
-                    elif 'secrets' in err_str.lower():
-                        st.error("❌ **Configuration des secrets manquante**")
-                        st.markdown("""
-                        Assurez-vous que les secrets suivants sont configurés:
-                        - `GCP_TYPE`, `GCP_PROJECT_ID`, `GCP_PRIVATE_KEY_ID`
-                        - `GCP_PRIVATE_KEY`, `GCP_CLIENT_EMAIL`, `GCP_CLIENT_ID`
-                        - `GCP_AUTH_URI`, `GCP_TOKEN_URI`, etc.
-                        """)
+                    st.error(f"Erreur synchronisation Recrutement: {e}")
+
+                # Pilotage budgétaire
+                try:
+                    if gs_budget_url_input:
+                        df_budget = load_data_from_google_sheets(gs_budget_url_input)
+                        if df_budget is not None and len(df_budget) > 0:
+                            st.session_state.synced_budget_df = df_budget
+                            any_success = True
+                            st.success(f"✅ Synchronisation Pilotage réussie ({len(df_budget)} lignes, {len(df_budget.columns)} colonnes)")
+                        else:
+                            st.warning("⚠️ Aucune donnée trouvée dans la feuille Pilotage.")
+                except Exception as e:
+                    st.error(f"Erreur synchronisation Pilotage: {e}")
+
+                # Forcer recalcul et rerun pour mettre à jour les graphiques
+                if any_success:
+                    st.session_state.data_updated = True
+
+            # Option pour charger le fichier local de pilotage/recrutement
+            st.markdown("---")
+            if st.button("📂 Charger fichier local Recrutement 2026.xlsx", key="load_local_budget_upload"):
+                try:
+                    local_path = "/workspaces/TG_Hire/Recrutement 2026.xlsx"
+                    if os.path.exists(local_path):
+                        df_local_budget = pd.read_excel(local_path, sheet_name=0)
+                        st.session_state.local_budget_df = df_local_budget
+                        st.success(f"✅ Fichier local chargé: {os.path.basename(local_path)} ({len(df_local_budget)} lignes)")
                     else:
-                        st.error(f"Erreur technique: {err_str}")
+                        st.error("Fichier local introuvable: /workspaces/TG_Hire/Recrutement 2026.xlsx")
+                except Exception as e:
+                    st.error(f"Erreur lecture Excel local: {e}")
+
+            # Afficher les tables synchronisées dans des expanders (affiché / caché)
+            if st.session_state.get('synced_recrutement_df') is not None:
+                with st.expander("📋 Données Recrutement (Google Sheets) - afficher / cacher", expanded=False):
+                    st.dataframe(st.session_state.synced_recrutement_df)
+            if st.session_state.get('synced_budget_df') is not None:
+                with st.expander("📋 Données Pilotage Budgétaire (Google Sheets) - afficher / cacher", expanded=False):
+                    st.dataframe(st.session_state.synced_budget_df)
+            if st.session_state.get('local_budget_df') is not None:
+                with st.expander("📋 Données Pilotage Budgétaire (Fichier local) - afficher / cacher", expanded=False):
+                    st.dataframe(st.session_state.local_budget_df)
 
         with col2:
             st.subheader("📊 Fichier Excel - Données de Recrutement")
@@ -4888,37 +4915,45 @@ def main():
     with tabs[1]:
         st.header("📈 Pilotage budgétaire")
 
-        # Options de synchronisation spécifiques au pilotage
-        col_sync1, col_sync2 = st.columns([2,1])
-        with col_sync1:
-            default_budget_sheet = "https://docs.google.com/spreadsheets/d/1a3_SuZ5udezO-pJNjD1a5ugE1e_NeKuO/edit?gid=2071824040#gid=2071824040"
-            gs_budget_url = st.text_input("URL Google Sheet - Pilotage budgétaire", value=default_budget_sheet, key="gsheet_budget_url")
-            if st.button("🔁 Synchroniser Pilotage depuis Google Sheets", key="sync_budget_gs"):
-                try:
-                    df_budget = load_data_from_google_sheets(gs_budget_url)
-                    st.success(f"✅ Synchronisation réussie: {len(df_budget)} lignes")
-                    st.dataframe(df_budget.head(5))
-                except Exception as e:
-                    st.error(f"Erreur lors de la synchronisation: {e}")
+        # Récupérer les données de pilotage synchronisées (remplies depuis l'onglet Upload)
+        df_budget = st.session_state.get('synced_budget_df') or st.session_state.get('local_budget_df')
 
-        with col_sync2:
-            if st.button("📂 Charger fichier local Recrutement 2026.xlsx", key="load_local_budget"):
-                try:
-                    local_path = "/workspaces/TG_Hire/Recrutement 2026.xlsx"
-                    if os.path.exists(local_path):
-                        df_local_budget = pd.read_excel(local_path, sheet_name=0)
-                        st.success(f"✅ Fichier local chargé: {os.path.basename(local_path)} ({len(df_local_budget)} lignes)")
-                        st.dataframe(df_local_budget.head(4))
-                    else:
-                        st.error("Fichier local introuvable: /workspaces/TG_Hire/Recrutement 2026.xlsx")
-                except Exception as e:
-                    st.error(f"Erreur lecture Excel local: {e}")
+        # KPI cards (haut) - valeurs dynamiques si df_budget fourni
+        budget_annuel_total = None
+        budget_engage = None
+        taux_consommation = None
+        statut_global = "--"
 
-        # KPI cards (haut)
+        if df_budget is not None and isinstance(df_budget, pd.DataFrame) and len(df_budget) > 0:
+            # Chercher colonnes pertinentes
+            # Budget engagé: somme de la première colonne numérique
+            num_cols = [c for c in df_budget.columns if pd.api.types.is_numeric_dtype(df_budget[c])]
+            if num_cols:
+                try:
+                    budget_engage = int(df_budget[num_cols[0]].sum())
+                except Exception:
+                    budget_engage = None
+
+            for cand in ['Budget Annuel', 'budget_annuel', 'Budget', 'budget_total', 'budget']:
+                if cand in df_budget.columns:
+                    try:
+                        budget_annuel_total = int(pd.to_numeric(df_budget[cand], errors='coerce').dropna().iloc[0])
+                        break
+                    except Exception:
+                        pass
+
+            if budget_annuel_total and budget_engage:
+                try:
+                    taux_consommation = 100.0 * float(budget_engage) / float(budget_annuel_total)
+                except Exception:
+                    taux_consommation = None
+
+            statut_global = "CONFORME" if (taux_consommation is None or (taux_consommation < 80)) else "A/R"
+
         metrics = [
-            ("Budget Annuel Total", f"{budget_annuel_total:,.0f} DH", "#1f77b4"),
-            ("Budget Actuellement Engagé", f"{budget_engage:,.0f} DH", "#2ca02c"),
-            ("Taux de consommation", f"{taux_consommation:.1f} %", "#172b4d"),
+            ("Budget Annuel Total", f"{budget_annuel_total:,.0f} DH" if budget_annuel_total else "-", "#1f77b4"),
+            ("Budget Actuellement Engagé", f"{budget_engage:,.0f} DH" if budget_engage else "-", "#2ca02c"),
+            ("Taux de consommation", f"{taux_consommation:.1f} %" if taux_consommation else "-", "#172b4d"),
             ("Statut budgétaire global", statut_global, "#2ca02c"),
         ]
         st.markdown(render_generic_metrics(metrics), unsafe_allow_html=True)
@@ -4959,15 +4994,25 @@ def main():
             {"Direction": "Direction RH", "Clos": "3 / 5", "Budget engagé (DH)": 160_000, "Écart (DH)": 0, "Commentaire": "En ligne avec le plan", "Pastille": "green"},
             {"Direction": "Autres (SI, Jur,...)", "Clos": "0 / 20", "Budget engagé (DH)": 0, "Écart (DH)": 0, "Commentaire": "Recrutements planifiés plus tard (S15-S20)", "Pastille": "grey"},
         ]
+        # Reprendre le style du tableau 'Besoins en Cours par Entité'
         df_detail = pd.DataFrame(table_rows)
-        # Formattage monétaire
         df_detail["Budget engagé (DH)"] = df_detail["Budget engagé (DH)"].apply(lambda v: f"{v:,.0f} DH")
         df_detail["Écart (DH)"] = df_detail["Écart (DH)"].apply(lambda v: f"{v:+,d} DH")
-        st.table(df_detail.drop(columns=['Pastille']))
 
-        # Total synthèse
-        st.markdown("---")
-        st.markdown("**TOTAL (Semaine 12)** : Sur 105 postes budgétés, 13 sont clos pour un montant total de 1 950 000 DH (écart global favorable de -7 KDH). Situation : **globale saine**.")
+        st.markdown("""
+        <style>
+        .custom-table-small {border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05);}
+        .custom-table-small th {background:#9C182F;color:white;padding:8px;text-align:left}
+        .custom-table-small td {padding:8px;border-bottom:1px solid #eee}
+        .custom-table-small .comment {font-size:0.95em;color:#444}
+        </style>
+        """, unsafe_allow_html=True)
+
+        html = '<table class="custom-table-small"><thead><tr><th>Direction</th><th>Clos</th><th>Budget engagé</th><th>Écart</th><th>Commentaire</th></tr></thead><tbody>'
+        for r in table_rows:
+            html += f"<tr><td style='font-weight:600'>{r['Direction']}</td><td>{r['Clos']}</td><td>{r['Budget engagé (DH)']:,}</td><td>{r['Écart (DH)']:,}</td><td class='comment'>{r['Commentaire']}</td></tr>"
+        html += '</tbody></table>'
+        st.markdown(html, unsafe_allow_html=True)
     
     # Continuer l'onglet Upload avec la section PowerPoint
     with tabs[0]:
