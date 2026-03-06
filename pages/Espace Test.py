@@ -4963,10 +4963,16 @@ def main():
 
         # Données synthétiques pour la courbe Jan-Dec
         months = pd.date_range(start="2026-01-01", periods=12, freq='MS').strftime('%b')
-        planned = np.linspace(0, budget_annuel_total, 12)
-        # dépenses réelles = un peu en dessous jusqu'à mars
-        actual = planned * 0.95
-        actual[3:] = planned[3:] * 0.98
+        # Guarder contre budget_annuel_total == None
+        if budget_annuel_total is not None and isinstance(budget_annuel_total, (int, float)):
+            planned = np.linspace(0, budget_annuel_total, 12)
+            # dépenses réelles = un peu en dessous jusqu'à mars
+            actual = planned * 0.95
+            actual[3:] = planned[3:] * 0.98
+        else:
+            # Pas de données : séries vides (zéros) et annotation gérée plus bas
+            planned = np.zeros(12)
+            actual = np.zeros(12)
 
         fig_trend = go.Figure()
         fig_trend.add_trace(go.Scatter(x=months, y=planned, mode='lines+markers', name='Prévu', line=dict(dash='dash', color='royalblue')))
