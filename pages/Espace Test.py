@@ -4845,20 +4845,8 @@ def main():
                 if any_success:
                     st.session_state.data_updated = True
 
-            # Option pour charger le fichier local de pilotage/recrutement
+            # (Removed) local file loader: we now use the two Excel uploaders above
             st.markdown("---")
-            if st.button("📂 Charger fichier local Recrutement 2026.xlsx", key="load_local_budget_upload"):
-                try:
-                    local_path = "/workspaces/TG_Hire/Recrutement 2026.xlsx"
-                    if os.path.exists(local_path):
-                        df_local_budget = pd.read_excel(local_path, sheet_name=0)
-                        # Store as local pilotage data (kept for backward compatibility)
-                        st.session_state.local_budget_df = df_local_budget
-                        st.success(f"✅ Fichier local chargé: {os.path.basename(local_path)} ({len(df_local_budget)} lignes)")
-                    else:
-                        st.error("Fichier local introuvable: /workspaces/TG_Hire/Recrutement 2026.xlsx")
-                except Exception as e:
-                    st.error(f"Erreur lecture Excel local: {e}")
 
             # Afficher les tables synchronisées dans des expanders (affiché / caché)
             if st.session_state.get('synced_recrutement_df') is not None:
@@ -4918,6 +4906,13 @@ def main():
         # Bouton pour actualiser les données - s'étale sur les deux colonnes
         st.markdown("---")
         if st.button("🔄 Actualiser les Graphiques", type="primary", width="stretch"):
+            # If the user uploaded Excel files in this session, prefer them as the source
+            if st.session_state.get('local_recrutement_df') is not None:
+                st.session_state.synced_recrutement_df = st.session_state.local_recrutement_df.copy()
+            if st.session_state.get('local_budget_df') is not None:
+                # Mirror local pilotage upload into the synced_budget slot so Pilotage tab reads it
+                st.session_state.synced_budget_df = st.session_state.local_budget_df.copy()
+            # Toggle update flag used by Pilotage tab to recompute charts
             st.session_state.data_updated = True
             st.success("Données mises à jour ! Consultez les autres onglets.")
     
@@ -5008,16 +5003,29 @@ def main():
             actual = np.zeros(12)
 
         fig_trend = go.Figure()
-        fig_trend.add_trace(go.Scatter(x=months, y=planned, mode='lines+markers', name='Prévu', line=dict(dash='dash', color='royalblue')))
-        fig_trend.add_trace(go.Scatter(x=months, y=actual, mode='lines+markers', name='Réel', line=dict(color='green')))
-        fig_trend.update_layout(title='Tendance de consommation (Jan - Déc)', yaxis_title='Montant (DH)')
+        # annotate only the last point with the series name to avoid a separate legend
+        text_planned = ["" for _ in months]
+        text_actual = ["" for _ in months]
+        if len(months) > 0:
+            text_planned[-1] = 'Prévu'
+            text_actual[-1] = 'Réel'
+
+        fig_trend.add_trace(go.Scatter(
+            x=months, y=planned, mode='lines+markers+text', text=text_planned,
+            textposition='middle right', name='Prévu', line=dict(dash='dash', color='royalblue')
+        ))
+        fig_trend.add_trace(go.Scatter(
+            x=months, y=actual, mode='lines+markers+text', text=text_actual,
+            textposition='middle right', name='Réel', line=dict(color='green')
+        ))
+        fig_trend.update_layout(title='Tendance de consommation (Jan - Déc)', yaxis_title='Montant (DH)', height=320, showlegend=False)
         fig_trend = apply_title_style(fig_trend)
 
         # Barres consommation par direction
         dirs = ["Direction RH", "Pôle Admin & Fin.", "Encadrement Chantier", "Direction SI", "Autres"]
         perc = [30, 25, 18, 8, 5]
         fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'% consommation', 'y':''}, text=[f"{p}%" for p in perc], height=400)
-        fig_bar.update_layout(title='Taux de consommation par direction')
+        fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=14)))
         fig_bar = apply_title_style(fig_bar)
 
         with col_left:
@@ -5028,10 +5036,10 @@ def main():
         # Tableau d'analyse détaillée (bas)
         st.subheader("Analyse détaillée par direction")
         table_rows = [
-            {"Direction": "Encadrement Chantier", "Clos": "8 / 76", "Budget engagé (DH)": 1_480_000, "Écart (DH)": -22_000, "Commentaire": "Retard de sourcing sur 2 CDP (retard à l'allumage)", "Pastille": "green"},
-            {"Direction": "Pôle Admin & Fin.", "Clos": "2 / 4", "Budget engagé (DH)": 310_000, "Écart (DH)": 15_000, "Commentaire": "Surcoût de 5 KDH sur le contrôleur de gestion", "Pastille": "yellow"},
-            {"Direction": "Direction RH", "Clos": "3 / 5", "Budget engagé (DH)": 160_000, "Écart (DH)": 0, "Commentaire": "En ligne avec le plan", "Pastille": "green"},
-            {"Direction": "Autres (SI, Jur,...)", "Clos": "0 / 20", "Budget engagé (DH)": 0, "Écart (DH)": 0, "Commentaire": "Recrutements planifiés plus tard (S15-S20)", "Pastille": "grey"},
+            {"Direction": "Encadrement Chantier", "Clos": "8 / 76", "Budget engagé (DH)": 1_480_000, "Écart (DH)": -22_000, "Pastille": "green"},
+            {"Direction": "Pôle Admin & Fin.", "Clos": "2 / 4", "Budget engagé (DH)": 310_000, "Écart (DH)": 15_000, "Pastille": "yellow"},
+            {"Direction": "Direction RH", "Clos": "3 / 5", "Budget engagé (DH)": 160_000, "Écart (DH)": 0, "Pastille": "green"},
+            {"Direction": "Autres (SI, Jur,...)", "Clos": "0 / 20", "Budget engagé (DH)": 0, "Écart (DH)": 0, "Pastille": "grey"},
         ]
         # Reprendre le style du tableau 'Besoins en Cours par Entité'
         df_detail = pd.DataFrame(table_rows)
@@ -5042,14 +5050,14 @@ def main():
         <style>
         .custom-table-small {border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05);}
         .custom-table-small th {background:#9C182F;color:white;padding:8px;text-align:left}
-        .custom-table-small td {padding:8px;border-bottom:1px solid #eee}
-        .custom-table-small .comment {font-size:0.95em;color:#444}
+        .custom-table-small td {padding:8px;border-bottom:1px solid #eee; font-size:1.06em}
+        .custom-table-small .pastille {font-weight:700}
         </style>
         """, unsafe_allow_html=True)
 
-        html = '<table class="custom-table-small"><thead><tr><th>Direction</th><th>Clos</th><th>Budget engagé</th><th>Écart</th><th>Commentaire</th></tr></thead><tbody>'
+        html = '<table class="custom-table-small"><thead><tr><th>Direction</th><th>Clos</th><th>Budget engagé</th><th>Écart</th></tr></thead><tbody>'
         for r in table_rows:
-            html += f"<tr><td style='font-weight:600'>{r['Direction']}</td><td>{r['Clos']}</td><td>{r['Budget engagé (DH)']:,}</td><td>{r['Écart (DH)']:,}</td><td class='comment'>{r['Commentaire']}</td></tr>"
+            html += f"<tr><td style='font-weight:600'>{r['Direction']}</td><td>{r['Clos']}</td><td>{r['Budget engagé (DH)']:,}</td><td>{r['Écart (DH)']:,}</td></tr>"
         html += '</tbody></table>'
         st.markdown(html, unsafe_allow_html=True)
     
