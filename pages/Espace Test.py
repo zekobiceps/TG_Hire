@@ -4993,7 +4993,12 @@ def main():
 
             # Détecter budget engagé / consommation
             budget_engage = None
-            col_engage = find_col([r'engag', r'consomm', r'depens', r'montant'])
+            # Prefer explicit 'Salaire net négocié' if present
+            col_engage = None
+            if 'Salaire net négocié' in dfb.columns:
+                col_engage = 'Salaire net négocié'
+            if col_engage is None:
+                col_engage = find_col([r'engag', r'consomm', r'depens', r'montant', r'salaire'])
             if col_engage is not None:
                 try:
                     budget_engage = int(dfb[col_engage].dropna().sum())
@@ -5072,15 +5077,14 @@ def main():
             x=months, y=actual, mode='lines+markers+text', text=text_actual,
             textposition='middle right', name='Réel', line=dict(color='green')
         ))
-        fig_trend.update_layout(title='Tendance de consommation (Jan - Déc)', yaxis_title='Montant (DH)', height=320, showlegend=False)
+        # Reduce trend chart size by half and hide legend; annotate series labels on lines
+        fig_trend.update_layout(title='Tendance de consommation (Jan - Déc)', yaxis_title='Montant (DH)', height=160, showlegend=False)
         fig_trend = apply_title_style(fig_trend)
 
         # Barres consommation par direction
-        # Source pour l'agrégation : préférer df_recrutement s'il existe (colonne 'Direction concernée'), sinon df_budget
+        # Source pour l'agrégation : utiliser uniquement le fichier Pilotage (`df_budget`) qui contient les directions attendues
         df_dir_source = None
-        if 'df_recrutement' in locals() and df_recrutement is not None:
-            df_dir_source = df_recrutement
-        elif df_budget is not None and 'Direction concernée' in df_budget.columns:
+        if df_budget is not None and 'Direction concernée' in df_budget.columns:
             df_dir_source = df_budget
 
         dirs = []
@@ -5110,14 +5114,16 @@ def main():
             dirs = ["Direction RH", "Pôle Admin & Fin.", "Encadrement Chantier", "Direction SI", "Autres"]
             perc = [30, 25, 18, 8, 5]
 
-        fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'% consommation', 'y':''}, text=[f"{p}%" for p in perc], height=400)
-        fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=14)))
+        # Increase bar chart size slightly
+        fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'% consommation', 'y':''}, text=[f"{p}%" for p in perc], height=520)
+        fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=16)))
         fig_bar = apply_title_style(fig_bar)
 
         with col_left:
             st.plotly_chart(fig_trend, use_container_width=True)
         with col_right:
             st.plotly_chart(fig_bar, use_container_width=True)
+
 
         # Tableau d'analyse détaillée (bas)
         st.subheader("Analyse détaillée par direction")
@@ -5187,6 +5193,18 @@ def main():
             ]
 
         df_detail = pd.DataFrame(detail_rows)
+        # Ajouter une ligne Totaux pour les colonnes numériques
+        if not df_detail.empty:
+            total_prevue = df_detail['Budget prévue (DH)'].replace('', 0).fillna(0).astype(float).sum()
+            total_engage = df_detail['Budget engagé (DH)'].replace('', 0).fillna(0).astype(float).sum()
+            total_slip = df_detail['slipping (écart)'].replace('', 0).fillna(0).astype(float).sum()
+            df_detail = df_detail.append({
+                'Direction': 'TOTAL',
+                'Clos': '',
+                'Budget prévue (DH)': total_prevue,
+                'Budget engagé (DH)': int(total_engage),
+                'slipping (écart)': total_slip
+            }, ignore_index=True)
         if 'Budget prévue (DH)' in df_detail.columns:
             df_detail['Budget prévue (DH)'] = df_detail['Budget prévue (DH)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
         if 'Budget engagé (DH)' in df_detail.columns:
