@@ -4852,6 +4852,7 @@ def main():
                     local_path = "/workspaces/TG_Hire/Recrutement 2026.xlsx"
                     if os.path.exists(local_path):
                         df_local_budget = pd.read_excel(local_path, sheet_name=0)
+                        # Store as local pilotage data (kept for backward compatibility)
                         st.session_state.local_budget_df = df_local_budget
                         st.success(f"✅ Fichier local chargé: {os.path.basename(local_path)} ({len(df_local_budget)} lignes)")
                     else:
@@ -4872,24 +4873,47 @@ def main():
 
         with col2:
             st.subheader("📊 Fichier Excel - Données de Recrutement")
-            uploaded_excel = st.file_uploader(
+            uploaded_excel_recrutement = st.file_uploader(
                 "Choisir le fichier Excel de recrutement",
                 type=['xlsx', 'xls'],
                 help="Fichier Excel contenant les données de recrutement",
-                key="excel_uploader"
+                key="excel_uploader_recrutement"
             )
-            
-            if uploaded_excel is not None:
-                # Aperçu des données
+
+            uploaded_excel_pilotage = st.file_uploader(
+                "(Optionnel) Choisir le fichier Excel pour Pilotage budgétaire",
+                type=['xlsx', 'xls'],
+                help="Fichier Excel contenant les données de pilotage budgétaire",
+                key="excel_uploader_pilotage"
+            )
+
+            # Handle recruitment Excel upload
+            if uploaded_excel_recrutement is not None:
                 try:
-                    preview_excel = pd.read_excel(uploaded_excel, sheet_name=0)
-                    st.success(f"✅ Fichier Excel chargé: {uploaded_excel.name} - {len(preview_excel)} lignes, {len(preview_excel.columns)} colonnes")
+                    preview_excel = pd.read_excel(uploaded_excel_recrutement, sheet_name=0)
+                    st.success(f"✅ Fichier Excel (Recrutement) chargé: {uploaded_excel_recrutement.name} - {len(preview_excel)} lignes, {len(preview_excel.columns)} colonnes")
                     st.dataframe(preview_excel.head(3), width="stretch")
-                    # Reset file pointer for later use
-                    uploaded_excel.seek(0)
-                    st.session_state.uploaded_excel = uploaded_excel
+                    uploaded_excel_recrutement.seek(0)
+                    st.session_state.uploaded_excel_recrutement = uploaded_excel_recrutement
+                    # Also store parsed DataFrame for immediate use
+                    try:
+                        st.session_state.local_recrutement_df = preview_excel.copy()
+                    except Exception:
+                        pass
                 except Exception as e:
-                    st.error(f"Erreur lors de la lecture de l'Excel: {e}")
+                    st.error(f"Erreur lors de la lecture de l'Excel de recrutement: {e}")
+
+            # Handle pilotage Excel upload
+            if uploaded_excel_pilotage is not None:
+                try:
+                    preview_pilotage = pd.read_excel(uploaded_excel_pilotage, sheet_name=0)
+                    st.success(f"✅ Fichier Excel (Pilotage) chargé: {uploaded_excel_pilotage.name} - {len(preview_pilotage)} lignes, {len(preview_pilotage.columns)} colonnes")
+                    st.dataframe(preview_pilotage.head(3), width="stretch")
+                    uploaded_excel_pilotage.seek(0)
+                    st.session_state.uploaded_excel_pilotage = uploaded_excel_pilotage
+                    st.session_state.local_budget_df = preview_pilotage.copy()
+                except Exception as e:
+                    st.error(f"Erreur lors de la lecture de l'Excel de pilotage: {e}")
         
         # Bouton pour actualiser les données - s'étale sur les deux colonnes
         st.markdown("---")
@@ -4898,7 +4922,9 @@ def main():
             st.success("Données mises à jour ! Consultez les autres onglets.")
     
     # Charger les données ICI (avant l'onglet Upload pour pouvoir les utiliser)
-    df_integration, df_recrutement = load_data_from_files(None, uploaded_excel)
+    # Passer le fichier Excel de recrutement s'il a été uploadé via l'UI
+    excel_for_recrutement = st.session_state.get('uploaded_excel_recrutement') if st.session_state.get('uploaded_excel_recrutement') is not None else None
+    df_integration, df_recrutement = load_data_from_files(None, excel_for_recrutement)
 
     # --------------------
     # Onglet: Pilotage budgétaire
@@ -4916,7 +4942,14 @@ def main():
         st.header("📈 Pilotage budgétaire")
 
         # Récupérer les données de pilotage synchronisées (remplies depuis l'onglet Upload)
-        df_budget = st.session_state.get('synced_budget_df') or st.session_state.get('local_budget_df')
+        synced = st.session_state.get('synced_budget_df')
+        local = st.session_state.get('local_budget_df')
+        if synced is not None:
+            df_budget = synced
+        elif local is not None:
+            df_budget = local
+        else:
+            df_budget = None
 
         # KPI cards (haut) - valeurs dynamiques si df_budget fourni
         budget_annuel_total = None
