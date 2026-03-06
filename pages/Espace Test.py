@@ -1,4451 +1,5215 @@
 import streamlit as st
 from utils import require_login
 
-# -------------------- Streamlit Page Config --------------------
 st.set_page_config(
-    page_title="Analyse CV AI",
-    page_icon="📄",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="📊 Reporting RH Complet",
+    page_icon="📊",
+    layout="wide"
 )
 
 # Vérification de la connexion (avant imports lourds)
 require_login()
 
 import pandas as pd
-import io
-import json
-import os
-import re
-import time
-import requests
-import google.generativeai as genai
-import anthropic
-from datetime import datetime
-from typing import cast
-
-try:
-    import groq
-except Exception:
-    groq = None
-
-try:
-    import fitz
-except Exception:
-    fitz = None
-
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import numpy as np
+from datetime import datetime, timedelta
+import warnings
+import os
+import base64
+warnings.filterwarnings('ignore')
+import re
+import streamlit.components.v1 as components
+import unicodedata
+from io import BytesIO
+import json
+import gspread
+from google.oauth2 import service_account
+import unicodedata
+from pptx import Presentation
+from utils import compute_promise_refusal_rate_row
+def _format_long_title(title: str, max_line_length: int = 20) -> str:
+    """Insert spaces in very long titles without natural breaks to force wrapping.
+    - If the title already contains spaces, return as-is (CSS will wrap).
+    - If no spaces and length > max_line_length, insert spaces every max_line_length chars.
+    """
+    if title is None:
+        return ""
+    s = str(title).strip()
+    if len(s) <= max_line_length:
+        return s
+    if " " in s:
+        return s
+    chunks = [s[i:i+max_line_length] for i in range(0, len(s), max_line_length)]
+    return " ".join(chunks)
+def smart_wrap_title(title, max_line_length=25):
+    """Retourne un titre avec des balises <br> aux bons endroits.
+    - Coupe aux espaces si possible pour respecter max_line_length
+    - Gère les titres sans espaces (souvent en MAJUSCULES) via regex
+    - Dernier recours: coupe tous les max_line_length caractères
+    """
+    if not isinstance(title, str):
+        return title
+
+    s = title.strip()
+    if len(s) <= max_line_length:
+        return s
+
+    # Si le titre contient des espaces, essayer de couper aux espaces
+    if " " in s:
+        words = s.split()
+        lines = []
+        current = ""
+        for w in words:
+            sep = (1 if current else 0)
+            if len(current) + sep + len(w) <= max_line_length:
+                current = (current + (" " if current else "") + w)
+            else:
+                if current:
+                    lines.append(current)
+                current = w
+        if current:
+            lines.append(current)
+        return "<br>".join(lines)
+
+    # Pour les titres sans espaces (majuscules, acronymes, chiffres)
+    try:
+        parts = re.findall(r"[A-Z][a-z]+|[A-Z]{2,}|[a-z]+|\d+", s)
+    except Exception:
+        parts = []
+
+    if len(parts) > 1:
+        spaced = " ".join(parts)
+        return smart_wrap_title(spaced, max_line_length)
+
+    # Dernier recours: couper tous les max_line_length caractères
+    chunks = [s[i:i+max_line_length] for i in range(0, len(s), max_line_length)]
+    return "<br>".join(chunks)
+from pptx.util import Inches, Pt
+from PIL import Image
+import io
+
+def _normalize_text(text):
+    """A global function to safely normalize text, handling None and NaN values."""
+    if text is None or (isinstance(text, float) and np.isnan(text)):
+        return ''
+    s = str(text)
+    s = unicodedata.normalize('NFKD', s)
+    s = ''.join(ch for ch in s if not unicodedata.combining(ch))
+    return s.lower().strip()
+
+def _norm(x):
+    """Robust text normalization for status/keywords matching."""
+    return _normalize_text(x)
+
+
+def _truncate_label(label: str, max_len: int = 20) -> str:
+    """Truncate long labels to a max length and append ellipsis.
+
+    Returns a truncated string (if needed). Keep a plain truncation without
+    changing accents/characters. Default max_len=20 (adjustable).
+    """
+    if not isinstance(label, str):
+        return label
+    if len(label) <= max_len:
+        return label
+    return label[: max_len - 4].rstrip() + '....'
+
+
+def render_generic_metrics(metrics):
+    """Render a horizontal row of metric cards via HTML.
+    metrics: list of tuples (title, value, color_hex)
+    """
+    css = """
+    <style>
+    .gen-kpi-row{display:flex;gap:18px;justify-content:center;align-items:stretch;margin-bottom:8px}
+    .gen-kpi{background:#fff;border-radius:8px;padding:14px 18px;min-width:220px;flex:0 1 auto;border:1px solid #e6eef6;box-shadow:0 2px 6px rgba(0,0,0,0.04);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+    .gen-kpi .t{font-size:17px;color:#2c3e50;margin-bottom:8px;font-weight:700;text-align:center}
+    .gen-kpi .v{font-size:36px;color:#172b4d;font-weight:800;text-align:center}
+    </style>
+    """
+    cards = []
+    for title, value, color in metrics:
+        cards.append(f"<div class='gen-kpi'><div class='t'>{title}</div><div class='v' style='color:{color};'>{value}</div></div>")
+    html = css + "<div class='gen-kpi-row'>" + "".join(cards) + "</div>"
+    return html
+
+
+# Shared title font used for all main charts so typography is consistent
+TITLE_FONT = dict(family="Arial, sans-serif", size=18, color="#111111", )
+
+# --- Centralisation des Logos et Affichage Entités ---
+ENTITY_LOGO_MAP = {
+    'TGCC': 'TGCC.PNG',
+    'TGEM': 'TGEM.PNG',
+    'TG ALU': 'TG ALU.PNG',
+    'TG COVER': 'TG COVER.PNG',
+    'TG STEEL': 'TG STEEL.PNG',
+    'TG STONE': 'TG STONE.PNG',
+    'TG WOOD': 'TG WOOD.PNG',
+    'STAM': 'STAM.png',
+    'BFO': 'BFO.png',
+    'TGCC IMMOBILIER': 'tgcc-immobilier.png',
+    'TGCC-IMMOBILIER': 'tgcc-immobilier.png'
+}
+
+@st.cache_data
+def load_all_logos_b64():
+    """Charge tous les logos disponibles en base64."""
+    logos_dict = {}
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.dirname(current_dir)
+    logo_dir = os.path.join(root_dir, "LOGO")
     
-# Imports pour OCR (Cas des CV scannés)
-try:
-    import pytesseract
-    from pdf2image import convert_from_path, convert_from_bytes
-except Exception:
-    pytesseract = None
-    convert_from_path = None
+    if os.path.exists(logo_dir):
+        for filename in os.listdir(logo_dir):
+            if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+                try:
+                    path = os.path.join(logo_dir, filename)
+                    with open(path, "rb") as f:
+                        logos_dict[filename] = base64.b64encode(f.read()).decode()
+                except Exception:
+                    pass
+    return logos_dict
 
-# Imports pour la méthode sémantique
-from sentence_transformers import SentenceTransformer, util
-import torch
-
-# Import des fonctions avancées d'analyse
-from utils import (
-    rank_resumes_with_ensemble,
-    batch_process_resumes,
-    save_feedback,
-    get_average_feedback_score,
-    get_feedback_summary,
-    display_commit_info,
-)
-
-# -------------------- Configuration de la clé API DeepSeek --------------------
-# --- CORRECTION : Déplacé à l'intérieur des fonctions pour éviter l'erreur au démarrage ---
-
-# --- Vérification unique de la clé API DeepSeek au démarrage ---
-# Cette vérification est silencieuse ici pour éviter de bloquer ou d'afficher des erreurs avant le chargement complet
-_deepseek_api_available = False
-try:
-    if "DEEPSEEK_API_KEY" in st.secrets:
-        _deepseek_api_available = True
-except Exception:
-    pass
-
-
-# Initialisation des variables de session
-if "cv_analysis_feedback" not in st.session_state:
-    st.session_state.cv_analysis_feedback = False
-if "last_analysis_method" not in st.session_state:
-    st.session_state.last_analysis_method = None
-if "last_analysis_result" not in st.session_state:
-    st.session_state.last_analysis_result = None
-if "last_job_title" not in st.session_state:
-    st.session_state.last_job_title = ""
-if "last_job_description" not in st.session_state:
-    st.session_state.last_job_description = ""
-if "last_cv_count" not in st.session_state:
-    st.session_state.last_cv_count = 0
+def get_entity_display_html_with_logo(name, logos_dict):
+    """Retourne le HTML (Logo + Suffixe éventuel) pour l'affichage avec logo."""
+    if not name or pd.isna(name): return ""
+    name_str = str(name).strip()
+    name_upper = name_str.upper()
     
-# Variables pour le système de feedback persistent
-if "show_feedback_form" not in st.session_state:
-    st.session_state.show_feedback_form = False
-if "feedback_submitted" not in st.session_state:
-    st.session_state.feedback_submitted = False
-if "global_feedback_score" not in st.session_state:
-    st.session_state.global_feedback_score = 3
+    logo_file = None
+    if name_upper in ENTITY_LOGO_MAP:
+        logo_file = ENTITY_LOGO_MAP[name_upper]
     
-# Variables pour conserver les résultats de l'analyse même après feedback
-if "ranked_resumes" not in st.session_state:
-    st.session_state.ranked_resumes = []
-if "file_names" not in st.session_state:
-    st.session_state.file_names = []
-if "scores" not in st.session_state:
-    st.session_state.scores = []
+    if not logo_file:
+        for filename in logos_dict.keys():
+            if os.path.splitext(filename)[0].upper() == name_upper:
+                logo_file = filename
+                break
+                
+    if not logo_file:
+        for key in sorted(ENTITY_LOGO_MAP.keys(), key=len, reverse=True):
+            if key in name_upper:
+                logo_file = ENTITY_LOGO_MAP[key]
+                break
 
-# -------------------- CSS --------------------
+    if logo_file and logo_file in logos_dict:
+        logo_b64_str = logos_dict[logo_file]
+        if name_upper in ['TG STEEL', 'TG STONE'] or 'IMMOBILIER' in name_upper:
+            logo_height = 50
+        elif name_upper == 'BFO':
+            logo_height = 80
+        else:
+            logo_height = 63
+            
+        img_tag = f'<img src="data:image/png;base64,{logo_b64_str}" height="{logo_height}" style="vertical-align: middle; display: block; margin: 0 auto;">'
+        
+        matched_key = next((k for k in sorted(ENTITY_LOGO_MAP.keys(), key=len, reverse=True) if k in name_upper), None)
+        if matched_key:
+            pattern = re.escape(matched_key) + r'\s*-\s*(.*)'
+            match = re.search(pattern, name_str, flags=re.IGNORECASE)
+            if match and match.group(1):
+                return f'{img_tag} <span style="vertical-align: middle; margin-top: 5px; font-weight: bold; display: block; text-align: center;">{match.group(1)}</span>'
+        
+        return img_tag
+    
+    return f'<div style="text-align: center; font-weight: 600;">{name_str}</div>'
+
+def apply_title_style(fig):
+    """Applique la police et le style de titre standardisé à une figure Plotly."""
+    try:
+        fig.update_layout(title_font=TITLE_FONT)
+    except Exception:
+        try:
+            current = ''
+            if hasattr(fig.layout, 'title') and getattr(fig.layout.title, 'text', None):
+                current = fig.layout.title.text
+            fig.update_layout(title=dict(text=current, x=0, xanchor='left', font=TITLE_FONT))
+        except Exception:
+            pass
+    # Increase generic data-label fontsize and legend font for better readability
+    try:
+        fig.update_traces(textfont=dict(size=15))
+    except Exception:
+        pass
+    try:
+        if hasattr(fig.layout, 'legend'):
+            fig.update_layout(legend=dict(font=dict(size=13)))
+    except Exception:
+        pass
+    return fig
+
+
+def get_current_commit_hash(short: bool = True) -> str:
+    """Return the current git commit hash (short by default).
+
+    Tries subprocess git first, then falls back to reading .git/HEAD or
+    environment variable GIT_COMMIT. Returns 'unknown' if not available.
+    """
+    import subprocess
+    try:
+        if short:
+            out = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"], stderr=subprocess.DEVNULL)
+        else:
+            out = subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL)
+        return out.decode().strip()
+    except Exception:
+        # Try environment variable
+        import os
+        env = os.environ.get('GIT_COMMIT') or os.environ.get('COMMIT_SHA') or os.environ.get('GITHUB_SHA')
+        if env:
+            return env[:7] if short else env
+        # Try minimal .git reading
+        try:
+            git_head = None
+            head_path = os.path.join(os.path.dirname(__file__), '..', '.git', 'HEAD')
+            head_path = os.path.abspath(head_path)
+            if os.path.exists(head_path):
+                with open(head_path, 'r') as f:
+                    ref = f.read().strip()
+                if ref.startswith('ref:'):
+                    ref_path = ref.split(' ', 1)[1]
+                    ref_file = os.path.join(os.path.dirname(head_path), ref_path)
+                    if os.path.exists(ref_file):
+                        with open(ref_file, 'r') as rf:
+                            val = rf.read().strip()
+                            return val[:7] if short else val
+                else:
+                    return ref[:7] if short else ref
+        except Exception:
+            pass
+    return 'unknown'
+
+
+def get_current_commit_datetime() -> str:
+    """Return the current git commit date/time as a string.
+
+    Format: "DD/MM/YYYY HH:MM" (heure 24h), par exemple
+    "27/01/2026 17:35".
+    """
+    import subprocess
+    try:
+        # Utilise le pretty format de git avec un format explicite
+        out = subprocess.check_output(
+            [
+                "git",
+                "show",
+                "-s",
+                "--format=%cd",
+                "--date=format:%d/%m/%Y %H:%M",
+                "HEAD",
+            ],
+            stderr=subprocess.DEVNULL,
+        )
+        return out.decode().strip()
+    except Exception:
+        return ""
+
+
+def _parse_mixed_dates(series):
+    """Parse a pandas Series that may contain mixed date representations.
+
+    Strategy:
+      1. If values are numeric (Excel serial), convert using Excel epoch.
+      2. Try pd.to_datetime(..., dayfirst=True) to favor dd/mm/YYYY formats.
+      3. Fallback to pd.to_datetime(..., errors='coerce') for other formats.
+
+    Returns a datetime64[ns] Series with NaT for unparseable values.
+    """
+    s = series.copy()
+    try:
+        # If the series is numeric (Excel serials), convert per-element where it looks numeric
+        if pd.api.types.is_numeric_dtype(s):
+            def _maybe_excel(x):
+                try:
+                    xf = float(x)
+                    return pd.Timestamp('1899-12-30') + pd.Timedelta(days=xf)
+                except Exception:
+                    return pd.NaT
+
+            return s.apply(lambda v: _maybe_excel(v) if pd.notna(v) and str(v).strip().replace('.', '', 1).isdigit() else pd.NaT).combine_first(pd.to_datetime(s, dayfirst=True, errors='coerce'))
+    except Exception:
+        # fall through to permissive parsing below
+        pass
+
+    # First try dayfirst parsing (dd/mm/YYYY common in French contexts)
+    parsed = pd.to_datetime(s, dayfirst=True, errors='coerce')
+    # If many values still NaT, try fallback parsing
+    if parsed.isna().sum() > len(parsed) * 0.25:
+        parsed_alt = pd.to_datetime(s, errors='coerce')
+        parsed = parsed.combine_first(parsed_alt)
+
+    return parsed
+
+
+def render_kpi_cards(recrutements, postes, directions, delai_display, delai_help=None):
+    """Render a single-row set of KPI cards (inline, bordered with colored left stripe).
+
+    Cards: [Nombre de recrutements] [Postes concernés] [Directions concernées] [Délai moyen]
+    Returns an HTML string ready to be inserted with st.markdown(..., unsafe_allow_html=True)
+    """
+
+    css = """
+<style>
+.kpi-row{display:flex;gap:16px;flex-wrap:nowrap;align-items:stretch;margin-bottom:14px;justify-content:center}
+.kpi-card{flex:1 1 0;background:#fff;border-radius:8px;padding:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid #e6eef6;min-width:180px;text-align:center}
+.kpi-card .title{font-size:14px;color:#2c3e50;margin-bottom:8px;font-weight:700;text-align:center}
+.kpi-card .value{font-size:26px;font-weight:700;color:#172b4d;text-align:center}
+.kpi-accent{border-left:6px solid #1f77b4}
+.kpi-green{border-left-color:#2ca02c}
+.kpi-orange{border-left-color:#ff7f0e}
+.kpi-purple{border-left-color:#6f42c1}
+.kpi-help{font-size:12px;color:#555;margin-top:8px;text-align:center}
+@media(max-width:800px){.kpi-row{flex-direction:column}}
+</style>
+"""
+
+    html = f"""
+{css}
+<div class='kpi-row'>
+    <div class='kpi-card kpi-accent' style='flex:2'>
+        <div class='title'>Nombre de recrutements</div>
+        <div class='value'>{recrutements:,}</div>
+    </div>
+    <div class='kpi-card kpi-green'>
+        <div class='title'>Postes concernés</div>
+        <div class='value'>{postes:,}</div>
+    </div>
+    <div class='kpi-card kpi-orange'>
+        <div class='title'>Directions concernées</div>
+        <div class='value'>{directions:,}</div>
+    </div>
+    <div class='kpi-card kpi-purple'>
+        <div class='title'>Délai moyen (jours)</div>
+        <div class='value'>{delai_display}</div>
+        <div class='kpi-help'>{delai_help or ''}</div>
+    </div>
+</div>
+"""
+
+    return html
+
+    df2 = df.copy()
+    df2[start_col] = pd.to_datetime(df2[start_col], errors='coerce')
+    df2[end_col] = pd.to_datetime(df2[end_col], errors='coerce')
+
+    # Optionally filter to a specific status (e.g., 'Clôture') if the column exists
+    if status_col in df2.columns and status_value is not None:
+        df2 = df2[df2[status_col] == status_value].copy()
+
+    # Compute delta in days
+    df2['time_to_hire_days'] = (df2[end_col] - df2[start_col]).dt.days
+
+    if drop_negative:
+        df2 = df2[df2['time_to_hire_days'].notna() & (df2['time_to_hire_days'] >= 0)].copy()
+    else:
+        df2 = df2[df2['time_to_hire_days'].notna()].copy()
+
+    if df2.empty:
+        overall = None
+    else:
+        overall = {
+            'mean': float(df2['time_to_hire_days'].mean()),
+            'median': float(df2['time_to_hire_days'].median()),
+            'std': float(df2['time_to_hire_days'].std()),
+            'count': int(df2['time_to_hire_days'].count())
+        }
+
+    # Grouped aggregates
+    by_direction = None
+    by_poste = None
+    if 'Direction concernée' in df2.columns:
+        by_direction = df2.groupby('Direction concernée')['time_to_hire_days'].agg(['count', 'mean', 'median', 'std']).reset_index().sort_values('mean')
+    if 'Poste demandé' in df2.columns:
+        by_poste = df2.groupby('Poste demandé')['time_to_hire_days'].agg(['count', 'mean', 'median', 'std']).reset_index().sort_values('mean')
+
+    return {
+        'start_col': start_col,
+        'end_col': end_col,
+        'overall': overall,
+        'by_direction': by_direction,
+        'by_poste': by_poste,
+        'df': df2
+    }
+
+
+# CSS pour styliser le bouton Google Sheets en rouge vif
 st.markdown("""
 <style>
-div[data-testid="stTabs"] button p {
-    font-size: 18px; 
+.stButton > button[title="Synchroniser les données depuis Google Sheets"] {
+    background-color: #FF4B4B !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 5px !important;
+    font-weight: bold !important;
 }
-.stTextArea textarea {
-    white-space: pre-wrap !important;
-}
-.feedback-box {
-    padding: 1rem;
-    border-radius: 0.5rem;
-    background-color: #f0f8ff;
-    margin-bottom: 1rem;
-}
-.feedback-title {
-    font-size: 1.2rem;
-    font-weight: bold;
-    margin-bottom: 0.5rem;
-}
-.method-stats {
-    padding: 0.5rem;
-    border-radius: 0.3rem;
-    background-color: #f5f5f5;
-    margin: 0.2rem 0;
-}
-.progress-bar-container {
-    width: 100%;
-    height: 10px;
-    background-color: #f0f0f0;
-    border-radius: 5px;
-    margin: 10px 0;
-    overflow: hidden;
-}
-.progress-bar {
-    height: 100%;
-    background-color: #4CAF50;
-    border-radius: 5px;
-}
-/* Réduire la taille du texte des métriques */
-[data-testid="metric-container"] {
-    font-size: 0.8em !important;
-}
-[data-testid="metric-container"] > div:first-child {
-    font-size: 0.75em !important;
-}
-[data-testid="metric-container"] > div:last-child {
-    font-size: 0.7em !important;
+.stButton > button[title="Synchroniser les données depuis Google Sheets"]:hover {
+    background-color: #FF3333 !important;
+    color: white !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# -------------------- Chargement des modèles ML (mis en cache) --------------------
-@st.cache_resource
-def load_embedding_model():
-    """Charge le modèle SentenceTransformer une seule fois de manière sécurisée."""
-    try:
-        hf_token = None
-        token_keys = [
-            "HUGGINGFACEHUB_API_TOKEN",
-            "HF_TOKEN",
-            "HUGGINGFACE_TOKEN",
-            "HF_HUB_TOKEN",
-            "HUGGINGFACE_API_TOKEN"
-        ]
-        try:
-            for key in token_keys:
-                if key in st.secrets and st.secrets[key]:
-                    hf_token = st.secrets[key]
-                    break
-        except Exception:
-            pass
-        if not hf_token:
-            for key in token_keys:
-                env_val = os.environ.get(key)
-                if env_val:
-                    hf_token = env_val
-                    break
-
-        if hf_token:
-            os.environ.setdefault("HUGGINGFACEHUB_API_TOKEN", hf_token)
-            os.environ.setdefault("HF_TOKEN", hf_token)
-
-        # Try the full HF repo path first, then the short name for backwards compatibility
-        try:
-            return SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2', use_auth_token=hf_token)
-        except Exception:
-            return SentenceTransformer('all-MiniLM-L6-v2', use_auth_token=hf_token)
-    except Exception as e:
-        # Provide a clearer diagnostic for common causes (local dir with same name, missing weights)
-        msg = str(e)
-        hint = (
-            "Vérifiez que le package 'sentence-transformers' est installé et que vous avez accès au modèle. "
-            "Si vous chargez depuis Hugging Face, assurez-vous que le chemin est 'sentence-transformers/all-MiniLM-L6-v2' "
-            "et qu'il n'existe pas de dossier local avec le même nom qui pourrait masquer le modèle."
-        )
-        if "429" in msg or "Too Many Requests" in msg:
-            hint += " Vous avez atteint la limite anonyme de Hugging Face. Ajoutez votre jeton personnel via st.secrets ou l'environnement (clé 'HUGGINGFACEHUB_API_TOKEN')."
-        st.warning(f"⚠️ Impossible de charger le modèle sémantique (embedding). La méthode 'Sémantique' sera indisponible. Erreur: {msg} {hint}")
-        return None
-
-embedding_model = load_embedding_model()
-
-def _retrieve_api_secret(possible_roots: list[str], nested_keys: list[str] | None = None):
-    """Recherche une clé API dans st.secrets (y compris structures imbriquées)."""
-    nested_keys = nested_keys or ["api_key", "API_KEY", "token", "TOKEN", "key", "KEY"]
-    try:
-        for root in possible_roots:
-            if root in st.secrets:
-                value = st.secrets[root]
-                if isinstance(value, str) and value.strip():
-                    return value.strip()
-                if isinstance(value, dict):
-                    for nested_key in nested_keys:
-                        nested_val = value.get(nested_key)
-                        if isinstance(nested_val, str) and nested_val.strip():
-                            return nested_val.strip()
-    except Exception:
-        pass
-    return None
-
-# -------------------- Fonctions de traitement --------------------
-def get_api_key():
-    """Récupère la clé API avec persistance en session state pour éviter les pertes lors du rechargement."""
-    # 1. Vérifier si déjà en session
-    if "DEEPSEEK_API_KEY" in st.session_state:
-        return st.session_state.DEEPSEEK_API_KEY
-        
-    api_key = None
-    try:
-        # 2. Vérifier st.secrets
-        if "DEEPSEEK_API_KEY" in st.secrets:
-             api_key = st.secrets["DEEPSEEK_API_KEY"]
-        # 3. Vérifier variables d'environnement (fallback)
-        if not api_key:
-             api_key = os.environ.get("DEEPSEEK_API_KEY")
-             
-        if api_key:
-            st.session_state.DEEPSEEK_API_KEY = api_key
-            return api_key
-    except Exception:
-        pass
-    return None
-
-def extract_text_from_pdf(file):
-    try:
-        # Utiliser un buffer mémoire pour plus de compatibilité
-        import io
-        try:
-            file.seek(0)
-            data = file.read()
-            bio = io.BytesIO(data)
-        except Exception:
-            bio = file
-
-        # 0) PyMuPDF (fitz) - PRIORITÉ ABSOLUE pour l'ordre de lecture
-        # sort=True remet le texte dans l'ordre de lecture visuel (haut-gauche -> bas-droite)
-        # C'est CRUCIAL pour les CVs où le nom est dans un en-tête graphique.
-        if fitz:
-            try:
-                bio.seek(0)
-                doc = fitz.open(stream=bio, filetype="pdf")
-                text_parts = []
-                for page_num in range(len(doc)):
-                    page = doc[page_num]
-                    # sort=True est la clé ici pour éviter que le nom ne finisse à la fin du fichier
-                    text_parts.append(page.get_text("text", sort=True))
-                text = "\n".join(text_parts).strip()
-                if len(text) > 50:  # Validation minimale
-                    return text
-            except Exception as e:
-                print(f"fitz sorting error: {e}")
-
-        # 1) pdfplumber (meilleur pour extraction de texte mise en page)
-        try:
-            import pdfplumber
-            bio.seek(0)
-            with pdfplumber.open(bio) as pdf:
-                parts = []
-                for page in pdf.pages:
-                    pt = page.extract_text()
-                    if pt:
-                        parts.append(pt)
-                text = "\n".join(parts).strip()
-                if text:
-                    return text
-        except Exception as e:
-            # Ignorer et essayer d'autres méthodes
-            print(f"pdfplumber error: {e}")
-
-        # 2) PyPDF2
-        try:
-            import PyPDF2
-            bio.seek(0)
-            reader = PyPDF2.PdfReader(bio)
-            parts = []
-            for page in reader.pages:
-                try:
-                    pt = page.extract_text()
-                except Exception:
-                    pt = None
-                if pt:
-                    parts.append(pt)
-            text = "\n".join(parts).strip()
-            if text:
-                return text
-        except Exception as e:
-            print(f"PyPDF2 error: {e}")
-
-        # 3) pypdf
-        try:
-            from pypdf import PdfReader as PypdfReader
-            bio.seek(0)
-            reader = PypdfReader(bio)
-            parts = []
-            for page in reader.pages:
-                try:
-                    pt = page.extract_text()
-                except Exception:
-                    pt = None
-                if pt:
-                    parts.append(pt)
-            text = "\n".join(parts).strip()
-            if text:
-                return text
-        except Exception as e:
-            print(f"pypdf error: {e}")
-
-        # Aucun texte extrait -> PDF probablement scanné (images) ou protégé
-        # Tentative OCR si disponible
-        if pytesseract and convert_from_bytes:
-            try:
-                bio.seek(0)
-                # On convertit le contenu du BytesIO en bytes
-                pdf_bytes = bio.read()
-                # On convertit la première page en image
-                images = convert_from_bytes(pdf_bytes, first_page=1, last_page=1)
-                if images:
-                    ocr_text = pytesseract.image_to_string(images[0], lang='fra+eng')
-                    if len(ocr_text.strip()) > 10:
-                        return ocr_text
-            except Exception as e:
-                print(f"OCR failed: {e}")
-
-        return "Aucun texte lisible trouvé. Le PDF est peut-être un scan (images) ou protégé par mot de passe."
-    except Exception as e:
-        return f"Erreur d'extraction du texte: {str(e)}"
-
-# --- MÉTHODE 1 : SIMILARITÉ COSINUS (AVEC LOGIQUE) ---
-def rank_resumes_with_cosine(job_description, resumes, file_names):
-    try:
-        documents = [job_description] + resumes
-        vectorizer = TfidfVectorizer(stop_words='english').fit(documents)
-        vectors = vectorizer.transform(documents).toarray()
-        
-        cosine_similarities = cosine_similarity([vectors[0]], vectors[1:]).flatten()
-        
-        logic = {}
-        feature_names = vectorizer.get_feature_names_out()
-        for i, resume_text in enumerate(resumes):
-            jd_vector = vectors[0]
-            resume_vector = vectors[i+1]
-            common_keywords_indices = (jd_vector > 0) & (resume_vector > 0)
-            common_keywords = feature_names[common_keywords_indices]
-            logic[file_names[i]] = {"Mots-clés communs importants": list(common_keywords[:10])}
-
-        return {"scores": cosine_similarities, "logic": logic}
-    except Exception as e:
-        st.error(f"❌ Erreur Cosinus: {e}")
-        return {"scores": [], "logic": {}}
-
-# --- MÉTHODE 2 : WORD EMBEDDINGS (AVEC LOGIQUE) ---
-def rank_resumes_with_embeddings(job_description, resumes, file_names):
-    if embedding_model is None:
-        st.error("❌ Le modèle sémantique n'est pas chargé. Impossible d'utiliser cette méthode.")
-        return {"scores": [0] * len(resumes), "logic": {}}
-        
-    try:
-        jd_embedding = embedding_model.encode(job_description, convert_to_tensor=True)
-        resume_embeddings = embedding_model.encode(resumes, convert_to_tensor=True)
-        cosine_scores = util.pytorch_cos_sim(jd_embedding, resume_embeddings)
-        scores = cosine_scores.flatten().cpu().numpy()
-
-        logic = {}
-        jd_sentences = [s.strip() for s in job_description.split('.') if len(s.strip()) > 10]
-        if not jd_sentences: jd_sentences = [job_description]
-        jd_sent_embeddings = embedding_model.encode(jd_sentences, convert_to_tensor=True)
-
-        for i, resume_text in enumerate(resumes):
-            resume_sentences = [s.strip() for s in resume_text.split('\n') if len(s.strip()) > 10]
-            if not resume_sentences: continue
-            resume_sent_embeddings = embedding_model.encode(resume_sentences, convert_to_tensor=True)
-            
-            similarity_matrix = util.pytorch_cos_sim(resume_sent_embeddings, jd_sent_embeddings)
-            best_matches = {}
-            for jd_idx, jd_sent in enumerate(jd_sentences):
-                best_match_score, best_match_idx = torch.max(similarity_matrix[:, jd_idx], dim=0)
-                if best_match_score > 0.5: # Seuil de pertinence
-                     best_matches[jd_sent] = resume_sentences[best_match_idx.item()]
-            logic[file_names[i]] = {"Phrases les plus pertinentes (Annonce -> CV)": best_matches}
-
-        return {"scores": scores, "logic": logic}
-    except Exception as e:
-        st.error(f"❌ Erreur Sémantique : {e}")
-        return {"scores": [], "logic": {}}
-
-# --- ANALYSE PAR REGEX AMÉLIORÉE (AVEC CALCUL D'EXPÉRIENCE) ---
-def regex_analysis(text):
-    text_lower = text.lower()
-    
-    # --- CALCUL D'EXPÉRIENCE BASÉ SUR LES DATES ---
-    total_experience_months = 0
-    
-    # Patterns pour différents formats de dates
-    # 1. Format MM/YYYY - MM/YYYY
-    # 2. Format Mois YYYY - Mois YYYY
-    # 3. Format YYYY - YYYY
-    # 4. Format période (X ans et Y mois)
-    date_patterns = [
-        # Format MM/YYYY - MM/YYYY ou Mois YYYY - Mois YYYY
-        re.findall(r'(\d{1,2}/\d{4})\s*-\s*(\d{1,2}/\d{4}|aujourd\'hui|présent|jour|current)|([a-zéèêëàâäôöùûüïîç]+\.?\s+\d{4})\s*-\s*([a-zéèêëàâäôöùûüïîç]+\.?\s+\d{4}|aujourd\'hui|présent|jour|current)', text, re.IGNORECASE),
-        # Format YYYY - YYYY
-        re.findall(r'(?<!\d)(\d{4})\s*-\s*(\d{4}|aujourd\'hui|présent|jour|current)(?!\d)', text, re.IGNORECASE),
-        # Format "X ans et Y mois" ou "X années d'expérience"
-        re.findall(r'(\d+)\s+ans?\s+(?:et\s+(\d+)\s+mois)?|(\d+)\s+années?\s+d[e\']expérience', text, re.IGNORECASE)
-    ]
-    
-    month_map = {
-        # Français
-        "janvier": 1, "février": 2, "mars": 3, "avril": 4, "mai": 5, "juin": 6, 
-        "juillet": 7, "août": 8, "septembre": 9, "octobre": 10, "novembre": 11, "décembre": 12,
-        "jan": 1, "fév": 2, "mar": 3, "avr": 4, "mai": 5, "juin": 6, 
-        "juil": 7, "août": 8, "sept": 9, "oct": 10, "nov": 11, "déc": 12,
-        # Anglais
-        "january": 1, "february": 2, "march": 3, "april": 4, "may": 5, "june": 6,
-        "july": 7, "august": 8, "september": 9, "october": 10, "november": 11, "december": 12,
-        "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
-        "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12
-    }
-    
-    def parse_date(date_str):
-        if not date_str:
-            return None
-            
-        date_str = date_str.lower().strip().replace('.','').replace('û','u')
-        
-        # Traitement des mentions "aujourd'hui", "présent", etc.
-        if any(current_term in date_str for current_term in ["aujourd'hui", "présent", "current", "jour"]):
-            return datetime.now()
-            
-        # Pour le format année seule (YYYY)
-        if re.match(r'^\d{4}$', date_str):
-            return datetime(int(date_str), 1, 1)
-            
-        # Pour les formats avec mois en lettres
-        for month_name, month_num in month_map.items():
-            if month_name in date_str:
-                year_match = re.search(r'\d{4}', date_str)
-                if year_match:
-                    year = int(year_match.group())
-                    return datetime(year, month_num, 1)
-                    
-        # Format MM/YYYY par défaut
-        try:
-            return datetime.strptime(date_str, '%m/%Y')
-        except ValueError:
-            # En cas d'échec, on essaie de nettoyer davantage
-            cleaned = re.sub(r'[^\d/]', '', date_str).strip()
-            if re.match(r'^\d{1,2}/\d{4}$', cleaned):
-                return datetime.strptime(cleaned, '%m/%Y')
-                
-        return None
-
-    # Traitement du format MM/YYYY - MM/YYYY ou Mois YYYY - Mois YYYY
-    for match in date_patterns[0]:
-        try:
-            start_str, end_str = match[0] or match[2], match[1] or match[3]
-            
-            start_date = parse_date(start_str)
-            end_date = datetime.now() if any(current_term in end_str.lower() for current_term in ["aujourd'hui", "présent", "current", "jour"]) else parse_date(end_str)
-            
-            if start_date and end_date:
-                duration = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
-                total_experience_months += max(0, duration)
-        except Exception:
-            continue
-    
-    # Traitement du format YYYY - YYYY
-    for match in date_patterns[1]:
-        try:
-            start_year, end_year = match
-            
-            if any(current_term in end_year.lower() for current_term in ["aujourd'hui", "présent", "current", "jour"]):
-                end_date = datetime.now()
-                start_date = datetime(int(start_year), 1, 1)
-            else:
-                start_date = datetime(int(start_year), 1, 1)
-                end_date = datetime(int(end_year), 12, 31)
-                
-            duration = (end_date.year - start_date.year) * 12 + (end_date.month - start_date.month)
-            total_experience_months += max(0, duration)
-        except Exception:
-            continue
-    
-    # Traitement des mentions explicites d'années d'expérience
-    for match in date_patterns[2]:
-        try:
-            years = int(match[0] or match[2] or 0)  # Années
-            months = int(match[1] or 0)             # Mois (optionnel)
-            
-            total_experience_months += years * 12 + months
-        except Exception:
-            continue
-    
-    # Si aucune expérience détectée mais "X ans d'expérience" est mentionné directement
-    if total_experience_months == 0:
-        # Recherche de mentions d'expérience directes en français et en anglais
-        direct_exp_patterns = [
-            r'(\d+)\s*(?:an(?:s|né(?:e|es))?)\s+d[\'e]\s*(?:expérience|exp\.)',  # X ans d'expérience
-            r'expérience\s+(?:de|d[\'e])\s+(\d+)\s*(?:an(?:s|né(?:e|es))?)',      # expérience de X ans
-            r'(\d+)\s*(?:year(?:s)?)\s+(?:of)?\s*experience',                    # X years experience (EN)
-            r'experience\s+(?:of)?\s+(\d+)\s*(?:year(?:s)?)',                    # experience of X years (EN)
-        ]
-        
-        for pattern in direct_exp_patterns:
-            direct_exp_match = re.search(pattern, text_lower)
-            if direct_exp_match:
-                try:
-                    years = int(direct_exp_match.group(1))
-                    total_experience_months = years * 12
-                    break
-                except:
-                    continue
-    
-    # Arrondi à l'année la plus proche
-    total_experience_years = round(total_experience_months / 12)
-
-    education_level = 0
-    # Patterns d'éducation améliorés avec équivalents internationaux
-    edu_patterns = {
-        8: r'doctorat|phd|ph\.d|docteur|doctorate',
-        5: r'bac\s*\+\s*5|master|m\.?sc\.?|ingénieur|mba|diplôme\s+d[\'e]ingénieur',
-        3: r'bac\s*\+\s*3|licence|bachelor|b\.?sc\.?|diplôme\s+universitaire\s+de\s+technologie|d\.?u\.?t',
-        2: r'bac\s*\+\s*2|bts|dut|deug',
-        0: r'baccalauréat|bac|high\s+school|secondary\s+education'
-    }
-    
-    # On commence par rechercher le diplôme le plus élevé
-    levels = sorted(edu_patterns.keys(), reverse=True)
-    for level in levels:
-        pattern = edu_patterns[level]
-        if re.search(pattern, text_lower):
-            education_level = level
-            break
-            
-    skills = []
-    
-    # Recherche de sections spécifiques où les compétences peuvent se trouver
-    skill_sections = [
-        r"(?:compétences|skills|competences)\s*(?:techniques|technical)?\s*[:;](.*?)(?:\n\n|\Z)",
-        r"(?:profil|profile)\s+(?:recherché|sought|technique|technical)\s*[:;](.*?)(?:\n\n|\Z)",
-        r"(?:technologies|outils|tools|langages|languages)\s*[:;](.*?)(?:\n\n|\Z)",
-        r"(?:expertise|savoir-faire)\s*[:;](.*?)(?:\n\n|\Z)"
-    ]
-    
-    # Stop words plus complets (FR/EN)
-    stop_words = [
-        # Français
-        "profil", "recherché", "maîtrise", "bonne", "expérience", "esprit", "basé", "casablanca", 
-        "missions", "principales", "confirmée", "idéalement", "selon", "avoir", "être", "connaissance",
-        "capable", "capacité", "aptitude", "compétence", "technique", "solide", "avancée",
-        # Anglais
-        "profile", "required", "mastery", "good", "experience", "spirit", "based", "mission", "main",
-        "confirmed", "ideally", "according", "have", "being", "knowledge", "able", "ability", "skill",
-        "technical", "solid", "advanced"
-    ]
-    
-    # Recherche dans les différentes sections
-    for pattern in skill_sections:
-        section_match = re.search(pattern, text_lower, re.DOTALL | re.IGNORECASE)
-        if section_match:
-            section_text = section_match.group(1)
-            # Extraction des mots pertinents (mots de 4 lettres minimum, incluant caractères spéciaux techniques)
-            words = re.findall(r'\b[a-zA-ZÀ-ÿ\+\#\.]{4,}\b', section_text)
-            skills.extend([word for word in words if word.lower() not in stop_words])
-    
-    # Si aucune section trouvée, chercher dans tout le texte
-    if not skills:
-        # Recherche de termes techniques communs
-        tech_patterns = [
-            r'\b(?:python|java(?:script)?|typescript|c\+\+|ruby|php|html5?|css3?|sql|nosql|mongodb|mysql|postgresql|oracle|azure|aws|gcp|react(?:js)?|angular(?:js)?|vue(?:js)?|node(?:js)?|express(?:js)?|django|flask|spring|hibernate|docker|kubernetes|jenkins|git|jira|confluence|agile|scrum|kanban)\b',
-            r'\b(?:excel|word|powerpoint|outlook|office|sharepoint|teams|visio|project|access|onedrive|dynamics|power\s*bi|tableau|qlik(?:view)?|looker|microstrategy)\b',
-            r'\b(?:sap|oracle|salesforce|workday|netsuite|peoplesoft|microsoft\s*dynamics|jd\s*edwards|sage|quickbooks)\b'
-        ]
-        
-        for pattern in tech_patterns:
-            tech_matches = re.findall(pattern, text_lower, re.IGNORECASE)
-            skills.extend(tech_matches)
-
-    return {
-        "Niveau d'études": education_level,
-        "Années d'expérience": total_experience_years,
-        "Compétences clés extraites": list(set(skills))
-    }
-
-# --- SCORING PAR RÈGLES AVEC REGEX AMÉLIORÉ ---
-def rank_resumes_with_rules(job_description, resumes, file_names):
-    jd_entities = regex_analysis(job_description)
-    results = []
-    
-    SKILL_WEIGHT = 5
-    EDUCATION_WEIGHT = 30
-    EXPERIENCE_WEIGHT = 20
-    
-    for i, resume_text in enumerate(resumes):
-        resume_entities = regex_analysis(resume_text)
-        current_score = 0
-        logic = {}
-        
-        jd_skills = jd_entities["Compétences clés extraites"]
-        common_skills = [skill for skill in jd_skills if re.search(r'\b' + re.escape(skill) + r'\b', resume_text.lower())]
-        
-        score_from_skills = len(common_skills) * SKILL_WEIGHT
-        current_score += score_from_skills
-        logic['Compétences correspondantes'] = f"{common_skills} (+{score_from_skills} pts)"
-
-        score_from_edu = 0
-        if resume_entities["Niveau d'études"] >= jd_entities["Niveau d'études"]:
-            score_from_edu = EDUCATION_WEIGHT
-            current_score += score_from_edu
-        logic['Niveau d\'études'] = "Candidat: Bac+{} vs Requis: Bac+{} (+{} pts)".format(resume_entities["Niveau d'études"], jd_entities["Niveau d'études"], score_from_edu)
-        
-        score_from_exp = 0
-        if resume_entities["Années d'expérience"] >= jd_entities["Années d'expérience"]:
-            score_from_exp = EXPERIENCE_WEIGHT
-            current_score += score_from_exp
-        logic['Expérience'] = "Candidat: {} ans vs Requis: {} ans (+{} pts)".format(resume_entities["Années d'expérience"], jd_entities["Années d'expérience"], score_from_exp)
-        
-        results.append({"file_name": file_names[i], "score": current_score, "logic": logic})
-
-    max_score = (len(jd_entities["Compétences clés extraites"]) * SKILL_WEIGHT) + EDUCATION_WEIGHT + EXPERIENCE_WEIGHT
-    
-    if max_score > 0:
-        for res in results:
-            res["score"] = min(res["score"] / max_score, 1.0)
-            
-    return results
-
-# --- PROMPT COURT POUR LE MODE COURT ---
-def _build_short_prompt(safe_name, job_description, resume_text):
-    """Génère un prompt court pour l'analyse IA comparative (Mode court)."""
-    return f"""En tant qu'expert en recrutement, évalue BRIÈVEMENT la pertinence du CV de "{safe_name}" pour le poste ci-dessous.
-Réponds de façon concise et structurée (maximum 15 lignes).
-
-**Format de sortie OBLIGATOIRE :**
-
-**👤 {safe_name}**
-
-**📊 Score d'adéquation :** [X]% — [1 phrase de synthèse]
-
-**🎓 Formation :** [Diplôme principal]
-**💼 Expérience :** [Dernier poste, durée totale]
-**🛠️ Compétences clés :** [4-5 compétences pertinentes]
-
-**✅ Points forts :**
-- [Point 1]
-- [Point 2]
-
-**⚠️ Points à améliorer / Écarts avec le poste :**
-- [Point 1]
-
-**🏁 Conclusion :** [1 phrase : recommandation finale]
-
----
-**Description du poste :**
-{job_description}
----
-**Texte du CV :**
-{resume_text}
-"""
-
-# --- MÉTHODE 4 : ANALYSE PAR IA (PARSING CORRIGÉ) ---
-def get_detailed_score_with_ai(job_description, resume_text, candidate_name, mode_court=False):
-    API_KEY = get_api_key()
-    if not API_KEY: return {"score": 0.0, "explanation": "❌ Analyse IA impossible."}
-    url = "https://api.deepseek.com/v1/chat/completions"
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
-    
-    safe_name = (candidate_name or "Candidat").strip()
-
-    if mode_court:
-        prompt = _build_short_prompt(safe_name, job_description, resume_text)
-    else:
-        prompt = f"""
-    En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
-    Produis une analyse comparative détaillée.
-
-    **Format de sortie OBLIGATOIRE :**
-
-    **👤 {safe_name}**
-
-    **📊 Synthèse d'adéquation**
-    [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
-    
-    **🎓 Formation**
-    [Analyse de la formation du candidat par rapport aux exigences du poste.]
-
-    **💼 Expérience**
-    [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
-
-    **🛠️ Compétences clés**
-    [Liste des compétences du candidat qui correspondent aux compétences requises.]
-
-    **💡 Points forts pour ce poste**
-    [2-3 points forts spécifiques du candidat pour ce poste.]
-
-    **⚠️ Points d'attention pour ce poste**
-    [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
-    
-    ---
-    **Description du poste :**
-    {job_description}
-    ---
-    **Texte du CV :**
-    {resume_text}
-    """
-    
-    payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.1}
-    try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
-        response.raise_for_status()
-        full_response_text = response.json()["choices"][0]["message"]["content"]
-        
-        # Extraction du score améliorée pour être plus flexible
-        score_match = re.search(r"score.*?\s*:\s*(\d+)\s*%|(\d+)\s*%", full_response_text, re.IGNORECASE)
-        score = 0.0
-        if score_match:
-            # Le pattern peut capturer dans le groupe 1 ou 2
-            score_str = score_match.group(1) or score_match.group(2)
-            if score_str:
-                score = int(score_str) / 100.0
-                
-        return {"score": score, "explanation": full_response_text}
-    except Exception as e:
-        st.warning(f"⚠️ Erreur IA : {e}")
-        return {"score": 0.0, "explanation": "Erreur"}
-
-def rank_resumes_with_ai(job_description, resumes, file_names, mode_court=False):
-    scores_data = []
-    for i, resume_text in enumerate(resumes):
-        # Extraire le nom pour le passer à la fonction d'analyse
-        extracted = extract_name_from_cv_text(resume_text)
-        candidate_name = extracted.get('name') if extracted else file_names[i]
-        scores_data.append(get_detailed_score_with_ai(job_description, resume_text, candidate_name, mode_court=mode_court))
-    return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
-
-
-
-# --- FONCTIONS GROQ ---
-def get_groq_api_key():
-    """Récupère la clé Groq avec persistance en session state."""
-    if "Groq_API_KEY" in st.session_state:
-        return st.session_state.Groq_API_KEY
-    
-    api_key = None
-    try:
-        keys_to_check = ["Groq_API_KEY", "GROQ_API_KEY"]
-        api_key = _retrieve_api_secret(keys_to_check + ["groq", "Groq"])
-
-        if not api_key:
-            for k in keys_to_check:
-                val = os.environ.get(k)
-                if val:
-                    api_key = val.strip()
-                    break
-                    
-        if api_key:
-            st.session_state.Groq_API_KEY = api_key
-            return api_key
-    except Exception:
-        pass
-    return None
-
-def get_detailed_score_with_groq(job_description, resume_text, candidate_name, mode_court=False):
-    API_KEY = get_groq_api_key()
-    if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Groq manquante."}
-    if groq is None:
-        return {"score": 0.0, "explanation": "❌ SDK Groq non installé."}
-    
-    safe_name = (candidate_name or "Candidat").strip()
-
-    try:
-        assert groq is not None
-        client = groq.Groq(api_key=API_KEY)
-        if mode_court:
-            prompt = _build_short_prompt(safe_name, job_description, resume_text)
-        else:
-            prompt = f"""
-        En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
-        Produis une analyse comparative détaillée.
-
-        **Format de sortie OBLIGATOIRE :**
-
-        **👤 {safe_name}**
-
-        **📊 Synthèse d'adéquation**
-        [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
-        
-        **🎓 Formation**
-        [Analyse de la formation du candidat par rapport aux exigences du poste.]
-
-        **💼 Expérience**
-        [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
-
-        **🛠️ Compétences clés**
-        [Liste des compétences du candidat qui correspondent aux compétences requises.]
-
-        **💡 Points forts pour ce poste**
-        [2-3 points forts spécifiques du candidat pour ce poste.]
-
-        **⚠️ Points d'attention pour ce poste**
-        [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
-        
-        ---
-        **Description du poste :**
-        {job_description}
-        ---
-        **Texte du CV :**
-        {resume_text}
-        """
-        
-        chat_completion = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="llama-3.1-70b-versatile",
-            max_tokens=4000,
-        )
-        text_resp = chat_completion.choices[0].message.content
-        
-        score_match = re.search(r"score.*?\s*:\s*(\d+)\s*%|(\d+)\s*%", text_resp, re.IGNORECASE)
-        score = 0.0
-        if score_match:
-            score_str = score_match.group(1) or score_match.group(2)
-            if score_str:
-                score = int(score_str) / 100.0
-        
-        return {"score": score, "explanation": text_resp}
-    except Exception as e:
-        return {"score": 0.0, "explanation": f"Erreur Groq: {e}"}
-
-def rank_resumes_with_groq(job_description, resumes, file_names, mode_court=False):
-    scores_data = []
-    progress_bar = st.progress(0)
-    for i, resume_text in enumerate(resumes):
-        extracted = extract_name_from_cv_text(resume_text)
-        candidate_name = extracted.get('name') if extracted else file_names[i]
-        scores_data.append(get_detailed_score_with_groq(job_description, resume_text, candidate_name, mode_court=mode_court))
-        progress_bar.progress((i + 1) / len(resumes))
-    progress_bar.empty()
-    return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
-
-def get_groq_profile_analysis(text: str, candidate_name: str | None = None) -> str:
-    API_KEY = get_groq_api_key()
-    if not API_KEY: return "❌ Analyse Groq impossible (clé manquante)."
-    if groq is None: return "❌ Analyse Groq impossible (SDK Groq non installé)."
-
-    safe_name = (candidate_name or "Candidat").strip()
-
-    try:
-        assert groq is not None
-        client = groq.Groq(api_key=API_KEY)
-        prompt = f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
-
-Règles NOM :
-- Nom identifié : "{safe_name}".
-- Si "{safe_name}" est inapproprié (Candidat, Permis B...), Trouve le vrai nom dans le texte.
-- Sinon garde "{safe_name}".
-
-**Format de sortie OBLIGATOIRE** :
-
-**👤 [Nom du Candidat]**
-
-**📊 Synthèse**
-[2-3 phrases]
-
-**🎓 Formation**
-[Diplôme le plus élevé]
-
-**💼 Expérience**
-[Dernier poste]
-
-**🛠️ Compétences clés**
-[4-5 compétences]
-
-**💡 Points forts**
-[2-3 points]
-
-**⚠️ Points d'attention**
-[1-2 points]
-
-Texte du CV :
-{text[:4000]}
-"""
-        chat_completion = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="llama-3.3-70b-versatile",
-            max_tokens=2000,
-        )
-        return chat_completion.choices[0].message.content
-    except Exception as e:
-        return f"❌ Erreur Groq : {e}"
-
-# --- FONCTIONS OPENROUTER ---
-def get_openrouter_api_key():
-    """Récupère la clé OpenRouter avec persistance en session state."""
-    if "OpenRouter_API_KEY" in st.session_state:
-        return st.session_state.OpenRouter_API_KEY
-
-    api_key = None
-    try:
-        # Try multiple possible secret keys and nested structures
-        # 1) Direct keys in st.secrets
-        try:
-            # st.secrets behaves like a dict-like object
-            secret_keys = [
-                "OpenRouter_API_KEY", "OPENROUTER_API_KEY", "openrouter_api_key",
-                "openrouter", "OPENROUTER"
-            ]
-            for k in secret_keys:
-                if k in st.secrets:
-                    candidate = st.secrets[k]
-                    if isinstance(candidate, dict):
-                        # common nested fields
-                        for nk in ["api_key", "OpenRouter_API_KEY", "openrouter_api_key", "key"]:
-                            if nk in candidate and candidate[nk]:
-                                api_key = candidate[nk]
-                                break
-                        if api_key:
-                            break
-                    elif candidate:
-                        api_key = candidate
-                        break
-        except Exception:
-            # If st.secrets access fails, continue to env fallback
-            pass
-
-        # 2) Environment variables fallback
-        if not api_key:
-            for k in ["OPENROUTER_API_KEY", "OpenRouter_API_KEY", "openrouter_api_key"]:
-                val = os.environ.get(k)
-                if val:
-                    api_key = val
-                    break
-
-        # Final normalization and caching in session_state
-        if api_key:
-            api_key = str(api_key).strip()
-            if api_key:
-                st.session_state.OpenRouter_API_KEY = api_key
-                return api_key
-    except Exception as e:
-        print(f"Erreur get_openrouter_api_key: {e}")
-
-    return None
-
-def get_detailed_score_with_openrouter(job_description, resume_text, candidate_name, mode_court=False):
-    API_KEY = get_openrouter_api_key()
-    if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé OpenRouter manquante."}
-
-    safe_name = (candidate_name or "Candidat").strip()
-
-    try:
-        if mode_court:
-            prompt_content = _build_short_prompt(safe_name, job_description, resume_text)
-        else:
-            prompt_content = f"""
-                        En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
-                        Produis une analyse comparative détaillée.
-
-                        **Format de sortie OBLIGATOIRE :**
-
-                        **👤 {safe_name}**
-
-                        **📊 Synthèse d'adéquation**
-                        [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
-                        
-                        **🎓 Formation**
-                        [Analyse de la formation du candidat par rapport aux exigences du poste.]
-
-                        **💼 Expérience**
-                        [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
-
-                        **🛠️ Compétences clés**
-                        [Liste des compétences du candidat qui correspondent aux compétences requises.]
-
-                        **💡 Points forts pour ce poste**
-                        [2-3 points forts spécifiques du candidat pour ce poste.]
-
-                        **⚠️ Points d'attention pour ce poste**
-                        [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
-                        
-                        ---
-                        **Description du poste :**
-                        {job_description}
-                        ---
-                        **Texte du CV :**
-                        {resume_text}
-                        """
-        response = requests.post(
-            url="https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://tg-hire.streamlit.app/", 
-                "X-Title": "TG Hire"
-            },
-            data=json.dumps({
-                "model": "openai/gpt-4o", 
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": prompt_content
-                    }
-                ]
-            })
-        )
-        response.raise_for_status()
-        data = response.json()
-        text_resp = data['choices'][0]['message']['content']
-        
-        score_match = re.search(r"score.*?\s*:\s*(\d+)\s*%|(\d+)\s*%", text_resp, re.IGNORECASE)
-        score = 0.0
-        if score_match:
-            score_str = score_match.group(1) or score_match.group(2)
-            if score_str:
-                score = int(score_str) / 100.0
-        
-        return {"score": score, "explanation": text_resp}
-    except Exception as e:
-        return {"score": 0.0, "explanation": f"Erreur OpenRouter: {e}"}
-
-def rank_resumes_with_openrouter(job_description, resumes, file_names, mode_court=False):
-    scores_data = []
-    progress_bar = st.progress(0)
-    for i, resume_text in enumerate(resumes):
-        extracted = extract_name_from_cv_text(resume_text)
-        candidate_name = extracted.get('name') if extracted else file_names[i]
-        scores_data.append(get_detailed_score_with_openrouter(job_description, resume_text, candidate_name, mode_court=mode_court))
-        progress_bar.progress((i + 1) / len(resumes))
-    progress_bar.empty()
-    return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
-
-def get_openrouter_profile_analysis(text: str, candidate_name: str | None = None) -> str:
-    API_KEY = get_openrouter_api_key()
-    if not API_KEY: return "❌ Analyse OpenRouter impossible (clé manquante)."
-
-    safe_name = (candidate_name or "Candidat").strip()
-
-    try:
-        response = requests.post(
-            url="https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {API_KEY}",
-                "Content-Type": "application/json",
-            },
-            data=json.dumps({
-                "model": "openai/gpt-3.5-turbo",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
-
-Règles NOM :
-- Nom identifié : "{safe_name}".
-- Si "{safe_name}" est inapproprié (Candidat, Permis B...), Trouve le vrai nom dans le texte.
-- Sinon garde "{safe_name}".
-
-**Format de sortie OBLIGATOIRE** :
-
-**👤 [Nom du Candidat]**
-
-**📊 Synthèse**
-[2-3 phrases]
-
-**🎓 Formation**
-[Diplôme le plus élevé]
-
-**💼 Expérience**
-[Dernier poste]
-
-**🛠️ Compétences clés**
-[4-5 compétences]
-
-**💡 Points forts**
-[2-3 points]
-
-**⚠️ Points d'attention**
-[1-2 points]
-
-Texte du CV :
-{text[:4000]}
-"""
-                    }
-                ]
-            })
-        )
-        response.raise_for_status()
-        return response.json()['choices'][0]['message']['content']
-    except Exception as e:
-        return f"❌ Erreur OpenRouter : {e}"
-        
-# DELETED DUPLICATE FUNCTION: get_openrouter_auto_classification
-
-# --- FONCTIONS CLAUDE ---
-def get_claude_api_key():
-    """Récupère la clé Claude avec persistance en session state."""
-    if "Claude_API_KEY" in st.session_state:
-        return st.session_state.Claude_API_KEY
-    
-    api_key = None
-    try:
-        keys_to_check = ["Claude_API_KEY", "CLAUDE_API_KEY", "anthropic_api_key", "ANTHROPIC_API_KEY"]
-        api_key = _retrieve_api_secret(keys_to_check + ["anthropic", "Anthropic", "claude", "Claude"])
-
-        if not api_key:
-            for k in keys_to_check:
-                val = os.environ.get(k)
-                if val:
-                    api_key = val.strip()
-                    break
-        
-        if api_key:
-            st.session_state.Claude_API_KEY = api_key
-            return api_key
-    except Exception:
-        pass
-    return None
-
-def get_detailed_score_with_claude(job_description, resume_text, candidate_name, mode_court=False):
-    API_KEY = get_claude_api_key()
-    if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Claude manquante."}
-    
-    safe_name = (candidate_name or "Candidat").strip()
-
-    try:
-        client = anthropic.Anthropic(api_key=API_KEY)
-        if mode_court:
-            prompt = _build_short_prompt(safe_name, job_description, resume_text)
-        else:
-            prompt = f"""
-        En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
-        Produis une analyse comparative détaillée.
-
-        **Format de sortie OBLIGATOIRE :**
-
-        **👤 {safe_name}**
-
-        **📊 Synthèse d'adéquation**
-        [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
-        
-        **🎓 Formation**
-        [Analyse de la formation du candidat par rapport aux exigences du poste.]
-
-        **💼 Expérience**
-        [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
-
-        **🛠️ Compétences clés**
-        [Liste des compétences du candidat qui correspondent aux compétences requises.]
-
-        **💡 Points forts pour ce poste**
-        [2-3 points forts spécifiques du candidat pour ce poste.]
-
-        **⚠️ Points d'attention pour ce poste**
-        [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
-        
-        ---
-        **Description du poste :**
-        {job_description}
-        ---
-        **Texte du CV :**
-        {resume_text}
-        """
-        
-        message = client.messages.create(
-            model="claude-3-sonnet-20240229",
-            max_tokens=4000,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        text_resp = ""
-        for block in message.content:
-            if block.type == "text":
-                text_resp += block.text
-        
-        score_match = re.search(r"score.*?\s*:\s*(\d+)\s*%|(\d+)\s*%", text_resp, re.IGNORECASE)
-        score = 0.0
-        if score_match:
-            score_str = score_match.group(1) or score_match.group(2)
-            if score_str:
-                score = int(score_str) / 100.0
-        
-        return {"score": score, "explanation": text_resp}
-    except Exception as e:
-        return {"score": 0.0, "explanation": f"Erreur Claude: {e}"}
-
-def get_claude_profile_analysis(text: str, candidate_name: str | None = None) -> str:
-    API_KEY = get_claude_api_key()
-    if not API_KEY: return "❌ Analyse Claude impossible (clé manquante)."
-
-    safe_name = (candidate_name or "Candidat").strip()
-
-    try:
-        client = anthropic.Anthropic(api_key=API_KEY)
-        prompt = f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
-
-Règles NOM :
-- Nom identifié : "{safe_name}".
-- Si "{safe_name}" est inapproprié (Candidat, Permis B...), Trouve le vrai nom dans le texte.
-- Sinon garde "{safe_name}".
-
-**Format de sortie OBLIGATOIRE** :
-
-**👤 [Nom du Candidat]**
-
-**📊 Synthèse**
-[2-3 phrases]
-
-**🎓 Formation**
-[Diplôme le plus élevé]
-
-**💼 Expérience**
-[Dernier poste]
-
-**🛠️ Compétences clés**
-[4-5 compétences]
-
-**💡 Points forts**
-[2-3 points]
-
-**⚠️ Points d'attention**
-[1-2 points]
-
-Texte du CV :
-{text[:4000]}
-"""
-        message = client.messages.create(
-            model="claude-3-haiku-20240307",
-            max_tokens=2000,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        # Safely extract text from blocks
-        text_resp = ""
-        for block in message.content:
-            if block.type == "text":
-                text_resp += block.text
-        return text_resp
-    except Exception as e:
-        return f"❌ Erreur Claude : {e}"
-
-# --- FONCTIONS GEMINI ---
-
-def get_gemini_api_key():
-    """Récupère la clé Gemini avec persistance en session state."""
-    # 1. Vérifier si déjà en session
-    if "Gemini_API_KEY" in st.session_state:
-        return st.session_state.Gemini_API_KEY
-    
-    api_key = None
-    try:
-        keys_to_check = ["Gemini_API_KEY", "GEMINI_API_KEY", "google_api_key", "GOOGLE_API_KEY"]
-        api_key = _retrieve_api_secret(keys_to_check + ["gemini", "Gemini", "google", "Google"], nested_keys=["api_key", "API_KEY", "token", "TOKEN"])
-
-        if not api_key:
-            for k in keys_to_check:
-                val = os.environ.get(k)
-                if val:
-                    api_key = val.strip()
-                    break
-        
-        if api_key:
-            st.session_state.Gemini_API_KEY = api_key
-            return api_key
-    except Exception:
-        pass
-    return None
-
-def get_detailed_score_with_gemini(job_description, resume_text, candidate_name, mode_court=False):
-    API_KEY = get_gemini_api_key()
-    if not API_KEY: return {"score": 0.0, "explanation": "❌ Clé Gemini manquante."}
-    
-    genai.configure(api_key=API_KEY)
-    
-    safe_name = (candidate_name or "Candidat").strip()
-
-    try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
-    except Exception:
-        try:
-            model = genai.GenerativeModel('gemini-1.5-pro')
-        except Exception:
-            st.error("Impossible de charger un modèle Gemini compatible.")
-            return {"score": 0.0, "explanation": "Erreur de chargement du modèle Gemini."}
-
-    if mode_court:
-        prompt = _build_short_prompt(safe_name, job_description, resume_text)
-    else:
-        prompt = f"""
-    En tant qu'expert en recrutement, évalue la pertinence du CV de "{safe_name}" pour la description de poste ci-dessous.
-    Produis une analyse comparative détaillée.
-
-    **Format de sortie OBLIGATOIRE :**
-
-    **👤 {safe_name}**
-
-    **📊 Synthèse d'adéquation**
-    [Score en pourcentage, puis 2-3 phrases sur l'adéquation globale du profil au poste.]
-    
-    **🎓 Formation**
-    [Analyse de la formation du candidat par rapport aux exigences du poste.]
-
-    **💼 Expérience**
-    [Analyse de l'expérience du candidat (durée, postes, secteurs) par rapport au poste.]
-
-    **🛠️ Compétences clés**
-    [Liste des compétences du candidat qui correspondent aux compétences requises.]
-
-    **💡 Points forts pour ce poste**
-    [2-3 points forts spécifiques du candidat pour ce poste.]
-
-    **⚠️ Points d'attention pour ce poste**
-    [1-2 points à clarifier ou qui semblent manquants par rapport au poste.]
-    
-    ---
-    **Description du poste :**
-    {job_description}
-    ---
-    **Texte du CV :**
-    {resume_text}
-    """
-    
-    try:
-        response = model.generate_content(prompt)
-        text_resp = response.text
-        
-        score_match = re.search(r"score.*?\s*:\s*(\d+)\s*%|(\d+)\s*%", text_resp, re.IGNORECASE)
-        score = 0.0
-        if score_match:
-            score_str = score_match.group(1) or score_match.group(2)
-            if score_str:
-                score = int(score_str) / 100.0
-        
-        return {"score": score, "explanation": text_resp}
-    except Exception as e:
-        return {"score": 0.0, "explanation": f"Erreur Gemini: {e}"}
-
-def rank_resumes_with_gemini(job_description, resumes, file_names, mode_court=False):
-    scores_data = []
-    progress_bar = st.progress(0)
-    for i, resume_text in enumerate(resumes):
-        extracted = extract_name_from_cv_text(resume_text)
-        candidate_name = extracted.get('name') if extracted else file_names[i]
-        scores_data.append(get_detailed_score_with_gemini(job_description, resume_text, candidate_name, mode_court=mode_court))
-        progress_bar.progress((i + 1) / len(resumes))
-        time.sleep(1) 
-    progress_bar.empty()
-    return {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
-
-def get_gemini_profile_analysis(text: str, candidate_name: str | None = None) -> str:
-    API_KEY = get_gemini_api_key()
-    if not API_KEY: return "❌ Analyse impossible (clé API Gemini manquante)."
-    
-    # Logique Nom
-    if candidate_name and is_valid_name_candidate(candidate_name):
-        safe_name = candidate_name
-    else:
-        extracted = extract_name_from_cv_text(text)
-        if extracted and extracted.get('name'):
-            safe_name = extracted['name']
-        else:
-            safe_name = "Candidat"
-    
-    safe_name = safe_name.replace("##", "").replace("**", "").strip()
-
-    genai.configure(api_key=API_KEY)
-    # Utilisation de gemini-2.5-flash-lite
-    model = genai.GenerativeModel('gemini-2.5-flash-lite')
-    
-    prompt = f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
-
-Règles NOM :
-- Nom identifié : "{safe_name}".
-- Si "{safe_name}" est inapproprié (Candidat, Permis B...), Trouve le vrai nom dans le texte.
-- Sinon garde "{safe_name}".
-
-**Format de sortie OBLIGATOIRE** :
-
-**👤 [Nom du Candidat]**
-
-**📊 Synthèse**
-[2-3 phrases]
-
-**🎓 Formation**
-[Diplôme le plus élevé]
-
-**💼 Expérience**
-[Dernier poste]
-
-**🛠️ Compétences clés**
-[4-5 compétences]
-
-**💡 Points forts**
-[2-3 points]
-
-**⚠️ Points d'attention**
-[1-2 points]
-
-Texte du CV :
-{text[:4000]}
-"""
-    try:
-        response = model.generate_content(prompt)
-        return response.text.strip()
-    except Exception as e:
-         # Fallback recursif silencieux si gemini-2.0-flash échoue
-        try:
-             model = genai.GenerativeModel('gemini-flash-latest')
-             response = model.generate_content(prompt)
-             return response.text.strip()
-        except:
-            return f"❌ Erreur Gemini : {e}"
-
-def get_gemini_auto_classification(text: str, full_name: str | None) -> dict:
-    API_KEY = get_gemini_api_key()
-    safe_name = (full_name or "Candidat").strip()
-    if not API_KEY:
-        return {
-            "macro_category": "Non classé",
-            "sub_category": NON_CLASSE_SUBCATEGORY,
-            "years_experience": 0,
-            "profile_summary": f"Erreur config Gemini",
-            "candidate_name": safe_name
-        }
-        
-    genai.configure(api_key=API_KEY)
-    # Update to gemini-2.5-flash-lite which is available
-    model = genai.GenerativeModel('gemini-2.5-flash-lite', generation_config={"response_mime_type": "application/json"})
-    
-    # Use centralized classification prompt to ensure exactly 4 categories
-    prompt = get_classification_prompt(text, safe_name)
-    
-    try:
-        response = model.generate_content(prompt)
-        try:
-            data = json.loads(response.text)
-        except:
-             # Fallback JSON parsing simple
-            clean_text = clean_json_string(response.text)
-            data = json.loads(clean_text)
-        
-        # Fallback values handle
-        macro = data.get("macro_category") or "Non classé"
-        if macro not in ["Fonctions supports", "Logistique", "Production/Technique"]: macro = "Non classé"
-        
-        macro, sub = normalize_classification_labels(macro, data.get("sub_category"), text)
-        return {
-            "macro_category": macro,
-            "sub_category": sub,
-            "years_experience": int(data.get("years_experience", 0)),
-            "profile_summary": data.get("profile_summary", ""),
-            "candidate_name": data.get("candidate_name", safe_name)
-        }
-    except Exception as e:
-        # Fallback silent to gemini-flash-latest
-        try:
-            model = genai.GenerativeModel('gemini-flash-latest', generation_config={"response_mime_type": "application/json"})
-            response = model.generate_content(prompt)
-            try:
-                data = json.loads(response.text)
-            except:
-                clean_text = clean_json_string(response.text)
-                data = json.loads(clean_text)
-            
-            macro = data.get("macro_category") or "Non classé"
-            macro, sub = normalize_classification_labels(macro, data.get("sub_category"), text)
-            
-            return {
-                "macro_category": macro,
-                "sub_category": sub,
-                "years_experience": int(data.get("years_experience", 0)),
-                "profile_summary": data.get("profile_summary", ""),
-                "candidate_name": data.get("candidate_name", safe_name)
-            }
-        except:
-            return {
-                "macro_category": "Non classé",
-                "sub_category": NON_CLASSE_SUBCATEGORY,
-                "years_experience": 0,
-                "profile_summary": f"Erreur Gemini: {e}",
-                "candidate_name": safe_name
-            }
-
-
-### Centralized classification prompt (ENFORCE 4 categories) ###
-PRODUCTION_ALLOWED_SUBCATEGORIES = [
-    "PRODUCTION - ÉTUDES (BUREAU)",
-    "PRODUCTION - TRAVAUX (CHANTIER)",
-    "PRODUCTION - QUALITÉ",
-    "PRODUCTION - AUTRES"
-]
-
-NON_CLASSE_SUBCATEGORY = "Divers / Hors périmètre"
-
-# Mapping strict : sous-direction → macro-catégorie obligatoire
-# Utilisé pour forcer la bonne catégorie même si l'IA se trompe
-SUBDIRECTION_TO_MACRO = {
-    # Fonctions supports - sous-directions métier
-    "RH": "Fonctions supports",
-    "RESSOURCES HUMAINES": "Fonctions supports",
-    "RECRUTEMENT": "Fonctions supports",
-    "PAIE": "Fonctions supports",
-    "FORMATION": "Fonctions supports",
-    "FINANCE": "Fonctions supports",
-    "COMPTABILITÉ": "Fonctions supports",
-    "COMPTABILITE": "Fonctions supports",
-    "TRÉSORERIE": "Fonctions supports",
-    "TRESORERIE": "Fonctions supports",
-    "CONTRÔLE DE GESTION": "Fonctions supports",
-    "CONTROLE DE GESTION": "Fonctions supports",
-    "AUDIT": "Fonctions supports",
-    "ACHATS": "Fonctions supports",
-    "ACHAT": "Fonctions supports",
-    "DSI": "Fonctions supports",
-    "INFORMATIQUE": "Fonctions supports",
-    "IT": "Fonctions supports",
-    "SUPPORT IT": "Fonctions supports",
-    "QHSE": "Fonctions supports",
-    "QUALITÉ": "Fonctions supports",
-    "QUALITE": "Fonctions supports",
-    "HSE": "Fonctions supports",
-    "JURIDIQUE": "Fonctions supports",
-    "LEGAL": "Fonctions supports",
-    "COMMUNICATION": "Fonctions supports",
-    "MARKETING": "Fonctions supports",
-    "ADMINISTRATION": "Fonctions supports",
-    "ASSISTANAT": "Fonctions supports",
-    "SECRÉTARIAT": "Fonctions supports",
-    "SECRETARIAT": "Fonctions supports",
-    
-    # Logistique - sous-directions
-    "SUPPLY CHAIN": "Logistique",
-    "APPROVISIONNEMENT": "Fonctions supports",  # Achats = support
-    "TRANSPORT": "Logistique",
-    "ENTREPÔT": "Logistique",
-    "ENTREPOT": "Logistique",
-    "STOCKS": "Logistique",
-    "PRÉPARATION": "Logistique",
-    "PREPARATION": "Logistique",
-    "DISTRIBUTION": "Logistique",
-    
-    # Production - forcées si vraiment production
-    "PRODUCTION - ÉTUDES (BUREAU)": "Production/Technique",
-    "PRODUCTION - TRAVAUX (CHANTIER)": "Production/Technique",
-    "PRODUCTION - QUALITÉ": "Production/Technique",
+# Global tweaks: enlarge tab labels, plot titles and legend fonts for better readability
+st.markdown("""
+<style>
+/* Tabs: increase font-size and weight (stronger selectors) */
+div[role="tablist"] > button, button[role="tab"], div[role="tablist"] button[role="tab"] {
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    padding: 8px 14px !important;
 }
 
-CATEGORIES_PROMPT = """
-Agis comme un expert en recrutement. Tu dois classer STRICTEMENT le CV dans UNE et UNE SEULE des quatre macro-catégories suivantes :
+/* Plotly title and legend sizing (fallback selector) */
+.plotly .gtitle, .plotly .gtitle text { font-family: Arial, sans-serif !important; font-size: 18px !important; fill: #111 !important; }
+.plotly .legend { font-size: 14px !important; }
 
-1) Fonctions supports
-    - Ce sont les fonctions transverses qui soutiennent l'activité opérationnelle.
-    - ⚠️ ATTENTION : La sous-catégorie doit être le NOM de la SOUS-DIRECTION (pas l'intitulé du poste) !
-    
-    **Sous-directions disponibles :**
-    • **DSI** : Développeur, Business Analyst IT, Data Analyst, Product Owner, Chef de projet IT/digital, Consultant IT, AMOA, Transformation digitale, Administrateur système, Support IT, Ingénieur réseau, RSSI...
-    • **Finance** : Comptable, Contrôleur de gestion, DAF, Auditeur, Trésorier, M&A, Corporate Finance, Consultant Finance, Financement...
-    • **Achats** : Acheteur, Ingénieur achats, Directeur achats, Approvisionneur, Sourcing...
-    • **RH** : Recruteur, Responsable RH, DRH, Gestionnaire paie, Chargé de formation, Relations sociales...
-    • **QHSE** : Responsable qualité, Coordinateur HSE, Ingénieur sécurité, Auditeur qualité...
-    • **Juridique** : Juriste, Avocat, Directeur juridique, Compliance...
-    • **Communication** : Chargé de communication, Community manager, Responsable marketing, Chef de produit...
-    • **Administration** : Assistant, Secrétaire, Office manager...
-    
-    - ⚠️ RÈGLE ABSOLUE : DSI, Informatique, IT, Développement, Data = TOUJOURS Fonctions supports (jamais Production).
-    - ⚠️ RÈGLE ABSOLUE : Achats, Approvisionnement = TOUJOURS Fonctions supports.
-    - **La sous-catégorie doit être UNIQUEMENT : "DSI", "RH", "Finance", "Achats", "QHSE", "Juridique", "Communication" ou "Administration".**
-    - **NE RETOURNE JAMAIS l'intitulé du poste comme sous-catégorie !**
+/* Streamlit metrics: aggressive selectors to increase label and value sizes */
+/* Streamlit metrics: aggressive selectors to increase label and value sizes and center them */
+div[data-testid="metric-container"] div[data-testid="stMetric"] span[data-testid], div[data-testid="metric-container"] .stMetricValue, .stMetricValue {
+    font-size: 28px !important; font-weight: 800 !important; line-height:1 !important; display:block; text-align:center !important;
+}
+div[data-testid="metric-container"] div[data-testid="stMetric"] p, .stMetricLabel {
+    font-size: 15px !important; color: #2c3e50 !important; margin:0 !important; display:block; text-align:center !important;
+}
 
-2) Production/Technique
-    - Métiers de la production, du BTP, de l'industrie, de la maintenance, du bureau d'études.
-    - ⚠️ Exclut TOUS les métiers IT/Digital (ceux-là vont en Fonctions supports - DSI).
-    - Exemples : Ingénieur BTP, Conducteur de travaux, Chef de chantier, Technicien maintenance, Opérateur production, Ingénieur méthodes, Dessinateur projeteur.
-    - TU DOIS choisir UNE SEULE sous-catégorie parmi :
-        • "PRODUCTION - ÉTUDES (BUREAU)" → Bureau d'études, méthodes, prix, planification technique
-        • "PRODUCTION - TRAVAUX (CHANTIER)" → Chantier, conduite de travaux, chef de chantier, conducteur d'engins
-        • "PRODUCTION - QUALITÉ" → Qualité production, contrôle qualité sur site
+/* Fallback generic selectors for metrics */
+span[data-testid="stMetricLabel"] { font-size:15px !important; }
+span[data-testid="stMetricValue"] { font-size:28px !important; font-weight:700 !important; }
 
-3) Logistique
-    - Métiers centrés sur la gestion des flux physiques : transport, entrepôt, stocks, distribution.
-    - Exemples : Responsable entrepôt, Préparateur de commandes, Gestionnaire de stocks, Responsable transport, Supply chain (flux physiques).
-    - Sous-catégorie : le type de métier logistique (ex : "Transport", "Entrepôt", "Stocks").
+/* Slight increase for general section subtitles */
+.stSubheader, .stMarkdown h3 { font-size: 1.06em !important; }
+</style>
+""", unsafe_allow_html=True)
 
-4) Non classé
-    - Utilise cette catégorie seulement si le CV est hors périmètre (autre secteur) ou illisible.
-    - Sous-catégorie OBLIGATOIRE : "Divers / Hors périmètre".
-"""
+# Données pour le Kanban
+postes_data = [
+    # Colonne Nouvelle demande
+    {"titre": "Nouvelle Demande Exemple", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "X.DEMANDE", "recruteur": "Jalal", "statut": "Nouvelle demande"},
+    # Colonne Sourcing
+    {"titre": "Ingénieur Achat", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.BOUZOUBAA", "recruteur": "Zakaria", "statut": "Sourcing"},
+    {"titre": "Directeur Achats Adjoint", "entite": "TGCC", "lieu": "Siège", "demandeur": "C.BENABDELLAH", "recruteur": "Zakaria", "statut": "Sourcing"},
+    {"titre": "INGENIEUR TRAVAUX", "entite": "TGCC", "lieu": "YAMED LOT B", "demandeur": "M.TAZI", "recruteur": "Zakaria", "statut": "Sourcing"},
 
-def normalize_classification_labels(raw_macro: str | None, raw_sub: str | None, full_text: str | None = "") -> tuple[str, str]:
-    """Normalise les libellés renvoyés par l'IA pour garantir la cohérence métier.
-    
-    RÈGLE CLÉE : Les sous-directions forcent la macro-catégorie.
-    Ex: si sub="DSI" → macro DOIT être "Fonctions supports" même si l'IA a dit Production.
+    # Colonne Shortlisté
+    {"titre": "CHEF DE PROJETS", "entite": "TGCC", "lieu": "DESSALMENT JORF", "demandeur": "M.FENNAN", "recruteur": "ZAKARIA", "statut": "Shortlisté"},
+    {"titre": "Planificateur", "entite": "TGCC", "lieu": "ASFI-B", "demandeur": "SOUFIANI", "recruteur": "Ghita", "statut": "Shortlisté"},
+    {"titre": "RESPONSABLE TRANS INTERCH", "entite": "TG PREFA", "lieu": "OUED SALEH", "demandeur": "FBOUZOUBAA", "recruteur": "Ghita", "statut": "Shortlisté"},
+
+    # Colonne Signature DRH
+    {"titre": "PROJETEUR DESSINATEUR", "entite": "TG WOOD", "lieu": "OUED SALEH", "demandeur": "S.MENJRA", "recruteur": "Zakaria", "statut": "Signature DRH"},
+    {"titre": "Projeteur", "entite": "TGCC", "lieu": "TSP Safi", "demandeur": "B.MORABET", "recruteur": "Zakaria", "statut": "Signature DRH"},
+    {"titre": "Consultant SAP", "entite": "TGCC", "lieu": "Siège", "demandeur": "O.KETTA", "recruteur": "Zakaria", "statut": "Signature DRH"},
+
+    # Colonne Clôture
+    {"titre": "Doc Controller", "entite": "TGEM", "lieu": "SIEGE", "demandeur": "A.SANKARI", "recruteur": "Zakaria", "statut": "Clôture"},
+    {"titre": "Ingénieur étude/qualité", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.MOUTANABI", "recruteur": "Zakaria", "statut": "Clôture"},
+    {"titre": "Responsable Cybersecurité", "entite": "TGCC", "lieu": "Siège", "demandeur": "Ghazi", "recruteur": "Zakaria", "statut": "Clôture"},
+    {"titre": "CHEF DE CHANTIER", "entite": "TGCC", "demandeur": "M.FENNAN", "recruteur": "Zakaria", "statut": "Clôture"},
+    {"titre": "Ing contrôle de la performance", "entite": "TGCC", "lieu": "Siège", "demandeur": "H.BARIGOU", "recruteur": "Ghita", "statut": "Clôture"},
+    {"titre": "Ingénieur Systèmes Réseaux", "entite": "TGCC", "lieu": "Siège", "demandeur": "M.JADDOR", "recruteur": "Ghita", "statut": "Clôture"},
+    {"titre": "Responsable étude de prix", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "S.Bennani Zitani", "recruteur": "Ghita", "statut": "Clôture"},
+    {"titre": "Responsable Travaux", "entite": "TGEM", "lieu": "Zone Rabat", "demandeur": "S.ACHIR", "recruteur": "Zakaria", "statut": "Clôture"},
+
+    # Colonne Désistement
+    {"titre": "Conducteur de Travaux", "entite": "TGCC", "lieu": "JORF LASFAR", "demandeur": "M.FENNAN", "recruteur": "Zakaria", "statut": "Désistement"},
+    {"titre": "Chef de Chantier", "entite": "TGCC", "lieu": "TOARC", "demandeur": "M.FENNAN", "recruteur": "Zakaria", "statut": "Désistement"},
+    {"titre": "Magasinier", "entite": "TG WOOD", "lieu": "Oulad Saleh", "demandeur": "K.TAZI", "recruteur": "Ghita", "statut": "Désistement", "commentaire": "Pas de retour du demandeur"}
+]
+
+
+def create_integration_filters(df_recrutement, prefix=""):
+    """Créer des filtres spécifiques pour les intégrations (sans les périodes)"""
+    if df_recrutement is None or len(df_recrutement) == 0:
+        return {}
+
+    # Organiser les filtres dans deux colonnes dans la sidebar
+    filters = {}
+    left_col, right_col = st.sidebar.columns(2)
+
+    # Filtre par entité demandeuse (colonne gauche)
+    entites = ['Toutes'] + sorted(df_recrutement['Entité demandeuse'].dropna().unique())
+    with left_col:
+        filters['entite'] = st.selectbox("Entité demandeuse", entites, key=f"{prefix}_entite")
+
+    # Filtre par direction concernée (colonne droite)
+    directions = ['Toutes'] + sorted(df_recrutement['Direction concernée'].dropna().unique())
+    with right_col:
+        filters['direction'] = st.selectbox("Direction concernée", directions, key=f"{prefix}_direction")
+
+    # Pas de filtres de période pour les intégrations
+    filters['periode_recrutement'] = 'Toutes'
+    filters['periode_demande'] = 'Toutes'
+
+    return filters
+
+def create_global_filters(df_recrutement, prefix="", include_periode_recrutement=True, include_periode_demande=True):
+    """Créer des filtres globaux réutilisables pour tous les onglets.
+
+    include_periode_recrutement et include_periode_demande contrôlent si le sélecteur
+    de période correspondant est affiché (utile pour n'affecter qu'une section).
     """
-    macro = (raw_macro or "").strip()
-    sub = (raw_sub or "").strip()
-    text_lower = (full_text or "").lower()
-    sub_upper = sub.upper()
+    if df_recrutement is None or len(df_recrutement) == 0:
+        return {}
 
-    # ÉTAPE 1 : Vérifier si la sous-direction impose une macro-catégorie spécifique
-    # Cela corrige les erreurs de l'IA (ex: DSI classée en Production)
-    if sub_upper in SUBDIRECTION_TO_MACRO:
-        forced_macro = SUBDIRECTION_TO_MACRO[sub_upper]
-        # Si la macro forcée diffère de celle proposée, on la corrige
-        if forced_macro != macro:
-            macro = forced_macro
-        
-        # CONTINUER vers l'étape 2 pour normaliser le libellé de la sous-catégorie (ex: Recrutement -> RH)
+    # Organiser les filtres dans deux colonnes dans la sidebar
+    filters = {}
+    left_col, right_col = st.sidebar.columns(2)
 
+    # Filtre par entité demandeuse (colonne gauche)
+    entites = ['Toutes'] + sorted(df_recrutement['Entité demandeuse'].dropna().unique())
+    with left_col:
+        filters['entite'] = st.selectbox("Entité demandeuse", entites, key=f"{prefix}_entite")
 
-    # ÉTAPE 2 : Détection de mots-clés métier dans la sous-direction ou le texte
-    # pour affiner automatiquement même si l'IA n'a pas donné la bonne sous-direction
-    
-    # Détection DSI / Informatique → TOUJOURS Fonctions supports
-    # Élargie pour capturer développeur, data analyst, product owner, business analyst IT, etc.
-    if any(kw in sub_upper for kw in ["DSI", "INFORMATIQUE", "IT", "SUPPORT IT", "SYSTÈME", "SYSTEME", "RÉSEAU", "RESEAU", "CYBER", 
-                                        "DÉVELOPPEUR", "DEVELOPPEUR", "DEV ", "FULL-STACK", "FULL STACK", "BACKEND", "FRONTEND",
-                                        "DATA ANALYST", "DATA ENGINEER", "DATA SCIENTIST", "BI", "BUSINESS INTELLIGENCE",
-                                        "PRODUCT OWNER", "SCRUM MASTER", "CHEF DE PROJET IT", "CHEF DE PROJET DIGITAL",
-                                        "DIGITALISATION", "DIGITAL", "TRANSFORMATION DIGITALE", "NUMÉRIQUE", "NUMERIQUE",
-                                        "BUSINESS ANALYST IT", "ANALYSTE IT", "CONSULTANT IT", "AMOA", "MOA"]):
-        return "Fonctions supports", "DSI"
-    if any(kw in text_lower for kw in [" dsi ", "direction des systèmes", "direction système", "infrastructure it", "support informatique", 
-                                         "administrateur système", "ingénieur système", "développeur", "developpeur", "full stack", "full-stack",
-                                         "data analyst", "data engineer", "data scientist", "business intelligence", "product owner", 
-                                         "scrum master", "chef de projet it", "digitalisation", "transformation digitale", "business analyst it"]):
-        return "Fonctions supports", "DSI"
-    
-    # Détection RH
-    if any(kw in sub_upper for kw in ["RH", "RESSOURCES HUMAINES", "RECRUTEMENT", "PAIE", "FORMATION"]):
-        return "Fonctions supports", "RH"
-    if any(kw in text_lower for kw in ["ressources humaines", "recruteur", "chargé de recrutement", "gestionnaire paie", "responsable formation"]):
-        return "Fonctions supports", "RH"
-    
-    # Détection Finance / Compta
-    # Élargie pour M&A, Corporate Finance, Financement, Contrôle de gestion
-    if any(kw in sub_upper for kw in ["FINANCE", "COMPTAB", "TRÉSOR", "AUDIT", "CONTRÔLE DE GESTION", "CONTROLE DE GESTION",
-                                        "M&A", "CORPORATE FINANCE", "FINANCEMENT", "INVESTISSEMENT", "GESTION FINANCIÈRE", "GESTION FINANCIERE",
-                                        "CONTRÔLEU", "CONTROLEU", "DAF", "RAF"]):
-        return "Fonctions supports", "Finance"
-    if any(kw in text_lower for kw in ["comptable", "contrôleur de gestion", "controleur de gestion", "auditeur", "trésorier", 
-                                         "directeur financier", "daf", "m&a", "corporate finance", "financement", "finance manager",
-                                         "consultant finance", "consultante finance"]):
-        return "Fonctions supports", "Finance"
-    
-    # Détection Achats
-    if any(kw in sub_upper for kw in ["ACHAT", "APPROVISIONNEMENT", "SOURCING"]):
-        return "Fonctions supports", "Achats"
-    if any(kw in text_lower for kw in ["acheteur", "ingénieur achats", "directeur achats", "responsable achats", "approvisionneur"]):
-        return "Fonctions supports", "Achats"
-    
-    # Détection Juridique
-    if any(kw in sub_upper for kw in ["JURIDIQUE", "LEGAL", "DROIT"]):
-        return "Fonctions supports", "Juridique"
-    if any(kw in text_lower for kw in ["juriste", "avocat", "directeur juridique", "conseil juridique"]):
-        return "Fonctions supports", "Juridique"
-    
-    # Détection Communication / Marketing
-    if any(kw in sub_upper for kw in ["COMMUNICATION", "MARKETING", "COM ", "RESPONSABLE MARKETING", "CHARGÉ COM", "CHARGE COM"]):
-        return "Fonctions supports", "Communication"
-    if any(kw in text_lower for kw in ["chargé de communication", "charge de communication", "community manager", "responsable marketing", 
-                                         "chef de produit", "responsable communication"]):
-        return "Fonctions supports", "Communication"
-    
-    # Détection Administration / Assistanat
-    if any(kw in sub_upper for kw in ["ADMINISTRATION", "ASSISTANAT", "SECRÉTARIAT", "SECRETARIAT", "ASSISTANT"]):
-        return "Fonctions supports", "Administration"
-    if any(kw in text_lower for kw in ["assistant", "secrétaire", "office manager", "assistant de direction"]):
-        return "Fonctions supports", "Administration"
+    # Filtre par direction concernée (colonne droite)
+    directions = ['Toutes'] + sorted(df_recrutement['Direction concernée'].dropna().unique())
+    with right_col:
+        filters['direction'] = st.selectbox("Direction concernée", directions, key=f"{prefix}_direction")
 
-    # ÉTAPE 3 : Normalisation stricte des macro catégories si pas encore fait
-    if "support" in macro.lower():
-        macro = "Fonctions supports"
-    elif "logist" in macro.lower():
-        macro = "Logistique"
-    elif "production" in macro.lower() or "tech" in macro.lower():
-        macro = "Production/Technique"
+    # Ajouter les filtres de période (sans ligne de séparation)
+    left_col2, right_col2 = st.sidebar.columns(2)
+
+    # Filtre Période de recrutement (basé sur Date d'entrée effective)
+    if include_periode_recrutement:
+        with left_col2:
+            if 'Date d\'entrée effective du candidat' in df_recrutement.columns:
+                df_recrutement['Année_Recrutement'] = df_recrutement['Date d\'entrée effective du candidat'].dt.year
+                annees_rec = sorted([y for y in df_recrutement['Année_Recrutement'].dropna().unique() if not pd.isna(y)])
+                if annees_rec:
+                    filters['periode_recrutement'] = st.selectbox(
+                        "Période de recrutement", 
+                        ['Toutes'] + [int(a) for a in annees_rec], 
+                        index=len(annees_rec), 
+                        key=f"{prefix}_periode_rec"
+                    )
+                else:
+                    filters['periode_recrutement'] = 'Toutes'
+            else:
+                filters['periode_recrutement'] = 'Toutes'
     else:
-        macro = "Non classé"
+        # Ne pas afficher le sélecteur, s'assurer que la valeur reste 'Toutes'
+        filters['periode_recrutement'] = 'Toutes'
 
-    # ÉTAPE 4 : Traitement spécifique Production/Technique
-    if macro == "Production/Technique":
-        # Respect strict des sous-directions autorisées
-        for allowed in PRODUCTION_ALLOWED_SUBCATEGORIES:
-            if allowed.upper() == sub_upper:
-                return macro, allowed
-
-        # Heuristiques basées sur les mots-clés du texte ou du sous-libellé reçu
-        if any(keyword in sub_upper for keyword in ["QUAL", "QC", "QHSE", "HSE"]) or any(keyword in text_lower for keyword in ["qualit", "qse", "controle qual", "control quality"]):
-            return macro, "PRODUCTION - QUALITÉ"
-        if any(keyword in sub_upper for keyword in ["METH", "PLAN", "ETU", "MÉTR", "METR", "BUREAU", "PRIX"]) or any(keyword in text_lower for keyword in ["méthode", "method", "planning", "planificateur", "métr", "etude de prix", "bureau d'etude"]):
-            return macro, "PRODUCTION - ÉTUDES (BUREAU)"
-        if any(keyword in sub_upper for keyword in ["TRAVAUX", "CHANTIER", "CONDUCTEUR", "DIRECTEUR", "CHEF DE PROJET", "CHEF D'ÉQUIPE", "CHEF D'EQUIPE", "OPC"]) or any(keyword in text_lower for keyword in ["chantier", "conducteur", "chef de chantier", "travaux", "opc"]):
-            return macro, "PRODUCTION - TRAVAUX (CHANTIER)"
-        # Par défaut, classer en Autres pour relecture ultérieure
-        return macro, "PRODUCTION - AUTRES"
-
-    if macro == "Non classé":
-        return macro, NON_CLASSE_SUBCATEGORY
-
-    # Pour les autres catégories, renvoyer un sous-libellé propre ou défaut
-    if not sub:
-        if macro == "Fonctions supports":
-            return macro, "Support"
-        if macro == "Logistique":
-            return macro, "Logistique"
-
-    return macro, sub
-
-
-def get_classification_prompt(text: str, hint_name: str | None) -> str:
-    hint = (hint_name or "").strip()
-    return f"""
-    {CATEGORIES_PROMPT}
-
-    Agis comme un Expert Recrutement BTP.
-    
-    Tâche 1 : Identité
-    Trouve le "Prénom NOM" (Indice: "{hint}").
-
-    Tâche 2 : Classification
-    Choisis UNE seule catégorie : "FONCTIONS SUPPORTS", "LOGISTIQUE", "PRODUCTION / TECHNIQUE", "DIVERS / HORS PÉRIMÈTRE".
-    
-    Tâche 3 : Le Poste (Sous-catégorie)
-    Extrait le titre EXACT du poste (ex: "Ingénieur Travaux", "Contrôleur de Gestion").
-    Si c'est de la Production, précise si c'est "Études", "Travaux" ou "Qualité".
-
-    Tâche 4 : Expérience & Résumé.
-
-    Réponds UNIQUEMENT avec ce JSON :
-    {{
-        "candidate_name": "...",
-        "macro_category": "...",
-        "sub_category": "...",
-        "years_experience": 0,
-        "profile_summary": "..."
-    }}
-
-    CV TEXTE :
-    {text[:4000]}
-    """
-
-def get_deepseek_profile_analysis(text: str, candidate_name: str | None = None) -> str:
-    """
-    Génère une analyse de profil générique et concise en français.
-    Retourne un texte structuré avec les points clés du candidat.
-    Format en 2 colonnes pour affichage, commence par synthèse + nom.
-    """
-    API_KEY = get_api_key()
-    if not API_KEY:
-        return "❌ Analyse impossible (clé API manquante)."
-    
-    # --- LOGIQUE AMÉLIORÉE POUR LE NOM ---
-    safe_name = ""
-    
-    # 1. Priorité au nom passé en argument s'il est valide
-    if candidate_name and is_valid_name_candidate(candidate_name):
-        safe_name = candidate_name
+    # Filtre Période de la demande (basé sur Date de réception de la demande)
+    date_demande_col = 'Date de réception de la demande aprés validation de la DRH'
+    if include_periode_demande:
+        with right_col2:
+            if date_demande_col in df_recrutement.columns:
+                df_recrutement['Année_Demande'] = df_recrutement[date_demande_col].dt.year
+                annees_dem = sorted([y for y in df_recrutement['Année_Demande'].dropna().unique() if not pd.isna(y)])
+                if annees_dem:
+                    filters['periode_demande'] = st.selectbox(
+                        "Période de la demande", 
+                        ['Toutes'] + [int(a) for a in annees_dem], 
+                        index=len(annees_dem), 
+                        key=f"{prefix}_periode_dem"
+                    )
+                else:
+                    filters['periode_demande'] = 'Toutes'
+            else:
+                filters['periode_demande'] = 'Toutes'
     else:
-        # 2. Sinon, tentative d'extraction locale robuste
-        extracted = extract_name_from_cv_text(text)
-        if extracted and extracted.get('name'):
-            safe_name = extracted['name']
-        else:
-            safe_name = "Candidat"
+        # Ne pas afficher le sélecteur, s'assurer que la valeur reste 'Toutes'
+        filters['periode_demande'] = 'Toutes'
+
+    return filters
+
+def apply_global_filters(df, filters):
+    """Appliquer les filtres globaux aux données"""
+    df_filtered = df.copy()
     
-    # Nettoyage final du nom (au cas où des ## resteraient)
-    safe_name = safe_name.replace("##", "").replace("**", "").strip()
-    # -------------------------------------
+    if filters.get('entite') != 'Toutes':
+        df_filtered = df_filtered[df_filtered['Entité demandeuse'] == filters['entite']]
     
-    url = "https://api.deepseek.com/v1/chat/completions"
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
+    if filters.get('direction') != 'Toutes':
+        df_filtered = df_filtered[df_filtered['Direction concernée'] == filters['direction']]
     
-    prompt = f"""Tu es un expert en recrutement. Analyse le CV suivant et génère un résumé structuré et concis EN FRANÇAIS.
-
-Règles NOM STRICTES (alignées avec l'extraction locale) :
-- Utilise STRICTEMENT le nom fourni ci-dessous s'il est présent.
-- Ne modifie PAS le nom (pas d'ajout de points, parenthèses, intitulés).
-- N'invente JAMAIS de nom. Si le nom ci-dessus est "Candidat (Nom non détecté)", REPRENDS-LE tel quel.
-- Ignore toute ligne contenant des mots interdits fréquents (ex: AutoCAD, ORSYS, Secteur, BIM, Owner, PSPO, Client, Missions, Permis, Angleterre, Irlande, Luxembourg, Urbanisme, Agro-alimentaire, Lecture, Multi-disciplinary, Engineering, Studies, Parcours, Professionnel, Ivalua, PRM, AMF, Alerting, Blockchain, Projects, Purposes, Program).
-
-**Format de sortie OBLIGATOIRE** - Respecte EXACTEMENT cet ordre et ces titres :
-
-**👤 {safe_name}**
-
-**📊 Synthèse**
-[2-3 phrases max : années d'expérience, type de profil (junior/confirmé/senior), domaine d'expertise principal]
-
-**🎓 Formation**
-[Diplôme le plus élevé - établissement - année si disponible]
-
-**💼 Expérience**
-[Dernier poste occupé - entreprise - durée]
-[Secteur(s) d'activité]
-
-**🛠️ Compétences clés**
-[4-5 compétences techniques, séparées par des virgules]
-
-**💡 Points forts**
-[2-3 points forts, une ligne chacun]
-
-**⚠️ Points d'attention**
-[1-2 éléments à vérifier en entretien]
-
-Contraintes STRICTES :
-- Commence TOUJOURS par le nom puis la synthèse
-- Sois factuel et concis (pas de formules de politesse)
-- Si info absente du CV, écris "Non précisé"
-- Maximum 12 lignes au total
-
-Texte du CV :
-{text[:4000]}
-"""
+    # Appliquer le filtre période de recrutement
+    if filters.get('periode_recrutement') != 'Toutes' and 'Année_Recrutement' in df_filtered.columns:
+        df_filtered = df_filtered[df_filtered['Année_Recrutement'] == filters['periode_recrutement']]
     
-    payload = {
-        "model": "deepseek-chat",
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.2,
-    }
+    # Appliquer le filtre période de la demande
+    if filters.get('periode_demande') != 'Toutes' and 'Année_Demande' in df_filtered.columns:
+        df_filtered = df_filtered[df_filtered['Année_Demande'] == filters['periode_demande']]
     
+    return df_filtered
+
+
+@st.cache_resource
+def get_gsheet_client():
+    """Crée et retourne un client gspread authentifié en utilisant les secrets Streamlit."""
     try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
-        response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"].strip()
-    except Exception as e:
-        return f"❌ Erreur lors de l'analyse : {e}"
-
-
-def get_deepseek_analysis(text):
-    API_KEY = get_api_key()
-    if not API_KEY: return "Analyse impossible."
-    url = "https://api.deepseek.com/v1/chat/completions"
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
-    prompt = f"""
-     Tu es un expert en recrutement. À partir du texte du CV ci-dessous, classe le poste cible dans UNE seule des trois macro-catégories suivantes :
-
-     1. Fonctions supports
-         • Direction RH : Recrutement, paie, formation, relations sociales.
-         • Direction Finance : Comptabilité, trésorerie, fiscalité, audit.
-         • Contrôle de Gestion : Analyse de la performance, budgets.
-         • Direction des Achats : Sourcing, négociation, approvisionnements.
-         • Direction Logistique : Gestion des flux, transport, entreposage.
-         • Direction Informatique (DSI) : Infrastructure, support, cybersécurité.
-         • QHSE : Normes ISO, sécurité au travail, environnement.
-         • Direction Juridique : Conformité, contrats.
-         • Communication / Marketing : Image de marque, digital.
-
-     2. Logistique
-         • Activités centrées sur la gestion des flux physiques, transport, entrepôts, distribution.
-
-     3. Production/Technique
-         • BTP / Génie Civil : Études de prix, conduite de travaux.
-         • Industrie : Production, ligne d'assemblage, usinage, électromécanique, automatisme.
-         • R&D / Bureau d'études : Conception, ingénierie.
-         • Commercial / Vente : Développement du chiffre d'affaires lié à une offre technique ou industrielle.
-
-      Consigne IMPORTANTE :
-      - Réponds UNIQUEMENT par le nom exact d'UNE SEULE des quatre macro-catégories ci-dessous :
-          "Fonctions supports" OU "Logistique" OU "Production/Technique" OU "Non classé".
-      - Ne donne aucune explication supplémentaire.
-
-     Texte du CV :
-     {text}
-     """
-    payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0.2}
-    try:
-        response = requests.post(url, headers=headers, data=json.dumps(payload))
-        response.raise_for_status()
-        # Récupérer uniquement la catégorie (nettoyer la réponse)
-        result = response.json()["choices"][0]["message"]["content"].strip()
-        res_low = result.lower()
-        # Normaliser la réponse pour s'assurer qu'elle correspond à l'une des quatre catégories
-        if "support" in res_low:
-            return "Fonctions supports"
-        if "logist" in res_low:
-            return "Logistique"
-        if "production" in res_low or "technique" in res_low:
-            return "Production/Technique"
-        if "non class" in res_low or "non-class" in res_low or "non classé" in res_low:
-            return "Non classé"
-        # Garder la réponse originale si elle ne correspond pas aux patterns prévus
-        return result
-    except Exception as e:
-        return f"Erreur IA : {e}"
-
-
-
-def clean_json_string(json_str):
-    """Nettoie la réponse de l'IA pour extraire uniquement le bloc JSON valide."""
-    import re
-    # Enlever les balises Markdown ```json ... ```
-    if "```" in json_str:
-        json_str = re.sub(r'```json\s*', '', json_str)
-        json_str = re.sub(r'```\s*', '', json_str)
-    
-    # Trouver le premier '{' et le dernier '}'
-    start = json_str.find('{')
-    end = json_str.rfind('}')
-    
-    if start != -1 and end != -1:
-        return json_str[start : end + 1]
-    return json_str
-
-def get_deepseek_auto_classification(text: str, local_extracted_name: str | None) -> dict:
-    API_KEY = get_api_key()
-    hint_name = (local_extracted_name or "").strip()
-    
-    # Fallback immédiat si pas de clé
-    default_response = {
-        "macro_category": "Non classé",
-        "sub_category": NON_CLASSE_SUBCATEGORY,
-        "years_experience": 0,
-        "candidate_name": hint_name or "Candidat",
-        "profile_summary": "Analyse impossible (clé manquante)."
-    }
-    
-    if not API_KEY: return default_response
-
-    url = "https://api.deepseek.com/v1/chat/completions"
-    headers = {"Content-Type": "application/json", "Authorization": f"Bearer {API_KEY}"}
-    
-    # Use centralized classification prompt to ensure exactly 4 categories
-    prompt = get_classification_prompt(text, hint_name)
-
-    try:
-        response = requests.post(url, headers=headers, data=json.dumps({
-            "model": "deepseek-chat",
-            "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0.1
-        }))
-        response.raise_for_status()
-        
-        # Nettoyage et Parsing
-        raw_content = response.json()["choices"][0]["message"]["content"]
-        # Utiliser l'outil de nettoyage JSON que nous avons ajouté
-        clean_content = clean_json_string(raw_content)
-        
-        try:
-            data = json.loads(clean_content)
-        except:
-            # Si le JSON est cassé, on essaie de sauver les meubles avec regex
-            data = {}
-            if "Production" in raw_content or "Technique" in raw_content: data["macro_category"] = "Production/Technique"
-            elif "Logistique" in raw_content: data["macro_category"] = "Logistique"
-            elif "support" in raw_content: data["macro_category"] = "Fonctions supports"
-
-        # Validation post-traitement (Safety check)
-        final_name = data.get("candidate_name", "Candidat")
-        
-        # Liste noire de sécurité
-        blacklist = ["curriculum", "vitae", "resume", "profil", "ingénieur", "manager", "développeur", "page", "cv"]
-        if any(bad in final_name.lower() for bad in blacklist):
-            final_name = hint_name if hint_name else "Candidat (Nom non détecté)"
-
-        macro, sub = normalize_classification_labels(data.get("macro_category"), data.get("sub_category"), text)
-
-        return {
-            "macro_category": macro,
-            "sub_category": sub,
-            "years_experience": data.get("years_experience", 0),
-            "candidate_name": final_name,
-            "profile_summary": data.get("profile_summary", "")
+        service_account_info = {
+            "type": st.secrets["GCP_TYPE"],
+            "project_id": st.secrets["GCP_PROJECT_ID"],
+            "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
+            "private_key": st.secrets["GCP_PRIVATE_KEY"].replace('\\n', '\n').strip(),
+            "client_email": st.secrets["GCP_CLIENT_EMAIL"],
+            "client_id": st.secrets["GCP_CLIENT_ID"],
+            "auth_uri": st.secrets["GCP_AUTH_URI"],
+            "token_uri": st.secrets["GCP_TOKEN_URI"],
+            "auth_provider_x509_cert_url": st.secrets["GCP_AUTH_PROVIDER_CERT_URL"],
+            "client_x509_cert_url": st.secrets["GCP_CLIENT_CERT_URL"]
         }
-
+        return gspread.service_account_from_dict(service_account_info)
     except Exception as e:
-        print(f"DeepSeek Error: {e}")
-        default_response["candidate_name"] = hint_name or "Erreur Extraction"
-        return default_response
-
-def get_groq_auto_classification(text: str, local_extracted_name: str | None) -> dict:
-    API_KEY = get_groq_api_key()
-    hint_name = (local_extracted_name or "").strip()
-    
-    default_response = {
-        "macro_category": "Non classé",
-        "sub_category": NON_CLASSE_SUBCATEGORY,
-        "years_experience": 0,
-        "candidate_name": hint_name or "Candidat",
-        "profile_summary": "Analyse impossible (clé manquante)."
-    }
-    
-    if not API_KEY: return default_response
-    if groq is None:
-        default_response["profile_summary"] = "Analyse impossible (SDK Groq non installé)."
-        return default_response
-
-    try:
-        assert groq is not None
-        client = groq.Groq(api_key=API_KEY)
-        
-        # Use centralized classification prompt to ensure exactly 4 categories
-        prompt = get_classification_prompt(text, hint_name)
-
-        completion = client.chat.completions.create(
-            messages=[
-                {"role": "system", "content": "Tu es un expert JSON. Tu ne réponds que du JSON valide."},
-                {"role": "user", "content": prompt}
-            ],
-            model="llama-3.1-8b-instant",
-            temperature=0.1,
-            response_format={"type": "json_object"}
-        )
-        
-        content = completion.choices[0].message.content
-        data = json.loads(content)
-        
-        macro, sub = normalize_classification_labels(data.get("macro_category"), data.get("sub_category"), text)
-
-        return {
-            "macro_category": macro,
-            "sub_category": sub,
-            "years_experience": data.get("years_experience", 0),
-            "candidate_name": data.get("candidate_name", hint_name),
-            "profile_summary": data.get("profile_summary", "")
-        }
-    except Exception as e:
-        print(f"Groq Error: {e}")
-        return default_response
-
-def get_claude_auto_classification(text: str, local_extracted_name: str | None) -> dict:
-    API_KEY = get_claude_api_key()
-    hint_name = (local_extracted_name or "").strip()
-    
-    default_response = {
-        "macro_category": "Non classé",
-        "sub_category": NON_CLASSE_SUBCATEGORY,
-        "years_experience": 0,
-        "candidate_name": hint_name or "Candidat",
-        "profile_summary": "Analyse impossible (clé manquante)."
-    }
-    
-    if not API_KEY: return default_response
-
-    try:
-        client = anthropic.Anthropic(api_key=API_KEY)
-        
-        # Use centralized classification prompt to ensure exactly 4 categories
-        prompt = get_classification_prompt(text, hint_name)
-
-        message = client.messages.create(
-            model="claude-3-haiku-20240307",
-            max_tokens=1000,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        
-        content = ""
-        for block in message.content:
-            if block.type == "text":
-                content += block.text
-        
-        clean_content = clean_json_string(content)
-        data = json.loads(clean_content)
-        
-        macro, sub = normalize_classification_labels(data.get("macro_category"), data.get("sub_category"), text)
-
-        return {
-            "macro_category": macro,
-            "sub_category": sub,
-            "years_experience": data.get("years_experience", 0),
-            "candidate_name": data.get("candidate_name", hint_name),
-            "profile_summary": data.get("profile_summary", "")
-        }
-    except Exception as e:
-        print(f"Claude Error: {e}")
-        return default_response
-
-def get_openrouter_auto_classification(text: str, local_extracted_name: str | None) -> dict:
-    API_KEY = get_openrouter_api_key()
-    hint_name = (local_extracted_name or "").strip()
-    
-    default_response = {
-        "macro_category": "Non classé",
-        "sub_category": NON_CLASSE_SUBCATEGORY,
-        "years_experience": 0,
-        "candidate_name": hint_name or "Candidat",
-        "profile_summary": "Analyse impossible (clé manquante)."
-    }
-    
-    if not API_KEY: return default_response
-
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://tg-hire.streamlit.app/",
-        "X-Title": "TG Hire"
-    }
-    
-    prompt = f"""
-    Act as a recruitment expert. Analyze this resume.
-    
-    1. Name: Find the candidate name. Hint: "{hint_name}".
-    2. Category (STRICTLY ONE OF): "Fonctions supports", "Logistique", "Production/Technique".
-    3. Sub-category (Do NOT use "Student" or "Intern". Use target job title).
-    4. Years of experience (integer).
-    5. Summary (2 sentences).
-
-    Reply ONLY with valid JSON:
-    {{
-        "candidate_name": "...",
-        "macro_category": "...",
-        "sub_category": "...",
-        "years_experience": 0,
-        "profile_summary": "..."
-    }}
-
-    RESUME TEXT:
-    {text[:4000]}
-    """
-
-    try:
-        response = requests.post(
-            "https://openrouter.ai/api/v1/chat/completions",
-            headers=headers,
-            data=json.dumps({
-                "model": "openai/gpt-3.5-turbo",
-                "messages": [{"role": "user", "content": prompt}]
-            })
-        )
-        response.raise_for_status()
-        
-        content = response.json()['choices'][0]['message']['content']
-        clean_content = clean_json_string(content)
-        data = json.loads(clean_content)
-        
-        macro, sub = normalize_classification_labels(data.get("macro_category"), data.get("sub_category"), text)
-
-        return {
-            "macro_category": macro,
-            "sub_category": sub,
-            "years_experience": data.get("years_experience", 0),
-            "candidate_name": data.get("candidate_name", hint_name),
-            "profile_summary": data.get("profile_summary", "")
-        }
-    except Exception as e:
-        print(f"OpenRouter Error: {e}")
-        return default_response
-
-
-def extract_name_smart_email(text):
-    """
-    Extrait le nom via l'email ET vérifie sa présence dans le texte pour confirmer.
-    Gère les formats : prenom.nom, prenom_nom, nom.prenom
-    """
-    import re
-    if not text: return None
-    
-    # 1. Trouver les emails
-    email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-    emails = re.findall(email_pattern, text)
-    
-    # Liste d'emails génériques à ignorer
-    ignore_emails = ['contact', 'info', 'recrutement', 'job', 'stages', 'rh', 'email', 'gmail', 'yahoo']
-    
-    for email in emails:
-        user_part = email.split('@')[0]
-        
-        # Si l'email est générique, on saute
-        if any(bad in user_part.lower() for bad in ignore_emails):
-            continue
-            
-        # Séparateurs possibles dans l'email (point, underscore, tiret)
-        parts = re.split(r'[._-]', user_part)
-        
-        # On ne garde que les parties alphabétiques de plus de 2 lettres (évite les chiffres ou initiales)
-        valid_parts = [p for p in parts if p.isalpha() and len(p) >= 3]
-        
-        if len(valid_parts) >= 2:
-            # On a potentiellement Prénom et Nom. On cherche ces mots dans les 1000 premiers caractères du CV
-            header_text = text[:1000]
-            found_parts = []
-            
-            for part in valid_parts:
-                # On cherche le mot exact dans le texte (insensible à la casse)
-                match = re.search(r'\b' + re.escape(part) + r'\b', header_text, re.IGNORECASE)
-                if match:
-                    # On récupère la version écrite dans le CV (ex: "DUPONT" au lieu de "dupont")
-                    found_parts.append(match.group(0))
-            
-            # Si on a retrouvé au moins 2 parties du nom dans le texte, c'est un match solide !
-            if len(found_parts) >= 2:
-                # On retourne les parties trouvées, jointes par un espace
-                return {"name": " ".join(found_parts), "confidence": 0.99, "method_used": "smart_email_cross_check"}
-                
-    return None
-
-# -------------------- Extraction de noms des CV (AMÉLIORÉE) --------------------
-
-def is_valid_name_candidate(text: str) -> bool:
-    """
-    Vérifie si un texte ressemble à un vrai nom.
-    Plus permissif pour accepter les noms composés et formats internationaux.
-    """
-    if not text or len(text) < 2:
-        return False
-    
-    # Nettoyage de base
-    text = text.strip()
-    
-    # Rejets évidents
-    if len(text) > 50 and ' ' not in text: return False  # Trop long sans espace
-    if re.search(r'\d', text): return False  # Contient des chiffres
-    if re.search(r'[@€$£%&:]', text): return False  # Caractères spéciaux invalides (inclut : et &)
-    if text.count('-') > 3: return False  # Trop de tirets
-    
-    # Doit contenir au moins une voyelle (sauf exceptions très rares)
-    if not re.search(r'[aeiouyàâäéèêëïîôöùûü]', text.lower()):
-        return False
-    
-    # Ratio de lettres (doit être principalement des lettres)
-    # On enlève espaces et tirets pour le calcul
-    clean_chars = re.sub(r'[\s\-\.]', '', text)
-    if not clean_chars: return False
-    
-    return True
-
-
-def is_likely_name_line(line: str) -> bool:
-    """
-    Détermine si une ligne a de fortes chances d'être un nom (et pas un titre).
-    """
-    line_lower = line.lower().strip()
-    words = line_lower.split()
-    
-    # 1. Mots INTERDITS : S'ils sont présents, ce n'est PAS un nom
-    forbidden_words = [
-        # Mots génériques et titres de sections
-        'cv', 'curriculum', 'vitae', 'resume', 'profil', 'profile',
-        'expérience', 'experience', 'formation', 'education', 
-        'compétences', 'skills', 'langues', 'languages',
-        'projet', 'project', 'contact', 'téléphone', 'email', 'adresse',
-        'page', 'date', 'diplômes', 'formations', 'certifications', 'hobbies', 'loisirs',
-        'permis', 'vehicule', 'véhicule', 'conduite', 'driver', 'driving', 'b', 'voiture',
-        'centres', 'intérêt', 'projets', 'réalisés', 'professionnelles',
-        'coordonnées', 'spécialisations', 'management', 'onboarding', 'performance',
-        'sommaire', 'summary', 'objectif', 'objective', 'propos', 'about', 'me', 'moi',
-        'bac', 'baccalauréat', 'baccalaureate', 'degree', 'niveau', 'level',
-        'logiciels', 'maîtrisés', 'activités', 'associatives',
-        
-        # Écoles et Universités (Faux positifs fréquents)
-        'école', 'ecole', 'school', 'business', 'university', 'université',
-        'hec', 'essec', 'esc', 'em', 'dauphine', 'polytechnique', 'centrale', 'mines',
-        'master', 'bachelor', 'licence', 'mba', 'diplôme', 'diplome', 'msc',
-        'lycée', 'lycee', 'college', 'collège', 'institut', 'academy',
-        
-        # Compétences techniques & Outils
-        'excel', 'vba', 'power', 'bi', 'crm', 'python', 'java', 'sql', 'office',
-        'pack', 'adobe', 'suite', 'google', 'cloud', 'aws', 'azure', 'sap', 'erp',
-        'photoshop', 'illustrator', 'indesign', 'canva', 'jira', 'trello',
-        
-        # Entreprises connues (pour éviter "BNP Paribas" comme nom)
-        'bnp', 'paribas', 'société', 'générale', 'crédit', 'agricole', 'sncf',
-        'groupe', 'group', 'bank', 'banque', 'service', 'civique', 'unilever',
-        'orange', 'capgemini', 'atos', 'sopra', 'steria', 'accenture', 'deloitte',
-        'kpmg', 'ey', 'pwc', 'mazars', 'nge', 'mire',
-        
-        # Pays et Villes (souvent en en-tête)
-        'france', 'paris', 'maroc', 'casablanca', 'rabat', 'lyon', 'marseille',
-        'toulouse', 'bordeaux', 'lille', 'nantes', 'strasbourg', 'rennes',
-        
-        # Blancs ou très courts
-        'non', 'trouvé',
-        'analyste', 'financière', 'contrôleuse', 'gestion', 'ingénieur',
-        'directeur', 'directrice', 'manager', 'consultant', 'développeur', 'responsable',
-        'développement', 'rh', 'sirh', 'assistant', 'assistante', 'stagiaire',
-        'technicien', 'commercial', 'vente', 'marketing', 'comptable', 'auditeur',
-        'senior', 'junior', 'expert', 'chef', 'actuaire', 'data', 'scientist',
-        'chargé', 'chargée', 'officer', 'executive', 'associate', 'partner',
-        
-        # Postes et métiers supplémentaires
-        'job', 'étudiant', 'etudiant', 'student', 'intern', 'internship', 'stage',
-        'engineer', 'developer', 'designer', 'analyst', 'specialist', 'coordinator',
-        'ia', 'ai', 'ml', 'machine', 'learning', 'deep',
-        'mécanique', 'mecanique', 'électrique', 'electrique', 'civil', 'industriel',
-        
-        # Termes de documents/réunions
-        'weekly', 'meeting', 'decks', 'deck', 'presentation', 'rapport', 'report',
-        'document', 'documents', 'fichier', 'fichiers', 'dossier', 'dossiers',
-        
-        # Verbes d'action (souvent en bullet points)
-        'gérer', 'piloter', 'management', 'coordonner', 'développer', 'créer',
-        'réaliser', 'participer', 'contribuer', 'superviser', 'analyser',
-        
-        # Entreprises supplémentaires (faux positifs fréquents)
-        'procter', 'gamble', 'l\'oréal', 'loreal', 'carrefour', 'hsbc', 'edf',
-        
-        # Langues et nationalités
-        'français', 'francais', 'anglais', 'arabe', 'espagnol', 'courant', 'bilingue',
-        'nationality', 'nationalité', 'franco-moroccan', 'franco-marocain',
-        
-        # Termes RH et certifications
-        'gpec', 'gepp', 'hdi', 'certification', 'certifications', 'itil',
-        
-        # Logiciels et outils supplémentaires
-        'diapason', 'ktp', 'summit', 'anaplan', 'swiftnet', 'servicenow', 'remedy',
-        'dynamics', 'confluence', 'slack', 'figma', 'tableau',
-        
-        # Loisirs et intérêts
-        'intérêts', 'interets', 'football', 'natation', 'voyages', 'lecture',
-        'sport', 'voyage', 'bénévolat', 'benevolat', 'danse', 'musique',
-        
-        # Termes scientifiques/académiques
-        'physiologie', 'physiopathologie', 'physiopathologies', 'humaine', 'modélisation',
-        
-        # Mots génériques supplémentaires
-        'soft', 'hard', 'about', 'linkedin', 'trésorier', 'tresorier', 'ingénieure', 'ingenieure',
-        
-        # ====== NOUVEAUX MOTS INTERDITS (Faux positifs observés) ======
-        # Termes techniques/métiers
-        'simulation', 'numérique', 'numerique', 'pensée', 'pensee', 'critique', 'lecture',
-        'concept', 'partenaire', 'entreprise', 'entreprises',
-        'charge', 'chargee', 'delivery', 'delivery', 'secteur', 'agro-alimentaire',
-        'multi-disciplinary', 'multidisciplinary', 'engineering', 'studies', 'etudes', 'études',
-        'parcours', 'professionnel', 'profile',
-        
-        # Sections CV supplémentaires  
-        'experiences', 'expériences', 'professionelles', 'professionnelle',
-        'competences', 'realisations', 'réalisations',
-        
-        # Entreprises/Lieux supplémentaires
-        'saem', 'corum', 'montpellier', 'groupement', 'mousquetaires', 'intermarché',
-        'leclerc', 'auchan', 'lidl', 'casino', 'monoprix',
-        'puteaux', 'orsys', 'angleterre', 'irlande', 'luxembourg',
-        'ivalua', 'prm',
-        
-        # Termes anglais courants
-        'delivery', 'manager', 'coordinator', 'specialist', 'officer', 'owner', 'pspo',
-        'technical', 'professional', 'summary', 'overview',
-        'and', 'alerting', 'blockchain', 'projects', 'purposes', 'program',
-        
-        # Logiciels techniques / CAO / Outils scientifiques
-        'logiciels', 'abaqus', 'catia', 'solidworks', 'autocad', 'ansys', 'matlab', 'bim', 'software',
-        'xlstat', 'minitab', 'spss', 'stata', 'r', 'rstudio', 'hive', 'psql',
-        'rtgs', 'target', 'swift', 'bpce',
-        
-        # Soft skills et termes RH
-        'stress', 'équipe', 'equipe', 'organisation', 'esprit', 'sens',
-        'gestion', 'autonomie', 'rigueur', 'adaptabilité', 'adaptabilite',
-        'dynamisme', 'motivation', 'travail', 'team', 'leadership',
-        
-        # Titres de postes
-        'cash', 'flux', 'foncier', 'trésorerie', 'tresorerie',
-        # Termes génériques récurrents à exclure
-        'client', 'missions',
-        # Certifications/Accréditations spécifiques
-        'amf',
-        # Mots à bannir (Faux positifs signalés)
-        'formateur', 'cuisine', 'agile', 'scrum', 'méthodologie', 'methodologie',
-        'ocp', 'sa', 'sarl', 'sas', 'inc', 'ltd', 'group', 'groupe', 'holding',
-        'résidence', 'residence', 'immeuble', 'apt', 'app', 'étage',
-        'compétence', 'competence', 'professionnelle', 'limitée',
-        
-        # Mots à bannir (Faux positifs signalés)
-        'formateur', 'cuisine', 'agile', 'scrum', 'méthodologie', 'methodologie',
-        'ocp', 'sa', 'sarl', 'sas', 'inc', 'ltd', 'group', 'groupe', 'holding',
-        'résidence', 'residence', 'immeuble', 'apt', 'app', 'étage',
-        'compétence', 'competence', 'professionnelle', 'limitée',
-    ]
-
-    # --- 1.1 FILTRAGE AGRESSIF (Substrings) ---
-    # Certains mots invalident TOUTE la ligne même s'ils sont collés
-    # Ex: "GestionDeProjet", "CompétenceProfessionnelle"
-    fatal_substrings = [
-        'compétence', 'competence', 'formation', 'education', 
-        'projets', 'réalisés', 'experience', 'expérience', 
-        'sommaire', 'summary', 'profil', 'profile',
-        'soft', 'hard', 'skills', 'outils', 'logiciels',
-        'management', 'agile', 'scrum', 'methodologie', 'méthodologie'
-    ]
-    if any(fs in line_lower for fs in fatal_substrings):
-        return False
-
-    
-    # Si un mot de la ligne est interdit -> Rejet
-    if any(w in forbidden_words for w in words):
-        return False
-    
-    # Rejet si la ligne contient des caractères spéciaux typiques de labels
-    if ':' in line or '&' in line:
-        return False
-    # Rejet si la ligne contient ponctuation indicative de titres/sections
-    if any(p in line for p in ['.', '(', ')', '/', ',']) or any(c.isdigit() for c in line):
-        return False
-
-    # 2. Vérifications de structure
-    # Doit contenir entre 2 et 5 mots (ex: "Jean Dupont" ou "Jean-Pierre de la Tour")
-    if len(words) < 2 or len(words) > 5:
-        return False
-    
-    # Mots d'arrêt (Articles) : acceptés dans un nom compos, mais ne doivent pas constituer tout le nom
-    stop_words = ['de', 'du', 'des', 'le', 'la', 'les', 'van', 'von', 'da', 'di']
-    
-    # Si tous les mots sont des stop words -> Rejet
-    if all(w in stop_words for w in words):
-        return False
-    
-    # Au moins un mot doit commencer par une majuscule (sauf si tout est en majuscule)
-    # Note: line.isupper() gère les noms tout en majuscule
-    if not line.isupper() and not any(w[0].isupper() for w in line.split() if w):
-        return False
-        
-    return True
-
-
-def score_name_candidate(text: str) -> float:
-    """
-    Attribue un score de probabilité (0-1) qu'un texte soit un nom.
-    """
-    score = 0.0
-    words = text.split()
-    
-    # Longueur idéale (2-3 mots)
-    if 2 <= len(words) <= 3: score += 0.3
-    elif len(words) == 4: score += 0.2
-    
-    # Casse (Casing)
-    if text.isupper():  # TOUT EN MAJUSCULES (fréquent pour les noms de famille)
-        score += 0.2
-    elif all(w[0].isupper() for w in words if w):  # Title Case
-        score += 0.2
-    elif len(words) >= 2 and words[-1].isupper() and words[0][0].isupper():  # Prénom NOM
-        score += 0.3
-        
-    # Validation basique
-    if is_valid_name_candidate(text):
-        score += 0.2
-    else:
-        return 0  # Si invalide, score 0 direct
-        
-    return min(score, 1.0)
-
-
-def clean_merged_text_pdf(text: str) -> str:
-    """
-    Corrige les problèmes de parsing PDF où les mots sont collés.
-    Ex: 'Verneuil enABDALLAH' -> 'Verneuil en ABDALLAH'
-    Ex: '0787860895HADDOUCHI' -> '0787860895 HADDOUCHI'
-    Ex: 'CompétenceProfessionnelle' -> 'Compétence Professionnelle'
-    """
-    if not text: return ""
-    
-    # 1. Séparer minuscule/Majuscule (CamelCase strict)
-    # Ex: 'CompétenceProfessionnelle' -> 'Compétence Professionnelle'
-    # Attention: 'McDonald' -> 'Mc Donald' (Acceptable pour l'analyse)
-    text = re.sub(r'([a-zà-ÿ])([A-ZÀ-Ÿ])', r'\1 \2', text)
-    
-    # 2. Séparer Chiffre/Lettre (ex: 95HADDOUCHI)
-    text = re.sub(r'([0-9])([a-zA-Z]{2,})', r'\1 \2', text)
-    
-    return text
-
-def extract_name_from_cv_text(text):
-    """
-    Extrait le nom complet d'un CV avec une approche heuristique avancée.
-    Gère les cas comme "## Hiba BELFARJI" ou les mises en page OCR.
-    """
-    if not text or len(text.strip()) < 10:
-        return {"name": None, "confidence": 0, "method_used": "text_too_short"}
-    
-    # NETTOYAGE CRITIQUE : Séparation des mots collés (OCR/PDF mal formés)
-    text = clean_merged_text_pdf(text)
-    
-    lines = text.split('\n')
-    
-    # --- ÉTAPE 1 : Nettoyage préliminaire des lignes ---
-    # MODIF : Augmentation de la portée d'analyse à 200 lignes pour capturer les noms dans les sidebars (multi-colonnes)
-    SCAN_LIMIT = 200
-    cleaned_lines = []
-    
-    # On itère avec l'index pour pénaliser la position si nécessaire
-    for idx, line in enumerate(lines[:SCAN_LIMIT]):
-        # Enlever les caractères de formatage Markdown ou OCR
-        clean = line.strip()
-        clean = re.sub(r'^##\s*', '', clean)  # Enlever "## " au début
-        clean = re.sub(r'^\*\*\s*', '', clean)  # Enlever "** " au début
-        clean = re.sub(r'\s*\*\*$', '', clean)  # Enlever " **" à la fin
-        clean = re.sub(r'^[-•➢–]\s*', '', clean)  # Enlever les puces
-        clean = re.sub(r'^[o]\s*', '', clean) # Enlever autres puces OCR
-        
-        if not clean:
-            continue
-            
-        # On garde l'info de ligne originelle si besoin
-        cleaned_lines.append(clean)
-        
-        # Gestion des noms espacés (ex: "I c h r a k B A K I A" ou "M a r w a n  L A A N I G R I")
-        # Si la ligne contient beaucoup d'espaces et des lettres isolées
-        if len(clean) > 5 and ' ' in clean:
-            # Compte le nombre de tokens de 1 lettre
-            single_letter_tokens = [w for w in clean.split() if len(w) == 1 and w.isalpha()]
-            if len(single_letter_tokens) > len(clean.split()) / 2:
-                # C'est probablement un texte espacé
-                # AMÉLIORATION: Reconstituer en se basant sur les transitions de casse
-                # "I c h r a k B A K I A" -> "Ichrak BAKIA"
-                result_parts = []
-                current_word = ""
-                prev_was_lower = False
-                
-                for char in clean:
-                    if char == ' ':
-                        continue  # Ignorer les espaces
-                    
-                    is_upper = char.isupper()
-                    
-                    # Transition minuscule -> majuscule = nouveau mot (prénom terminé, nom commence)
-                    if prev_was_lower and is_upper and current_word:
-                        result_parts.append(current_word)
-                        current_word = char
-                    else:
-                        current_word += char
-                    
-                    prev_was_lower = char.islower()
-                
-                if current_word:
-                    result_parts.append(current_word)
-                
-                # Si on a au moins 2 parties, c'est probablement Prénom NOM
-                if len(result_parts) >= 2:
-                    normalized = ' '.join(result_parts)
-                    cleaned_lines.append(normalized)
-                elif result_parts:
-                    # Sinon fallback sur l'ancienne méthode
-                    temp = re.sub(r'\s{2,}', '|', clean)
-                    temp = temp.replace(' ', '')
-                    normalized = temp.replace('|', ' ')
-                    if normalized != clean:
-                        cleaned_lines.append(normalized)
-
-    # --- ÉTAPE 1-BIS : Fusion de lignes (Pour les cas : L1=Prénom, L2=Nom) ---
-    # Ex: "Oussama" \n "GARMOUMI"
-    merged_candidates = []
-    if len(cleaned_lines) > 1:
-        for i in range(len(cleaned_lines) - 1):
-            l1 = cleaned_lines[i]
-            l2 = cleaned_lines[i+1]
-            # Si l1 ressemble à un prénom (Title) et l2 à un nom (Upper) ou vice versa
-            # Et qu'ils ne sont pas trop longs
-            if len(l1.split()) == 1 and len(l2.split()) == 1:
-                # Oussama \n GARMOUMI
-                if l1.istitle() and l2.isupper():
-                    merged_candidates.append(f"{l1} {l2}")
-                # GARMOUMI \n Oussama
-                elif l1.isupper() and l2.istitle():
-                    merged_candidates.append(f"{l1} {l2}")
-
-    # --- ÉTAPE 2 : Recherche de patterns explicites (Regex forte) ---
-    # Pattern : Prénom (Title) NOM (Upper) ou NOM (Upper) Prénom (Title)
-    # Ex: "Hiba BELFARJI" ou "BELFARJI Hiba"
-    regex_strong = r'^([A-ZÀ-Ÿ][a-zà-ÿ]+(?:-[A-ZÀ-Ÿ][a-zà-ÿ]+)?)\s+([A-ZÀ-Ÿ]{2,}(?:\s+[A-ZÀ-Ÿ]{2,})?)$'
-    regex_reverse = r'^([A-ZÀ-Ÿ]{2,}(?:\s+[A-ZÀ-Ÿ]{2,})?)\s+([A-ZÀ-Ÿ][a-zà-ÿ]+(?:-[A-ZÀ-Ÿ][a-zà-ÿ]+)?)$'
-    
-    # Test d'abord sur les candidats mergés
-    for cand in merged_candidates:
-         if re.match(regex_strong, cand) or re.match(regex_reverse, cand):
-             # Vérif extra : pas de mot interdit
-             if is_likely_name_line(cand):
-                 return {"name": cand, "confidence": 0.90, "method_used": "merged_lines_regex"}
-
-    for line in cleaned_lines:
-        line_clean = line.strip()
-        # Test Prénom NOM
-        match = re.match(regex_strong, line_clean)
-        if match and is_likely_name_line(line_clean):
-            return {"name": line_clean, "confidence": 0.95, "method_used": "regex_strong_firstname_lastname"}
-        
-        # Test NOM Prénom
-        match = re.match(regex_reverse, line_clean)
-        if match and is_likely_name_line(line_clean):
-            return {"name": line_clean, "confidence": 0.95, "method_used": "regex_strong_lastname_firstname"}
-
-    # --- ÉTAPE 3 : Système de Scoring (Heuristique) ---
-    best_candidate = None
-    best_score = 0.0
-    
-    for line in cleaned_lines:
-        # Check rapide anti-spam (si ligne > 6 mots, peu probable que ce soit un nom sauf espacé)
-        if len(line.split()) > 6:
-            continue
-
-        if not is_likely_name_line(line):
-            continue
-            
-        current_score = score_name_candidate(line)
-        
-        # Bonus si la ligne est isolée (pas de phrase avant/après dans le bloc original ?? Difficile à dire ici)
-        # Mais on peut pénaliser les lignes très bas si elles n'ont pas un score excellent
-        
-        if current_score > best_score:
-            best_score = current_score
-            best_candidate = line
-            
-    # --- ÉTAPE 4 : Fallback Proximité Email/Tel (Deep Scan) ---
-    # Recherche étendue jusqu'à SCAN_LIMIT au lieu de 50
-    if best_score < 0.6:
-        for i, line in enumerate(lines[:SCAN_LIMIT]):
-            # Si on trouve un email ou un tel
-            if re.search(r'@[\w\.-]+', line) or re.search(r'(?:(?:\+|00)33|0)\s*[1-9]', line):
-                # Regarder 10 lignes AVANT (contexte immédiat)
-                start_range = max(0, i - 10)
-                # Mais aussi 3 lignes APRÈS (parfois le nom est sous l'email dans les sidebars)
-                end_range = min(len(lines), i + 3)
-                
-                context_lines = lines[start_range:i] + lines[i+1:end_range]
-                
-                for ctx_line in context_lines:
-                    ctx_line = ctx_line.strip()
-                    # Nettoyage léger
-                    clean_ctx = re.sub(r'^##\s*', '', ctx_line)
-                    clean_ctx = re.sub(r'^\*\*\s*', '', clean_ctx)
-                    clean_ctx = re.sub(r'\s*\*\*$', '', clean_ctx)
-                    clean_ctx = re.sub(r'^[-•➢–]\s*', '', clean_ctx)
-                    
-                    if not clean_ctx: continue
-
-                    if is_likely_name_line(clean_ctx):
-                        cand_score = score_name_candidate(clean_ctx)
-                        # On booste le score car proche des contacts
-                        boosted_score = cand_score + 0.3
-                        if boosted_score > best_score:
-                            best_score = boosted_score
-                            best_candidate = clean_ctx
-
-    # --- ÉTAPE 5 : Fallback Ultime (Recherche de patterns faibles) ---
-    # Si toujours rien, on cherche n'importe quoi qui ressemble à "Prénom NOM" même sans contexte
-    if not best_candidate or best_score < 0.4:
-        # Regex plus permissive (admet Title Title) pour les cas comme "Elkani Sadia"
-        regex_permissive = r'^([A-ZÀ-Ÿ][a-zà-ÿ]+)\s+([A-ZÀ-Ÿ][a-zà-ÿ]+)$'
-        
-        for line in cleaned_lines:
-             if re.match(regex_permissive, line) and is_likely_name_line(line):
-                 # On vérifie quand même que ce n'est pas un nom de ville ou d'école connu (déjà filtré par is_likely)
-                 score = 0.5 # Score moyen
-                 if score > best_score:
-                     best_score = score
-                     best_candidate = line
-    
-    if best_candidate and best_score > 0.4:
-        return {"name": best_candidate, "confidence": best_score, "method_used": "scoring_best_match"}
-
-    if best_candidate and best_score > 0.4:
-        return {"name": best_candidate, "confidence": best_score, "method_used": "scoring_best_match"}
-
-    return {"name": None, "confidence": 0, "method_used": "not_found"}
-
-
-def extract_name_from_line(line):
-    """Extrait un nom candidat d'une ligne en utilisant des heuristiques (fonction legacy)"""
-    if not line or len(line.strip()) < 5:
+        st.error(f"❌ Erreur de connexion à Google Sheets. Vérifiez vos secrets. Détails: {e}")
         return None
-    
-    # Nettoyer la ligne
-    line = line.strip()
-    line = re.sub(r'^##\s*', '', line)  # Enlever "## " au début
-    line = re.sub(r'^\*\*\s*', '', line)  # Enlever "** " au début
-    line = re.sub(r'\s*\*\*$', '', line)  # Enlever " **" à la fin
-    
-    # Utiliser les nouvelles fonctions
-    if is_likely_name_line(line):
-        score = score_name_candidate(line)
-        if score > 0.4:
-            return line
-    
-    return None
 
-# -------------------- Génération du ZIP organisé --------------------
-def merge_results_with_ai_analysis(original_results):
+
+def load_data_from_google_sheets(sheet_url):
     """
-    Intègre les résultats des analyses IA dans les résultats originaux.
-    Met à jour les catégories des CV qui ont été analysés par l'IA.
+    Charger les données depuis Google Sheets avec authentification automatique via les secrets.
     """
-    # Créer une copie pour ne pas modifier l'original
-    updated_results = original_results.copy()
-    
-    # Si des analyses IA existent, intégrer les résultats
-    if hasattr(st.session_state, 'deepseek_analyses') and st.session_state.deepseek_analyses:
-        ai_results = {result['Fichier']: result['Catégorie'] for result in st.session_state.deepseek_analyses}
+    try:
+        # Extraire l'ID de la feuille et le GID depuis l'URL
+        sheet_id_match = re.search(r"/d/([a-zA-Z0-9-_]+)", sheet_url)
+        gid_match = re.search(r"[?&]gid=(\d+)", sheet_url)
         
-        for i, result in enumerate(updated_results):
-            filename = result['file']
-            if filename in ai_results:
-                ai_category = ai_results[filename]
-                # Normaliser la catégorie IA selon nos catégories standard
-                if "support" in ai_category.lower():
-                    updated_results[i]['category'] = 'Fonctions supports'
-                elif "logistique" in ai_category.lower():
-                    updated_results[i]['category'] = 'Logistique'
-                elif "production" in ai_category.lower() or "technique" in ai_category.lower():
-                    updated_results[i]['category'] = 'Production/Technique'
-                # Si la catégorie IA n'est pas reconnue, on garde "Non classé"
-    
-    return updated_results
-
-def create_organized_zip(results, file_list):
-    """
-    Crée un fichier ZIP avec les CV organisés par catégorie et renommés.
-    Intègre automatiquement les résultats des analyses IA.
-    Retourne les bytes du ZIP et un DataFrame manifest.
-    """
-    import zipfile
-    import io
-    from io import BytesIO
-    
-    # Intégrer les analyses IA dans les résultats
-    merged_results = merge_results_with_ai_analysis(results)
-    
-    zip_buffer = BytesIO()
-    manifest_data = []
-    
-    # Créer les dossiers par catégorie
-    folders = {
-        'Production/Technique': 'Production_Technique/',
-        'Fonctions supports': 'Fonctions_supports/',
-        'Logistique': 'Logistique/',
-        'Non classé': 'Divers_Hors_Perimetre/'
-    }
-    
-    # Déterminer quelles catégories sont réellement présentes
-    categories_present = set(result['category'] for result in merged_results)
-    folders_to_create = set()
-    for category in categories_present:
-        if category in folders:
-            folders_to_create.add(folders[category])
-    
-    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-        # Créer seulement les dossiers nécessaires
-        for folder in folders_to_create:
-            zip_file.writestr(folder, '')
+        if not sheet_id_match:
+            raise ValueError("Impossible d'extraire l'ID du Google Sheet depuis l'URL")
         
-        # Traiter chaque CV avec les résultats intégrant l'IA
-        for result in merged_results:
-            original_name = result['file']
-            category = result['category']
-            
-            # Déterminer le nom final du fichier
-            if 'extracted_name' in result and result['extracted_name'] and result['extracted_name']['name']:
-                # Utiliser le nom extrait
-                extracted_name = result['extracted_name']['name']
-                # Normaliser les espaces multiples et nettoyer
-                try:
-                    import re as _re
-                    cleaned_extracted = _re.sub(r"\s+", " ", extracted_name).strip()
-                except Exception:
-                    cleaned_extracted = extracted_name.strip()
-                final_name = f"{cleaned_extracted}.pdf"
-                confidence = result['extracted_name']['confidence']
-                method = result['extracted_name']['method_used']
-            else:
-                # Garder le nom original
-                final_name = original_name
-                confidence = 0
-                method = 'original_name'
-            
-            # Déterminer le dossier de destination
-            folder = folders.get(category, 'Non_classe/')
-            file_path_in_zip = folder + final_name
-            
-            cache = st.session_state.get('uploaded_files_cache', {}) if hasattr(st.session_state, 'uploaded_files_cache') else {}
-            cache_key = result.get('cache_key')
-            cache_entry = cache.get(cache_key) if cache_key else None
-
-            file_content = None
-            if cache_entry and cache_entry.get('bytes') is not None:
-                file_content = cache_entry['bytes']
-            else:
-                matching_item = None
-                for item in file_list:
-                    if item.get('name') == original_name:
-                        matching_item = item
-                        break
-                if matching_item:
-                    if matching_item.get('content') is not None:
-                        file_content = matching_item['content']
-                    else:
-                        original_file = matching_item.get('file')
-                        if original_file:
-                            try:
-                                original_file.seek(0)
-                                file_content = original_file.read()
-                            except Exception:
-                                file_content = None
-
-            if file_content is None:
-                st.warning(f"Impossible de récupérer le fichier original pour {original_name}.")
-                continue
-
-            try:
-                zip_file.writestr(file_path_in_zip, file_content)
-
-                manifest_data.append({
-                    'fichier_original': original_name,
-                    'nouveau_nom': final_name,
-                    'categorie': category if category != 'Non classé' else 'Divers / Hors périmètre',
-                    'sous_categorie': result.get('sub_category', ''),
-                    'annees_experience': result.get('years_experience', 0),
-                    'confiance_extraction': confidence,
-                    'methode_extraction': method,
-                    'recap_profil': result.get('profile_summary', ''),
-                    'dossier': folder.rstrip('/')
-                })
-            except Exception as e:
-                st.warning(f"Erreur lors du traitement de {original_name}: {e}")
+        sheet_id = sheet_id_match.group(1)
+        gid = gid_match.group(1) if gid_match else '0'
         
-        # Créer et ajouter le manifest CSV (avec point-virgule pour Excel FR) + Excel natif
-        if manifest_data:
-            manifest_df = pd.DataFrame(manifest_data)
-            # CSV avec point-virgule pour Excel FR et encodage utf-8-sig (BOM)
-            manifest_csv = manifest_df.to_csv(index=False, sep=';', encoding='utf-8-sig')
-            zip_file.writestr('manifest.csv', manifest_csv.encode('utf-8-sig'))
-            
-            # Ajouter aussi un fichier Excel natif (.xlsx) pour compatibilité Excel 2010
-            excel_buffer = io.BytesIO()
-            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-                manifest_df.to_excel(writer, index=False, sheet_name='Manifest')
-            excel_buffer.seek(0)
-            zip_file.writestr('manifest.xlsx', excel_buffer.getvalue())
-    
-    zip_buffer.seek(0)
-    return zip_buffer.getvalue(), pd.DataFrame(manifest_data)
-
-# -------------------- Interface Utilisateur --------------------
-st.title("📄 Analyseur de CVs Intelligent")
-display_commit_info()
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📊 Classement de CVs", "🎯 Analyse de Profil", "📖 Guide des Méthodes", "📈 Statistiques de Feedback", "🗂️ Auto-classification"])
-
-with tab1:
-    st.markdown("### 📄 Informations du Poste")
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        # Menu déroulant pour choisir entre annonce et fiche de poste
-        job_source = st.selectbox(
-            "Source des informations du poste",
-            ["Annonce (saisie manuelle)", "Fiche de poste (PDF)"],
-            index=0
-        )
+        # Utiliser le client authentifié avec les secrets
+        gc = get_gsheet_client()
+        if gc is None:
+            # Fallback vers l'export CSV public si l'authentification échoue
+            export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+            df = pd.read_csv(export_url)
+            return df
         
-        job_title = ""
-        job_description = ""
-        fiche_poste_text = ""
+        # Ouvrir la feuille par ID
+        sh = gc.open_by_key(sheet_id)
         
-        if job_source == "Annonce (saisie manuelle)":
-            job_title = st.text_input("Intitulé du poste", placeholder="Ex: Archiviste Junior")
-            job_description = st.text_area("Description du poste", height=200, key="jd_ranking", placeholder="Collez la description...")
-        else:  # Fiche de poste (PDF)
-            fiche_poste_file = st.file_uploader("Importer une fiche de poste (PDF)", type=["pdf"], key="fiche_poste_uploader")
-            if fiche_poste_file:
-                fiche_poste_text = extract_text_from_pdf(fiche_poste_file)
-                if fiche_poste_text and not fiche_poste_text.startswith("Erreur"):
-                    # Use the fiche content silently (no success toast)
-                    job_description = fiche_poste_text  # Utiliser le contenu de la fiche comme description
-                else:
-                    st.error("Erreur lors de la lecture de la fiche de poste.")
-                    
-    with col2:
-        st.markdown("#### 📤 Importer des CVs")
-        uploaded_files_ranking = st.file_uploader("Importer des CVs", type=["pdf"], accept_multiple_files=True, key="ranking_uploader")
-    
-    st.markdown("---")
-    
-    mode_court = st.checkbox(
-        "📝 Mode court",
-        value=False,
-        help="Génère une analyse plus concise avec emojis (environ la moitié du résultat standard)."
-    )
-    
-    analysis_method = st.selectbox(
-        "✨ Choisissez votre méthode de classement",
-        ["Méthode Cosinus (Mots-clés)", "Méthode Sémantique (Embeddings)", "Scoring par Règles (Regex)", 
-         "Analyse combinée (Ensemble)", "Analyse par IA (DeepSeek)", "Analyse par IA (Gemini)", 
-         "Analyse par IA (Groq)", "Analyse par IA (Claude)", "Analyse par IA (OpenRouter)"],
-        index=0, help="Consultez l'onglet 'Guide des Méthodes'."
-    )
-    
-    # Options supplémentaires pour l'analyse combinée
-    if analysis_method == "Analyse combinée (Ensemble)":
-        st.markdown("### 🔢 Paramètres de combinaison")
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            cosinus_weight = st.slider("Poids Cosinus", 0.0, 1.0, 0.2, 0.1, key="slider_cosinus")
-        with col2:
-            semantic_weight = st.slider("Poids Sémantique", 0.0, 1.0, 0.4, 0.1, key="slider_semantic")
-        with col3:
-            rules_weight = st.slider("Poids Règles", 0.0, 1.0, 0.4, 0.1, key="slider_rules")
+        # Sélectionner la worksheet par GID
+        try:
+            worksheet = sh.get_worksheet_by_id(int(gid))
+        except:
+            worksheet = sh.sheet1  # Fallback vers la première feuille
+        
+        # Récupérer toutes les données
+        data = worksheet.get_all_records()
+        df = pd.DataFrame(data)
+        
+        return df
+        
+    except Exception as e:
+        # Si l'authentification échoue, essayer l'export CSV public
+        try:
+            sheet_id_match = re.search(r"/d/([a-zA-Z0-9-_]+)", sheet_url)
+            gid_match = re.search(r"[?&]gid=(\d+)", sheet_url)
             
-        # Normalisation des poids
-        total_weight = cosinus_weight + semantic_weight + rules_weight
-        if total_weight > 0:
-            norm_cosinus = cosinus_weight / total_weight
-            norm_semantic = semantic_weight / total_weight
-            norm_rules = rules_weight / total_weight
-            st.info(f"Poids normalisés : Cosinus {norm_cosinus:.2f}, Sémantique {norm_semantic:.2f}, Règles {norm_rules:.2f}")
+            if sheet_id_match:
+                sheet_id = sheet_id_match.group(1)
+                gid = gid_match.group(1) if gid_match else '0'
+                export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
+                df = pd.read_csv(export_url)
+                return df
+        except:
+            pass
+        
+        raise e
+
+
+def load_data_from_files(csv_file=None, excel_file=None):
+    """Charger et préparer les données depuis les fichiers uploadés ou locaux"""
+    df_integration = None
+    df_recrutement = None
+    try:
+        # Charger le CSV (données d'intégration)
+        if csv_file is not None:
+            df_integration = pd.read_csv(csv_file)
         else:
-            st.warning("Veuillez attribuer un poids non nul à au moins une méthode.")
-    
-    # Options pour le traitement par lots
-    use_batch_processing = False
-    if len(uploaded_files_ranking or []) > 20:
-        use_batch_processing = st.checkbox("Activer le traitement par lots (recommandé pour plus de 20 CVs)", 
-                                         value=True, 
-                                         help="Traite les CVs par petits groupes pour éviter les problèmes de mémoire")
-        if use_batch_processing:
-            batch_size = st.slider("Taille du lot", min_value=5, max_value=50, value=10, 
-                                  help="Nombre de CVs traités simultanément")
+            # Fallback vers fichier local s'il existe
+            local_csv = '2025-10-09T20-31_export.csv'
+            if os.path.exists(local_csv):
+                df_integration = pd.read_csv(local_csv)
 
-    if st.button("🔍 Analyser et Classer", type="primary", width="stretch", disabled=not (uploaded_files_ranking and job_description)):
-        # Sauvegarder les informations pour le feedback
-        st.session_state.last_analysis_method = analysis_method
-        st.session_state.last_job_title = job_title
-        st.session_state.last_job_description = job_description
-        st.session_state.last_cv_count = len(uploaded_files_ranking)
-        
-        # Traitement standard ou par lots selon le nombre de CVs
-        if use_batch_processing:
-            # Créer une barre de progression
-            progress_placeholder = st.empty()
-            progress_bar = st.progress(0)
-            
-            def update_progress(progress):
-                progress_placeholder.text(f"Traitement en cours... {int(progress * 100)}%")
-                progress_bar.progress(progress)
-            
-            # Traitement par lots
-            results, file_names = batch_process_resumes(
-                job_description=job_description,
-                file_list=uploaded_files_ranking,
-                analysis_method=analysis_method,
-                batch_size=batch_size,
-                progress_callback=update_progress,
-                extract_text_from_pdf_func=extract_text_from_pdf,
-                rank_resumes_funcs={
-                    'cosine': rank_resumes_with_cosine,
-                    'embeddings': rank_resumes_with_embeddings,
-                    'rules': rank_resumes_with_rules,
-                    'ai': lambda jd, res, fnames, **kw: rank_resumes_with_ai(jd, res, fnames, mode_court=mode_court, **kw),
-                    'ensemble': lambda jd, res, fnames, **kwargs: rank_resumes_with_ensemble(
-                        jd, res, fnames,
-                        cosine_func=rank_resumes_with_cosine,
-                        semantic_func=rank_resumes_with_embeddings,
-                        rules_func=rank_resumes_with_rules,
-                        **kwargs
-                    )
-                }
-            )
-            
-            explanations = results.get("explanations")
-            logic = results.get("logic")
-            
-            # Nettoyer la barre de progression
-            progress_placeholder.empty()
-            progress_bar.empty()
-            
-        else:
-            # Lecture des fichiers PDF
-            resumes, file_names = [], []
-            progress_placeholder = st.empty()
-            progress_bar = st.progress(0)
-            total_files = len(uploaded_files_ranking)
-            
-            for idx, file in enumerate(uploaded_files_ranking):
-                progress_placeholder.info(f"📄 Lecture du fichier ({idx+1}/{total_files}) : {file.name}")
-                progress_bar.progress((idx + 1) / total_files * 0.3)  # 30% pour lecture
-                text = extract_text_from_pdf(file)
-                if not "Erreur" in text:
-                    resumes.append(text)
-                    file_names.append(file.name)
-            
-            # Analyse selon la méthode choisie
-            results, explanations, logic = {}, None, None
-            
-            
-            if analysis_method == "Analyse par IA (Gemini)":
-                progress_placeholder.info(f"🤖 Analyse Gemini en cours...")
-                result = rank_resumes_with_gemini(job_description, resumes, file_names, mode_court=mode_court)
-                results = {"scores": result["scores"], "explanations": result["explanations"]}
-                explanations = result["explanations"]
-                progress_bar.progress(1.0)
+        if df_integration is not None and 'Date Intégration' in df_integration.columns:
+            df_integration['Date Intégration'] = pd.to_datetime(df_integration['Date Intégration'])
 
-            elif analysis_method == "Analyse par IA (Groq)":
-                progress_placeholder.info(f"🤖 Analyse Groq en cours...")
-                result = rank_resumes_with_groq(job_description, resumes, file_names, mode_court=mode_court)
-                results = {"scores": result["scores"], "explanations": result["explanations"]}
-                explanations = result["explanations"]
-                progress_bar.progress(1.0)
-
-            elif analysis_method == "Analyse par IA (Claude)":
-                progress_placeholder.info(f"🤖 Analyse Claude en cours...")
-                scores_data = []
-                for i, r_text in enumerate(resumes):
-                    progress_placeholder.info(f"🤖 Analyse Claude ({i+1}/{len(resumes)})")
-                    extracted = extract_name_from_cv_text(r_text)
-                    candidate_name = extracted.get('name') if extracted else file_names[i]
-                    scores_data.append(get_detailed_score_with_claude(job_description, r_text, candidate_name, mode_court=mode_court))
-                    progress_bar.progress(0.3 + (i + 1) / len(resumes) * 0.7)
-                results = {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
-                explanations = results.get("explanations")
-
-            elif analysis_method == "Analyse par IA (OpenRouter)":
-                progress_placeholder.info(f"🤖 Analyse OpenRouter en cours...")
-                result = rank_resumes_with_openrouter(job_description, resumes, file_names, mode_court=mode_court)
-                results = {"scores": result["scores"], "explanations": result["explanations"]}
-                explanations = result["explanations"]
-                progress_bar.progress(1.0)
-
-            elif analysis_method == "Analyse par IA (DeepSeek)":
-                # Analyse IA avec progression individuelle
-                progress_placeholder.info(f"🤖 Analyse par IA en cours (0/{len(resumes)})...")
-                progress_bar.progress(0.3)
-                
-                scores_data = []
-                for i, resume_text in enumerate(resumes):
-                    progress_placeholder.info(f"🤖 Analyse par IA ({i+1}/{len(resumes)}) : {file_names[i]}")
-                    progress_bar.progress(0.3 + (i + 1) / len(resumes) * 0.7)
-                    scores_data.append(get_detailed_score_with_ai(job_description, resume_text, file_names[i], mode_court=mode_court))
-                
-                results = {"scores": [d["score"] for d in scores_data], "explanations": {file_names[i]: d["explanation"] for i, d in enumerate(scores_data)}}
-                explanations = results.get("explanations")
-
-            
-            elif analysis_method == "Scoring par Règles (Regex)":
-                progress_placeholder.info(f"📏 Analyse par règles en cours...")
-                rule_results = rank_resumes_with_rules(job_description, resumes, file_names)
-                results = {"scores": [r["score"] for r in rule_results]}
-                logic = {r["file_name"]: r["logic"] for r in rule_results}
-                progress_bar.progress(1.0)
-            
-            elif analysis_method == "Méthode Sémantique (Embeddings)":
-                progress_placeholder.info(f"🧠 Analyse sémantique en cours...")
-                results = rank_resumes_with_embeddings(job_description, resumes, file_names)
-                logic = results.get("logic")
-                progress_bar.progress(1.0)
-            
-            elif analysis_method == "Analyse combinée (Ensemble)":
-                progress_placeholder.info(f"🔗 Analyse combinée en cours...")
-                results = rank_resumes_with_ensemble(
-                    job_description, resumes, file_names,
-                    cosinus_weight=cosinus_weight,
-                    semantic_weight=semantic_weight,
-                    rules_weight=rules_weight,
-                    cosine_func=rank_resumes_with_cosine,
-                    semantic_func=rank_resumes_with_embeddings,
-                    rules_func=rank_resumes_with_rules
-                )
-                logic = results.get("logic")
-                progress_bar.progress(1.0)
-            
-            else:  # Méthode Cosinus par défaut
-                progress_placeholder.info(f"📐 Analyse cosinus en cours...")
-                results = rank_resumes_with_cosine(job_description, resumes, file_names)
-                logic = results.get("logic")
-                progress_bar.progress(1.0)
-
-            # Nettoyer les indicateurs de progression
-            progress_placeholder.empty()
-            progress_bar.empty()
-
-            scores = results.get("scores", [])
-            if scores is not None and len(scores) > 0:
-                ranked_resumes = sorted(zip(file_names, scores), key=lambda x: x[1], reverse=True)
-                results_df = pd.DataFrame(ranked_resumes, columns=["Nom du CV", "Score brut"])
-                results_df["Rang"] = range(1, len(results_df) + 1)
-                results_df["Score"] = results_df["Score brut"].apply(lambda x: f"{x*100:.1f}%")
-                
-                # Sauvegarder les résultats dans la session pour maintenir l'affichage
-                st.session_state.last_analysis_result = results_df
-                st.session_state.last_analysis_method = analysis_method
-                st.session_state.ranked_resumes = ranked_resumes
-                st.session_state.file_names = file_names
-                st.session_state.scores = scores
-                st.session_state.logic = logic
-                st.session_state.job_title = job_title
-                st.session_state.job_description = job_description
-                st.session_state.last_job_title = job_title
-                st.session_state.last_job_description = job_description
-                st.session_state.last_file_names = file_names
-                st.session_state.explanations = explanations
-                
+        # Charger l'Excel (données de recrutement)
+        # Si une synchronisation Google Sheets a été réalisée, utiliser ce DataFrame
+        try:
+            if 'synced_recrutement_df' in st.session_state and st.session_state.synced_recrutement_df is not None:
+                df_recrutement = st.session_state.synced_recrutement_df.copy()
+            elif excel_file is not None:
+                df_recrutement = pd.read_excel(excel_file, sheet_name=0)
             else:
-                st.error("L'analyse n'a retourné aucun score.")
-
-    # Affichage des résultats (toujours visible, même après feedback)
-    if hasattr(st.session_state, 'last_analysis_result') and st.session_state.last_analysis_result is not None:
-        results_df = st.session_state.last_analysis_result
-        ranked_resumes = st.session_state.ranked_resumes
-        logic = getattr(st.session_state, 'logic', None)
-        explanations = getattr(st.session_state, 'explanations', None)
-        
-        st.markdown("### 🏆 Résultats du Classement")
-        st.dataframe(results_df[["Rang", "Nom du CV", "Score"]], width="stretch", hide_index=True)
-        
-        if logic:
-            st.markdown("### 🧠 Logique de Scoring")
-            for _, row in results_df.iterrows():
-                file_name = row["Nom du CV"]
-                with st.expander(f"Détail du score pour : **{file_name}**"):
-                    st.json(logic.get(file_name, {}))
-
-        if explanations:
-            st.markdown("### 📝 Analyse détaillée par l'IA")
-            for _, row in results_df.iterrows():
-                file_name = row["Nom du CV"]
-                with st.expander(f"Analyse pour : **{file_name}**"):
-                    explanation = explanations.get(file_name, "N/A")
-                    import re
-                    
-                    # Post-traitement : forcer les titres clés en gras
-                    bold_titles = [
-                        "Points forts", "Points forts pour ce poste",
-                        "Points à améliorer", "Points à améliorer / Écarts avec le poste",
-                        "Écarts avec le poste",
-                        "Points d'attention", "Points d'attention pour ce poste",
-                        "Conclusion"
-                    ]
-                    for title in bold_titles:
-                        # Remplacer les versions non-gras par des versions en gras (avec ou sans emoji)
-                        explanation = re.sub(
-                            r'^(?!\*\*)(.*?)(' + re.escape(title) + r')\s*:?\s*$',
-                            r'**\1\2 :**',
-                            explanation,
-                            flags=re.MULTILINE | re.IGNORECASE
-                        )
-                    
-                    # Afficher l'explication complète, qui est maintenant formatée
-                    st.markdown(explanation)
-        
-        # Système de feedback par CV avec formulaires pour éviter les rechargements
-        st.markdown("---")
-        st.markdown("### 💬 Feedback sur les résultats")
-        
-        for i, (file_name, score) in enumerate(ranked_resumes):
-            with st.expander(f"💬 Évaluer le classement de : {file_name}"):
-                feedback_key = f"feedback_form_{i}"
-                submitted_key = f"submitted_{i}"
-                
-                # Vérifier si le feedback pour ce CV a déjà été soumis
-                if submitted_key not in st.session_state:
-                    st.session_state[submitted_key] = False
-                
-                # Si déjà soumis, afficher un message de confirmation
-                if st.session_state[submitted_key]:
-                    st.success(f"✅ Merci pour votre feedback sur {file_name} !")
+                # Fallback vers fichier local s'il existe (recherche du plus récent)
+                import glob
+                # Pattern pour trouver les fichiers Excel de recrutement
+                excel_files = glob.glob('Recrutement global PBI All*.xlsx')
+                if excel_files:
+                    # Trier par date de modification (le plus récent en dernier)
+                    excel_files.sort(key=os.path.getmtime)
+                    latest_excel = excel_files[-1]
+                    # st.info(f"Chargement automatique du fichier local : {latest_excel}")
+                    df_recrutement = pd.read_excel(latest_excel, sheet_name=0)
                 else:
-                    # Créer un formulaire pour chaque CV pour éviter les rechargements
-                    with st.form(key=feedback_key):
-                        st.markdown(f"#### 📊 Évaluation du CV : {file_name}")
-                        st.caption(f"Score actuel : {score*100:.1f}%")
+                    # Fallback legacy
+                    local_excel = 'Recrutement global PBI All  google sheet (5).xlsx'
+                    if os.path.exists(local_excel):
+                        df_recrutement = pd.read_excel(local_excel, sheet_name=0)
+        except Exception as e:
+            st.error(f"Erreur lors du chargement des données de recrutement: {e}")
 
-                        # Slider pour la notation (1-5)
-                        cv_feedback_score = st.slider(
-                            f"Note pour {file_name} (1 = Très insatisfaisant, 5 = Excellent)",
-                            min_value=1,
-                            max_value=5,
-                            value=3,
-                            step=1,
-                            key=f"cv_rating_{i}",
-                            help="Glissez pour donner votre note"
-                        )
-
-                        # Affichage visuel de la note
-                        score_labels = {
-                            1: "⭐ Très insatisfaisant",
-                            2: "⭐⭐ Insatisfaisant",
-                            3: "⭐⭐⭐ Acceptable",
-                            4: "⭐⭐⭐⭐ Satisfaisant",
-                            5: "⭐⭐⭐⭐⭐ Excellent"
-                        }
-                        cv_feedback_text = st.text_area(
-                            "Commentaires spécifiques (optionnel)",
-                            placeholder=f"Points forts/faibles du classement de {file_name}...",
-                            height=80,
-                            key=f"cv_comment_{i}"
-                        )
-
-                        # Bouton de soumission avec style amélioré
-                        col1, col2 = st.columns([3, 1])
-                        with col2:
-                            cv_submit_button = st.form_submit_button(
-                                label=f"📤 Évaluer",
-                                type="secondary"
-                            )
-                        
-                        if cv_submit_button:
-                            job_title = getattr(st.session_state, 'job_title', '')
-                            job_description = getattr(st.session_state, 'job_description', '')
-                            analysis_method = getattr(st.session_state, 'last_analysis_method', '')
-                            
-                            result = save_feedback(
-                                analysis_method=f"{analysis_method} (CV individuel)",
-                                job_title=job_title,
-                                job_description_snippet=job_description[:200],
-                                cv_count=1,
-                                feedback_score=cv_feedback_score,
-                                feedback_text=f"Feedback pour {file_name}: {cv_feedback_text}"
-                            )
-                            st.session_state[submitted_key] = True
-                            if result:
-                                st.success(f"✅ Merci pour votre feedback sur {file_name} !")
-                                st.rerun()
-                            else:
-                                st.error("❌ Échec de l'enregistrement du feedback.")
-        
-        # Feedback global sur l'analyse
-        st.markdown("---")
-        st.markdown("### 🌟 Feedback global sur l'analyse")
-
-        # Formulaire de feedback global directement visible
-        if not getattr(st.session_state, 'feedback_submitted', False):
-            with st.form(key='feedback_form'):
-                st.markdown("**Comment évaluez-vous la qualité globale des résultats de cette analyse ?**")
-                
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    # Slider pour la notation (1-5)
-                    global_feedback_score = st.slider(
-                        "Note globale (1 = Très insatisfaisant, 5 = Excellent)",
-                        min_value=1,
-                        max_value=5,
-                        value=3,
-                        step=1,
-                        help="Glissez pour donner votre note"
-                    )
-
-                    # Critères d'évaluation spécifiques
-                    st.markdown("**Critères évalués :**")
-                    user_criteria = st.multiselect(
-                        "Sélectionnez les critères :",
-                        options=[
-                            "Pertinence du classement",
-                            "Clarté de la logique d'analyse",
-                            "Rapidité d'exécution",
-                            "Facilité d'utilisation",
-                            "Précision des scores",
-                            "Qualité des explications",
-                            "Autre"
-                        ],
-                        default=[],
-                        help="Tous les critères qui s'appliquent"
-                    )
-                    
-                with col2:
-                    # Champ pour les commentaires
-                    global_feedback_text = st.text_area(
-                        "Commentaires et suggestions d'amélioration (optionnel)",
-                        placeholder="Qu'avez-vous apprécié ? Que pourrait-on améliorer ? Quelles fonctionnalités ajouter ?",
-                        height=200
-                    )
-
-                # Bouton de soumission avec style amélioré
-                col1, col2, col3 = st.columns([1, 2, 1])
-                with col2:
-                    submit_button = st.form_submit_button(
-                        label="📤 Envoyer mon feedback",
-                        type="primary",
-                        width="stretch"
-                    )
-
-                if submit_button:
-                    job_title = getattr(st.session_state, 'job_title', '')
-                    job_description = getattr(st.session_state, 'job_description', '')
-                    analysis_method = getattr(st.session_state, 'last_analysis_method', '')
-                    file_names = getattr(st.session_state, 'file_names', [])
-
-                    criteria_text = ", ".join(user_criteria) if user_criteria else ""
-
-                    result = save_feedback(
-                        analysis_method=analysis_method,
-                        job_title=job_title,
-                        job_description_snippet=job_description,
-                        cv_count=len(file_names),
-                        feedback_score=global_feedback_score,
-                        feedback_text=global_feedback_text,
-                        user_criteria=criteria_text,
-                        improvement_suggestions=global_feedback_text
-                    )
-                    st.session_state.feedback_submitted = True
-                    if result:
-                        st.success("✅ Merci pour votre feedback ! Il nous aidera à améliorer notre système.")
-                        st.balloons()  # Animation festive
-                        st.rerun()
-                    else:
-                        st.error("❌ Échec de l'enregistrement du feedback.")
-
-        # Message si le feedback a déjà été soumis
-        elif getattr(st.session_state, 'feedback_submitted', False):
-            st.success("✅ Merci pour votre feedback ! Il nous aidera à améliorer notre système.")
-
-with tab2:
-    st.markdown("### 📂 Importer un ou plusieurs CVs")
-    uploaded_files_analysis = st.file_uploader("Importer des CVs", type=["pdf"], key="analysis_uploader_single", accept_multiple_files=True)
-    
-    analysis_type_single = st.selectbox(
-        "Type d'analyse souhaité",
-        ("Analyse par IA (DeepSeek)", "Analyse par IA (Gemini)", "Analyse par IA (Groq)", "Analyse par IA (Claude)", "Analyse par IA (OpenRouter)",
-         "Analyse par Regex (Extraction d'entités)", "Analyse par la Méthode Sémantique", 
-         "Analyse par la Méthode Cosinus", "Analyse Combinée (Ensemble)")
-    )
-    captions = {
-        "Analyse par IA (DeepSeek)": "Analyse qualitative (points forts/faibles).",
-        "Analyse par IA (Gemini)": "Analyse par Google Gemini (Rapide & Performant).",
-        "Analyse par IA (Groq)": "Analyse ultra-rapide via Llama 3.",
-        "Analyse par IA (Claude)": "Analyse nuancée par Claude 3 Haiku.",
-        "Analyse par IA (OpenRouter)": "Analyse flexible via OpenRouter.",
-        "Analyse par Regex (Extraction d'entités)": "Extrait des informations structurées (compétences, diplômes, etc.).",
-        "Analyse par la Méthode Sémantique": "Calcule un score de pertinence basé sur le sens (nécessite une description de poste).",
-        "Analyse par la Méthode Cosinus": "Calcule un score de pertinence basé sur les mots-clés (nécessite une description de poste).",
-        "Analyse Combinée (Ensemble)": "Combine plusieurs méthodes d'analyse pour un score plus robuste (nécessite une description de poste)."
-    }
-    st.caption(captions.get(analysis_type_single))
-
-    job_desc_single = ""
-    if "Analyse par la Méthode" in analysis_type_single or "Analyse Combinée" in analysis_type_single:
-        job_desc_single = st.text_area("Description de poste pour le calcul du score", height=150, key="jd_single")
-
-    if uploaded_files_analysis and st.button("🚀 Lancer l'analyse", type="primary", width="stretch", key="btn_single_analysis"):
-        total_files = len(uploaded_files_analysis)
-        progress_bar_tab2 = st.progress(0)
-        progress_text_tab2 = st.empty()
-        
-        for file_idx, uploaded_file in enumerate(uploaded_files_analysis):
-            progress_text_tab2.info(f"🤖 Analyse en cours ({file_idx+1}/{total_files}) : {uploaded_file.name}")
-            progress_bar_tab2.progress((file_idx + 1) / total_files)
+        if df_recrutement is not None:
+            # Nettoyer et préparer les données de recrutement
+            # Convertir les dates
+            date_columns = ['Date de réception de la demande aprés validation de la DRH',
+                           'Date d\'entrée effective du candidat',
+                           'Date d\'annulation /dépriorisation de la demande',
+                           'Date de la 1er réponse du demandeur à l\'équipe RH',
+                           'Date du 1er retour equipe RH  au demandeur',
+                           'Date de désistement',
+                           'Date d\'acceptation du candidat',
+                           'Date d\'entrée prévisionnelle']
             
-            with st.expander(f"Résultat pour : **{uploaded_file.name}**", expanded=True):
-                text = extract_text_from_pdf(uploaded_file)
-                if "Erreur" in text or (text and text.strip().startswith("Aucun texte lisible trouvé")):
-                    # Message clair pour les PDFs scannés ou protégés
-                    if text and text.strip().startswith("Aucun texte lisible trouvé"):
-                        st.error("❌ Aucun texte lisible trouvé dans le PDF. Il s'agit probablement d'un PDF scanné (images) ou protégé.\n💡 Collez manuellement le contenu ou utilisez un OCR externe (ex: tesseract) pour convertir le PDF en texte.")
-                    else:
-                        st.error(f"❌ {text}")
-                else:
-                    if analysis_type_single == "Analyse par Regex (Extraction d'entités)":
-                        entities = regex_analysis(text)
-                        st.info("**Entités extraites par la méthode Regex**")
-                        st.json(entities)
-                    elif "Méthode Sémantique" in analysis_type_single:
-                        if not job_desc_single: st.warning("Veuillez fournir une description de poste.")
-                        else:
-                            result = rank_resumes_with_embeddings(job_desc_single, [text], [uploaded_file.name])
-                            score = result["scores"][0]
-                            st.metric("Score de Pertinence Sémantique", f"{score*100:.1f}%")
-                    elif "Méthode Cosinus" in analysis_type_single:
-                        if not job_desc_single: st.warning("Veuillez fournir une description de poste.")
-                        else:
-                            result = rank_resumes_with_cosine(job_desc_single, [text], [uploaded_file.name])
-                            score = result["scores"][0]
-                            st.metric("Score de Pertinence Cosinus", f"{score*100:.1f}%")
-                    elif "Analyse Combinée" in analysis_type_single:
-                        if not job_desc_single: st.warning("Veuillez fournir une description de poste.")
-                        else:
-                            result = rank_resumes_with_ensemble(
-                                job_desc_single, [text], [uploaded_file.name],
-                                cosinus_weight=0.2, semantic_weight=0.4, rules_weight=0.4,
-                                cosine_func=rank_resumes_with_cosine,
-                                semantic_func=rank_resumes_with_embeddings,
-                                rules_func=rank_resumes_with_rules
-                            )
-                            score = result["scores"][0]
-                            st.metric("Score de Pertinence Combinée", f"{score*100:.1f}%")
-                            
-                            # Affichage de la logique si disponible
-                            if "logic" in result:
-                                logic = result["logic"].get(uploaded_file.name, {})
-                                if logic:
-                                    st.markdown("**Détail de l'analyse combinée :**")
-                                    st.json(logic)
-                    elif analysis_type_single == "Analyse par IA (Gemini)":
-                        # Extraire le nom du candidat
-                        extracted = extract_name_from_cv_text(text)
-                        candidate_name = extracted.get('name') if extracted else None
-                        
-                        analysis_result = get_gemini_profile_analysis(text, candidate_name)
-                        st.markdown("### 🤖 Résultat de l'analyse Gemini")
-                        # Affichage en 2 colonnes
-                        col1, col2 = st.columns(2)
-                        sections = analysis_result.split('**')
-                        left_sections = []
-                        right_sections = []
-                        current_section = ""
-                        section_count = 0
-                        for i, section in enumerate(sections):
-                            if section.strip():
-                                if i % 2 == 1:
-                                    current_section = f"**{section}**"
-                                else:
-                                    full_section = current_section + section
-                                    if section_count < 3:
-                                        left_sections.append(full_section)
-                                    else:
-                                        right_sections.append(full_section)
-                                    section_count += 1
-                        with col1:
-                            st.markdown("".join(left_sections))
-                        with col2:
-                            st.markdown("".join(right_sections))
-
-                    elif analysis_type_single == "Analyse par IA (Groq)":
-                        extracted = extract_name_from_cv_text(text)
-                        candidate_name = extracted.get('name') if extracted else None
-                        analysis_result = get_groq_profile_analysis(text, candidate_name)
-                        st.markdown("### 🤖 Résultat de l'analyse Groq")
-                        # Affichage en 2 colonnes
-                        col1, col2 = st.columns(2)
-                        sections = analysis_result.split('**')
-                        left_sections = []
-                        right_sections = []
-                        current_section = ""
-                        section_count = 0
-                        for i, section in enumerate(sections):
-                            if section.strip():
-                                if i % 2 == 1:
-                                    current_section = f"**{section}**"
-                                else:
-                                    full_section = current_section + section
-                                    if section_count < 3:
-                                        left_sections.append(full_section)
-                                    else:
-                                        right_sections.append(full_section)
-                                    section_count += 1
-                        with col1:
-                            st.markdown("".join(left_sections))
-                        with col2:
-                            st.markdown("".join(right_sections))
-
-                    elif analysis_type_single == "Analyse par IA (Claude)":
-                        extracted = extract_name_from_cv_text(text)
-                        candidate_name = extracted.get('name') if extracted else None
-                        analysis_result = get_claude_profile_analysis(text, candidate_name)
-                        st.markdown("### 🤖 Résultat de l'analyse Claude")
-                        # Affichage en 2 colonnes
-                        col1, col2 = st.columns(2)
-                        sections = analysis_result.split('**')
-                        left_sections = []
-                        right_sections = []
-                        current_section = ""
-                        section_count = 0
-                        for i, section in enumerate(sections):
-                            if section.strip():
-                                if i % 2 == 1:
-                                    current_section = f"**{section}**"
-                                else:
-                                    full_section = current_section + section
-                                    if section_count < 3:
-                                        left_sections.append(full_section)
-                                    else:
-                                        right_sections.append(full_section)
-                                    section_count += 1
-                        with col1:
-                            st.markdown("".join(left_sections))
-                        with col2:
-                            st.markdown("".join(right_sections))
-
-                    elif analysis_type_single == "Analyse par IA (OpenRouter)":
-                        extracted = extract_name_from_cv_text(text)
-                        candidate_name = extracted.get('name') if extracted else None
-                        analysis_result = get_openrouter_profile_analysis(text, candidate_name)
-                        st.markdown("### 🤖 Résultat de l'analyse OpenRouter")
-                        # Affichage en 2 colonnes
-                        col1, col2 = st.columns(2)
-                        sections = analysis_result.split('**')
-                        left_sections = []
-                        right_sections = []
-                        current_section = ""
-                        section_count = 0
-                        for i, section in enumerate(sections):
-                            if section.strip():
-                                if i % 2 == 1:
-                                    current_section = f"**{section}**"
-                                else:
-                                    full_section = current_section + section
-                                    if section_count < 3:
-                                        left_sections.append(full_section)
-                                    else:
-                                        right_sections.append(full_section)
-                                    section_count += 1
-                        with col1:
-                            st.markdown("".join(left_sections))
-                        with col2:
-                            st.markdown("".join(right_sections))
-
-                    else: # Analyse IA DeepSeek
-                        # Extraire le nom du candidat
-                        extracted = extract_name_from_cv_text(text)
-                        candidate_name = extracted.get('name') if extracted else None
-                        analysis_result = get_deepseek_profile_analysis(text, candidate_name)
-                        
-                        # Affichage en 2 colonnes
-                        col1, col2 = st.columns(2)
-                        # Découper le résultat en sections
-                        sections = analysis_result.split('**')
-                        left_sections = []
-                        right_sections = []
-                        current_section = ""
-                        section_count = 0
-                        
-                        for i, section in enumerate(sections):
-                            if section.strip():
-                                if i % 2 == 1:  # C'est un titre
-                                    current_section = f"**{section}**"
-                                else:  # C'est le contenu
-                                    full_section = current_section + section
-                                    if section_count < 3:
-                                        left_sections.append(full_section)
-                                    else:
-                                        right_sections.append(full_section)
-                                    section_count += 1
-                        
-                        with col1:
-                            st.markdown("".join(left_sections))
-                        with col2:
-                            st.markdown("".join(right_sections))
-        
-        # Nettoyer la progression
-        progress_text_tab2.empty()
-        progress_bar_tab2.empty()
-        st.success(f"✅ Analyse terminée pour {total_files} CV(s).")
-
-with tab3:
-    st.header("📖 Comprendre les Méthodes d'Analyse")
-    st.markdown("Chaque méthode a ses propres forces et faiblesses. Voici un guide pour vous aider à choisir la plus adaptée à votre besoin.")
-    
-    st.subheader("1. Méthode Cosinus (Basée sur les Mots-clés)")
-    st.markdown("""
-    - **Principe** : Compare la fréquence des mots exacts entre le CV et l'annonce.
-    - **Comment ça marche ?** Elle utilise un modèle mathématique (TF-IDF) pour donner plus de poids aux mots rares et importants. Le score représente la similarité de ces "sacs de mots-clés".
-    - **Idéal pour** : Un premier tri très rapide et grossier.
-    - **Avantages** : ✅ Extrêmement rapide, ne nécessite aucune IA externe.
-    - **Limites** : ❌ Ne comprend absolument pas le contexte ou les synonymes.
-    """)
-    
-    st.subheader("2. Méthode Sémantique (Basée sur les Embeddings)")
-    st.markdown("""
-    - **Principe** : Utilise une IA pour convertir les phrases en vecteurs de sens, puis compare ces vecteurs.
-    - **Comment ça marche ?** Au lieu de comparer des mots, on compare la "direction" de ces vecteurs. Deux vecteurs qui pointent dans la même direction représentent des idées sémantiquement similaires.
-    - **Idéal pour** : Obtenir un score plus intelligent qui comprend les nuances du langage.
-    - **Avantages** : ✅ Comprend le contexte et les synonymes. Excellent équilibre entre vitesse et intelligence.
-    - **Limites** : ❌ Un peu plus lente que la méthode cosinus.
-    """)
-
-    st.subheader("3. Scoring par Règles (Basé sur Regex)")
-    st.markdown("""
-    - **Principe** : Imite la façon dont un recruteur humain lit un CV. On définit des règles claires (compétences, expérience, diplôme) et on attribue des points.
-    - **Comment ça marche ?** Le code extrait dynamiquement les exigences de l'annonce, puis recherche ces éléments dans chaque CV pour calculer un score.
-    - **Idéal pour** : Des postes où les critères sont très clairs et objectifs.
-    - **Avantages** : ✅ Totalement transparent (le détail du score est affiché), 100% personnalisable et sans dépendances complexes.
-    - **Limites** : ❌ Très rigide. Si une compétence est formulée différemment, elle ne sera pas détectée.
-    """)
-    
-    st.subheader("4. Analyse par IA (Basée sur un LLM)")
-    st.markdown("""
-    - **Principe** : On envoie le CV et l'annonce à un grand modèle de langage (DeepSeek) en lui demandant d'agir comme un expert en recrutement.
-    - **Comment ça marche ?** L'IA lit et comprend les deux textes, puis utilise sa vaste connaissance pour évaluer la pertinence et formuler une explication.
-    - **Idéal pour** : Obtenir une analyse fine et contextuelle, similaire à celle d'un premier entretien.
-    - **Avantages** : ✅ La plus précise et la plus "humaine". Comprend les nuances et fournit des explications de haute qualité.
-    - **Limites** : ❌ La plus lente, et chaque analyse **consomme vos tokens !**
-    """)
-    
-    st.subheader("5. Analyse combinée (Ensemble)")
-    st.markdown("""
-    - **Principe** : Combine plusieurs méthodes d'analyse (Cosinus, Sémantique, Règles) en un seul score pondéré.
-    - **Comment ça marche ?** Chaque CV est analysé selon les trois méthodes, puis les scores sont multipliés par les poids attribués à chaque méthode et additionnés.
-    - **Idéal pour** : Obtenir un classement plus équilibré qui tire parti des forces de chaque méthode. Réduire les faux positifs et les faux négatifs.
-    - **Avantages** : ✅ Plus robuste face aux biais de chaque méthode individuelle. Hautement personnalisable via les poids attribués. Fournit des explications détaillées.
-    - **Limites** : ❌ Plus lent que les méthodes individuelles (mais plus rapide que l'analyse par IA). Complexité accrue.
-    
-    ##### Comment ajuster les poids ?
-    - **Augmentez le poids Cosinus** lorsque les mots-clés exacts sont très importants (termes techniques spécifiques).
-    - **Augmentez le poids Sémantique** pour les postes créatifs ou les compétences transversales, où la compréhension du contexte est cruciale.
-    - **Augmentez le poids Règles** pour les postes avec des exigences formelles strictes en termes d'expérience ou de diplômes.
-    """)
-
-with tab4:
-
-
-    # Récupération des statistiques (pré-chargement à l'ouverture de l'onglet)
-    feedback_stats = get_feedback_summary()
-
-    if len(feedback_stats) > 0:
-        # Métriques principales
-        st.subheader("📈 Métriques Clés")
-
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            total_feedbacks = feedback_stats["Nombre d'évaluations"].sum()
-            st.metric("Total Feedbacks", total_feedbacks, help="Nombre total d'évaluations reçues")
-
-        with col2:
-            avg_score = (feedback_stats["Score moyen"] * feedback_stats["Nombre d'évaluations"]).sum() / total_feedbacks
-            st.metric("Score Moyen Global", f"{avg_score:.2f}/5", help="Satisfaction moyenne globale")
-
-        with col3:
-            best_method = feedback_stats.loc[feedback_stats["Score moyen"].idxmax()]
-            st.metric("Meilleure Méthode", best_method["Méthode"].split(" (")[0], help=f"Score: {best_method['Score moyen']:.2f}/5")
-
-        with col4:
-            most_used = feedback_stats.loc[feedback_stats["Nombre d'évaluations"].idxmax()]
-            evaluations_count = most_used["Nombre d'évaluations"]
-            st.metric("Top", most_used["Méthode"].split(" (")[0], help=f"{evaluations_count} évaluations")
-
-        st.markdown("---")
-
-        # Graphiques améliorés
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.subheader("🌟 Satisfaction par Méthode")
-            # Filtrer uniquement les méthodes avec des évaluations
-            feedback_with_evals = feedback_stats[feedback_stats["Nombre d'évaluations"] > 0]
-
-            if not feedback_with_evals.empty:
-                # Graphique en barres horizontales avec couleurs
-                fig_scores = go.Figure()
-                colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD']
-
-                for i, (_, row) in enumerate(feedback_with_evals.iterrows()):
-                    fig_scores.add_trace(go.Bar(
-                        x=[row["Score moyen"]],
-                        y=[row["Méthode"]],
-                        orientation='h',
-                        name=row["Méthode"],
-                        marker_color=colors[i % len(colors)],
-                        showlegend=False
-                    ))
-
-                fig_scores.update_layout(
-                    title="Score moyen par méthode (sur 5)",
-                    height=max(300, len(feedback_with_evals) * 40),
-                    margin={"l": 200, "r": 20, "t": 40, "b": 20},
-                    xaxis={"range": [0, 5], "title": "Score moyen"},
-                    yaxis={"title": ""},
-                )
-
-                st.plotly_chart(fig_scores, width="stretch")
-
-        with col2:
-            st.subheader("📊 Distribution des Évaluations")
-            if not feedback_with_evals.empty:
-                # Camembert avec pourcentages
-                fig_evals = go.Figure(data=[go.Pie(
-                    labels=feedback_with_evals["Méthode"],
-                    values=feedback_with_evals["Nombre d'évaluations"],
-                    marker_colors=['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD'],
-                    textinfo='label+percent',
-                    hovertemplate="<b>%{label}</b><br>%{value} évaluations (%{percent})<extra></extra>"
-                )])
-
-                fig_evals.update_layout(
-                    title="Répartition des feedbacks par méthode",
-                    height=400,
-                    margin={"l": 20, "r": 20, "t": 40, "b": 20},
-                    font=dict(size=14),
-                    legend=dict(font=dict(size=16))
-                )
-
-                st.plotly_chart(fig_evals, width="stretch")
-
-        st.markdown("---")
-
-        # Tableau détaillé avec style amélioré
-        st.subheader("📋 Détails des Statistiques")
-
-        # Préparer les données pour l'affichage
-        display_stats = feedback_stats.copy()
-        display_stats["Score Formaté"] = display_stats.apply(lambda row: 
-            f"{row['Score moyen']:.2f}/5 {'🟢' if row['Score moyen'] >= 4.0 else '🟡' if row['Score moyen'] >= 3.0 else '🔴'}", axis=1)
-        display_stats["Fiabilité"] = display_stats["Nombre d'évaluations"].apply(
-            lambda x: "Très fiable 🎯" if x >= 10 else "À confirmer ⚠️" if x >= 5 else "Données limitées 📊")
-        
-        # Afficher le tableau avec colonnes formatées
-        st.dataframe(
-            display_stats[["Méthode", "Score Formaté", "Nombre d'évaluations", "Fiabilité"]],
-            column_config={
-                "Méthode": st.column_config.TextColumn("Méthode d'Analyse", width="medium"),
-                "Score Formaté": st.column_config.TextColumn("Score Moyen", width="small"),
-                "Nombre d'évaluations": st.column_config.NumberColumn("Évaluations", width="small"),
-                "Fiabilité": st.column_config.TextColumn("Fiabilité", width="medium")
-            },
-            hide_index=True,
-            width="stretch"
-        )
-
-        # Insights et recommandations
-        st.markdown("---")
-        st.subheader("💡 Insights & Recommandations")
-
-        if len(feedback_with_evals) > 1:
-            best_method = feedback_with_evals.loc[feedback_with_evals["Score moyen"].idxmax()]
-            worst_method = feedback_with_evals.loc[feedback_with_evals["Score moyen"].idxmin()]
-
-            # Assurer un scalaire numérique pour l'écart de score (aide Pylance)
-            best_score = cast(float, best_method["Score moyen"])
-            worst_score = cast(float, worst_method["Score moyen"])
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.success(f"🏆 **Meilleure méthode** : {best_method['Méthode']} avec un score de {best_score:.2f}/5")
-                st.info("💭 **Recommandation** : Priorisez cette méthode pour vos analyses futures.")
-
-            with col2:
-                if best_score - worst_score > 0.5:
-                    st.warning(f"⚠️ **Méthode à améliorer** : {worst_method['Méthode']} (score: {worst_score:.2f}/5)")
-                    st.info("💭 **Suggestion** : Collectez plus de feedbacks pour affiner cette méthode.")
-
-        # Évolution temporelle (si assez de données)
-        if total_feedbacks >= 10:
-            st.subheader("📈 Évolution de la Satisfaction")
-            st.info("📊 Avec plus de données, nous pourrons afficher des graphiques d'évolution temporelle de la satisfaction utilisateur.")
-
-    else:
-        # Interface vide avec call-to-action
-        st.info("Aucun feedback n'a encore été enregistré.")
-        st.markdown("""
-        <div style='margin-top:1em;'>
-        <b>Comment ça marche :</b><br>
-        1. Effectuez des analyses de CV<br>
-        2. Évaluez les résultats obtenus<br>
-        3. Les statistiques s'affichent automatiquement ici
-        </div>
-        """, unsafe_allow_html=True)
-
-with st.sidebar:
-    st.markdown("### 🔧 Configuration")
-    
-    # Indicateurs d'état discret
-    ds_status = "✅" if get_api_key() else "⚠️"
-    gem_status = "✅" if get_gemini_api_key() else "⚠️"
-    
-    if ds_status == "⚠️":
-        st.caption("⚠️ DeepSeek API non configurée")
-    if gem_status == "⚠️":
-        st.caption("⚠️ Gemini API non configurée")
-
-    if st.button("Test connexion API"):
-        # Test DeepSeek
-        ds_key = get_api_key()
-        if ds_key:
-            try:
-                response = requests.get("https://api.deepseek.com/v1/models", headers={"Authorization": f"Bearer {ds_key}"})
-                if response.status_code == 200:
-                    st.success("✅ DeepSeek : Connecté")
-                else:
-                    st.error(f"❌ DeepSeek : Erreur {response.status_code}")
-            except Exception as e:
-                st.error(f"❌ DeepSeek : {e}")
-        else:
-            st.warning("⚠️ DeepSeek : Clé manquante")
-            
-        # Test Gemini
-        gem_key = get_gemini_api_key()
-        if gem_key:
-            try:
-                genai.configure(api_key=gem_key)
-                
-                # Test prioritaires sur les modèles disponibles (2.5-flash-lite)
-                try:
-                    model = genai.GenerativeModel('gemini-2.5-flash-lite')
-                    response = model.generate_content("Ping")
-                    if response:
-                        st.success("✅ Gemini (2.5 Flash Lite) : Connecté")
-                except Exception as e_flash:
-                     # Fallback sur flash-latest
+            for col in date_columns:
+                if col in df_recrutement.columns:
                     try:
-                        model = genai.GenerativeModel('gemini-flash-latest')
-                        response = model.generate_content("Ping")
-                        if response:
-                             st.success("✅ Gemini (Flash Latest) : Connecté")
-                    except Exception as e_latest:
-                        st.error(f"❌ Gemini indisponible. Erreur : {e_flash} | {e_latest}")
-            except Exception as e:
-                st.error(f"❌ Gemini : {e}")
-        else:
-             st.warning("⚠️ Gemini : Clé manquante")
-
-        # Test Claude
-        claude_key = get_claude_api_key()
-        if claude_key:
-            try:
-                client = anthropic.Anthropic(api_key=claude_key)
-                message = client.messages.create(
-                    model="claude-3-haiku-20240307",
-                    max_tokens=10,
-                    messages=[
-                        {"role": "user", "content": "Ping"}
-                    ]
-                )
-                if message and message.content:
-                    st.success("✅ Claude (Haiku) : Connecté")
-            except Exception as e:
-                st.error(f"❌ Claude : {e}")
-        else:
-             st.warning("⚠️ Claude : Clé manquante")
-
-        # Test Groq
-        groq_key = get_groq_api_key()
-        if groq_key and groq is None:
-            st.error("❌ Groq : SDK non installé (pip install groq)")
-        elif groq_key and groq is not None:
-            try:
-                assert groq is not None
-                client = groq.Groq(api_key=groq_key)
-                chat_completion = client.chat.completions.create(
-                    messages=[{"role": "user", "content": "Ping"}],
-                    model="llama-3.1-8b-instant",
-                )
-                if chat_completion.choices[0].message.content:
-                    st.success("✅ Groq (Llama 3) : Connecté")
-            except Exception as e:
-                st.error(f"❌ Groq : {e}")
-        else:
-             st.warning("⚠️ Groq : Clé manquante")
-
-        # Test OpenRouter
-        openrouter_key = get_openrouter_api_key()
-        if openrouter_key:
-            try:
-                resp = requests.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {openrouter_key}"},
-                    json={
-                        "model": "openai/gpt-3.5-turbo",
-                        "messages": [{"role": "user", "content": "Ping"}]
-                    },
-                    timeout=10
-                )
-                if resp.status_code == 200:
-                    # basic validation of response structure
-                    try:
-                        jr = resp.json()
-                        if jr.get('choices') and jr['choices'][0].get('message'):
-                            st.success("✅ OpenRouter : Connecté")
-                        else:
-                            st.error(f"❌ OpenRouter : réponse inattendue")
+                        df_recrutement[col] = _parse_mixed_dates(df_recrutement[col])
                     except Exception:
-                        st.error("❌ OpenRouter : réponse non JSON")
-                else:
-                    st.error(f"❌ OpenRouter : Erreur {resp.status_code}")
-            except Exception as e:
-                st.error(f"❌ OpenRouter : {e}")
-        else:
-            st.warning("⚠️ OpenRouter : Clé manquante")
+                        # fallback
+                        df_recrutement[col] = pd.to_datetime(df_recrutement[col], errors='coerce')
+            
+            # Nettoyer les colonnes avec des espaces
+            df_recrutement.columns = df_recrutement.columns.str.strip()
+            
+            # Nettoyer les valeurs des colonnes critiques pour éviter les problèmes de labels ou d'espaces invisibles
+            critical_cols = ['Poste demandé', 'Direction concernée', 'Entité demandeuse', 'Statut de la demande']
+            for col in critical_cols:
+                if col in df_recrutement.columns:
+                    df_recrutement[col] = df_recrutement[col].astype(str).str.strip()
+            
+            # Nettoyer les colonnes numériques pour éviter les erreurs de type
+            numeric_columns = ['Nb de candidats pré-selectionnés']
+            for col in numeric_columns:
+                if col in df_recrutement.columns:
+                    df_recrutement[col] = pd.to_numeric(df_recrutement[col], errors='coerce')
+                    df_recrutement[col] = df_recrutement[col].fillna(0)
 
-with tab5:
-    st.header("🗂️ Auto-classification de CVs (4 catégories)")
-    st.markdown("Chargez et analysez jusqu'à 500 CVs (PDF). L'outil extrait le texte et classe automatiquement chaque CV dans l'une des 4 catégories : Fonctions supports, Logistique, Production/Technique, Non classé.")
+            # Vérification basique des colonnes critiques et message dans les logs
+            required_cols = [
+                'Statut de la demande', 'Poste demandé', 'Direction concernée',
+                'Entité demandeuse', 'Modalité de recrutement'
+            ]
+            missing = [c for c in required_cols if c not in df_recrutement.columns]
+            if missing:
+                # Log via st.warning but don't raise — keep app running
+                st.warning(f"Colonnes attendues manquantes dans le fichier de recrutement: {missing}")
+        
+        return df_integration, df_recrutement
+        
+    except Exception as e:
+        st.error(f"Erreur lors du chargement des données: {e}")
+        return None, None
 
-    # Importer des CVs uniquement via upload
-    uploaded_files_auto = st.file_uploader("Importer des CVs (PDF)", type=["pdf"], accept_multiple_files=True, key="auto_uploader")
+def create_integration_timeline(df):
+    """Créer un graphique de timeline des intégrations"""
+    # Grouper par mois
+    df['Mois'] = df['Date Intégration'].dt.to_period('M')
+    monthly_stats = df.groupby(['Mois', 'Statut']).size().reset_index(name='Count')
+    monthly_stats['Mois_str'] = monthly_stats['Mois'].astype(str)
     
-    file_list: list[dict] = []
-    # Afficher immédiatement combien de CVs ont été uploadés
-    if uploaded_files_auto:
-        total_uploads = len(uploaded_files_auto)
+    fig = px.bar(
+        monthly_stats, 
+        x='Mois_str', 
+        y='Count',
+        color='Statut',
+        title="📈 Évolution des Intégrations par Mois",
+        color_discrete_map={'En cours': '#ff6b6b', 'Complet': '#51cf66'}
+    )
+    
+    fig.update_traces(hovertemplate='%{y}<extra></extra>')
+    fig.update_layout(
+        xaxis_title="Mois",
+        yaxis_title="Nombre d'intégrations",
+        showlegend=True,
+        height=400
+    )
+    
+    return fig
 
-        # Limiter à 500 pour sécurité
-        if total_uploads > 500:
-            st.warning('⚠️ Limite de 500 CVs atteinte. Seuls les 500 premiers seront traités.')
-            uploaded_files_auto = uploaded_files_auto[:500]
-            total_uploads = len(uploaded_files_auto)
-
-        file_list = []
-        for uf in uploaded_files_auto:
-            file_list.append({'name': uf.name, 'file': uf})
-
-        # Message de confirmation unique
-        st.success(f"✅ {total_uploads} CVs chargés avec succès et prêts pour l'IA !")
-
-        st.session_state.uploaded_files_list = [dict(item) for item in file_list]
+def create_affectation_chart(df):
+    """Créer un graphique par affectation"""
+    # Prefer 'Entité demandeuse' if present, else fallback to 'Affectation'
+    if 'Entité demandeuse' in df.columns and df['Entité demandeuse'].notna().sum() > 0:
+        serie = df['Entité demandeuse'].value_counts()
+        title = "🏢 Répartition par Entité (Top 10)"
+    elif 'Affectation' in df.columns:
+        serie = df['Affectation'].value_counts()
+        title = "🏢 Répartition par Affectation (Top 10)"
     else:
-        st.session_state.pop('uploaded_files_list', None)
-        st.session_state.pop('uploaded_files_cache', None)
+        serie = pd.Series([], dtype=int)
+        title = "Répartition"
 
-    # Initialiser les variables de session pour la classification et l'analyse DeepSeek
-    if 'classification_results' not in st.session_state:
-        st.session_state.classification_results = None
-    if 'deepseek_analyses' not in st.session_state:
-        st.session_state.deepseek_analyses = []
-    if 'last_action' not in st.session_state:
-        st.session_state.last_action = None
-    
-    # Afficher un indicateur de statut si une action a été effectuée précédemment
-    if st.session_state.last_action:
-        action_message = {
-            # 'classified' message intentionally removed per user request
-            "analyzed": "✅ CVs non classés analysés avec DeepSeek IA !",
-            "reset": "🔄 Analyses IA réinitialisées."
-        }
-        msg = action_message.get(st.session_state.last_action, "")
-        if msg:
-            st.success(msg)
-        # Réinitialiser pour ne pas afficher le message à chaque rechargement
-        st.session_state.last_action = None
-    
-    # Option pour renommer et organiser les CV
-    rename_and_organize = st.checkbox(
-        "📁 Renommer les CV et organiser par dossiers",
-        value=True,
-        help="Extrait automatiquement les noms des candidats et organise les CV par catégorie dans un fichier ZIP"
+    serie = serie.head(10)
+    fig = px.pie(
+        values=serie.values,
+        names=serie.index,
+        title=title
     )
-
-    # Choix du modèle IA pour la classification
-    classif_model = st.selectbox("Modèle IA pour la classification", ["DeepSeek", "Gemini", "Groq", "Claude", "OpenRouter"])
-
-    # Traitement par lots pour éviter les crashes mémoire
-    batch_size = st.number_input(
-        "Taille des lots (CVs)",
-        min_value=10,
-        max_value=200,
-        value=100,
-        step=10,
-        help="Traite les CVs par lots pour réduire la charge mémoire."
+    fig.update_traces(textposition='inside', textinfo='percent+label', textfont=dict(size=14))
+    fig.update_layout(
+        height=420,
+        title=dict(text=title, x=0, xanchor='left', font=TITLE_FONT),
+        legend=dict(
+            orientation="v",
+            yanchor="middle",
+            y=0.5,
+            xanchor="left",
+            x=0.75,  # Rapprochement vers la gauche vers le centre du graphique
+            font=dict(size=16) # Taille de légende augmentée
+        ),
+        margin=dict(l=20, r=20, t=60, b=20)
     )
+    return fig
 
-    # Bouton de classification primaire
-    if st.button("📂 Lancer l'auto-classification", type='primary'):
-            # Réinitialiser les analyses DeepSeek lors d'une nouvelle classification
-            st.session_state.deepseek_analyses = []
+
+def render_plotly_scrollable(fig, max_height=500):
+    """Renders a plotly figure inside a scrollable HTML div so the user can scroll when there are many bars."""
+    try:
+        # Use components.html so the plotly JS is executed correctly in Streamlit
+        html = fig.to_html(full_html=False, include_plotlyjs='cdn')
+        # Inject a small CSS block that targets Plotly's title classes inside the
+        # generated HTML so we can enforce consistent font and left alignment
+        injected_css = """
+    <style>
+    /* Ensure the plotly SVG title (gtitle) uses our TITLE_FONT and is left-aligned */
+    .plotly .gtitle, .plotly .gtitle text { font-family: Arial, sans-serif !important; font-size: 18px !important; fill: #111111 !important; }
+    .plotly .gtitle { text-anchor: start !important; }
+    /* Force the plot container to align left inside the Streamlit component */
+    .streamlit-plotly-wrapper{ display:flex; justify-content:flex-start; }
+    </style>
+    """
+
+        # Wrap the plot HTML in a left-aligned container so the chart isn't centered
+        wrapper = f"""
+<div class='streamlit-plotly-wrapper' style='width:100%;'>
+  {injected_css}
+  {html}
+</div>
+"""
+        # components.html supports scrolling and executes scripts
+        components.html(wrapper, height=max_height, scrolling=True)
+    except Exception:
+        # Fallback to default renderer
+                fig = apply_title_style(fig)
+                st.plotly_chart(fig, width="stretch")
+
+def create_recrutements_clotures_tab(df_recrutement, global_filters):
+    """Onglet Recrutements Clôturés avec style carte"""
+    
+    # Filtrer seulement les recrutements clôturés
+    df_cloture = df_recrutement[df_recrutement['Statut de la demande'] == 'Clôture'].copy()
+    
+    if len(df_cloture) == 0:
+        st.warning("Aucune donnée de recrutement clôturé disponible")
+        return
+    
+    # Appliquer les filtres globaux
+    df_filtered = apply_global_filters(df_cloture, global_filters)
+
+    # Use the HTML KPI cards renderer for a more attractive layout
+    recrutements = len(df_filtered)
+    postes_uniques = df_filtered['Poste demandé'].nunique()
+    directions_uniques = df_filtered['Direction concernée'].nunique()
+
+    # Compute delai display and help
+    date_reception_col = 'Date de réception de la demande aprés validation de la DRH'
+    date_retour_rh_col = 'Date du 1er retour equipe RH  au demandeur'
+    delai_display = "N/A"
+    delai_help = "Colonnes manquantes ou pas de durées valides"
+    if date_reception_col in df_filtered.columns and date_retour_rh_col in df_filtered.columns:
+        try:
+            s = pd.to_datetime(df_filtered[date_reception_col], errors='coerce')
+            e = pd.to_datetime(df_filtered[date_retour_rh_col], errors='coerce')
+            mask = s.notna() & e.notna()
+            if mask.sum() > 0:
+                durees = (e[mask] - s[mask]).dt.days
+                durees = durees[durees >= 0]
+                if len(durees) > 0:
+                    delai_moyen = round(durees.mean(), 1)
+                    delai_display = f"{delai_moyen}"
+                    delai_help = f"Moyenne calculée sur {len(durees)} recrutements clôturés"
+        except Exception:
+            pass
+
+    # Render KPIs as HTML cards for larger/consistent styling
+    metrics_html = render_generic_metrics([
+        ("Nombre de recrutements", recrutements, "#1f77b4"),
+        ("Postes concernés", postes_uniques, "#2ca02c"),
+        ("Nombre de Directions concernées", directions_uniques, "#ff7f0e"),
+        ("Délai moyen recrutement (jours)", delai_display, "#6f42c1")
+    ])
+    st.markdown(metrics_html, unsafe_allow_html=True)
+    
+    # Graphiques en ligne 1
+    col1, col2 = st.columns([2,1])
+    
+    with col1:
+        # Évolution des recrutements par mois (comme dans l'image 1)
+        if 'Date d\'entrée effective du candidat' in df_filtered.columns:
+            # Générer une série complète de mois entre la plus petite et la plus grande date
+            df_filtered['Mois_Année'] = df_filtered['Date d\'entrée effective du candidat'].dt.to_period('M').dt.to_timestamp()
+            monthly_data = df_filtered.groupby('Mois_Année').size().rename('Count')
+            if not monthly_data.empty:
+                all_months = pd.date_range(start=monthly_data.index.min(), end=monthly_data.index.max(), freq='MS')
+                monthly_data = monthly_data.reindex(all_months, fill_value=0)
+                monthly_data = monthly_data.reset_index().rename(columns={'index': 'Mois_Année'})
+                monthly_data['Mois_Année'] = monthly_data['Mois_Année'].dt.strftime('%b %Y')
+
+                fig_evolution = px.bar(
+                    monthly_data,
+                    x='Mois_Année',
+                    y='Count',
+                    title="Évolution des recrutements",
+                    text='Count'
+                )
+                fig_evolution.update_traces(
+                    marker_color='#1f77b4',
+                    textposition='inside',
+                    texttemplate='<b>%{y}</b>',
+                    textfont=dict(size=15, color='white'),
+                    hovertemplate='%{y}<extra></extra>'
+                )
+                fig_evolution.update_layout(
+                    height=360,
+                    margin=dict(t=48, b=30, l=20, r=20),
+                    xaxis_title=None,
+                    yaxis_title=None,
+                    xaxis=dict(
+                        tickmode='array',
+                        tickvals=monthly_data['Mois_Année'],
+                        ticktext=monthly_data['Mois_Année'],
+                        tickangle=45
+                    )
+                )
+                fig_evolution = apply_title_style(fig_evolution)
+                st.plotly_chart(fig_evolution, width="stretch")
+    
+    with col2:
+        # Répartition par modalité de recrutement (CORRECTION: légende déplacée à l'extérieur)
+        if 'Modalité de recrutement' in df_filtered.columns:
+            modalite_data = df_filtered['Modalité de recrutement'].value_counts()
             
-            results = []
-            total = len(file_list)
-            total_batches = (total + int(batch_size) - 1) // int(batch_size) if total else 0
+            fig_modalite = go.Figure(data=[go.Pie(
+                labels=modalite_data.index, 
+                values=modalite_data.values,
+                hole=.5,
+                textposition='inside',
+                textinfo='percent'
+            )])
+            fig_modalite.update_traces(textfont=dict(size=14))
+            fig_modalite.update_layout(
+                title=dict(text="Répartition par Modalité de recrutement", x=0, xanchor='left', font=TITLE_FONT),
+                height=380,
+                # Légende positionnée à droite pour éviter le chevauchement
+                legend=dict(
+                    orientation="v", 
+                    yanchor="middle", 
+                    y=0.5, 
+                    xanchor="left", 
+                    x=1.0,
+                    font=dict(size=14)
+                ),
+                # Ajuster les marges pour faire de la place à la légende
+                margin=dict(l=20, r=140, t=60, b=20)
+            )
+            fig_modalite = apply_title_style(fig_modalite)
+            st.plotly_chart(fig_modalite, width="stretch")
+
+    # Graphiques en ligne 2
+    col3, col4 = st.columns(2)
+    
+    with col3:
+        # Comparaison par direction
+        direction_counts = df_filtered['Direction concernée'].value_counts()
+        # Convert Series to DataFrame for plotly express compatibility
+        df_direction = direction_counts.rename_axis('Direction').reset_index(name='Count')
+        df_direction = df_direction.sort_values('Count', ascending=False)
+        # Truncate long labels for readability, keep full label in customdata for hover
+        df_direction['Label_trunc'] = df_direction['Direction'].apply(lambda s: _truncate_label(s, max_len=24))
+        # Ensure a display label exists (truncated + small gap) to be used for axis and ordering
+        if 'Label_display' not in df_direction.columns:
+            df_direction['Label_display'] = df_direction['Label_trunc'] + '\u00A0\u00A0'
+        # Add two non-breaking spaces to create visual gap between label and bar
+        df_direction['Label_display'] = df_direction['Label_trunc'] + '\u00A0\u00A0'
+        fig_direction = px.bar(
+            df_direction,
+            x='Count',
+            y='Label_display',
+            title="Comparaison par direction",
+            text='Count',
+            orientation='h',
+            custom_data=['Direction']
+        )
+        fig_direction.update_traces(
+            marker_color='grey',
+            textposition='inside',
+            texttemplate='<b>%{x}</b>',
+            textfont=dict(size=14, color='white'),
+            textangle=0,  # Forcer l'orientation horizontale des valeurs
+            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>',
+            constraintext='none'
+        )
+        fig_direction.update_layout(
+            height=300,
+            xaxis_title=None,
+            yaxis_title=None,
+            margin=dict(l=160, t=48, b=30, r=20),
+            xaxis=dict(tickangle=0),
+            yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_direction['Label_display'][::-1])),
+            title=dict(text="<b>Comparaison par direction</b>", x=0, xanchor='left', font=TITLE_FONT),
+            uniformtext=dict(minsize=10, mode='show')
+        )
+        fig_direction = apply_title_style(fig_direction)
+        # Use a compact default visible area and allow scrolling when long
+        render_plotly_scrollable(fig_direction, max_height=320)
+
+    with col4:
+        # Comparaison par poste
+        poste_counts = df_filtered['Poste demandé'].value_counts()
+        df_poste = poste_counts.rename_axis('Poste').reset_index(name='Count')
+        df_poste = df_poste.sort_values('Count', ascending=False)
+        df_poste['Label_trunc'] = df_poste['Poste'].apply(lambda s: _truncate_label(s, max_len=24))
+        if 'Label_display' not in df_poste.columns:
+            df_poste['Label_display'] = df_poste['Label_trunc'] + '\u00A0\u00A0'
+        df_poste['Label_display'] = df_poste['Label_trunc'] + '\u00A0\u00A0'
+        fig_poste = px.bar(
+            df_poste,
+            x='Count',
+            y='Label_display',
+            title="Comparaison par poste",
+            text='Count',
+            orientation='h',
+            custom_data=['Poste']
+        )
+        fig_poste.update_traces(
+            marker_color='grey',
+            textposition='inside',
+            texttemplate='<b>%{x}</b>',
+            textfont=dict(size=14, color='white'),
+            textangle=0,  # Forcer l'orientation horizontale des valeurs
+            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>',
+            constraintext='none'
+        )
+        height_poste = max(320, 28 * len(df_poste))
+        fig_poste.update_layout(
+            height=height_poste,
+            xaxis_title=None,
+            yaxis_title=None,
+            margin=dict(l=160, t=48, b=30, r=20),
+            xaxis=dict(tickangle=0),
+            yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_poste['Label_display'][::-1])),
+            title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT),
+            uniformtext=dict(minsize=10, mode='show')
+        )
+        fig_poste = apply_title_style(fig_poste)
+        render_plotly_scrollable(fig_poste, max_height=320)
+
+
+    # Ligne 3 - KPIs de délai et candidats
+    col5, col6 = st.columns(2)
+
+    with col5:
+        # Nombre de candidats présélectionnés - avec conversion sécurisée
+        try:
+            # Convertir les valeurs en numérique, remplacer les erreurs par 0
+            candidats_series = pd.to_numeric(df_filtered['Nb de candidats pré-selectionnés'], errors='coerce').fillna(0)
+            total_candidats = int(candidats_series.sum())
+        except (KeyError, ValueError):
+            total_candidats = 0
             
-            # Compteur pour le traitement IA (texte uniquement)
-            processing_status_placeholder = st.empty()
-            processing_status_placeholder.info(f"🤖 Traitement IA en cours : 0/{total} CVs")
-            
-            processing_detail_placeholder = st.empty()
-            batch_status_placeholder = st.empty()
-            spinner_text = 'Extraction, classification et extraction des noms en cours...' if rename_and_organize else 'Extraction et classification en cours...'
-            
-            with st.spinner(spinner_text):
-                cache = st.session_state.get('uploaded_files_cache', {})
-                processed = 0
-                for batch_index, start in enumerate(range(0, total, int(batch_size)), start=1):
-                    batch = file_list[start:start + int(batch_size)]
-                    batch_status_placeholder.info(f"Lot {batch_index}/{total_batches} — {len(batch)} CVs")
-                    for i, item in enumerate(batch, start=start):
-                        f = item['file']
-                        name = item['name']
-                        processed += 1
-                        
-                        # Mettre à jour le compteur de traitement
-                        processing_status_placeholder.info(f"🤖 Traitement IA en cours : {processed}/{total} CVs")
-                        processing_detail_placeholder.info(f"CV en cours : {name}")
-                        cache_key = item.get('cache_key') or f"{name}|{i}"
-                    cache_entry = cache.setdefault(cache_key, {}) if cache is not None else {}
+        # Titre stylé comme les autres graphiques
+        st.markdown("<div style='font-family:Arial,sans-serif; font-size:18px; font-weight:700; color:#111111; text-align:left; margin:8px 0 4px 0;'>Nombre de candidats présélectionnés</div>", unsafe_allow_html=True)
 
-                    file_bytes = cache_entry.get('bytes') if cache_entry else None
-                    if file_bytes is None and 'content' in item and item['content'] is not None:
-                        file_bytes = item['content']
-                        if cache_entry is not None:
-                            cache_entry['bytes'] = file_bytes
+        fig_candidats = go.Figure(go.Indicator(
+            mode = "gauge+number",
+            value = total_candidats,
+            gauge = {'axis': {'range': [0, max(total_candidats * 2, 100)], 'visible': True},
+                     'bar': {'color': "green"},
+                    }))
+        fig_candidats.update_layout(height=260, margin=dict(t=10, b=10, l=20, r=20))
+        st.plotly_chart(fig_candidats, width="stretch")
 
-                    text = ''
-                    if cache_entry and 'text' in cache_entry:
-                        text = cache_entry['text']
-                    else:
-                        try:
-                            if file_bytes is not None:
-                                text = extract_text_from_pdf(io.BytesIO(file_bytes))
-                            else:
-                                text = extract_text_from_pdf(f)
-                                if cache_entry is not None:
-                                    try:
-                                        f.seek(0)
-                                        file_bytes = f.read()
-                                        cache_entry['bytes'] = file_bytes
-                                    except Exception:
-                                        pass
-                        except Exception:
-                            text = ''
-                        if cache_entry is not None:
-                            cache_entry['text'] = text
-                            cache[cache_key] = cache_entry
+    with col6:
+        # Taux de refus basé sur toutes les promesses réalisées (quelle que soit la Colonne TG Hire)
+        # - Dénominateur: lignes où `Nb de promesses d'embauche réalisée` == 1
+        # - Numérateur: lignes où promesse == 1 ET `Nb de refus aux promesses d'embauches` == 1
+        # Les cas "Clôture" avec promesse=1 et refus=0 impactent donc bien l'indicateur (dans le dénominateur uniquement).
 
-                    # --- NOUVELLE LOGIQUE D'EXTRACTION DE NOM ---
-                    # 1. Extraction locale intelligente (Email Cross-Check)
-                    local_extraction = extract_name_smart_email(text)
-                    extracted_name_info = local_extraction
-                    
-                    if not extracted_name_info:
-                         # Fallback sur l'ancienne méthode regex
-                         extracted_name_info = extract_name_from_cv_text(text) if text else None
+        # Base de calcul: données de recrutement filtrées par entité / direction et par période (année)
+        df_base = df_recrutement.copy() if df_recrutement is not None else pd.DataFrame()
+        if not df_base.empty and isinstance(global_filters, dict):
+            entite = global_filters.get('entite')
+            direction = global_filters.get('direction')
+            if entite and entite != 'Toutes' and 'Entité demandeuse' in df_base.columns:
+                df_base = df_base[df_base['Entité demandeuse'] == entite]
+            if direction and direction != 'Toutes' and 'Direction concernée' in df_base.columns:
+                df_base = df_base[df_base['Direction concernée'] == direction]
 
-                    # Détermination du nom à envoyer à l'IA comme indice
-                    if extracted_name_info and extracted_name_info.get('name'):
-                        display_name = extracted_name_info['name']
-                    else:
-                        display_name = os.path.splitext(name)[0]
+            # Filtre d'année (période) :
+            # - si Date de désistement est renseignée, on prend son année
+            # - sinon, si Date d'acceptation du candidat est renseignée, on prend son année
+            annee_sel = global_filters.get('periode_recrutement', 'Toutes')
+            if annee_sel != 'Toutes' and not df_base.empty:
+                annee = int(annee_sel)
+                des_year = None
+                acc_year = None
+                if 'Date de désistement' in df_base.columns:
+                    des_year = df_base['Date de désistement'].dt.year  # type: ignore[attr-defined]
+                if "Date d'acceptation du candidat" in df_base.columns:
+                    acc_year = df_base["Date d'acceptation du candidat"].dt.year  # type: ignore[attr-defined]
 
-                    # Classification principale 100% via IA (macro + sous-cat + récap)
-                    text_for_ai = (text or '')[:3000]
-                    
-                    if classif_model == "Gemini":
-                        classification = get_gemini_auto_classification(text_for_ai, display_name)
-                    elif classif_model == "Groq":
-                        classification = get_groq_auto_classification(text_for_ai, display_name)
-                    elif classif_model == "Claude":
-                        classification = get_claude_auto_classification(text_for_ai, display_name)
-                    elif classif_model == "OpenRouter":
-                        classification = get_openrouter_auto_classification(text_for_ai, display_name)
-                    else:
-                        classification = get_deepseek_auto_classification(text_for_ai, display_name)
+                if des_year is not None and acc_year is not None:
+                    mask = (
+                        (des_year.notna() & (des_year == annee)) |
+                        (des_year.isna() & acc_year.notna() & (acc_year == annee))
+                    )
+                elif des_year is not None:
+                    mask = des_year.notna() & (des_year == annee)
+                elif acc_year is not None:
+                    mask = acc_year.notna() & (acc_year == annee)
+                else:
+                    mask = pd.Series(False, index=df_base.index)
 
-                    cat = classification.get('macro_category', 'Non classé')
-                    sub_cat = classification.get('sub_category', 'Autre')
-                    profile_summary = classification.get('profile_summary', '')
-                    years_exp = classification.get('years_experience', 0)
-                    
-                    # ============================================================
-                    # POST-TRAITEMENT : DICTIONNAIRE MÉTIER & CORRECTION
-                    # ============================================================
-                    cat = cat or "Non classé"
-                    sub_cat = sub_cat or ""
-                    sub_cat_clean = sub_cat.lower()
-                    text_clean = (text or "").lower()
+                df_base = df_base[mask].copy()
 
-                    METIER_MAPPING = {
-                        # SUPPORTS (Inclut DSI/IT)
-                        "rh": "FONCTIONS SUPPORTS", "ressources humaines": "FONCTIONS SUPPORTS",
-                        "recrutement": "FONCTIONS SUPPORTS", "paie": "FONCTIONS SUPPORTS",
-                        "finance": "FONCTIONS SUPPORTS", "comptab": "FONCTIONS SUPPORTS",
-                        "trésor": "FONCTIONS SUPPORTS", "audit": "FONCTIONS SUPPORTS",
-                        "contrôle de gestion": "FONCTIONS SUPPORTS", "controle de gestion": "FONCTIONS SUPPORTS",
-                        "juridi": "FONCTIONS SUPPORTS", "contentieux": "FONCTIONS SUPPORTS",
-                        "dsi": "FONCTIONS SUPPORTS", "système d'information": "FONCTIONS SUPPORTS",
-                        "informatique": "FONCTIONS SUPPORTS", "helpdesk": "FONCTIONS SUPPORTS",
-                        "réseau": "FONCTIONS SUPPORTS", "développeur": "FONCTIONS SUPPORTS",
-                        "marketing": "FONCTIONS SUPPORTS", "communication": "FONCTIONS SUPPORTS",
-                        "achat": "FONCTIONS SUPPORTS", "services généraux": "FONCTIONS SUPPORTS",
-                        "qhse siège": "FONCTIONS SUPPORTS", "pmo": "FONCTIONS SUPPORTS",
+        # Taux de refus = lignes où promesse==1 ET refus==1 / lignes où promesse==1
+        res = compute_promise_refusal_rate_row(df_base)
+        taux_refus = res['rate'] if res['rate'] is not None else 0.0
+        numer = res['numerator']
+        denom = res['denominator']
 
-                        # LOGISTIQUE
-                        "logistique": "LOGISTIQUE", "supply chain": "LOGISTIQUE",
-                        "transport": "LOGISTIQUE", "parc": "LOGISTIQUE", "matériel": "LOGISTIQUE",
-
-                        # PRODUCTION (Mots génériques BTP)
-                        "travaux": "PRODUCTION / TECHNIQUE", "chantier": "PRODUCTION / TECHNIQUE",
-                        "conduite": "PRODUCTION / TECHNIQUE", "métré": "PRODUCTION / TECHNIQUE",
-                        "étude de prix": "PRODUCTION / TECHNIQUE", "chiffrage": "PRODUCTION / TECHNIQUE",
-                        "projeteur": "PRODUCTION / TECHNIQUE", "bim": "PRODUCTION / TECHNIQUE",
-                        "génie civil": "PRODUCTION / TECHNIQUE", "béton": "PRODUCTION / TECHNIQUE"
-                    }
-
-                    category_found_in_dict = False
-                    forced_keyword = None
-                    for keyword, mapped_category in METIER_MAPPING.items():
-                        if keyword in sub_cat_clean:
-                            if keyword == "génie civil" and "achat" in sub_cat_clean:
-                                continue
-                            cat = mapped_category
-                            forced_keyword = keyword
-                            category_found_in_dict = True
-                            break
-
-                    cat_upper = cat.upper()
-
-                    if "PRODUCTION" in cat_upper:
-                        kw_etudes = ["étude", "etude", "prix", "chiffrage", "métr", "devis", "méthode", "planning", "bim", "projeteur", "dessin", "synthèse"]
-                        kw_travaux = ["travaux", "chantier", "conduite", "conducteur", "chef de projet", "directeur de projet", "chef d'équipe", "chef d'equipe", "opc"]
-                        kw_qualite = ["qualité", "qualite", "qse", "contrôle", "controle"]
-
-                        if any(k in sub_cat_clean for k in kw_qualite) or any(k in text_clean for k in kw_qualite):
-                            cat = "PRODUCTION - QUALITÉ"
-                        elif any(k in sub_cat_clean for k in kw_etudes) or any(k in text_clean for k in kw_etudes):
-                            cat = "PRODUCTION - ÉTUDES (BUREAU)"
-                        elif any(k in sub_cat_clean for k in kw_travaux) or any(k in text_clean for k in kw_travaux):
-                            cat = "PRODUCTION - TRAVAUX (CHANTIER)"
-                        else:
-                            cat = "PRODUCTION - AUTRES"
-
-                    if "PRODUCTION" in cat.upper():
-                        anti_prod_keywords = ["ressources humaines", "recrutement", "comptable", "financier", "juriste", "helpdesk", "développeur full stack"]
-                        if any(k in sub_cat_clean for k in anti_prod_keywords) or any(k in text_clean for k in anti_prod_keywords):
-                            cat = "FONCTIONS SUPPORTS"
-
-                    if cat.upper().startswith("PRODUCTION - ") and (not sub_cat or "PRODUCTION" not in sub_cat.upper()):
-                        sub_cat = cat
-                    elif category_found_in_dict and forced_keyword:
-                        if not sub_cat or sub_cat_clean in ("autre", "autres", ""): 
-                            sub_cat = forced_keyword.upper()
-
-                    if cat.upper() == "FONCTIONS SUPPORTS" and (not sub_cat.strip() or "PRODUCTION" in sub_cat.upper()):
-                        sub_cat = ""
-                    if cat.upper() == "LOGISTIQUE" and not sub_cat.strip():
-                        sub_cat = ""
-                    if cat.upper() == "DIVERS / HORS PÉRIMÈTRE":
-                        sub_cat = ""
-
-                    cat, sub_cat = normalize_classification_labels(cat, sub_cat, text)
-
-                    # Mise à jour du nom extrait si l'IA en a trouvé un meilleur
-                    ai_name = classification.get('candidate_name')
-                    if ai_name and "Candidat" not in ai_name and "Erreur" not in ai_name:
-                        if not (extracted_name_info and extracted_name_info.get('confidence', 0) >= 0.99):
-                            extracted_name_info = {
-                                "name": ai_name,
-                                "confidence": 1.0,
-                                "method_used": f"{classif_model}_Refined"
-                            }
-
-                    result_item = {
-                        'file': name,
-                        'category': cat,
-                        'sub_category': sub_cat,
-                        'years_experience': years_exp,
-                        'profile_summary': profile_summary,
-                        'text_snippet': (text or '')[:800],
-                        'full_text': text,
-                        'cache_key': cache_key
-                    }
-
-                    if extracted_name_info:
-                        result_item['extracted_name'] = extracted_name_info
-
-                        results.append(result_item)
-
-                        if cache is not None:
-                            st.session_state.uploaded_files_cache = cache
-
-                        # Libérer la mémoire cache après traitement du CV
-                        if cache is not None and cache_key in cache:
-                            cache.pop(cache_key, None)
-
-            # Afficher la confirmation finale du traitement
-            processing_status_placeholder.success(f"✅ Traitement IA terminé : {total} CVs classés avec succès !")
-            processing_detail_placeholder.empty()
-            batch_status_placeholder.empty()
-            
-            # Stocker les résultats et relancer l'affichage global (le rendu principal s'appuiera
-            # sur la logique de rendu déjà présente en dehors de ce bloc). Cela évite les variables
-            # non initialisées et permet d'avoir un rendu cohérent après classification.
+        st.markdown("<div style='font-family:Arial,sans-serif; font-size:18px; font-weight:700; color:#111111; text-align:left; margin:8px 0 4px 0;'>Taux de refus des promesses d'embauche (%)</div>", unsafe_allow_html=True)
+        fig_refus = go.Figure(go.Indicator(
+            mode='gauge+number',
+            value=round(taux_refus, 1),
+            number={'suffix':' %'},
+            gauge={'axis': {'range':[0,100], 'visible': True}, 'bar': {'color':'#d62728'}}
+        ))
+        fig_refus.update_layout(height=280, margin=dict(t=20, b=20, l=20, r=20))
+        st.plotly_chart(fig_refus, width='stretch')
+        st.caption(f"Numérateur (refus): {numer} | Dénominateur (promesses réalisées): {denom}")
+    # Debug local pour l'onglet Recrutements Clôturés / refus promesses
+    st.markdown("---")
+    with st.expander("🔍 Debug - Détails des lignes (Recrutements Clôturés)", expanded=False):
+        try:
+            st.markdown("**Lignes de promesse d'embauche (avec ou sans désistement):**")
+            # Utiliser la même base que pour le KPI (df_base) pour le debug,
+            # en mettant en avant le candidat, la Colonne TG Hire et la date de désistement.
             try:
-                st.session_state.classification_results = results
-                st.session_state.rename_and_organize_option = rename_and_organize
-                st.session_state.last_action = 'classified'
-                # Forcer le rerun pour afficher les résultats
-                st.rerun()
+                df_debug_clo = df_base.copy()
+            except NameError:
+                df_debug_clo = df_filtered.copy()
+
+            # Normaliser la date de désistement si présente
+            desist_col = 'Date de désistement'
+            if desist_col in df_debug_clo.columns:
+                df_debug_clo[desist_col] = pd.to_datetime(df_debug_clo[desist_col], errors='coerce').dt.strftime('%d/%m/%Y')
+
+            # Chercher la colonne Nom Prénom du candidat ayant accepté la promesse
+            candidate_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
+            if candidate_col not in df_debug_clo.columns:
+                for c in df_debug_clo.columns:
+                    if 'candidat retenu' in c.lower() and 'promesse' in c.lower():
+                        candidate_col = c
+                        break
+
+            # Colonnes de base pour le debug (dans l'ordre souhaité)
+            cols_debug = []
+            if candidate_col in df_debug_clo.columns:
+                cols_debug.append(candidate_col)
+            cols_debug.extend([
+                'Poste demandé',
+                'Colonne TG Hire',
+            ])
+            if desist_col in df_debug_clo.columns:
+                cols_debug.append(desist_col)
+
+            # Ajout des colonnes qui contribuent au KPI "Taux de refus des promesses d'embauche (%)"
+            try:
+                prom_col = res.get('columns', {}).get('prom') if isinstance(res, dict) else None
+                refus_col = res.get('columns', {}).get('refus') if isinstance(res, dict) else None
+            except NameError:
+                prom_col = None
+                refus_col = None
+
+            # Colonnes brutes utilisées pour le calcul (promesse réalisée / refus de promesse)
+            for extra_col in [prom_col, refus_col]:
+                if extra_col and extra_col in df_debug_clo.columns and extra_col not in cols_debug:
+                    cols_debug.append(extra_col)
+
+            # Colonne booléenne indiquant si la ligne contribue au numérateur du KPI de refus
+            if prom_col and refus_col and prom_col in df_debug_clo.columns and refus_col in df_debug_clo.columns:
+                prom_vals = pd.to_numeric(df_debug_clo[prom_col], errors='coerce').fillna(0)
+                refus_vals = pd.to_numeric(df_debug_clo[refus_col], errors='coerce').fillna(0)
+                df_debug_clo['Contribue KPI Refus'] = prom_vals.eq(1) & refus_vals.eq(1)
+                cols_debug.append('Contribue KPI Refus')
+
+            cols_available = [c for c in cols_debug if c in df_debug_clo.columns]
+            if cols_available:
+                st.dataframe(df_debug_clo[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
+            else:
+                st.dataframe(df_debug_clo.reset_index(drop=True), use_container_width=True, hide_index=True)
+        except Exception:
+            st.write("Aucune donnée disponible pour le debug.")
+
+    # ... KPI row now includes Délai moyen de recrutement (moved up)
+
+def create_demandes_recrutement_tab(df_recrutement, global_filters):
+    """Onglet Demandes de Recrutement avec style carte"""
+    
+    # Appliquer les filtres globaux
+    df_filtered = apply_global_filters(df_recrutement, global_filters)
+    
+    # Colonne de date pour les calculs
+    date_col = 'Date de réception de la demande aprés validation de la DRH'
+    
+    # KPIs principaux - Indicateurs de demandes sur la même ligne
+    # Rendre les KPI principaux via HTML pour contrôle précis des tailles
+    total_demandes = len(df_filtered)
+    today = datetime.now()
+    start_of_month = today.replace(day=1)
+    nouvelles_demandes = 0
+    if date_col in df_filtered.columns:
+        try:
+            nouvelles_demandes = int((pd.to_datetime(df_filtered[date_col], errors='coerce') >= start_of_month).sum())
+        except Exception:
+            nouvelles_demandes = 0
+
+    demandes_annulees = 0
+    if 'Statut de la demande' in df_filtered.columns:
+        demandes_annulees = int(df_filtered['Statut de la demande'].astype(str).str.contains('annul|déprioris', case=False, na=False).sum())
+    taux_annulation = f"{round((demandes_annulees / total_demandes) * 100, 1)}%" if total_demandes > 0 else "N/A"
+
+    metrics_html = render_generic_metrics([
+        ("Nombre de demandes", total_demandes, "#1f77b4"),
+        ("Nouvelles Demandes (ce mois-ci)", nouvelles_demandes, "#2ca02c"),
+        ("Demandes Annulées/Dépriorisées", demandes_annulees, "#ff7f0e"),
+        ("Taux d'annulation", taux_annulation, "#d62728")
+    ])
+    st.markdown(metrics_html, unsafe_allow_html=True)
+
+    # Graphiques principaux
+    col1, col2, col3 = st.columns([1,1,2])
+    
+    with col1:
+        # Répartition par statut de la demande
+        statut_counts = df_filtered['Statut de la demande'].value_counts()
+        fig_statut = go.Figure(data=[go.Pie(labels=statut_counts.index, values=statut_counts.values, hole=.5)])
+        fig_statut.update_traces(textfont=dict(size=14))
+        fig_statut.update_layout(
+            title=dict(text="Répartition par statut de la demande", x=0, xanchor='left', font=TITLE_FONT),
+            height=380,
+            legend=dict(
+                orientation="v", 
+                yanchor="middle", 
+                y=0.5, 
+                xanchor="left", 
+                x=1.0,
+                font=dict(size=13)
+            ),
+            margin=dict(l=20, r=140, t=60, b=20)
+        )
+        fig_statut = apply_title_style(fig_statut)
+        st.plotly_chart(fig_statut, width="stretch")
+    
+    with col2:
+        # Comparaison par raison du recrutement
+        if 'Raison du recrutement' in df_filtered.columns:
+            raison_counts = df_filtered['Raison du recrutement'].value_counts()
+            df_raison = raison_counts.rename_axis('Raison').reset_index(name='Count')
+            fig_raison = px.bar(
+                df_raison,
+                x='Raison',
+                y='Count',
+                title="<b>Comparaison par raison du recrutement</b>",
+                text='Count',
+                orientation='v'
+            )
+            fig_raison.update_traces(
+                marker_color='grey', 
+                textposition='inside',
+                texttemplate='<b>%{y}</b>',
+                textfont=dict(size=14, color='white'),
+                hovertemplate='%{y}<extra></extra>',
+                constraintext='none'
+            )
+            fig_raison.update_layout(
+                height=380, 
+                xaxis_title=None, 
+                yaxis_title=None,
+                xaxis={'categoryorder':'total descending'},
+                yaxis=dict(range=[0, None]),
+                margin=dict(l=20, r=20, t=48, b=80),
+                title=dict(text="<b>Comparaison par raison du recrutement</b>", x=0, xanchor='left', font=TITLE_FONT),
+                uniformtext=dict(minsize=10, mode='show')
+            )
+            fig_raison = apply_title_style(fig_raison)
+            st.plotly_chart(fig_raison, width="stretch")
+    
+    with col3:
+        # Évolution des demandes
+        if date_col in df_filtered.columns:
+            # Générer une série complète de mois entre la plus petite et la plus grande date de demande
+            df_filtered['Mois_Année_Demande'] = df_filtered[date_col].dt.to_period('M').dt.to_timestamp()
+            monthly_demandes = df_filtered.groupby('Mois_Année_Demande').size().rename('Count')
+            if not monthly_demandes.empty:
+                all_months = pd.date_range(start=monthly_demandes.index.min(), end=monthly_demandes.index.max(), freq='MS')
+                monthly_demandes = monthly_demandes.reindex(all_months, fill_value=0)
+                monthly_demandes = monthly_demandes.reset_index().rename(columns={'index': 'Mois_Année_Demande'})
+                monthly_demandes['Mois_Année_Demande'] = monthly_demandes['Mois_Année_Demande'].dt.strftime('%b %Y')
+
+                fig_evolution_demandes = px.bar(
+                    monthly_demandes,
+                    x='Mois_Année_Demande',
+                    y='Count',
+                    title="Évolution des demandes",
+                    text='Count'
+                )
+                fig_evolution_demandes.update_traces(
+                    marker_color='#1f77b4',
+                    textposition='inside',
+                    texttemplate='<b>%{y}</b>',
+                    textfont=dict(size=15, color='white'),
+                    hovertemplate='%{y}<extra></extra>'
+                )
+                # Aligner la marge supérieure avec les autres titres (ex: pie statuts)
+                fig_evolution_demandes.update_layout(height=320, margin=dict(t=48, b=30, l=20, r=20), xaxis_title=None, yaxis_title=None)
+                fig_evolution_demandes = apply_title_style(fig_evolution_demandes)
+                st.plotly_chart(fig_evolution_demandes, width="stretch")
+    
+    # Deuxième ligne de graphiques
+    col4, col5 = st.columns(2)
+    
+    with col4:
+        # Comparaison par direction
+        direction_counts = df_filtered['Direction concernée'].value_counts()
+        df_direction = direction_counts.rename_axis('Direction').reset_index(name='Count')
+        df_direction = df_direction.sort_values('Count', ascending=False)
+        # Truncate long labels for readability, keep full label in customdata for hover
+        df_direction['Label_trunc'] = df_direction['Direction'].apply(lambda s: _truncate_label(s, max_len=24))
+        # Ensure display label exists (truncated + small gap) to be used for axis and ordering
+        if 'Label_display' not in df_direction.columns:
+            df_direction['Label_display'] = df_direction['Label_trunc'] + '\u00A0\u00A0'
+        fig_direction = px.bar(
+            df_direction,
+            x='Count',
+            y='Label_display',
+            title="Comparaison par direction",
+            text='Count',
+            orientation='h',
+            custom_data=['Direction']
+        )
+        # Show values inside bars and full label on hover
+        fig_direction.update_traces(
+            marker_color='grey',
+            textposition='auto',
+            texttemplate='<b>%{x}</b>',
+            textfont=dict(size=15, color='white'),
+            textangle=0, # Orientation horizontale des valeurs
+            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
+        )
+        # Dynamic height so long lists become scrollable on the page
+        height_dir = max(300, 28 * len(df_direction))
+        # Ensure largest values appear on top by reversing the truncated label array
+        category_array_dir = list(df_direction['Label_display'][::-1])
+        fig_direction.update_layout(
+            height=height_dir,
+            xaxis_title=None,
+            yaxis_title=None,
+            margin=dict(l=160, t=48, b=30, r=20),
+            xaxis=dict(tickangle=0),
+            yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_dir),
+            title=dict(text="<b>Comparaison par direction</b>", x=0, xanchor='left', font=TITLE_FONT)
+        )
+        # Render inside the column so the two charts are on the same row and the component width matches the column
+        render_plotly_scrollable(fig_direction, max_height=320)
+    
+    with col5:
+        # Comparaison par poste
+        poste_counts = df_filtered['Poste demandé'].value_counts()
+        df_poste = poste_counts.rename_axis('Poste').reset_index(name='Count')
+        df_poste = df_poste.sort_values('Count', ascending=False)
+        df_poste['Label_trunc'] = df_poste['Poste'].apply(lambda s: _truncate_label(s, max_len=24))
+        if 'Label_display' not in df_poste.columns:
+            df_poste['Label_display'] = df_poste['Label_trunc'] + '\u00A0\u00A0'
+        df_poste['Label_display'] = df_poste['Label_trunc'] + '\u00A0\u00A0'
+        fig_poste = px.bar(
+            df_poste,
+            x='Count',
+            y='Label_display',
+            title="Comparaison par poste",
+            text='Count',
+            orientation='h',
+            custom_data=['Poste']
+        )
+        fig_poste.update_traces(
+            marker_color='grey',
+            textposition='inside',
+            texttemplate='<b>%{x}</b>',
+            textfont=dict(size=14, color='white'),
+            textangle=0, # Orientation horizontale des valeurs
+            hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>',
+            constraintext='none'
+        )
+        height_poste = max(320, 28 * len(df_poste))
+        category_array_poste = list(df_poste['Label_display'][::-1])
+        fig_poste.update_layout(
+            height=height_poste,
+            xaxis_title=None,
+            yaxis_title=None,
+            margin=dict(l=160, t=48, b=30, r=20),
+            xaxis=dict(tickangle=0),
+            yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_poste),
+            title=dict(text="<b>Comparaison par poste</b>", x=0, xanchor='left', font=TITLE_FONT),
+            uniformtext=dict(minsize=10, mode='show')
+        )
+        render_plotly_scrollable(fig_poste, max_height=320)
+
+    # Debug local pour l'onglet Demandes de Recrutement (en dehors des colonnes, aligné à gauche)
+    st.markdown("---")
+    with st.expander("🔍 Debug - Détails des lignes (Demandes de Recrutement)", expanded=False):
+        try:
+            st.markdown("**Lignes contribuant aux graphiques (toutes les données filtrées):**")
+            df_debug_dem = df_filtered.copy()
+            # Formater la date sans heure
+            date_col_dem = 'Date de réception de la demande aprés validation de la DRH'
+            if date_col_dem in df_debug_dem.columns:
+                df_debug_dem[date_col_dem] = pd.to_datetime(df_debug_dem[date_col_dem], errors='coerce').dt.strftime('%d/%m/%Y')
+            cols_debug = ['Poste demandé', 'Entité demandeuse', 'Direction concernée', 'Raison du recrutement', 'Statut de la demande', date_col_dem]
+            cols_available = [c for c in cols_debug if c in df_debug_dem.columns]
+            if cols_available:
+                st.dataframe(df_debug_dem[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
+            else:
+                st.dataframe(df_debug_dem.reset_index(drop=True), use_container_width=True, hide_index=True)
+        except Exception:
+            st.write("Aucune donnée disponible pour le debug.")
+
+def create_integrations_tab(df_recrutement, global_filters):
+    """Onglet Intégrations basé sur les bonnes données"""
+    st.header("📊 Intégrations")
+    
+    # Filtrer les données : Statut "En cours" ET candidat ayant accepté (nom présent)
+    candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
+    date_integration_col = "Date d'entrée prévisionnelle"
+    plan_integration_col = "Plan d'intégration à préparer"
+    
+    # Diagnostic des données disponibles
+    total_en_cours = len(df_recrutement[df_recrutement['Statut de la demande'] == 'En cours'])
+    avec_candidat = len(df_recrutement[
+        (df_recrutement['Statut de la demande'] == 'En cours') &
+        (df_recrutement[candidat_col].notna()) &
+        (df_recrutement[candidat_col].str.strip() != "")
+    ])
+    avec_date_prevue = len(df_recrutement[
+        (df_recrutement['Statut de la demande'] == 'En cours') &
+        (df_recrutement[candidat_col].notna()) &
+        (df_recrutement[candidat_col].str.strip() != "") &
+        (df_recrutement[date_integration_col].notna())
+    ])
+    
+    # Critères : Statut "En cours" ET candidat avec nom
+    df_integrations = df_recrutement[
+        (df_recrutement['Statut de la demande'] == 'En cours') &
+        (df_recrutement[candidat_col].notna()) &
+        (df_recrutement[candidat_col].str.strip() != "")
+    ].copy()
+    
+    # Message de diagnostic
+    if total_en_cours > 0:
+        st.info(f"📊 Diagnostic: {total_en_cours} demandes 'En cours' • {avec_candidat} avec candidat nommé • {avec_date_prevue} avec date d'entrée prévue")
+    
+    if len(df_integrations) == 0:
+        st.warning("Aucune intégration en cours trouvée")
+        st.info("Vérifiez que les demandes ont le statut 'En cours' ET un nom de candidat dans la colonne correspondante.")
+        return
+    
+    # Appliquer les filtres globaux
+    df_filtered = apply_global_filters(df_integrations, global_filters)
+    
+    # KPIs d'intégration (HTML cards pour contrôle précis des tailles)
+    nb_int = len(df_filtered)
+    a_preparer = 0
+    if plan_integration_col in df_filtered.columns:
+        try:
+            a_preparer = int((df_filtered[plan_integration_col].astype(str).str.lower() == 'oui').sum())
+        except Exception:
+            a_preparer = 0
+
+    en_retard = "N/A"
+    if date_integration_col in df_filtered.columns:
+        try:
+            df_temp = df_filtered.copy()
+            df_temp[date_integration_col] = pd.to_datetime(df_temp[date_integration_col], errors='coerce')
+            reporting_date = st.session_state.get('reporting_date', None)
+            if reporting_date is None:
+                today = datetime.now()
+            else:
+                if isinstance(reporting_date, datetime):
+                    today = reporting_date
+                else:
+                    today = datetime.combine(reporting_date, datetime.min.time())
+            en_retard = int(((df_temp[date_integration_col].notna()) & (df_temp[date_integration_col] < today)).sum())
+        except Exception:
+            en_retard = "N/A"
+
+    metrics_html = render_generic_metrics([
+        ("👥 Intégrations en cours", nb_int, "#1f77b4"),
+        ("📋 Plan d'intégration à préparer", a_preparer, "#ff7f0e"),
+        ("⚠️ En retard", en_retard, "#d62728")
+    ])
+    st.markdown(metrics_html, unsafe_allow_html=True)
+    
+    # Graphiques
+    col1, col2 = st.columns(2)
+
+    # Graphique par affectation réactivé
+    with col1:
+        if 'Affectation' in df_filtered.columns:
+            # Utiliser la fonction existante create_affectation_chart
+            fig_affectation = create_affectation_chart(df_filtered)
+            fig_affectation = apply_title_style(fig_affectation)
+            st.plotly_chart(fig_affectation, width="stretch")
+        else:
+            st.warning("Colonne 'Affectation' non trouvée dans les données.")
+
+    with col2:
+        # Évolution des dates d'intégration prévues
+        if date_integration_col in df_filtered.columns:
+            df_filtered['Mois_Integration'] = df_filtered[date_integration_col].dt.to_period('M')
+            monthly_integration = df_filtered.groupby('Mois_Integration').size().reset_index(name='Count')
+            # Convertir en nom de mois seulement (ex: "Janvier", "Février")
+            monthly_integration['Mois_str'] = monthly_integration['Mois_Integration'].dt.strftime('%B').str.capitalize()
+            # Ajouter une marge de +3 sur l'axe Y pour éviter la coupure des labels
+            y_max = int(monthly_integration['Count'].max()) if not monthly_integration.empty else 0
+            
+            fig_evolution_int = px.bar(
+                monthly_integration, 
+                x='Mois_str', 
+                y='Count',
+                title="📈 Évolution des Intégrations Prévues",
+                text='Count',
+                range_y=[0, y_max + 3]
+            )
+            fig_evolution_int.update_traces(
+                marker_color='#2ca02c', 
+                textposition='outside',
+                texttemplate='<b>%{y}</b>',
+                textfont=dict(size=14, color='#333333'),
+                textangle=0,
+                cliponaxis=False,
+                hovertemplate='%{y}<extra></extra>'
+            )
+            fig_evolution_int.update_layout(height=400, xaxis_title="Mois", yaxis_title="Nombre", margin=dict(t=60, b=40))
+            st.plotly_chart(fig_evolution_int, width="stretch")
+    
+    # Tableau détaillé des intégrations
+    st.subheader("📋 Détail des Intégrations en Cours")
+    
+    # Détection automatique de la colonne Poste pour éviter les problèmes d'espaces
+    poste_col_detected = 'Poste demandé ' if 'Poste demandé ' in df_filtered.columns else 'Poste demandé'
+    
+    colonnes_affichage = [
+        candidat_col, 
+        poste_col_detected,
+        'Entité demandeuse',
+        'Affectation',
+        date_integration_col,
+        plan_integration_col,
+        'Commentaire'
+    ]
+    # Filtrer les colonnes qui existent
+    colonnes_disponibles = [col for col in colonnes_affichage if col in df_filtered.columns]
+    
+    if colonnes_disponibles:
+        # Travailler sur une copie des colonnes disponibles
+        df_display = df_filtered[colonnes_disponibles].copy()
+
+        # Exclure les lignes sans date d'intégration prévue AVANT le formatage
+        if date_integration_col in df_display.columns:
+            df_display = df_display[df_display[date_integration_col].notna() & df_display[date_integration_col].astype(str).str.strip().ne('')].copy()
+            
+            # Trier par date d'intégration croissante AVANT formatage
+            try:
+                df_display['_sort_date'] = pd.to_datetime(df_display[date_integration_col], errors='coerce')
+                df_display = df_display.sort_values('_sort_date', ascending=True)
+                df_display = df_display.drop(columns=['_sort_date'])
             except Exception:
                 pass
 
-    # =============================================================================
-    # AFFICHAGE DES RÉSULTATS (EN DEHORS DU BOUTON)
-    # Ce code s'exécute dès que classification_results existe dans session_state
-    # =============================================================================
-    if st.session_state.classification_results:
-        results = st.session_state.classification_results
+            # Formater la date pour enlever l'heure et s'assurer du bon format DD/MM/YYYY
+            def format_date_safely(date_str):
+                if pd.isna(date_str) or date_str == '' or str(date_str).strip().upper() == 'N/A' or date_str is pd.NaT:
+                    return 'N/A'
+                parsed_date = pd.to_datetime(date_str, errors='coerce')
+                if pd.notna(parsed_date):
+                    return parsed_date.strftime('%d/%m/%Y')
+                else:
+                    return 'N/A'
+
+            df_display[date_integration_col] = df_display[date_integration_col].apply(format_date_safely)
+
+        # Renommer pour affichage plus propre
+        rename_map = {
+            candidat_col: "Candidat",
+            date_integration_col: "Date d'Intégration Prévue"
+        }
+        if poste_col_detected in df_display.columns:
+            rename_map[poste_col_detected] = "Poste demandé"
+            
+        df_display_table = df_display.rename(columns=rename_map)
+
+        # Style CSS (version texte uniquement, plus aérée)
+        st.markdown("""
+        <style>
+        .int-table-container {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            margin: 20px 0;
+        }
+        .int-custom-table {
+            border-collapse: collapse;
+            font-family: Arial, sans-serif;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            width: 85%;
+            margin: 0 auto;
+        }
+        .int-custom-table th {
+            background-color: #9C182F !important;
+            color: white !important;
+            font-weight: bold !important;
+            text-align: center !important;
+            padding: 10px 15px !important;
+            border: 1px solid white !important;
+            font-size: 1.05em;
+            white-space: nowrap;
+        }
+        .int-custom-table td {
+            text-align: center !important;
+            padding: 8px 12px !important;
+            border: 1px solid #ddd !important;
+            background-color: white !important;
+            font-size: 1.0em;
+            font-weight: 500;
+        }
+        .int-custom-table .candidate-cell {
+            font-weight: bold;
+            color: #2c3e50;
+            text-align: left !important;
+            padding-left: 15px !important;
+        }
+        /* Réduire légèrement la largeur de la colonne Commentaire (dernière colonne) */
+        .int-custom-table th:last-child,
+        .int-custom-table td:last-child {
+            min-width: 120px;
+            max-width: 200px;
+            white-space: normal;
+            word-wrap: break-word;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        html_table = '<div class="int-table-container"><table class="int-custom-table"><thead><tr>'
+        for col in df_display_table.columns:
+            html_table += f'<th>{col}</th>'
+        html_table += '</tr></thead><tbody>'
+
+        for _, row in df_display_table.iterrows():
+            html_table += '<tr>'
+            for col in df_display_table.columns:
+                val = row[col]
+                if col == 'Candidat':
+                    html_table += f'<td class="candidate-cell">{val}</td>'
+                else:
+                    html_table += f'<td>{val}</td>'
+            html_table += '</tr>'
         
-        # Catégorie "Autres" pour les non classés (calculée ensuite à partir du dataframe fusionné)
-        nc = None
-        nc = None
-        if nc is not None and not nc.empty:
-            st.markdown('---')
-            count_nc = len(nc)
-            st.subheader(f'🔍 Autres / Non classés ({count_nc})')
-            st.dataframe(nc[['file', 'text_snippet']], width="stretch")
+        html_table += '</tbody></table></div>'
+        st.markdown(html_table, unsafe_allow_html=True)
+    else:
+        st.warning("Colonnes d'affichage non disponibles")
+
+    # Debug local pour l'onglet Intégrations avec colonnes de contribution
+    st.markdown("---")
+    with st.expander("🔍 Debug - Détails des lignes (Intégrations)", expanded=False):
+        try:
+            st.markdown("**Lignes contribuant aux indicateurs (en cours, en retard, plan d'intégration à préparer):**")
+            # Construire les colonnes de contribution pour les indicateurs
+            df_debug_int = df_filtered.copy()
             
-            # Bouton pour analyser les CV non classés avec DeepSeek
-            analyze_button = st.button('🔍 Analyser les CV non classés avec Intelligence Artificielle', type='secondary')
+            # Contribution: En cours (toutes les lignes filtrées)
+            df_debug_int['contrib_en_cours'] = True
             
-            # Si on clique sur le bouton
-            if analyze_button and nc is not None and not nc.empty:
-                # Exécuter l'analyse
-                unclassified_results = []
-                unclassified_progress = st.progress(0)
-                unclassified_total = len(nc) if nc is not None else 0
-                processing_ai_placeholder = st.empty()
-                
-                with st.spinner('Analyse des CVs non classés avec Intelligence Artificielle...'):
-                    for i, (_, row) in enumerate(nc.iterrows()):
-                        name = row['file']
-                        text_snippet = row['text_snippet']
-                        # Mettre à jour le fichier en cours
-                        processing_ai_placeholder.info(f"Analyse par IA ({i+1}/{unclassified_total}) : {name}")
+            # Contribution: En retard (date d'intégration prévue < aujourd'hui)
+            today = datetime.now()
+            if date_integration_col in df_debug_int.columns:
+                df_debug_int['_date_check'] = pd.to_datetime(df_debug_int[date_integration_col], errors='coerce')
+                df_debug_int['contrib_en_retard'] = df_debug_int['_date_check'] < today
+                df_debug_int = df_debug_int.drop(columns=['_date_check'])
+            else:
+                df_debug_int['contrib_en_retard'] = False
+            
+            # Contribution: Plan d'intégration à préparer (plan = 'oui')
+            if plan_integration_col in df_debug_int.columns:
+                df_debug_int['contrib_plan_a_preparer'] = df_debug_int[plan_integration_col].astype(str).str.lower() == 'oui'
+            else:
+                df_debug_int['contrib_plan_a_preparer'] = False
+            
+            # Trier par date d'intégration croissante
+            if date_integration_col in df_debug_int.columns:
+                df_debug_int['_sort_date'] = pd.to_datetime(df_debug_int[date_integration_col], errors='coerce')
+                df_debug_int = df_debug_int.sort_values('_sort_date', ascending=True)
+                df_debug_int = df_debug_int.drop(columns=['_sort_date'])
+            
+            # Formater la date sans l'heure
+            if date_integration_col in df_debug_int.columns:
+                df_debug_int[date_integration_col] = pd.to_datetime(df_debug_int[date_integration_col], errors='coerce').dt.strftime('%d/%m/%Y')
+            
+            # Sélectionner colonnes pertinentes (sans Plan d'intégration)
+            cols_display = [candidat_col, 'Poste demandé ', 'Entité demandeuse', date_integration_col, 'contrib_en_cours', 'contrib_en_retard', 'contrib_plan_a_preparer']
+            cols_available = [c for c in cols_display if c in df_debug_int.columns]
+            
+            st.dataframe(df_debug_int[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
+        except Exception as e:
+            st.write(f"Aucune donnée disponible pour le debug. Erreur: {e}")
 
-                        try:
-                            # Utiliser l'API DeepSeek pour analyser le CV
-                            category = get_deepseek_analysis(text_snippet)
-                            unclassified_results.append({'Fichier': name, 'Catégorie': category})
-                        except Exception as e:
-                            unclassified_results.append({'Fichier': name, 'Catégorie': f"Erreur: {str(e)}"})
 
-                        unclassified_progress.progress((i+1)/unclassified_total)
-                
-                # Nettoyer le placeholder
-                processing_ai_placeholder.empty()
-                
-                # Stocker les résultats dans la session state
-                st.session_state.deepseek_analyses = unclassified_results
+def create_demandes_recrutement_combined_tab(df_recrutement):
+    """Onglet combiné Demandes et Recrutement avec cartes expandables comme Home.py"""
+    st.header("📊 Demandes & Recrutement")
+    
+    # CSS pour les cartes style Home.py
+    st.markdown("""
+    <style>
+    .report-card {
+        border-radius: 8px;
+        background-color: #f8f9fa;
+        padding: 15px;
+        margin-bottom: 15px;
+        border-left: 4px solid #007bff;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .report-card h4 {
+        margin-top: 0;
+        margin-bottom: 10px;
+        color: #2c3e50;
+        font-size: 1.25em;
+        font-weight: 600;
+    }
+    .report-card p {
+        margin-bottom: 8px;
+        font-size: 1.02em;
+        color: #5a6c7d;
+    }
+    .report-card .status-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 12px;
+        font-size: 0.8em;
+        font-weight: bold;
+        color: white;
+        background-color: #007bff;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Créer un seul jeu de filtres (4 contrôles): Entité, Direction, Période de la demande, Période de recrutement
+    st.sidebar.subheader("🔧 Filtres Globaux")
+    shared_filters = create_global_filters(df_recrutement, "combined", include_periode_recrutement=True, include_periode_demande=True)
 
-                # Intégrer les catégories renvoyées par l'IA dans les résultats de classification
-                # (mettre à jour st.session_state.classification_results où 'file' correspond)
-                try:
-                    if 'classification_results' in st.session_state and st.session_state.classification_results:
-                        for res in unclassified_results:
-                            fname = res.get('Fichier') or res.get('file')
-                            cat = res.get('Catégorie') or res.get('Catégorie')
-                            # Chercher l'entrée correspondante
-                            for entry in st.session_state.classification_results:
-                                if entry.get('file') == fname:
-                                    # Normaliser la catégorie si nécessaire
-                                    if cat and cat.strip():
-                                        entry['category'] = cat
-                                    break
-                except Exception:
-                    # En cas d'erreur, ne pas interrompre le flux — les analyses IA restent disponibles séparément
-                    pass
+    # Dériver deux jeux de filtres à partir des filtres partagés pour que chaque section
+    # n'applique que la période qui lui est pertinente.
+    filters_demandes = {
+        'entite': shared_filters.get('entite', 'Toutes'),
+        'direction': shared_filters.get('direction', 'Toutes'),
+        'periode_demande': shared_filters.get('periode_demande', 'Toutes'),
+        # Ne pas filtrer par période de recrutement dans la section Demandes
+        'periode_recrutement': 'Toutes'
+    }
 
-                st.session_state.last_action = "analyzed"
+    filters_clotures = {
+        'entite': shared_filters.get('entite', 'Toutes'),
+        'direction': shared_filters.get('direction', 'Toutes'),
+        'periode_recrutement': shared_filters.get('periode_recrutement', 'Toutes'),
+        # Ne pas filtrer par période de demande dans la section Clôtures
+        'periode_demande': 'Toutes'
+    }
+
+    # Créer deux cartes expandables principales (comme dans Home.py)
+    with st.expander("📋 **DEMANDES DE RECRUTEMENT**", expanded=False):
+        create_demandes_recrutement_tab(df_recrutement, filters_demandes)
+    
+    with st.expander("🎯 **RECRUTEMENTS CLÔTURÉS**", expanded=False):
+        create_recrutements_clotures_tab(df_recrutement, filters_clotures)
+
+
+def calculate_weekly_metrics(df_recrutement):
+    """Calcule les métriques hebdomadaires basées sur les vraies données"""
+    if df_recrutement is None or len(df_recrutement) == 0:
+        return {}
+    
+    # Obtenir la date de reporting (utiliser st.session_state si défini)
+    reporting_date = st.session_state.get('reporting_date', None)
+    if reporting_date is None:
+        today = datetime.now()
+    else:
+        if isinstance(reporting_date, datetime):
+            today = reporting_date
+        else:
+            today = datetime.combine(reporting_date, datetime.min.time())
+    # start_of_week = Monday (00:00) of the reporting_date's week
+    start_of_week = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())  # Lundi de cette semaine à 00:00
+    # Définir la semaine précédente (Lundi -> Vendredi). Exemple: si reporting_date=2025-10-15 (mercredi),
+    # start_of_week = 2025-10-13 (lundi), previous_monday = 2025-10-06, previous_friday = 2025-10-10.
+    previous_monday = start_of_week - timedelta(days=7)   # Lundi de la semaine précédente (00:00)
+    previous_friday = start_of_week - timedelta(days=3)   # Vendredi de la semaine précédente (00:00)
+    # exclusive upper bound for inclusive-Friday semantics: < previous_friday + 1 day
+    previous_friday_exclusive = previous_friday + timedelta(days=1)
+    
+    # Définir les colonnes attendues avec des alternatives possibles
+    date_reception_col = "Date de réception de la demande après validation de la DRH"
+    date_integration_col = "Date d'intégration prévisionnelle"
+    candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
+    statut_col = "Statut de la demande"
+    entite_col = "Entité demandeuse"
+    
+    # Créer une copie pour les calculs
+    df = df_recrutement.copy()
+
+    # Toujours exclure les demandes clôturées/annulées du compteur 'avant'
+    # (la case UI a été supprimée : les demandes clôturées ne sont pas comptées)
+    include_closed = False
+    
+    # Vérifier les colonnes disponibles
+    available_columns = df.columns.tolist()
+    
+    # Chercher les colonnes similaires si les noms exacts n'existent pas
+    def find_similar_column(target_col, available_cols):
+        """Trouve une colonne similaire dans la liste disponible"""
+        target_lower = target_col.lower()
+        for col in available_cols:
+            if col.lower() == target_lower:
+                return col
+        # Chercher des mots-clés
+        if "date" in target_lower and "réception" in target_lower:
+            for col in available_cols:
+                if "date" in col.lower() and ("réception" in col.lower() or "reception" in col.lower() or "demande" in col.lower()):
+                    return col
+        elif "date" in target_lower and "intégration" in target_lower:
+            for col in available_cols:
+                if "date" in col.lower() and ("intégration" in col.lower() or "integration" in col.lower() or "entrée" in col.lower()):
+                    return col
+        elif "candidat" in target_lower and "retenu" in target_lower:
+            for col in available_cols:
+                if ("candidat" in col.lower() and "retenu" in col.lower()) or ("nom" in col.lower() and "prénom" in col.lower()):
+                    return col
+        elif "statut" in target_lower:
+            for col in available_cols:
+                if "statut" in col.lower() or "status" in col.lower():
+                    return col
+        elif "entité" in target_lower:
+            for col in available_cols:
+                if "entité" in col.lower() or "entite" in col.lower():
+                    return col
+        return None
+    
+    # Trouver les colonnes réelles
+    real_date_reception_col = find_similar_column(date_reception_col, available_columns)
+    real_date_integration_col = find_similar_column(date_integration_col, available_columns)
+    # chercher une colonne d'acceptation du candidat (date d'acceptation de la promesse)
+    possible_accept_cols = [
+        "Date d'acceptation",
+        "Date d'acceptation du candidat",
+        "Date d'acceptation de la promesse",
+        "Date d'acceptation promesse",
+        "Date d'accept",
+        "Date d'acceptation de la promesse d'embauche",
+        "Date d'acceptation de la promesse d embauche",
+        "Date d'acceptation du candidat",
+        'Date d\'acceptation',
+    ]
+    real_accept_col = find_similar_column('Date d\'acceptation du candidat', available_columns)
+    # fallback to integration date if no explicit acceptance date
+    if real_accept_col is None:
+        # try some common alternatives
+        for alt in ['Date d\'acceptation', 'Date d\'acceptation de la promesse', "Date d'accept"]:
+            c = find_similar_column(alt, available_columns)
+            if c:
+                real_accept_col = c
+                break
+    real_candidat_col = find_similar_column(candidat_col, available_columns)
+    real_statut_col = find_similar_column(statut_col, available_columns)
+    real_entite_col = find_similar_column(entite_col, available_columns)
+    # detect Poste demandé column (used for optional entity-specific title filters)
+    real_poste_col = find_similar_column('Poste demandé', available_columns) or find_similar_column('Poste', available_columns)
+    
+    # Si les colonnes essentielles n'existent pas, retourner vide
+    if not real_entite_col:
+        st.warning(f"⚠️ Colonne 'Entité' non trouvée. Colonnes disponibles: {', '.join(available_columns[:5])}...")
+        return {}
+    
+    if not real_statut_col:
+        st.warning(f"⚠️ Colonne 'Statut' non trouvée. Colonnes disponibles: {', '.join(available_columns[:5])}...")
+        return {}
+    
+    # Convertir les dates si les colonnes existent (gardes robustes)
+    if real_date_reception_col and real_date_reception_col in df.columns:
+        df[real_date_reception_col] = pd.to_datetime(df[real_date_reception_col], errors='coerce')
+    else:
+        real_date_reception_col = None
+    if real_date_integration_col and real_date_integration_col in df.columns:
+        df[real_date_integration_col] = pd.to_datetime(df[real_date_integration_col], errors='coerce')
+    else:
+        real_date_integration_col = None
+    if real_accept_col and real_accept_col in df.columns:
+        # Use robust mixed-date parser (handles Excel serials and mixed formats)
+        try:
+            df[real_accept_col] = _parse_mixed_dates(df[real_accept_col])
+        except Exception:
+            # Last-resort fallback
+            df[real_accept_col] = pd.to_datetime(df[real_accept_col], errors='coerce')
+    else:
+        real_accept_col = None
+
+    # Normalisation et mots-clés de statuts fermés (utiles dans plusieurs blocs)
+    closed_keywords = ['cloture', 'clôture', 'annule', 'annulé', 'depriorise', 'dépriorisé', 'desistement', 'désistement', 'annul', 'reject', 'rejett']
+    # Optional: entity-specific title inclusion lists. If an entity is present here,
+    # only postes matching the provided list will be counted in 'en_cours' for that entity.
+    SPECIAL_TITLE_FILTERS = {
+        'TGCC': [
+            'CHEF DE PROJETS',
+            'INGENIEUR TRAVAUX',
+            'CONDUCTEUR TRAVAUX SENIOR (ou Ingénieur Junior)',
+            'CONDUCTEUR TRAVAUX',
+            'INGENIEUR TRAVAUX JUNIOR',
+            'RESPONSABLE QUALITE',
+            'CHEF DE CHANTIER',
+            'METREUR',
+            'RESPONSABLE HSE',
+            'SUPERVISEUR HSE',
+            'ANIMATEUR HSE',
+            'DIRECTEUR PROJETS',
+            'RESPONSABLE ADMINISTRATIF ET FINANCIER',
+            'RESPONSABLE MAINTENANCE',
+            'RESPONSABLE ENERGIE INDUSTRIELLE',
+            'RESPONSABLE CYBER SECURITE',
+            'RESPONSABLE VRD',
+            'RESPONSABLE ACCEUIL',
+            'RESPONSABLE ETUDES',
+            'TECHNICIEN SI',
+            'RESPONSABLE GED & ARCHIVAGE',
+            'ARCHIVISTE SENIOR',
+            'ARCHIVISTE JUNIOR',
+            'TOPOGRAPHE'
+        ]
+    }
+    
+    # Calculer les métriques par entité
+    # Normaliser les noms d'entités pour éviter les doublons (ex: "TG WOOD" vs "TG WOOD ")
+    if real_entite_col:
+        df[real_entite_col] = df[real_entite_col].astype(str).str.strip().str.upper()
+    
+    entites = df[real_entite_col].dropna().unique()
+    metrics_by_entity = {}
+    
+    for entite in entites:
+        df_entite = df[df[real_entite_col] == entite]
+        # Définitions temporelles par entité (basées sur la semaine précédente Lundi->Vendredi)
+        # previous_monday / previous_friday_exclusive sont définis en haut de la fonction
+
+        # 1. Nb postes ouverts avant début semaine
+        # Doit compter toutes les lignes dont 'Date de réception ...' est STRICTEMENT antérieure
+        # au vendredi de la semaine précédente (i.e. < previous_friday)
+        postes_avant = 0
+        if real_date_reception_col and real_date_reception_col in df_entite.columns:
+            mask_date_avant = df_entite[real_date_reception_col] < previous_monday
+            mask_not_closed = None
+            if not include_closed and real_statut_col and real_statut_col in df_entite.columns:
+                mask_not_closed = ~df_entite[real_statut_col].fillna("").astype(str).apply(lambda s: any(k in _norm(s) for k in closed_keywords))
+            # Exclure les lignes avec une date d'acceptation du candidat antérieure à la semaine précédente
+            mask_old_accept = None
+            if real_accept_col and real_accept_col in df_entite.columns:
+                mask_old_accept = (df_entite[real_accept_col] < previous_monday)
+            mask_avant = mask_date_avant
+            if mask_not_closed is not None:
+                mask_avant = mask_avant & mask_not_closed
+            if mask_old_accept is not None:
+                mask_avant = mask_avant & (~mask_old_accept)
+            postes_avant = int(df_entite[mask_avant].shape[0])
+        else:
+            postes_avant = 0
+
+        # 2. Nb nouveaux postes ouverts cette semaine = demandes validées par la DRH
+        # dans la semaine précédente (du lundi au vendredi inclus).
+        nouveaux_postes = 0
+        if real_date_reception_col and real_date_reception_col in df_entite.columns:
+            mask_nouveaux = (df_entite[real_date_reception_col] >= previous_monday) & (df_entite[real_date_reception_col] < previous_friday_exclusive)
+            nouveaux_postes = int(df_entite[mask_nouveaux].shape[0])
+        else:
+            nouveaux_postes = 0
+
+        # 3. Nb postes pourvus cette semaine: compter les acceptations du candidat
+        # dont la date d'acceptation est dans la même fenêtre (previous_monday..previous_friday)
+        postes_pourvus = 0
+        mask_has_name = None
+        if real_candidat_col and real_candidat_col in df_entite.columns:
+            mask_has_name = df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '')
+
+        # préparer un masque de statut 'En cours' si la colonne statut existe (réutilisé plus bas)
+        mask_status_en_cours = None
+        if real_statut_col and real_statut_col in df_entite.columns:
+            mask_status_en_cours = df_entite[real_statut_col].fillna("").astype(str).apply(lambda s: 'en cours' in _norm(s) or 'encours' in _norm(s))
+
+        if real_accept_col and real_accept_col in df_entite.columns:
+            mask_accept_prev_week = (df_entite[real_accept_col] >= previous_monday) & (df_entite[real_accept_col] < previous_friday_exclusive)
+            if mask_has_name is not None:
+                postes_pourvus = int(df_entite[mask_accept_prev_week & mask_has_name].shape[0])
+            else:
+                postes_pourvus = int(df_entite[mask_accept_prev_week].shape[0])
+        else:
+            # fallback: try using integration date as proxy for pourvus in the same window
+            if real_date_integration_col and real_date_integration_col in df_entite.columns:
+                mask_integ_prev_week = (df_entite[real_date_integration_col] >= previous_monday) & (df_entite[real_date_integration_col] < previous_friday_exclusive)
+                if mask_has_name is not None:
+                    postes_pourvus = int(df_entite[mask_integ_prev_week & mask_has_name].shape[0])
+                else:
+                    postes_pourvus = int(df_entite[mask_integ_prev_week].shape[0])
+            else:
+                postes_pourvus = 0
+
+        # 4. Nb postes en cours cette semaine
+        # Par défaut on calcule une formule de secours (nouveaux + avant - pourvus)
+        postes_en_cours_formula = nouveaux_postes + postes_avant - postes_pourvus
+        if postes_en_cours_formula is None:
+            postes_en_cours_formula = 0
+
+        # Si la colonne Statut existe, on suit la règle métier stricte demandée :
+        # "Postes en cours" = lignes avec statut 'En cours' ET sans valeur dans
+        # la colonne 'Nom Prénom du candidat retenu...' (donc pas d'acceptation).
+        # Si la colonne Statut est absente, on retombe sur la formule de secours.
+        postes_en_cours = int(postes_en_cours_formula)
+        postes_en_cours_status = 0
+        if mask_status_en_cours is not None:
+            mask_has_name_local = None
+            if real_candidat_col and real_candidat_col in df_entite.columns:
+                mask_has_name_local = df_entite[real_candidat_col].notna() & (df_entite[real_candidat_col].astype(str).str.strip() != '')
+
+            # Exclure les lignes où la date d'acceptation du candidat est antérieure à la semaine précédente
+            mask_old_accept = None
+            if real_accept_col and real_accept_col in df_entite.columns:
+                mask_old_accept = (df_entite[real_accept_col] < previous_monday)
+            # Règle stricte : "Postes en cours" = statut 'En cours' ET sans candidat ET pas d'acceptation ancienne
+            if mask_has_name_local is not None:
+                mask_sourcing = mask_status_en_cours & (~mask_has_name_local)
+            else:
+                mask_sourcing = mask_status_en_cours
+            if mask_old_accept is not None:
+                mask_sourcing = mask_sourcing & (~mask_old_accept)
+
+            postes_en_cours_status = int(df_entite[mask_sourcing].shape[0])
+            postes_en_cours = int(postes_en_cours_status)
+
+        metrics_by_entity[entite] = {
+            'avant': postes_avant,
+            'nouveaux': nouveaux_postes,
+            'pourvus': postes_pourvus,
+            'en_cours': postes_en_cours,
+            # ajouter info additionnelle utile pour debug/UI
+            'en_cours_status_count': postes_en_cours_status
+        }
+    
+    # Créer aussi table_data pour l'export PowerPoint
+    excluded_entities = {'BESIX-TGCC', 'DECO EXCELL', 'TG PREFA'}
+    metrics_included = {k: v for k, v in metrics_by_entity.items() if k not in excluded_entities}
+    
+    # Calculer les totaux
+    total_avant = sum(data['avant'] for data in metrics_included.values())
+    total_nouveaux = sum(data['nouveaux'] for data in metrics_included.values())
+    total_pourvus = sum(data['pourvus'] for data in metrics_included.values())
+    total_en_cours = sum(data['en_cours'] for data in metrics_included.values())
+    total_en_cours_status = sum(data.get('en_cours_status_count', 0) for data in metrics_included.values())
+    
+    # Préparer les données pour le tableau
+    table_data = []
+    for entite, data in metrics_included.items():
+        table_data.append({
+            'Entité': entite,  # Sans les logos pour le PowerPoint
+            'Nb postes ouverts avant début semaine': data['avant'] if data['avant'] > 0 else 0,
+            'Nb nouveaux postes ouverts cette semaine': data['nouveaux'] if data['nouveaux'] > 0 else 0,
+            'Nb postes pourvus cette semaine': data['pourvus'] if data['pourvus'] > 0 else 0,
+            'Nb postes en cours cette semaine (sourcing)': data['en_cours'] if data['en_cours'] > 0 else 0
+        })
+    
+    # Ajouter la ligne TOTAL
+    table_data.append({
+        'Entité': 'TOTAL',
+        'Nb postes ouverts avant début semaine': total_avant,
+        'Nb nouveaux postes ouverts cette semaine': total_nouveaux,
+        'Nb postes pourvus cette semaine': total_pourvus,
+        'Nb postes en cours cette semaine (sourcing)': total_en_cours
+    })
+    
+    return {
+        'metrics_by_entity': metrics_by_entity,
+        'table_data': table_data,
+        'totals': {
+            'avant': total_avant,
+            'nouveaux': total_nouveaux,
+            'pourvus': total_pourvus,
+            'en_cours': total_en_cours
+        }
+    }
+
+def create_weekly_report_tab(df_recrutement=None):
+    """Onglet Reporting Hebdomadaire (simplifié)
+
+    Cette version affiche les KPI calculés par calculate_weekly_metrics
+    en respectant la `st.session_state['reporting_date']` si fournie.
+    """
+    st.header("📅 Reporting Hebdomadaire : Chiffres Clés de la semaine")
+
+    # Note: les demandes clôturées sont exclues du compteur 'avant' par défaut.
+    # La case pour inclure les demandes clôturées a été supprimée.
+
+    # Calculer les métriques
+    if df_recrutement is not None and len(df_recrutement) > 0:
+        try:
+            metrics_result = calculate_weekly_metrics(df_recrutement)
+            # Extraire metrics_by_entity de la nouvelle structure
+            metrics = metrics_result.get('metrics_by_entity', {}) if isinstance(metrics_result, dict) else {}
+        except Exception as e:
+            st.error(f"⚠️ Erreur lors du calcul des métriques: {e}")
+            metrics = {}
+    else:
+        metrics = {}
+
+    # Exclure certaines entités (Besix, DECO EXCELL et TG PREFA) de l'affichage et des totaux
+    excluded_entities = set(['BESIX-TGCC', 'DECO EXCELL', 'TG PREFA'])
+    metrics_included = {e: m for e, m in metrics.items() if e not in excluded_entities}
+
+    total_avant = sum(m.get('avant', 0) for m in metrics_included.values())
+    total_nouveaux = sum(m.get('nouveaux', 0) for m in metrics_included.values())
+    total_pourvus = sum(m.get('pourvus', 0) for m in metrics_included.values())
+    total_en_cours = sum(m.get('en_cours', 0) for m in metrics_included.values())
+    # total lines with statut 'En cours' (may include those with candidate)
+    total_en_cours_status = sum(m.get('en_cours_status_count', 0) for m in metrics_included.values())
+
+    # KPI cards (styled and centered like other KPI cards)
+    kpi_cards_html = render_generic_metrics([
+        ("Postes en cours (sourcing)", total_en_cours, "#1f77b4"),
+        ("Postes pourvus cette semaine", total_pourvus, "#2ca02c"),
+        ("Nouveaux postes ouverts", total_nouveaux, "#ff7f0e"),
+        ("Total postes ouverts avant la semaine", total_avant, "#6f42c1")
+    ])
+    st.markdown(kpi_cards_html, unsafe_allow_html=True)
+
+    # Tableau récapitulatif par entité (HTML personnalisé, rendu centralisé)
+    st.markdown(
+        '<div style="display: flex; align-items: center;">'
+        '<span style="font-size: 1.25em; font-weight: 600;">📊 Besoins en Cours par Entité</span>'
+        '</div>',
+        unsafe_allow_html=True
+    )
+    if metrics and len(metrics) > 0:
+        logos_dict = load_all_logos_b64()
         
-        # Afficher les analyses IA s'il y en a
-        if st.session_state.deepseek_analyses:
-            st.markdown('---')
-            st.subheader("📝 Analyses par Intelligence Artificielle des CV non classés")
-            
-            # Ajouter un bouton pour réinitialiser les analyses si nécessaire
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.success(f"✅ Analyse par Intelligence Artificielle pour {len(st.session_state.deepseek_analyses)} CV(s) non classés.")
-            with col2:
-                if st.button("🔄 Réinitialiser analyses", key="reset_deepseek"):
-                    st.session_state.deepseek_analyses = []
-                    st.session_state.last_action = "reset"
-                    st.rerun()
-            
-            # Créer un tableau pour afficher les résultats de manière plus organisée
-            ai_results_df = pd.DataFrame(st.session_state.deepseek_analyses)
-            
-            # Afficher le tableau avec les catégories attribuées
-            st.dataframe(ai_results_df, width="stretch", hide_index=True)
+        def get_entity_display(name):
+            return get_entity_display_html_with_logo(name, logos_dict)
 
-        # Préparer un CSV à 4 colonnes en prenant en compte les analyses IA
-        # Déterminer les noms à utiliser (extraits ou originaux)
-        def get_display_name(row):
-            original_name = row['file']
-            if (hasattr(st.session_state, 'rename_and_organize_option') and 
-                st.session_state.rename_and_organize_option and 
-                'extracted_name' in row and row['extracted_name'] and 
-                row['extracted_name']['name']):
-                return row['extracted_name']['name']
-            return original_name
-        
-        # Créer un DataFrame avec les résultats intégrés (incluant les analyses IA)
-        merged_results_for_csv = merge_results_with_ai_analysis(st.session_state.classification_results)
-        df_merged = pd.DataFrame(merged_results_for_csv)
-        
-        # Récupérer les classifications finales (après IA) avec les bons noms
-        supports = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Fonctions supports'].iterrows()]
-        logistics = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Logistique'].iterrows()]
-        production = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Production/Technique'].iterrows()]
-        unclassified = [get_display_name(row) for _, row in df_merged[df_merged['category'] == 'Non classé'].iterrows()]
+        # Préparer les données pour le HTML
+        table_data = []
+        for entite, data in metrics_included.items():
+            table_data.append({
+                'Entité': get_entity_display(entite),
+                'Nb postes ouverts avant début semaine': data['avant'] if data['avant'] > 0 else '-',
+                'Nb nouveaux postes ouverts cette semaine': data['nouveaux'] if data['nouveaux'] > 0 else '-',
+                'Nb postes pourvus cette semaine': data['pourvus'] if data['pourvus'] > 0 else '-',
+                "Nb postes statut 'En cours' (total)": data.get('en_cours_status_count', 0) if data.get('en_cours_status_count', 0) > 0 else '-',
+                'Nb postes en cours cette semaine (sourcing)': data['en_cours'] if data['en_cours'] > 0 else '-'
+            })
 
-        max_len = max(len(supports), len(logistics), len(production), len(unclassified)) if max(len(supports), len(logistics), len(production), len(unclassified)) > 0 else 0
-        # Pad lists
-        supports += [''] * (max_len - len(supports))
-        logistics += [''] * (max_len - len(logistics))
-        production += [''] * (max_len - len(production))
-        unclassified += [''] * (max_len - len(unclassified))
-
-        export_df = pd.DataFrame({
-            'Fonctions supports': supports,
-            'Logistique': logistics,
-            'Production/Technique': production,
-            'Divers / Hors périmètre': unclassified
+        # Ajouter la ligne de total
+        table_data.append({
+            'Entité': '<div style="text-align: center; font-weight: bold;">TOTAL</div>',
+            'Nb postes ouverts avant début semaine': f'**{total_avant}**',
+            'Nb nouveaux postes ouverts cette semaine': f'**{total_nouveaux}**',
+            'Nb postes pourvus cette semaine': f'**{total_pourvus}**',
+            "Nb postes statut 'En cours' (total)": f'**{total_en_cours_status}**',
+            'Nb postes en cours cette semaine (sourcing)': f'**{total_en_cours}**'
         })
 
-        # Séparateur visuel
-        st.markdown("---")
+        # HTML + CSS (RETOUR À LA VERSION ORIGINALE AVEC LOGOS)
+        st.markdown("""
+        <style>
+        .table-container {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            margin: 15px 0;
+        }
+        .custom-table {
+            border-collapse: collapse;
+            font-family: Arial, sans-serif;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            width: 75%;
+            margin: 0 auto;
+        }
+        .custom-table th {
+            background-color: #9C182F !important;
+            color: white !important;
+            font-weight: bold !important;
+            text-align: center !important;
+            padding: 6px 4px !important;
+            border: 1px solid white !important;
+            font-size: 1.1em;
+            line-height: 1.3;
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            max-width: 150px;
+        }
+        .custom-table td {
+            text-align: center !important;
+            padding: 6px 4px !important;
+            border: 1px solid #ddd !important;
+            background-color: white !important;
+            font-size: 1.1em;
+            line-height: 1.2;
+            font-weight: 500;
+        }
+        .custom-table .entity-cell {
+            text-align: center !important;
+            padding: 4px 2px !important;
+            font-weight: 600;
+            min-width: 80px;
+            max-width: 100px;
+        }
+        .custom-table .total-row td {
+            background-color: #9C182F !important;
+            color: white !important;
+            font-weight: bold !important;
+            border: 1px solid #9C182F !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
 
-        # Comptage des CVs par catégorie pour l'affichage
-        count_support = len([x for x in supports if x])
-        count_logistics = len([x for x in logistics if x])
-        count_production = len([x for x in production if x])
-        count_unclassified = len([x for x in unclassified if x])
+        # Construire le tableau HTML
+        html_table = '<div class="table-container">'
+        html_table += '<table class="custom-table">'
+        html_table += '<thead><tr>'
+        html_table += '<th>Entité</th>'
+        html_table += '<th>Nb postes ouverts avant début semaine</th>'
+        html_table += '<th>Nb nouveaux postes ouverts cette semaine</th>'
+        html_table += '<th>Nb postes pourvus cette semaine</th>'
+        html_table += '<th>Nb postes en cours cette semaine (sourcing)</th>'
+        html_table += '</tr></thead>'
+        html_table += '<tbody>'
 
-        # Indicateur IA
-        ai_indicator = " (incluant les analyses IA)" if hasattr(st.session_state, 'deepseek_analyses') and st.session_state.deepseek_analyses else ""
-        st.markdown(f"**Résumé{ai_indicator}**: {count_support} Fonctions supports • {count_logistics} Logistique • {count_production} Production/Technique • {count_unclassified} Divers / Hors périmètre.")
+        # Ajouter les lignes de données (toutes sauf la dernière qui est TOTAL)
+        data_rows = table_data[:-1]
+        for row in data_rows:
+            html_table += '<tr>'
+            html_table += f'<td class="entity-cell">{row["Entité"]}</td>'
+            html_table += f'<td>{row["Nb postes ouverts avant début semaine"]}</td>'
+            html_table += f'<td>{row["Nb nouveaux postes ouverts cette semaine"]}</td>'
+            html_table += f'<td>{row["Nb postes pourvus cette semaine"]}</td>'
+            html_table += f'<td>{row["Nb postes en cours cette semaine (sourcing)"]}</td>'
+            html_table += '</tr>'
 
-        col1, col2, col3 = st.columns(3)
+        # Ligne TOTAL (la dernière)
+        total_row = table_data[-1]
+        html_table += '<tr class="total-row">'
+        html_table += f'<td class="entity-cell">TOTAL</td>'
+        html_table += f'<td>{total_row["Nb postes ouverts avant début semaine"].replace("**", "")}</td>'
+        html_table += f'<td>{total_row["Nb nouveaux postes ouverts cette semaine"].replace("**", "")}</td>'
+        html_table += f'<td>{total_row["Nb postes pourvus cette semaine"].replace("**", "")}</td>'
+        html_table += f'<td>{total_row["Nb postes en cours cette semaine (sourcing)"].replace("**", "")}</td>'
+        html_table += '</tr>'
+        html_table += '</tbody></table></div>'
 
-        def render_category(col, cat_label):
-            with col:
-                df_cat = df_merged[df_merged['category'] == cat_label]
-                header_label = 'Divers / Hors périmètre' if cat_label == 'Non classé' else cat_label
-                st.header(f"{header_label} ({len(df_cat)})")
+        st.markdown(html_table, unsafe_allow_html=True)
 
-                if cat_label == 'Production/Technique':
-                    for sub_label in PRODUCTION_ALLOWED_SUBCATEGORIES:
-                        items = df_cat[df_cat['sub_category'] == sub_label]
-                        st.subheader(f"{sub_label} ({len(items)})")
-                        for _, r in items.iterrows():
-                            name_display = get_display_name(r)
-                            try:
-                                years_exp = int(r.get('years_experience', 0))
-                            except Exception:
-                                years_exp = 0
-                            profile = r.get('profile_summary') or (r.get('text_snippet') or '')
-                            exp_title = f"👤 {name_display} — {sub_label}"
-                            if years_exp and years_exp > 0:
-                                exp_title += f" — {years_exp} ans"
-                            with st.expander(exp_title):
-                                if profile:
-                                    st.markdown(f"**📝 Synthèse du profil :**\n\n{profile}")
-                                else:
-                                    st.info("Aucune synthèse disponible.")
-                                st.write(f"Fichier: {r['file']}")
+        # --- Tableau : Recrutements en cours par recruteur (juste après 'Besoins en Cours par Entité')
+        try:
+            if df_recrutement is not None and 'Colonne TG Hire' in df_recrutement.columns:
+                # On veut un tableau avec une colonne par statut: Nouvelle demande, Sourcing, Shortlisté, Signature DRH
+                wanted_statuses = ['Nouvelle demande', 'Sourcing', 'Shortlisté', 'Signature DRH']
+                # Construire un pivot complet par recruteur (colonnes = Colonne TG Hire demandées)
+                # Le TOTAL affiché est le nombre de lignes pour lesquelles 'Statut de la demande' == 'En cours'
+                # Identifier la colonne recruteur de façon robuste (sur le DF complet)
+                recruteur_col = next((c for c in df_recrutement.columns if 'responsable' in c.lower() and 'traitement' in c.lower()), None)
+                if not recruteur_col:
+                    recruteur_col = next((c for c in df_recrutement.columns if 'recruteur' in c.lower() or 'responsable' in c.lower()), None)
 
-                    extras = df_cat[~df_cat['sub_category'].isin(PRODUCTION_ALLOWED_SUBCATEGORIES)]
-                    if not extras.empty:
-                        st.subheader(f"À vérifier ({len(extras)})")
-                        for _, r in extras.iterrows():
-                            name_display = get_display_name(r)
-                            try:
-                                years_exp = int(r.get('years_experience', 0))
-                            except Exception:
-                                years_exp = 0
-                            profile = r.get('profile_summary') or (r.get('text_snippet') or '')
-                            raw_sub = r.get('sub_category')
-                            cleaned_sub = raw_sub.strip() if isinstance(raw_sub, str) and raw_sub.strip() else "Sous-catégorie à préciser"
-                            exp_title = f"👤 {name_display} — {cleaned_sub}"
-                            if years_exp and years_exp > 0:
-                                exp_title += f" — {years_exp} ans"
-                            with st.expander(exp_title):
-                                if profile:
-                                    st.markdown(f"**📝 Synthèse du profil :**\n\n{profile}")
-                                else:
-                                    st.info("Aucune synthèse disponible.")
-                                st.write(f"Fichier: {r['file']}")
-                else:
-                    if df_cat.empty:
-                        return
-                    for subcat, items in df_cat.groupby('sub_category', dropna=False):
-                        is_missing = pd.isna(subcat) or (isinstance(subcat, str) and not subcat.strip())
-                        label = subcat.strip() if isinstance(subcat, str) and not is_missing else ("Direction" if cat_label == 'Fonctions supports' else "Logistique")
-                        st.subheader(f"{label} ({len(items)})")
-                        for _, r in items.iterrows():
-                            name_display = get_display_name(r)
-                            try:
-                                years_exp = int(r.get('years_experience', 0))
-                            except Exception:
-                                years_exp = 0
-                            profile = r.get('profile_summary') or (r.get('text_snippet') or '')
-                            raw_sub = r.get('sub_category')
-                            sub_label = raw_sub.strip() if isinstance(raw_sub, str) and raw_sub.strip() else label
-                            exp_title = f"👤 {name_display} — {sub_label}"
-                            if years_exp and years_exp > 0:
-                                exp_title += f" — {years_exp} ans"
-                            with st.expander(exp_title):
-                                if profile:
-                                    st.markdown(f"**📝 Synthèse du profil :**\n\n{profile}")
-                                else:
-                                    st.info("Aucune synthèse disponible.")
-                                st.write(f"Fichier: {r['file']}")
+                if recruteur_col:
+                    # Pivot sur l'ensemble des données pour récupérer les colonnes d'intérêt
+                    pivot = pd.crosstab(df_recrutement[recruteur_col].fillna('').astype(str).str.strip(), df_recrutement['Colonne TG Hire'])
+                    # S'assurer de l'ordre des colonnes et présence de toutes (ajoute 0 si manquante)
+                    for s in wanted_statuses:
+                        if s not in pivot.columns:
+                            pivot[s] = 0
+                    pivot = pivot[wanted_statuses]
 
-        render_category(col1, 'Fonctions supports')
-        render_category(col2, 'Logistique')
-        render_category(col3, 'Production/Technique')
+                    # Supprimer les lignes sans recruteur explicite et exclure certains recruteurs indésirables
+                    pivot.index = pivot.index.astype(str)
+                    pivot = pivot[~pivot.index.str.strip().str.lower().isin(['', '(sans)', 'nan', 'none'])]
+                    exclude_list = {n.lower() for n in [
+                        'Bouchra AJBILOU','Bouchra AOUISSE','Ghita LAKHDAR',
+                        'Reda Berrada','Reda Mohamed BERRADA','Saad FATI'
+                    ]}
+                    pivot = pivot[~pivot.index.str.lower().isin(exclude_list)]
 
-        # Afficher les Non classés en dessous si présent
-        df_nc = df_merged[df_merged['category'] == 'Non classé']
-        if not df_nc.empty:
-            st.markdown('---')
-            st.subheader(f'🔍 Divers / Hors périmètre ({len(df_nc)})')
-            for _, r in df_nc.iterrows():
-                name_display = get_display_name(r)
-                try:
-                    years_exp = int(r.get('years_experience', 0) if hasattr(r, 'get') else (r['years_experience'] if 'years_experience' in r else 0))
-                except Exception:
-                    years_exp = 0
-                profile = r.get('profile_summary') if hasattr(r, 'get') else (r['profile_summary'] if 'profile_summary' in r else '')
-                if not profile:
-                    profile = (r.get('text_snippet') if hasattr(r, 'get') else (r['text_snippet'] if 'text_snippet' in r else '')) or ''
-                subcat = r.get('sub_category') if hasattr(r, 'get') else (r['sub_category'] if 'sub_category' in r else '')
-                exp_title = f"👤 {name_display} — {subcat}"
-                if years_exp and years_exp > 0:
-                    exp_title += f" — {years_exp} ans"
-                with st.expander(exp_title):
-                    if profile:
-                        st.markdown(f"**📝 Synthèse du profil :**\n\n{profile}")
+                    # Calculer la colonne demandée: Total = Nouvelle demande + Sourcing + Shortlisté + Signature DRH
+                    cols_sum = [c for c in wanted_statuses if c in pivot.columns]
+                    if cols_sum:
+                        pivot['Total'] = pivot[cols_sum].sum(axis=1).clip(lower=0).astype(int)
                     else:
-                        st.info("Aucune synthèse disponible.")
-                    st.write(f"Fichier: {r['file']}")
+                        pivot['Total'] = 0
 
-        # Générer Excel et CSV pour export (inchangés)
-        csv = export_df.to_csv(index=False, sep=';').encode('utf-8-sig')
-        from io import BytesIO
-        excel_buffer = BytesIO()
-        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-            export_df.to_excel(writer, index=False, sheet_name='Classification')
-        excel_data = excel_buffer.getvalue()
+                    # Construire le HTML du tableau
+                    html_rec = '<div class="table-container" style="margin-top:8px;">'
+                    # Styles spécifiques pour réduire les colonnes 'Nouvelle demande' (2e) et 'Signature DRH' (5e)
+                    html_rec += '<style>.rec-table th:nth-child(2), .rec-table td:nth-child(2){width:60px;} .rec-table th:nth-child(5), .rec-table td:nth-child(5){width:60px;}</style>'
+                    html_rec += '<table class="custom-table rec-table" style="width:60%; margin:0;">'
+                    # Header
+                    html_rec += '<thead><tr><th>Recruteur</th>'
+                    for s in wanted_statuses:
+                        html_rec += f'<th>{s}</th>'
+                    html_rec += '<th>Total</th></tr></thead><tbody>'
 
-        # Boutons de téléchargement (export)
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.download_button(label='⬇️ Télécharger Excel (.xlsx)', data=excel_data, file_name='classification_results.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        with col2:
-            st.download_button(label='⬇️ Télécharger CSV (;)', data=csv, file_name='classification_results.csv', mime='text/csv')
+                    # Lignes par recruteur
+                    for rec, row in pivot.iterrows():
+                        html_rec += '<tr>'
+                        html_rec += f'<td class="entity-cell">{rec}</td>'
+                        for s in wanted_statuses:
+                            html_rec += f'<td>{int(row[s])}</td>'
+                        html_rec += f'<td>{int(row["Total"])}</td>'
+                        html_rec += '</tr>'
 
-        with col3:
-            # Bouton ZIP disponible si l'option de renommage était cochée
-            if hasattr(st.session_state, 'rename_and_organize_option') and st.session_state.rename_and_organize_option:
-                if st.button('📦 Préparer et télécharger le ZIP organisé'):
-                    with st.spinner('Création du fichier ZIP organisé...'):
+                    html_rec += '</tbody></table></div>'
+
+                    st.markdown('<div style="font-family:Arial,sans-serif; font-size:1.15em; font-weight:700; margin-top:12px;">📋 Recrutements en cours par recruteur</div>', unsafe_allow_html=True)
+                    st.markdown(html_rec, unsafe_allow_html=True)
+                    
+                    # Debug pour le tableau recruteur
+                    with st.expander("🔍 Debug - Détails des lignes (Recrutements par recruteur)", expanded=False):
                         try:
-                            zip_data, manifest_df = create_organized_zip(st.session_state.classification_results, st.session_state.uploaded_files_list)
-                            st.success('✅ ZIP créé avec succès !')
-
-                            # Afficher un aperçu du manifest
-                            with st.expander("📋 Aperçu du contenu du ZIP"):
-                                st.dataframe(manifest_df, width="stretch")
-
-                            # Bouton de téléchargement du ZIP
-                            st.download_button(
-                                label='⬇️ Télécharger le ZIP organisé',
-                                data=zip_data,
-                                file_name='CVs_Classes_Organises.zip',
-                                mime='application/zip',
-                                key='download_zip_btn'
-                            )
-                            # NE PAS effacer les résultats après le téléchargement du ZIP
-                            # Les résultats restent affichés pour permettre d'autres exports
+                            st.markdown("**Lignes contribuant au tableau (statut 'En cours') par statut:**")
+                            # Filtrer uniquement les lignes avec statut 'En cours'
+                            df_rec_debug = df_recrutement[df_recrutement['Statut de la demande'] == 'En cours'].copy()
+                            # Ajouter colonnes de contribution
+                            df_rec_debug['contrib_Nouvelle_demande'] = df_rec_debug['Colonne TG Hire'] == 'Nouvelle demande'
+                            df_rec_debug['contrib_Sourcing'] = df_rec_debug['Colonne TG Hire'] == 'Sourcing'
+                            df_rec_debug['contrib_Shortlisté'] = df_rec_debug['Colonne TG Hire'] == 'Shortlisté'
+                            df_rec_debug['contrib_Signature_DRH'] = df_rec_debug['Colonne TG Hire'] == 'Signature DRH'
+                            cols_show = ['Entité demandeuse', recruteur_col, 'Poste demandé', 'Colonne TG Hire', 'contrib_Nouvelle_demande', 'contrib_Sourcing', 'contrib_Shortlisté', 'contrib_Signature_DRH']
+                            cols_avail = [c for c in cols_show if c in df_rec_debug.columns]
+                            st.dataframe(df_rec_debug[cols_avail].reset_index(drop=True), use_container_width=True, hide_index=True)
                         except Exception as e:
-                            st.error(f"❌ Erreur lors de la création du ZIP : {e}")
+                            st.write(f"Erreur debug: {e}")
+        except Exception:
+            pass
+
+    # Section Debug (expandable): montrer les lignes et pourquoi elles sont comptées
+    with st.expander("🔍 Debug - Détails des lignes", expanded=False):
+        st.markdown("""
+        **Explication des KPI du tableau 'Besoins en Cours par Entité'**
+        - **Nb postes ouverts avant début semaine** : demandes dont la date de réception est antérieure au lundi de la semaine de reporting, et qui ne sont pas clôturées/annulées. Les lignes avec une date d'acceptation du candidat antérieure à la semaine précédente sont également exclues.
+        - **Nb nouveaux postes ouverts cette semaine** : demandes validées par la DRH entre le lundi et le vendredi de la semaine précédente.
+        - **Nb postes pourvus cette semaine** : postes pour lesquels un candidat a accepté (ou date d'intégration) dans la même fenêtre temporelle.
+        - **Nb postes en cours cette semaine (sourcing)** : calculé comme (nouveaux + avant - pourvus), ou plus précisément comme les lignes avec statut "En cours" et sans candidat retenu. Les lignes avec une date d'acceptation du candidat antérieure à la semaine précédente sont également exclues, même si le statut est "En cours".
+        - **Nb postes statut 'En cours' (total)** : nombre de lignes avec statut "En cours" (peut inclure celles avec candidat).
+        """)
+        try:
+            df_debug = df_recrutement.copy() if df_recrutement is not None else pd.DataFrame()
+            if not df_debug.empty:
+                cols = df_debug.columns.tolist()
+
+                def find_similar_column(target_col, available_cols):
+                    target_lower = target_col.lower()
+                    for col in available_cols:
+                        if col.lower() == target_lower:
+                            return col
+                    if "date" in target_lower and "réception" in target_lower:
+                        for col in available_cols:
+                            if "date" in col.lower() and ("réception" in col.lower() or "reception" in col.lower() or "demande" in col.lower()):
+                                return col
+                    if "date" in target_lower and "intégration" in target_lower:
+                        for col in available_cols:
+                            if "date" in col.lower() and ("intégration" in col.lower() or "integration" in col.lower() or "entrée" in col.lower()):
+                                return col
+                    # Prefer columns explicitly mentioning the candidate / promesse
+                    if "candidat" in target_lower or "promesse" in target_lower or "accept" in target_lower:
+                        for col in available_cols:
+                            lc = col.lower()
+                            if ("candidat" in lc and "retenu" in lc) or ("accept" in lc and "candidat" in lc) or ("promesse" in lc and "candidat" in lc):
+                                return col
+                        # fallback to any column containing 'candidat'
+                        for col in available_cols:
+                            if 'candidat' in col.lower():
+                                return col
+                    # As a last resort, match generic 'nom'/'prénom' columns
+                    if "candidat" in target_lower and "retenu" in target_lower:
+                        for col in available_cols:
+                            if ("nom" in col.lower() and "pr" in col.lower()) or ("nom" in col.lower() and "prenom" in col.lower()):
+                                return col
+                    if "statut" in target_lower:
+                        for col in available_cols:
+                            if "statut" in col.lower() or "status" in col.lower():
+                                return col
+                    if "entité" in target_lower or "entite" in target_lower:
+                        for col in available_cols:
+                            if "entité" in col.lower() or "entite" in col.lower():
+                                return col
+                    return None
+
+                date_reception_col = "Date de réception de la demande après validation de la DRH"
+                date_integration_col = "Date d'intégration prévisionnelle"
+                candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
+
+                real_date_reception_col = find_similar_column(date_reception_col, cols)
+                real_date_integration_col = find_similar_column(date_integration_col, cols)
+                real_accept_col = None
+                for alt in ['Date d\'acceptation du candidat','Date d\'acceptation','Date d\'acceptation de la promesse',"Date d'accept"]:
+                    c = find_similar_column(alt, cols)
+                    if c:
+                        real_accept_col = c
+                        break
+                real_candidat_col = candidat_col if candidat_col in cols else find_similar_column(candidat_col, cols)
+                real_statut_col = find_similar_column('Statut de la demande', cols)
+                real_entite_col = find_similar_column('Entité demandeuse', cols) or find_similar_column('Entité', cols)
+
+                rd = st.session_state.get('reporting_date', None)
+                if rd is None:
+                    today = datetime.now()
+                else:
+                    today = rd if isinstance(rd, datetime) else datetime.combine(rd, datetime.min.time())
+                
+                # Re-create the same date ranges as in `calculate_weekly_metrics` for consistency
+                start_of_week = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
+                previous_monday = start_of_week - timedelta(days=7)
+                previous_friday_exclusive = (start_of_week - timedelta(days=3))
+                previous_friday_exclusive = previous_friday_exclusive + timedelta(days=1)  # Vendredi + 1 jour
+
+                if real_date_reception_col and real_date_reception_col in df_debug.columns:
+                    df_debug[real_date_reception_col] = pd.to_datetime(df_debug[real_date_reception_col], errors='coerce')
+                if real_date_integration_col and real_date_integration_col in df_debug.columns:
+                    df_debug[real_date_integration_col] = pd.to_datetime(df_debug[real_date_integration_col], errors='coerce')
+                if real_accept_col and real_accept_col in df_debug.columns:
+                    try:
+                        df_debug[real_accept_col] = _parse_mixed_dates(df_debug[real_accept_col])
+                    except Exception:
+                        df_debug[real_accept_col] = pd.to_datetime(df_debug[real_accept_col], errors='coerce')
+
+                def _local_norm(x):
+                    if pd.isna(x) or x is None:
+                        return ''
+                    s = str(x)
+                    s = unicodedata.normalize('NFKD', s)
+                    s = ''.join(ch for ch in s if not unicodedata.combining(ch))
+                    return s.lower().strip()
+
+                # Masks for contribution flags, aligned with `calculate_weekly_metrics`
+                mask_avant_semaine = pd.Series(False, index=df_debug.index)
+                mask_nouveaux_semaine = pd.Series(False, index=df_debug.index)
+                mask_pourvus_semaine = pd.Series(False, index=df_debug.index)
+                mask_status_en_cours = pd.Series(False, index=df_debug.index)
+                mask_has_name = pd.Series(False, index=df_debug.index)
+                closed_keywords = ['cloture', 'clôture', 'annule', 'annulé', 'depriorise', 'dépriorisé', 'desistement', 'désistement', 'annul', 'reject', 'rejett']
+
+                if real_date_reception_col and real_date_reception_col in df_debug.columns:
+                    # "Avant": reception date is before the start of the previous week
+                    mask_avant_semaine = df_debug[real_date_reception_col] < previous_monday
+                    # "Nouveaux": reception date is within the previous week (Mon-Fri)
+                    mask_nouveaux_semaine = (df_debug[real_date_reception_col] >= previous_monday) & (df_debug[real_date_reception_col] < previous_friday_exclusive)
+
+                if real_statut_col and real_statut_col in df_debug.columns:
+                    mask_status_en_cours = df_debug[real_statut_col].fillna("").astype(str).apply(lambda s: ('en cours' in _local_norm(s)) or ('encours' in _local_norm(s)))
+                    mask_not_closed = ~df_debug[real_statut_col].fillna("").astype(str).apply(lambda s: any(k in _local_norm(s) for k in closed_keywords))
+                    mask_avant_semaine = mask_avant_semaine & mask_not_closed
+
+
+                if real_candidat_col and real_candidat_col in df_debug.columns:
+                    mask_has_name = df_debug[real_candidat_col].notna() & (df_debug[real_candidat_col].astype(str).str.strip() != '')
+
+                if real_accept_col and real_accept_col in df_debug.columns:
+                    # "Pourvus": acceptance date is within the previous week (Mon-Fri)
+                    mask_pourvus_semaine = (df_debug[real_accept_col] >= previous_monday) & (df_debug[real_accept_col] < previous_friday_exclusive)
+                
+                contributes_avant = mask_avant_semaine
+                contributes_nouveaux = mask_nouveaux_semaine
+                contributes_pourvus = mask_pourvus_semaine & mask_has_name
+                # contrib_en_cours: statut 'En cours'
+                contributes_en_cours = mask_status_en_cours
+
+                # For the debug view we want the contributors to exactly reflect the
+                # 'Besoins en Cours' table. We will show all rows that contribute to *any* of the KPIs.
+                any_contrib = contributes_avant | contributes_nouveaux | contributes_pourvus | contributes_en_cours
+
+                df_selected = df_debug[any_contrib].copy()
+
+                display_cols = []
+                if real_entite_col and real_entite_col in df_selected.columns:
+                    display_cols.append(real_entite_col)
+                if real_candidat_col and real_candidat_col in df_selected.columns:
+                    display_cols.append(real_candidat_col)
+                if real_statut_col and real_statut_col in df_selected.columns:
+                    display_cols.append(real_statut_col)
+                if real_date_reception_col and real_date_reception_col in df_selected.columns:
+                    display_cols.append(real_date_reception_col)
+                if real_accept_col and real_accept_col in df_selected.columns:
+                    display_cols.append(real_accept_col)
+
+                df_out = df_selected[display_cols].copy() if display_cols else df_selected.copy()
+                # mark if the row matches any SPECIAL_TITLE_FILTERS for its entity (useful for TGCC overrides)
+                # compute a boolean flag indicating whether the row's title matches
+                # any entry in the SPECIAL_TITLE_FILTERS for that entity.
+                # Use safe fallbacks if some variables are not present in this scope.
+                try:
+                    # try to access SPECIAL_TITLE_FILTERS from the module scope
+                    st_special_filters = globals().get('SPECIAL_TITLE_FILTERS', None)
+                    # if real_poste_col isn't defined in this block, try to discover a 'Poste' column
+                    rp = globals().get('real_poste_col', None)
+                    if not rp:
+                        # conservative search for a poste-like column name in df_selected
+                        for c in df_selected.columns:
+                            if 'poste' in c.lower() or 'title' in c.lower():
+                                rp = c
+                                break
+
+                    def _matches_special_title(row):
+                        ent = row.get(real_entite_col, '') if real_entite_col in row.index else (row.get('Entité demandeuse', '') or row.get('Entité', ''))
+                        titre = ''
+                        if rp and rp in row.index:
+                            titre = row.get(rp, '')
+                        else:
+                            titre = row.get('Poste demandé', '') or row.get('Poste demandé ', '') or ''
+
+                        if not ent or not st_special_filters:
+                            return False
+                        filter_list = st_special_filters.get(ent, [])
+                        if not filter_list:
+                            return False
+                        tnorm = str(titre).strip().upper()
+                        return any(tnorm == s for s in filter_list)
+
+                    df_out['special_title_match'] = df_selected.apply(_matches_special_title, axis=1)
+                except Exception:
+                    df_out['special_title_match'] = False
+                df_out['contrib_avant'] = pd.Series(contributes_avant.loc[df_out.index], dtype='bool')
+                df_out['contrib_nouveaux'] = pd.Series(contributes_nouveaux.loc[df_out.index], dtype='bool')
+                df_out['contrib_pourvus'] = pd.Series(contributes_pourvus.loc[df_out.index], dtype='bool')
+                df_out['contrib_en_cours'] = pd.Series(contributes_en_cours.loc[df_out.index], dtype='bool')
+
+                # Ensure the candidate value is present in a predictable column named 'candidate_value'
+                try:
+                    if real_candidat_col and real_candidat_col in df_selected.columns:
+                        df_out['candidate_value'] = df_selected[real_candidat_col].fillna('').astype(str)
+                    else:
+                        df_out['candidate_value'] = ''
+                except Exception:
+                    df_out['candidate_value'] = ''
+
+                for dc in [real_date_reception_col, real_accept_col, real_date_integration_col]:
+                    if dc and dc in df_out.columns:
+                        try:
+                            # Safely format each date value in the column using .map
+                            df_out[dc] = pd.to_datetime(df_out[dc], errors='coerce')
+                            df_out[dc] = df_out[dc].map(lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) and hasattr(x, 'strftime') else 'N/A')
+                        except Exception:
+                            pass
+
+                # Allow user to choose display mode: KPI contributors or all rows with statut 'En cours'
+                display_mode = st.radio("Mode d'affichage:", ["Contributeurs 'Postes en cours'", "Toutes lignes statut 'En cours'"], index=0)
+
+                if display_mode == "Toutes lignes statut 'En cours'":
+                    if real_statut_col and real_statut_col in df_debug.columns:
+                        df_status = df_debug[mask_status_en_cours].copy()
+                        
+                        # Créer la colonne candidate_value avec la même logique que le mode contributeurs
+                        if real_candidat_col and real_candidat_col in df_status.columns:
+                            # Supprimer la colonne existante pour éviter les doublons
+                            if real_candidat_col in df_status.columns:
+                                df_status = df_status.drop(columns=[real_candidat_col])
+                            df_status['candidate_value'] = df_debug.loc[df_status.index, real_candidat_col].fillna('').astype(str)
+                        else:
+                            df_status['candidate_value'] = ''
+                        
+                        # Formater les dates en jj/mm/aaaa
+                        if real_date_reception_col and real_date_reception_col in df_status.columns:
+                            df_status[real_date_reception_col] = pd.to_datetime(df_status[real_date_reception_col], errors='coerce')
+                            df_status[real_date_reception_col] = df_status[real_date_reception_col].apply(
+                                lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else 'N/A'
+                            )
+                        if real_accept_col and real_accept_col in df_status.columns:
+                            df_status[real_accept_col] = pd.to_datetime(df_status[real_accept_col], errors='coerce')
+                            df_status[real_accept_col] = df_status[real_accept_col].apply(
+                                lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else 'N/A'
+                            )
+                        
+                        # option: masquer par défaut les lignes où un candidat est déjà renseigné
+                        show_with_candidate = st.checkbox("Afficher aussi les lignes avec candidat renseigné", value=False)
+                        if not show_with_candidate:
+                            df_status = df_status[~(df_status['candidate_value'].str.strip() != '')].copy()
+
+                        # Colonnes à afficher (sans demandeur, Direction concernée, Raison du recrutement)
+                        desired_cols = [
+                            'Poste demandé', 'Entité demandeuse', 'Affectation',
+                            'candidate_value',  # Colonne du candidat
+                            real_date_reception_col,  # Date de réception de la demande
+                            real_accept_col  # Date d'acceptation du candidat
+                        ]
+                        # Filtrer les colonnes qui sont réellement disponibles et non nulles
+                        available_show = [c for c in desired_cols if c and c in df_status.columns]
+                        
+                        # Renommer candidate_value pour l'affichage
+                        if 'candidate_value' in available_show and real_candidat_col:
+                            df_status = df_status.rename(columns={'candidate_value': real_candidat_col})  # type: ignore
+                            available_show = [real_candidat_col if c == 'candidate_value' else c for c in available_show]
+
+                        df_out_status = df_status[available_show].copy() if available_show else df_status.copy()
+                        st.info(f"Lignes avec statut 'En cours' détectées (après filtre candidat): {len(df_out_status)}")
+                        st.dataframe(df_out_status.reset_index(drop=True), width="stretch")
+                    else:
+                        st.warning("Colonne de statut introuvable — impossible de lister les lignes 'En cours'.")
+                else:
+                    st.info(f"Lignes contribuant au KPI 'Postes en cours' : {len(df_out)} lignes")
+                    # Colonnes à afficher dans le dataframe final
+                    display_cols_final = [
+                        '_orig_index', 'contrib_avant', 'contrib_nouveaux', 'contrib_pourvus', 'contrib_en_cours'
+                    ]
+                    # Ajouter les colonnes de base si elles existent
+                    if real_entite_col in df_out.columns: display_cols_final.insert(1, real_entite_col)
+                    if real_statut_col in df_out.columns: display_cols_final.insert(2, real_statut_col)
+                    # Utiliser 'candidate_value' au lieu de real_candidat_col directement
+                    if 'candidate_value' in df_out.columns: 
+                        display_cols_final.insert(3, 'candidate_value')
+                    
+                    df_out_display = df_out.reset_index().rename(columns={'index': '_orig_index'})
+                    
+                    # Renommer candidate_value pour l'affichage si besoin
+                    if 'candidate_value' in df_out_display.columns and real_candidat_col:
+                        # Si la colonne réelle existe déjà, la supprimer d'abord pour éviter les doublons
+                        if real_candidat_col in df_out_display.columns:
+                            df_out_display = df_out_display.drop(columns=[real_candidat_col])
+                        df_out_display = df_out_display.rename(columns={'candidate_value': real_candidat_col})
+                        # Mettre à jour display_cols_final avec le nouveau nom
+                        display_cols_final = [real_candidat_col if col == 'candidate_value' else col for col in display_cols_final]
+                    
+                    # S'assurer que toutes les colonnes de contribution sont booléennes
+                    for col in ['contrib_avant', 'contrib_nouveaux', 'contrib_pourvus', 'contrib_en_cours']:
+                        if col in df_out_display.columns:
+                            df_out_display[col] = df_out_display[col].astype(bool)
+
+                    # Ajouter les deux colonnes de date si elles existent
+                    extra_date_cols = ["Date d'acceptation du candidat", "Date de réception de la demande"]
+                    for col in extra_date_cols:
+                        if col in df_out_display.columns and col not in display_cols_final:
+                            display_cols_final.append(col)
+                    # Filtrer pour n'afficher que les colonnes désirées
+                    existing_display_cols = [c for c in display_cols_final if c in df_out_display.columns]
+                    st.dataframe(df_out_display[existing_display_cols], width="stretch")
             else:
-                st.info("💡 Cochez l'option 'Renommer les CV' lors du prochain traitement pour activer le téléchargement ZIP organisé.")
+                st.info('Aucune donnée pour le debug.')
+        except Exception as e:
+            st.error(f"Erreur lors de la génération du debug: {e}")
 
-# --- FONCTIONS GEMINI (NOUVEAU) ---
+    st.markdown("---")
+
+    # 3. Section "Pipeline de Recrutement (Kanban)"
+    # (Le nombre total sera ajouté après avoir collecté les données)
+
+    # Construire les données du Kanban à partir du fichier importé (préférence aux données réelles)
+    # Détection heuristique des colonnes utiles
+    def _find_col(cols, keywords):
+        for k in keywords:
+            for c in cols:
+                if k in c.lower():
+                    return c
+        return None
+
+    cols = df_recrutement.columns.tolist() if df_recrutement is not None else []
+    kanban_col = 'Colonne TG Hire' if 'Colonne TG Hire' in cols else _find_col(cols, ['colonne tg hire'])
+    poste_col = _find_col(cols, ['poste', 'title', 'post'])
+    entite_col = _find_col(cols, ['entité', 'entite', 'entité demandeuse', 'entite demandeuse', 'entité'])
+    lieu_col = _find_col(cols, ['lieu', 'affectation', 'site'])
+    demandeur_col = _find_col(cols, ['demandeur', 'requester'])
+    recruteur_col = _find_col(cols, ['responsable de traitement', 'recruteur', 'recruiter'])
+    commentaire_col = _find_col(cols, ['commentaire', 'comment'])
+    accept_date_col = _find_col(cols, ["date d'acceptation du candidat", "date d'acceptation", "date d'acceptation de la promesse", "date d'acceptation promesse", "date d'accept"])  # robust search
+    desistement_date_col = _find_col(cols, ["date de désistement", "date désistement", "date desistement", "date desistement"])
+
+    def _normalize_kanban(text):
+        if text is None or (isinstance(text, float) and np.isnan(text)):
+            return ''
+        s = str(text)
+        s = unicodedata.normalize('NFKD', s)
+        s = ''.join(ch for ch in s if not unicodedata.combining(ch))
+        return s.lower().strip()
+
+    # Statuts Kanban canoniques (ordre d'affichage)
+    statuts_kanban_display = ["Nouvelle demande", "Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+
+    # Mapping de formes possibles -> statut canonique
+    status_map = {
+        'nouvelle demande': 'Nouvelle demande',
+        'nouvelle': 'Nouvelle demande',
+        'desistement': 'Désistement',
+        'desisté': 'Désistement',
+        'sourcing': 'Sourcing',
+        'shortlist': 'Shortlisté',
+        'shortlisté': 'Shortlisté',
+        'shortliste': 'Shortlisté',
+        'signature drh': 'Signature DRH',
+        'signature': 'Signature DRH',
+        'cloture': 'Clôture',
+        'clôture': 'Clôture',
+        'dépriorisé': 'Dépriorisé',
+        'depriorise': 'Dépriorisé',
+    }
+
+    postes_data = []
+    if df_recrutement is not None and kanban_col:
+        # Utiliser uniquement la colonne "Colonne TG Hire" pour le statut Kanban
+        df_kanban = df_recrutement[df_recrutement[kanban_col].notna()].copy()
+        df_kanban[kanban_col] = df_kanban[kanban_col].astype(str)
+        for _, r in df_kanban.iterrows():
+            raw_kanban = r.get(kanban_col)
+            if pd.isna(raw_kanban):
+                continue
+            norm = _normalize_kanban(raw_kanban)
+            canon = None
+            for key, val in status_map.items():
+                if key in norm:
+                    canon = val
+                    break
+            if canon is None:
+                for tgt in statuts_kanban_display:
+                    if _normalize_kanban(tgt) == norm:
+                        canon = tgt
+                        break
+            if canon is None:
+                continue
+
+            titre = r.get(poste_col, '') if poste_col else r.get('Poste demandé', '')
+            # Ajout de la date d'acceptation du candidat pour le filtrage "Clôture"
+            accept_date = r.get(accept_date_col) if accept_date_col else None
+            # Ajout de la date de désistement pour le filtrage "Désistement"
+            desistement_date = r.get(desistement_date_col) if desistement_date_col else None
+            postes_data.append({
+                'statut': canon,
+                'titre': titre or '',
+                'entite': r.get(entite_col, '') if entite_col else r.get('Entité demandeuse', ''),
+                'lieu': r.get(lieu_col, '') if lieu_col else '',
+                'demandeur': r.get(demandeur_col, '') if demandeur_col else '',
+                'recruteur': str(r.get(recruteur_col, '')).replace('nan', '') if recruteur_col else '',
+                'commentaire': r.get(commentaire_col, '') if commentaire_col else '',
+                'date_acceptation': accept_date,
+                'date_desistement': desistement_date
+            })
+    
+    # Afficher le titre avec le nombre total de cartes
+    # total_cartes = len(postes_data)
+    st.subheader("Pipeline de Recrutement (Kanban)")
+    
+    # CSS pour styliser les cartes (flexbox pour affichage fluide)
+    st.markdown("""
+    <style>
+    .kanban-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+    .kanban-card {
+        flex: 0 0 auto;
+        width: 250px;
+        border-radius: 5px;
+        background-color: #f0f2f6;
+        padding: 8px;
+        border-left: 4px solid #1f77b4;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        min-height: 80px;
+    }
+    .kanban-card h4 {
+        margin-top: 0;
+        margin-bottom: 4px;
+        font-size: 1.1em !important;
+        color: #2c3e50;
+        line-height: 1.2;
+        white-space: normal;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
+        word-break: break-all;
+        display: -webkit-box;
+        -webkit-line-clamp: 3;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .kanban-card p {
+        margin-bottom: 2px;
+        font-size: 1.0em !important;
+        color: #555;
+        line-height: 1.1;
+        white-space: normal;
+    }
+    .kanban-header {
+        text-align: center !important;
+        font-weight: bold;
+        font-size: 1.3em !important;
+        color: #FFFFFF !important;
+        padding: 8px;
+        background-color: #9C182F !important;
+        border-radius: 6px;
+        margin-bottom: 10px;
+        margin-top: 20px;
+        border: 1px solid #B01030;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Remplir chaque section (ligne) avec les postes correspondants
+    for i, statut in enumerate(statuts_kanban_display):
+        # ...filtrage des postes_in_col (inchangé)...
+        if statut == "Clôture":
+            reporting_date = st.session_state.get('reporting_date', None)
+            if reporting_date is None:
+                today = datetime.now()
+            else:
+                today = reporting_date if isinstance(reporting_date, datetime) else datetime.combine(reporting_date, datetime.min.time())
+            current_week_monday = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
+            start_filter = current_week_monday - timedelta(days=7)
+            end_filter = current_week_monday + timedelta(days=6)
+            def in_reporting_week(poste):
+                accept_date = poste.get('date_acceptation')
+                if not accept_date:
+                    return False
+                if isinstance(accept_date, str):
+                    try:
+                        accept_date = pd.to_datetime(accept_date, errors='coerce')
+                    except Exception:
+                        return False
+                if not pd.notna(accept_date):
+                    return False
+                return start_filter <= accept_date <= end_filter + timedelta(days=1)
+            postes_in_col = [p for p in postes_data if p["statut"] == statut and in_reporting_week(p)]
+        elif statut == "Désistement":
+            reporting_date = st.session_state.get('reporting_date', None)
+            if reporting_date is None:
+                today = datetime.now()
+            else:
+                today = reporting_date if isinstance(reporting_date, datetime) else datetime.combine(reporting_date, datetime.min.time())
+            current_week_monday = datetime(year=today.year, month=today.month, day=today.day) - timedelta(days=today.weekday())
+            start_filter = current_week_monday - timedelta(days=7)
+            end_filter = current_week_monday + timedelta(days=6)
+            def in_reporting_week_desistement(poste):
+                desist_date = poste.get('date_desistement')
+                if not desist_date:
+                    return False
+                if isinstance(desist_date, str):
+                    try:
+                        desist_date = pd.to_datetime(desist_date, errors='coerce')
+                    except Exception:
+                        return False
+                if not pd.notna(desist_date):
+                    return False
+                return start_filter <= desist_date <= end_filter + timedelta(days=1)
+            postes_in_col = [p for p in postes_data if p["statut"] == statut and in_reporting_week_desistement(p)]
+        else:
+            postes_in_col = [p for p in postes_data if p["statut"] == statut]
+        nb_postes = len(postes_in_col)
+        st.markdown(f'<div class="kanban-header">{statut} ({nb_postes})</div>', unsafe_allow_html=True)
+
+        # Limiter à 8 cartes par ligne
+        max_cards_per_row = 8
+        for row_start in range(0, len(postes_in_col), max_cards_per_row):
+            cards_html = '<div class="kanban-container">'
+            for poste in postes_in_col[row_start:row_start+max_cards_per_row]:
+                commentaire = poste.get('commentaire', '')
+                commentaire_html = f"<p style='margin-top: 4px; font-style: italic; color: #666;'>💬 {commentaire}</p>" if commentaire and str(commentaire).strip() else ""
+                titre_fmt = smart_wrap_title(poste.get('titre', ''))
+                card_div = f"""<div class="kanban-card">
+<h4><b>{titre_fmt}</b></h4>
+<p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
+<p>👤 {poste.get('demandeur', 'N/A')}</p>
+<p>✍️ {poste.get('recruteur', 'N/A')}</p>
+{commentaire_html}
+</div>"""
+                cards_html += card_div
+            cards_html += '</div>'
+            st.markdown(cards_html, unsafe_allow_html=True)
+
+    # Debug local pour Pipeline de Recrutement (Kanban)
+    st.markdown("---")
+    with st.expander("🔍 Debug - Détails des lignes (Pipeline Kanban)", expanded=False):
+        try:
+            st.markdown("**Lignes contribuant au pipeline par statut:**")
+            if postes_data:
+                # Convertir postes_data en DataFrame pour affichage
+                df_kanban_debug = pd.DataFrame(postes_data)
+                # Ajouter colonnes de contribution par statut
+                for s in statuts_kanban_display:
+                    df_kanban_debug[f'contrib_{s}'] = df_kanban_debug['statut'] == s
+                # Afficher colonnes pertinentes
+                cols_show = ['titre', 'entite', 'lieu', 'recruteur', 'statut'] + [f'contrib_{s}' for s in statuts_kanban_display]
+                cols_available = [c for c in cols_show if c in df_kanban_debug.columns]
+                st.dataframe(df_kanban_debug[cols_available].reset_index(drop=True), use_container_width=True, hide_index=True)
+            else:
+                st.write("Aucune donnée de pipeline disponible.")
+        except Exception as e:
+            st.write(f"Erreur debug pipeline: {e}")
 
 
-# --- FIN FONCTIONS GEMINI ---
+def generate_table_image_simple(weekly_metrics):
+    """Génère une image simple du tableau avec PIL incluant les LOGOS"""
+    from PIL import Image, ImageDraw, ImageFont
+    import tempfile
+    
+    try:
+        metrics_by_entity = weekly_metrics.get('metrics_by_entity', {})
+        excluded_entities = {'BESIX-TGCC', 'DECO EXCELL', 'TG PREFA'}
+        metrics_included = {k: v for k, v in metrics_by_entity.items() if k not in excluded_entities}
+        
+        # Calculer les totaux
+        total_avant = sum(data['avant'] for data in metrics_included.values())
+        total_nouveaux = sum(data['nouveaux'] for data in metrics_included.values())
+        total_pourvus = sum(data['pourvus'] for data in metrics_included.values())
+        total_en_cours = sum(data['en_cours'] for data in metrics_included.values())
+        
+        # --- CHARGEMENT DES LOGOS ---
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        logo_folder = os.path.join(os.path.dirname(current_dir), "LOGO")
+        loaded_logos = {}
+        
+        # Mapping des noms d'entités vers les fichiers (ordre prioritaire)
+        entity_logo_map = {
+            'TGCC IMMOBILIER': 'tgcc-immobilier.png',
+            'TGCC-IMMOBILIER': 'tgcc-immobilier.png',
+            'TGCC Immobilier': 'tgcc-immobilier.png',
+            'TG STEEL': 'TG STEEL.PNG',
+            'TG STONE': 'TG STONE.PNG',
+            'TG ALU': 'TG ALU.PNG',
+            'TG COVER': 'TG COVER.PNG',
+            'TG WOOD': 'TG WOOD.PNG',
+            'STAM': 'STAM.png',
+            'BFO': 'BFO.png',
+            'TGEM': 'TGEM.PNG',
+            'TGCC': 'TGCC.PNG'
+        }
 
+        if os.path.exists(logo_folder):
+            for filename in os.listdir(logo_folder):
+                if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.jfif')):
+                    try:
+                        img_path = os.path.join(logo_folder, filename)
+                        loaded_logos[filename.upper()] = Image.open(img_path).convert("RGBA")
+                    except Exception as e:
+                        print(f"Erreur chargement logo {filename}: {e}")
+
+        def get_logo_image(entity_name):
+            """Récupère l'image du logo pour une entité (priorité à IMMOBILIER)"""
+            name_upper = str(entity_name).upper().strip()
+            
+            # Chercher dans le mapping avec ordre de priorité (déjà ordonné dans entity_logo_map)
+            filename = None
+            for key in entity_logo_map:
+                if key.upper() in name_upper:
+                    filename = entity_logo_map[key]
+                    break
+            
+            # Si pas trouvé, chercher directement
+            if not filename:
+                for fname in loaded_logos.keys():
+                    base_name = os.path.splitext(fname)[0]
+                    if base_name in name_upper or name_upper in base_name:
+                        filename = fname
+                        break
+            
+            if filename and filename.upper() in loaded_logos:
+                return loaded_logos[filename.upper()]
+            return None
+
+        # --- DESSIN DU TABLEAU ---
+        num_rows = len(metrics_included) + 2  # +1 pour header, +1 pour total
+        row_height = 80  # Hauteur augmentée pour les logos
+        width = 1920
+        height = num_rows * row_height + 60
+        
+        img = Image.new('RGB', (width, height), 'white')
+        draw = ImageDraw.Draw(img)
+        
+        # Police
+        try:
+            font_header = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 24)
+            font_data = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 20)
+        except:
+            font_header = ImageFont.load_default()
+            font_data = ImageFont.load_default()
+        
+        # Header
+        headers = ['Entité', 'Postes avant', 'Nouveaux postes', 'Postes pourvus', 'Postes en cours']
+        col_widths = [350, 300, 300, 300, 300]  # Première colonne plus large pour logos
+        x_positions = [0] + [sum(col_widths[:i+1]) for i in range(len(col_widths))]
+        
+        # Dessiner le header
+        draw.rectangle([0, 0, width, row_height], fill='#9C182F')
+        for i, header in enumerate(headers):
+            x = x_positions[i] + col_widths[i] // 2
+            draw.text((x, row_height // 2), header, fill='white', font=font_header, anchor='mm')
+        
+        # Données
+        y_offset = row_height
+        
+        # Custom sort and filter
+        sorted_items = []
+        for entite, data in metrics_included.items():
+            # Filter out empty TG WOOD (duplicate) or any empty entity
+            # User specifically mentioned duplicate TG WOOD being empty
+            entite_str = str(entite).upper().strip()
+            if 'TG WOOD' in entite_str and data['avant'] == 0 and data['nouveaux'] == 0 and data['pourvus'] == 0 and data['en_cours'] == 0:
+                continue
+            # Also filter out literal "NAN" or "NONE" strings if they appear as entities
+            if entite_str in ['NAN', 'NONE', '']:
+                continue
+                
+            sorted_items.append((entite, data))
+            
+        # Sort: TGCC first, then others
+        def sort_key(item):
+            name = str(item[0]).upper().strip()
+            if name == 'TGCC':
+                return '000_TGCC' # Force first
+            if 'TGCC' in name and 'IMMOBILIER' not in name:
+                 return '001_TGCC_OTHER'
+            return name
+            
+        sorted_items.sort(key=sort_key)
+
+        for entite, data in sorted_items:
+            # Lignes alternées
+            if ((y_offset - row_height) // row_height) % 2 == 0:
+                draw.rectangle([0, y_offset, width, y_offset + row_height], fill='#f9f9f9')
+            
+            # Logo ou texte de l'entité
+            logo_img = get_logo_image(entite)
+            cell_center_x = x_positions[0] + col_widths[0] // 2
+            cell_center_y = y_offset + row_height // 2
+            
+            if logo_img:
+                # Redimensionner le logo avec tailles personnalisées
+                entite_upper = str(entite).upper().strip()
+                if 'STEEL' in entite_upper or 'STONE' in entite_upper:
+                    new_h = 45  # Plus petit pour STEEL et STONE
+                elif 'BFO' in entite_upper:
+                    new_h = 70  # Plus grand pour BFO
+                elif 'ALU' in entite_upper or 'WOOD' in entite_upper:
+                    new_h = 65  # Plus grand pour ALU et WOOD
+                elif 'COVER' in entite_upper:
+                    new_h = 60  # Plus grand pour COVER
+                else:
+                    new_h = 55  # Taille standard
+                
+                aspect_ratio = logo_img.width / logo_img.height
+                new_w = int(new_h * aspect_ratio)
+                if new_w > col_widths[0] - 20:
+                    new_w = col_widths[0] - 20
+                    new_h = int(new_w / aspect_ratio)
+                
+                logo_resized = logo_img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                paste_x = int(cell_center_x - new_w / 2)
+                paste_y = int(cell_center_y - new_h / 2)
+                
+                # Coller avec transparence
+                if logo_resized.mode == 'RGBA':
+                    img.paste(logo_resized, (paste_x, paste_y), logo_resized)
+                else:
+                    img.paste(logo_resized, (paste_x, paste_y))
+            else:
+                # Fallback texte si pas de logo
+                draw.text((cell_center_x, cell_center_y), entite[:20], fill='black', font=font_data, anchor='mm')
+            draw.text((x_positions[1] + col_widths[1] // 2, y_offset + row_height // 2), 
+                     str(data['avant'] if data['avant'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
+            draw.text((x_positions[2] + col_widths[2] // 2, y_offset + row_height // 2), 
+                     str(data['nouveaux'] if data['nouveaux'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
+            draw.text((x_positions[3] + col_widths[3] // 2, y_offset + row_height // 2), 
+                     str(data['pourvus'] if data['pourvus'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
+            draw.text((x_positions[4] + col_widths[4] // 2, y_offset + row_height // 2), 
+                     str(data['en_cours'] if data['en_cours'] > 0 else '-'), fill='black', font=font_data, anchor='mm')
+            
+            # Bordures
+            draw.line([(0, y_offset + row_height), (width, y_offset + row_height)], fill='#ddd', width=1)
+            y_offset += row_height
+        
+        # Ligne TOTAL
+        draw.rectangle([0, y_offset, width, y_offset + row_height], fill='#9C182F')
+        draw.text((x_positions[0] + col_widths[0] // 2, y_offset + row_height // 2), 
+                 'TOTAL', fill='white', font=font_header, anchor='mm')
+        draw.text((x_positions[1] + col_widths[1] // 2, y_offset + row_height // 2), 
+                 str(total_avant), fill='white', font=font_header, anchor='mm')
+        draw.text((x_positions[2] + col_widths[2] // 2, y_offset + row_height // 2), 
+                 str(total_nouveaux), fill='white', font=font_header, anchor='mm')
+        draw.text((x_positions[3] + col_widths[3] // 2, y_offset + row_height // 2), 
+                 str(total_pourvus), fill='white', font=font_header, anchor='mm')
+        draw.text((x_positions[4] + col_widths[4] // 2, y_offset + row_height // 2), 
+                 str(total_en_cours), fill='white', font=font_header, anchor='mm')
+        
+        # Sauvegarder
+        output_path = os.path.join(tempfile.gettempdir(), 'table_reporting.png')
+        img.save(output_path)
+        return output_path
+        
+    except Exception as e:
+        st.error(f"Erreur génération image tableau: {e}")
+        return None
+
+
+def generate_kanban_image_simple(df_recrutement):
+    """Génère une image simple du Kanban avec PIL"""
+    from PIL import Image, ImageDraw, ImageFont
+    import tempfile
+    import pandas as pd
+    
+    try:
+        # Si pas de dataframe, utiliser des données par défaut
+        if df_recrutement is None or len(df_recrutement) == 0:
+            colonnes = {
+                'Sourcing': pd.DataFrame(),
+                'Shortlisté': pd.DataFrame(),
+                'Signature DRH': pd.DataFrame(),
+                'Clôture': pd.DataFrame(),
+                'Désistement': pd.DataFrame(),
+            }
+        else:
+            # Charger les données du kanban
+            colonnes = {
+                'Sourcing': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Sourcing'],
+                'Shortlisté': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Shortlisté'],
+                'Signature DRH': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Signature DRH'],
+                'Clôture': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Clôture'],
+                'Désistement': df_recrutement[df_recrutement['Colonne TG Hire'] == 'Désistement'],
+            }
+        
+        # Dimensions (haute résolution)
+        col_width = 370  # Plus large
+        num_cols = 5
+        width = col_width * num_cols + 60
+        height = 1080  # Haute résolution
+        
+        img = Image.new('RGB', (width, height), 'white')
+        draw = ImageDraw.Draw(img)
+        
+        # Polices (plus grandes)
+        try:
+            font_header = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 20)
+            font_card_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 14)
+            font_card = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 12)
+        except:
+            font_header = ImageFont.load_default()
+            font_card_title = ImageFont.load_default()
+            font_card = ImageFont.load_default()
+        
+        x_offset = 20
+        for statut, df_col in colonnes.items():
+            # En-tête de colonne
+            draw.rectangle([x_offset, 20, x_offset + col_width - 10, 60], fill='#9C182F', outline='#9C182F')
+            count = len(df_col)
+            draw.text((x_offset + col_width // 2 - 5, 40), f"{statut} ({count})", 
+                     fill='white', font=font_header, anchor='mm')
+            
+            # Cartes
+            y_offset = 80
+            for idx, row in df_col.iterrows():
+                if y_offset > height - 100:
+                    break
+                
+                # Carte
+                draw.rectangle([x_offset + 5, y_offset, x_offset + col_width - 15, y_offset + 90], 
+                              fill='#f9f9f9', outline='#ddd', width=2)
+                
+                # Titre du poste (wrap jusqu'à 3 lignes)
+                titre_raw = str(row.get('Intitulé du poste', 'N/A')).strip()
+                titre_formatted = smart_wrap_title(titre_raw, max_line_length=25)
+                title_lines = [seg for seg in titre_formatted.replace('<br>', '\n').split('\n') if seg][:3]
+                for i, line in enumerate(title_lines):
+                    draw.text((x_offset + 10, y_offset + 10 + (i * 16)), line, fill='#9C182F', font=font_card_title)
+                title_block_height = 10 + (len(title_lines) * 16)
+                
+                # Entité et lieu
+                entite = str(row.get('Entité demandeuse', '')).strip()
+                lieu = str(row.get('Ville', '')).strip()
+                draw.text((x_offset + 10, y_offset + title_block_height + 18), f"{entite[:40]} - {lieu[:40]}", fill='black', font=font_card)
+                
+                # Demandeur
+                demandeur = str(row.get('Nom du Demandeur', '')).strip()[:50]
+                draw.text((x_offset + 10, y_offset + title_block_height + 36), f"👤 {demandeur}", fill='black', font=font_card)
+                
+                # Recruteur
+                recruteur = str(row.get('RH en charge du recrutement', '')).strip()[:50]
+                draw.text((x_offset + 10, y_offset + title_block_height + 54), f"✍️ {recruteur}", fill='black', font=font_card)
+
+                # Commentaire (si présent)
+                comment_col = next((c for c in row.index if 'comment' in c.lower()), None)
+                if comment_col:
+                    commentaire_val = str(row.get(comment_col, '')).strip()
+                    if commentaire_val:
+                        draw.text((x_offset + 10, y_offset + title_block_height + 72), f"[!] {commentaire_val[:80]}", fill='#666666', font=font_card)
+                
+                y_offset += max(110, title_block_height + 88)
+            
+            x_offset += col_width
+        
+        # Sauvegarder
+        output_path = os.path.join(tempfile.gettempdir(), 'kanban_reporting.png')
+        img.save(output_path)
+        return output_path
+        
+    except Exception as e:
+        st.error(f"Erreur génération image kanban: {e}")
+        return None
+
+
+def check_logos():
+    """Vérifie que les logos sont bien accessibles"""
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    logo_folder = os.path.join(os.path.dirname(current_dir), "LOGO")
+    
+    if not os.path.exists(logo_folder):
+        st.error(f"❌ Dossier LOGO non trouvé: {logo_folder}")
+        return False
+    
+    logos = os.listdir(logo_folder)
+    if not logos:
+        st.error("❌ Aucun logo trouvé dans le dossier LOGO")
+        return False
+    
+    st.success(f"✅ {len(logos)} logos trouvés dans: {logo_folder}")
+    st.info(f"📁 Fichiers: {', '.join(logos[:5])}{'...' if len(logos) > 5 else ''}")
+    return True
+
+
+def find_chromium_executable():
+    """Trouve le chemin de l'exécutable Chromium en testant plusieurs emplacements."""
+    import shutil
+    
+    # Liste des chemins à tester, dans l'ordre de priorité
+    # IMPORTANT: html2image a besoin du vrai binaire, pas du script wrapper
+    possible_paths = [
+        '/usr/lib/chromium/chromium',  # Debian/Ubuntu - VRAI BINAIRE (priorité 1)
+        '/usr/bin/google-chrome',       # Google Chrome
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/chromium',            # Script wrapper (peut ne pas fonctionner avec html2image)
+        '/usr/bin/chromium-browser',
+        'chromium',                     # PATH
+        'chromium-browser',
+        'google-chrome'
+    ]
+    
+    for path in possible_paths:
+        # Vérifier si le fichier existe
+        if os.path.isfile(path):
+            st.info(f"🔍 Test chemin: {path} - ✅ TROUVÉ")
+            return path
+        elif shutil.which(path):
+            found_path = shutil.which(path)
+            st.info(f"🔍 Test chemin: {path} - ✅ TROUVÉ via PATH: {found_path}")
+            return found_path
+        else:
+            st.warning(f"🔍 Test chemin: {path} - ❌ Non trouvé")
+    
+    st.error("❌ Aucun exécutable Chromium trouvé dans tous les chemins testés")
+    return None
+
+
+def generate_table_html_image(weekly_metrics):
+    """Génère une image du tableau des besoins avec logos"""
+    import tempfile
+    
+    st.info("🔍 Début génération tableau HTML avec logos...")
+    
+    try:
+        # Essayer d'abord avec html2image + Chromium
+        from html2image import Html2Image
+        st.info("✅ Module Html2Image importé")
+        
+        # Trouver Chromium automatiquement
+        chromium_path = find_chromium_executable()
+        if not chromium_path:
+            st.error("❌ Chromium non trouvé - les images seront générées avec PIL (sans logos)")
+            raise Exception("Chromium non trouvé")
+        
+        st.success(f"✅ Chromium détecté: {chromium_path}")
+        
+        # Configurer html2image pour utiliser Chromium avec flags no-sandbox
+        hti = Html2Image(
+            output_path=tempfile.gettempdir(),
+            browser_executable=chromium_path,
+            custom_flags=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--headless']
+        )
+        st.success("✅ Html2Image configuré")
+    except Exception as e:
+        st.warning(f"⚠️ html2image non disponible ({e}), utilisation de PIL à la place")
+        # Fallback vers PIL
+        return generate_table_image_simple(weekly_metrics)
+    
+    try:
+        # Créer le HTML du tableau exactement comme dans Streamlit
+        metrics_by_entity = weekly_metrics.get('metrics_by_entity', {})
+        excluded_entities = {'BESIX-TGCC', 'DECO EXCELL', 'TG PREFA'}
+        metrics_included = {k: v for k, v in metrics_by_entity.items() if k not in excluded_entities}
+        
+        # Charger les logos
+        logo_folder = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "LOGO")
+        entity_logo_map = {
+            'TGCC': 'TGCC.PNG',
+            'TGEM': 'TGEM.PNG',
+            'TG ALU': 'TG ALU.PNG',
+            'TG COVER': 'TG COVER.PNG',
+            'TG STEEL': 'TG STEEL.PNG',
+            'TG STONE': 'TG STONE.PNG',
+            'TG WOOD': 'TG WOOD.PNG',
+            'STAM': 'STAM.png',
+            'BFO': 'BFO.png',
+            'TGCC IMMOBILIER': 'tgcc-immobilier.png',
+            'TGCC Immobilier': 'tgcc-immobilier.png'
+        }
+        
+        logos_dict = {}
+        for entity, logo_file in entity_logo_map.items():
+            logo_path = os.path.join(logo_folder, logo_file)
+            if os.path.exists(logo_path):
+                with open(logo_path, "rb") as f:
+                    logos_dict[entity] = base64.b64encode(f.read()).decode()
+        
+        # Fonction pour obtenir l'affichage avec logo
+        def get_entity_display(name_str):
+            if not name_str or pd.isna(name_str):
+                return name_str
+            
+            name_upper = str(name_str).upper().strip()
+            
+            # Ordre de priorité: vérifier IMMOBILIER en premier pour éviter confusion avec TGCC simple
+            priority_order = [
+                'TGCC IMMOBILIER', 'TGCC-IMMOBILIER', 'TGCC Immobilier',
+                'TG STEEL', 'TG STONE', 'TG ALU', 'TG COVER', 'TG WOOD',
+                'STAM', 'BFO', 'TGEM', 'TGCC'
+            ]
+            
+            for entity_key in priority_order:
+                if entity_key.upper() in name_upper:
+                    if entity_key in logos_dict:
+                        logo_b64 = logos_dict[entity_key]
+                        # Log pour débogage
+                        print(f"Match: '{name_str}' -> '{entity_key}'")
+                        # Ajuster les tailles selon les besoins
+                        size_map = {
+                            'TG STEEL': 45,      # Réduit
+                            'TG STONE': 45,      # Réduit
+                            'TGCC IMMOBILIER': 50,
+                            'TGCC Immobilier': 50,
+                            'BFO': 90,           # Augmenté
+                            'TG ALU': 75,        # Augmenté
+                            'TG COVER': 70,      # Augmenté
+                            'TG WOOD': 75,       # Augmenté
+                            'STAM': 63,
+                            'TGEM': 63,
+                            'TGCC': 63
+                        }
+                        logo_size = size_map.get(entity_key, 63)
+                        img_tag = f'<img src="data:image/png;base64,{logo_b64}" style="height: {logo_size}px; vertical-align: middle;" />'
+                        return img_tag
+            print(f"No match for: '{name_str}'")
+            return name_str
+        
+        # Calculer les totaux
+        total_avant = sum(data['avant'] for data in metrics_included.values())
+        total_nouveaux = sum(data['nouveaux'] for data in metrics_included.values())
+        total_pourvus = sum(data['pourvus'] for data in metrics_included.values())
+        total_en_cours = sum(data['en_cours'] for data in metrics_included.values())
+        
+        # Créer le HTML
+        html_table = f"""
+        <html>
+        <head>
+            <style>
+                body {{
+                    margin: 0;
+                    padding: 20px;
+                    font-family: Arial, sans-serif;
+                    background: white;
+                }}
+                .table-container {{
+                    width: 100%;
+                }}
+                .custom-table {{
+                    width: 90%;
+                    margin: 0 auto;
+                    border-collapse: collapse;
+                    background-color: white;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                }}
+                .custom-table th {{
+                    background-color: #9C182F;
+                    color: white;
+                    font-weight: bold;
+                    text-align: center;
+                    padding: 8px 6px;
+                    border: 1px solid white;
+                    font-size: 1.0em;
+                    line-height: 1.2;
+                    white-space: normal;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                    word-break: break-word;
+                    min-width: 120px;
+                }}
+                .custom-table td {{
+                    text-align: center;
+                    padding: 6px 4px;
+                    border: 1px solid #ddd;
+                    background-color: white;
+                    font-size: 1.1em;
+                    line-height: 1.2;
+                    font-weight: 500;
+                }}
+                .custom-table .entity-cell {{
+                    text-align: center;
+                    padding: 4px 2px;
+                    font-weight: 600;
+                    min-width: 80px;
+                }}
+                .custom-table .total-row {{
+                    background-color: #9C182F;
+                    color: white;
+                    font-weight: bold;
+                    border-top: 2px solid #9C182F;
+                }}
+                .custom-table .total-row td {{
+                    background-color: #9C182F;
+                    color: white;
+                    font-size: 1.1em;
+                    font-weight: bold;
+                    border: 1px solid #9C182F;
+                }}
+                .custom-table .total-row .entity-cell {{
+                    text-align: center;
+                    padding: 4px 2px;
+                    font-weight: bold;
+                    background-color: #9C182F;
+                    color: white;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="table-container">
+                <table class="custom-table">
+                    <thead>
+                        <tr>
+                            <th>Entité</th>
+                            <th>Nb postes ouverts avant début semaine</th>
+                            <th>Nb nouveaux postes ouverts cette semaine</th>
+                            <th>Nb postes pourvus cette semaine</th>
+                            <th>Nb postes en cours cette semaine (sourcing)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+        """
+        
+        # Ajouter les lignes de données
+        for entite, data in metrics_included.items():
+            html_table += f'''<tr>
+                <td class="entity-cell">{get_entity_display(entite)}</td>
+                <td>{data['avant'] if data['avant'] > 0 else '-'}</td>
+                <td>{data['nouveaux'] if data['nouveaux'] > 0 else '-'}</td>
+                <td>{data['pourvus'] if data['pourvus'] > 0 else '-'}</td>
+                <td>{data['en_cours'] if data['en_cours'] > 0 else '-'}</td>
+            </tr>'''
+        
+        # Ligne TOTAL
+        html_table += f'''<tr class="total-row">
+            <td class="entity-cell">TOTAL</td>
+            <td>{total_avant}</td>
+            <td>{total_nouveaux}</td>
+            <td>{total_pourvus}</td>
+            <td>{total_en_cours}</td>
+        </tr>
+        '''
+        
+        html_table += """
+                    </tbody>
+                </table>
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Convertir en image avec html2image (haute résolution)
+        # Supprimer l'ancien fichier s'il existe
+        old_file = os.path.join(tempfile.gettempdir(), 'table.png')
+        if os.path.exists(old_file):
+            os.remove(old_file)
+            st.info(f"🗑️ Ancien fichier table.png supprimé")
+        
+        image_path = hti.screenshot(html_str=html_table, save_as='table.png', size=(1920, 1080))[0]
+        st.success(f"✅ Image tableau générée: {image_path}")
+        
+        return image_path
+    except Exception as e:
+        st.error(f"Erreur lors de la génération de l'image du tableau avec html2image: {e}")
+        st.info("Tentative avec PIL...")
+        # Fallback vers PIL
+        return generate_table_image_simple(weekly_metrics)
+
+
+def generate_kanban_statut_image(df_recrutement, statut, max_cards=10):
+    """Génère une image pour un statut Kanban spécifique.
+    
+    Args:
+        df_recrutement: DataFrame avec les données
+        statut: Le statut à afficher ('Sourcing', 'Shortlisté', etc.)
+        max_cards: Nombre maximum de cartes à afficher
+    
+    Returns:
+        Chemin de l'image générée
+    """
+    import tempfile
+    
+    # Vérifier si le DataFrame est vide
+    if df_recrutement is None or len(df_recrutement) == 0:
+        st.warning(f"Aucune donnée pour le statut {statut}")
+        return None
+    
+    st.info(f"🔍 Début génération Kanban pour {statut}...")
+    
+    try:
+        # Essayer d'abord avec html2image + Chromium
+        from html2image import Html2Image
+        st.info(f"✅ Module Html2Image importé pour {statut}")
+        
+        # Trouver Chromium automatiquement
+        chromium_path = find_chromium_executable()
+        if not chromium_path:
+            st.error(f"❌ Chromium non trouvé pour Kanban {statut} - utilisation de PIL (limité)")
+            raise Exception("Chromium non trouvé")
+        
+        st.success(f"✅ Chromium détecté pour Kanban {statut}: {chromium_path}")
+        
+        # Configurer html2image
+        hti = Html2Image(
+            output_path=tempfile.gettempdir(),
+            browser_executable=chromium_path,
+            custom_flags=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--headless']
+        )
+    except Exception as e:
+        st.warning(f"⚠️ html2image non disponible pour {statut} ({e}), utilisation de PIL à la place")
+        # Fallback vers PIL
+        return generate_kanban_statut_image_simple(df_recrutement, statut, max_cards)
+    
+    try:
+        # Charger les données pour ce statut
+        postes_data = []
+        
+        for index, row in df_recrutement.iterrows():
+            if row.get('Colonne TG Hire') == statut:
+                # Utiliser les noms de colonnes originaux du fichier Excel
+                postes_data.append({
+                    "titre": str(row.get('Poste demandé ', 'N/A')).strip(),
+                    "entite": str(row.get('Entité demandeuse', 'N/A')).strip(),
+                    "lieu": str(row.get('Affectation', 'N/A')).strip(),
+                    "demandeur": str(row.get('Nom Prénom du demandeur', 'N/A')).strip(),
+                    "recruteur": str(row.get('Responsable de traitement de  la demande ', 'N/A')).strip(),
+                    "commentaire": str(row.get('Commentaire', '')) if pd.notna(row.get('Commentaire')) else None
+                })
+                # Limiter le nombre de cartes
+                if len(postes_data) >= max_cards:
+                    break
+        
+        # Créer HTML
+        html_content = f"""
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body {{
+                    margin: 0;
+                    padding: 20px;
+                    font-family: Arial, sans-serif;
+                    background: white;
+                }}
+                .statut-header {{
+                    background-color: #9C182F;
+                    color: white;
+                    padding: 22px;
+                    border-radius: 8px;
+                    font-size: 2.3em;
+                    font-weight: bold;
+                    text-align: center;
+                    margin-bottom: 28px;
+                }}
+                .cards-container {{
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+                    grid-auto-flow: dense;
+                    gap: 22px;
+                    padding: 20px;
+                    justify-items: center;
+                    justify-content: center;
+                    align-items: start;
+                    width: 100%;
+                    margin: 0 auto;
+                }}
+                .kanban-card {{
+                    background-color: #f0f2f6;
+                    border-radius: 8px;
+                    padding: 14px;
+                    box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+                    border-left: 5px solid #1f77b4;
+                    min-height: 140px;
+                    width: 100%;
+                    box-sizing: border-box;
+                }}
+                .kanban-card h4 {{
+                    margin: 0 0 8px 0;
+                    color: #9C182F;
+                    font-size: 1.05em;
+                    line-height: 1.25;
+                    font-weight: 700;
+                    white-space: normal !important;
+                    word-break: break-word !important;
+                    overflow-wrap: break-word !important;
+                    hyphens: auto !important;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 3;
+                    -webkit-box-orient: vertical;
+                    overflow: hidden;
+                }}
+                .kanban-card p {{
+                    margin: 4px 0;
+                    font-size: 0.96em;
+                    color: #444;
+                    line-height: 1.3;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                    word-break: break-word;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="statut-header">{statut} ({len(postes_data)} postes)</div>
+            <div class="cards-container">
+        """
+        
+        for poste in postes_data:
+                titre_fmt = smart_wrap_title(poste.get('titre', ''))
+                commentaire_html = f"<p style='color:#666;font-style:italic;'>[!] {poste['commentaire']}</p>" if poste.get('commentaire') and str(poste.get('commentaire')).strip() not in ['nan', 'None', ''] else ""
+                html_content += f"""
+                <div class="kanban-card">
+                    <h4><b>{titre_fmt}</b></h4>
+                    <p><b>&gt;</b> {poste['entite']} - {poste['lieu']}</p>
+                    <p><b>*</b> {poste['demandeur']}</p>
+                    <p><b>#</b> {poste['recruteur']}</p>
+                    {commentaire_html}
+                </div>
+                """
+        
+        html_content += """
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Générer l'image
+        image_filename = f'{statut.lower().replace(" ", "_")}.png'
+        image_path = hti.screenshot(html_str=html_content, save_as=image_filename, size=(1920, 1080))[0]
+        
+        return image_path
+    except Exception as e:
+        st.error(f"Erreur lors de la génération de l'image {statut}: {e}")
+        return generate_kanban_statut_image_simple(df_recrutement, statut, max_cards)
+
+
+def generate_kanban_statut_image_simple(df_recrutement, statut, max_cards=10):
+    """Génère une image simple pour un statut avec PIL (fallback)."""
+    from PIL import Image, ImageDraw, ImageFont
+    import tempfile
+    
+    width, height = 1920, 1080
+    img = Image.new('RGB', (width, height), 'white')
+    draw = ImageDraw.Draw(img)
+    
+    try:
+        font_header = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 40)
+        font_card_title = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 18)
+        font_card = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16)
+    except:
+        font_header = ImageFont.load_default()
+        font_card_title = ImageFont.load_default()
+        font_card = ImageFont.load_default()
+    
+    # Header
+    draw.rectangle([0, 0, width, 100], fill='#9C182F')
+    
+    # Filtrer les données
+    if df_recrutement is not None and len(df_recrutement) > 0:
+        # Trouver la colonne 'Colonne TG Hire' (avec gestion des espaces)
+        col_tg_hire = next((c for c in df_recrutement.columns if 'colonne' in c.lower() and 'tg' in c.lower() and 'hire' in c.lower()), None)
+        
+        if col_tg_hire:
+            df_statut = df_recrutement[df_recrutement[col_tg_hire] == statut]
+            count = len(df_statut)
+        else:
+            # Fallback: essayer de trouver une colonne 'Statut'
+            col_statut = next((c for c in df_recrutement.columns if 'statut' in c.lower()), None)
+            if col_statut:
+                df_statut = df_recrutement[df_recrutement[col_statut] == statut]
+                count = len(df_statut)
+            else:
+                df_statut = None
+                count = 0
+    else:
+        df_statut = None
+        count = 0
+    
+    # Ajouter un timestamp de génération pour prouver que l'image est fraîche
+    from datetime import datetime
+    timestamp = datetime.now().strftime("%H:%M:%S")
+    draw.text((width - 150, 50), f"Généré à {timestamp}", fill='white', font=font_card, anchor='mm')
+
+    draw.text((width // 2, 50), f"{statut} ({count} postes)", fill='white', font=font_header, anchor='mm')
+    
+    # Cartes en grille 6 colonnes
+    if df_statut is not None and count > 0:
+        card_width = (width - 140) // 6  # 6 colonnes
+        card_height = 160
+        x_positions = [20 + i * (card_width + 20) for i in range(6)]
+        y_offset = 120
+        col = 0
+        
+        for idx, row in df_statut.iterrows():
+            if y_offset > height - 200:
+                break
+            
+            x = x_positions[col]
+            
+            # Carte
+            draw.rectangle([x, y_offset, x + card_width, y_offset + card_height], 
+                          fill='#f0f2f6', outline='#ddd', width=2)
+            
+            # Contenu - utiliser noms colonnes originaux (avec gestion des espaces potentiels)
+            # Titre
+            titre_col = 'Poste demandé' if 'Poste demandé' in row else 'Poste demandé '
+            titre = str(row.get(titre_col, 'N/A')).strip()
+            # Wrap title robustly (use <br> segments then draw lines)
+            formatted = smart_wrap_title(titre, max_line_length=25)
+            wrapped_lines = [seg for seg in formatted.replace('<br>', '\n').split('\n') if seg][:3]
+            for i, line in enumerate(wrapped_lines):
+                draw.text((x + 10, y_offset + 10 + (i * 20)), line, fill='#9C182F', font=font_card_title)
+            title_block_height = 10 + (len(wrapped_lines) * 20)
+            
+            # Entité
+            entite_val = str(row.get('Entité demandeuse', 'N/A')).strip()
+            affectation_val = str(row.get('Affectation', row.get('Direction concernée', ''))).strip()
+            entite_txt = f"> {entite_val}"
+            if affectation_val:
+                entite_txt += f" - {affectation_val}"
+            draw.text((x + 10, y_offset + title_block_height + 20), entite_txt[:50], fill='#555', font=font_card)
+            
+            # Demandeur
+            demandeur_col = 'Nom Prénom du demandeur'
+            if demandeur_col not in row:
+                # Chercher une colonne ressemblante
+                demandeur_col = next((c for c in row.index if 'demandeur' in c.lower() and 'nom' in c.lower()), 'Demandeur')
+            
+            demandeur_val = str(row.get(demandeur_col, 'N/A')).strip()
+            demandeur = f"* {demandeur_val}"
+            draw.text((x + 10, y_offset + title_block_height + 45), demandeur[:50], fill='#555', font=font_card)
+            
+            # Recruteur
+            recruteur_col = 'Responsable de traitement de la demande'
+            if recruteur_col not in row:
+                # Chercher avec double espace ou autre
+                recruteur_col = next((c for c in row.index if 'responsable' in c.lower() and 'traitement' in c.lower()), 'RH')
+                
+            recruteur_val = str(row.get(recruteur_col, 'N/A')).strip()
+            recruteur = f"# {recruteur_val}"
+            draw.text((x + 10, y_offset + title_block_height + 70), recruteur[:50], fill='#555', font=font_card)
+
+            # Commentaire (si présent)
+            comment_col = next((c for c in row.index if 'comment' in c.lower()), None)
+            if comment_col:
+                commentaire_val = str(row.get(comment_col, '')).strip()
+                if commentaire_val:
+                    draw.text((x + 10, y_offset + title_block_height + 88), f"[!] {commentaire_val[:80]}", fill='#666666', font=font_card)
+            
+            col += 1
+            if col >= 6:
+                col = 0
+                y_offset += card_height + 30
+    
+    # Sauvegarder
+    output_path = os.path.join(tempfile.gettempdir(), f'{statut.lower().replace(" ", "_")}_reporting.png')
+    img.save(output_path)
+    return output_path
+
+
+def generate_kanban_html_image(df_recrutement):
+    """Génère une image du Kanban avec les données réelles"""
+    import tempfile
+    
+    try:
+        # Essayer d'abord avec html2image + Chromium
+        from html2image import Html2Image
+        
+        # Trouver Chromium automatiquement
+        chromium_path = find_chromium_executable()
+        if not chromium_path:
+            raise Exception("Chromium non trouvé")
+        
+        # Configurer html2image pour utiliser Chromium avec flags no-sandbox
+        hti = Html2Image(
+            output_path=tempfile.gettempdir(),
+            browser_executable=chromium_path,
+            custom_flags=['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--headless']
+        )
+        st.info(f"✅ Chromium trouvé: {chromium_path}")
+    except Exception as e:
+        st.warning(f"⚠️ html2image non disponible ({e}), utilisation de PIL à la place")
+        return generate_kanban_image_simple(df_recrutement)
+    
+    try:
+        # Charger les données réelles du dataframe
+        statuts = ["Nouvelle demande", "Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+        postes_data = []
+        
+        for index, row in df_recrutement.iterrows():
+            if row.get('Colonne TG Hire') in statuts:
+                postes_data.append({
+                    "titre": str(row.get('Poste demandé ', 'N/A')).strip(),
+                    "entite": str(row.get('Entité demandeuse', 'N/A')).strip(),
+                    "lieu": str(row.get('Affectation', 'N/A')).strip(),
+                    "demandeur": str(row.get('Nom Prénom du demandeur', 'N/A')).strip(),
+                    "recruteur": str(row.get('Responsable de traitement de  la demande ', 'N/A')).strip(),
+                    "statut": str(row.get('Colonne TG Hire', 'N/A')),
+                    "commentaire": str(row.get('Commentaire', '')) if pd.notna(row.get('Commentaire')) else None
+                })
+        
+        # Si pas de données, utiliser un exemple
+        if len(postes_data) == 0:
+            postes_data = [
+            {"titre": "Ingénieur Achat", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.BOUZOUBAA", "recruteur": "Zakaria", "statut": "Sourcing"},
+            {"titre": "Directeur Achats Adjoint", "entite": "TGCC", "lieu": "Siège", "demandeur": "C.BENABDELLAH", "recruteur": "Zakaria", "statut": "Sourcing"},
+            {"titre": "INGENIEUR TRAVAUX", "entite": "TGCC", "lieu": "YAMED LOT B", "demandeur": "M.TAZI", "recruteur": "Zakaria", "statut": "Sourcing"},
+            {"titre": "CHEF DE PROJETS", "entite": "TGCC", "lieu": "DESSALEMENT JORF", "demandeur": "M.FENNAN", "recruteur": "ZAKARIA", "statut": "Shortlisté"},
+            {"titre": "Planificateur", "entite": "TGCC", "lieu": "ASFI-B", "demandeur": "SOUFIANI", "recruteur": "Ghita", "statut": "Shortlisté"},
+            {"titre": "RESPONSABLE TRANS INTERCH", "entite": "TG PREFA", "lieu": "OUED SALEH", "demandeur": "FBOUZOUBAA", "recruteur": "Ghita", "statut": "Shortlisté"},
+            {"titre": "PROJETEUR DESSINATEUR", "entite": "TG WOOD", "lieu": "OUED SALEH", "demandeur": "S.MENJRA", "recruteur": "Zakaria", "statut": "Signature DRH"},
+            {"titre": "Projeteur", "entite": "TGCC", "lieu": "TSP Safi", "demandeur": "B.MORABET", "recruteur": "Zakaria", "statut": "Signature DRH"},
+            {"titre": "Consultant SAP", "entite": "TGCC", "lieu": "Siège", "demandeur": "O.KETTA", "recruteur": "Zakaria", "statut": "Signature DRH"},
+            {"titre": "Doc Controller", "entite": "TGEM", "lieu": "SIEGE", "demandeur": "A.SANKARI", "recruteur": "Zakaria", "statut": "Clôture"},
+            {"titre": "Ingénieur étude/qualité", "entite": "TGCC", "lieu": "SIEGE", "demandeur": "A.MOUTANABI", "recruteur": "Zakaria", "statut": "Clôture"},
+            {"titre": "Responsable Cybersecurité", "entite": "TGCC", "lieu": "Siège", "demandeur": "Ghazi", "recruteur": "Zakaria", "statut": "Clôture"},
+            {"titre": "Conducteur de Travaux", "entite": "TGCC", "lieu": "JORF LASFAR", "demandeur": "M.FENNAN", "recruteur": "Zakaria", "statut": "Désistement"},
+            {"titre": "Chef de Chantier", "entite": "TGCC", "lieu": "TOARC", "demandeur": "M.FENNAN", "recruteur": "Zakaria", "statut": "Désistement"},
+            {"titre": "Magasinier", "entite": "TG WOOD", "lieu": "Oulad Saleh", "demandeur": "K.TAZI", "recruteur": "Ghita", "statut": "Désistement", "commentaire": "Pas de retour du demandeur"}
+        ]
+        
+        statuts = ["Nouvelle demande", "Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+        
+        html_kanban = """
+        <html>
+        <head>
+            <style>
+                body {
+                    margin: 0;
+                    padding: 20px;
+                    font-family: Arial, sans-serif;
+                    background: #f5f5f5;
+                }
+                .kanban-container {
+                    display: flex;
+                    gap: 15px;
+                    overflow-x: auto;
+                    padding: 10px;
+                }
+                .kanban-column {
+                    min-width: 260px;
+                    background-color: #f0f0f0;
+                    border-radius: 10px;
+                    padding: 14px;
+                    box-sizing: border-box;
+                }
+                .kanban-header {
+                    background-color: #9C182F;
+                    color: white;
+                    padding: 12px;
+                    border-radius: 6px;
+                    font-weight: 800;
+                    text-align: center;
+                    margin-bottom: 12px;
+                    font-size: 1.45em;
+                }
+                .kanban-card {
+                    background-color: white;
+                    border-radius: 6px;
+                    padding: 14px;
+                    margin-bottom: 12px;
+                    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+                    min-height: 120px;
+                }
+                .kanban-card h4 {
+                    margin: 0 0 8px 0;
+                    color: #9C182F;
+                    white-space: normal !important;
+                    word-break: break-all !important;
+                    overflow-wrap: anywhere !important;
+                    hyphens: auto !important;
+                    display: -webkit-box;
+                    -webkit-line-clamp: 3;
+                    -webkit-box-orient: vertical;
+                    overflow: hidden;
+                }
+                .kanban-card p {
+                    margin: 4px 0;
+                    font-size: 0.9em;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="kanban-container">
+        """
+        
+        for statut in statuts:
+            postes_in_col = [p for p in postes_data if p["statut"] == statut]
+            html_kanban += f'<div class="kanban-column">'
+            html_kanban += f'<div class="kanban-header">{statut} ({len(postes_in_col)})</div>'
+            
+            for poste in postes_in_col:
+                titre_fmt = smart_wrap_title(poste.get('titre', ''))
+                commentaire_html = f"<p>💬 {poste['commentaire']}</p>" if poste.get('commentaire') else ""
+                html_kanban += f'''
+                <div class="kanban-card">
+                    <h4><b>{titre_fmt}</b></h4>
+                    <p>📍 {poste.get('entite', 'N/A')} - {poste.get('lieu', 'N/A')}</p>
+                    <p>👤 {poste.get('demandeur', 'N/A')}</p>
+                    <p>✍️ {poste.get('recruteur', 'N/A')}</p>
+                    {commentaire_html}
+                </div>
+                '''
+            
+            html_kanban += '</div>'
+        
+        html_kanban += """
+            </div>
+        </body>
+        </html>
+        """
+        
+        # Convertir en image avec html2image (haute résolution)
+        image_path = hti.screenshot(html_str=html_kanban, save_as='kanban.png', size=(1920, 1080))[0]
+        
+        return image_path
+    except Exception as e:
+        st.error(f"Erreur lors de la génération de l'image du Kanban avec html2image: {e}")
+        st.info("Tentative avec PIL...")
+        # Fallback vers PIL
+        return generate_kanban_image_simple(df_recrutement)
+
+
+def _html_kpi_card(title, value, color="#1f77b4"):
+        return f"""
+        <div class='kpi-card'>
+            <div class='kpi-title'>{title}</div>
+            <div class='kpi-value' style='color:{color};'>{value}</div>
+        </div>
+        """
+
+# --- Plotly image helpers for PPT composition ---
+def _plotly_fig_to_pil(fig, width=900, height=520):
+        """Render a Plotly figure to a PIL Image using kaleido. Falls back to PNG bytes in memory."""
+        try:
+            import plotly.io as pio
+            import io
+            img_bytes = pio.to_image(fig, format="png", width=width, height=height, engine="kaleido")
+            from PIL import Image
+            return Image.open(io.BytesIO(img_bytes)).convert('RGB')
+        except Exception as e:
+            st.warning(f"⚠️ Impossible d'exporter le graphique (kaleido manquant ?): {e}")
+            return None
+
+def _compose_dashboard_image(title_text, kpi_items, chart_rows, output_filename):
+        """Compose a 1920x1080 dashboard image with a title, KPI row and chart rows.
+        - title_text: string
+        - kpi_items: list of tuples (label, value, color)
+        - chart_rows: list of lists of PIL.Image objects (each inner list is a row)
+        - output_filename: name to save in temp dir
+        Returns absolute path to saved PNG.
+        """
+        import tempfile
+        from PIL import Image, ImageDraw, ImageFont
+
+        W, H = 1920, 1080
+        M = 36  # outer margin
+        img = Image.new('RGB', (W, H), 'white')
+        draw = ImageDraw.Draw(img)
+        try:
+            font_title = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 42)
+            font_kpi_label = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 22)
+            font_kpi_value = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 30)
+        except Exception:
+            font_title = ImageFont.load_default()
+            font_kpi_label = ImageFont.load_default()
+            font_kpi_value = ImageFont.load_default()
+
+        # Title
+        draw.text((M, M), title_text, fill="#9C182F", font=font_title)
+
+        # KPI row layout
+        kpi_top = M + 70
+        kpi_height = 100
+        kpi_gap = 16
+        kpi_cols = max(1, len(kpi_items))
+        kpi_col_width = int((W - 2*M - (kpi_gap * (kpi_cols - 1))) / kpi_cols)
+        for i, (lab, val, col) in enumerate(kpi_items):
+            x = M + i * (kpi_col_width + kpi_gap)
+            y = kpi_top
+            # card background
+            draw.rounded_rectangle([x, y, x + kpi_col_width, y + kpi_height], radius=12, fill="#f8f9fa", outline="#e1e5ea")
+            draw.line([(x+6, y), (x+6, y + kpi_height)], fill=col, width=6)
+            draw.text((x + 16, y + 16), lab, fill="#334", font=font_kpi_label)
+            draw.text((x + 16, y + 52), str(val), fill=col, font=font_kpi_value)
+
+        # Charts layout
+        current_y = kpi_top + kpi_height + 24
+        row_gap = 24
+        for row in chart_rows:
+            if not row:
+                continue
+            # Determine widths per chart in row
+            charts = [c for c in row if c is not None]
+            if not charts:
+                continue
+            cols = len(charts)
+            # leave margins left/right
+            avail_w = W - 2*M
+            gap = 16
+            col_w = int((avail_w - gap * (cols - 1)) / cols)
+            # uniform height per row
+            row_h = 360
+            x = M
+            for cimg in charts:
+                try:
+                    # resize maintaining aspect
+                    ci = cimg.copy()
+                    ci.thumbnail((col_w, row_h))
+                    img.paste(ci, (x, current_y))
+                except Exception:
+                    pass
+                x += col_w + gap
+            current_y += row_h + row_gap
+
+        out_path = os.path.join(tempfile.gettempdir(), output_filename)
+        img.save(out_path)
+        return out_path
+
+def generate_demandes_recrutement_html_image(df_recrutement):
+        """Compose an image with the same charts as the Streamlit 'Demandes' tab."""
+        df = df_recrutement.copy()
+        # KPIs
+        total = len(df)
+        date_col = next((c for c in df.columns if "réception" in c.lower() and "date" in c.lower()), None)
+        nouvelles = 0
+        if date_col is not None:
+            now = datetime.now(); start_of_month = now.replace(day=1)
+            try:
+                s = pd.to_datetime(df[date_col], errors='coerce')
+                nouvelles = int((s >= start_of_month).sum())
+            except Exception:
+                nouvelles = 0
+        annulees = 0
+        if 'Statut de la demande' in df.columns:
+            annulees = int(df['Statut de la demande'].astype(str).str.contains('annul|déprioris', case=False, na=False).sum())
+        taux_annulation = f"{round((annulees/total)*100,1)}%" if total > 0 else "N/A"
+
+        # Figures
+        import plotly.express as px
+        import plotly.graph_objects as go
+        figs_row1 = []
+        # pie statut
+        try:
+            if 'Statut de la demande' in df.columns:
+                statut_counts = df['Statut de la demande'].value_counts()
+                fig_statut = go.Figure(data=[go.Pie(labels=statut_counts.index, values=statut_counts.values, hole=.5)])
+                fig_statut.update_traces(textfont=dict(size=14))
+                fig_statut.update_layout(title=dict(text="Répartition par statut", x=0, xanchor='left', font=TITLE_FONT), height=360, margin=dict(l=20,r=20,t=48,b=12), legend=dict(font=dict(size=13)))
+                figs_row1.append(fig_statut)
+        except Exception:
+            figs_row1.append(None)
+        # bar raison
+        try:
+            if 'Raison du recrutement' in df.columns:
+                raison_counts = df['Raison du recrutement'].value_counts()
+                df_raison = raison_counts.rename_axis('Raison').reset_index(name='Count')
+                # Ajouter un headroom Y (+3) pour éviter que les valeurs 'outside' soient coupées
+                y_max = int(df_raison['Count'].max()) if not df_raison.empty else 0
+                fig_raison = px.bar(df_raison, x='Raison', y='Count', title="Raison du recrutement", text='Count', range_y=[0, y_max + 3])
+                fig_raison.update_traces(marker_color='grey', textposition='outside', cliponaxis=False)
+                fig_raison.update_layout(height=320, margin=dict(l=20,r=20,t=40,b=10), xaxis_title=None, yaxis_title=None)
+                figs_row1.append(fig_raison)
+        except Exception:
+            figs_row1.append(None)
+        # evolution demandes monthly
+        figs_row1.append(None)  # placeholder; we'll compute next
+        if date_col in df.columns:
+            try:
+                df['Mois_Année_Demande'] = pd.to_datetime(df[date_col], errors='coerce').dt.to_period('M').dt.to_timestamp()
+                monthly = df.groupby('Mois_Année_Demande').size().rename('Count')
+                if not monthly.empty:
+                    all_months = pd.date_range(start=monthly.index.min(), end=monthly.index.max(), freq='MS')
+                    monthly = monthly.reindex(all_months, fill_value=0).reset_index().rename(columns={'index':'Mois'})
+                    monthly['Label'] = monthly['Mois'].dt.strftime('%b %Y')
+                    y_max = int(monthly['Count'].max()) if not monthly.empty else 0
+                    fig_evo = px.bar(monthly, x='Label', y='Count', title="Évolution des demandes", text='Count', range_y=[0, y_max + 3])
+                    fig_evo.update_traces(marker_color='#1f77b4', textposition='outside', cliponaxis=False)
+                    fig_evo.update_layout(height=320, margin=dict(l=20,r=20,t=40,b=10), xaxis_title=None, yaxis_title=None)
+                    figs_row1[-1] = fig_evo
+            except Exception:
+                pass
+
+        # row2: direction and poste bars (horizontal)
+        figs_row2 = []
+        try:
+            if 'Direction concernée' in df.columns:
+                direction_counts = df['Direction concernée'].value_counts()
+                dfd = direction_counts.rename_axis('Direction').reset_index(name='Count').sort_values('Count', ascending=False)
+                dfd['Label'] = dfd['Direction']
+                fig_dir = px.bar(dfd, x='Count', y='Label', title="Comparaison par direction", text='Count', orientation='h')
+                fig_dir.update_traces(marker_color='grey', textposition='auto', texttemplate='%{x}', textfont=dict(size=15), hovertemplate='%{y}<extra></extra>')
+                fig_dir.update_layout(height=320, margin=dict(l=160,t=48,b=30,r=20), xaxis_title=None, yaxis_title=None, yaxis=dict(tickfont=dict(size=13)))
+                figs_row2.append(fig_dir)
+        except Exception:
+            figs_row2.append(None)
+        try:
+            if 'Poste demandé' in df.columns:
+                poste_counts = df['Poste demandé'].value_counts()
+                dfp = poste_counts.rename_axis('Poste').reset_index(name='Count').sort_values('Count', ascending=False)
+                dfp['Label'] = dfp['Poste']
+                fig_poste = px.bar(dfp, x='Count', y='Label', title="Comparaison par poste", text='Count', orientation='h')
+                fig_poste.update_traces(marker_color='grey', textposition='auto', texttemplate='%{x}', textfont=dict(size=15), hovertemplate='%{y}<extra></extra>')
+                fig_poste.update_layout(height=320, margin=dict(l=160,t=48,b=30,r=20), xaxis_title=None, yaxis_title=None, yaxis=dict(tickfont=dict(size=13)))
+                figs_row2.append(fig_poste)
+        except Exception:
+            figs_row2.append(None)
+
+        # Convert figures to PIL images
+        row1_imgs = [(_plotly_fig_to_pil(f, width=600, height=320) if f else None) for f in figs_row1]
+        row2_imgs = [(_plotly_fig_to_pil(f, width=900, height=360) if f else None) for f in figs_row2]
+
+        # Compose final image
+        kpis = [("Nombre de demandes", total, "#1f77b4"), ("Nouvelles (mois en cours)", nouvelles, "#2ca02c"), ("Annulées/Dépriorisées", annulees, "#ff7f0e"), ("Taux d'annulation", taux_annulation, "#d62728")]
+        chart_rows = [row1_imgs, row2_imgs]
+        return _compose_dashboard_image("📋 DEMANDES DE RECRUTEMENT", kpis, chart_rows, 'demandes_recrutement.png')
+
+def generate_recrutements_clotures_html_image(df_recrutement):
+    """Compose an image with charts matching the Streamlit 'Clôturés' tab."""
+    df = df_recrutement.copy()
+    df_cl = df[df['Statut de la demande'] == 'Clôture'] if 'Statut de la demande' in df.columns else df.iloc[0:0]
+    nb = len(df_cl)
+    postes_uniques = df_cl['Poste demandé'].nunique() if 'Poste demandé' in df_cl.columns else 0
+    directions_uniques = df_cl['Direction concernée'].nunique() if 'Direction concernée' in df_cl.columns else 0
+    delai_display = "N/A"
+    rec_col = next((c for c in df_cl.columns if "réception" in c.lower() and "date" in c.lower()), None)
+    ret_col = next((c for c in df_cl.columns if "retour" in c.lower() and "date" in c.lower()), None)
+    if rec_col and ret_col:
+        try:
+            s = pd.to_datetime(df_cl[rec_col], errors='coerce'); e = pd.to_datetime(df_cl[ret_col], errors='coerce')
+            mask = s.notna() & e.notna(); durees = (e[mask]-s[mask]).dt.days; durees = durees[durees >= 0]
+            delai_display = str(round(durees.mean(),1)) if len(durees)>0 else "N/A"
+        except Exception:
+            delai_display = "N/A"
+
+    import plotly.express as px
+    import plotly.graph_objects as go
+    # Row1: evolution monthly + modalité pie
+    figs_row1 = []
+    # Evolution
+    try:
+        mois_col = next((c for c in df_cl.columns if "entrée effective" in c.lower() or "date d'entrée" in c.lower()), None)
+        if mois_col:
+            s = pd.to_datetime(df_cl[mois_col], errors='coerce')
+            series = s.dt.to_period('M').value_counts().sort_index()
+            monthly = series.rename_axis('Mois').reset_index(name='Count')
+            monthly['Label'] = monthly['Mois'].astype(str)
+            y_max = int(monthly['Count'].max()) if not monthly.empty else 0
+            fig_evo = px.bar(monthly, x='Label', y='Count', title="Évolution des recrutements", text='Count', range_y=[0, y_max + 3])
+            fig_evo.update_traces(marker_color='#1f77b4', textposition='outside', cliponaxis=False)
+            fig_evo.update_layout(height=320, margin=dict(l=20,r=20,t=40,b=10), xaxis_title=None, yaxis_title=None)
+            figs_row1.append(fig_evo)
+    except Exception:
+        figs_row1.append(None)
+    # Modalité pie
+    try:
+        if 'Modalité de recrutement' in df_cl.columns:
+            modalite_data = df_cl['Modalité de recrutement'].value_counts()
+            fig_mod = go.Figure(data=[go.Pie(labels=modalite_data.index, values=modalite_data.values, hole=.5, textposition='inside', textinfo='percent')])
+            fig_mod.update_traces(textfont=dict(size=14))
+            fig_mod.update_layout(title=dict(text="Répartition par Modalité", x=0, xanchor='left', font=TITLE_FONT), height=360, margin=dict(l=20,r=20,t=48,b=12), legend=dict(font=dict(size=13)))
+            figs_row1.append(fig_mod)
+    except Exception:
+        figs_row1.append(None)
+
+    # Row2: direction and poste
+    figs_row2 = []
+    try:
+        if 'Direction concernée' in df_cl.columns:
+            direction_counts = df_cl['Direction concernée'].value_counts()
+            dfd = direction_counts.rename_axis('Direction').reset_index(name='Count').sort_values('Count', ascending=False)
+            dfd['Label'] = dfd['Direction']
+            fig_dir = px.bar(dfd, x='Count', y='Label', title="Comparaison par direction", text='Count', orientation='h')
+            fig_dir.update_traces(marker_color='#ff7f0e', textposition='inside', texttemplate='%{x}')
+            fig_dir.update_layout(height=max(320, 24*len(dfd)), margin=dict(l=160,t=40,b=30,r=20), xaxis_title=None, yaxis_title=None)
+            figs_row2.append(fig_dir)
+    except Exception:
+        figs_row2.append(None)
+    try:
+        if 'Poste demandé' in df_cl.columns:
+            poste_counts = df_cl['Poste demandé'].value_counts()
+            dfp = poste_counts.rename_axis('Poste').reset_index(name='Count').sort_values('Count', ascending=False)
+            dfp['Label'] = dfp['Poste']
+            fig_poste = px.bar(dfp, x='Count', y='Label', title="Comparaison par poste", text='Count', orientation='h')
+            fig_poste.update_traces(marker_color='#2ca02c', textposition='inside', texttemplate='%{x}')
+            fig_poste.update_layout(height=max(320, 24*len(dfp)), margin=dict(l=160,t=40,b=30,r=20), xaxis_title=None, yaxis_title=None)
+            figs_row2.append(fig_poste)
+    except Exception:
+        figs_row2.append(None)
+
+    row1_imgs = [(_plotly_fig_to_pil(f, width=900, height=320) if f else None) for f in figs_row1]
+    row2_imgs = [(_plotly_fig_to_pil(f, width=900, height=360) if f else None) for f in figs_row2]
+
+    kpis = [("Nombre de recrutements", nb, "#1f77b4"), ("Postes concernés", postes_uniques, "#2ca02c"), ("Directions concernées", directions_uniques, "#ff7f0e"), ("Délai moyen (jours)", delai_display, "#d62728")]
+    chart_rows = [row1_imgs, row2_imgs]
+    return _compose_dashboard_image("🎯 RECRUTEMENTS CLÔTURÉS", kpis, chart_rows, 'recrutements_clotures.png')
+
+def generate_integrations_html_image(df_recrutement):
+    """Compose an image with charts matching the Streamlit 'Intégrations' tab."""
+    df = df_recrutement.copy()
+    candidat_col = "Nom Prénom du candidat retenu yant accepté la promesse d'embauche"
+    date_integration_col = "Date d'entrée prévisionnelle"
+    plan_integration_col = "Plan d'intégration à préparer"
+    if 'Statut de la demande' in df.columns:
+        df = df[df['Statut de la demande'] == 'En cours']
+    if candidat_col in df.columns:
+        df = df[(df[candidat_col].notna()) & (df[candidat_col].astype(str).str.strip() != "")]
+
+    nb_int = len(df)
+    a_preparer = 0
+    if plan_integration_col in df.columns:
+        try:
+            a_preparer = int((df[plan_integration_col].astype(str).str.lower() == 'oui').sum())
+        except Exception:
+            a_preparer = 0
+    en_retard = 0
+    if date_integration_col in df.columns:
+        try:
+            s = pd.to_datetime(df[date_integration_col], errors='coerce')
+            reporting_date = st.session_state.get('reporting_date', datetime.now().date())
+            today = reporting_date if isinstance(reporting_date, datetime) else datetime.combine(reporting_date, datetime.min.time())
+            en_retard = int(((s.notna()) & (s < today)).sum())
+        except Exception:
+            en_retard = 0
+
+    import plotly.express as px
+    # Row1: affectation pie + monthly bar
+    figs_row1 = []
+    try:
+        if 'Affectation' in df.columns:
+            affect_counts = df['Affectation'].value_counts().head(10)
+            fig_aff = px.pie(values=affect_counts.values, names=affect_counts.index, title="Répartition par Affectation")
+            fig_aff.update_traces(textposition='inside', textinfo='percent+label', textfont=dict(size=14))
+            fig_aff.update_layout(title=dict(text="Répartition par Affectation", x=0, xanchor='left', font=TITLE_FONT), height=420, margin=dict(l=20,r=20,t=48,b=12), legend=dict(font=dict(size=14)))
+            figs_row1.append(fig_aff)
+    except Exception:
+        figs_row1.append(None)
+    try:
+        if date_integration_col in df.columns:
+            s = pd.to_datetime(df[date_integration_col], errors='coerce')
+            monthly = s.dt.to_period('M').value_counts().sort_index().rename_axis('Mois').reset_index(name='Count')
+            monthly['Label'] = monthly['Mois'].astype(str)
+            # Conserver les valeurs d'origine mais ajouter une marge Y de +3 pour éviter la coupure
+            y_max = int(monthly['Count'].max()) if not monthly.empty else 0
+            fig_month = px.bar(monthly, x='Label', y='Count', title="Évolution des Intégrations Prévues", text='Count', range_y=[0, y_max + 3])
+            fig_month.update_traces(marker_color='#2ca02c', textposition='outside', cliponaxis=False)
+            fig_month.update_layout(height=360, margin=dict(l=20,r=20,t=40,b=10), xaxis_title=None, yaxis_title=None)
+            figs_row1.append(fig_month)
+    except Exception:
+        figs_row1.append(None)
+
+    row1_imgs = [(_plotly_fig_to_pil(f, width=900, height=360) if f else None) for f in figs_row1]
+    kpis = [("Intégrations en cours", nb_int, "#1f77b4"), ("Plan d'intégration à préparer", a_preparer, "#ff7f0e"), ("En retard", en_retard, "#d62728")]
+    chart_rows = [row1_imgs]
+    return _compose_dashboard_image("📊 Intégrations", kpis, chart_rows, 'integrations.png')
+def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2).pptx"):
+    """
+    Génère un rapport PowerPoint à partir d'un template en remplaçant les placeholders
+    par les graphiques et tableaux générés.
+    
+    Returns: BytesIO contenant le fichier PowerPoint généré
+    """
+    try:
+        from pptx.util import Inches, Pt
+        from pptx.enum.text import PP_ALIGN
+        from pptx.dml.color import RGBColor
+        from pptx.shapes.base import BaseShape
+        
+        # Charger le template
+        prs = Presentation(template_path)
+        
+        # Préparer les données pour les placeholders
+        # Calculer les métriques hebdomadaires
+        weekly_metrics = calculate_weekly_metrics(df_recrutement)
+        
+        # Debug: afficher les informations sur weekly_metrics
+        if weekly_metrics:
+            st.info(f"✅ Métriques hebdomadaires calculées: {len(weekly_metrics.get('table_data', []))} lignes")
+        else:
+            st.warning("⚠️ Métriques hebdomadaires vides, le PowerPoint sera généré avec des données limitées.")
+        
+        # Générer les images HTML avec logos (utilise html2image + Chromium)
+        st.info("📊 Génération des images avec les visualisations Streamlit...")
+        table_image_path = generate_table_html_image(weekly_metrics) if weekly_metrics else None
+        
+        # Obtenir la date de reporting pour le filtre Clôture/Désistement
+        from datetime import datetime, timedelta
+        reporting_date = st.session_state.get('reporting_date', datetime.now().date())
+        if isinstance(reporting_date, str):
+            reporting_date = pd.to_datetime(reporting_date).date()
+        
+        # Calculer la fenêtre de dates (semaine précédente + courante)
+        current_week_monday = datetime(year=reporting_date.year, month=reporting_date.month, day=reporting_date.day) - timedelta(days=reporting_date.weekday())
+        start_filter = current_week_monday - timedelta(days=7)  # Lundi précédent
+        end_filter = current_week_monday + timedelta(days=6)    # Dimanche courant
+        
+        st.info(f"📅 Période de filtrage Clôture/Désistement: {start_filter.date()} au {end_filter.date()}")
+        
+        # Générer une image par statut Kanban
+        statuts = ["Nouvelle demande", "Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+        kanban_images = {}
+        
+        for statut in statuts:
+            st.info(f"🔄 Génération de l'image pour {statut}...")
+            
+            # Pour Clôture et Désistement, appliquer le filtre de date
+            if statut == "Clôture":
+                # Trouver la colonne de date d'acceptation
+                accept_col = None
+                for col_name in df_recrutement.columns:
+                    if "date" in col_name.lower() and ("accept" in col_name.lower() or "promesse" in col_name.lower()):
+                        accept_col = col_name
+                        break
+                
+                if accept_col:
+                    df_filtered = df_recrutement[
+                        (df_recrutement['Colonne TG Hire'] == 'Clôture')
+                    ].copy()
+                    # Filtrer par date
+                    df_filtered[accept_col] = pd.to_datetime(df_filtered[accept_col], errors='coerce')
+                    df_filtered = df_filtered[
+                        (df_filtered[accept_col].dt.date >= start_filter.date()) &
+                        (df_filtered[accept_col].dt.date <= end_filter.date())
+                    ]
+                    st.info(f"📅 Clôture filtrée: {len(df_filtered)} postes (colonne: {accept_col})")
+                else:
+                    df_filtered = df_recrutement[df_recrutement['Colonne TG Hire'] == 'Clôture'].copy()
+                    st.warning(f"⚠️ Colonne date d'acceptation non trouvée, affichage de tous les {len(df_filtered)} postes clôturés")
+                
+                kanban_images[statut] = generate_kanban_statut_image(df_filtered, statut, max_cards=100)
+                
+            elif statut == "Désistement":
+                # Trouver la colonne de date de désistement
+                desist_col = None
+                for col_name in df_recrutement.columns:
+                    if "date" in col_name.lower() and "désist" in col_name.lower():
+                        desist_col = col_name
+                        break
+                
+                if desist_col:
+                    df_filtered = df_recrutement[
+                        (df_recrutement['Colonne TG Hire'] == 'Désistement')
+                    ].copy()
+                    # Filtrer par date
+                    df_filtered[desist_col] = pd.to_datetime(df_filtered[desist_col], errors='coerce')
+                    df_filtered = df_filtered[
+                        (df_filtered[desist_col].dt.date >= start_filter.date()) &
+                        (df_filtered[desist_col].dt.date <= end_filter.date())
+                    ]
+                    st.info(f"📅 Désistement filtré: {len(df_filtered)} postes (colonne: {desist_col})")
+                else:
+                    df_filtered = df_recrutement[df_recrutement['Colonne TG Hire'] == 'Désistement'].copy()
+                    st.warning(f"⚠️ Colonne date désistement non trouvée, affichage de tous les {len(df_filtered)} désistements")
+                # Toujours générer une image même si aucune donnée
+                img_path_desist = generate_kanban_statut_image(df_filtered, statut, max_cards=100)
+                if not img_path_desist or not os.path.exists(img_path_desist):
+                    # Placeholder image
+                    try:
+                        from PIL import Image, ImageDraw, ImageFont
+                        import tempfile
+                        width, height = 1920, 1080
+                        img = Image.new('RGB',(width,height),'white')
+                        d = ImageDraw.Draw(img)
+                        try:
+                            f_title = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 42)
+                            f_text = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 20)
+                        except:
+                            f_title = ImageFont.load_default(); f_text = ImageFont.load_default()
+                        d.text((width//2, 80), 'Désistement (0 poste)', fill='#9C182F', font=f_title, anchor='mm')
+                        d.text((width//2, height//2), 'Aucune donnée pour cette période', fill='#666666', font=f_text, anchor='mm')
+                        ph_path = os.path.join(tempfile.gettempdir(),'desistement_empty.png')
+                        img.save(ph_path)
+                        kanban_images[statut] = ph_path
+                    except Exception:
+                        kanban_images[statut] = img_path_desist
+                else:
+                    kanban_images[statut] = img_path_desist
+            else:
+                # Pour les autres statuts, pas de filtre de date
+                kanban_images[statut] = generate_kanban_statut_image(df_recrutement, statut, max_cards=100)
+        
+        # Debug: Vérifier les chemins des images
+        if table_image_path and os.path.exists(table_image_path):
+            st.success(f"✅ Image tableau générée: {os.path.basename(table_image_path)}")
+        else:
+            st.warning("⚠️ Échec génération image tableau")
+        
+        # Vérifier les images Kanban
+        for statut, img_path in kanban_images.items():
+            if img_path and os.path.exists(img_path):
+                st.success(f"✅ Image {statut} générée: {os.path.basename(img_path)}")
+            else:
+                st.warning(f"⚠️ Échec génération image {statut}")
+
+        # Générer les deux slides supplémentaires: Demandes de Recrutement et Recrutements Clôturés
+        st.info("🧩 Génération des images pour DEMANDES DE RECRUTEMENT et RECRUTEMENTS CLÔTURÉS...")
+        demandes_img = generate_demandes_recrutement_html_image(df_recrutement)
+        clotures_img = generate_recrutements_clotures_html_image(df_recrutement)
+        
+        # Parcourir chaque slide et remplacer les placeholders
+        for slide_idx, slide in enumerate(prs.slides):
+            st.info(f"📄 Traitement de la slide {slide_idx + 1}/{len(prs.slides)}")
+            shapes_to_remove = []
+            
+            # Debug: lister tous les shapes avec texte
+            text_shapes = []
+            for shape in slide.shapes:
+                shape_text = getattr(shape, "text", None)
+                if shape_text and shape_text.strip():
+                    text_shapes.append(shape_text[:100])  # Premier 100 chars
+            
+            if text_shapes:
+                st.code(f"Slide {slide_idx + 1} - Shapes avec texte:\n" + "\n".join([f"  - {t}" for t in text_shapes]))
+            
+            for shape in slide.shapes:
+                # Utiliser getattr pour éviter les erreurs Pylance
+                shape_text = getattr(shape, "text", None)
+                if shape_text is None:
+                    continue
+                    
+                # Tableau des besoins par entité - Insérer l'image
+                if "{{TABLEAU_BESOINS_ENTITES}}" in shape_text:
+                    st.info(f"🔍 Placeholder {{{{TABLEAU_BESOINS_ENTITES}}}} trouvé dans slide {slide_idx + 1}")
+                    try:
+                        # Récupérer la position et taille du shape original
+                        left = shape.left
+                        top = shape.top
+                        width = shape.width
+                        height = shape.height
+                        
+                        st.info(f"📐 Position Tableau: left={left}, top={top}, width={width}, height={height}")
+                        
+                        # Marquer le shape pour suppression
+                        shapes_to_remove.append(shape)
+                        
+                        # Insérer l'image du tableau si elle existe (en grand format)
+                        if table_image_path and os.path.exists(table_image_path):
+                            # Utiliser toute la largeur de la slide pour une meilleure visibilité
+                            slide_width = prs.slide_width
+                            slide_height = prs.slide_height
+                            # Positionner l'image en laissant des marges
+                            img_left = Inches(0.5)
+                            img_top = Inches(1.5)
+                            # Calculer dimensions avec vérification
+                            if slide_width and slide_height:
+                                img_width = Inches((slide_width.inches if hasattr(slide_width, 'inches') else slide_width / 914400) - 1)
+                                img_height = Inches((slide_height.inches if hasattr(slide_height, 'inches') else slide_height / 914400) - 2.5)
+                                slide.shapes.add_picture(table_image_path, img_left, img_top, width=img_width, height=img_height)
+                            else:
+                                slide.shapes.add_picture(table_image_path, img_left, img_top)
+                            st.success(f"✅ Image tableau insérée dans slide {slide_idx + 1} (dimensions optimisées)")
+                        else:
+                            st.error(f"❌ Image tableau non trouvée: {table_image_path}")
+                            # Fallback: ajouter un message d'erreur
+                            txBox = slide.shapes.add_textbox(left, top, width, height)
+                            text_frame = txBox.text_frame
+                            p = text_frame.paragraphs[0]
+                            p.text = "Erreur: Impossible de générer l'image du tableau"
+                            p.font.size = Pt(14)
+                    except Exception as e:
+                        st.error(f"❌ Erreur lors de l'insertion du tableau: {e}")
+                        import traceback
+                        st.code(traceback.format_exc())
+                
+                # Métrique total postes - Créer 5 slides Kanban (une par statut) dans l'ordre souhaité
+                elif "{{METRIC_TOTAL_POSTES}}" in shape_text:
+                    st.info(f"🔍 Placeholder {{{{METRIC_TOTAL_POSTES}}}} trouvé dans slide {slide_idx + 1}")
+                    st.info("📋 Création de 5 slides Kanban (une par statut) dans l'ordre: Sourcing, Shortlisté, Signature DRH, Clôture, Désistement...")
+                    try:
+                        # Marquer le shape pour suppression
+                        shapes_to_remove.append(shape)
+                        
+                        # Pour chaque statut, insérer l'image dans cette slide ou créer de nouvelles slides
+                        # On va insérer toutes les images Kanban après cette slide
+                        # Pour l'instant, on insère juste la première dans la slide actuelle
+                        
+                        # Récupérer les dimensions de slide pour positionnement
+                        slide_width = prs.slide_width
+                        slide_height = prs.slide_height
+                        img_left = Inches(0.5)
+                        img_top = Inches(1.5)
+                        
+                        # Calculer dimensions avec vérification
+                        if slide_width and slide_height:
+                            img_width = Inches((slide_width.inches if hasattr(slide_width, 'inches') else slide_width / 914400) - 1)
+                            img_height = Inches((slide_height.inches if hasattr(slide_height, 'inches') else slide_height / 914400) - 2.5)
+                        else:
+                            img_width = Inches(9)
+                            img_height = Inches(6)
+                        
+                        # Insérer les 5 images Kanban dans des slides séparées selon l'ordre demandé
+                        ordered_status = ["Nouvelle demande", "Sourcing", "Shortlisté", "Signature DRH", "Clôture", "Désistement"]
+                        for statut in ordered_status:
+                            img_path = kanban_images.get(statut)
+                            # Créer une nouvelle slide pour chaque statut (ne pas utiliser la slide actuelle)
+                            new_slide = prs.slides.add_slide(slide.slide_layout)
+                            # Titre de la slide: nom du statut
+                            if hasattr(new_slide.shapes, 'title') and new_slide.shapes.title:
+                                new_slide.shapes.title.text = f"Kanban - {statut}"
+                            # Insérer l'image
+                            if img_path and os.path.exists(img_path):
+                                new_slide.shapes.add_picture(img_path, img_left, img_top, width=img_width, height=img_height)
+                                st.success(f"✅ Slide insérée pour {statut}")
+                            else:
+                                st.warning(f"⚠️ Image {statut} non trouvée")
+
+                        # Ajouter juste après Désistement: DEMANDES DE RECRUTEMENT puis RECRUTEMENTS CLÔTURÉS, puis INTÉGRATIONS
+                        if demandes_img and os.path.exists(demandes_img):
+                            slide_dem = prs.slides.add_slide(slide.slide_layout)
+                            if hasattr(slide_dem.shapes, 'title') and slide_dem.shapes.title:
+                                slide_dem.shapes.title.text = "📋 DEMANDES DE RECRUTEMENT"
+                            slide_dem.shapes.add_picture(demandes_img, img_left, img_top, width=img_width, height=img_height)
+                            st.success("✅ Slide ajoutée: DEMANDES DE RECRUTEMENT")
+                        else:
+                            st.warning("⚠️ Image DEMANDES DE RECRUTEMENT non trouvée")
+
+                        if clotures_img and os.path.exists(clotures_img):
+                            slide_clo = prs.slides.add_slide(slide.slide_layout)
+                            if hasattr(slide_clo.shapes, 'title') and slide_clo.shapes.title:
+                                slide_clo.shapes.title.text = "🎯 RECRUTEMENTS CLÔTURÉS"
+                            slide_clo.shapes.add_picture(clotures_img, img_left, img_top, width=img_width, height=img_height)
+                            st.success("✅ Slide ajoutée: RECRUTEMENTS CLÔTURÉS")
+                        else:
+                            st.warning("⚠️ Image RECRUTEMENTS CLÔTURÉS non trouvée")
+
+                        # Intégrations
+                        integrations_img = generate_integrations_html_image(df_recrutement)
+                        if integrations_img and os.path.exists(integrations_img):
+                            slide_int = prs.slides.add_slide(slide.slide_layout)
+                            if hasattr(slide_int.shapes, 'title') and slide_int.shapes.title:
+                                slide_int.shapes.title.text = "📊 Intégrations"
+                            slide_int.shapes.add_picture(integrations_img, img_left, img_top, width=img_width, height=img_height)
+                            st.success("✅ Slide ajoutée: Intégrations")
+                        else:
+                            st.warning("⚠️ Image Intégrations non trouvée")
+                        
+                    except Exception as e:
+                        st.error(f"❌ Erreur lors de l'insertion des Kanban: {e}")
+                        import traceback
+                        st.code(traceback.format_exc())
+                
+                # Graphiques Plotly - on peut ajouter d'autres placeholders ici
+                elif "{{GRAPH_" in shape_text:
+                    placeholder = shape_text.strip()
+                    text_frame = getattr(shape, "text_frame", None)
+                    if text_frame:
+                        text_frame.clear()
+                        p = text_frame.paragraphs[0] if text_frame.paragraphs else text_frame.add_paragraph()
+                        p.text = f"Graphique {placeholder} (à venir)"
+                        p.font.size = Pt(12)
+            
+            # Supprimer les shapes marqués (après la boucle pour éviter les problèmes d'itération)
+            for shape in shapes_to_remove:
+                sp = shape.element
+                sp.getparent().remove(sp)
+        
+        # Nettoyer les fichiers temporaires
+        if table_image_path and os.path.exists(table_image_path):
+            try:
+                os.remove(table_image_path)
+            except:
+                pass
+        
+        # Nettoyer les images Kanban temporaires
+        for img_path in kanban_images.values():
+            if img_path and os.path.exists(img_path):
+                try:
+                    os.remove(img_path)
+                except:
+                    pass
+
+        # Nettoyer les images supplémentaires
+        for extra in [demandes_img, clotures_img, integrations_img]:
+            try:
+                if extra and os.path.exists(extra):
+                    os.remove(extra)
+            except:
+                pass
+        
+        # Sauvegarder le PowerPoint modifié dans un BytesIO
+        ppt_bytes = BytesIO()
+        prs.save(ppt_bytes)
+        ppt_bytes.seek(0)
+        
+        return ppt_bytes
+    
+    except Exception as e:
+        st.error(f"Erreur lors de la génération du PowerPoint: {e}")
+        return None
+
+
+def main():
+    st.title("📊 Tableau de Bord RH")
+    # Afficher le hash du commit actuel pour aider au debug des déploiements
+    try:
+        commit_hash = get_current_commit_hash()
+        commit_dt = get_current_commit_datetime()
+        if commit_dt:
+            commit_text = f"Commit: {commit_hash} — {commit_dt}"
+        else:
+            commit_text = f"Commit: {commit_hash}"
+        st.markdown(
+            f"<div style='font-size:12px;color:#666;margin-top:-8px'>{commit_text}</div>",
+            unsafe_allow_html=True,
+        )
+    except Exception:
+        pass
+    st.markdown("---")
+    # Date de reporting : permet de fixer la date de référence pour tous les calculs
+    if 'reporting_date' not in st.session_state:
+        # default to today's date
+        st.session_state['reporting_date'] = datetime.now().date()
+
+    with st.sidebar:
+        st.subheader("🔧 Filtres - Hebdomadaire")
+        # Ensure the session value is a plain date object Streamlit expects.
+        # Protect against cases where session_state may contain a str or pd.Timestamp
+        rd_val = st.session_state.get('reporting_date', None)
+        if rd_val is not None:
+            try:
+                # pandas Timestamp or datetime -> date
+                import pandas as _pd
+                if isinstance(rd_val, _pd.Timestamp):
+                    st.session_state['reporting_date'] = rd_val.date()
+                elif hasattr(rd_val, 'date') and not isinstance(rd_val, str):
+                    # datetime -> date (leave date as-is)
+                    try:
+                        st.session_state['reporting_date'] = rd_val.date()
+                    except Exception:
+                        pass
+                elif isinstance(rd_val, str):
+                    # try parsing common formats
+                    from dateutil import parser as _parser
+                    try:
+                        parsed = _parser.parse(rd_val)
+                        st.session_state['reporting_date'] = parsed.date()
+                    except Exception:
+                        # fallback: keep original (Streamlit will raise if invalid)
+                        pass
+            except Exception:
+                # If pandas isn't available or any unexpected issue, ignore and let Streamlit handle
+                pass
+        # Do not pass both `value` and `key` for the same widget to avoid Streamlit's
+        # warning: the widget was created with a default value but also had its
+        # value set via the Session State API. Passing `key='reporting_date'`
+        # is enough for Streamlit to initialize the widget from
+        # `st.session_state['reporting_date']`. Avoid providing `value=` here.
+        rd = st.date_input(
+            "Date de reporting (hebdomadaire)",
+            help="Date utilisée comme référence pour le reporting hebdomadaire",
+            key='reporting_date',
+            format='DD/MM/YYYY'
+        )
+    
+    # Créer les onglets (Demandes et Recrutement regroupés)
+    # CSS pour agrandir le texte des onglets
+    st.markdown("""
+    <style>
+    .stTabs [data-baseweb="tab-list"] button {
+        font-size: 1.15em !important;
+        font-weight: 600 !important;
+        padding: 12px 20px !important;
+    }
+    .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+        font-size: 1.15em !important;
+        font-weight: 600 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    tabs = st.tabs(["📂 Upload & Téléchargement", "📈 Pilotage budgétaire", "🗂️ Demandes & Recrutement", "📅 Hebdomadaire", "🤝 Intégrations", "📖 Méthodologie"])
+    
+    # Variables pour stocker les fichiers uploadés
+    # Use session_state to persist upload/refresh state
+    if 'data_updated' not in st.session_state:
+        st.session_state.data_updated = False
+    if 'uploaded_excel' not in st.session_state:
+        st.session_state.uploaded_excel = None
+    uploaded_excel = st.session_state.uploaded_excel
+    
+    with tabs[0]:
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.subheader("🔗 Synchroniser depuis Google Sheets")
+            # Respecter la date de reporting si fournie dans st.session_state
+            reporting_date = st.session_state.get('reporting_date', None)
+            if reporting_date is None:
+                today = datetime.now()
+            else:
+                # reporting_date is a date object from st.date_input; convert to datetime
+                if isinstance(reporting_date, datetime):
+                    today = reporting_date
+                else:
+                    today = datetime.combine(reporting_date, datetime.min.time())
+            start_of_month = today.replace(day=1)
+            # valeur par défaut du Google Sheet (identique à celle utilisée précédemment)
+            default_sheet = "https://docs.google.com/spreadsheets/d/1hvghSMjcbdY8yNZOWqALBpgMdLWB5CxVJCDwEm6JULI/edit?gid=785271056#gid=785271056"
+            gs_url = st.text_input("URL Google Sheet", value=default_sheet, key="gsheet_url")
+            
+            if 'synced_recrutement_df' not in st.session_state:
+                st.session_state.synced_recrutement_df = None
+            
+            if st.button("🔁 Synchroniser depuis Google Sheets", 
+                        help="Synchroniser les données depuis Google Sheets",
+                        width="stretch"):
+                
+                try:
+                    # Utiliser la fonction de connexion automatique (comme dans Home.py)
+                    df_synced = load_data_from_google_sheets(gs_url)
+                    
+                    if df_synced is not None and len(df_synced) > 0:
+                        st.session_state.synced_recrutement_df = df_synced
+                        st.session_state.data_updated = True
+                        nb_lignes = len(df_synced)
+                        nb_colonnes = len(df_synced.columns)
+                        st.success(f"✅ Synchronisation Google Sheets réussie ! Les onglets ont été mis à jour. ({nb_lignes} lignes, {nb_colonnes} colonnes)")
+                    else:
+                        st.warning("⚠️ Aucune donnée trouvée dans la feuille Google Sheets.")
+                        
+                except Exception as e:
+                    err_str = str(e)
+                    st.error(f"Erreur lors de la synchronisation: {err_str}")
+                    
+                    if '401' in err_str or 'Unauthorized' in err_str or 'HTTP Error 401' in err_str:
+                        st.error("❌ **Feuille Google privée** - Vérifiez que:")
+                        st.markdown("""
+                        1. La feuille est partagée avec: `your-service-account@your-project.iam.gserviceaccount.com`
+                        2. Les secrets Streamlit sont correctement configurés
+                        3. L'URL de la feuille est correcte
+                        """)
+                    elif 'secrets' in err_str.lower():
+                        st.error("❌ **Configuration des secrets manquante**")
+                        st.markdown("""
+                        Assurez-vous que les secrets suivants sont configurés:
+                        - `GCP_TYPE`, `GCP_PROJECT_ID`, `GCP_PRIVATE_KEY_ID`
+                        - `GCP_PRIVATE_KEY`, `GCP_CLIENT_EMAIL`, `GCP_CLIENT_ID`
+                        - `GCP_AUTH_URI`, `GCP_TOKEN_URI`, etc.
+                        """)
+                    else:
+                        st.error(f"Erreur technique: {err_str}")
+
+        with col2:
+            st.subheader("📊 Fichier Excel - Données de Recrutement")
+            uploaded_excel = st.file_uploader(
+                "Choisir le fichier Excel de recrutement",
+                type=['xlsx', 'xls'],
+                help="Fichier Excel contenant les données de recrutement",
+                key="excel_uploader"
+            )
+            
+            if uploaded_excel is not None:
+                # Aperçu des données
+                try:
+                    preview_excel = pd.read_excel(uploaded_excel, sheet_name=0)
+                    st.success(f"✅ Fichier Excel chargé: {uploaded_excel.name} - {len(preview_excel)} lignes, {len(preview_excel.columns)} colonnes")
+                    st.dataframe(preview_excel.head(3), width="stretch")
+                    # Reset file pointer for later use
+                    uploaded_excel.seek(0)
+                    st.session_state.uploaded_excel = uploaded_excel
+                except Exception as e:
+                    st.error(f"Erreur lors de la lecture de l'Excel: {e}")
+        
+        # Bouton pour actualiser les données - s'étale sur les deux colonnes
+        st.markdown("---")
+        if st.button("🔄 Actualiser les Graphiques", type="primary", width="stretch"):
+            st.session_state.data_updated = True
+            st.success("Données mises à jour ! Consultez les autres onglets.")
+    
+    # Charger les données ICI (avant l'onglet Upload pour pouvoir les utiliser)
+    df_integration, df_recrutement = load_data_from_files(None, uploaded_excel)
+
+    # --------------------
+    # Onglet: Pilotage budgétaire
+    # --------------------
+    # Les valeurs ci-dessous sont des exemples statiques fournis par l'utilisateur.
+    # Elles peuvent être remplacées par des données synchronisées depuis Google Sheets
+    # ou par le fichier Excel local (voir boutons ci-dessous).
+    budget_annuel_total = 17_100_000  # 17,1 MDH
+    budget_engage = 2_150_000         # 2,15 MDH (13 recrutements clos)
+    taux_consommation = 12.6          # en %
+    statut_global = "CONFORME"
+    nb_recrutements_clos = 13
+
+    with tabs[1]:
+        st.header("📈 Pilotage budgétaire")
+
+        # Options de synchronisation spécifiques au pilotage
+        col_sync1, col_sync2 = st.columns([2,1])
+        with col_sync1:
+            default_budget_sheet = "https://docs.google.com/spreadsheets/d/1a3_SuZ5udezO-pJNjD1a5ugE1e_NeKuO/edit?gid=2071824040#gid=2071824040"
+            gs_budget_url = st.text_input("URL Google Sheet - Pilotage budgétaire", value=default_budget_sheet, key="gsheet_budget_url")
+            if st.button("🔁 Synchroniser Pilotage depuis Google Sheets", key="sync_budget_gs"):
+                try:
+                    df_budget = load_data_from_google_sheets(gs_budget_url)
+                    st.success(f"✅ Synchronisation réussie: {len(df_budget)} lignes")
+                    st.dataframe(df_budget.head(5))
+                except Exception as e:
+                    st.error(f"Erreur lors de la synchronisation: {e}")
+
+        with col_sync2:
+            if st.button("📂 Charger fichier local Recrutement 2026.xlsx", key="load_local_budget"):
+                try:
+                    local_path = "/workspaces/TG_Hire/Recrutement 2026.xlsx"
+                    if os.path.exists(local_path):
+                        df_local_budget = pd.read_excel(local_path, sheet_name=0)
+                        st.success(f"✅ Fichier local chargé: {os.path.basename(local_path)} ({len(df_local_budget)} lignes)")
+                        st.dataframe(df_local_budget.head(4))
+                    else:
+                        st.error("Fichier local introuvable: /workspaces/TG_Hire/Recrutement 2026.xlsx")
+                except Exception as e:
+                    st.error(f"Erreur lecture Excel local: {e}")
+
+        # KPI cards (haut)
+        metrics = [
+            ("Budget Annuel Total", f"{budget_annuel_total:,.0f} DH", "#1f77b4"),
+            ("Budget Actuellement Engagé", f"{budget_engage:,.0f} DH", "#2ca02c"),
+            ("Taux de consommation", f"{taux_consommation:.1f} %", "#172b4d"),
+            ("Statut budgétaire global", statut_global, "#2ca02c"),
+        ]
+        st.markdown(render_generic_metrics(metrics), unsafe_allow_html=True)
+
+        # Graphiques de tendance et consommation par direction
+        col_left, col_right = st.columns([2,1])
+
+        # Données synthétiques pour la courbe Jan-Dec
+        months = pd.date_range(start="2026-01-01", periods=12, freq='MS').strftime('%b')
+        planned = np.linspace(0, budget_annuel_total, 12)
+        # dépenses réelles = un peu en dessous jusqu'à mars
+        actual = planned * 0.95
+        actual[3:] = planned[3:] * 0.98
+
+        fig_trend = go.Figure()
+        fig_trend.add_trace(go.Scatter(x=months, y=planned, mode='lines+markers', name='Prévu', line=dict(dash='dash', color='royalblue')))
+        fig_trend.add_trace(go.Scatter(x=months, y=actual, mode='lines+markers', name='Réel', line=dict(color='green')))
+        fig_trend.update_layout(title='Tendance de consommation (Jan - Déc)', yaxis_title='Montant (DH)')
+        fig_trend = apply_title_style(fig_trend)
+
+        # Barres consommation par direction
+        dirs = ["Direction RH", "Pôle Admin & Fin.", "Encadrement Chantier", "Direction SI", "Autres"]
+        perc = [30, 25, 18, 8, 5]
+        fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'% consommation', 'y':''}, text=[f"{p}%" for p in perc], height=400)
+        fig_bar.update_layout(title='Taux de consommation par direction')
+        fig_bar = apply_title_style(fig_bar)
+
+        with col_left:
+            st.plotly_chart(fig_trend, use_container_width=True)
+        with col_right:
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+        # Tableau d'analyse détaillée (bas)
+        st.subheader("Analyse détaillée par direction")
+        table_rows = [
+            {"Direction": "Encadrement Chantier", "Clos": "8 / 76", "Budget engagé (DH)": 1_480_000, "Écart (DH)": -22_000, "Commentaire": "Retard de sourcing sur 2 CDP (retard à l'allumage)", "Pastille": "green"},
+            {"Direction": "Pôle Admin & Fin.", "Clos": "2 / 4", "Budget engagé (DH)": 310_000, "Écart (DH)": 15_000, "Commentaire": "Surcoût de 5 KDH sur le contrôleur de gestion", "Pastille": "yellow"},
+            {"Direction": "Direction RH", "Clos": "3 / 5", "Budget engagé (DH)": 160_000, "Écart (DH)": 0, "Commentaire": "En ligne avec le plan", "Pastille": "green"},
+            {"Direction": "Autres (SI, Jur,...)", "Clos": "0 / 20", "Budget engagé (DH)": 0, "Écart (DH)": 0, "Commentaire": "Recrutements planifiés plus tard (S15-S20)", "Pastille": "grey"},
+        ]
+        df_detail = pd.DataFrame(table_rows)
+        # Formattage monétaire
+        df_detail["Budget engagé (DH)"] = df_detail["Budget engagé (DH)"].apply(lambda v: f"{v:,.0f} DH")
+        df_detail["Écart (DH)"] = df_detail["Écart (DH)"].apply(lambda v: f"{v:+,d} DH")
+        st.table(df_detail.drop(columns=['Pastille']))
+
+        # Total synthèse
+        st.markdown("---")
+        st.markdown("**TOTAL (Semaine 12)** : Sur 105 postes budgétés, 13 sont clos pour un montant total de 1 950 000 DH (écart global favorable de -7 KDH). Situation : **globale saine**.")
+    
+    # Continuer l'onglet Upload avec la section PowerPoint
+    with tabs[0]:
+        # Section de génération du PowerPoint
+        st.markdown("---")
+        st.subheader("📥 Télécharger le Rapport PowerPoint")
+        
+        col_ppt1, col_ppt2 = st.columns(2)
+        
+        with col_ppt1:
+            st.info("📊 **Génération automatique de votre rapport PowerPoint**")
+
+        with col_ppt2:
+            # Vérifier que des données sont disponibles
+            if df_recrutement is not None or st.session_state.get('synced_recrutement_df') is not None:
+                # Option de format d'export
+                export_format = st.radio(
+                    "Format d'export:",
+                    ["PowerPoint (.pptx)", "PDF (.pdf)"],
+                    horizontal=True,
+                    help="PDF recommandé pour une meilleure compatibilité avec Office 2010"
+                )
+                
+                if st.button("📥 Générer et Télécharger le Rapport", type="primary", width="stretch"):
+                    with st.spinner("Génération du rapport en cours..."):
+                        # Utiliser les données synchronisées si disponibles
+                        data_to_use = st.session_state.get('synced_recrutement_df')
+                        if data_to_use is None:
+                            data_to_use = df_recrutement
+                        
+                        # Générer le PowerPoint
+                        ppt_bytes = generate_powerpoint_report(data_to_use)
+                        
+                        if ppt_bytes:
+                            # Générer un nom de fichier avec la date
+                            today_str = datetime.now().strftime("%Y-%m-%d")
+                            
+                            if export_format == "PDF (.pdf)":
+                                # Convertir en PDF
+                                try:
+                                    from pptx import Presentation
+                                    from pptx.enum.shapes import MSO_SHAPE_TYPE
+                                    from reportlab.lib.pagesizes import A4, landscape
+                                    from reportlab.pdfgen import canvas
+                                    from reportlab.lib.utils import ImageReader
+                                    from PIL import Image
+                                    import io
+                                    import tempfile
+                                    
+                                    st.info("📄 Conversion en PDF...")
+                                    
+                                    # Charger le PPT depuis les bytes
+                                    ppt_bytes.seek(0)
+                                    prs = Presentation(ppt_bytes)
+                                    
+                                    # Créer un PDF
+                                    pdf_buffer = io.BytesIO()
+                                    c = canvas.Canvas(pdf_buffer, pagesize=landscape(A4))
+                                    page_width, page_height = landscape(A4)
+                                    
+                                    # Pour chaque slide, extraire les images et les ajouter au PDF
+                                    for slide_idx, slide in enumerate(prs.slides):
+                                        # Ajouter un titre de page
+                                        c.setFont("Helvetica-Bold", 16)
+                                        c.drawString(50, page_height - 40, f"Slide {slide_idx + 1}")
+                                        
+                                        # Extraire les images de la slide
+                                        img_y = page_height - 80
+                                        for shape in slide.shapes:
+                                            try:
+                                                # Extraire uniquement les images (pictures)
+                                                if getattr(shape, "shape_type", None) == MSO_SHAPE_TYPE.PICTURE:
+                                                    img_obj = getattr(shape, "image", None)
+                                                    if img_obj is None:
+                                                        continue
+                                                    img_data = img_obj.blob
+                                                    img = Image.open(io.BytesIO(img_data))
+                                                    
+                                                    # Redimensionner pour tenir dans la page
+                                                    max_width = page_width - 100
+                                                    max_height = page_height - 150
+                                                    img_ratio = img.width / img.height
+                                                    
+                                                    if img.width > max_width:
+                                                        new_width = max_width
+                                                        new_height = new_width / img_ratio
+                                                    else:
+                                                        new_width = img.width
+                                                        new_height = img.height
+                                                    
+                                                    if new_height > max_height:
+                                                        new_height = max_height
+                                                        new_width = new_height * img_ratio
+                                                    
+                                                    # Sauvegarder temporairement
+                                                    temp_img = io.BytesIO()
+                                                    img.save(temp_img, format='PNG')
+                                                    temp_img.seek(0)
+                                                    
+                                                    c.drawImage(ImageReader(temp_img), 50, img_y - new_height, 
+                                                               width=new_width, height=new_height)
+                                                    img_y -= new_height + 20
+                                            except Exception as img_e:
+                                                st.warning(f"Image non extraite: {img_e}")
+                                        
+                                        c.showPage()
+                                    
+                                    c.save()
+                                    pdf_buffer.seek(0)
+                                    
+                                    st.download_button(
+                                        label="💾 Télécharger le Rapport PDF",
+                                        data=pdf_buffer,
+                                        file_name=f"Rapport_RH_{today_str}.pdf",
+                                        mime="application/pdf",
+                                        type="primary",
+                                        width="stretch"
+                                    )
+                                    st.success("✅ PDF généré avec succès !")
+                                    
+                                except ImportError:
+                                    st.error("❌ Module 'reportlab' non installé. Installation: pip install reportlab")
+                                    st.info("💡 En attendant, voici le PowerPoint:")
+                                    ppt_bytes.seek(0)
+                                    st.download_button(
+                                        label="💾 Télécharger le Rapport PowerPoint",
+                                        data=ppt_bytes,
+                                        file_name=f"Rapport_RH_{today_str}.pptx",
+                                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                                        type="secondary",
+                                        width="stretch"
+                                    )
+                                except Exception as pdf_e:
+                                    st.error(f"❌ Erreur lors de la conversion PDF: {pdf_e}")
+                                    st.info("💡 Téléchargez le PowerPoint à la place:")
+                                    ppt_bytes.seek(0)
+                                    st.download_button(
+                                        label="💾 Télécharger le Rapport PowerPoint",
+                                        data=ppt_bytes,
+                                        file_name=f"Rapport_RH_{today_str}.pptx",
+                                        mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                                        type="secondary",
+                                        width="stretch"
+                                    )
+                            else:
+                                # Export PowerPoint standard
+                                filename = f"Rapport_RH_{today_str}.pptx"
+                                
+                                st.download_button(
+                                    label="💾 Télécharger le Rapport PowerPoint",
+                                    data=ppt_bytes,
+                                    file_name=filename,
+                                    mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                                    type="primary",
+                                    width="stretch"
+                                )
+                                st.success("✅ PowerPoint généré avec succès !")
+            else:
+                st.warning("⚠️ Veuillez d'abord charger des données (Google Sheets ou Excel) avant de générer le PowerPoint.")
+    
+    # Message d'information sur les données chargées
+    has_uploaded = (st.session_state.uploaded_excel is not None) or (st.session_state.get('synced_recrutement_df') is not None)
+    if df_recrutement is None and df_integration is None:
+        st.sidebar.warning("⚠️ Aucune donnée disponible. Veuillez uploader vos fichiers dans l'onglet 'Upload Fichiers'.")
+    elif df_recrutement is None:
+        st.sidebar.warning("⚠️ Données de recrutement non disponibles. Seules les données d'intégration sont chargées.")
+    elif df_integration is None:
+        st.sidebar.warning("⚠️ Données d'intégration non disponibles. Seules les données de recrutement sont chargées.")
+
+    with tabs[2]:
+        if df_recrutement is not None:
+            create_demandes_recrutement_combined_tab(df_recrutement)
+        else:
+            st.warning("📊 Aucune donnée de recrutement disponible. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
+    
+    with tabs[3]:
+        create_weekly_report_tab(df_recrutement)
+
+    with tabs[4]:
+        # Onglet Intégrations basé sur les données Excel
+        if df_recrutement is not None:
+            # Créer les filtres spécifiques pour les intégrations (sans période)
+            st.sidebar.subheader("🔧 Filtres - Intégrations")
+            int_filters = create_integration_filters(df_recrutement, "integrations")
+            create_integrations_tab(df_recrutement, int_filters)
+        else:
+            st.warning("📊 Aucune donnée disponible pour les intégrations. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
+
+    with tabs[5]:
+        st.header("📖 Méthodologie & Guide Utilisateur")
+        
+        st.subheader("Comment générer le reporting ?")
+        st.markdown("""
+        1.  **Chargement des Données** : 
+            *   Allez dans l'onglet **"📂 Upload & Téléchar"**.
+            *   **Option A** : Cliquez sur le bouton rouge **"🔁 Synchroniser depuis Google Sheets"** pour récupérer les données les plus récentes.
+            *   **Option B** : Glissez-déposez votre fichier Excel de recrutement dans la zone de chargement.
+        2.  **Actualisation** : 
+            *   Cliquez impérativement sur le bouton bleu **"🔄 Actualiser les Graphiques"**. Cela déclenche le calcul de tous les indicateurs et la mise à jour des visuels.
+        3.  **Configuration & Filtres** :
+            *   Utilisez le **menu à gauche (sidebar)** pour sélectionner la **"Date de reporting"**. 
+            *   Le reporting hebdomadaire prend en compte la performance de la semaine précédente (période du **Vendredi au Lundi S-1**).
+            *   Affinez vos analyses grâce aux filtres par **Entité**, **Direction** ou **Année**.
+        4.  **Consultation et Export** :
+            *   Naviguez dans les onglets (**Demandes**, **Hebdo**, **Intégrations**) pour visualiser les résultats.
+            *   Pour finir, prenez des captures d'écran des graphiques et tableaux pour les insérer dans le PowerPoint.
+            *   Le reporting des stagaires se prend pour le moment avec Power BI (Lien : https://drive.google.com/file/d/1BF3JNIq11O9FGNzN428r3JiEl3qqYWID/view?usp=drive_link)
+
+        💡 *Une fonction permettant d'automatiser totalement la génération périodique du reporting est actuellement en cours de développement (les captures d'écran des graphiques et tableaux y seront automatiquement intégrées).*
+        """)
+
+        st.markdown("---")
+        st.subheader("🔍 Détail des Indicateurs & Méthodologie")
+        st.markdown("""
+        Cette section explique comment chaque indicateur est calculé pour garantir la fiabilité des données :
+
+        ### 📂 Onglet Demandes & Recrutement
+        - **Besoins en cours par entité** : Calculés à partir des demandes validées par la DRH. Un poste est considéré "en cours" s'il a le statut `En cours`. Si les données sont incomplètes, le système utilise la balance `(Stock Initial + Nouveaux - Pourvus)`.
+        - **Recrutements en cours par recruteur** : Tableau croisé dynamique basé sur la `Colonne TG Hire`. Le **"Total (hors clôture)"** additionne les étapes *Sourcing*, *Shortlisté* et *Signature DRH* pour mesurer la charge active.
+        - **Comparaison par direction / poste** : Histogrammes de volume basés sur les colonnes `Direction concernée` et `Poste demandé`. Les labels sont tronqués pour la lisibilité mais le nom complet est visible au survol.
+        - **Évolution mensuelle** : Agrégation temporelle basée sur la `Date de réception de la demande`.
+
+        ### 📅 Onglet Reporting Hebdomadaire
+        - **Fenêtre de calcul** : Basée sur la `Date de reporting` sélectionnée dans le menu latéral. Elle analyse la performance du **Lundi au Vendredi** de la semaine précédente.
+        - **Postes Avant** : Demandes ouvertes avant le lundi de la semaine S-1.
+        - **Nouveaux** : Demandes reçues entre le lundi et le vendredi de la semaine S-1.
+        - **Pourvus** : Recrutements dont la date d'acceptation du candidat tombe dans la semaine S-1.
+        - **Stock (En cours)** : Postes restant ouverts (Statut 'En cours' + Pas de candidat retenu) à la fin de la période.
+
+        ### 🤝 Onglet Intégrations
+        - **Critères d'Inclusion** : Seules les demandes avec le statut `En cours` ET un `Nom de candidat` renseigné sont affichées ici.
+        - **Signal "⚠️ En retard"** : Une alerte rouge s'affiche si la `Date d'entrée prévisionnelle` est antérieure à la date du jour (ou la date de reporting choisie).
+        - **Répartition par Entité** : Visualisation en "Donut Chart" pour identifier les filiales avec le plus gros volume d'arrivées imminentes.
+
+        ### 🎯 Indicateurs de Performance (KPIs)
+        - **Nombre de candidats présélectionnés** : Somme cumulative de la colonne `Nb de candidats pré-selectionnés`.
+        - **Délai de recrutement (Duree de recrutement)** : Calculé selon la formule : `DATEDIFF('Date de réception de la demande','Date du 1er retour equipe RH', day)`. Cet indicateur se base **uniquement** sur les postes ayant le statut **"Clôture"**.
+        - **Taux de refus des promesses d'embauche (%)** :
+            - **Dénominateur** : nombre de lignes où `Nb de promesses d'embauche réalisée` = 1 (toutes les promesses effectivement réalisées, que la `Colonne TG Hire` soit `Clôture` ou `Désistement`).
+            - **Numérateur** : parmi ces mêmes lignes, nombre de cas où `Nb de refus aux promesses d'embauches` = 1 (refus explicite de la promesse).
+            - Les cas `Clôture` avec promesse réalisée = 1 et refus = 0 sont donc bien pris en compte dans le dénominateur mais pas dans le numérateur, ce qui fait mécaniquement baisser le taux.
+        """, unsafe_allow_html=True)
+
+if __name__ == "__main__":
+    main()
