@@ -5202,21 +5202,25 @@ def main():
                 { 'Direction': 'Encadrement Chantier', 'Clos': '8 / 76', 'Budget prévue (DH)': 1_500_000, 'Budget engagé (DH)': 1_480_000, 'slipping (écart)': -20_000 },
                 { 'Direction': 'Pôle Admin & Fin.', 'Clos': '2 / 4', 'Budget prévue (DH)': 300_000, 'Budget engagé (DH)': 310_000, 'slipping (écart)': -10_000 },
             ]
-
+        # Ensure df_detail exists and add totals row
+        if 'detail_rows' in locals():
             df_detail = pd.DataFrame(detail_rows)
-            # Ajouter une ligne Totaux pour les colonnes numériques
-            if not df_detail.empty:
-                total_prevue = df_detail['Budget prévue (DH)'].replace('', 0).fillna(0).astype(float).sum()
-                total_engage = df_detail['Budget engagé (DH)'].replace('', 0).fillna(0).astype(float).sum()
-                total_slip = df_detail['slipping (écart)'].replace('', 0).fillna(0).astype(float).sum()
-                totals_row = pd.DataFrame([{
-                    'Direction': 'TOTAL',
-                    'Clos': '',
-                    'Budget prévue (DH)': total_prevue,
-                    'Budget engagé (DH)': int(total_engage),
-                    'slipping (écart)': total_slip
-                }])
-                df_detail = pd.concat([df_detail, totals_row], ignore_index=True)
+        else:
+            df_detail = pd.DataFrame()
+
+        if not df_detail.empty:
+            total_prevue = df_detail['Budget prévue (DH)'].replace('', 0).fillna(0).astype(float).sum()
+            total_engage = df_detail['Budget engagé (DH)'].replace('', 0).fillna(0).astype(float).sum()
+            total_slip = df_detail['slipping (écart)'].replace('', 0).fillna(0).astype(float).sum()
+            totals_row = pd.DataFrame([{
+                'Direction': 'TOTAL',
+                'Clos': '',
+                'Budget prévue (DH)': total_prevue,
+                'Budget engagé (DH)': int(total_engage),
+                'slipping (écart)': total_slip
+            }])
+            df_detail = pd.concat([df_detail, totals_row], ignore_index=True)
+
         if 'Budget prévue (DH)' in df_detail.columns:
             df_detail['Budget prévue (DH)'] = df_detail['Budget prévue (DH)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
         if 'Budget engagé (DH)' in df_detail.columns:
