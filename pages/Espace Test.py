@@ -5267,19 +5267,21 @@ def main():
             pass
 
         # Increase bar chart size slightly
-        fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'', 'y':''}, text=[f"{p}%" for p in perc], height=520)
+        fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'', 'y':''}, text=[f"{p}%" for p in perc], height=420)
         fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=16)), showlegend=False)
         fig_bar = apply_title_style(fig_bar)
 
-        st.plotly_chart(fig_bar, use_container_width=True)
-
-
         # ===== GRAPHIQUE TENDANCE MENSUELLE =====
-        st.markdown("---")
-        st.subheader("Tendance de consommation budgétaire")
+        # Layout: put both chart groups side-by-side
+        col_consumption, col_trend = st.columns([1, 1.2])
         
-        # Créer un graphique "Budget consommé vs restant" en donut + graphique tendance
-        col_chart1, col_chart2 = st.columns([1, 2])
+        with col_consumption:
+            st.plotly_chart(fig_bar, use_container_width=True)
+        
+        with col_trend:
+            st.markdown("<h3 style='margin-bottom: 0;'>Tendance de consommation budgétaire</h3>", unsafe_allow_html=True)
+            # Créer un graphique "Budget consommé vs restant" en donut + graphique tendance
+            col_chart1, col_chart2 = st.columns([1, 1.2])
         
         with col_chart1:
             # Donut chart : Budget consommé vs restant
@@ -5292,7 +5294,7 @@ def main():
                 )])
                 fig_donut.update_layout(
                     title='Budget consommé vs restant',
-                    height=380,
+                    height=320,
                     showlegend=True,
                     legend=dict(x=1.0, y=0.5, xanchor='left', yanchor='middle')
                 )
@@ -5485,10 +5487,10 @@ def main():
         st.markdown("""
         <style>
         .custom-table-small {border-collapse: collapse; width: 85%; margin:auto; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed}
-        .custom-table-small th {background:#9C182F;color:white;padding:2px 3px;text-align:left;font-size:12px;}
-        .custom-table-small td {padding:2px 3px;border-bottom:1px solid #eee; font-size:0.88em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+        .custom-table-small th {background:#9C182F;color:white;padding:1px 2px;text-align:left;font-size:13px;font-weight:600;}
+        .custom-table-small td {padding:1px 2px;border-bottom:1px solid #eee; font-size:0.95em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
         .custom-table-small tbody tr:last-child {background:#9C182F; color:white}
-        .custom-table-small tbody tr:last-child td {color:white; font-weight:700; padding:2px 3px;}
+        .custom-table-small tbody tr:last-child td {color:white; font-weight:700; padding:1px 2px;}
         .budget-surplus {color:#2ca02c; font-weight:600}
         .budget-deficit {color:#d62728; font-weight:600}
         </style>
