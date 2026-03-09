@@ -8,7 +8,7 @@ st.set_page_config(
 )
 
 # Vérification de la connexion (avant imports lourds)
-require_login()
+# require_login() disabled for the test page so it is accessible without login
 
 import pandas as pd
 import plotly.express as px
@@ -1887,6 +1887,7 @@ def calculate_weekly_metrics(df_recrutement):
     # Créer une copie pour les calculs
     df = df_recrutement.copy()
 
+                    
     # Toujours exclure les demandes clôturées/annulées du compteur 'avant'
     # (la case UI a été supprimée : les demandes clôturées ne sont pas comptées)
     include_closed = False
@@ -5034,12 +5035,12 @@ def main():
             else:
                 statut_global = "--"
 
-            # Nombre de recrutements clos (heuristique)
+            # Nombre de recrutements clos (heuristique) — n'accepte que les lignes dont le statut est exactement 'Clôture'
             nb_recrutements_clos = None
             col_statut = find_col([r'statut', r'clos', r'pourvu', r'recrut'])
             if col_statut is not None:
                 try:
-                    nb_recrutements_clos = int(dfb[col_statut].astype(str).str.contains(r'clos|pourvu|réalisé|terminé', case=False, na=False).sum())
+                    nb_recrutements_clos = int(dfb[col_statut].astype(str).apply(lambda s: _normalize_text(s) == 'cloture').sum())
                 except Exception:
                     nb_recrutements_clos = None
 
@@ -5213,12 +5214,12 @@ def main():
                         group = dfr[dfr['_dir_norm'] == dir_norm]
                         total = int(group.shape[0])
                         if status_col_r is not None:
-                            closed = int(group[status_col_r].astype(str).str.contains(r'clôtur|clotur|clos|pourvu|réalisé|terminé', case=False, na=False).sum())
+                            closed = int(group[status_col_r].astype(str).apply(lambda s: _normalize_text(s) == 'cloture').sum())
                         else:
                             # fallback using a broad statut column if present
                             match_col = next((c for c in dfr.columns if re.search(r'statut', str(c), re.I)), None)
                             if match_col is not None:
-                                closed = int(group[match_col].astype(str).str.contains(r'clôtur|clotur|clos|pourvu|réalisé|terminé', case=False, na=False).sum())
+                                closed = int(group[match_col].astype(str).apply(lambda s: _normalize_text(s) == 'cloture').sum())
                             else:
                                 closed = 0
                         clos_str = f"{closed} / {total}"
@@ -5301,9 +5302,11 @@ def main():
 
         st.markdown("""
         <style>
-        .custom-table-small {border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05);}
-        .custom-table-small th {background:#9C182F;color:white;padding:8px;text-align:left}
-        .custom-table-small td {padding:8px;border-bottom:1px solid #eee; font-size:1.06em}
+        .custom-table-small {border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed}
+        .custom-table-small th {background:#9C182F;color:white;padding:6px 8px;text-align:left}
+        .custom-table-small td {padding:6px 8px;border-bottom:1px solid #eee; font-size:0.98em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+        .custom-table-small tbody tr:last-child {background:#9C182F; color:white}
+        .custom-table-small tbody tr:last-child td {color:white; font-weight:700}
         </style>
         """, unsafe_allow_html=True)
 
