@@ -5178,7 +5178,9 @@ def main():
                         budget_annuel_total = None
 
             # Détecter budget engagé / consommation
+            # ⚠️ IMPORTANT: Seuls les recrutements "Clôture" comptent comme réellement engagés
             budget_engage = None
+            col_statut_recr = find_col([r'statut.*recr', r'statut.*demand', r'statut'])
             # Prefer explicit 'Salaire net négocié' if present
             col_engage = None
             if 'Salaire net négocié' in dfb.columns:
@@ -5187,15 +5189,22 @@ def main():
                 col_engage = find_col([r'engag', r'consomm', r'depens', r'montant', r'salaire'])
             if col_engage is not None:
                 try:
-                    budget_engage = int(dfb[col_engage].dropna().sum())
+                    # Filtrer SEULEMENT les lignes avec Statut recrutement = "Clôture"
+                    dfb_cloture = dfb.copy()
+                    if col_statut_recr is not None and col_statut_recr in dfb_cloture.columns:
+                        dfb_cloture = dfb_cloture[dfb_cloture[col_statut_recr].astype(str).apply(lambda s: _normalize_text(s) == 'cloture')]
+                    budget_engage = int(dfb_cloture[col_engage].dropna().sum())
                 except Exception:
                     budget_engage = None
             else:
-                # fallback: première colonne numérique non vide
+                # fallback: première colonne numérique non vide (avec filtre Clôture si possible)
                 numeric_cols = [c for c in dfb.columns if pd.api.types.is_numeric_dtype(dfb[c])]
                 if numeric_cols:
                     try:
-                        budget_engage = int(dfb[numeric_cols[0]].dropna().sum())
+                        dfb_cloture = dfb.copy()
+                        if col_statut_recr is not None and col_statut_recr in dfb_cloture.columns:
+                            dfb_cloture = dfb_cloture[dfb_cloture[col_statut_recr].astype(str).apply(lambda s: _normalize_text(s) == 'cloture')]
+                        budget_engage = int(dfb_cloture[numeric_cols[0]].dropna().sum())
                     except Exception:
                         budget_engage = None
 
@@ -5267,17 +5276,24 @@ def main():
                     except Exception:
                         budget_prevue_dir = 0
 
-                    # budget engagé (Salaire net négocié) for this direction
+                    # budget engagé (Salaire net négocié) for this direction - FILTRÉE SUR CLÔTURE
                     try:
                         if 'Salaire net négocié' in df_budget.columns:
-                            budget_engage_dir = pd.to_numeric(df_budget[df_budget['_dir_norm'] == dir_norm]['Salaire net négocié'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
+                            # Filtrer SEULEMENT les lignes avec Statut recrutement = "Clôture"
+                            df_budget_cloture = df_budget[df_budget['_dir_norm'] == dir_norm].copy()
+                            if 'Statut recrutement' in df_budget_cloture.columns:
+                                df_budget_cloture = df_budget_cloture[df_budget_cloture['Statut recrutement'].astype(str).apply(lambda s: _normalize_text(s) == 'cloture')]
+                            budget_engage_dir = pd.to_numeric(df_budget_cloture['Salaire net négocié'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
                         else:
                             # fallback to recrutement column if available
                             budget_engage_dir = 0
                             if 'df_recrutement' in locals() and df_recrutement is not None:
                                 cols_r = [c for c in df_recrutement.columns if re.search(r'salaire net négocié|salaire|montant', str(c), re.I)]
                                 if cols_r:
-                                    budget_engage_dir = pd.to_numeric(df_recrutement[df_recrutement['_dir_norm'] == dir_norm][cols_r[0]].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
+                                    df_recr_cloture = df_recrutement[df_recrutement['_dir_norm'] == dir_norm].copy()
+                                    if 'Statut recrutement' in df_recr_cloture.columns:
+                                        df_recr_cloture = df_recr_cloture[df_recr_cloture['Statut recrutement'].astype(str).apply(lambda s: _normalize_text(s) == 'cloture')]
+                                    budget_engage_dir = pd.to_numeric(df_recr_cloture[cols_r[0]].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
                     except Exception:
                         budget_engage_dir = 0
 
@@ -5401,12 +5417,16 @@ def main():
                 except Exception:
                     budget_prevue = 0
 
-                # Budget engagé: sum Salaire net négocié for this direction
+                # Budget engagé: sum Salaire net négocié for this direction - UNIQUEMENT les recrutements CLÔTURÉS
                 budget_engaged_dir = 0
                 try:
                     if 'Salaire net négocié' in dfb.columns:
+                        # Filtrer SEULEMENT les lignes avec Statut recrutement = "Clôture"
+                        dir_group_cloture = dir_group.copy()
+                        if 'Statut recrutement' in dir_group_cloture.columns:
+                            dir_group_cloture = dir_group_cloture[dir_group_cloture['Statut recrutement'].astype(str).apply(lambda s: _normalize_text(s) == 'cloture')]
                         budget_engaged_dir = pd.to_numeric(
-                            dir_group['Salaire net négocié'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."),
+                            dir_group_cloture['Salaire net négocié'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."),
                             errors='coerce'
                         ).fillna(0).sum()
                 except Exception:
