@@ -4953,6 +4953,17 @@ def main():
         else:
             df_budget = None
 
+        # Debug helper: show which DataFrame is used and their columns (temporary)
+        with st.expander("Debug: sources et colonnes (temporaire)", expanded=False):
+            st.write("df_budget source:", 'synced' if synced is not None else ('local' if local is not None else 'none'))
+            if df_budget is not None:
+                st.write('df_budget columns:', list(df_budget.columns))
+                st.write('df_budget sample:', df_budget.head(2))
+            # recruitment DF used by Pilotage computations
+            if 'df_recrutement' in locals() and df_recrutement is not None:
+                st.write('df_recrutement columns:', list(df_recrutement.columns))
+                st.write("sample directions/statuts:", df_recrutement[['Direction concernée']].head(3) if 'Direction concernée' in df_recrutement.columns else df_recrutement.head(3))
+
         # KPI cards (haut) - valeurs dynamiques si df_budget fourni
         budget_annuel_total = None
         budget_engage = None
