@@ -5188,44 +5188,53 @@ def main():
             dir_col_r = None
             status_col_r = None
             if recr_exists:
-                # try find direction column in recruitment table
-                for c in df_recrutement.columns:
-                    if re.search(r'direction', str(c), re.I):
-                        dir_col_r = c
-                        break
-                # try find statut recrutement column (prefer explicit name)
-                for c in df_recrutement.columns:
-                    if re.search(r'statut\s*recrut|statut', str(c), re.I):
-                        status_col_r = c
-                        break
-                # create normalized dir key in recrutement df for matching
-                if dir_col_r is not None:
-                    dfr = df_recrutement.copy()
-                    dfr['_dir_norm'] = dfr[dir_col_r].astype(str).apply(_normalize_text)
+                # Prefer explicit 'Direction concernée' if present, else try to detect a 'direction' column
+                if 'Direction concernée' in df_recrutement.columns:
+                    dir_col_r = 'Direction concernée'
                 else:
-                    dfr = df_recrutement.copy()
-                    dfr['_dir_norm'] = dfr['Direction concernée'].astype(str).apply(_normalize_text) if 'Direction concernée' in dfr.columns else dfr.iloc[:,0].astype(str).apply(_normalize_text)
+                    dir_col_r = next((c for c in df_recrutement.columns if re.search(r'\bdirection\b', str(c), re.I)), None)
+
+                # Prefer explicit 'Statut recrutement' (or close variants), else fallback to any 'statut' containing column
+                preferred_status_names = ['Statut recrutement', 'Statut de la demande', 'Statut']
+                for pref in preferred_status_names:
+                    for c in df_recrutement.columns:
+                        try:
+                            if _normalize_text(c) == _normalize_text(pref):
+                                status_col_r = c
+                                break
+                        except Exception:
+                            continue
+                    if status_col_r is not None:
+                        break
+                if status_col_r is None:
+                    status_col_r = next((c for c in df_recrutement.columns if re.search(r'statut', str(c), re.I)), None)
+
+                # create normalized dir key in recrutement df for matching
+                dfr = df_recrutement.copy()
+                if dir_col_r is not None and dir_col_r in dfr.columns:
+                    dfr['_dir_norm'] = dfr[dir_col_r].astype(str).apply(_normalize_text)
+                elif 'Direction concernée' in dfr.columns:
+                    dfr['_dir_norm'] = dfr['Direction concernée'].astype(str).apply(_normalize_text)
+                else:
+                    first_col = dfr.columns[0]
+                    dfr['_dir_norm'] = dfr[first_col].astype(str).apply(_normalize_text)
 
             for d in dirs_list:
                 dir_norm = _normalize_text(d)
                 # count posts and closed posts from recruitment using normalized matching
-                if recr_exists:
-                    try:
-                        group = dfr[dfr['_dir_norm'] == dir_norm]
-                        total = int(group.shape[0])
-                        if status_col_r is not None:
-                            closed = int(group[status_col_r].astype(str).apply(lambda s: _normalize_text(s) == 'cloture').sum())
-                        else:
-                            # fallback using a broad statut column if present
-                            match_col = next((c for c in dfr.columns if re.search(r'statut', str(c), re.I)), None)
-                            if match_col is not None:
-                                closed = int(group[match_col].astype(str).apply(lambda s: _normalize_text(s) == 'cloture').sum())
+                    if recr_exists:
+                        try:
+                            group = dfr[dfr['_dir_norm'] == dir_norm]
+                            total = int(group.shape[0])
+                            # Strict rule: consider a poste 'clos' ONLY when the statut (normalized) equals 'cloture'
+                            if status_col_r is not None and status_col_r in group.columns:
+                                closed = int(group[status_col_r].astype(str).apply(lambda s: _normalize_text(s) == 'cloture').sum())
                             else:
                                 closed = 0
-                        clos_str = f"{closed} / {total}"
-                    except Exception:
-                        clos_str = "0 / 0"
-                        total = 0
+                            clos_str = f"{closed} / {total}"
+                        except Exception:
+                            clos_str = "0 / 0"
+                            total = 0
                 else:
                     clos_str = "0 / 0"
                     total = 0
