@@ -5222,19 +5222,19 @@ def main():
             for d in dirs_list:
                 dir_norm = _normalize_text(d)
                 # count posts and closed posts from recruitment using normalized matching
-                    if recr_exists:
-                        try:
-                            group = dfr[dfr['_dir_norm'] == dir_norm]
-                            total = int(group.shape[0])
-                            # Strict rule: consider a poste 'clos' ONLY when the statut (normalized) equals 'cloture'
-                            if status_col_r is not None and status_col_r in group.columns:
-                                closed = int(group[status_col_r].astype(str).apply(lambda s: _normalize_text(s) == 'cloture').sum())
-                            else:
-                                closed = 0
-                            clos_str = f"{closed} / {total}"
-                        except Exception:
-                            clos_str = "0 / 0"
-                            total = 0
+                if recr_exists:
+                    try:
+                        group = dfr[dfr['_dir_norm'] == dir_norm]
+                        total = int(group.shape[0])
+                        # Strict rule: consider a poste 'clos' ONLY when the statut (normalized) equals 'cloture'
+                        if status_col_r is not None and status_col_r in group.columns:
+                            closed = int(group[status_col_r].astype(str).apply(lambda s: _normalize_text(s) == 'cloture').sum())
+                        else:
+                            closed = 0
+                        clos_str = f"{closed} / {total}"
+                    except Exception:
+                        clos_str = "0 / 0"
+                        total = 0
                 else:
                     clos_str = "0 / 0"
                     total = 0
