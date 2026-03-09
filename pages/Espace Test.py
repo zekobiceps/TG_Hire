@@ -743,19 +743,27 @@ def load_data_from_files(csv_file=None, excel_file=None):
             else:
                 # Fallback vers fichier local s'il existe (recherche du plus récent)
                 import glob
-                # Pattern pour trouver les fichiers Excel de recrutement
-                excel_files = glob.glob('Recrutement global PBI All*.xlsx')
-                if excel_files:
-                    # Trier par date de modification (le plus récent en dernier)
-                    excel_files.sort(key=os.path.getmtime)
-                    latest_excel = excel_files[-1]
-                    # st.info(f"Chargement automatique du fichier local : {latest_excel}")
-                    df_recrutement = pd.read_excel(latest_excel, sheet_name=0)
-                else:
-                    # Fallback legacy
-                    local_excel = 'Recrutement global PBI All  google sheet (5).xlsx'
-                    if os.path.exists(local_excel):
-                        df_recrutement = pd.read_excel(local_excel, sheet_name=0)
+                # Chercher d'abord Recrutement 2026 (priorité)
+                prioritized_files = ['Recrutement 2026 (3).xlsx', 'Recrutement 2026 (2).xlsx', 'Recrutement 2026.xlsx']
+                for prio_file in prioritized_files:
+                    if os.path.exists(prio_file):
+                        df_recrutement = pd.read_excel(prio_file, sheet_name=0)
+                        break
+                
+                # Si pas trouvé, chercher Recrutement global PBI All*.xlsx
+                if df_recrutement is None:
+                    excel_files = glob.glob('Recrutement global PBI All*.xlsx')
+                    if excel_files:
+                        # Trier par date de modification (le plus récent en dernier)
+                        excel_files.sort(key=os.path.getmtime)
+                        latest_excel = excel_files[-1]
+                        # st.info(f"Chargement automatique du fichier local : {latest_excel}")
+                        df_recrutement = pd.read_excel(latest_excel, sheet_name=0)
+                    else:
+                        # Fallback legacy
+                        local_excel = 'Recrutement global PBI All  google sheet (5).xlsx'
+                        if os.path.exists(local_excel):
+                            df_recrutement = pd.read_excel(local_excel, sheet_name=0)
         except Exception as e:
             st.error(f"Erreur lors du chargement des données de recrutement: {e}")
 
