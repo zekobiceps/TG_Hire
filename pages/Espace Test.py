@@ -5196,7 +5196,7 @@ def main():
                 fig_donut = go.Figure(data=[go.Pie(
                     labels=['Consommé', 'Restant'],
                     values=[budget_engage, budget_restant],
-                    hole=0.32,
+                    hole=0.25,
                     marker=dict(colors=['#2ca02c', '#ff7f0e']),
                     textinfo='percent',
                     texttemplate='%{percent:.1%}',
@@ -5206,7 +5206,7 @@ def main():
                     hovertemplate='<b>%{label}</b><br>%{value:,.0f} DH<br>%{percent:.1%}<extra></extra>'
                 )])
                 # Add annotations outside: label + value
-                fig_donut.add_annotation(text=f"<b>Consommé</b><br>{budget_engage:,.0f} DH", x=0.25, y=0.75, showarrow=False, font=dict(size=13, color='#2ca02c'))
+                fig_donut.add_annotation(text=f"<b>Consommé</b><br>{budget_engage:,.0f} DH", x=-0.1, y=0.85, showarrow=False, font=dict(size=13, color='#2ca02c'))
                 fig_donut.add_annotation(text=f"<b>Restant</b><br>{budget_restant:,.0f} DH", x=0.85, y=-0.12, showarrow=False, font=dict(size=13, color='#ff7f0e'))
                 fig_donut.update_layout(
                     title=dict(text='Budget consommé vs restant', x=0, xanchor='left', font=TITLE_FONT),
