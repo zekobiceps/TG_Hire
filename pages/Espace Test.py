@@ -5155,8 +5155,10 @@ def main():
 
         # Increase bar chart height to show long percentage values properly
         fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'', 'y':''}, text=[f"{p}%" for p in perc], height=400)
-        fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=13)), showlegend=False, margin=dict(l=180, r=140, t=50, b=30))
-        fig_bar.update_traces(textposition='outside', textfont=dict(size=11))
+        fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=13)), showlegend=False, margin=dict(l=180, r=20, t=50, b=30), xaxis=dict(range=[0, max(perc)*1.25] if perc else None))
+        fig_bar.update_traces(textposition='inside', textfont=dict(size=11, color='white'), insidetextanchor='end', cliponaxis=False)
+        # For small bars, put text outside so it's readable
+        fig_bar.for_each_trace(lambda t: t.update(textposition='outside', textfont=dict(size=11, color='#333')) if max(t.x) < 10 else None)
         fig_bar = apply_title_style(fig_bar)
 
         # ===== GRAPHIQUE TENDANCE MENSUELLE =====
@@ -5173,21 +5175,21 @@ def main():
         with col_chart1:
             # Donut chart : Budget consommé vs restant
             if budget_annuel_total and budget_engage:
-                # Calculate percentages for display
-                pct_consume = (budget_engage / budget_annuel_total * 100) if budget_annuel_total > 0 else 0
-                pct_remaining = 100 - pct_consume
                 fig_donut = go.Figure(data=[go.Pie(
-                    labels=['Budget consommé', 'Budget restant'],
+                    labels=['Consommé', 'Restant'],
                     values=[budget_engage, budget_restant],
                     hole=0.4,
                     marker=dict(colors=['#2ca02c', '#ff7f0e']),
-                    textinfo='label+value',
-                    texttemplate='<b>%{label}</b><br>%{value:,.0f} DH<br><i>%{percent:.1%}</i>'
+                    textinfo='label+value+percent',
+                    texttemplate='<b>%{label}</b><br>%{value:,.0f} DH<br>%{percent:.1%}',
+                    textposition='inside',
+                    insidetextorientation='horizontal'
                 )])
                 fig_donut.update_layout(
-                    title='Budget consommé vs restant',
+                    title=dict(text='Budget consommé vs restant', x=0, xanchor='left', font=TITLE_FONT),
                     height=320,
-                    showlegend=False
+                    showlegend=False,
+                    margin=dict(l=10, r=10, t=50, b=10)
                 )
                 st.plotly_chart(fig_donut, use_container_width=True)
         
@@ -5250,12 +5252,15 @@ def main():
                     marker=dict(size=8, color='#ff7f0e'),
                     line=dict(color='#ff7f0e', width=2)
                 )
+                # Extend y-axis range to fit highest value label (e.g. 90,000)
+                y_max = df_mois['Consommé'].max() if len(df_mois) > 0 else 100000
                 fig_mois.update_layout(
                     xaxis_title='',
                     yaxis_title='Montant (DH)',
                     showlegend=False,
                     hovermode='x',
-                    margin=dict(l=50, r=30, t=50, b=50)
+                    margin=dict(l=60, r=30, t=50, b=50),
+                    yaxis=dict(range=[0, y_max * 1.2])
                 )
                 fig_mois = apply_title_style(fig_mois)
                 st.plotly_chart(fig_mois, use_container_width=True)
@@ -5379,13 +5384,17 @@ def main():
             df_detail['Budget engagé (DH)'] = df_detail['Budget engagé (DH)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
         st.markdown("""
         <style>
-        .custom-table-small {border-collapse: collapse; width: 85%; margin:auto; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed; border-spacing: 0;}
-        .custom-table-small th {background:#9C182F;color:white;padding:1px 0.2px;text-align:center;font-size:14px;font-weight:700;}
-        .custom-table-small td {padding:0.25px 0.2px;border-bottom:1px solid #eee; font-size:0.90em; text-align:center;}
+        .custom-table-small {border-collapse: collapse; width: 70%; margin:auto; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed; border-spacing: 0;}
+        .custom-table-small th {background:#9C182F;color:white;padding:2px 4px;text-align:center;font-size:14px;font-weight:700;}
+        .custom-table-small td {padding:2px 4px;border-bottom:1px solid #eee; font-size:0.90em; text-align:center;}
         .custom-table-small td:first-child, .custom-table-small th:first-child {text-align:left;}
         .custom-table-small tbody tr:last-child {background:#9C182F; color:white}
-        .custom-table-small tbody tr:last-child td {color:white; font-weight:700; padding:0.25px 0.2px; text-align:center;}
+        .custom-table-small tbody tr:last-child td {color:white; font-weight:700; padding:2px 4px; text-align:center;}
         .custom-table-small tbody tr:last-child td:first-child {text-align:left;}
+        .custom-table-small th:nth-child(1), .custom-table-small td:nth-child(1){width:40%;}
+        .custom-table-small th:nth-child(2), .custom-table-small td:nth-child(2){width:12%;}
+        .custom-table-small th:nth-child(3), .custom-table-small td:nth-child(3){width:24%;}
+        .custom-table-small th:nth-child(4), .custom-table-small td:nth-child(4){width:24%;}
         </style>
         """, unsafe_allow_html=True)
 
