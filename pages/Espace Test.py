@@ -2396,9 +2396,9 @@ def create_weekly_report_tab(df_recrutement=None):
 
                     # Construire le HTML du tableau
                     html_rec = '<div class="table-container" style="margin-top:8px;">'
-                    # Styles spécifiques pour équilibrer les colonnes : Nouvelle demande et Signature DRH plus larges, autres réduites
-                    html_rec += '<style>.rec-table th:nth-child(2), .rec-table td:nth-child(2){width:90px;} .rec-table th:nth-child(3), .rec-table td:nth-child(3){width:70px;} .rec-table th:nth-child(4), .rec-table td:nth-child(4){width:70px;} .rec-table th:nth-child(5), .rec-table td:nth-child(5){width:90px;} .rec-table th:nth-child(6), .rec-table td:nth-child(6){width:65px;}</style>'
-                    html_rec += '<table class="custom-table rec-table" style="width:60%; margin:0;">'
+                    # Styles spécifiques pour égaliser les colonnes : largeurs égales pour les 6 colonnes
+                    html_rec += '<style>.rec-table th:nth-child(1), .rec-table td:nth-child(1){width:14%;} .rec-table th:nth-child(2), .rec-table td:nth-child(2){width:14%;} .rec-table th:nth-child(3), .rec-table td:nth-child(3){width:14%;} .rec-table th:nth-child(4), .rec-table td:nth-child(4){width:14%;} .rec-table th:nth-child(5), .rec-table td:nth-child(5){width:14%;} .rec-table th:nth-child(6), .rec-table td:nth-child(6){width:14%;} .rec-table th:nth-child(7), .rec-table td:nth-child(7){width:14%;}</style>'
+                    html_rec += '<table class="custom-table rec-table" style="width:100%; margin:0;">'
                     # Header
                     html_rec += '<thead><tr><th>Recruteur</th>'
                     for s in wanted_statuses:
@@ -5209,30 +5209,17 @@ def main():
             except Exception:
                 nb_postes_clos_total = 0
         
-        # Coût moyen réel sur tous les recrutements clôturés
-        coût_moyen_reel = 0
-        if nb_postes_clos_total > 0 and budget_engage:
-            coût_moyen_reel = int(budget_engage / nb_postes_clos_total)
-        
-        # KPI Row 1 : Métriques principales du storytelling (format carte HTML)
-        metrics_principal = [
+        # ===== KPIs COMBINÉS =====
+        # Combiner les métriques principales et secondaires en une seule rangée
+        metrics_combined = [
             ("Recrutements Clôturés", f"{nb_postes_clos_total}/{nb_total_postes}", "#1f77b4"),
             ("Budget Restant", f"{budget_restant:,.0f} DH" if budget_restant else "-", "#2ca02c"),
-            ("Coût Moyen Réel", f"{coût_moyen_reel:,.0f} DH" if coût_moyen_reel else "-", "#ff7f0e"),
             ("Taux de Consommation", f"{taux_consommation:.1f}%" if taux_consommation else "-", "#172b4d"),
-        ]
-        st.markdown(render_generic_metrics(metrics_principal), unsafe_allow_html=True)
-        
-        st.markdown("---")
-        
-        # ===== KPIs SECONDAIRES (Détails) =====
-        metrics = [
             ("Budget Annuel Total", f"{budget_annuel_total:,.0f} DH" if budget_annuel_total else "-", "#1f77b4"),
             ("Budget Actuellement Engagé", f"{budget_engage:,.0f} DH" if budget_engage else "-", "#2ca02c"),
-            ("Postes restants à pourvoir", f"{nb_total_postes - nb_postes_clos_total}", "#ff7f0e"),
             ("Statut budgétaire global", statut_global, "#2ca02c" if statut_global == "CONFORME" else "#d62728"),
         ]
-        st.markdown(render_generic_metrics(metrics), unsafe_allow_html=True)
+        st.markdown(render_generic_metrics(metrics_combined), unsafe_allow_html=True)
 
         # Graphiques de tendance et consommation par direction
         col_left, col_right = st.columns([2,1])
@@ -5562,9 +5549,9 @@ def main():
         
         detail_rows.sort(key=lambda x: extract_closed_count(x['Clos']), reverse=True)
         
-        # Limiter aux 5 top directions pour réduire la longueur et centraliser (enlever ~50%)
-        if len(detail_rows) > 5:
-            detail_rows = detail_rows[:5]
+        # Limiter aux 10 top directions par nombre de clôturés pour afficher plus de détails
+        if len(detail_rows) > 10:
+            detail_rows = detail_rows[:10]
         
         # Ensure df_detail exists and add totals row
         if 'detail_rows' in locals():
@@ -5607,10 +5594,10 @@ def main():
         st.markdown("""
         <style>
         .custom-table-small {border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed}
-        .custom-table-small th {background:#9C182F;color:white;padding:6px 8px;text-align:left}
-        .custom-table-small td {padding:6px 8px;border-bottom:1px solid #eee; font-size:0.98em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+        .custom-table-small th {background:#9C182F;color:white;padding:3px 4px;text-align:left;font-size:13px;}
+        .custom-table-small td {padding:3px 4px;border-bottom:1px solid #eee; font-size:0.93em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
         .custom-table-small tbody tr:last-child {background:#9C182F; color:white}
-        .custom-table-small tbody tr:last-child td {color:white; font-weight:700}
+        .custom-table-small tbody tr:last-child td {color:white; font-weight:700; padding:3px 4px;}
         .budget-surplus {color:#2ca02c; font-weight:600}
         .budget-deficit {color:#d62728; font-weight:600}
         </style>
