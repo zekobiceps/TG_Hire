@@ -2398,7 +2398,7 @@ def create_weekly_report_tab(df_recrutement=None):
                     html_rec = '<div class="table-container" style="margin-top:8px;">'
                     # Styles spécifiques pour égaliser les colonnes : largeurs égales pour les 6 colonnes
                     html_rec += '<style>.rec-table th:nth-child(1), .rec-table td:nth-child(1){width:14%;} .rec-table th:nth-child(2), .rec-table td:nth-child(2){width:14%;} .rec-table th:nth-child(3), .rec-table td:nth-child(3){width:14%;} .rec-table th:nth-child(4), .rec-table td:nth-child(4){width:14%;} .rec-table th:nth-child(5), .rec-table td:nth-child(5){width:14%;} .rec-table th:nth-child(6), .rec-table td:nth-child(6){width:14%;} .rec-table th:nth-child(7), .rec-table td:nth-child(7){width:14%;}</style>'
-                    html_rec += '<table class="custom-table rec-table" style="width:100%; margin:0;">'
+                    html_rec += '<table class="custom-table rec-table" style="width:70%; margin:auto;">'
                     # Header
                     html_rec += '<thead><tr><th>Recruteur</th>'
                     for s in wanted_statuses:
@@ -5222,115 +5222,7 @@ def main():
         st.markdown(render_generic_metrics(metrics_combined), unsafe_allow_html=True)
 
         # Graphiques de tendance et consommation par direction
-        col_left, col_right = st.columns([2,1])
-
-        # Graphique de Productivité du Budget (Efficacité) demandé par l'utilisateur
-        # X : Directions (issues de df_budget)
-        # Barre 1 : Coût moyen prévu par poste = (Budget Net par direction) / (nombre de postes dans cette direction)
-        # Barre 2 : Coût moyen réel constaté = (Salaire net négocié par direction) / (nombre de postes dans cette direction)
-        prod_rows = []
-        try:
-            if df_budget is not None and isinstance(df_budget, pd.DataFrame) and 'Direction concernée' in df_budget.columns:
-                # create normalized keys for matching
-                df_budget['_dir_norm'] = df_budget['Direction concernée'].astype(str).apply(_normalize_text)
-                if 'df_recrutement' in locals() and df_recrutement is not None and 'Direction concernée' in df_recrutement.columns:
-                    df_recrutement['_dir_norm'] = df_recrutement['Direction concernée'].astype(str).apply(_normalize_text)
-
-                unique_dirs = sorted(df_budget['Direction concernée'].dropna().unique())
-                for d in unique_dirs:
-                    dir_norm = _normalize_text(d)
-                    # number of posts from recrutement matching normalized direction
-                    n_posts = 0
-                    if 'df_recrutement' in locals() and df_recrutement is not None and '_dir_norm' in df_recrutement.columns:
-                        try:
-                            n_posts = int(df_recrutement[df_recrutement['_dir_norm'] == dir_norm].shape[0])
-                        except Exception:
-                            n_posts = 0
-
-                    # budget prévu (Budget Net) for this direction
-                    try:
-                        if 'Budget Net' in df_budget.columns:
-                            budget_prevue_dir = pd.to_numeric(df_budget[df_budget['_dir_norm'] == dir_norm]['Budget Net'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
-                        else:
-                            budget_prevue_dir = 0
-                    except Exception:
-                        budget_prevue_dir = 0
-
-                    # budget engagé (Salaire net négocié) for this direction
-                    try:
-                        if 'Salaire net négocié' in df_budget.columns:
-                            budget_engage_dir = pd.to_numeric(df_budget[df_budget['_dir_norm'] == dir_norm]['Salaire net négocié'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
-                        else:
-                            # fallback to recrutement column if available
-                            budget_engage_dir = 0
-                            if 'df_recrutement' in locals() and df_recrutement is not None:
-                                cols_r = [c for c in df_recrutement.columns if re.search(r'salaire net négocié|salaire|montant', str(c), re.I)]
-                                if cols_r:
-                                    budget_engage_dir = pd.to_numeric(df_recrutement[df_recrutement['_dir_norm'] == dir_norm][cols_r[0]].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
-                    except Exception:
-                        budget_engage_dir = 0
-
-                    cost_prevu = float(budget_prevue_dir) / n_posts if n_posts > 0 else 0.0
-                    cost_reel = float(budget_engage_dir) / n_posts if n_posts > 0 else 0.0
-                    prod_rows.append({'Direction': d, 'Coût moyen prévu': cost_prevu, 'Coût moyen réel': cost_reel})
-        except Exception:
-            prod_rows = []
-
-        if prod_rows:
-            df_prod = pd.DataFrame(prod_rows)
-        else:
-            df_prod = pd.DataFrame({'Direction': ['Direction RH', 'Pôle Admin & Fin.'], 'Coût moyen prévu': [0,0], 'Coût moyen réel':[0,0]})
-
-        # Graphique de Productivité - BAR CHART HORIZONTAL (plus lisible)
-        if not df_prod.empty:
-            # Trier par coût moyen réel décroissant
-            df_prod = df_prod.sort_values('Coût moyen réel', ascending=True)  # ascending=True pour horizontal (inverse)
-            # Limiter à top 5 directions avec recrutements
-            df_prod = df_prod.tail(5)  # tail au lieu de head pour ordre décroissant horizontal
-            fig_prod = px.bar(
-                df_prod,
-                y='Direction',
-                x=['Coût moyen prévu', 'Coût moyen réel'],
-                barmode='group',
-                orientation='h',
-                labels={'value':'Montant (DH)'},
-                height=350
-            )
-            fig_prod.update_layout(
-                title='Productivité du Budget (coût moyen par poste)',
-                xaxis_title='Montant (DH)',
-                yaxis_title='Direction',
-                hovermode='closest',
-                legend=dict(
-                    x=0.65,
-                    y=0.95,
-                    bgcolor='rgba(255, 255, 255, 0.8)',
-                    bordercolor='#ccc',
-                    borderwidth=1
-                )
-            )
-            fig_prod = apply_title_style(fig_prod)
-        else:
-            fig_prod = px.bar(
-                df_prod,
-                y='Direction',
-                x=['Coût moyen prévu', 'Coût moyen réel'],
-                barmode='group',
-                orientation='h',
-                labels={'value':'Montant (DH)'},
-                height=350
-            )
-            fig_prod.update_layout(
-                title='Productivité du Budget (coût moyen par poste)',
-                legend=dict(
-                    x=0.65,
-                    y=0.95,
-                    bgcolor='rgba(255, 255, 255, 0.8)',
-                    bordercolor='#ccc',
-                    borderwidth=1
-                )
-            )
-            fig_prod = apply_title_style(fig_prod)
+        # Graphique de Productivité du Budget removed per user request
 
         # Barres consommation par direction
         # Source pour l'agrégation : utiliser uniquement le fichier Pilotage (`df_budget`) qui contient les directions attendues
@@ -5379,10 +5271,7 @@ def main():
         fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=16)), showlegend=False)
         fig_bar = apply_title_style(fig_bar)
 
-        with col_left:
-            st.plotly_chart(fig_prod, use_container_width=True)
-        with col_right:
-            st.plotly_chart(fig_bar, use_container_width=True)
+        st.plotly_chart(fig_bar, use_container_width=True)
 
 
         # ===== GRAPHIQUE TENDANCE MENSUELLE =====
@@ -5404,7 +5293,8 @@ def main():
                 fig_donut.update_layout(
                     title='Budget consommé vs restant',
                     height=380,
-                    showlegend=True
+                    showlegend=True,
+                    legend=dict(x=1.0, y=0.5, xanchor='left', yanchor='middle')
                 )
                 st.plotly_chart(fig_donut, use_container_width=True)
         
@@ -5457,7 +5347,7 @@ def main():
                     labels={'Consommé': 'Montant (DH)'},
                     color='Consommé',
                     color_continuous_scale=['#ffd700', '#ff7f0e', '#d62728'],
-                    height=380
+                    height=320
                 )
                 fig_mois.update_layout(
                     xaxis_title='',
@@ -5465,6 +5355,7 @@ def main():
                     showlegend=False,
                     hovermode='x'
                 )
+                fig_mois.update_traces(width=0.5)
                 fig_mois = apply_title_style(fig_mois)
                 st.plotly_chart(fig_mois, use_container_width=True)
             except Exception as e:
@@ -5593,11 +5484,11 @@ def main():
 
         st.markdown("""
         <style>
-        .custom-table-small {border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed}
-        .custom-table-small th {background:#9C182F;color:white;padding:3px 4px;text-align:left;font-size:13px;}
-        .custom-table-small td {padding:3px 4px;border-bottom:1px solid #eee; font-size:0.93em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+        .custom-table-small {border-collapse: collapse; width: 85%; margin:auto; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed}
+        .custom-table-small th {background:#9C182F;color:white;padding:2px 3px;text-align:left;font-size:12px;}
+        .custom-table-small td {padding:2px 3px;border-bottom:1px solid #eee; font-size:0.88em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
         .custom-table-small tbody tr:last-child {background:#9C182F; color:white}
-        .custom-table-small tbody tr:last-child td {color:white; font-weight:700; padding:3px 4px;}
+        .custom-table-small tbody tr:last-child td {color:white; font-weight:700; padding:2px 3px;}
         .budget-surplus {color:#2ca02c; font-weight:600}
         .budget-deficit {color:#d62728; font-weight:600}
         </style>
