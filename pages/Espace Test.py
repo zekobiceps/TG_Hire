@@ -716,6 +716,24 @@ def load_data_from_google_sheets(sheet_url):
         raise e
 
 
+def load_pilotage_data():
+    """Charger les données simplifiées pour Pilotage budgétaire (Recrutement 2026 (3).xlsx)"""
+    df_pilotage = None
+    try:
+        # Chercher le fichier Pilotage simplifié
+        import glob
+        pilotage_files = ['Recrutement 2026 (3).xlsx']
+        for pFile in pilotage_files:
+            if os.path.exists(pFile):
+                df_pilotage = pd.read_excel(pFile, sheet_name=0)
+                return df_pilotage
+        
+        # Si pas trouvé localement, None
+        return None
+    except Exception:
+        return None
+
+
 def load_data_from_files(csv_file=None, excel_file=None):
     """Charger et préparer les données depuis les fichiers uploadés ou locaux"""
     df_integration = None
@@ -743,27 +761,18 @@ def load_data_from_files(csv_file=None, excel_file=None):
             else:
                 # Fallback vers fichier local s'il existe (recherche du plus récent)
                 import glob
-                # Chercher d'abord Recrutement 2026 (priorité)
-                prioritized_files = ['Recrutement 2026 (3).xlsx', 'Recrutement 2026 (2).xlsx', 'Recrutement 2026.xlsx']
-                for prio_file in prioritized_files:
-                    if os.path.exists(prio_file):
-                        df_recrutement = pd.read_excel(prio_file, sheet_name=0)
-                        break
-                
-                # Si pas trouvé, chercher Recrutement global PBI All*.xlsx
-                if df_recrutement is None:
-                    excel_files = glob.glob('Recrutement global PBI All*.xlsx')
-                    if excel_files:
-                        # Trier par date de modification (le plus récent en dernier)
-                        excel_files.sort(key=os.path.getmtime)
-                        latest_excel = excel_files[-1]
-                        # st.info(f"Chargement automatique du fichier local : {latest_excel}")
-                        df_recrutement = pd.read_excel(latest_excel, sheet_name=0)
-                    else:
-                        # Fallback legacy
-                        local_excel = 'Recrutement global PBI All  google sheet (5).xlsx'
-                        if os.path.exists(local_excel):
-                            df_recrutement = pd.read_excel(local_excel, sheet_name=0)
+                # PRIORITÉ 1: Chercher Recrutement global PBI All (fichier complet pour le reste de l'app)
+                excel_files = glob.glob('Recrutement global PBI All*.xlsx')
+                if excel_files:
+                    # Trier par date de modification (le plus récent en dernier)
+                    excel_files.sort(key=os.path.getmtime)
+                    latest_excel = excel_files[-1]
+                    df_recrutement = pd.read_excel(latest_excel, sheet_name=0)
+                else:
+                    # FALLBACK: Legacy
+                    local_excel = 'Recrutement global PBI All  google sheet (5).xlsx'
+                    if os.path.exists(local_excel):
+                        df_recrutement = pd.read_excel(local_excel, sheet_name=0)
         except Exception as e:
             st.error(f"Erreur lors du chargement des données de recrutement: {e}")
 
@@ -4933,6 +4942,9 @@ def main():
     excel_for_recrutement = st.session_state.get('uploaded_excel_recrutement') if st.session_state.get('uploaded_excel_recrutement') is not None else None
     df_integration, df_recrutement = load_data_from_files(None, excel_for_recrutement)
 
+    # Charger les données SIMPLIFÉES pour la Pilotage budgétaire (Recrutement 2026 (3).xlsx)
+    df_pilotage = load_pilotage_data()
+
     # --------------------
     # Onglet: Pilotage budgétaire
     # --------------------
@@ -4958,18 +4970,24 @@ def main():
             df_budget = synced
         elif local is not None:
             df_budget = local
+        elif df_pilotage is not None:
+            # Utiliser le fichier simplifié Recrutement 2026 (3).xlsx comme source par défaut
+            df_budget = df_pilotage.copy()
         else:
             df_budget = None
 
-        # CRITICAL FIX: Also update df_recrutement from session_state if available
-        # This ensures the "Clos" column uses the same data source as Budget columns
+        # CRITICAL: Use df_pilotage for Clos counting since it has Statut recrutement column
+        # Create a separate dataframe for recruitment data in Pilotage section
+        df_recrutement_pilotage = None
+        if df_pilotage is not None:
+            df_recrutement_pilotage = df_pilotage.copy()
+        # If user uploaded a simplified file, prefer it
         synced_recr = st.session_state.get('synced_recrutement_df')
         local_recr = st.session_state.get('local_recrutement_df')
         if synced_recr is not None:
-            df_recrutement = synced_recr.copy()
+            df_recrutement_pilotage = synced_recr.copy()
         elif local_recr is not None:
-            df_recrutement = local_recr.copy()
-        # else: df_recrutement remains from initial load_data_from_files()
+            df_recrutement_pilotage = local_recr.copy()
 
         # Debug helper: show sources and contribution to indicators (temporary)
         with st.expander("Debug: Sources & Contribution aux Indicateurs", expanded=False):
