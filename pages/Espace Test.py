@@ -5267,7 +5267,7 @@ def main():
 
         # Increase bar chart height to show long percentage values properly
         fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'', 'y':''}, text=[f"{p}%" for p in perc], height=400)
-        fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=13)), showlegend=False, margin=dict(l=180, r=30, t=50, b=20))
+        fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=13)), showlegend=False, margin=dict(l=180, r=100, t=50, b=30))
         fig_bar.update_traces(textposition='outside', textfont=dict(size=11))
         fig_bar = apply_title_style(fig_bar)
 
@@ -5289,7 +5289,9 @@ def main():
                     labels=['Budget consommé', 'Budget restant'],
                     values=[budget_engage, budget_restant],
                     hole=0.4,
-                    marker=dict(colors=['#2ca02c', '#ff7f0e'])
+                    marker=dict(colors=['#2ca02c', '#ff7f0e']),
+                    textinfo='label+value',
+                    texttemplate='<b>%{label}</b><br>%{value:,.0f} DH'
                 )])
                 fig_donut.update_layout(
                     title='Budget consommé vs restant',
@@ -5362,7 +5364,8 @@ def main():
                     xaxis_title='',
                     yaxis_title='Montant (DH)',
                     showlegend=False,
-                    hovermode='x'
+                    hovermode='x',
+                    margin=dict(l=50, r=30, t=50, b=50)
                 )
                 fig_mois = apply_title_style(fig_mois)
                 st.plotly_chart(fig_mois, use_container_width=True)
@@ -5486,12 +5489,12 @@ def main():
             df_detail['Budget engagé (DH)'] = df_detail['Budget engagé (DH)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
         st.markdown("""
         <style>
-        .custom-table-small {border-collapse: collapse; width: 85%; margin:auto; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed}
-        .custom-table-small th {background:#9C182F;color:white;padding:1px 1px;text-align:center;font-size:12px;font-weight:600;}
-        .custom-table-small td {padding:1px 1px;border-bottom:1px solid #eee; font-size:0.92em; text-align:center;}
+        .custom-table-small {border-collapse: collapse; width: 85%; margin:auto; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed; border-spacing: 0;}
+        .custom-table-small th {background:#9C182F;color:white;padding:2px 0.5px;text-align:center;font-size:14px;font-weight:700;}
+        .custom-table-small td {padding:0.5px 0.5px;border-bottom:1px solid #eee; font-size:0.90em; text-align:center;}
         .custom-table-small td:first-child, .custom-table-small th:first-child {text-align:left;}
         .custom-table-small tbody tr:last-child {background:#9C182F; color:white}
-        .custom-table-small tbody tr:last-child td {color:white; font-weight:700; padding:1px 1px; text-align:center;}
+        .custom-table-small tbody tr:last-child td {color:white; font-weight:700; padding:0.5px 0.5px; text-align:center;}
         .custom-table-small tbody tr:last-child td:first-child {text-align:left;}
         </style>
         """, unsafe_allow_html=True)
