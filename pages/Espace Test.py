@@ -4961,6 +4961,16 @@ def main():
         else:
             df_budget = None
 
+        # CRITICAL FIX: Also update df_recrutement from session_state if available
+        # This ensures the "Clos" column uses the same data source as Budget columns
+        synced_recr = st.session_state.get('synced_recrutement_df')
+        local_recr = st.session_state.get('local_recrutement_df')
+        if synced_recr is not None:
+            df_recrutement = synced_recr.copy()
+        elif local_recr is not None:
+            df_recrutement = local_recr.copy()
+        # else: df_recrutement remains from initial load_data_from_files()
+
         # Debug helper: show sources and contribution to indicators (temporary)
         with st.expander("Debug: Sources & Contribution aux Indicateurs", expanded=False):
             col_src1, col_src2 = st.columns(2)
@@ -5343,23 +5353,30 @@ def main():
 
             for d in dirs_list:
                 dir_norm = _normalize_text(d)
-                # count posts and closed posts from recruitment using normalized matching
-                if recr_exists:
+                clos_str = "0 / 0"
+                total = 0
+                
+                # Count posts and closed posts from recruitment using normalized matching
+                if recr_exists and 'df_recrutement' in locals() and df_recrutement is not None:
                     try:
-                        group = dfr[dfr['_dir_norm'] == dir_norm]
-                        total = int(group.shape[0])
-                        # Strict rule: consider a poste 'clos' ONLY when the statut (normalized) equals 'cloture'
-                        if status_col_r is not None and status_col_r in group.columns:
-                            closed = int(group[status_col_r].astype(str).apply(lambda s: _normalize_text(s) == 'cloture').sum())
-                        else:
-                            closed = 0
+                        # Simple & robust: filter df_recrutement by normalized direction
+                        df_recr_norm = df_recrutement.copy()
+                        df_recr_norm['_dir_norm'] = df_recr_norm['Direction concernée'].astype(str).apply(_normalize_text)
+                        group = df_recr_norm[df_recr_norm['_dir_norm'] == dir_norm]
+                        
+                        total = len(group)
+                        closed = 0
+                        
+                        # If df has a 'Statut recrutement' column, count only exact matches
+                        if 'Statut recrutement' in df_recrutement.columns and total > 0:
+                            closed = int(group['Statut recrutement'].astype(str).apply(
+                                lambda s: _normalize_text(s) == 'cloture'
+                            ).sum())
+                        
                         clos_str = f"{closed} / {total}"
-                    except Exception:
+                    except Exception as e:
                         clos_str = "0 / 0"
                         total = 0
-                else:
-                    clos_str = "0 / 0"
-                    total = 0
 
                 # Budget prévue: use 'Budget Net' from df_budget for the direction
                 try:
