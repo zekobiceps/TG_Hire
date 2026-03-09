@@ -5155,10 +5155,9 @@ def main():
 
         # Increase bar chart height to show long percentage values properly
         fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'', 'y':''}, text=[f"{p}%" for p in perc], height=400)
-        fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=13)), showlegend=False, margin=dict(l=180, r=20, t=50, b=30), xaxis=dict(range=[0, max(perc)*1.25] if perc else None))
-        fig_bar.update_traces(textposition='inside', textfont=dict(size=11, color='white'), insidetextanchor='end', cliponaxis=False)
-        # For small bars, put text outside so it's readable
-        fig_bar.for_each_trace(lambda t: t.update(textposition='outside', textfont=dict(size=11, color='#333')) if max(t.x) < 10 else None)
+        max_pct = max(perc) if perc else 100
+        fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=13)), showlegend=False, margin=dict(l=180, r=80, t=50, b=30), xaxis=dict(range=[0, max_pct * 1.3]))
+        fig_bar.update_traces(textposition='outside', textfont=dict(size=11), cliponaxis=False)
         fig_bar = apply_title_style(fig_bar)
 
         # ===== GRAPHIQUE TENDANCE MENSUELLE =====
@@ -5175,21 +5174,28 @@ def main():
         with col_chart1:
             # Donut chart : Budget consommé vs restant
             if budget_annuel_total and budget_engage:
+                pct_c = budget_engage / budget_annuel_total * 100 if budget_annuel_total else 0
+                pct_r = 100 - pct_c
                 fig_donut = go.Figure(data=[go.Pie(
                     labels=['Consommé', 'Restant'],
                     values=[budget_engage, budget_restant],
-                    hole=0.4,
+                    hole=0.45,
                     marker=dict(colors=['#2ca02c', '#ff7f0e']),
-                    textinfo='label+value+percent',
-                    texttemplate='<b>%{label}</b><br>%{value:,.0f} DH<br>%{percent:.1%}',
+                    textinfo='percent',
+                    texttemplate='%{percent:.1%}',
                     textposition='inside',
-                    insidetextorientation='horizontal'
+                    textfont=dict(size=14, color='white'),
+                    insidetextorientation='horizontal',
+                    hovertemplate='<b>%{label}</b><br>%{value:,.0f} DH<br>%{percent:.1%}<extra></extra>'
                 )])
+                # Add annotations outside: label + value
+                fig_donut.add_annotation(text=f"<b>Consommé</b><br>{budget_engage:,.0f} DH", x=0.15, y=1.12, showarrow=False, font=dict(size=11, color='#2ca02c'))
+                fig_donut.add_annotation(text=f"<b>Restant</b><br>{budget_restant:,.0f} DH", x=0.85, y=-0.12, showarrow=False, font=dict(size=11, color='#ff7f0e'))
                 fig_donut.update_layout(
                     title=dict(text='Budget consommé vs restant', x=0, xanchor='left', font=TITLE_FONT),
                     height=320,
                     showlegend=False,
-                    margin=dict(l=10, r=10, t=50, b=10)
+                    margin=dict(l=10, r=10, t=50, b=30)
                 )
                 st.plotly_chart(fig_donut, use_container_width=True)
         
@@ -5327,12 +5333,13 @@ def main():
                     'Direction': d,
                     'Clos': clos_str,
                     'Budget prévue (DH)': budget_prevue if pd.notna(budget_prevue) else 0,
-                    'Budget engagé (DH)': int(budget_engaged_dir) if pd.notna(budget_engaged_dir) else 0
+                    'Budget engagé (DH)': int(budget_engaged_dir) if pd.notna(budget_engaged_dir) else 0,
+                    'Écart (DH)': int(budget_restant_val)
                 })
         else:
             detail_rows = [
-                { 'Direction': 'Encadrement Chantier', 'Clos': '8 / 76', 'Budget prévue (DH)': 1_500_000, 'Budget engagé (DH)': 1_480_000 },
-                { 'Direction': 'Pôle Admin & Fin.', 'Clos': '2 / 4', 'Budget prévue (DH)': 300_000, 'Budget engagé (DH)': 310_000 },
+                { 'Direction': 'Encadrement Chantier', 'Clos': '8 / 76', 'Budget prévue (DH)': 1_500_000, 'Budget engagé (DH)': 1_480_000, 'Écart (DH)': 20_000 },
+                { 'Direction': 'Pôle Admin & Fin.', 'Clos': '2 / 4', 'Budget prévue (DH)': 300_000, 'Budget engagé (DH)': 310_000, 'Écart (DH)': -10_000 },
             ]
         
         # Trier detail_rows par nombre de clôturés (décroissant)
@@ -5370,11 +5377,13 @@ def main():
                     except Exception:
                         pass
             clos_total_str = f"{total_clos_count} / {total_posts_count}" if total_posts_count > 0 else "0 / 0"
+            total_ecart = int(total_prevue - total_engage)
             totals_row = pd.DataFrame([{
                 'Direction': 'TOTAL',
                 'Clos': clos_total_str,
                 'Budget prévue (DH)': total_prevue,
-                'Budget engagé (DH)': int(total_engage)
+                'Budget engagé (DH)': int(total_engage),
+                'Écart (DH)': total_ecart
             }])
             df_detail = pd.concat([df_detail, totals_row], ignore_index=True)
 
@@ -5382,33 +5391,39 @@ def main():
             df_detail['Budget prévue (DH)'] = df_detail['Budget prévue (DH)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
         if 'Budget engagé (DH)' in df_detail.columns:
             df_detail['Budget engagé (DH)'] = df_detail['Budget engagé (DH)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
+        if 'Écart (DH)' in df_detail.columns:
+            df_detail['Écart (DH)'] = df_detail['Écart (DH)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
         st.markdown("""
         <style>
-        .custom-table-small {border-collapse: collapse; width: 70%; margin:auto; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed; border-spacing: 0;}
+        .custom-table-small {border-collapse: collapse; width: 75%; margin:auto; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed; border-spacing: 0;}
         .custom-table-small th {background:#9C182F;color:white;padding:2px 4px;text-align:center;font-size:14px;font-weight:700;}
         .custom-table-small td {padding:2px 4px;border-bottom:1px solid #eee; font-size:0.90em; text-align:center;}
         .custom-table-small td:first-child, .custom-table-small th:first-child {text-align:left;}
         .custom-table-small tbody tr:last-child {background:#9C182F; color:white}
         .custom-table-small tbody tr:last-child td {color:white; font-weight:700; padding:2px 4px; text-align:center;}
         .custom-table-small tbody tr:last-child td:first-child {text-align:left;}
-        .custom-table-small th:nth-child(1), .custom-table-small td:nth-child(1){width:40%;}
-        .custom-table-small th:nth-child(2), .custom-table-small td:nth-child(2){width:12%;}
-        .custom-table-small th:nth-child(3), .custom-table-small td:nth-child(3){width:24%;}
-        .custom-table-small th:nth-child(4), .custom-table-small td:nth-child(4){width:24%;}
+        .custom-table-small th:nth-child(1), .custom-table-small td:nth-child(1){width:34%;}
+        .custom-table-small th:nth-child(2), .custom-table-small td:nth-child(2){width:10%;}
+        .custom-table-small th:nth-child(3), .custom-table-small td:nth-child(3){width:20%;}
+        .custom-table-small th:nth-child(4), .custom-table-small td:nth-child(4){width:20%;}
+        .custom-table-small th:nth-child(5), .custom-table-small td:nth-child(5){width:16%;}
         </style>
         """, unsafe_allow_html=True)
 
-        cols_display = ['Direction', 'Clos', 'Budget prévue (DH)', 'Budget engagé (DH)']
+        cols_display = ['Direction', 'Clos', 'Budget prévue (DH)', 'Budget engagé (DH)', 'Écart (DH)']
         html = '<table class="custom-table-small"><thead><tr>'
         for c in cols_display:
             html += f"<th>{c}</th>"
         html += '</tr></thead><tbody>'
         for _, r in df_detail.iterrows():
+            ecart_val = r.get('Écart (DH)', '-')
+            ecart_color = 'color:#d62728;' if isinstance(ecart_val, str) and ecart_val.startswith('-') else ''
             html += '<tr>'
             html += f"<td style='font-weight:600; text-align:left;'>{r['Direction']}</td>"
             html += f"<td style='text-align:center;'>{r['Clos']}</td>"
             html += f"<td style='text-align:center;'>{r['Budget prévue (DH)']}</td>"
             html += f"<td style='text-align:center;'>{r['Budget engagé (DH)']}</td>"
+            html += f"<td style='text-align:center;{ecart_color}'>{ecart_val}</td>"
             html += '</tr>'
         html += '</tbody></table>'
         st.markdown(html, unsafe_allow_html=True)
