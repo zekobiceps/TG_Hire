@@ -5265,9 +5265,10 @@ def main():
         except Exception:
             pass
 
-        # Reduce bar chart size to accommodate long percentages
-        fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'', 'y':''}, text=[f"{p}%" for p in perc], height=300)
-        fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=14)), showlegend=False, margin=dict(l=150, r=20, t=40, b=20))
+        # Increase bar chart height to show long percentage values properly
+        fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'', 'y':''}, text=[f"{p}%" for p in perc], height=400)
+        fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=13)), showlegend=False, margin=dict(l=180, r=30, t=50, b=20))
+        fig_bar.update_traces(textposition='outside', textfont=dict(size=11))
         fig_bar = apply_title_style(fig_bar)
 
         # ===== GRAPHIQUE TENDANCE MENSUELLE =====
@@ -5354,14 +5355,14 @@ def main():
                     text=[f"{int(v):,}" for v in df_mois['Consommé']],
                     textposition='top center',
                     textfont=dict(size=10),
-                    marker=dict(size=8, color='#ff7f0e')
+                    marker=dict(size=8, color='#ff7f0e'),
+                    line=dict(color='#ff7f0e', width=2)
                 )
                 fig_mois.update_layout(
                     xaxis_title='',
                     yaxis_title='Montant (DH)',
                     showlegend=False,
-                    hovermode='x',
-                    line=dict(color='#ff7f0e', width=2)
+                    hovermode='x'
                 )
                 fig_mois = apply_title_style(fig_mois)
                 st.plotly_chart(fig_mois, use_container_width=True)
@@ -5486,11 +5487,11 @@ def main():
         st.markdown("""
         <style>
         .custom-table-small {border-collapse: collapse; width: 85%; margin:auto; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed}
-        .custom-table-small th {background:#9C182F;color:white;padding:2px 3px;text-align:center;font-size:13px;font-weight:600;}
-        .custom-table-small td {padding:2px 3px;border-bottom:1px solid #eee; font-size:0.95em; text-align:center;}
+        .custom-table-small th {background:#9C182F;color:white;padding:1px 1px;text-align:center;font-size:12px;font-weight:600;}
+        .custom-table-small td {padding:1px 1px;border-bottom:1px solid #eee; font-size:0.92em; text-align:center;}
         .custom-table-small td:first-child, .custom-table-small th:first-child {text-align:left;}
         .custom-table-small tbody tr:last-child {background:#9C182F; color:white}
-        .custom-table-small tbody tr:last-child td {color:white; font-weight:700; padding:2px 3px; text-align:center;}
+        .custom-table-small tbody tr:last-child td {color:white; font-weight:700; padding:1px 1px; text-align:center;}
         .custom-table-small tbody tr:last-child td:first-child {text-align:left;}
         </style>
         """, unsafe_allow_html=True)
