@@ -1528,27 +1528,36 @@ def create_integrations_tab(df_recrutement, global_filters):
         (df_recrutement[candidat_col].notna()) &
         (df_recrutement[candidat_col].str.strip() != "")
     ])
+    avec_statut_cloture = len(df_recrutement[
+        (df_recrutement['Statut de la demande'] == 'En cours') &
+        (df_recrutement[candidat_col].notna()) &
+        (df_recrutement[candidat_col].str.strip() != "") &
+        (df_recrutement['Colonne TG Hire'] == 'Clôture')
+    ])
     avec_date_prevue = len(df_recrutement[
         (df_recrutement['Statut de la demande'] == 'En cours') &
         (df_recrutement[candidat_col].notna()) &
         (df_recrutement[candidat_col].str.strip() != "") &
+        (df_recrutement['Colonne TG Hire'] == 'Clôture') &
         (df_recrutement[date_integration_col].notna())
     ])
     
-    # Critères : Statut "En cours" ET candidat avec nom
+    # Critères : Statut "En cours" ET candidat avec nom ET Colonne TG Hire = "Clôture" ET date d'entrée prévue
     df_integrations = df_recrutement[
         (df_recrutement['Statut de la demande'] == 'En cours') &
         (df_recrutement[candidat_col].notna()) &
-        (df_recrutement[candidat_col].str.strip() != "")
+        (df_recrutement[candidat_col].str.strip() != "") &
+        (df_recrutement['Colonne TG Hire'] == 'Clôture') &
+        (df_recrutement[date_integration_col].notna())
     ].copy()
     
     # Message de diagnostic
     if total_en_cours > 0:
-        st.info(f"📊 Diagnostic: {total_en_cours} demandes 'En cours' • {avec_candidat} avec candidat nommé • {avec_date_prevue} avec date d'entrée prévue")
+        st.info(f"📊 Diagnostic: {total_en_cours} demandes 'En cours' • {avec_candidat} avec candidat nommé • {avec_statut_cloture} avec Colonne TG Hire='Clôture' • {avec_date_prevue} avec date d'entrée prévue")
     
     if len(df_integrations) == 0:
         st.warning("Aucune intégration en cours trouvée")
-        st.info("Vérifiez que les demandes ont le statut 'En cours' ET un nom de candidat dans la colonne correspondante.")
+        st.info("Vérifiez que les demandes ont: le statut 'En cours', un nom de candidat, la Colonne TG Hire='Clôture' ET une date d'entrée prévue.")
         return
     
     # Appliquer les filtres globaux
