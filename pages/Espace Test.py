@@ -5328,99 +5328,57 @@ def main():
         st.subheader("Analyse détaillée par direction")
 
         # Construire le tableau de façon dynamique en utilisant les directions du fichier Pilotage (df_budget)
-        # Les compteurs "Clos" sont calculés à partir des données de recrutement (df_recrutement) mais
-        # seules les directions présentes dans la feuille Pilotage sont affichées (demande de l'utilisateur).
+        # Les compteurs "Clos" sont calculés à partir du même fichier (df_budget = df_pilotage qui a Statut recrutement)
         detail_rows = []
         # Preferer les directions provenant du Pilotage budgétaire
         if df_budget is not None and isinstance(df_budget, pd.DataFrame) and 'Direction concernée' in df_budget.columns:
-            # normalize pilotage directions
-            df_budget['_dir_norm'] = df_budget['Direction concernée'].astype(str).apply(_normalize_text)
-            dirs_list = sorted(df_budget['Direction concernée'].dropna().unique())
-
-            # Identify recruitment columns (direction + statut)
-            recr_exists = 'df_recrutement' in locals() and df_recrutement is not None
-            dir_col_r = None
-            status_col_r = None
-            if recr_exists:
-                # Prefer explicit 'Direction concernée' if present, else try to detect a 'direction' column
-                if 'Direction concernée' in df_recrutement.columns:
-                    dir_col_r = 'Direction concernée'
-                else:
-                    dir_col_r = next((c for c in df_recrutement.columns if re.search(r'\bdirection\b', str(c), re.I)), None)
-
-                # Prefer explicit 'Statut recrutement' (or close variants), else fallback to any 'statut' containing column
-                preferred_status_names = ['Statut recrutement', 'Statut de la demande', 'Statut']
-                for pref in preferred_status_names:
-                    for c in df_recrutement.columns:
-                        try:
-                            if _normalize_text(c) == _normalize_text(pref):
-                                status_col_r = c
-                                break
-                        except Exception:
-                            continue
-                    if status_col_r is not None:
-                        break
-                if status_col_r is None:
-                    status_col_r = next((c for c in df_recrutement.columns if re.search(r'statut', str(c), re.I)), None)
-
-                # create normalized dir key in recrutement df for matching
-                dfr = df_recrutement.copy()
-                if dir_col_r is not None and dir_col_r in dfr.columns:
-                    dfr['_dir_norm'] = dfr[dir_col_r].astype(str).apply(_normalize_text)
-                elif 'Direction concernée' in dfr.columns:
-                    dfr['_dir_norm'] = dfr['Direction concernée'].astype(str).apply(_normalize_text)
-                else:
-                    first_col = dfr.columns[0]
-                    dfr['_dir_norm'] = dfr[first_col].astype(str).apply(_normalize_text)
+            # Créer copy avec normalized directions
+            dfb = df_budget.copy()
+            dfb['_dir_norm'] = dfb['Direction concernée'].astype(str).apply(_normalize_text)
+            dirs_list = sorted(dfb['Direction concernée'].dropna().unique())
 
             for d in dirs_list:
                 dir_norm = _normalize_text(d)
+                
+                # SIMPLE: Filter by normalized direction and count from df_budget directly
+                dir_group = dfb[dfb['_dir_norm'] == dir_norm]
+                total = len(dir_group)
                 clos_str = "0 / 0"
-                total = 0
-                # Count posts and closed posts from recruitment using normalized matching
-                if df_recrutement_pilotage is not None and 'Direction concernée' in df_recrutement_pilotage.columns and 'Statut recrutement' in df_recrutement_pilotage.columns:
+                
+                # Count "Clôture" (normalized) if column exists
+                if 'Statut recrutement' in dfb.columns and total > 0:
                     try:
-                        df_recr_norm = df_recrutement_pilotage.copy()
-                        df_recr_norm['_dir_norm'] = df_recr_norm['Direction concernée'].astype(str).apply(_normalize_text)
-                        group = df_recr_norm[df_recr_norm['_dir_norm'] == dir_norm]
-                        total = len(group)
-                        closed = int(group['Statut recrutement'].astype(str).apply(lambda s: _normalize_text(s) == 'cloture').sum())
+                        closed = int(dir_group['Statut recrutement'].astype(str).apply(lambda s: _normalize_text(s) == 'cloture').sum())
                         clos_str = f"{closed} / {total}"
                     except Exception:
                         clos_str = "0 / 0"
-                        total = 0
+                elif total > 0:
+                    clos_str = f"0 / {total}"
 
-                # Budget prévue: use 'Budget Net' from df_budget for the direction
+                # Budget prévue: sum Budget Net for this direction
+                budget_prevue = 0
                 try:
-                    if 'Budget Net' in df_budget.columns:
-                        budget_prevue = pd.to_numeric(df_budget[df_budget['_dir_norm'] == dir_norm]['Budget Net'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
-                    else:
-                        budget_prevue = 0
+                    if 'Budget Net' in dfb.columns:
+                        budget_prevue = pd.to_numeric(
+                            dir_group['Budget Net'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."),
+                            errors='coerce'
+                        ).fillna(0).sum()
                 except Exception:
                     budget_prevue = 0
 
-                # Budget engagé: prefer 'Salaire net négocié' from df_budget, else fallback to recrutement
+                # Budget engagé: sum Salaire net négocié for this direction
+                budget_engaged_dir = 0
                 try:
-                    if 'Salaire net négocié' in df_budget.columns:
-                        budget_engaged_dir = pd.to_numeric(df_budget[df_budget['_dir_norm'] == dir_norm]['Salaire net négocié'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
-                    else:
-                        budget_engaged_dir = 0
+                    if 'Salaire net négocié' in dfb.columns:
+                        budget_engaged_dir = pd.to_numeric(
+                            dir_group['Salaire net négocié'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."),
+                            errors='coerce'
+                        ).fillna(0).sum()
                 except Exception:
                     budget_engaged_dir = 0
 
-                if (not budget_engaged_dir) and recr_exists:
-                    try:
-                        cols_r = [c for c in dfr.columns if re.search(r'salaire net négocié|salaire|montant', str(c), re.I)]
-                        if cols_r:
-                            budget_engaged_dir = pd.to_numeric(group[cols_r[0]].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
-                    except Exception:
-                        budget_engaged_dir = 0
-
-                slipping = None
-                try:
-                    slipping = float(budget_prevue) - float(budget_engaged_dir)
-                except Exception:
-                    slipping = 0
+                # Calculate slipping
+                slipping = float(budget_prevue) - float(budget_engaged_dir) if budget_prevue or budget_engaged_dir else 0
 
                 detail_rows.append({
                     'Direction': d,
