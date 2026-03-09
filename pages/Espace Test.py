@@ -5392,6 +5392,17 @@ def main():
                 { 'Direction': 'Encadrement Chantier', 'Clos': '8 / 76', 'Budget prévue (DH)': 1_500_000, 'Budget engagé (DH)': 1_480_000, 'slipping (écart)': -20_000 },
                 { 'Direction': 'Pôle Admin & Fin.', 'Clos': '2 / 4', 'Budget prévue (DH)': 300_000, 'Budget engagé (DH)': 310_000, 'slipping (écart)': -10_000 },
             ]
+        
+        # Trier detail_rows par nombre de clôturés (décroissant)
+        def extract_closed_count(clos_str):
+            """Extract closed count from 'X / Y' format"""
+            try:
+                return int(clos_str.split('/')[0].strip())
+            except Exception:
+                return 0
+        
+        detail_rows.sort(key=lambda x: extract_closed_count(x['Clos']), reverse=True)
+        
         # Ensure df_detail exists and add totals row
         if 'detail_rows' in locals():
             df_detail = pd.DataFrame(detail_rows)
