@@ -4971,23 +4971,27 @@ def main():
         elif local is not None:
             df_budget = local
         elif df_pilotage is not None:
-            # Utiliser le fichier simplifié Recrutement 2026 (3).xlsx comme source par défaut
             df_budget = df_pilotage.copy()
         else:
             df_budget = None
 
-        # CRITICAL: Use df_pilotage for Clos counting since it has Statut recrutement column
-        # Create a separate dataframe for recruitment data in Pilotage section
+        # Use df_pilotage for Clos counting since it has Statut recrutement column
         df_recrutement_pilotage = None
-        if df_pilotage is not None:
-            df_recrutement_pilotage = df_pilotage.copy()
-        # If user uploaded a simplified file, prefer it
+        if df_budget is not None and 'Statut recrutement' in df_budget.columns:
+            df_recrutement_pilotage = df_budget.copy()
         synced_recr = st.session_state.get('synced_recrutement_df')
         local_recr = st.session_state.get('local_recrutement_df')
         if synced_recr is not None:
             df_recrutement_pilotage = synced_recr.copy()
         elif local_recr is not None:
             df_recrutement_pilotage = local_recr.copy()
+
+        # Hide everything if no data is loaded
+        if df_budget is None or df_recrutement_pilotage is None or len(df_budget) == 0 or len(df_recrutement_pilotage) == 0:
+            st.info("Aucune donnée chargée. Veuillez synchroniser via Google Sheets ou charger un fichier Excel.")
+            st.stop()
+
+        # ...existing code...
 
         # Debug helper: show sources and contribution to indicators (temporary)
         with st.expander("Debug: Sources & Contribution aux Indicateurs", expanded=False):
@@ -5373,26 +5377,16 @@ def main():
                 dir_norm = _normalize_text(d)
                 clos_str = "0 / 0"
                 total = 0
-                
                 # Count posts and closed posts from recruitment using normalized matching
-                if recr_exists and 'df_recrutement' in locals() and df_recrutement is not None:
+                if df_recrutement_pilotage is not None and 'Direction concernée' in df_recrutement_pilotage.columns and 'Statut recrutement' in df_recrutement_pilotage.columns:
                     try:
-                        # Simple & robust: filter df_recrutement by normalized direction
-                        df_recr_norm = df_recrutement.copy()
+                        df_recr_norm = df_recrutement_pilotage.copy()
                         df_recr_norm['_dir_norm'] = df_recr_norm['Direction concernée'].astype(str).apply(_normalize_text)
                         group = df_recr_norm[df_recr_norm['_dir_norm'] == dir_norm]
-                        
                         total = len(group)
-                        closed = 0
-                        
-                        # If df has a 'Statut recrutement' column, count only exact matches
-                        if 'Statut recrutement' in df_recrutement.columns and total > 0:
-                            closed = int(group['Statut recrutement'].astype(str).apply(
-                                lambda s: _normalize_text(s) == 'cloture'
-                            ).sum())
-                        
+                        closed = int(group['Statut recrutement'].astype(str).apply(lambda s: _normalize_text(s) == 'cloture').sum())
                         clos_str = f"{closed} / {total}"
-                    except Exception as e:
+                    except Exception:
                         clos_str = "0 / 0"
                         total = 0
 
