@@ -5267,9 +5267,43 @@ def main():
         else:
             df_prod = pd.DataFrame({'Direction': ['Direction RH', 'Pôle Admin & Fin.'], 'Coût moyen prévu': [0,0], 'Coût moyen réel':[0,0]})
 
-        fig_prod = px.bar(df_prod, x='Direction', y=['Coût moyen prévu', 'Coût moyen réel'], barmode='group', labels={'value':'Montant (DH)'}, height=420)
-        fig_prod.update_layout(title='Productivité du Budget (coût moyen par poste)', xaxis_tickangle=-45)
-        fig_prod = apply_title_style(fig_prod)
+        # Présentation alternative: Tableau HTML avec barres visuelles au lieu de bar chart
+        if not df_prod.empty:
+            # Trier par coût moyen réel décroissant
+            df_prod = df_prod.sort_values('Coût moyen réel', ascending=False)
+            # Limiter à top 8 directions
+            df_prod = df_prod.head(8)
+            
+            # Créer tableau HTML avec barres visuelles
+            st.markdown("""
+            <style>
+            .prod-table {border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05)}
+            .prod-table th {background:#9C182F;color:white;padding:10px;text-align:left;font-weight:700}
+            .prod-table td {padding:10px;border-bottom:1px solid #eee}
+            .prod-bar {background:linear-gradient(90deg, #1f77b4 0%, #1f77b4 100%);height:24px;display:flex;align-items:center;color:white;font-size:12px;border-radius:3px}
+            .prod-bar-real {background:linear-gradient(90deg, #2ca02c 0%, #2ca02c 100%)}
+            .dir-name {font-weight:600;color:#1f4788}
+            </style>
+            """, unsafe_allow_html=True)
+            
+            html_prod = '<table class="prod-table"><thead><tr><th style="width:25%">Direction</th><th style="width:37.5%">Coût moyen prévu</th><th style="width:37.5%">Coût moyen réel</th></tr></thead><tbody>'
+            max_cost = df_prod[['Coût moyen prévu', 'Coût moyen réel']].max().max() if not df_prod.empty else 1
+            if max_cost == 0:
+                max_cost = 1
+            
+            for _, r in df_prod.iterrows():
+                prev_pct = (r['Coût moyen prévu'] / max_cost * 100) if max_cost > 0 else 0
+                real_pct = (r['Coût moyen réel'] / max_cost * 100) if max_cost > 0 else 0
+                html_prod += f'<tr><td class="dir-name">{r["Direction"]}</td>'
+                html_prod += f'<td><div class="prod-bar" style="width:{prev_pct}%">{int(r["Coût moyen prévu"]):,} DH</div></td>'
+                html_prod += f'<td><div class="prod-bar prod-bar-real" style="width:{real_pct}%">{int(r["Coût moyen réel"]):,} DH</div></td></tr>'
+            html_prod += '</tbody></table>'
+            fig_prod = None  # Neutraliser pour passer le plotly chart ci-dessous
+        else:
+            fig_prod = px.bar(df_prod, x='Direction', y=['Coût moyen prévu', 'Coût moyen réel'], barmode='group', labels={'value':'Montant (DH)'}, height=420)
+            fig_prod.update_layout(title='Productivité du Budget (coût moyen par poste)', xaxis_tickangle=-45)
+            fig_prod = apply_title_style(fig_prod)
+            html_prod = None
 
         # Barres consommation par direction
         # Source pour l'agrégation : utiliser uniquement le fichier Pilotage (`df_budget`) qui contient les directions attendues
@@ -5319,7 +5353,11 @@ def main():
         fig_bar = apply_title_style(fig_bar)
 
         with col_left:
-            st.plotly_chart(fig_prod, use_container_width=True)
+            if html_prod is not None:
+                st.subheader("Productivité du Budget (coût moyen par poste)")
+                st.markdown(html_prod, unsafe_allow_html=True)
+            elif fig_prod is not None:
+                st.plotly_chart(fig_prod, use_container_width=True)
         with col_right:
             st.plotly_chart(fig_bar, use_container_width=True)
 
@@ -5403,6 +5441,10 @@ def main():
         
         detail_rows.sort(key=lambda x: extract_closed_count(x['Clos']), reverse=True)
         
+        # Limiter aux 8 top directions pour réduire la longueur et centraliser (enlever ~30%)
+        if len(detail_rows) > 8:
+            detail_rows = detail_rows[:8]
+        
         # Ensure df_detail exists and add totals row
         if 'detail_rows' in locals():
             df_detail = pd.DataFrame(detail_rows)
@@ -5413,9 +5455,21 @@ def main():
             total_prevue = df_detail['Budget prévue (DH)'].replace('', 0).fillna(0).astype(float).sum()
             total_engage = df_detail['Budget engagé (DH)'].replace('', 0).fillna(0).astype(float).sum()
             total_slip = df_detail['slipping (écart)'].replace('', 0).fillna(0).astype(float).sum()
+            # Calculate total clos: sum of X and Y from "X / Y" format
+            total_clos_count = 0
+            total_posts_count = 0
+            for _, row in df_detail.iterrows():
+                if pd.notna(row['Clos']) and '/' in str(row['Clos']):
+                    try:
+                        parts = str(row['Clos']).split('/')
+                        total_clos_count += int(parts[0].strip())
+                        total_posts_count += int(parts[1].strip())
+                    except Exception:
+                        pass
+            clos_total_str = f"{total_clos_count} / {total_posts_count}" if total_posts_count > 0 else "0 / 0"
             totals_row = pd.DataFrame([{
                 'Direction': 'TOTAL',
-                'Clos': '',
+                'Clos': clos_total_str,
                 'Budget prévue (DH)': total_prevue,
                 'Budget engagé (DH)': int(total_engage),
                 'slipping (écart)': total_slip
