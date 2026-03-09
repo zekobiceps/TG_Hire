@@ -4993,119 +4993,7 @@ def main():
 
         # ...existing code...
 
-        # Debug helper: show sources and contribution to indicators (temporary)
-        with st.expander("Debug: Sources & Contribution aux Indicateurs", expanded=False):
-            col_src1, col_src2 = st.columns(2)
-            
-            with col_src1:
-                st.markdown("**📊 Source Pilotage (Budget)**")
-                budget_source = 'Google Sheets (synced)' if synced is not None else ('Excel Upload (local)' if local is not None else 'NONE')
-                budget_source_icon = '✅' if synced is not None else ('📁' if local is not None else '❌')
-                st.markdown(f"{budget_source_icon} {budget_source}")
-                if df_budget is not None:
-                    st.info(f"🔢 Lignes: {len(df_budget)}")
-                    # Show critical columns for indicators
-                    critical_cols = ['Direction concernée', 'Budget Net', 'Salaire net négocié']
-                    found_cols = [c for c in critical_cols if c in df_budget.columns]
-                    if found_cols:
-                        st.markdown(f"📌 Colonnes critiques trouvées: {', '.join(found_cols)}")
-            
-            with col_src2:
-                st.markdown("**👥 Source Recrutement (Embauches)**")
-                recr_available = 'df_recrutement' in locals() and df_recrutement is not None
-                if recr_available:
-                    st.markdown(f"✅ CSV/Excel import")
-                    st.info(f"🔢 Lignes: {len(df_recrutement)}")
-                    critical_cols_r = ['Direction concernée', 'Statut recrutement', 'Poste demandé']
-                    found_cols_r = [c for c in critical_cols_r if c in df_recrutement.columns]
-                    if found_cols_r:
-                        st.markdown(f"📌 Colonnes trouvées: {', '.join(found_cols_r)}")
-                else:
-                    st.markdown("❌ Non disponible")
-            
-            st.markdown("---")
-            st.markdown("**📈 Contribution aux Indicateurs KPI**")
-            
-            if df_budget is not None and isinstance(df_budget, pd.DataFrame) and len(df_budget) > 0:
-                # Analyze KPI sources
-                kpi_analysis = []
-                
-                # Budget Annuel Total
-                if 'Budget Net' in df_budget.columns:
-                    try:
-                        budget_total_contrib = pd.to_numeric(
-                            df_budget['Budget Net'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."),
-                            errors='coerce'
-                        ).fillna(0).sum()
-                        kpi_analysis.append(('Budget Annuel Total', f"{budget_total_contrib:,.0f} DH", '✅ Budget Net'))
-                    except Exception:
-                        kpi_analysis.append(('Budget Annuel Total', 'Erreur', '❌ Budget Net'))
-                
-                # Budget Engagé
-                if 'Salaire net négocié' in df_budget.columns:
-                    try:
-                        budget_eng_contrib = pd.to_numeric(
-                            df_budget['Salaire net négocié'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."),
-                            errors='coerce'
-                        ).fillna(0).sum()
-                        kpi_analysis.append(('Budget Engagé', f"{budget_eng_contrib:,.0f} DH", '✅ Salaire net négocié'))
-                    except Exception:
-                        kpi_analysis.append(('Budget Engagé', 'Erreur', '❌ Salaire net négocié'))
-                
-                # Recrutements fermés
-                if recr_available and df_recrutement is not None and 'Statut recrutement' in df_recrutement.columns:
-                    try:
-                        closed_count = int(df_recrutement['Statut recrutement'].astype(str).apply(lambda s: _normalize_text(s) == 'cloture').sum())
-                        total_count = len(df_recrutement)
-                        kpi_analysis.append(('Recrutements Clos', f"{closed_count} / {total_count}", '✅ Statut recrutement'))
-                    except Exception:
-                        kpi_analysis.append(('Recrutements Clos', 'Erreur', '❌ Statut recrutement'))
-                
-                if kpi_analysis:
-                    for indicator, value, source in kpi_analysis:
-                        col_i1, col_i2 = st.columns([2, 2])
-                        with col_i1:
-                            st.write(f"📊 {indicator}")
-                        with col_i2:
-                            st.write(f"{source} → **{value}**")
-            
-            # Productivity chart contribution breakdown
-            st.markdown("---")
-            st.markdown("**📊 Contribution au Graphique Productivité du Budget**")
-            
-            if df_budget is not None and 'Direction concernée' in df_budget.columns and recr_available:
-                try:
-                    df_budget_tmp = df_budget.copy()
-                    df_budget_tmp['_dir_norm'] = df_budget_tmp['Direction concernée'].astype(str).apply(_normalize_text)
-                    df_recr_tmp = df_recrutement.copy()
-                    df_recr_tmp['_dir_norm'] = df_recr_tmp['Direction concernée'].astype(str).apply(_normalize_text)
-                    
-                    unique_dirs = sorted(df_budget_tmp['Direction concernée'].dropna().unique())
-                    st.write(f"📍 {len(unique_dirs)} Directions analysées")
-                    
-                    # Show top 3 directions by budget
-                    prod_data = []
-                    for d in unique_dirs:
-                        dir_norm = _normalize_text(d)
-                        n_posts = int(df_recr_tmp[df_recr_tmp['_dir_norm'] == dir_norm].shape[0])
-                        try:
-                            if 'Budget Net' in df_budget_tmp.columns:
-                                budget_prevue = pd.to_numeric(
-                                    df_budget_tmp[df_budget_tmp['_dir_norm'] == dir_norm]['Budget Net'].astype(str)
-                                    .str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."),
-                                    errors='coerce'
-                                ).fillna(0).sum()
-                            else:
-                                budget_prevue = 0
-                        except:
-                            budget_prevue = 0
-                        
-                        prod_data.append({'Direction': d, 'Posts': n_posts, 'Budget': budget_prevue})
-                    
-                    df_prod_debug = pd.DataFrame(prod_data).sort_values('Budget', ascending=False).head(5)
-                    st.dataframe(df_prod_debug, use_container_width=True)
-                except Exception as e:
-                    st.warning(f"Erreur analyse productivité: {e}")
+
 
         # KPI cards (haut) - valeurs dynamiques si df_budget fourni
         budget_annuel_total = None
@@ -5267,7 +5155,7 @@ def main():
 
         # Increase bar chart height to show long percentage values properly
         fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'', 'y':''}, text=[f"{p}%" for p in perc], height=400)
-        fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=13)), showlegend=False, margin=dict(l=180, r=100, t=50, b=30))
+        fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=13)), showlegend=False, margin=dict(l=180, r=140, t=50, b=30))
         fig_bar.update_traces(textposition='outside', textfont=dict(size=11))
         fig_bar = apply_title_style(fig_bar)
 
@@ -5285,19 +5173,21 @@ def main():
         with col_chart1:
             # Donut chart : Budget consommé vs restant
             if budget_annuel_total and budget_engage:
+                # Calculate percentages for display
+                pct_consume = (budget_engage / budget_annuel_total * 100) if budget_annuel_total > 0 else 0
+                pct_remaining = 100 - pct_consume
                 fig_donut = go.Figure(data=[go.Pie(
                     labels=['Budget consommé', 'Budget restant'],
                     values=[budget_engage, budget_restant],
                     hole=0.4,
                     marker=dict(colors=['#2ca02c', '#ff7f0e']),
                     textinfo='label+value',
-                    texttemplate='<b>%{label}</b><br>%{value:,.0f} DH'
+                    texttemplate='<b>%{label}</b><br>%{value:,.0f} DH<br><i>%{percent:.1%}</i>'
                 )])
                 fig_donut.update_layout(
                     title='Budget consommé vs restant',
                     height=320,
-                    showlegend=True,
-                    legend=dict(x=1.0, y=0.5, xanchor='left', yanchor='middle')
+                    showlegend=False
                 )
                 st.plotly_chart(fig_donut, use_container_width=True)
         
@@ -5349,7 +5239,7 @@ def main():
                     title='Consommation budgétaire par mois',
                     labels={'Consommé': 'Montant (DH)'},
                     markers=True,
-                    height=320
+                    height=400
                 )
                 # Add value text on each point
                 fig_mois.update_traces(
@@ -5490,11 +5380,11 @@ def main():
         st.markdown("""
         <style>
         .custom-table-small {border-collapse: collapse; width: 85%; margin:auto; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed; border-spacing: 0;}
-        .custom-table-small th {background:#9C182F;color:white;padding:2px 0.5px;text-align:center;font-size:14px;font-weight:700;}
-        .custom-table-small td {padding:0.5px 0.5px;border-bottom:1px solid #eee; font-size:0.90em; text-align:center;}
+        .custom-table-small th {background:#9C182F;color:white;padding:1px 0.2px;text-align:center;font-size:14px;font-weight:700;}
+        .custom-table-small td {padding:0.25px 0.2px;border-bottom:1px solid #eee; font-size:0.90em; text-align:center;}
         .custom-table-small td:first-child, .custom-table-small th:first-child {text-align:left;}
         .custom-table-small tbody tr:last-child {background:#9C182F; color:white}
-        .custom-table-small tbody tr:last-child td {color:white; font-weight:700; padding:0.5px 0.5px; text-align:center;}
+        .custom-table-small tbody tr:last-child td {color:white; font-weight:700; padding:0.25px 0.2px; text-align:center;}
         .custom-table-small tbody tr:last-child td:first-child {text-align:left;}
         </style>
         """, unsafe_allow_html=True)
