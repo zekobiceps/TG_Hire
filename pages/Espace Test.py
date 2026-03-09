@@ -5071,7 +5071,7 @@ def main():
             
             # Productivity chart contribution breakdown
             st.markdown("---")
-            st.markdown("**📊 Contribution au Graphique Productivité du Budget**")
+            st.markdown("**📊 Contribution au Graphique Productivité du Budget (Coût moyen par poste)**")
             
             if df_budget is not None and 'Direction concernée' in df_budget.columns and recr_available:
                 try:
@@ -5083,11 +5083,14 @@ def main():
                     unique_dirs = sorted(df_budget_tmp['Direction concernée'].dropna().unique())
                     st.write(f"📍 {len(unique_dirs)} Directions analysées")
                     
-                    # Show top 3 directions by budget
+                    # Show directions by coût moyen réel (matching the actual chart)
                     prod_data = []
                     for d in unique_dirs:
                         dir_norm = _normalize_text(d)
+                        # Number of posts from recrutement
                         n_posts = int(df_recr_tmp[df_recr_tmp['_dir_norm'] == dir_norm].shape[0])
+                        
+                        # Budget prévu (Budget Net)
                         try:
                             if 'Budget Net' in df_budget_tmp.columns:
                                 budget_prevue = pd.to_numeric(
@@ -5100,10 +5103,32 @@ def main():
                         except:
                             budget_prevue = 0
                         
-                        prod_data.append({'Direction': d, 'Posts': n_posts, 'Budget': budget_prevue})
+                        # Budget engagé (Salaire net négocié)
+                        try:
+                            if 'Salaire net négocié' in df_budget_tmp.columns:
+                                budget_engage = pd.to_numeric(
+                                    df_budget_tmp[df_budget_tmp['_dir_norm'] == dir_norm]['Salaire net négocié'].astype(str)
+                                    .str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."),
+                                    errors='coerce'
+                                ).fillna(0).sum()
+                            else:
+                                budget_engage = 0
+                        except:
+                            budget_engage = 0
+                        
+                        # Coûts moyens
+                        cost_prevue = float(budget_prevue) / n_posts if n_posts > 0 else 0.0
+                        cost_engage = float(budget_engage) / n_posts if n_posts > 0 else 0.0
+                        
+                        prod_data.append({
+                            'Direction': d, 
+                            'Nb Postes': n_posts,
+                            'Coût moyen prévu (DH)': int(cost_prevue),
+                            'Coût moyen réel (DH)': int(cost_engage)
+                        })
                     
-                    df_prod_debug = pd.DataFrame(prod_data).sort_values('Budget', ascending=False).head(5)
-                    st.dataframe(df_prod_debug, use_container_width=True)
+                    df_prod_debug = pd.DataFrame(prod_data).sort_values('Coût moyen réel (DH)', ascending=False)
+                    st.dataframe(df_prod_debug.head(8), use_container_width=False)
                 except Exception as e:
                     st.warning(f"Erreur analyse productivité: {e}")
 
@@ -5413,9 +5438,8 @@ def main():
         
         detail_rows.sort(key=lambda x: extract_closed_count(x['Clos']), reverse=True)
         
-        # Limiter aux 5 top directions pour réduire la longueur et centraliser (enlever ~50%)
-        if len(detail_rows) > 5:
-            detail_rows = detail_rows[:5]
+        # Affecter TOUTES les directions sans limitation
+        # (pas de limite, toutes les directions seront affichées)
         
         # Ensure df_detail exists and add totals row
         if 'detail_rows' in locals():
@@ -5457,16 +5481,17 @@ def main():
 
         st.markdown("""
         <style>
-        .custom-table-small {border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed}
-        .custom-table-small th {background:#9C182F;color:white;padding:6px 8px;text-align:left}
-        .custom-table-small td {padding:6px 8px;border-bottom:1px solid #eee; font-size:0.98em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+        .custom-table-small {border-collapse: collapse; width: 80%; margin: 0 auto; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed; font-size: 0.9em}
+        .custom-table-small th {background:#9C182F;color:white;padding:4px 6px;text-align:left;font-size: 0.9em}
+        .custom-table-small td {padding:4px 6px;border-bottom:1px solid #eee; font-size:0.85em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
         .custom-table-small tbody tr:last-child {background:#9C182F; color:white}
         .custom-table-small tbody tr:last-child td {color:white; font-weight:700}
+        .table-container-center {display: flex; justify-content: center; width: 100%}
         </style>
         """, unsafe_allow_html=True)
 
         cols_display = ['Direction', 'Clos', 'Budget prévue (DH)', 'Budget engagé (DH)', 'slipping (écart)']
-        html = '<table class="custom-table-small"><thead><tr>'
+        html = '<div class="table-container-center"><table class="custom-table-small"><thead><tr>'
         for c in cols_display:
             html += f"<th>{c}</th>"
         html += '</tr></thead><tbody>'
@@ -5478,7 +5503,7 @@ def main():
             html += f"<td>{r['Budget engagé (DH)']}</td>"
             html += f"<td>{r['slipping (écart)']}</td>"
             html += '</tr>'
-        html += '</tbody></table>'
+        html += '</tbody></table></div>'
         st.markdown(html, unsafe_allow_html=True)
     
     # Continuer l'onglet Upload avec la section PowerPoint
