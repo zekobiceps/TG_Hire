@@ -5103,27 +5103,10 @@ def main():
             ("Budget Annuel Total", f"{budget_annuel_total:,.0f} DH" if budget_annuel_total else "-", "#1f77b4"),
             ("Budget Actuellement Engagé", f"{budget_engage:,.0f} DH" if budget_engage else "-", "#2ca02c"),
             ("Taux de Consommation", f"{taux_consommation:.1f}%" if taux_consommation else "-", "#172b4d"),
-            ("Recrutements Clôturés", f"{nb_postes_clos_total}/{nb_total_postes}", "#ff7f0e"),
+            ("Postes budgétés restants", f"{nb_total_postes - nb_postes_clos_total}/{nb_total_postes}", "#ff7f0e"),
             ("Statut budgétaire global", statut_global, "#2ca02c" if statut_global == "CONFORME" else "#d62728"),
         ]
         st.markdown(render_generic_metrics(metrics_combined), unsafe_allow_html=True)
-        
-        # Button styled as KPI card on same line
-        button_html = """
-        <style>
-        .kpi-link-btn{display:inline-flex;align-items:center;justify-content:center;background:#fff;border-radius:8px;padding:14px 18px;min-width:220px;border:1px solid #e6eef6;box-shadow:0 2px 6px rgba(0,0,0,0.04);text-decoration:none;color:inherit;transition:all 0.2s ease;margin-left:18px;vertical-align:top}
-        .kpi-link-btn:hover{box-shadow:0 4px 12px rgba(0,102,204,0.15);border-color:#0066cc}
-        .kpi-link-btn .link-title{font-size:17px;color:#2c3e50;margin-bottom:8px;font-weight:700;text-align:center;display:block}
-        .kpi-link-btn .link-value{font-size:16px;color:#0066cc;font-weight:800;text-align:center;display:block}
-        </style>
-        <a href="https://docs.google.com/spreadsheets/d/1a3_SuZ5udezO-pJNjD1a5ugE1e_NeKuO/edit?gid=2071824040#gid=2071824040" target="_blank" class="kpi-link-btn">
-            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center">
-                <span class="link-title">📊 Lien vers fichier</span>
-                <span class="link-value">de suivi pour plus de détail</span>
-            </div>
-        </a>
-        """
-        st.markdown(button_html, unsafe_allow_html=True)
 
         # Graphiques de tendance et consommation par direction
         # Graphique de Productivité du Budget removed per user request
