@@ -5189,7 +5189,7 @@ def main():
                     hovertemplate='<b>%{label}</b><br>%{value:,.0f} DH<br>%{percent:.1%}<extra></extra>'
                 )])
                 # Add annotations outside: label + value
-                fig_donut.add_annotation(text=f"<b>Consommé</b><br>{budget_engage:,.0f} DH", x=0.15, y=1.12, showarrow=False, font=dict(size=11, color='#2ca02c'))
+                fig_donut.add_annotation(text=f"<b>Consommé</b><br>{budget_engage:,.0f} DH", x=0.15, y=0.85, showarrow=False, font=dict(size=11, color='#2ca02c'))
                 fig_donut.add_annotation(text=f"<b>Restant</b><br>{budget_restant:,.0f} DH", x=0.85, y=-0.12, showarrow=False, font=dict(size=11, color='#ff7f0e'))
                 fig_donut.update_layout(
                     title=dict(text='Budget consommé vs restant', x=0, xanchor='left', font=TITLE_FONT),
@@ -5334,12 +5334,12 @@ def main():
                     'Clos': clos_str,
                     'Budget prévue (DH)': budget_prevue if pd.notna(budget_prevue) else 0,
                     'Budget engagé (DH)': int(budget_engaged_dir) if pd.notna(budget_engaged_dir) else 0,
-                    'Écart (DH)': int(budget_restant_val)
+                    'Slippage (écart)': int(budget_restant_val)
                 })
         else:
             detail_rows = [
-                { 'Direction': 'Encadrement Chantier', 'Clos': '8 / 76', 'Budget prévue (DH)': 1_500_000, 'Budget engagé (DH)': 1_480_000, 'Écart (DH)': 20_000 },
-                { 'Direction': 'Pôle Admin & Fin.', 'Clos': '2 / 4', 'Budget prévue (DH)': 300_000, 'Budget engagé (DH)': 310_000, 'Écart (DH)': -10_000 },
+                { 'Direction': 'Encadrement Chantier', 'Clos': '8 / 76', 'Budget prévue (DH)': 1_500_000, 'Budget engagé (DH)': 1_480_000, 'Slippage (écart)': 20_000 },
+                { 'Direction': 'Pôle Admin & Fin.', 'Clos': '2 / 4', 'Budget prévue (DH)': 300_000, 'Budget engagé (DH)': 310_000, 'Slippage (écart)': -10_000 },
             ]
         
         # Trier detail_rows par nombre de clôturés (décroissant)
@@ -5383,7 +5383,7 @@ def main():
                 'Clos': clos_total_str,
                 'Budget prévue (DH)': total_prevue,
                 'Budget engagé (DH)': int(total_engage),
-                'Écart (DH)': total_ecart
+                'Slippage (écart)': total_ecart
             }])
             df_detail = pd.concat([df_detail, totals_row], ignore_index=True)
 
@@ -5391,8 +5391,8 @@ def main():
             df_detail['Budget prévue (DH)'] = df_detail['Budget prévue (DH)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
         if 'Budget engagé (DH)' in df_detail.columns:
             df_detail['Budget engagé (DH)'] = df_detail['Budget engagé (DH)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
-        if 'Écart (DH)' in df_detail.columns:
-            df_detail['Écart (DH)'] = df_detail['Écart (DH)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
+        if 'Slippage (écart)' in df_detail.columns:
+            df_detail['Slippage (écart)'] = df_detail['Slippage (écart)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
         st.markdown("""
         <style>
         .custom-table-small {border-collapse: collapse; width: 75%; margin:auto; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed; border-spacing: 0;}
@@ -5410,13 +5410,13 @@ def main():
         </style>
         """, unsafe_allow_html=True)
 
-        cols_display = ['Direction', 'Clos', 'Budget prévue (DH)', 'Budget engagé (DH)', 'Écart (DH)']
+        cols_display = ['Direction', 'Clos', 'Budget prévue (DH)', 'Budget engagé (DH)', 'Slippage (écart)']
         html = '<table class="custom-table-small"><thead><tr>'
         for c in cols_display:
             html += f"<th>{c}</th>"
         html += '</tr></thead><tbody>'
         for _, r in df_detail.iterrows():
-            ecart_val = r.get('Écart (DH)', '-')
+            ecart_val = r.get('Slippage (écart)', '-')
             ecart_color = 'color:#d62728;' if isinstance(ecart_val, str) and ecart_val.startswith('-') else ''
             html += '<tr>'
             html += f"<td style='font-weight:600; text-align:left;'>{r['Direction']}</td>"
