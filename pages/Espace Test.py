@@ -5212,11 +5212,10 @@ def main():
         # ===== KPIs COMBINÉS =====
         # Combiner les métriques principales et secondaires en une seule rangée
         metrics_combined = [
-            ("Recrutements Clôturés", f"{nb_postes_clos_total}/{nb_total_postes}", "#1f77b4"),
-            ("Budget Restant", f"{budget_restant:,.0f} DH" if budget_restant else "-", "#2ca02c"),
-            ("Taux de Consommation", f"{taux_consommation:.1f}%" if taux_consommation else "-", "#172b4d"),
             ("Budget Annuel Total", f"{budget_annuel_total:,.0f} DH" if budget_annuel_total else "-", "#1f77b4"),
             ("Budget Actuellement Engagé", f"{budget_engage:,.0f} DH" if budget_engage else "-", "#2ca02c"),
+            ("Taux de Consommation", f"{taux_consommation:.1f}%" if taux_consommation else "-", "#172b4d"),
+            ("Recrutements Clôturés", f"{nb_postes_clos_total}/{nb_total_postes}", "#ff7f0e"),
             ("Statut budgétaire global", statut_global, "#2ca02c" if statut_global == "CONFORME" else "#d62728"),
         ]
         st.markdown(render_generic_metrics(metrics_combined), unsafe_allow_html=True)
@@ -5266,9 +5265,9 @@ def main():
         except Exception:
             pass
 
-        # Increase bar chart size slightly
-        fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'', 'y':''}, text=[f"{p}%" for p in perc], height=420)
-        fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=16)), showlegend=False)
+        # Reduce bar chart size to accommodate long percentages
+        fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'', 'y':''}, text=[f"{p}%" for p in perc], height=300)
+        fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=14)), showlegend=False, margin=dict(l=150, r=20, t=40, b=20))
         fig_bar = apply_title_style(fig_bar)
 
         # ===== GRAPHIQUE TENDANCE MENSUELLE =====
@@ -5279,7 +5278,6 @@ def main():
             st.plotly_chart(fig_bar, use_container_width=True)
         
         with col_trend:
-            st.markdown("<h3 style='margin-bottom: 0;'>Tendance de consommation budgétaire</h3>", unsafe_allow_html=True)
             # Créer un graphique "Budget consommé vs restant" en donut + graphique tendance
             col_chart1, col_chart2 = st.columns([1, 1.2])
         
@@ -5341,23 +5339,30 @@ def main():
                         })
                 
                 df_mois = pd.DataFrame(mois_data)
-                fig_mois = px.bar(
+                fig_mois = px.line(
                     df_mois,
                     x='Mois',
                     y='Consommé',
                     title='Consommation budgétaire par mois',
                     labels={'Consommé': 'Montant (DH)'},
-                    color='Consommé',
-                    color_continuous_scale=['#ffd700', '#ff7f0e', '#d62728'],
+                    markers=True,
                     height=320
+                )
+                # Add value text on each point
+                fig_mois.update_traces(
+                    mode='lines+markers+text',
+                    text=[f"{int(v):,}" for v in df_mois['Consommé']],
+                    textposition='top center',
+                    textfont=dict(size=10),
+                    marker=dict(size=8, color='#ff7f0e')
                 )
                 fig_mois.update_layout(
                     xaxis_title='',
                     yaxis_title='Montant (DH)',
                     showlegend=False,
-                    hovermode='x'
+                    hovermode='x',
+                    line=dict(color='#ff7f0e', width=2)
                 )
-                fig_mois.update_traces(width=0.5)
                 fig_mois = apply_title_style(fig_mois)
                 st.plotly_chart(fig_mois, use_container_width=True)
             except Exception as e:
@@ -5423,13 +5428,12 @@ def main():
                     'Direction': d,
                     'Clos': clos_str,
                     'Budget prévue (DH)': budget_prevue if pd.notna(budget_prevue) else 0,
-                    'Budget engagé (DH)': int(budget_engaged_dir) if pd.notna(budget_engaged_dir) else 0,
-                    'Budget restant (DH)': budget_restant_val if budget_restant_val is not None else 0
+                    'Budget engagé (DH)': int(budget_engaged_dir) if pd.notna(budget_engaged_dir) else 0
                 })
         else:
             detail_rows = [
-                { 'Direction': 'Encadrement Chantier', 'Clos': '8 / 76', 'Budget prévue (DH)': 1_500_000, 'Budget engagé (DH)': 1_480_000, 'Budget restant (DH)': 20_000 },
-                { 'Direction': 'Pôle Admin & Fin.', 'Clos': '2 / 4', 'Budget prévue (DH)': 300_000, 'Budget engagé (DH)': 310_000, 'Budget restant (DH)': -10_000 },
+                { 'Direction': 'Encadrement Chantier', 'Clos': '8 / 76', 'Budget prévue (DH)': 1_500_000, 'Budget engagé (DH)': 1_480_000 },
+                { 'Direction': 'Pôle Admin & Fin.', 'Clos': '2 / 4', 'Budget prévue (DH)': 300_000, 'Budget engagé (DH)': 310_000 },
             ]
         
         # Trier detail_rows par nombre de clôturés (décroissant)
@@ -5455,7 +5459,6 @@ def main():
         if not df_detail.empty:
             total_prevue = df_detail['Budget prévue (DH)'].replace('', 0).fillna(0).astype(float).sum()
             total_engage = df_detail['Budget engagé (DH)'].replace('', 0).fillna(0).astype(float).sum()
-            total_restant = df_detail['Budget restant (DH)'].replace('', 0).fillna(0).astype(float).sum()
             # Calculate total clos: sum of X and Y from "X / Y" format
             total_clos_count = 0
             total_posts_count = 0
@@ -5472,8 +5475,7 @@ def main():
                 'Direction': 'TOTAL',
                 'Clos': clos_total_str,
                 'Budget prévue (DH)': total_prevue,
-                'Budget engagé (DH)': int(total_engage),
-                'Budget restant (DH)': total_restant
+                'Budget engagé (DH)': int(total_engage)
             }])
             df_detail = pd.concat([df_detail, totals_row], ignore_index=True)
 
@@ -5481,43 +5483,29 @@ def main():
             df_detail['Budget prévue (DH)'] = df_detail['Budget prévue (DH)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
         if 'Budget engagé (DH)' in df_detail.columns:
             df_detail['Budget engagé (DH)'] = df_detail['Budget engagé (DH)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
-        if 'Budget restant (DH)' in df_detail.columns:
-            df_detail['Budget restant (DH)'] = df_detail['Budget restant (DH)'].apply(lambda v: f"{int(v):+,d} DH" if pd.notna(v) else "-")
-
         st.markdown("""
         <style>
         .custom-table-small {border-collapse: collapse; width: 85%; margin:auto; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed}
-        .custom-table-small th {background:#9C182F;color:white;padding:1px 2px;text-align:left;font-size:13px;font-weight:600;}
-        .custom-table-small td {padding:1px 2px;border-bottom:1px solid #eee; font-size:0.95em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+        .custom-table-small th {background:#9C182F;color:white;padding:2px 3px;text-align:center;font-size:13px;font-weight:600;}
+        .custom-table-small td {padding:2px 3px;border-bottom:1px solid #eee; font-size:0.95em; text-align:center;}
+        .custom-table-small td:first-child, .custom-table-small th:first-child {text-align:left;}
         .custom-table-small tbody tr:last-child {background:#9C182F; color:white}
-        .custom-table-small tbody tr:last-child td {color:white; font-weight:700; padding:1px 2px;}
-        .budget-surplus {color:#2ca02c; font-weight:600}
-        .budget-deficit {color:#d62728; font-weight:600}
+        .custom-table-small tbody tr:last-child td {color:white; font-weight:700; padding:2px 3px; text-align:center;}
+        .custom-table-small tbody tr:last-child td:first-child {text-align:left;}
         </style>
         """, unsafe_allow_html=True)
 
-        cols_display = ['Direction', 'Clos', 'Budget prévue (DH)', 'Budget engagé (DH)', 'Budget restant (DH)']
+        cols_display = ['Direction', 'Clos', 'Budget prévue (DH)', 'Budget engagé (DH)']
         html = '<table class="custom-table-small"><thead><tr>'
         for c in cols_display:
             html += f"<th>{c}</th>"
         html += '</tr></thead><tbody>'
         for _, r in df_detail.iterrows():
             html += '<tr>'
-            html += f"<td style='font-weight:600'>{r['Direction']}</td>"
-            html += f"<td>{r['Clos']}</td>"
-            html += f"<td>{r['Budget prévue (DH)']}</td>"
-            html += f"<td>{r['Budget engagé (DH)']}</td>"
-            # Couleur conditionnelle pour Budget restant
-            restant_val = r['Budget restant (DH)']
-            if pd.notna(restant_val) and restant_val != "-":
-                try:
-                    val_num = float(str(restant_val).replace(' ', '').replace('DH', '').replace('+', '').replace(',', ''))
-                    color_class = 'budget-surplus' if val_num >= 0 else 'budget-deficit'
-                    html += f"<td class='{color_class}'>{restant_val}</td>"
-                except Exception:
-                    html += f"<td>{restant_val}</td>"
-            else:
-                html += f"<td>{restant_val}</td>"
+            html += f"<td style='font-weight:600; text-align:left;'>{r['Direction']}</td>"
+            html += f"<td style='text-align:center;'>{r['Clos']}</td>"
+            html += f"<td style='text-align:center;'>{r['Budget prévue (DH)']}</td>"
+            html += f"<td style='text-align:center;'>{r['Budget engagé (DH)']}</td>"
             html += '</tr>'
         html += '</tbody></table>'
         st.markdown(html, unsafe_allow_html=True)
