@@ -5214,39 +5214,14 @@ def main():
         if nb_postes_clos_total > 0 and budget_engage:
             coût_moyen_reel = int(budget_engage / nb_postes_clos_total)
         
-        # KPI Row 1 : Métriques principales du storytelling
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            st.metric(
-                "Recrutements Clôturés",
-                f"{nb_postes_clos_total}/{nb_total_postes}",
-                delta=f"{round((nb_postes_clos_total/nb_total_postes*100) if nb_total_postes > 0 else 0, 1)}%",
-                help="Postes pourvus / Total de postes budgétés"
-            )
-        
-        with col2:
-            st.metric(
-                "Budget Restant",
-                f"{budget_restant:,.0f} DH" if budget_restant else "-",
-                delta=f"-{round(((budget_engage or 0)/(budget_annuel_total or 1)*100), 1)}% utilisé" if budget_annuel_total else "-",
-                help="Budget non consommé"
-            )
-        
-        with col3:
-            st.metric(
-                "Coût Moyen Réel",
-                f"{coût_moyen_reel:,.0f} DH" if coût_moyen_reel else "-",
-                help="Coût moyen par recrutement clôturé"
-            )
-        
-        with col4:
-            st.metric(
-                "Taux de Consommation",
-                f"{taux_consommation:.1f}%" if taux_consommation else "-",
-                delta=statut_global,
-                help="Budget engagé / Budget total"
-            )
+        # KPI Row 1 : Métriques principales du storytelling (format carte HTML)
+        metrics_principal = [
+            ("Recrutements Clôturés", f"{nb_postes_clos_total}/{nb_total_postes}", "#1f77b4"),
+            ("Budget Restant", f"{budget_restant:,.0f} DH" if budget_restant else "-", "#2ca02c"),
+            ("Coût Moyen Réel", f"{coût_moyen_reel:,.0f} DH" if coût_moyen_reel else "-", "#ff7f0e"),
+            ("Taux de Consommation", f"{taux_consommation:.1f}%" if taux_consommation else "-", "#172b4d"),
+        ]
+        st.markdown(render_generic_metrics(metrics_principal), unsafe_allow_html=True)
         
         st.markdown("---")
         
@@ -5338,7 +5313,14 @@ def main():
                 title='Productivité du Budget (coût moyen par poste)',
                 xaxis_title='Montant (DH)',
                 yaxis_title='Direction',
-                hovermode='closest'
+                hovermode='closest',
+                legend=dict(
+                    x=0.65,
+                    y=0.95,
+                    bgcolor='rgba(255, 255, 255, 0.8)',
+                    bordercolor='#ccc',
+                    borderwidth=1
+                )
             )
             fig_prod = apply_title_style(fig_prod)
         else:
@@ -5351,7 +5333,16 @@ def main():
                 labels={'value':'Montant (DH)'},
                 height=350
             )
-            fig_prod.update_layout(title='Productivité du Budget (coût moyen par poste)')
+            fig_prod.update_layout(
+                title='Productivité du Budget (coût moyen par poste)',
+                legend=dict(
+                    x=0.65,
+                    y=0.95,
+                    bgcolor='rgba(255, 255, 255, 0.8)',
+                    bordercolor='#ccc',
+                    borderwidth=1
+                )
+            )
             fig_prod = apply_title_style(fig_prod)
 
         # Barres consommation par direction
@@ -5406,6 +5397,91 @@ def main():
         with col_right:
             st.plotly_chart(fig_bar, use_container_width=True)
 
+
+        # ===== GRAPHIQUE TENDANCE MENSUELLE =====
+        st.markdown("---")
+        st.subheader("Tendance de consommation budgétaire")
+        
+        # Créer un graphique "Budget consommé vs restant" en donut + graphique tendance
+        col_chart1, col_chart2 = st.columns([1, 2])
+        
+        with col_chart1:
+            # Donut chart : Budget consommé vs restant
+            if budget_annuel_total and budget_engage:
+                fig_donut = go.Figure(data=[go.Pie(
+                    labels=['Budget consommé', 'Budget restant'],
+                    values=[budget_engage, budget_restant],
+                    hole=0.4,
+                    marker=dict(colors=['#2ca02c', '#ff7f0e'])
+                )])
+                fig_donut.update_layout(
+                    title='Budget consommé vs restant',
+                    height=380,
+                    showlegend=True
+                )
+                st.plotly_chart(fig_donut, use_container_width=True)
+        
+        with col_chart2:
+            # Graphique de tendance mensuelle basée sur "Date d'intégration"
+            try:
+                mois_data = []
+                # Chercher la colonne "Date d'intégration" dans df_budget
+                if df_budget is not None and len(df_budget) > 0:
+                    date_col = None
+                    for col in df_budget.columns:
+                        if 'intégration' in col.lower() or 'integration' in col.lower():
+                            date_col = col
+                            break
+                    
+                    if date_col is not None:
+                        # Utiliser les vraies dates d'intégration
+                        df_temp = df_budget.copy()
+                        df_temp[date_col] = pd.to_datetime(df_temp[date_col], errors='coerce')
+                        # Grouper par mois
+                        df_temp['Mois'] = df_temp[date_col].dt.to_period('M')
+                        # Grouper par mois et compter / sommer budget engagé
+                        if 'Salaire net négocié' in df_temp.columns:
+                            mois_agg = df_temp.groupby('Mois')['Salaire net négocié'].apply(
+                                lambda x: pd.to_numeric(x.astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
+                            ).reset_index(name='Consommé')
+                        else:
+                            mois_agg = df_temp.groupby('Mois').size().reset_index(name='Consommé')
+                        
+                        mois_agg['Mois_str'] = mois_agg['Mois'].astype(str)
+                        mois_data = mois_agg[['Mois_str', 'Consommé']].to_dict('records')
+                        mois_data = [{'Mois': m['Mois_str'], 'Consommé': int(m['Consommé'])} for m in mois_data]
+                
+                # Fallback si pas de date trouvée
+                if not mois_data:
+                    total_budget = budget_engage if budget_engage else 100000
+                    nb_mois = 12
+                    for mois in range(1, nb_mois + 1):
+                        mois_data.append({
+                            'Mois': f'M{mois}',
+                            'Consommé': int(total_budget * (mois / nb_mois))
+                        })
+                
+                df_mois = pd.DataFrame(mois_data)
+                fig_mois = px.bar(
+                    df_mois,
+                    x='Mois',
+                    y='Consommé',
+                    title='Consommation budgétaire par mois',
+                    labels={'Consommé': 'Montant (DH)'},
+                    color='Consommé',
+                    color_continuous_scale=['#ffd700', '#ff7f0e', '#d62728'],
+                    height=380
+                )
+                fig_mois.update_layout(
+                    xaxis_title='',
+                    yaxis_title='Montant (DH)',
+                    showlegend=False,
+                    hovermode='x'
+                )
+                fig_mois = apply_title_style(fig_mois)
+                st.plotly_chart(fig_mois, use_container_width=True)
+            except Exception as e:
+                st.info("Graphique de tendance mensuelle indisponible")
 
         # Tableau d'analyse détaillée (bas)
         st.subheader("Analyse détaillée par direction")
@@ -5565,74 +5641,6 @@ def main():
             html += '</tr>'
         html += '</tbody></table>'
         st.markdown(html, unsafe_allow_html=True)
-        
-        # ===== GRAPHIQUE TENDANCE MENSUELLE =====
-        st.markdown("---")
-        st.subheader("Tendance de consommation budgétaire")
-        
-        # Créer un graphique "Budget consommé vs restant" en donut + graphique tendance
-        col_chart1, col_chart2 = st.columns([1, 2])
-        
-        with col_chart1:
-            # Donut chart : Budget consommé vs restant
-            if budget_annuel_total and budget_engage:
-                fig_donut = go.Figure(data=[go.Pie(
-                    labels=['Budget consommé', 'Budget restant'],
-                    values=[budget_engage, budget_restant],
-                    hole=0.4,
-                    marker=dict(colors=['#2ca02c', '#ff7f0e'])
-                )])
-                fig_donut.update_layout(
-                    title='Budget consommé vs restant',
-                    height=380,
-                    showlegend=True
-                )
-                st.plotly_chart(fig_donut, use_container_width=True)
-        
-        with col_chart2:
-            # Graphique de tendance mensuelle (simulation si données réelles non disponibles)
-            try:
-                # Essayer de créer une tendance basée sur les directions et statuts
-                mois_data = []
-                if df_budget is not None and len(df_budget) > 0:
-                    # Grouper par month si colonne date existe, sinon créer une simulation
-                    # Pour la démo, on crée une progression linéaire
-                    total_budget = budget_engage if budget_engage else 100000
-                    nb_mois = 12
-                    for mois in range(1, nb_mois + 1):
-                        mois_data.append({
-                            'Mois': f'M{mois}',
-                            'Consommé': int(total_budget * (mois / nb_mois))
-                        })
-                else:
-                    # Fallback : données par défaut
-                    mois_data = [
-                        {'Mois': 'Jan', 'Consommé': 20000},
-                        {'Mois': 'Fev', 'Consommé': 45000},
-                        {'Mois': 'Mar', 'Consommé': 95000},
-                    ]
-                
-                df_mois = pd.DataFrame(mois_data)
-                fig_mois = px.bar(
-                    df_mois,
-                    x='Mois',
-                    y='Consommé',
-                    title='Consommation budgétaire par mois',
-                    labels={'Consommé': 'Montant (DH)'},
-                    color='Consommé',
-                    color_continuous_scale=['#ffd700', '#ff7f0e', '#d62728'],
-                    height=380
-                )
-                fig_mois.update_layout(
-                    xaxis_title='',
-                    yaxis_title='Montant (DH)',
-                    showlegend=False,
-                    hovermode='x'
-                )
-                fig_mois = apply_title_style(fig_mois)
-                st.plotly_chart(fig_mois, use_container_width=True)
-            except Exception:
-                st.info("Graphique de tendance mensuelle indisponible")
     
     # Continuer l'onglet Upload avec la section PowerPoint
     with tabs[0]:

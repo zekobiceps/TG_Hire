@@ -1,11 +1,10 @@
 nohup: ignoring input
+2026-03-09 11:00:42.591 "client.showWarningOnDirectExecution" is not a valid config option. If you previously had this config option set, it may have been removed.
 
 Collecting usage statistics. To deactivate, set browser.gatherUsageStats to false.
 
 
   You can now view your Streamlit app in your browser.
 
-  Local URL: http://localhost:8501
-  Network URL: http://10.0.13.237:8501
-  External URL: http://20.42.11.19:8501
+  URL: http://0.0.0.0:8501
 
