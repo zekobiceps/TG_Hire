@@ -5108,12 +5108,22 @@ def main():
         ]
         st.markdown(render_generic_metrics(metrics_combined), unsafe_allow_html=True)
         
-        # Button pour accéder au fichier de suivi
-        st.link_button(
-            "📊 Lien vers fichier de suivi pour plus de détail",
-            "https://docs.google.com/spreadsheets/d/1a3_SuZ5udezO-pJNjD1a5ugE1e_NeKuO/edit?gid=2071824040#gid=2071824040",
-            use_container_width=False
-        )
+        # Button styled as KPI card on same line
+        button_html = """
+        <style>
+        .kpi-link-btn{display:inline-flex;align-items:center;justify-content:center;background:#fff;border-radius:8px;padding:14px 18px;min-width:220px;border:1px solid #e6eef6;box-shadow:0 2px 6px rgba(0,0,0,0.04);text-decoration:none;color:inherit;transition:all 0.2s ease;margin-left:18px;vertical-align:top}
+        .kpi-link-btn:hover{box-shadow:0 4px 12px rgba(0,102,204,0.15);border-color:#0066cc}
+        .kpi-link-btn .link-title{font-size:17px;color:#2c3e50;margin-bottom:8px;font-weight:700;text-align:center;display:block}
+        .kpi-link-btn .link-value{font-size:16px;color:#0066cc;font-weight:800;text-align:center;display:block}
+        </style>
+        <a href="https://docs.google.com/spreadsheets/d/1a3_SuZ5udezO-pJNjD1a5ugE1e_NeKuO/edit?gid=2071824040#gid=2071824040" target="_blank" class="kpi-link-btn">
+            <div style="display:flex;flex-direction:column;align-items:center;justify-content:center">
+                <span class="link-title">📊 Lien vers fichier</span>
+                <span class="link-value">de suivi pour plus de détail</span>
+            </div>
+        </a>
+        """
+        st.markdown(button_html, unsafe_allow_html=True)
 
         # Graphiques de tendance et consommation par direction
         # Graphique de Productivité du Budget removed per user request
@@ -5186,7 +5196,7 @@ def main():
                 fig_donut = go.Figure(data=[go.Pie(
                     labels=['Consommé', 'Restant'],
                     values=[budget_engage, budget_restant],
-                    hole=0.38,
+                    hole=0.32,
                     marker=dict(colors=['#2ca02c', '#ff7f0e']),
                     textinfo='percent',
                     texttemplate='%{percent:.1%}',
@@ -5196,7 +5206,7 @@ def main():
                     hovertemplate='<b>%{label}</b><br>%{value:,.0f} DH<br>%{percent:.1%}<extra></extra>'
                 )])
                 # Add annotations outside: label + value
-                fig_donut.add_annotation(text=f"<b>Consommé</b><br>{budget_engage:,.0f} DH", x=-0.05, y=0.80, showarrow=False, font=dict(size=13, color='#2ca02c'))
+                fig_donut.add_annotation(text=f"<b>Consommé</b><br>{budget_engage:,.0f} DH", x=0.25, y=0.75, showarrow=False, font=dict(size=13, color='#2ca02c'))
                 fig_donut.add_annotation(text=f"<b>Restant</b><br>{budget_restant:,.0f} DH", x=0.85, y=-0.12, showarrow=False, font=dict(size=13, color='#ff7f0e'))
                 fig_donut.update_layout(
                     title=dict(text='Budget consommé vs restant', x=0, xanchor='left', font=TITLE_FONT),
