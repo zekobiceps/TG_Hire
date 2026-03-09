@@ -5107,6 +5107,13 @@ def main():
             ("Statut budgétaire global", statut_global, "#2ca02c" if statut_global == "CONFORME" else "#d62728"),
         ]
         st.markdown(render_generic_metrics(metrics_combined), unsafe_allow_html=True)
+        
+        # Button pour accéder au fichier de suivi
+        st.link_button(
+            "📊 Lien vers fichier de suivi pour plus de détail",
+            "https://docs.google.com/spreadsheets/d/1a3_SuZ5udezO-pJNjD1a5ugE1e_NeKuO/edit?gid=2071824040#gid=2071824040",
+            use_container_width=False
+        )
 
         # Graphiques de tendance et consommation par direction
         # Graphique de Productivité du Budget removed per user request
@@ -5189,7 +5196,7 @@ def main():
                     hovertemplate='<b>%{label}</b><br>%{value:,.0f} DH<br>%{percent:.1%}<extra></extra>'
                 )])
                 # Add annotations outside: label + value
-                fig_donut.add_annotation(text=f"<b>Consommé</b><br>{budget_engage:,.0f} DH", x=0.15, y=0.55, showarrow=False, font=dict(size=13, color='#2ca02c'))
+                fig_donut.add_annotation(text=f"<b>Consommé</b><br>{budget_engage:,.0f} DH", x=-0.05, y=0.80, showarrow=False, font=dict(size=13, color='#2ca02c'))
                 fig_donut.add_annotation(text=f"<b>Restant</b><br>{budget_restant:,.0f} DH", x=0.85, y=-0.12, showarrow=False, font=dict(size=13, color='#ff7f0e'))
                 fig_donut.update_layout(
                     title=dict(text='Budget consommé vs restant', x=0, xanchor='left', font=TITLE_FONT),
