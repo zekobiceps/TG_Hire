@@ -150,7 +150,7 @@ ENTITY_LOGO_MAP = {
     'TG STONE': 'TG STONE.PNG',
     'TG WOOD': 'TG WOOD.PNG',
     'STAM': 'STAM.png',
-    'BFO': 'BFO.png',
+    'Autres': 'Autres.png',
     'TGCC IMMOBILIER': 'tgcc-immobilier.png',
     'TGCC-IMMOBILIER': 'tgcc-immobilier.png'
 }
@@ -200,7 +200,7 @@ def get_entity_display_html_with_logo(name, logos_dict):
         logo_b64_str = logos_dict[logo_file]
         if name_upper in ['TG STEEL', 'TG STONE'] or 'IMMOBILIER' in name_upper:
             logo_height = 50
-        elif name_upper == 'BFO':
+        elif name_upper == 'AUTRES':
             logo_height = 80
         else:
             logo_height = 63
@@ -3012,7 +3012,7 @@ def generate_table_image_simple(weekly_metrics):
             'TG COVER': 'TG COVER.PNG',
             'TG WOOD': 'TG WOOD.PNG',
             'STAM': 'STAM.png',
-            'BFO': 'BFO.png',
+            'Autres': 'Autres.png',
             'TGEM': 'TGEM.PNG',
             'TGCC': 'TGCC.PNG'
         }
@@ -3120,8 +3120,8 @@ def generate_table_image_simple(weekly_metrics):
                 entite_upper = str(entite).upper().strip()
                 if 'STEEL' in entite_upper or 'STONE' in entite_upper:
                     new_h = 45  # Plus petit pour STEEL et STONE
-                elif 'BFO' in entite_upper:
-                    new_h = 70  # Plus grand pour BFO
+                elif 'AUTRES' in entite_upper:
+                    new_h = 70  # Plus grand pour Autres
                 elif 'ALU' in entite_upper or 'WOOD' in entite_upper:
                     new_h = 65  # Plus grand pour ALU et WOOD
                 elif 'COVER' in entite_upper:
@@ -3388,7 +3388,7 @@ def generate_table_html_image(weekly_metrics):
             'TG STONE': 'TG STONE.PNG',
             'TG WOOD': 'TG WOOD.PNG',
             'STAM': 'STAM.png',
-            'BFO': 'BFO.png',
+            'Autres': 'Autres.png',
             'TGCC IMMOBILIER': 'tgcc-immobilier.png',
             'TGCC Immobilier': 'tgcc-immobilier.png'
         }
@@ -3411,7 +3411,7 @@ def generate_table_html_image(weekly_metrics):
             priority_order = [
                 'TGCC IMMOBILIER', 'TGCC-IMMOBILIER', 'TGCC Immobilier',
                 'TG STEEL', 'TG STONE', 'TG ALU', 'TG COVER', 'TG WOOD',
-                'STAM', 'BFO', 'TGEM', 'TGCC'
+                'STAM', 'Autres', 'TGEM', 'TGCC'
             ]
             
             for entity_key in priority_order:
@@ -3426,7 +3426,7 @@ def generate_table_html_image(weekly_metrics):
                             'TG STONE': 45,      # Réduit
                             'TGCC IMMOBILIER': 50,
                             'TGCC Immobilier': 50,
-                            'BFO': 90,           # Augmenté
+                            'Autres': 90,           # Augmenté
                             'TG ALU': 75,        # Augmenté
                             'TG COVER': 70,      # Augmenté
                             'TG WOOD': 75,       # Augmenté

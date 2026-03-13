@@ -150,7 +150,7 @@ ENTITY_LOGO_MAP = {
     'TG STONE': 'TG STONE.PNG',
     'TG WOOD': 'TG WOOD.PNG',
     'STAM': 'STAM.png',
-    'BFO': 'BFO.png',
+    'Autres': 'Autres.png',
     'TGCC IMMOBILIER': 'tgcc-immobilier.png',
     'TGCC-IMMOBILIER': 'tgcc-immobilier.png'
 }
@@ -200,7 +200,7 @@ def get_entity_display_html_with_logo(name, logos_dict):
         logo_b64_str = logos_dict[logo_file]
         if name_upper in ['TG STEEL', 'TG STONE'] or 'IMMOBILIER' in name_upper:
             logo_height = 50
-        elif name_upper == 'BFO':
+        elif name_upper == 'AUTRES':
             logo_height = 80
         else:
             logo_height = 63
@@ -3030,7 +3030,7 @@ def generate_table_image_simple(weekly_metrics):
             'TG COVER': 'TG COVER.PNG',
             'TG WOOD': 'TG WOOD.PNG',
             'STAM': 'STAM.png',
-            'BFO': 'BFO.png',
+            'Autres': 'Autres.png',
             'TGEM': 'TGEM.PNG',
             'TGCC': 'TGCC.PNG'
         }
@@ -3138,8 +3138,8 @@ def generate_table_image_simple(weekly_metrics):
                 entite_upper = str(entite).upper().strip()
                 if 'STEEL' in entite_upper or 'STONE' in entite_upper:
                     new_h = 45  # Plus petit pour STEEL et STONE
-                elif 'BFO' in entite_upper:
-                    new_h = 70  # Plus grand pour BFO
+                elif 'AUTRES' in entite_upper:
+                    new_h = 70  # Plus grand pour Autres
                 elif 'ALU' in entite_upper or 'WOOD' in entite_upper:
                     new_h = 65  # Plus grand pour ALU et WOOD
                 elif 'COVER' in entite_upper:
@@ -3406,7 +3406,7 @@ def generate_table_html_image(weekly_metrics):
             'TG STONE': 'TG STONE.PNG',
             'TG WOOD': 'TG WOOD.PNG',
             'STAM': 'STAM.png',
-            'BFO': 'BFO.png',
+            'Autres': 'Autres.png',
             'TGCC IMMOBILIER': 'tgcc-immobilier.png',
             'TGCC Immobilier': 'tgcc-immobilier.png'
         }
@@ -3429,7 +3429,7 @@ def generate_table_html_image(weekly_metrics):
             priority_order = [
                 'TGCC IMMOBILIER', 'TGCC-IMMOBILIER', 'TGCC Immobilier',
                 'TG STEEL', 'TG STONE', 'TG ALU', 'TG COVER', 'TG WOOD',
-                'STAM', 'BFO', 'TGEM', 'TGCC'
+                'STAM', 'Autres', 'TGEM', 'TGCC'
             ]
             
             for entity_key in priority_order:
@@ -3444,7 +3444,7 @@ def generate_table_html_image(weekly_metrics):
                             'TG STONE': 45,      # Réduit
                             'TGCC IMMOBILIER': 50,
                             'TGCC Immobilier': 50,
-                            'BFO': 90,           # Augmenté
+                            'Autres': 90,           # Augmenté
                             'TG ALU': 75,        # Augmenté
                             'TG COVER': 70,      # Augmenté
                             'TG WOOD': 75,       # Augmenté
@@ -5112,7 +5112,7 @@ def main():
             ("Budget Annuel Total", f"{budget_annuel_total:,.0f} DH" if budget_annuel_total else "-", "#1f77b4"),
             ("Budget Actuellement Engagé", f"{budget_engage:,.0f} DH" if budget_engage else "-", "#2ca02c"),
             ("Taux de Consommation", f"{taux_consommation:.1f}%" if taux_consommation else "-", "#172b4d"),
-            ("Postes budgétés restants", f"{nb_total_postes - nb_postes_clos_total}/{nb_total_postes}", "#ff7f0e"),
+            ("Postes budgétés restants", f"{nb_total_postes - nb_postes_clos_total}", "#ff7f0e"),
             ("Statut budgétaire global", statut_global, "#2ca02c" if statut_global == "CONFORME" else "#d62728"),
         ]
         st.markdown(render_generic_metrics(metrics_combined), unsafe_allow_html=True)
@@ -5401,7 +5401,7 @@ def main():
         if 'Budget engagé (DH)' in df_detail.columns:
             df_detail['Budget engagé (DH)'] = df_detail['Budget engagé (DH)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
         if 'Slippage (écart)' in df_detail.columns:
-            df_detail['Slippage (écart)'] = df_detail['Slippage (écart)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
+            df_detail['Slippage (écart)'] = df_detail['Slippage (écart)'].apply(lambda v: (f"+{int(v):,} DH" if int(v) > 0 else f"{int(v):,} DH") if pd.notna(v) else "-")
         st.markdown("""
         <style>
         .custom-table-small {border-collapse: collapse; width: 75%; margin:auto; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed; border-spacing: 0;}
