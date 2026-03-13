@@ -1082,10 +1082,10 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
             constraintext='none'
         )
         fig_direction.update_layout(
-            height=300,
+            height=max(350, 35 * len(df_direction)),
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=160, t=48, b=30, r=20),
+            margin=dict(l=220, t=48, b=30, r=20),
             xaxis=dict(tickangle=0),
             yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=list(df_direction['Label_display'][::-1])),
             title=dict(text="<b>Comparaison par direction</b>", x=0, xanchor='left', font=TITLE_FONT),
@@ -1093,7 +1093,7 @@ def create_recrutements_clotures_tab(df_recrutement, global_filters):
         )
         fig_direction = apply_title_style(fig_direction)
         # Use a compact default visible area and allow scrolling when long
-        render_plotly_scrollable(fig_direction, max_height=320)
+        render_plotly_scrollable(fig_direction, max_height=420)
 
     with col4:
         # Comparaison par poste
@@ -1441,20 +1441,20 @@ def create_demandes_recrutement_tab(df_recrutement, global_filters):
             hovertemplate='<b>%{customdata[0]}</b><br>Nombre: %{x}<extra></extra>'
         )
         # Dynamic height so long lists become scrollable on the page
-        height_dir = max(300, 28 * len(df_direction))
+        height_dir = max(350, 35 * len(df_direction))
         # Ensure largest values appear on top by reversing the truncated label array
         category_array_dir = list(df_direction['Label_display'][::-1])
         fig_direction.update_layout(
             height=height_dir,
             xaxis_title=None,
             yaxis_title=None,
-            margin=dict(l=160, t=48, b=30, r=20),
+            margin=dict(l=220, t=48, b=30, r=20),
             xaxis=dict(tickangle=0),
             yaxis=dict(automargin=True, tickfont=dict(size=15), ticklabelposition='outside left', categoryorder='array', categoryarray=category_array_dir),
             title=dict(text="<b>Comparaison par direction</b>", x=0, xanchor='left', font=TITLE_FONT)
         )
         # Render inside the column so the two charts are on the same row and the component width matches the column
-        render_plotly_scrollable(fig_direction, max_height=320)
+        render_plotly_scrollable(fig_direction, max_height=420)
     
     with col5:
         # Comparaison par poste
@@ -4263,7 +4263,7 @@ def generate_demandes_recrutement_html_image(df_recrutement):
                 dfd['Label'] = dfd['Direction']
                 fig_dir = px.bar(dfd, x='Count', y='Label', title="Comparaison par direction", text='Count', orientation='h')
                 fig_dir.update_traces(marker_color='grey', textposition='auto', texttemplate='%{x}', textfont=dict(size=15), hovertemplate='%{y}<extra></extra>')
-                fig_dir.update_layout(height=320, margin=dict(l=160,t=48,b=30,r=20), xaxis_title=None, yaxis_title=None, yaxis=dict(tickfont=dict(size=13)))
+                fig_dir.update_layout(height=max(350, 35*len(dfd)), margin=dict(l=220,t=48,b=30,r=20), xaxis_title=None, yaxis_title=None, yaxis=dict(tickfont=dict(size=13), automargin=True))
                 figs_row2.append(fig_dir)
         except Exception:
             figs_row2.append(None)
@@ -4345,7 +4345,7 @@ def generate_recrutements_clotures_html_image(df_recrutement):
             dfd['Label'] = dfd['Direction']
             fig_dir = px.bar(dfd, x='Count', y='Label', title="Comparaison par direction", text='Count', orientation='h')
             fig_dir.update_traces(marker_color='#ff7f0e', textposition='inside', texttemplate='%{x}')
-            fig_dir.update_layout(height=max(320, 24*len(dfd)), margin=dict(l=160,t=40,b=30,r=20), xaxis_title=None, yaxis_title=None)
+            fig_dir.update_layout(height=max(350, 35*len(dfd)), margin=dict(l=220,t=40,b=30,r=20), xaxis_title=None, yaxis_title=None, yaxis=dict(automargin=True))
             figs_row2.append(fig_dir)
     except Exception:
         figs_row2.append(None)
