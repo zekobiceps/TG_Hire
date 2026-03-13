@@ -151,6 +151,7 @@ ENTITY_LOGO_MAP = {
     'TG WOOD': 'TG WOOD.PNG',
     'STAM': 'STAM.png',
     'Autres': 'Autres.png',
+    'BFO': 'Autres.png',
     'TGCC IMMOBILIER': 'tgcc-immobilier.png',
     'TGCC-IMMOBILIER': 'tgcc-immobilier.png'
 }
@@ -200,7 +201,7 @@ def get_entity_display_html_with_logo(name, logos_dict):
         logo_b64_str = logos_dict[logo_file]
         if name_upper in ['TG STEEL', 'TG STONE'] or 'IMMOBILIER' in name_upper:
             logo_height = 50
-        elif name_upper == 'AUTRES':
+        elif name_upper in ('AUTRES', 'BFO'):
             logo_height = 80
         else:
             logo_height = 63
