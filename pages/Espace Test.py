@@ -1595,7 +1595,7 @@ def create_integrations_tab(df_recrutement, global_filters):
 
     metrics_html = render_generic_metrics([
         ("👥 Intégrations en cours", nb_int, "#1f77b4"),
-        ("📋 Plan d'intégration à préparer", a_preparer, "#ff7f0e"),
+        ("📋 Plan d'intégration", a_preparer, "#ff7f0e"),
         ("⚠️ En retard", en_retard, "#d62728")
     ])
     st.markdown(metrics_html, unsafe_allow_html=True)
@@ -1669,11 +1669,16 @@ def create_integrations_tab(df_recrutement, global_filters):
         if date_integration_col in df_display.columns:
             df_display = df_display[df_display[date_integration_col].notna() & df_display[date_integration_col].astype(str).str.strip().ne('')].copy()
             
-            # Trier par date d'intégration croissante AVANT formatage
+            # Trier: 1) Lignes avec 'oui' dans Plan d'intégration à préparer EN PREMIER, 2) Puis par date croissante
             try:
+                # Créer une colonne de tri pour les lignes "à préparer"
+                df_display['_plan_priority'] = 0
+                if plan_integration_col in df_display.columns:
+                    df_display['_plan_priority'] = (df_display[plan_integration_col].astype(str).str.lower() != 'oui').astype(int)
+                
                 df_display['_sort_date'] = pd.to_datetime(df_display[date_integration_col], errors='coerce')
-                df_display = df_display.sort_values('_sort_date', ascending=True)
-                df_display = df_display.drop(columns=['_sort_date'])
+                df_display = df_display.sort_values(['_plan_priority', '_sort_date'], ascending=[True, True])
+                df_display = df_display.drop(columns=['_plan_priority', '_sort_date'])
             except Exception:
                 pass
 
@@ -1692,7 +1697,9 @@ def create_integrations_tab(df_recrutement, global_filters):
         # Renommer pour affichage plus propre
         rename_map = {
             candidat_col: "Candidat",
-            date_integration_col: "Date d'Intégration Prévue"
+            date_integration_col: "Date d'Intégration",
+            'Entité demandeuse': 'Entité',
+            plan_integration_col: "Plan d'intégration"
         }
         if poste_col_detected in df_display.columns:
             rename_map[poste_col_detected] = "Poste demandé"
@@ -1739,11 +1746,11 @@ def create_integrations_tab(df_recrutement, global_filters):
             text-align: left !important;
             padding-left: 15px !important;
         }
-        /* Réduire légèrement la largeur de la colonne Commentaire (dernière colonne) */
+        /* Augmenter la largeur de la colonne Commentaire (dernière colonne) */
         .int-custom-table th:last-child,
         .int-custom-table td:last-child {
-            min-width: 120px;
-            max-width: 200px;
+            min-width: 180px;
+            max-width: 280px;
             white-space: normal;
             word-wrap: break-word;
         }
@@ -4385,7 +4392,7 @@ def generate_integrations_html_image(df_recrutement):
         figs_row1.append(None)
 
     row1_imgs = [(_plotly_fig_to_pil(f, width=900, height=360) if f else None) for f in figs_row1]
-    kpis = [("Intégrations en cours", nb_int, "#1f77b4"), ("Plan d'intégration à préparer", a_preparer, "#ff7f0e"), ("En retard", en_retard, "#d62728")]
+    kpis = [("Intégrations en cours", nb_int, "#1f77b4"), ("Plan d'intégration", a_preparer, "#ff7f0e"), ("En retard", en_retard, "#d62728")]
     chart_rows = [row1_imgs]
     return _compose_dashboard_image("📊 Intégrations", kpis, chart_rows, 'integrations.png')
 def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2).pptx"):
