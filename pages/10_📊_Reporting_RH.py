@@ -1747,41 +1747,33 @@ def create_integrations_tab(df_recrutement, global_filters):
             text-align: center !important;
             padding: 8px 12px !important;
         }
-        /* Colonne 1: # (Numéro) */
-        .int-custom-table th:nth-child(1),
-        .int-custom-table td:nth-child(1) {
-            min-width: 50px;
-            max-width: 70px;
-            font-weight: bold;
-            background-color: #f5f5f5;
-        }
-        /* Colonne 3: Poste demandé - AUGMENTÉ */
-        .int-custom-table th:nth-child(3),
-        .int-custom-table td:nth-child(3) {
+        /* Colonne 2: Poste demandé - AUGMENTÉ */
+        .int-custom-table th:nth-child(2),
+        .int-custom-table td:nth-child(2) {
             min-width: 150px;
             max-width: 210px;
         }
-        /* Colonne 4: Entité - NORMAL */
-        .int-custom-table th:nth-child(4),
-        .int-custom-table td:nth-child(4) {
+        /* Colonne 3: Entité - NORMAL */
+        .int-custom-table th:nth-child(3),
+        .int-custom-table td:nth-child(3) {
             min-width: 95px;
             max-width: 135px;
         }
-        /* Colonne 5: Affectation - AUGMENTÉ */
-        .int-custom-table th:nth-child(5),
-        .int-custom-table td:nth-child(5) {
+        /* Colonne 4: Affectation - AUGMENTÉ */
+        .int-custom-table th:nth-child(4),
+        .int-custom-table td:nth-child(4) {
             min-width: 130px;
             max-width: 180px;
         }
-        /* Colonne 6: Date d'Intégration - NORMAL */
-        .int-custom-table th:nth-child(6),
-        .int-custom-table td:nth-child(6) {
+        /* Colonne 5: Date d'Intégration - NORMAL */
+        .int-custom-table th:nth-child(5),
+        .int-custom-table td:nth-child(5) {
             min-width: 110px;
             max-width: 150px;
         }
-        /* Colonne 7: Plan d'intégration - AUGMENTÉ */
-        .int-custom-table th:nth-child(7),
-        .int-custom-table td:nth-child(7) {
+        /* Colonne 6: Plan d'intégration - AUGMENTÉ */
+        .int-custom-table th:nth-child(6),
+        .int-custom-table td:nth-child(6) {
             min-width: 80px;
             max-width: 120px;
         }
@@ -1796,23 +1788,13 @@ def create_integrations_tab(df_recrutement, global_filters):
         </style>
         """, unsafe_allow_html=True)
 
-        # Fonction pour convertir numéro en emoji numéroté
-        def number_to_emoji(n):
-            emojis = ['0️⃣','1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟']
-            if n < 11:
-                return emojis[n]
-            return f"{n}️⃣"  # Fallback pour nombres > 10
-        
         html_table = '<div class="int-table-container"><table class="int-custom-table"><thead><tr>'
-        html_table += '<th>#</th>'  # Colonne numéro
         for col in df_display_table.columns:
             html_table += f'<th>{col}</th>'
         html_table += '</tr></thead><tbody>'
 
-        for idx, (_, row) in enumerate(df_display_table.iterrows(), 1):
+        for _, row in df_display_table.iterrows():
             html_table += '<tr>'
-            # Ajouter le numéro avec emoji
-            html_table += f'<td style="text-align: center; font-weight: bold;">{number_to_emoji(idx)}</td>'
             for col in df_display_table.columns:
                 val = row[col]
                 if col == 'Candidat':
