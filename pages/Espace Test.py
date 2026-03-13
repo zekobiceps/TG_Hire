@@ -1744,14 +1744,14 @@ def create_integrations_tab(df_recrutement, global_filters):
         .int-custom-table .candidate-cell {
             font-weight: bold;
             color: #2c3e50;
-            text-align: left !important;
-            padding-left: 15px !important;
+            text-align: center !important;
+            padding: 8px 12px !important;
         }
         /* Colonne 2: Poste demandé - AUGMENTÉ */
         .int-custom-table th:nth-child(2),
         .int-custom-table td:nth-child(2) {
-            min-width: 130px;
-            max-width: 180px;
+            min-width: 150px;
+            max-width: 210px;
         }
         /* Colonne 3: Entité - NORMAL */
         .int-custom-table th:nth-child(3),
@@ -1771,11 +1771,11 @@ def create_integrations_tab(df_recrutement, global_filters):
             min-width: 110px;
             max-width: 150px;
         }
-        /* Colonne 6: Plan d'intégration - RÉDUIT */
+        /* Colonne 6: Plan d'intégration - AUGMENTÉ */
         .int-custom-table th:nth-child(6),
         .int-custom-table td:nth-child(6) {
-            min-width: 60px;
-            max-width: 90px;
+            min-width: 80px;
+            max-width: 120px;
         }
         /* Augmenter la largeur de la colonne Commentaire (dernière colonne) */
         .int-custom-table th:last-child,

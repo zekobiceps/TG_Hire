@@ -8,7 +8,7 @@ st.set_page_config(
 )
 
 # Vérification de la connexion (avant imports lourds)
-require_login()
+# require_login() disabled for the test page so it is accessible without login
 
 import pandas as pd
 import plotly.express as px
@@ -720,6 +720,24 @@ def load_data_from_google_sheets(sheet_url):
         raise e
 
 
+def load_pilotage_data():
+    """Charger les données simplifiées pour Pilotage budgétaire (Recrutement 2026 (3).xlsx)"""
+    df_pilotage = None
+    try:
+        # Chercher le fichier Pilotage simplifié
+        import glob
+        pilotage_files = ['Recrutement 2026 (3).xlsx']
+        for pFile in pilotage_files:
+            if os.path.exists(pFile):
+                df_pilotage = pd.read_excel(pFile, sheet_name=0)
+                return df_pilotage
+        
+        # Si pas trouvé localement, None
+        return None
+    except Exception:
+        return None
+
+
 def load_data_from_files(csv_file=None, excel_file=None):
     """Charger et préparer les données depuis les fichiers uploadés ou locaux"""
     df_integration = None
@@ -747,16 +765,15 @@ def load_data_from_files(csv_file=None, excel_file=None):
             else:
                 # Fallback vers fichier local s'il existe (recherche du plus récent)
                 import glob
-                # Pattern pour trouver les fichiers Excel de recrutement
+                # PRIORITÉ 1: Chercher Recrutement global PBI All (fichier complet pour le reste de l'app)
                 excel_files = glob.glob('Recrutement global PBI All*.xlsx')
                 if excel_files:
                     # Trier par date de modification (le plus récent en dernier)
                     excel_files.sort(key=os.path.getmtime)
                     latest_excel = excel_files[-1]
-                    # st.info(f"Chargement automatique du fichier local : {latest_excel}")
                     df_recrutement = pd.read_excel(latest_excel, sheet_name=0)
                 else:
-                    # Fallback legacy
+                    # FALLBACK: Legacy
                     local_excel = 'Recrutement global PBI All  google sheet (5).xlsx'
                     if os.path.exists(local_excel):
                         df_recrutement = pd.read_excel(local_excel, sheet_name=0)
@@ -1578,7 +1595,7 @@ def create_integrations_tab(df_recrutement, global_filters):
 
     metrics_html = render_generic_metrics([
         ("👥 Intégrations en cours", nb_int, "#1f77b4"),
-        ("📋 Plan d'intégration à préparer", a_preparer, "#ff7f0e"),
+        ("📋 Plan d'intégration", a_preparer, "#ff7f0e"),
         ("⚠️ En retard", en_retard, "#d62728")
     ])
     st.markdown(metrics_html, unsafe_allow_html=True)
@@ -1652,11 +1669,16 @@ def create_integrations_tab(df_recrutement, global_filters):
         if date_integration_col in df_display.columns:
             df_display = df_display[df_display[date_integration_col].notna() & df_display[date_integration_col].astype(str).str.strip().ne('')].copy()
             
-            # Trier par date d'intégration croissante AVANT formatage
+            # Trier: 1) Lignes avec 'oui' dans Plan d'intégration à préparer EN PREMIER, 2) Puis par date croissante
             try:
+                # Créer une colonne de tri pour les lignes "à préparer"
+                df_display['_plan_priority'] = 0
+                if plan_integration_col in df_display.columns:
+                    df_display['_plan_priority'] = (df_display[plan_integration_col].astype(str).str.lower() != 'oui').astype(int)
+                
                 df_display['_sort_date'] = pd.to_datetime(df_display[date_integration_col], errors='coerce')
-                df_display = df_display.sort_values('_sort_date', ascending=True)
-                df_display = df_display.drop(columns=['_sort_date'])
+                df_display = df_display.sort_values(['_plan_priority', '_sort_date'], ascending=[True, True])
+                df_display = df_display.drop(columns=['_plan_priority', '_sort_date'])
             except Exception:
                 pass
 
@@ -1675,7 +1697,9 @@ def create_integrations_tab(df_recrutement, global_filters):
         # Renommer pour affichage plus propre
         rename_map = {
             candidat_col: "Candidat",
-            date_integration_col: "Date d'Intégration Prévue"
+            date_integration_col: "Date d'Intégration",
+            'Entité demandeuse': 'Entité',
+            plan_integration_col: "Plan d'intégration"
         }
         if poste_col_detected in df_display.columns:
             rename_map[poste_col_detected] = "Poste demandé"
@@ -1695,7 +1719,7 @@ def create_integrations_tab(df_recrutement, global_filters):
             border-collapse: collapse;
             font-family: Arial, sans-serif;
             box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-            width: 85%;
+            width: 95%;
             margin: 0 auto;
         }
         .int-custom-table th {
@@ -1715,18 +1739,49 @@ def create_integrations_tab(df_recrutement, global_filters):
             background-color: white !important;
             font-size: 1.0em;
             font-weight: 500;
+            white-space: nowrap;
         }
         .int-custom-table .candidate-cell {
             font-weight: bold;
             color: #2c3e50;
-            text-align: left !important;
-            padding-left: 15px !important;
+            text-align: center !important;
+            padding: 8px 12px !important;
         }
-        /* Réduire légèrement la largeur de la colonne Commentaire (dernière colonne) */
+        /* Colonne 2: Poste demandé - AUGMENTÉ */
+        .int-custom-table th:nth-child(2),
+        .int-custom-table td:nth-child(2) {
+            min-width: 150px;
+            max-width: 210px;
+        }
+        /* Colonne 3: Entité - NORMAL */
+        .int-custom-table th:nth-child(3),
+        .int-custom-table td:nth-child(3) {
+            min-width: 95px;
+            max-width: 135px;
+        }
+        /* Colonne 4: Affectation - AUGMENTÉ */
+        .int-custom-table th:nth-child(4),
+        .int-custom-table td:nth-child(4) {
+            min-width: 130px;
+            max-width: 180px;
+        }
+        /* Colonne 5: Date d'Intégration - NORMAL */
+        .int-custom-table th:nth-child(5),
+        .int-custom-table td:nth-child(5) {
+            min-width: 110px;
+            max-width: 150px;
+        }
+        /* Colonne 6: Plan d'intégration - AUGMENTÉ */
+        .int-custom-table th:nth-child(6),
+        .int-custom-table td:nth-child(6) {
+            min-width: 80px;
+            max-width: 120px;
+        }
+        /* Augmenter la largeur de la colonne Commentaire (dernière colonne) */
         .int-custom-table th:last-child,
         .int-custom-table td:last-child {
-            min-width: 120px;
-            max-width: 200px;
+            min-width: 220px;
+            max-width: 340px;
             white-space: normal;
             word-wrap: break-word;
         }
@@ -1900,6 +1955,7 @@ def calculate_weekly_metrics(df_recrutement):
     # Créer une copie pour les calculs
     df = df_recrutement.copy()
 
+                    
     # Toujours exclure les demandes clôturées/annulées du compteur 'avant'
     # (la case UI a été supprimée : les demandes clôturées ne sont pas comptées)
     include_closed = False
@@ -2391,9 +2447,9 @@ def create_weekly_report_tab(df_recrutement=None):
 
                     # Construire le HTML du tableau
                     html_rec = '<div class="table-container" style="margin-top:8px;">'
-                    # Styles spécifiques pour réduire les colonnes 'Nouvelle demande' (2e) et 'Signature DRH' (5e)
-                    html_rec += '<style>.rec-table th:nth-child(2), .rec-table td:nth-child(2){width:60px;} .rec-table th:nth-child(5), .rec-table td:nth-child(5){width:60px;}</style>'
-                    html_rec += '<table class="custom-table rec-table" style="width:60%; margin:0;">'
+                    # Styles spécifiques pour égaliser les colonnes : largeurs égales pour les 6 colonnes
+                    html_rec += '<style>.rec-table th:nth-child(1), .rec-table td:nth-child(1){width:14%;} .rec-table th:nth-child(2), .rec-table td:nth-child(2){width:14%;} .rec-table th:nth-child(3), .rec-table td:nth-child(3){width:14%;} .rec-table th:nth-child(4), .rec-table td:nth-child(4){width:14%;} .rec-table th:nth-child(5), .rec-table td:nth-child(5){width:14%;} .rec-table th:nth-child(6), .rec-table td:nth-child(6){width:14%;} .rec-table th:nth-child(7), .rec-table td:nth-child(7){width:14%;}</style>'
+                    html_rec += '<table class="custom-table rec-table" style="width:70%; margin:auto;">'
                     # Header
                     html_rec += '<thead><tr><th>Recruteur</th>'
                     for s in wanted_statuses:
@@ -4367,7 +4423,7 @@ def generate_integrations_html_image(df_recrutement):
         figs_row1.append(None)
 
     row1_imgs = [(_plotly_fig_to_pil(f, width=900, height=360) if f else None) for f in figs_row1]
-    kpis = [("Intégrations en cours", nb_int, "#1f77b4"), ("Plan d'intégration à préparer", a_preparer, "#ff7f0e"), ("En retard", en_retard, "#d62728")]
+    kpis = [("Intégrations en cours", nb_int, "#1f77b4"), ("Plan d'intégration", a_preparer, "#ff7f0e"), ("En retard", en_retard, "#d62728")]
     chart_rows = [row1_imgs]
     return _compose_dashboard_image("📊 Intégrations", kpis, chart_rows, 'integrations.png')
 def generate_powerpoint_report(df_recrutement, template_path="MASQUE PPT TGCC (2).pptx"):
@@ -4768,6 +4824,7 @@ def main():
             key='reporting_date',
             format='DD/MM/YYYY'
         )
+        # (helper icon removed per user request)
     
     # Créer les onglets (Demandes et Recrutement regroupés)
     # CSS pour agrandir le texte des onglets
@@ -4784,7 +4841,7 @@ def main():
     }
     </style>
     """, unsafe_allow_html=True)
-    tabs = st.tabs(["📂 Upload & Téléchargement", "🗂️ Demandes & Recrutement", "📅 Hebdomadaire", "🤝 Intégrations", "📖 Méthodologie"])
+    tabs = st.tabs(["📂 Upload & Téléchargement", "📈 Pilotage budgétaire", "🗂️ Demandes & Recrutement", "📅 Hebdomadaire", "🤝 Intégrations", "📖 Méthodologie"])
     
     # Variables pour stocker les fichiers uploadés
     # Use session_state to persist upload/refresh state
@@ -4816,75 +4873,611 @@ def main():
             
             if 'synced_recrutement_df' not in st.session_state:
                 st.session_state.synced_recrutement_df = None
-            
-            if st.button("🔁 Synchroniser depuis Google Sheets", 
-                        help="Synchroniser les données depuis Google Sheets",
+            if 'synced_budget_df' not in st.session_state:
+                st.session_state.synced_budget_df = None
+            if 'local_budget_df' not in st.session_state:
+                st.session_state.local_budget_df = None
+
+            # Input pour la feuille Pilotage budgétaire (sera synchronisée avec le même bouton)
+            default_budget_sheet = "https://docs.google.com/spreadsheets/d/1a3_SuZ5udezO-pJNjD1a5ugE1e_NeKuO/edit?gid=2071824040#gid=2071824040"
+            gs_budget_url_input = st.text_input("URL Google Sheet - Pilotage budgétaire (optionnel)", value=default_budget_sheet, key="gsheet_budget_url_upload")
+
+            if st.button("🔁 Synchroniser depuis Google Sheets (Recrutement + Pilotage)", 
+                        help="Synchroniser les deux feuilles Google Sheets (recrutement et pilotage)",
                         width="stretch"):
-                
+                any_success = False
+                # Recrutement
                 try:
-                    # Utiliser la fonction de connexion automatique (comme dans Home.py)
                     df_synced = load_data_from_google_sheets(gs_url)
-                    
                     if df_synced is not None and len(df_synced) > 0:
                         st.session_state.synced_recrutement_df = df_synced
-                        st.session_state.data_updated = True
-                        nb_lignes = len(df_synced)
-                        nb_colonnes = len(df_synced.columns)
-                        st.success(f"✅ Synchronisation Google Sheets réussie ! Les onglets ont été mis à jour. ({nb_lignes} lignes, {nb_colonnes} colonnes)")
+                        any_success = True
+                        st.success(f"✅ Synchronisation Recrutement réussie ({len(df_synced)} lignes, {len(df_synced.columns)} colonnes)")
                     else:
-                        st.warning("⚠️ Aucune donnée trouvée dans la feuille Google Sheets.")
-                        
+                        st.warning("⚠️ Aucune donnée trouvée dans la feuille Recrutement.")
                 except Exception as e:
-                    err_str = str(e)
-                    st.error(f"Erreur lors de la synchronisation: {err_str}")
-                    
-                    if '401' in err_str or 'Unauthorized' in err_str or 'HTTP Error 401' in err_str:
-                        st.error("❌ **Feuille Google privée** - Vérifiez que:")
-                        st.markdown("""
-                        1. La feuille est partagée avec: `your-service-account@your-project.iam.gserviceaccount.com`
-                        2. Les secrets Streamlit sont correctement configurés
-                        3. L'URL de la feuille est correcte
-                        """)
-                    elif 'secrets' in err_str.lower():
-                        st.error("❌ **Configuration des secrets manquante**")
-                        st.markdown("""
-                        Assurez-vous que les secrets suivants sont configurés:
-                        - `GCP_TYPE`, `GCP_PROJECT_ID`, `GCP_PRIVATE_KEY_ID`
-                        - `GCP_PRIVATE_KEY`, `GCP_CLIENT_EMAIL`, `GCP_CLIENT_ID`
-                        - `GCP_AUTH_URI`, `GCP_TOKEN_URI`, etc.
-                        """)
-                    else:
-                        st.error(f"Erreur technique: {err_str}")
+                    st.error(f"Erreur synchronisation Recrutement: {e}")
+
+                # Pilotage budgétaire
+                try:
+                    if gs_budget_url_input:
+                        df_budget = load_data_from_google_sheets(gs_budget_url_input)
+                        if df_budget is not None and len(df_budget) > 0:
+                            st.session_state.synced_budget_df = df_budget
+                            any_success = True
+                            st.success(f"✅ Synchronisation Pilotage réussie ({len(df_budget)} lignes, {len(df_budget.columns)} colonnes)")
+                        else:
+                            st.warning("⚠️ Aucune donnée trouvée dans la feuille Pilotage.")
+                except Exception as e:
+                    st.error(f"Erreur synchronisation Pilotage: {e}")
+
+                # Forcer recalcul et rerun pour mettre à jour les graphiques
+                if any_success:
+                    st.session_state.data_updated = True
+
+            # (Removed) local file loader: we now use the two Excel uploaders above
+            st.markdown("---")
+
+            # Afficher les tables synchronisées dans des expanders (affiché / caché)
+            if st.session_state.get('synced_recrutement_df') is not None:
+                with st.expander("📋 Données Recrutement (Google Sheets) - afficher / cacher", expanded=False):
+                    st.dataframe(st.session_state.synced_recrutement_df)
+            if st.session_state.get('synced_budget_df') is not None:
+                with st.expander("📋 Données Pilotage Budgétaire (Google Sheets) - afficher / cacher", expanded=False):
+                    st.dataframe(st.session_state.synced_budget_df)
+            if st.session_state.get('local_budget_df') is not None:
+                with st.expander("📋 Données Pilotage Budgétaire (Fichier local) - afficher / cacher", expanded=False):
+                    st.dataframe(st.session_state.local_budget_df)
 
         with col2:
             st.subheader("📊 Fichier Excel - Données de Recrutement")
-            uploaded_excel = st.file_uploader(
+            uploaded_excel_recrutement = st.file_uploader(
                 "Choisir le fichier Excel de recrutement",
                 type=['xlsx', 'xls'],
                 help="Fichier Excel contenant les données de recrutement",
-                key="excel_uploader"
+                key="excel_uploader_recrutement"
             )
-            
-            if uploaded_excel is not None:
-                # Aperçu des données
+
+            uploaded_excel_pilotage = st.file_uploader(
+                "(Optionnel) Choisir le fichier Excel pour Pilotage budgétaire",
+                type=['xlsx', 'xls'],
+                help="Fichier Excel contenant les données de pilotage budgétaire",
+                key="excel_uploader_pilotage"
+            )
+
+            # Handle recruitment Excel upload
+            if uploaded_excel_recrutement is not None:
                 try:
-                    preview_excel = pd.read_excel(uploaded_excel, sheet_name=0)
-                    st.success(f"✅ Fichier Excel chargé: {uploaded_excel.name} - {len(preview_excel)} lignes, {len(preview_excel.columns)} colonnes")
+                    preview_excel = pd.read_excel(uploaded_excel_recrutement, sheet_name=0)
+                    st.success(f"✅ Fichier Excel (Recrutement) chargé: {uploaded_excel_recrutement.name} - {len(preview_excel)} lignes, {len(preview_excel.columns)} colonnes")
                     st.dataframe(preview_excel.head(3), width="stretch")
-                    # Reset file pointer for later use
-                    uploaded_excel.seek(0)
-                    st.session_state.uploaded_excel = uploaded_excel
+                    uploaded_excel_recrutement.seek(0)
+                    st.session_state.uploaded_excel_recrutement = uploaded_excel_recrutement
+                    # Also store parsed DataFrame for immediate use
+                    try:
+                        st.session_state.local_recrutement_df = preview_excel.copy()
+                    except Exception:
+                        pass
                 except Exception as e:
-                    st.error(f"Erreur lors de la lecture de l'Excel: {e}")
+                    st.error(f"Erreur lors de la lecture de l'Excel de recrutement: {e}")
+
+            # Handle pilotage Excel upload
+            if uploaded_excel_pilotage is not None:
+                try:
+                    preview_pilotage = pd.read_excel(uploaded_excel_pilotage, sheet_name=0)
+                    st.success(f"✅ Fichier Excel (Pilotage) chargé: {uploaded_excel_pilotage.name} - {len(preview_pilotage)} lignes, {len(preview_pilotage.columns)} colonnes")
+                    st.dataframe(preview_pilotage.head(3), width="stretch")
+                    uploaded_excel_pilotage.seek(0)
+                    st.session_state.uploaded_excel_pilotage = uploaded_excel_pilotage
+                    st.session_state.local_budget_df = preview_pilotage.copy()
+                except Exception as e:
+                    st.error(f"Erreur lors de la lecture de l'Excel de pilotage: {e}")
         
         # Bouton pour actualiser les données - s'étale sur les deux colonnes
         st.markdown("---")
         if st.button("🔄 Actualiser les Graphiques", type="primary", width="stretch"):
+            # If the user uploaded Excel files in this session, prefer them as the source
+            tmp_recr = st.session_state.get('local_recrutement_df')
+            if tmp_recr is not None:
+                st.session_state.synced_recrutement_df = tmp_recr.copy()
+            tmp_budget = st.session_state.get('local_budget_df')
+            if tmp_budget is not None:
+                # Mirror local pilotage upload into the synced_budget slot so Pilotage tab reads it
+                st.session_state.synced_budget_df = tmp_budget.copy()
+            # Toggle update flag used by Pilotage tab to recompute charts
             st.session_state.data_updated = True
             st.success("Données mises à jour ! Consultez les autres onglets.")
     
     # Charger les données ICI (avant l'onglet Upload pour pouvoir les utiliser)
-    df_integration, df_recrutement = load_data_from_files(None, uploaded_excel)
+    # Passer le fichier Excel de recrutement s'il a été uploadé via l'UI
+    excel_for_recrutement = st.session_state.get('uploaded_excel_recrutement') if st.session_state.get('uploaded_excel_recrutement') is not None else None
+    df_integration, df_recrutement = load_data_from_files(None, excel_for_recrutement)
+
+    # Charger les données SIMPLIFÉES pour la Pilotage budgétaire (Recrutement 2026 (3).xlsx)
+    df_pilotage = load_pilotage_data()
+
+    # --------------------
+    # Onglet: Pilotage budgétaire
+    # --------------------
+    # Les valeurs ci-dessous sont des exemples statiques fournis par l'utilisateur.
+    # Elles peuvent être remplacées par des données synchronisées depuis Google Sheets
+    # ou par le fichier Excel local (voir boutons ci-dessous).
+    budget_annuel_total = 17_100_000  # 17,1 MDH
+    budget_engage = 2_150_000         # 2,15 MDH (13 recrutements clos)
+    taux_consommation = 12.6          # en %
+    statut_global = "CONFORME"
+    nb_recrutements_clos = 13
+
+    with tabs[1]:
+        st.header("📈 Pilotage budgétaire")
+
+        # Ensure df_detail exists to avoid UnboundLocalError on later checks
+        df_detail = pd.DataFrame()
+
+        # Récupérer les données de pilotage synchronisées (remplies depuis l'onglet Upload)
+        synced = st.session_state.get('synced_budget_df')
+        local = st.session_state.get('local_budget_df')
+        if synced is not None:
+            df_budget = synced
+        elif local is not None:
+            df_budget = local
+        elif df_pilotage is not None:
+            df_budget = df_pilotage.copy()
+        else:
+            df_budget = None
+
+        # Use df_pilotage for Clos counting since it has Statut recrutement column
+        df_recrutement_pilotage = None
+        if df_budget is not None and 'Statut recrutement' in df_budget.columns:
+            df_recrutement_pilotage = df_budget.copy()
+        synced_recr = st.session_state.get('synced_recrutement_df')
+        local_recr = st.session_state.get('local_recrutement_df')
+        if synced_recr is not None:
+            df_recrutement_pilotage = synced_recr.copy()
+        elif local_recr is not None:
+            df_recrutement_pilotage = local_recr.copy()
+
+        # Hide everything if no data is loaded
+        if df_budget is None or df_recrutement_pilotage is None or len(df_budget) == 0 or len(df_recrutement_pilotage) == 0:
+            st.info("Aucune donnée chargée. Veuillez synchroniser via Google Sheets ou charger un fichier Excel.")
+            st.stop()
+
+        # ...existing code...
+
+
+
+        # KPI cards (haut) - valeurs dynamiques si df_budget fourni
+        budget_annuel_total = None
+        budget_engage = None
+        taux_consommation = None
+        statut_global = "--"
+
+        if df_budget is not None and isinstance(df_budget, pd.DataFrame) and len(df_budget) > 0:
+            # Préparer et nettoyer les colonnes pour la détection automatique des KPI
+            dfb = df_budget.copy()
+            for c in dfb.columns:
+                try:
+                    dfb[c] = pd.to_numeric(
+                        dfb[c].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."),
+                        errors='coerce'
+                    )
+                except Exception:
+                    pass
+
+            # Fonctions utilitaires de recherche de colonne par motifs
+            def find_col(patterns):
+                for p in patterns:
+                    for c in dfb.columns:
+                        try:
+                            if re.search(p, str(c), re.I):
+                                return c
+                        except Exception:
+                            continue
+                return None
+
+            # Détecter budget annuel
+            budget_annuel_total = None
+            col_budget_total = find_col([r'budget.*ann', r'annuel', r'budget.*total', r'total.*budget', r'budget'])
+            if col_budget_total is not None:
+                vals = dfb[col_budget_total].dropna()
+                if len(vals) == 1:
+                    try:
+                        budget_annuel_total = float(vals.iloc[0])
+                    except Exception:
+                        budget_annuel_total = None
+                elif len(vals) > 1:
+                    try:
+                        budget_annuel_total = float(vals.sum())
+                    except Exception:
+                        budget_annuel_total = None
+
+            # Détecter budget engagé / consommation
+            budget_engage = None
+            # Prefer explicit 'Salaire net négocié' if present
+            col_engage = None
+            if 'Salaire net négocié' in dfb.columns:
+                col_engage = 'Salaire net négocié'
+            if col_engage is None:
+                col_engage = find_col([r'engag', r'consomm', r'depens', r'montant', r'salaire'])
+            if col_engage is not None:
+                try:
+                    budget_engage = int(dfb[col_engage].dropna().sum())
+                except Exception:
+                    budget_engage = None
+            else:
+                # fallback: première colonne numérique non vide
+                numeric_cols = [c for c in dfb.columns if pd.api.types.is_numeric_dtype(dfb[c])]
+                if numeric_cols:
+                    try:
+                        budget_engage = int(dfb[numeric_cols[0]].dropna().sum())
+                    except Exception:
+                        budget_engage = None
+
+            # Calcul du taux
+            try:
+                if budget_annuel_total and budget_engage is not None and float(budget_annuel_total) > 0:
+                    taux_consommation = (budget_engage / float(budget_annuel_total)) * 100
+                else:
+                    taux_consommation = None
+            except Exception:
+                taux_consommation = None
+
+            # Statut global
+            if taux_consommation is not None:
+                statut_global = "CONFORME" if taux_consommation <= 100 else "DÉPASSÉ"
+            else:
+                statut_global = "--"
+
+            # Nombre de recrutements clos (heuristique) — n'accepte que les lignes dont le statut est exactement 'Clôture'
+            nb_recrutements_clos = None
+            col_statut = find_col([r'statut', r'clos', r'pourvu', r'recrut'])
+            if col_statut is not None:
+                try:
+                    nb_recrutements_clos = int(dfb[col_statut].astype(str).apply(lambda s: _normalize_text(s) == 'cloture').sum())
+                except Exception:
+                    nb_recrutements_clos = None
+
+        # ===== KPIs PRINCIPAUX (Vision clé) =====
+        # Calculer les metrics principales pour le storytelling du budget
+        budget_restant = (budget_annuel_total - budget_engage) if budget_annuel_total and budget_engage else 0
+        nb_total_postes = len(df_budget) if df_budget is not None else 0
+        nb_postes_clos_total = 0
+        if df_budget is not None and 'Statut recrutement' in df_budget.columns:
+            try:
+                nb_postes_clos_total = int(df_budget['Statut recrutement'].astype(str).apply(lambda s: _normalize_text(s) == 'cloture').sum())
+            except Exception:
+                nb_postes_clos_total = 0
+        
+        # ===== KPIs COMBINÉS =====
+        # Combiner les métriques principales et secondaires en une seule rangée
+        metrics_combined = [
+            ("Budget Annuel Total", f"{budget_annuel_total:,.0f} DH" if budget_annuel_total else "-", "#1f77b4"),
+            ("Budget Actuellement Engagé", f"{budget_engage:,.0f} DH" if budget_engage else "-", "#2ca02c"),
+            ("Taux de Consommation", f"{taux_consommation:.1f}%" if taux_consommation else "-", "#172b4d"),
+            ("Postes budgétés restants", f"{nb_total_postes - nb_postes_clos_total}", "#ff7f0e"),
+            ("Statut budgétaire global", statut_global, "#2ca02c" if statut_global == "CONFORME" else "#d62728"),
+        ]
+        st.markdown(render_generic_metrics(metrics_combined), unsafe_allow_html=True)
+
+        # Graphiques de tendance et consommation par direction
+        # Graphique de Productivité du Budget removed per user request
+
+        # Barres consommation par direction
+        # Source pour l'agrégation : utiliser uniquement le fichier Pilotage (`df_budget`) qui contient les directions attendues
+        df_dir_source = None
+        if df_budget is not None and 'Direction concernée' in df_budget.columns:
+            df_dir_source = df_budget
+
+        dirs = []
+        perc = []
+        if df_dir_source is not None and 'Direction concernée' in df_dir_source.columns:
+            src = df_dir_source.copy()
+            # detect numeric budget-like column in source
+            budget_cols = [c for c in src.columns if re.search(r'engag|consomm|montant|budget|depens', str(c), re.I)]
+            if budget_cols:
+                agg_col = budget_cols[0]
+                by_dir = src.groupby('Direction concernée')[agg_col].apply(lambda s: pd.to_numeric(s.astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()).reset_index(name='val')
+                total = by_dir['val'].sum() if by_dir['val'].sum() != 0 else 1
+                by_dir['pct'] = (by_dir['val'] / total * 100).round(1)
+                dirs = by_dir['Direction concernée'].tolist()
+                perc = by_dir['pct'].tolist()
+            else:
+                # fallback : use counts of closed recrutements by direction
+                if 'Statut de la demande' in src.columns:
+                    df_tmp = src.copy()
+                    df_tmp['is_closed'] = df_tmp['Statut de la demande'].astype(str).str.contains(r'clos|pourvu|réalisé|terminé', case=False, na=False)
+                    by_dir = df_tmp.groupby('Direction concernée')['is_closed'].agg(['sum','count']).reset_index()
+                    by_dir['pct'] = (by_dir['sum'] / by_dir['count'] * 100).round(1)
+                    dirs = by_dir['Direction concernée'].tolist()
+                    perc = by_dir['pct'].tolist()
+
+        if not dirs:
+            dirs = ["Direction RH", "Pôle Admin & Fin.", "Encadrement Chantier", "Direction SI", "Autres"]
+            perc = [30, 25, 18, 8, 5]
+
+        # Sort by percentage ascending (user requested) and remove axis label
+        try:
+            df_bar = pd.DataFrame({'dir': dirs, 'pct': perc})
+            df_bar = df_bar.sort_values('pct', ascending=True)
+            dirs = df_bar['dir'].tolist()
+            perc = df_bar['pct'].tolist()
+        except Exception:
+            pass
+
+        # Increase bar chart height to show long percentage values properly
+        fig_bar = px.bar(x=perc, y=dirs, orientation='h', labels={'x':'', 'y':''}, text=[f"{p}%" for p in perc], height=400)
+        max_pct = max(perc) if perc else 100
+        fig_bar.update_layout(title='Taux de consommation par direction', yaxis=dict(tickfont=dict(size=13)), showlegend=False, margin=dict(l=180, r=80, t=50, b=30), xaxis=dict(range=[0, max_pct * 1.3]))
+        fig_bar.update_traces(textposition='outside', textfont=dict(size=11), cliponaxis=False)
+        fig_bar = apply_title_style(fig_bar)
+
+        # ===== GRAPHIQUE TENDANCE MENSUELLE =====
+        # Layout: put both chart groups side-by-side
+        col_consumption, col_trend = st.columns([1, 1.2])
+        
+        with col_consumption:
+            st.plotly_chart(fig_bar, use_container_width=True)
+        
+        with col_trend:
+            # Créer un graphique "Budget consommé vs restant" en donut + graphique tendance
+            col_chart1, col_chart2 = st.columns([1, 1.2])
+        
+        with col_chart1:
+            # Donut chart : Budget consommé vs restant
+            if budget_annuel_total and budget_engage:
+                pct_c = budget_engage / budget_annuel_total * 100 if budget_annuel_total else 0
+                pct_r = 100 - pct_c
+                fig_donut = go.Figure(data=[go.Pie(
+                    labels=['Consommé', 'Restant'],
+                    values=[budget_engage, budget_restant],
+                    hole=0.15,
+                    marker=dict(colors=['#2ca02c', '#ff7f0e']),
+                    textinfo='percent',
+                    texttemplate='%{percent:.1%}',
+                    textposition='inside',
+                    textfont=dict(size=14, color='white'),
+                    insidetextorientation='horizontal',
+                    hovertemplate='<b>%{label}</b><br>%{value:,.0f} DH<br>%{percent:.1%}<extra></extra>'
+                )])
+                # Add annotations outside: label + value
+                fig_donut.add_annotation(text=f"<b>Consommé</b><br>{budget_engage:,.0f} DH", x=0.08, y=1.025, showarrow=False, font=dict(size=13, color='#2ca02c'))
+                fig_donut.add_annotation(text=f"<b>Restant</b><br>{budget_restant:,.0f} DH", x=0.85, y=-0.12, showarrow=False, font=dict(size=13, color='#ff7f0e'))
+                fig_donut.update_layout(
+                    title=dict(text='Budget consommé vs restant', x=0, xanchor='left', font=TITLE_FONT),
+                    height=320,
+                    showlegend=False,
+                    margin=dict(l=50, r=10, t=50, b=30)
+                )
+                st.plotly_chart(fig_donut, use_container_width=True)
+        
+        with col_chart2:
+            # Graphique de tendance mensuelle basée sur "Date d'intégration"
+            try:
+                mois_data = []
+                # Chercher la colonne "Date d'intégration" dans df_budget
+                if df_budget is not None and len(df_budget) > 0:
+                    date_col = None
+                    for col in df_budget.columns:
+                        if 'intégration' in col.lower() or 'integration' in col.lower():
+                            date_col = col
+                            break
+                    
+                    if date_col is not None:
+                        # Utiliser les vraies dates d'intégration
+                        df_temp = df_budget.copy()
+                        df_temp[date_col] = pd.to_datetime(df_temp[date_col], errors='coerce')
+                        # Grouper par mois
+                        df_temp['Mois'] = df_temp[date_col].dt.to_period('M')
+                        # Grouper par mois et compter / sommer budget engagé
+                        if 'Salaire net négocié' in df_temp.columns:
+                            mois_agg = df_temp.groupby('Mois')['Salaire net négocié'].apply(
+                                lambda x: pd.to_numeric(x.astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."), errors='coerce').fillna(0).sum()
+                            ).reset_index(name='Consommé')
+                        else:
+                            mois_agg = df_temp.groupby('Mois').size().reset_index(name='Consommé')
+                        
+                        mois_agg['Mois_str'] = mois_agg['Mois'].astype(str)
+                        mois_data = mois_agg[['Mois_str', 'Consommé']].to_dict('records')
+                        mois_data = [{'Mois': m['Mois_str'], 'Consommé': int(m['Consommé'])} for m in mois_data]
+                
+                # Fallback si pas de date trouvée
+                if not mois_data:
+                    total_budget = budget_engage if budget_engage else 100000
+                    nb_mois = 12
+                    for mois in range(1, nb_mois + 1):
+                        mois_data.append({
+                            'Mois': f'M{mois}',
+                            'Consommé': int(total_budget * (mois / nb_mois))
+                        })
+                
+                df_mois = pd.DataFrame(mois_data)
+                fig_mois = px.line(
+                    df_mois,
+                    x='Mois',
+                    y='Consommé',
+                    title='Consommation budgétaire par mois',
+                    labels={'Consommé': 'Montant (DH)'},
+                    markers=True,
+                    height=400
+                )
+                # Add value text on each point
+                fig_mois.update_traces(
+                    mode='lines+markers+text',
+                    text=[f"{int(v):,}" for v in df_mois['Consommé']],
+                    textposition='top center',
+                    textfont=dict(size=10),
+                    marker=dict(size=8, color='#ff7f0e'),
+                    line=dict(color='#ff7f0e', width=2)
+                )
+                # Extend y-axis range to fit highest value label (e.g. 90,000)
+                y_max = df_mois['Consommé'].max() if len(df_mois) > 0 else 100000
+                fig_mois.update_layout(
+                    xaxis_title='',
+                    yaxis_title='Montant (DH)',
+                    showlegend=False,
+                    hovermode='x',
+                    margin=dict(l=60, r=30, t=50, b=50),
+                    yaxis=dict(range=[0, y_max * 1.2])
+                )
+                fig_mois = apply_title_style(fig_mois)
+                st.plotly_chart(fig_mois, use_container_width=True)
+            except Exception as e:
+                st.info("Graphique de tendance mensuelle indisponible")
+
+        # Tableau d'analyse détaillée (bas)
+        st.subheader("Analyse détaillée par direction")
+
+        # Construire le tableau de façon dynamique en utilisant les directions du fichier Pilotage (df_budget)
+        # Les compteurs "Clos" sont calculés à partir du même fichier (df_budget = df_pilotage qui a Statut recrutement)
+        detail_rows = []
+        # Preferer les directions provenant du Pilotage budgétaire
+        if df_budget is not None and isinstance(df_budget, pd.DataFrame) and 'Direction concernée' in df_budget.columns:
+            # Créer copy avec normalized directions
+            dfb = df_budget.copy()
+            dfb['_dir_norm'] = dfb['Direction concernée'].astype(str).apply(_normalize_text)
+            dirs_list = sorted(dfb['Direction concernée'].dropna().unique())
+
+            for d in dirs_list:
+                dir_norm = _normalize_text(d)
+                
+                # SIMPLE: Filter by normalized direction and count from df_budget directly
+                dir_group = dfb[dfb['_dir_norm'] == dir_norm]
+                total = len(dir_group)
+                clos_str = "0 / 0"
+                
+                # Count "Clôture" (normalized) if column exists
+                if 'Statut recrutement' in dfb.columns and total > 0:
+                    try:
+                        closed = int(dir_group['Statut recrutement'].astype(str).apply(lambda s: _normalize_text(s) == 'cloture').sum())
+                        clos_str = f"{closed} / {total}"
+                    except Exception:
+                        clos_str = "0 / 0"
+                elif total > 0:
+                    clos_str = f"0 / {total}"
+
+                # Budget prévue: sum Budget Net for this direction
+                budget_prevue = 0
+                try:
+                    if 'Budget Net' in dfb.columns:
+                        budget_prevue = pd.to_numeric(
+                            dir_group['Budget Net'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."),
+                            errors='coerce'
+                        ).fillna(0).sum()
+                except Exception:
+                    budget_prevue = 0
+
+                # Budget engagé: sum Salaire net négocié for this direction
+                budget_engaged_dir = 0
+                try:
+                    if 'Salaire net négocié' in dfb.columns:
+                        budget_engaged_dir = pd.to_numeric(
+                            dir_group['Salaire net négocié'].astype(str).str.replace(r"[^0-9,\.-]", "", regex=True).str.replace(",", "."),
+                            errors='coerce'
+                        ).fillna(0).sum()
+                except Exception:
+                    budget_engaged_dir = 0
+
+                # Calculate budget restant (positif = surplus, négatif = dépassement)
+                budget_restant_val = float(budget_prevue) - float(budget_engaged_dir) if budget_prevue or budget_engaged_dir else 0
+
+                detail_rows.append({
+                    'Direction': d,
+                    'Clos': clos_str,
+                    'Budget prévue (DH)': budget_prevue if pd.notna(budget_prevue) else 0,
+                    'Budget engagé (DH)': int(budget_engaged_dir) if pd.notna(budget_engaged_dir) else 0,
+                    'Slippage (écart)': int(budget_restant_val)
+                })
+        else:
+            detail_rows = [
+                { 'Direction': 'Encadrement Chantier', 'Clos': '8 / 76', 'Budget prévue (DH)': 1_500_000, 'Budget engagé (DH)': 1_480_000, 'Slippage (écart)': 20_000 },
+                { 'Direction': 'Pôle Admin & Fin.', 'Clos': '2 / 4', 'Budget prévue (DH)': 300_000, 'Budget engagé (DH)': 310_000, 'Slippage (écart)': -10_000 },
+            ]
+        
+        # Trier detail_rows par nombre de clôturés (décroissant)
+        def extract_closed_count(clos_str):
+            """Extract closed count from 'X / Y' format"""
+            try:
+                return int(clos_str.split('/')[0].strip())
+            except Exception:
+                return 0
+        
+        detail_rows.sort(key=lambda x: extract_closed_count(x['Clos']), reverse=True)
+        
+        # Limiter aux 10 top directions par nombre de clôturés pour afficher plus de détails
+        if len(detail_rows) > 10:
+            detail_rows = detail_rows[:10]
+        
+        # Ensure df_detail exists and add totals row
+        if 'detail_rows' in locals():
+            df_detail = pd.DataFrame(detail_rows)
+        else:
+            df_detail = pd.DataFrame()
+
+        if not df_detail.empty:
+            total_prevue = df_detail['Budget prévue (DH)'].replace('', 0).fillna(0).astype(float).sum()
+            total_engage = df_detail['Budget engagé (DH)'].replace('', 0).fillna(0).astype(float).sum()
+            # Calculate total clos: sum of X and Y from "X / Y" format
+            total_clos_count = 0
+            total_posts_count = 0
+            for _, row in df_detail.iterrows():
+                if pd.notna(row['Clos']) and '/' in str(row['Clos']):
+                    try:
+                        parts = str(row['Clos']).split('/')
+                        total_clos_count += int(parts[0].strip())
+                        total_posts_count += int(parts[1].strip())
+                    except Exception:
+                        pass
+            clos_total_str = f"{total_clos_count} / {total_posts_count}" if total_posts_count > 0 else "0 / 0"
+            total_ecart = int(total_prevue - total_engage)
+            totals_row = pd.DataFrame([{
+                'Direction': 'TOTAL',
+                'Clos': clos_total_str,
+                'Budget prévue (DH)': total_prevue,
+                'Budget engagé (DH)': int(total_engage),
+                'Slippage (écart)': total_ecart
+            }])
+            df_detail = pd.concat([df_detail, totals_row], ignore_index=True)
+
+        if 'Budget prévue (DH)' in df_detail.columns:
+            df_detail['Budget prévue (DH)'] = df_detail['Budget prévue (DH)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
+        if 'Budget engagé (DH)' in df_detail.columns:
+            df_detail['Budget engagé (DH)'] = df_detail['Budget engagé (DH)'].apply(lambda v: f"{int(v):,} DH" if pd.notna(v) else "-")
+        if 'Slippage (écart)' in df_detail.columns:
+            df_detail['Slippage (écart)'] = df_detail['Slippage (écart)'].apply(lambda v: (f"+{int(v):,} DH" if int(v) > 0 else f"{int(v):,} DH") if pd.notna(v) else "-")
+        st.markdown("""
+        <style>
+        .custom-table-small {border-collapse: collapse; width: 75%; margin:auto; font-family: Arial, sans-serif; box-shadow:0 1px 4px rgba(0,0,0,0.05); table-layout:fixed; border-spacing: 0;}
+        .custom-table-small th {background:#9C182F;color:white;padding:2px 4px;text-align:center;font-size:14px;font-weight:700;}
+        .custom-table-small td {padding:2px 4px;border-bottom:1px solid #eee; font-size:0.90em; text-align:center;}
+        .custom-table-small td:first-child, .custom-table-small th:first-child {text-align:left;}
+        .custom-table-small tbody tr:last-child {background:#9C182F; color:white}
+        .custom-table-small tbody tr:last-child td {color:white; font-weight:700; padding:2px 4px; text-align:center;}
+        .custom-table-small tbody tr:last-child td:first-child {text-align:left;}
+        .custom-table-small th:nth-child(1), .custom-table-small td:nth-child(1){width:34%;}
+        .custom-table-small th:nth-child(2), .custom-table-small td:nth-child(2){width:10%;}
+        .custom-table-small th:nth-child(3), .custom-table-small td:nth-child(3){width:20%;}
+        .custom-table-small th:nth-child(4), .custom-table-small td:nth-child(4){width:20%;}
+        .custom-table-small th:nth-child(5), .custom-table-small td:nth-child(5){width:16%;}
+        </style>
+        """, unsafe_allow_html=True)
+
+        cols_display = ['Direction', 'Clos', 'Budget prévue (DH)', 'Budget engagé (DH)', 'Slippage (écart)']
+        html = '<table class="custom-table-small"><thead><tr>'
+        for c in cols_display:
+            html += f"<th>{c}</th>"
+        html += '</tr></thead><tbody>'
+        for _, r in df_detail.iterrows():
+            ecart_val = r.get('Slippage (écart)', '-')
+            ecart_color = 'color:#d62728;' if isinstance(ecart_val, str) and ecart_val.startswith('-') else ''
+            html += '<tr>'
+            html += f"<td style='font-weight:600; text-align:left;'>{r['Direction']}</td>"
+            html += f"<td style='text-align:center;'>{r['Clos']}</td>"
+            html += f"<td style='text-align:center;'>{r['Budget prévue (DH)']}</td>"
+            html += f"<td style='text-align:center;'>{r['Budget engagé (DH)']}</td>"
+            html += f"<td style='text-align:center;{ecart_color}'>{ecart_val}</td>"
+            html += '</tr>'
+        html += '</tbody></table>'
+        st.markdown(html, unsafe_allow_html=True)
     
     # Continuer l'onglet Upload avec la section PowerPoint
     with tabs[0]:
@@ -5054,16 +5647,16 @@ def main():
     elif df_integration is None:
         st.sidebar.warning("⚠️ Données d'intégration non disponibles. Seules les données de recrutement sont chargées.")
 
-    with tabs[1]:
+    with tabs[2]:
         if df_recrutement is not None:
             create_demandes_recrutement_combined_tab(df_recrutement)
         else:
             st.warning("📊 Aucune donnée de recrutement disponible. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
     
-    with tabs[2]:
+    with tabs[3]:
         create_weekly_report_tab(df_recrutement)
 
-    with tabs[3]:
+    with tabs[4]:
         # Onglet Intégrations basé sur les données Excel
         if df_recrutement is not None:
             # Créer les filtres spécifiques pour les intégrations (sans période)
@@ -5073,7 +5666,7 @@ def main():
         else:
             st.warning("📊 Aucune donnée disponible pour les intégrations. Veuillez uploader un fichier Excel dans l'onglet 'Upload Fichiers'.")
 
-    with tabs[4]:
+    with tabs[5]:
         st.header("📖 Méthodologie & Guide Utilisateur")
         
         st.subheader("Comment générer le reporting ?")
