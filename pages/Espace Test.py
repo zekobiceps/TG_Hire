@@ -1746,11 +1746,23 @@ def create_integrations_tab(df_recrutement, global_filters):
             text-align: left !important;
             padding-left: 15px !important;
         }
+        /* Réduire les colonnes Poste demandé, Entité, Affectation (colonnes 2, 3, 4) */
+        .int-custom-table th:nth-child(2),
+        .int-custom-table th:nth-child(3),
+        .int-custom-table th:nth-child(4),
+        .int-custom-table td:nth-child(2),
+        .int-custom-table td:nth-child(3),
+        .int-custom-table td:nth-child(4) {
+            min-width: 70px;
+            max-width: 110px;
+            white-space: normal;
+            word-wrap: break-word;
+        }
         /* Augmenter la largeur de la colonne Commentaire (dernière colonne) */
         .int-custom-table th:last-child,
         .int-custom-table td:last-child {
-            min-width: 180px;
-            max-width: 280px;
+            min-width: 220px;
+            max-width: 340px;
             white-space: normal;
             word-wrap: break-word;
         }
