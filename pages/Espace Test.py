@@ -1719,7 +1719,7 @@ def create_integrations_tab(df_recrutement, global_filters):
             border-collapse: collapse;
             font-family: Arial, sans-serif;
             box-shadow: 0 1px 4px rgba(0,0,0,0.1);
-            width: 85%;
+            width: 95%;
             margin: 0 auto;
         }
         .int-custom-table th {
@@ -1739,6 +1739,7 @@ def create_integrations_tab(df_recrutement, global_filters):
             background-color: white !important;
             font-size: 1.0em;
             font-weight: 500;
+            white-space: nowrap;
         }
         .int-custom-table .candidate-cell {
             font-weight: bold;
@@ -1746,17 +1747,35 @@ def create_integrations_tab(df_recrutement, global_filters):
             text-align: left !important;
             padding-left: 15px !important;
         }
-        /* Réduire les colonnes Poste demandé, Entité, Affectation (colonnes 2, 3, 4) */
+        /* Colonne 2: Poste demandé - AUGMENTÉ */
         .int-custom-table th:nth-child(2),
+        .int-custom-table td:nth-child(2) {
+            min-width: 130px;
+            max-width: 180px;
+        }
+        /* Colonne 3: Entité - NORMAL */
         .int-custom-table th:nth-child(3),
+        .int-custom-table td:nth-child(3) {
+            min-width: 95px;
+            max-width: 135px;
+        }
+        /* Colonne 4: Affectation - AUGMENTÉ */
         .int-custom-table th:nth-child(4),
-        .int-custom-table td:nth-child(2),
-        .int-custom-table td:nth-child(3),
         .int-custom-table td:nth-child(4) {
-            min-width: 70px;
-            max-width: 110px;
-            white-space: normal;
-            word-wrap: break-word;
+            min-width: 130px;
+            max-width: 180px;
+        }
+        /* Colonne 5: Date d'Intégration - NORMAL */
+        .int-custom-table th:nth-child(5),
+        .int-custom-table td:nth-child(5) {
+            min-width: 110px;
+            max-width: 150px;
+        }
+        /* Colonne 6: Plan d'intégration - RÉDUIT */
+        .int-custom-table th:nth-child(6),
+        .int-custom-table td:nth-child(6) {
+            min-width: 60px;
+            max-width: 90px;
         }
         /* Augmenter la largeur de la colonne Commentaire (dernière colonne) */
         .int-custom-table th:last-child,
