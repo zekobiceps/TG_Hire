@@ -180,8 +180,11 @@ def get_entity_display_html_with_logo(name, logos_dict):
     if not name or pd.isna(name): return ""
     name_str = str(name).strip()
     name_upper = name_str.upper()
+
+    # BFO/Autres : afficher uniquement le texte, pas de logo
+    if name_upper in ('BFO', 'AUTRES'):
+        return '<div style="text-align: center; font-weight: 600;">Autres</div>'
     
-    logo_file = None
     if name_upper in ENTITY_LOGO_MAP:
         logo_file = ENTITY_LOGO_MAP[name_upper]
     
