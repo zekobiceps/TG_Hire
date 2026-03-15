@@ -112,6 +112,16 @@ with linked_col2:
     st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
     scrape_clicked = st.button("🚀 Scraper & Analyser", use_container_width=True)
 
+st.markdown("---")
+st.markdown("#### 🔒 Authentification Requise pour l'Extraction Temps-Réel")
+st.info("LinkedIn requiert une connexion pour extraire ces données. Vos identifiants ne sont pas stockés.")
+
+cred_col1, cred_col2 = st.columns(2)
+with cred_col1:
+    li_email = st.text_input("Email LinkedIn", placeholder="votre@email.com")
+with cred_col2:
+    li_password = st.text_input("Mot de passe LinkedIn", type="password")
+
 # Data Loading Logic
 scraped_data = []
 DATA_FILE = None
@@ -130,19 +140,43 @@ if scrape_clicked or (linkedin_url and scraped_data):
         st.error("Veuillez entrer une URL LinkedIn valide.")
     else:
         if scrape_clicked:
-            with st.status("Collecte des données via Antigravity Engine...", expanded=True) as status:
-                st.write("🔍 Analyse de la structure LinkedIn...")
-                time.sleep(1)
-                st.write(f"🕵️ Extraction de {len(scraped_data)}+ profils...")
-                time.sleep(1.5)
-                status.update(label="Analyse terminée !", state="complete", expanded=False)
+            if li_email and li_password:
+                with st.status("Collecte des données via Selenium en cours (cela peut prendre quelques minutes)...", expanded=True) as status:
+                    st.write("🔍 Lancement du navigateur automatisé...")
+                    
+                    import sys
+                    sys.path.append(os.path.dirname(__file__) + '/..')
+                    from linkedin_scraper import scrape_linkedin_people
+                    
+                    try:
+                        scraped_data_real = scrape_linkedin_people(linkedin_url, li_email, li_password, max_scrolls=3)
+                        if isinstance(scraped_data_real, dict) and "error" in scraped_data_real:
+                            st.error(scraped_data_real["error"])
+                        else:
+                            st.write(f"🕵️ Extraction de {len(scraped_data_real)} profils réussie !")
+                            # Update the loaded data with real-time data
+                            scraped_data = scraped_data_real
+                            
+                            # Optional: save to file to persist temporarily
+                            with open("last_real_scrape.json", "w", encoding="utf-8") as f:
+                                json.dump(scraped_data, f, ensure_ascii=False, indent=2)
+                                
+                    except Exception as e:
+                        st.error(f"Erreur d'exécution du scraper: {e}")
+                        
+                    status.update(label="Analyse terminée !", state="complete", expanded=False)
+            else:
+                st.warning("Veuillez entrer vos identifiants LinkedIn pour lancer un scraping en temps réel. Affichage des données en cache pour cette URL.")
+                with st.status("Chargement des données en cache...", expanded=True) as status:
+                    time.sleep(1)
+                    status.update(label="Terminé", state="complete", expanded=False)
         
         # Search and Filter
         search_query = st.text_input("🔍 Rechercher un collaborateur ou un poste", "").lower()
         
         filtered_data = [
             p for p in scraped_data 
-            if search_query in p['name'].lower() or search_query in p['position'].lower()
+            if search_query in p.get('name', '').lower() or search_query in p.get('position', '').lower()
         ]
         
         st.markdown(f"### 👥 {len(filtered_data)} Collaborateurs Identifiés")
@@ -152,11 +186,32 @@ if scrape_clicked or (linkedin_url and scraped_data):
         
         if filtered_data:
             df = pd.DataFrame(filtered_data)
-            # Rename columns for display
-            df = df.rename(columns={'name': 'Collaborateur', 'position': 'Poste & Entité'})
             
-            # Use st.dataframe for a native, interactive table with scrolling and column sorting
-            st.dataframe(df, use_container_width=True, height=600, hide_index=True)
+            # Add a mock URL column for old static JSON data if it's missing
+            if 'url' not in df.columns:
+                df['url'] = "https://www.linkedin.com/search/results/people/?keywords=" + df['name'].str.replace(' ', '%20')
+                
+            # Rename columns for display
+            df = df.rename(columns={
+                'name': 'Collaborateur', 
+                'position': 'Poste & Entité',
+                'url': 'Lien Profil (URL)'
+            })
+            
+            # Reorder columns just in case
+            if 'Lien Profil (URL)' in df.columns:
+                df = df[['Collaborateur', 'Poste & Entité', 'Lien Profil (URL)']]
+            
+            # Configure dataframe columns, specifically formatting the URL as a link
+            st.dataframe(
+                df, 
+                use_container_width=True, 
+                height=600, 
+                hide_index=True,
+                column_config={
+                    "Lien Profil (URL)": st.column_config.LinkColumn("Lien Profil (URL)")
+                }
+            )
         else:
             st.info("Aucun collaborateur trouvé pour cette recherche.")
         
