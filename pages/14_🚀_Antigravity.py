@@ -166,44 +166,29 @@ if scrape_clicked or (linkedin_url and scraped_data):
         
         st.markdown(f"### 👥 {len(filtered_data)} Collaborateurs Identifiés")
         
-        # Scrollable area for high volume of profiles
+        # Display profiles as a single HTML block for better performance and scrollability
         st.markdown("""
         <style>
             .scroll-container {
                 max-height: 500px;
                 overflow-y: auto;
                 padding: 10px;
-                background: rgba(0,0,0,0.2);
+                background: rgba(0,0,0,0.1);
                 border-radius: 15px;
             }
         </style>
         """, unsafe_allow_html=True)
         
-        with st.container():
-            st.markdown('<div class="scroll-container">', unsafe_allow_html=True)
-            
-            # Display in columns
-            for i in range(0, len(filtered_data), 2):
-                col1, col2 = st.columns(2)
-                with col1:
-                    person = filtered_data[i]
-                    st.markdown(f"""
-                    <div class="glass-card" style="padding: 1rem; border-left: 5px solid #00c6ff; margin-bottom: 10px;">
-                        <div style="font-weight: bold; font-size: 1.05rem; color: white;">{person['name']}</div>
-                        <div style="color: #00c6ff; font-size: 0.85rem;">{person['position']}</div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                if i + 1 < len(filtered_data):
-                    with col2:
-                        person = filtered_data[i+1]
-                        st.markdown(f"""
-                        <div class="glass-card" style="padding: 1rem; border-left: 5px solid #00c6ff; margin-bottom: 10px;">
-                            <div style="font-weight: bold; font-size: 1.05rem; color: white;">{person['name']}</div>
-                            <div style="color: #00c6ff; font-size: 0.85rem;">{person['position']}</div>
-                        </div>
-                        """, unsafe_allow_html=True)
-            
-            st.markdown('</div>', unsafe_allow_html=True)
+        profiles_html = ""
+        for person in filtered_data:
+            profiles_html += f"""
+            <div class="glass-card" style="padding: 1rem; border-left: 5px solid #00c6ff; margin-bottom: 10px; width: 48%; display: inline-block; margin-right: 1.5%; vertical-align: top; min-height: 100px;">
+                <div style="font-weight: bold; font-size: 1.05rem; color: white;">{person['name']}</div>
+                <div style="color: #00c6ff; font-size: 0.85rem;">{person['position']}</div>
+            </div>
+            """
+        
+        st.markdown(f'<div class="scroll-container">{profiles_html}</div>', unsafe_allow_html=True)
         
         st.info("Note: Les données ont été extraites en temps réel. Le Groupe Rouandi compte environ 295 employés sur LinkedIn.")
 
