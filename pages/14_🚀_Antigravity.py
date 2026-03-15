@@ -2,7 +2,7 @@ import streamlit as st
 import time
 
 st.set_page_config(
-    page_title="Antigravity - Future of HR",
+    page_title="Antigravity",
     page_icon="🚀",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -82,7 +82,7 @@ st.markdown("""
 <div class="glass-card" style="text-align: center;">
     <span class="floating-icon">🚀</span>
     <h1>ANTIGRAVITY</h1>
-    <p style="font-size: 1.2rem; opacity: 0.8;">Dépasser les limites du recrutement traditionnel grâce à l'IA Générative</p>
+    <p style="font-size: 1.2rem; opacity: 0.8;"></p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -114,7 +114,6 @@ with linked_col2:
 
 st.markdown("---")
 st.markdown("#### 🔒 Authentification Requise pour l'Extraction Temps-Réel")
-st.info("LinkedIn requiert une connexion pour extraire ces données. Vos identifiants ne sont pas stockés.")
 
 cred_col1, cred_col2 = st.columns(2)
 with cred_col1:
