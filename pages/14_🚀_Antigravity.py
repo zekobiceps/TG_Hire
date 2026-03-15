@@ -149,7 +149,8 @@ if scrape_clicked or (linkedin_url and scraped_data):
                     from linkedin_scraper import scrape_linkedin_people
                     
                     try:
-                        scraped_data_real = scrape_linkedin_people(linkedin_url, li_email, li_password, max_scrolls=3)
+                        # Allow up to 15 scrolls to load all employees (deep scrape)
+                        scraped_data_real = scrape_linkedin_people(linkedin_url, li_email, li_password, max_scrolls=15)
                         if isinstance(scraped_data_real, dict) and "error" in scraped_data_real:
                             st.error(scraped_data_real["error"])
                         else:

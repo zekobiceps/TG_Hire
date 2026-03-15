@@ -112,7 +112,7 @@ if __name__ == "__main__":
         url = sys.argv[1]
         email = sys.argv[2]
         password = sys.argv[3]
-        results = scrape_linkedin_people(url, email, password, max_scrolls=2)
+        results = scrape_linkedin_people(url, email, password, max_scrolls=15)
         import json
         print(json.dumps(results, indent=2))
     else:
