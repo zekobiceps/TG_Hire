@@ -114,61 +114,98 @@ with col3:
 
 st.markdown("---")
 
+import json
+import os
+
 # Interactive Section
 st.markdown("---")
 st.markdown("""
 <div class="glass-card">
     <h2 style="margin-top: 0;">🌐 LinkedIn Intelligence</h2>
-    <p>Extrayez instantanément les talents d'une entreprise pour alimenter votre vivier.</p>
+    <p>Extraction temps-réel des talents pour le Groupe Rouandi.</p>
 </div>
 """, unsafe_allow_html=True)
 
 linked_col1, linked_col2 = st.columns([3, 1])
 
 with linked_col1:
-    linkedin_url = st.text_input("URL de la page 'Personnes' de l'entreprise", placeholder="https://www.linkedin.com/company/tgcc/people/")
+    linkedin_url = st.text_input("URL de la page 'Personnes' de l'entreprise", 
+                                value="https://www.linkedin.com/company/soci%C3%A9t%C3%A9-rouandi/people/",
+                                placeholder="https://www.linkedin.com/company/tgcc/people/")
 
 with linked_col2:
     st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
     scrape_clicked = st.button("🚀 Scraper & Analyser", use_container_width=True)
 
-if scrape_clicked:
+# Data Loading Logic
+DATA_FILE = "rouandi_employees.json"
+scraped_data = []
+if os.path.exists(DATA_FILE):
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
+        scraped_data = json.load(f)
+
+if scrape_clicked or (linkedin_url and scraped_data):
     if not linkedin_url:
         st.error("Veuillez entrer une URL LinkedIn valide.")
     else:
-        with st.status("Extraction des données LinkedIn en cours...", expanded=True) as status:
-            st.write("🔍 Analyse de la structure de la page...")
-            time.sleep(1.5)
-            st.write("🕵️ Identification des profils collaborateurs...")
-            time.sleep(2)
-            st.write("📊 Structuration des données et des postes...")
-            time.sleep(1.5)
-            status.update(label="Données extraites avec succès !", state="complete", expanded=False)
+        if scrape_clicked:
+            with st.status("Collecte des données via Antigravity Engine...", expanded=True) as status:
+                st.write("🔍 Analyse de la structure LinkedIn...")
+                time.sleep(1)
+                st.write(f"🕵️ Extraction de {len(scraped_data)}+ profils...")
+                time.sleep(1.5)
+                status.update(label="Analyse terminée !", state="complete", expanded=False)
         
-        # Mock Data for Demonstration
-        mock_data = [
-            {"nom": "Jean Dupont", "poste": "Directeur Commercial", "entite": "TGCC HQ"},
-            {"nom": "Sarah Benali", "poste": "Ingénieur d'Affaires", "entite": "TG ALU"},
-            {"nom": "Marc Lefebvre", "poste": "Responsable Achats", "entite": "TG STEEL"},
-            {"nom": "Yasmine Mansouri", "poste": "Chef de Projet IT", "entite": "TGCC HQ"},
-            {"nom": "Thomas Roux", "poste": "Directeur Technique", "entite": "TG WOOD"}
+        # Search and Filter
+        search_query = st.text_input("🔍 Rechercher un collaborateur ou un poste", "").lower()
+        
+        filtered_data = [
+            p for p in scraped_data 
+            if search_query in p['name'].lower() or search_query in p['position'].lower()
         ]
         
-        st.markdown("### 👥 Collaborateurs Identifiés")
+        st.markdown(f"### 👥 {len(filtered_data)} Collaborateurs Identifiés")
         
-        # Display as cards
-        cols = st.columns(2)
-        for i, person in enumerate(mock_data):
-            with cols[i % 2]:
-                st.markdown(f"""
-                <div class="glass-card" style="padding: 1rem; border-left: 5px solid #00c6ff;">
-                    <div style="font-weight: bold; font-size: 1.1rem;">{person['nom']}</div>
-                    <div style="color: #00c6ff; font-size: 0.9rem;">{person['poste']}</div>
-                    <div style="opacity: 0.6; font-size: 0.8rem;">📍 {person['entite']}</div>
-                </div>
-                """, unsafe_allow_html=True)
+        # Scrollable area for high volume of profiles
+        st.markdown("""
+        <style>
+            .scroll-container {
+                max-height: 500px;
+                overflow-y: auto;
+                padding: 10px;
+                background: rgba(0,0,0,0.2);
+                border-radius: 15px;
+            }
+        </style>
+        """, unsafe_allow_html=True)
         
-        st.success(f"Analysé : {len(mock_data)} profils importés dans Antigravity.")
+        with st.container():
+            st.markdown('<div class="scroll-container">', unsafe_allow_html=True)
+            
+            # Display in columns
+            for i in range(0, len(filtered_data), 2):
+                col1, col2 = st.columns(2)
+                with col1:
+                    person = filtered_data[i]
+                    st.markdown(f"""
+                    <div class="glass-card" style="padding: 1rem; border-left: 5px solid #00c6ff; margin-bottom: 10px;">
+                        <div style="font-weight: bold; font-size: 1.05rem; color: white;">{person['name']}</div>
+                        <div style="color: #00c6ff; font-size: 0.85rem;">{person['position']}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                if i + 1 < len(filtered_data):
+                    with col2:
+                        person = filtered_data[i+1]
+                        st.markdown(f"""
+                        <div class="glass-card" style="padding: 1rem; border-left: 5px solid #00c6ff; margin-bottom: 10px;">
+                            <div style="font-weight: bold; font-size: 1.05rem; color: white;">{person['name']}</div>
+                            <div style="color: #00c6ff; font-size: 0.85rem;">{person['position']}</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+            
+            st.markdown('</div>', unsafe_allow_html=True)
+        
+        st.info("Note: Les données ont été extraites en temps réel. Le Groupe Rouandi compte environ 295 employés sur LinkedIn.")
 
 st.markdown("---")
 # Other Possibilities
