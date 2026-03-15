@@ -115,7 +115,64 @@ with col3:
 st.markdown("---")
 
 # Interactive Section
-st.subheader("💡 Explorez les Possibilités")
+st.markdown("---")
+st.markdown("""
+<div class="glass-card">
+    <h2 style="margin-top: 0;">🌐 LinkedIn Intelligence</h2>
+    <p>Extrayez instantanément les talents d'une entreprise pour alimenter votre vivier.</p>
+</div>
+""", unsafe_allow_html=True)
+
+linked_col1, linked_col2 = st.columns([3, 1])
+
+with linked_col1:
+    linkedin_url = st.text_input("URL de la page 'Personnes' de l'entreprise", placeholder="https://www.linkedin.com/company/tgcc/people/")
+
+with linked_col2:
+    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+    scrape_clicked = st.button("🚀 Scraper & Analyser", use_container_width=True)
+
+if scrape_clicked:
+    if not linkedin_url:
+        st.error("Veuillez entrer une URL LinkedIn valide.")
+    else:
+        with st.status("Extraction des données LinkedIn en cours...", expanded=True) as status:
+            st.write("🔍 Analyse de la structure de la page...")
+            time.sleep(1.5)
+            st.write("🕵️ Identification des profils collaborateurs...")
+            time.sleep(2)
+            st.write("📊 Structuration des données et des postes...")
+            time.sleep(1.5)
+            status.update(label="Données extraites avec succès !", state="complete", expanded=False)
+        
+        # Mock Data for Demonstration
+        mock_data = [
+            {"nom": "Jean Dupont", "poste": "Directeur Commercial", "entite": "TGCC HQ"},
+            {"nom": "Sarah Benali", "poste": "Ingénieur d'Affaires", "entite": "TG ALU"},
+            {"nom": "Marc Lefebvre", "poste": "Responsable Achats", "entite": "TG STEEL"},
+            {"nom": "Yasmine Mansouri", "poste": "Chef de Projet IT", "entite": "TGCC HQ"},
+            {"nom": "Thomas Roux", "poste": "Directeur Technique", "entite": "TG WOOD"}
+        ]
+        
+        st.markdown("### 👥 Collaborateurs Identifiés")
+        
+        # Display as cards
+        cols = st.columns(2)
+        for i, person in enumerate(mock_data):
+            with cols[i % 2]:
+                st.markdown(f"""
+                <div class="glass-card" style="padding: 1rem; border-left: 5px solid #00c6ff;">
+                    <div style="font-weight: bold; font-size: 1.1rem;">{person['nom']}</div>
+                    <div style="color: #00c6ff; font-size: 0.9rem;">{person['poste']}</div>
+                    <div style="opacity: 0.6; font-size: 0.8rem;">📍 {person['entite']}</div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        st.success(f"Analysé : {len(mock_data)} profils importés dans Antigravity.")
+
+st.markdown("---")
+# Other Possibilities
+st.subheader("💡 Autres Possibilités")
 option = st.selectbox("Quelle fonctionnalité souhaitez-vous tester ?", ["Analyse Prédictive", "Optimisation de Pipeline", "Génération de Fiches de Poste"])
 
 if st.button("Lancer la Simulation"):
