@@ -113,9 +113,15 @@ with linked_col2:
     scrape_clicked = st.button("🚀 Scraper & Analyser", use_container_width=True)
 
 # Data Loading Logic
-DATA_FILE = "rouandi_employees.json"
 scraped_data = []
-if os.path.exists(DATA_FILE):
+DATA_FILE = None
+
+if "tgcc-immobilier" in linkedin_url.lower():
+    DATA_FILE = "tgcc_immobilier_employees.json"
+elif "rouandi" in linkedin_url.lower():
+    DATA_FILE = "rouandi_employees.json"
+
+if DATA_FILE and os.path.exists(DATA_FILE):
     with open(DATA_FILE, "r", encoding="utf-8") as f:
         scraped_data = json.load(f)
 
