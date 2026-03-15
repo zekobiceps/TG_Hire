@@ -86,33 +86,8 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    st.markdown("""
-    <div class="glass-card">
-        <h3>⚡ Vitesse Absolue</h3>
-        <p>Analyse de CV en quelques millisecondes. Matching intelligent ultra-précis.</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col2:
-    st.markdown("""
-    <div class="glass-card">
-        <h3>🧠 Intelligence Pure</h3>
-        <p>Compréhension sémantique profonde des compétences et du potentiel des candidats.</p>
-    </div>
-    """, unsafe_allow_html=True)
-
-with col3:
-    st.markdown("""
-    <div class="glass-card">
-        <h3>✨ Expérience Premium</h3>
-        <p>Interface intuitive conçue pour les recruteurs modernes et visionnaires.</p>
-    </div>
-    """, unsafe_allow_html=True)
-
 st.markdown("---")
+
 
 import json
 import os
@@ -122,9 +97,9 @@ st.markdown("---")
 st.markdown("""
 <div class="glass-card">
     <h2 style="margin-top: 0;">🌐 LinkedIn Intelligence</h2>
-    <p>Extraction temps-réel des talents pour le Groupe Rouandi.</p>
 </div>
 """, unsafe_allow_html=True)
+
 
 linked_col1, linked_col2 = st.columns([3, 1])
 
@@ -166,52 +141,18 @@ if scrape_clicked or (linkedin_url and scraped_data):
         
         st.markdown(f"### 👥 {len(filtered_data)} Collaborateurs Identifiés")
         
-        # Display profiles as a single HTML block containing a clean table
-        st.markdown("""
-        <style>
-            .scroll-container {
-                max-height: 600px;
-                overflow-y: auto;
-                padding: 15px;
-                background: rgba(0,0,0,0.1);
-                border-radius: 15px;
-                border: 1px solid rgba(255, 255, 255, 0.1);
-            }
-            .talent-table {
-                width: 100%;
-                border-collapse: collapse;
-            }
-            .talent-table th {
-                text-align: left;
-                padding: 12px;
-                background-color: rgba(0, 198, 255, 0.2);
-                color: #00c6ff;
-                position: sticky;
-                top: 0;
-                z-index: 1;
-            }
-            .talent-table td {
-                padding: 10px 12px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-                color: white;
-            }
-            .talent-table tr:hover td {
-                background-color: rgba(255, 255, 255, 0.05);
-            }
-        </style>
-        """, unsafe_allow_html=True)
+        # Display profiles as a native Streamlit dataframe
+        import pandas as pd
         
-        profiles_html = "<table class='talent-table'><thead><tr><th>Collaborateur</th><th>Poste & Entité</th></tr></thead><tbody>"
-        for person in filtered_data:
-            profiles_html += f"""
-            <tr>
-                <td style="font-weight: bold; font-size: 1.05rem;">{person['name']}</td>
-                <td style="font-size: 0.9rem; opacity: 0.9;">{person['position']}</td>
-            </tr>
-            """
-        profiles_html += "</tbody></table>"
-        
-        st.markdown(f'<div class="scroll-container">{profiles_html}</div>', unsafe_allow_html=True)
+        if filtered_data:
+            df = pd.DataFrame(filtered_data)
+            # Rename columns for display
+            df = df.rename(columns={'name': 'Collaborateur', 'position': 'Poste & Entité'})
+            
+            # Use st.dataframe for a native, interactive table with scrolling and column sorting
+            st.dataframe(df, use_container_width=True, height=600, hide_index=True)
+        else:
+            st.info("Aucun collaborateur trouvé pour cette recherche.")
         
         st.info(f"Note: Les données ont été extraites en temps réel. Total identifié : {len(scraped_data)} collaborateurs sur LinkedIn.")
 
