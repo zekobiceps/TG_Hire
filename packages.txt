@@ -1,2 +1,6 @@
 chromium
 chromium-driver
+poppler-utils
+tesseract-ocr
+tesseract-ocr-fra
+tesseract-ocr-ara
