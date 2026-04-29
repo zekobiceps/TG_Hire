@@ -185,7 +185,7 @@ def update_stagiaire_field(id_demande: str, updates: dict):
 def _get_or_create_folder(service, name: str, parent_id: str) -> str:
     q = (f"name='{name}' and mimeType='application/vnd.google-apps.folder' "
          f"and '{parent_id}' in parents and trashed=false")
-    res = service.files().list(q=q, fields="files(id)", supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
+    res = service.files().list(q=q, fields="files(id)", supportsAllDrives=True, includeItemsFromAllDrives=True).execute() or {}
     files = res.get("files", [])
     if files:
         return files[0]["id"]
@@ -263,13 +263,15 @@ def extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
         import pytesseract
         from PIL import Image as PILImage
         doc2 = fitz.open(stream=pdf_bytes, filetype="pdf")
-        texte_ocr = "\n".join(
-            pytesseract.image_to_string(
-                PILImage.frombytes("RGB", [p.width, p.height], (p := page.get_pixmap(dpi=300)).samples),
-                lang="fra+ara"
-            )
-            for page in doc2
-        )
+        textes = []
+        for page in doc2:
+            try:
+                pix = page.get_pixmap(dpi=300)
+                img = PILImage.frombytes("RGB", (pix.width, pix.height), pix.samples)
+                textes.append(pytesseract.image_to_string(img, lang="fra+ara"))
+            except Exception:
+                continue
+        texte_ocr = "\n".join(textes)
         return texte_ocr
     except Exception:
         pass
