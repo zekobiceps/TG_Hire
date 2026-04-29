@@ -208,7 +208,11 @@ def upload_files_to_folder(files: list[tuple[bytes, str, str]], folder_name: str
             links.append(uploaded.get("webViewLink", ""))
         return folder_id, links
     except Exception as e:
-        st.error(f"❌ Upload Drive : {e}")
+        # Afficher l'ID parent pour debug si erreur de quota/permissions
+        try:
+            st.error(f"❌ Upload Drive (parent={parent_id}) : {e}")
+        except Exception:
+            pass
         return "", []
 
 def list_folder_files(folder_id: str) -> list[dict]:
