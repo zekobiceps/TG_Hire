@@ -47,3 +47,7 @@ pdf2image
 pytesseract
 PyPDF2
 pypdf
+
+# Web Scraping
+selenium
+webdriver-manager

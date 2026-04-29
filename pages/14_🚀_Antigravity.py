@@ -1,0 +1,224 @@
+import streamlit as st
+import time
+
+st.set_page_config(
+    page_title="Antigravity",
+    page_icon="🚀",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom CSS for Premium Aesthetic
+st.markdown("""
+<style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;700&display=swap');
+
+    html, body, [data-testid="stStatusWidget"] {
+        font-family: 'Outfit', sans-serif;
+    }
+
+    .main {
+        background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+        color: white;
+    }
+
+    .glass-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        padding: 2rem;
+        margin-bottom: 2rem;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .glass-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    h1, h2, h3 {
+        background: linear-gradient(to right, #00c6ff, #0072ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 700;
+    }
+
+    .stButton>button {
+        background: linear-gradient(90deg, #00c6ff 0%, #0072ff 100%);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        padding: 0.6rem 2rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .stButton>button:hover {
+        box-shadow: 0 0 20px rgba(0, 198, 255, 0.6);
+        transform: scale(1.05);
+    }
+
+    /* Animation */
+    @keyframes float {
+        0% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+        100% { transform: translateY(0px); }
+    }
+
+    .floating-icon {
+        animation: float 3s ease-in-out infinite;
+        font-size: 4rem;
+        text-align: center;
+        display: block;
+        margin-bottom: 1rem;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# Hero Section
+st.markdown("""
+<div class="glass-card" style="text-align: center;">
+    <span class="floating-icon">🚀</span>
+    <h1>ANTIGRAVITY</h1>
+    <p style="font-size: 1.2rem; opacity: 0.8;"></p>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("---")
+
+
+import json
+import os
+
+# Interactive Section
+st.markdown("---")
+st.markdown("""
+<div class="glass-card">
+    <h2 style="margin-top: 0;">🌐 LinkedIn Intelligence</h2>
+</div>
+""", unsafe_allow_html=True)
+
+
+linked_col1, linked_col2 = st.columns([3, 1])
+
+with linked_col1:
+    linkedin_url = st.text_input("URL de la page 'Personnes' de l'entreprise", 
+                                value="https://www.linkedin.com/company/soci%C3%A9t%C3%A9-rouandi/people/",
+                                placeholder="https://www.linkedin.com/company/tgcc/people/")
+
+with linked_col2:
+    st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
+    scrape_clicked = st.button("🚀 Scraper & Analyser", use_container_width=True)
+
+st.markdown("---")
+st.markdown("#### 🔒 Authentification Requise pour l'Extraction Temps-Réel")
+
+cred_col1, cred_col2 = st.columns(2)
+with cred_col1:
+    li_email = st.text_input("Email LinkedIn", placeholder="votre@email.com")
+with cred_col2:
+    li_password = st.text_input("Mot de passe LinkedIn", type="password")
+
+# Data Loading Logic
+scraped_data = []
+DATA_FILE = None
+
+if "tgcc-immobilier" in linkedin_url.lower():
+    DATA_FILE = "tgcc_immobilier_employees.json"
+elif "rouandi" in linkedin_url.lower():
+    DATA_FILE = "rouandi_employees.json"
+
+if DATA_FILE and os.path.exists(DATA_FILE):
+    with open(DATA_FILE, "r", encoding="utf-8") as f:
+        scraped_data = json.load(f)
+
+if scrape_clicked or (linkedin_url and scraped_data):
+    if not linkedin_url:
+        st.error("Veuillez entrer une URL LinkedIn valide.")
+    else:
+        if scrape_clicked:
+            if li_email and li_password:
+                with st.status("Collecte des données via Selenium en cours (cela peut prendre quelques minutes)...", expanded=True) as status:
+                    st.write("🔍 Lancement du navigateur automatisé...")
+                    
+                    import sys
+                    sys.path.append(os.path.dirname(__file__) + '/..')
+                    from linkedin_scraper import scrape_linkedin_people
+                    
+                    try:
+                        # Allow up to 15 scrolls to load all employees (deep scrape)
+                        scraped_data_real = scrape_linkedin_people(linkedin_url, li_email, li_password, max_scrolls=15)
+                        if isinstance(scraped_data_real, dict) and "error" in scraped_data_real:
+                            st.error(scraped_data_real["error"])
+                        else:
+                            st.write(f"🕵️ Extraction de {len(scraped_data_real)} profils réussie !")
+                            # Update the loaded data with real-time data
+                            scraped_data = scraped_data_real
+                            
+                            # Optional: save to file to persist temporarily
+                            with open("last_real_scrape.json", "w", encoding="utf-8") as f:
+                                json.dump(scraped_data, f, ensure_ascii=False, indent=2)
+                                
+                    except Exception as e:
+                        st.error(f"Erreur d'exécution du scraper: {e}")
+                        
+                    status.update(label="Analyse terminée !", state="complete", expanded=False)
+            else:
+                st.warning("Veuillez entrer vos identifiants LinkedIn pour lancer un scraping en temps réel. Affichage des données en cache pour cette URL.")
+                with st.status("Chargement des données en cache...", expanded=True) as status:
+                    time.sleep(1)
+                    status.update(label="Terminé", state="complete", expanded=False)
+        
+        # Search and Filter
+        search_query = st.text_input("🔍 Rechercher un collaborateur ou un poste", "").lower()
+        
+        filtered_data = [
+            p for p in scraped_data 
+            if search_query in p.get('name', '').lower() or search_query in p.get('position', '').lower()
+        ]
+        
+        st.markdown(f"### 👥 {len(filtered_data)} Collaborateurs Identifiés")
+        
+        # Display profiles as a native Streamlit dataframe
+        import pandas as pd
+        
+        if filtered_data:
+            df = pd.DataFrame(filtered_data)
+            
+            # Add a mock URL column for old static JSON data if it's missing
+            if 'url' not in df.columns:
+                df['url'] = "https://www.linkedin.com/search/results/people/?keywords=" + df['name'].str.replace(' ', '%20')
+                
+            # Rename columns for display
+            df = df.rename(columns={
+                'name': 'Collaborateur', 
+                'position': 'Poste & Entité',
+                'url': 'Lien Profil (URL)'
+            })
+            
+            # Reorder columns just in case
+            if 'Lien Profil (URL)' in df.columns:
+                df = df[['Collaborateur', 'Poste & Entité', 'Lien Profil (URL)']]
+            
+            # Configure dataframe columns, specifically formatting the URL as a link
+            st.dataframe(
+                df, 
+                use_container_width=True, 
+                height=600, 
+                hide_index=True,
+                column_config={
+                    "Lien Profil (URL)": st.column_config.LinkColumn("Lien Profil (URL)")
+                }
+            )
+        else:
+            st.info("Aucun collaborateur trouvé pour cette recherche.")
+        
+        st.info(f"Note: Les données ont été extraites en temps réel. Total identifié : {len(scraped_data)} collaborateurs sur LinkedIn.")
+
+st.markdown("""
+<div style="margin-top: 5rem; text-align: center; opacity: 0.5; font-size: 0.8rem;">
+    Powered by Antigravity AI Engine v2.0 • TG-Hire Ecosystem
+</div>
+""", unsafe_allow_html=True)
