@@ -53,7 +53,7 @@ DOCS_TGCC = {
 
 COLONNES_SHEET = [
     "id_demande", "date_demande", "type_demande", "chantier", "responsable_demandeur",
-    "fonction_demandeur", "nom_tuteur", "fonction_tuteur", "fonction_stagiaire",
+    "fonction_demandeur", "civilite_tuteur", "nom_tuteur", "fonction_tuteur", "fonction_stagiaire",
     "type_stage", "duree_semaines", "date_debut", "date_fin", "missions",
     "formation_souhaitee", "experience_souhaitee", "indemnisation_min", "indemnisation_max",
     "commentaire", "nom_stagiaire", "email_stagiaire", "cv_uploaded", "formulaire_uploaded",
@@ -187,6 +187,17 @@ def _get_or_create_folder(service, name: str, parent_id: str) -> str:
     f = service.files().create(body=meta, fields="id", supportsAllDrives=True).execute()
     return f["id"]
 
+def _rename_drive_folder(service, folder_id: str, new_name: str):
+    """Renomme un dossier Drive existant."""
+    try:
+        service.files().update(
+            fileId=folder_id,
+            body={"name": new_name.upper()},
+            supportsAllDrives=True
+        ).execute()
+    except Exception:
+        pass
+
 def upload_files_to_folder(files: list[tuple[bytes, str, str]], folder_name: str, parent_id: str = DRIVE_ROOT_FOLDER_ID) -> tuple[str, list[str]]:
     """Crée (ou récupère) un dossier sous parent_id/année/folder_name et uploade les fichiers.
     files: list of tuples (bytes, filename, mimetype)
@@ -243,9 +254,16 @@ def extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
 
     # Essai 2 : OCR via pdf2image + pytesseract (PDF scanné ou manuscrit)
     try:
+        import shutil
         from pdf2image import convert_from_bytes
         import pytesseract
-        images = convert_from_bytes(pdf_bytes, dpi=300)
+        # Trouver pdftoppm (poppler)
+        poppler_path = None
+        for candidate in ["/usr/bin", "/usr/local/bin", "/opt/homebrew/bin"]:
+            if shutil.which("pdftoppm", path=candidate):
+                poppler_path = candidate
+                break
+        images = convert_from_bytes(pdf_bytes, dpi=300, poppler_path=poppler_path)
         texte_ocr = "\n".join(
             pytesseract.image_to_string(img, lang="fra+ara")
             for img in images
@@ -260,15 +278,22 @@ def extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
 def pdf_to_base64_images(pdf_bytes: bytes) -> list[str]:
     """Convertit les pages d'un PDF en images base64 (pour DeepSeek vision)."""
     try:
+        import shutil
         from pdf2image import convert_from_bytes
-        images = convert_from_bytes(pdf_bytes, dpi=200)
+        poppler_path = None
+        for candidate in ["/usr/bin", "/usr/local/bin", "/opt/homebrew/bin"]:
+            if shutil.which("pdftoppm", path=candidate):
+                poppler_path = candidate
+                break
+        images = convert_from_bytes(pdf_bytes, dpi=200, poppler_path=poppler_path)
         result = []
         for img in images:
             buf = io.BytesIO()
             img.save(buf, format="JPEG", quality=80)
             result.append(base64.b64encode(buf.getvalue()).decode())
         return result
-    except Exception:
+    except Exception as e:
+        st.warning(f"⚠️ Conversion PDF→images échouée : {e}")
         return []
 
 
@@ -487,8 +512,6 @@ def check_alertes_j7(df: pd.DataFrame | None):
             for row in alertes:
                 st.markdown(f"**{row.get('nom_stagiaire','?')}** — Chantier : {row.get('chantier','?')} — Fin : {row.get('date_fin','?')} — Tuteur : {row.get('nom_tuteur','?')}")
 
-check_alertes_j7(st.session_state.stagiaires_df)
-
 col_refresh, _ = st.columns([1, 5])
 with col_refresh:
     if st.button("🔄 Actualiser les données"):
@@ -558,6 +581,7 @@ if not is_rh():
                 responsable_demandeur = st.text_input("Responsable demandeur", value=prefill.get("responsable_demandeur", ""))
                 fonction_demandeur = st.text_input("Fonction du demandeur", value=prefill.get("fonction_demandeur", ""))
             with c2:
+                civilite_tuteur = st.selectbox("Civilité du tuteur", ["M.", "Mme."], key="civilite_tuteur_form")
                 nom_tuteur = st.text_input("Nom & prénom du tuteur", value=prefill.get("nom_tuteur", ""))
                 fonction_tuteur = st.text_input("Fonction du tuteur", value=prefill.get("fonction_tuteur", ""))
                 fonction_stagiaire = st.text_input("Fonction attribuée au stagiaire", value=prefill.get("fonction_stagiaire", ""))
@@ -615,6 +639,7 @@ if not is_rh():
                         "indemnisation_min": indemnisation_min,
                         "indemnisation_max": indemnisation_max,
                         "commentaire": commentaire,
+                        "civilite_tuteur": civilite_tuteur,
                         "nom_stagiaire": "",
                         "email_stagiaire": "",
                         "cv_uploaded": "Non" if sourcing_interne else "Oui",
@@ -824,41 +849,98 @@ if not is_rh():
     with tabs[tabs_labels.index("📧 Traitement & Suivi")]:
         st.subheader("📧 Traitement des demandes validées")
 
-        valides_df = df[df["etat"].isin(["Validée", "Mail envoyé", "Documents reçus"])] if not df.empty else pd.DataFrame()
+        # Inclure aussi les dossiers conformes/en cours (pour permettre édition complète)
+        valides_df = df[~df["etat"].isin(["En attente validation", "Rejetée"])] if not df.empty else pd.DataFrame()
         if valides_df.empty:
-            st.info("Aucune demande validée en attente de traitement.")
+            st.info("Aucune demande à traiter.")
         else:
+            # Sélecteur par nom stagiaire (ou id si pas encore renseigné)
+            def _label_suivi(r):
+                nom = str(r.get("nom_stagiaire", "")).strip()
+                return f"{r['id_demande']} — {nom if nom else '(sans nom)'} — {r.get('chantier','')}"
             ids = valides_df["id_demande"].tolist()
-            sel_id = st.selectbox("Sélectionner une demande", ids)
-            row = valides_df[valides_df["id_demande"] == sel_id].iloc[0]
+            sel_id = st.selectbox(
+                "Sélectionner une demande",
+                ids,
+                format_func=lambda x: _label_suivi(valides_df[valides_df["id_demande"]==x].iloc[0])
+            )
+            row = valides_df[valides_df["id_demande"] == sel_id].iloc[0].copy()
 
-            st.markdown(f"**Chantier :** {row.get('chantier','')} | **Période :** {row.get('date_debut','')} → {row.get('date_fin','')} | **État :** `{row.get('etat','')}`")
+            st.markdown(f"**Chantier :** {row.get('chantier','')} | **État :** `{row.get('etat','')}`")
             st.markdown("---")
 
-            # ── Saisie info stagiaire ───────────────────────────────────────
-            st.markdown("#### 1. Informations du stagiaire")
-            with st.form("form_info_stagiaire"):
-                nom_stag = st.text_input("Nom & Prénom du stagiaire", value=str(row.get("nom_stagiaire", "")))
-                email_stag = st.text_input("Email du stagiaire", value=str(row.get("email_stagiaire", "")))
-                if st.form_submit_button("💾 Enregistrer les informations stagiaire"):
-                    update_stagiaire_field(sel_id, {"nom_stagiaire": nom_stag, "email_stagiaire": email_stag})
-                    st.success("Informations sauvegardées.")
+            # ── 1. Édition complète du dossier ─────────────────────────────
+            st.markdown("#### 1. Édition du dossier")
+            with st.form("form_edition_dossier"):
+                c1e, c2e = st.columns(2)
+                with c1e:
+                    nom_stag = st.text_input("Nom & Prénom du stagiaire", value=str(row.get("nom_stagiaire", "")))
+                    email_stag = st.text_input("Email du stagiaire", value=str(row.get("email_stagiaire", "")))
+                    chantier_edit = st.text_input("Chantier", value=str(row.get("chantier", "")))
+                    etat_edit = st.selectbox("État", ETATS,
+                        index=ETATS.index(str(row.get("etat", "Validée"))) if str(row.get("etat", "")) in ETATS else 0)
+                with c2e:
+                    try:
+                        dd_v = datetime.datetime.strptime(str(row.get("date_debut", "")), "%d/%m/%Y").date()
+                    except Exception:
+                        dd_v = datetime.date.today()
+                    try:
+                        df_v = datetime.datetime.strptime(str(row.get("date_fin", "")), "%d/%m/%Y").date()
+                    except Exception:
+                        df_v = datetime.date.today()
+                    date_debut_edit = st.date_input("Date de début", value=dd_v)
+                    date_fin_edit = st.date_input("Date de fin", value=df_v)
+                    nom_tuteur_edit = st.text_input("Nom du tuteur", value=str(row.get("nom_tuteur", "")))
+                    type_stage_edit = st.text_input("Type de stage", value=str(row.get("type_stage", "")))
+                if st.form_submit_button("💾 Enregistrer les modifications"):
+                    updates = {
+                        "nom_stagiaire": nom_stag,
+                        "email_stagiaire": email_stag,
+                        "chantier": chantier_edit,
+                        "etat": etat_edit,
+                        "date_debut": date_debut_edit.strftime("%d/%m/%Y"),
+                        "date_fin": date_fin_edit.strftime("%d/%m/%Y"),
+                        "nom_tuteur": nom_tuteur_edit,
+                        "type_stage": type_stage_edit,
+                    }
+                    update_stagiaire_field(sel_id, updates)
+                    st.success("✅ Modifications enregistrées.")
+                    # Renommer le dossier Drive vers le nom du stagiaire si renseigné
+                    if nom_stag.strip():
+                        try:
+                            folder_url_row = str(row.get("drive_folder_url", ""))
+                            if folder_url_row:
+                                if "folders/" in folder_url_row:
+                                    fid_rename = folder_url_row.split("folders/")[1].split("?")[0]
+                                else:
+                                    fid_rename = folder_url_row.rstrip("/").split("/")[-1]
+                                svc_rename = _get_drive_service()
+                                if svc_rename:
+                                    _rename_drive_folder(svc_rename, fid_rename, nom_stag)
+                        except Exception:
+                            pass
                     refresh_data()
+                    st.rerun()
 
-            st.markdown("---")
-            # ── Canevas mail initiation ─────────────────────────────────────
-            st.markdown("#### 2. Mail d'invitation au stagiaire")
-            nom_s = str(row.get("nom_stagiaire", "XXXXXXXXXX")) or "XXXXXXXXXX"
+            # Recharger la ligne après d'éventuelles modifs
+            row = (st.session_state.stagiaires_df[st.session_state.stagiaires_df["id_demande"]==sel_id].iloc[0].copy()
+                   if st.session_state.stagiaires_df is not None and sel_id in (st.session_state.stagiaires_df["id_demande"].values) else row)
+            nom_stag = str(row.get("nom_stagiaire", "")) or "XXXXXXXXXX"
             chantier_s = str(row.get("chantier", "XXXX")) or "XXXX"
             dd = str(row.get("date_debut", "XX/XX/XXXX"))
             df_ = str(row.get("date_fin", "XX/XX/XXXX"))
-            resp_mail = str(row.get("responsable_demandeur", ""))
+            civilite_t = str(row.get("civilite_tuteur", "M.")) or "M."
+            nom_tuteur_s = str(row.get("nom_tuteur", "")) or "XXXXXXXXXX"
+            tuteur_complet = f"{civilite_t} {nom_tuteur_s}"
 
+            st.markdown("---")
+            # ── 2. Canevas mail initiation ─────────────────────────────────
+            st.markdown("#### 2. Mail d'invitation au stagiaire")
             mail_initiation = f"""**Objet : VOTRE STAGE AU SEIN DE TGCC**
 
 Bonjour,
 
-Suite à la validation de la DRH de la demande de stage de M. {nom_s} au sein du chantier {chantier_s} pour la période du {dd} au {df_}, merci de fournir les documents ci-joints.
+Suite à la validation de la DRH de la demande de stage de {tuteur_complet} au sein du chantier {chantier_s} pour la période du {dd} au {df_}, merci de fournir les documents ci-joints.
 
 *Fiche de renseignement (PJ) (bien remplie et signée par le stagiaire) dont photo récente ;
 *CIN recto/verso ;
@@ -876,10 +958,8 @@ Vous pouvez vous adresser à la Direction des Ressources Humaines pour exercer v
 
 Nous gardons contact et vous souhaitons une belle carrière.
 Bienvenue au sein de TGCC"""
-
             st.text_area("📋 Canevas à copier (mail stagiaire + responsable en CC)", value=mail_initiation, height=320)
-            st.caption(f"📎 Pièces jointes à ajouter : FR 20 (Fiche renseignement), Clause de discrétion, FI 04 (Liste documents) — disponibles dans le dossier **Forms/**")
-
+            st.caption("📎 Pièces jointes à ajouter : FR 20 (Fiche renseignement), Clause de discrétion, FI 04 (Liste documents) — disponibles dans le dossier **Forms/**")
             if str(row.get("etat", "")) == "Validée":
                 if st.button("📤 Marquer le mail comme envoyé", key="mail_envoye"):
                     update_stagiaire_field(sel_id, {"etat": "Mail envoyé"})
@@ -888,13 +968,14 @@ Bienvenue au sein de TGCC"""
                     st.rerun()
 
             st.markdown("---")
-            # ── Upload documents reçus + Drive ─────────────────────────────
+            # ── 3. Upload documents + Drive (dossier existant ou nom stagiaire) ───
             st.markdown("#### 3. Upload des documents reçus du stagiaire")
             docs_uploader = st.file_uploader(
                 "Uploader les documents (PDF, images)", type=["pdf", "jpg", "jpeg", "png"],
                 accept_multiple_files=True, key="upload_docs_stag"
             )
-            nom_stag_drive = str(row.get("nom_stagiaire", sel_id)).strip() or sel_id
+            # Upload dans le dossier existant ou en créer un au nom du stagiaire
+            nom_stag_drive = nom_stag.strip() if nom_stag.strip() and nom_stag != "XXXXXXXXXX" else sel_id
             if docs_uploader and st.button("☁️ Uploader vers Google Drive", key="upload_drive"):
                 with st.spinner("Upload en cours..."):
                     files_to_upload = []
@@ -903,27 +984,38 @@ Bienvenue au sein de TGCC"""
                         mime = "application/pdf" if f_up.name.endswith(".pdf") else "image/jpeg"
                         files_to_upload.append((fb, f_up.name, mime))
                     if files_to_upload:
-                        folder_id, links = upload_files_to_folder(files_to_upload, nom_stag_drive)
-                        if folder_id:
-                            folder_url = f"https://drive.google.com/drive/folders/{folder_id}"
-                            update_stagiaire_field(sel_id, {
-                                "etat": "Documents reçus",
-                                "drive_folder_url": folder_url,
-                            })
-                            st.success(f"✅ {len(links)} fichier(s) uploadé(s) sur Drive.")
+                        # Utiliser le dossier existant si disponible, sinon en créer un
+                        existing_url = str(row.get("drive_folder_url", ""))
+                        if existing_url:
+                            try:
+                                if "folders/" in existing_url:
+                                    existing_fid = existing_url.split("folders/")[1].split("?")[0]
+                                else:
+                                    existing_fid = existing_url.rstrip("/").split("/")[-1]
+                                from googleapiclient.http import MediaIoBaseUpload as MIU
+                                svc_up = _get_drive_service()
+                                links_direct = []
+                                for bts, fname, mimetype in files_to_upload:
+                                    media = MIU(io.BytesIO(bts), mimetype=mimetype)
+                                    meta = {"name": fname, "parents": [existing_fid]}
+                                    up = svc_up.files().create(body=meta, media_body=media, fields="id,webViewLink", supportsAllDrives=True).execute()
+                                    links_direct.append(up.get("webViewLink", ""))
+                                # Renommer le dossier vers le nom du stagiaire si pas encore fait
+                                if nom_stag_drive != sel_id:
+                                    _rename_drive_folder(svc_up, existing_fid, nom_stag_drive)
+                                update_stagiaire_field(sel_id, {"etat": "Documents reçus"})
+                                st.success(f"✅ {len(links_direct)} fichier(s) uploadé(s) dans le dossier existant.")
+                            except Exception as e:
+                                st.error(f"❌ Upload Drive (dossier existant) : {e}")
+                        else:
+                            folder_id, links = upload_files_to_folder(files_to_upload, nom_stag_drive)
+                            if folder_id:
+                                folder_url = f"https://drive.google.com/drive/folders/{folder_id}"
+                                update_stagiaire_field(sel_id, {"etat": "Documents reçus", "drive_folder_url": folder_url})
+                                st.success(f"✅ {len(links)} fichier(s) uploadé(s) sur Drive.")
                         refresh_data()
 
-            st.markdown("---")
-            # ── Dossier conforme → mail bienvenue ──────────────────────────
-            st.markdown("#### 4. Dossier conforme")
-            if str(row.get("etat", "")) in ("Documents reçus", "Mail envoyé"):
-                if st.button("✅ Marquer le dossier comme conforme", key="dossier_conforme", type="primary"):
-                    update_stagiaire_field(sel_id, {"etat": "Dossier conforme"})
-                    st.success("Dossier marqué conforme.")
-                    refresh_data()
-                    st.rerun()
-
-            if str(row.get("etat", "")) in ("Dossier conforme", "Stage en cours"):
+            if str(row.get("etat", "")) in ("Documents reçus", "Dossier conforme", "Stage en cours"):
                 mail_bienvenue = f"""**Objet : Intégration du stagiaire au sein de TGCC**
 
 Bonjour,
@@ -935,6 +1027,7 @@ Nous vous souhaitons la bienvenue parmi notre équipe, ainsi merci de bien voulo
 Nous gardons contact et vous souhaitons une belle carrière.
 
 — L'Équipe RH"""
+                st.markdown("---")
                 st.markdown("**📋 Canevas mail de bienvenue (à copier) :**")
                 st.text_area("Mail bienvenue stagiaire", value=mail_bienvenue, height=220)
 
@@ -944,33 +1037,33 @@ Nous gardons contact et vous souhaitons une belle carrière.
 if not is_rh():
     with tabs[tabs_labels.index("🔔 Alertes J-7")]:
         st.subheader("🔔 Alertes fins de stage (J-7)")
-    aujourd_hui = datetime.date.today()
-    alertes_list = []
-    if not df.empty:
-        for _, row in df.iterrows():
-            if str(row.get("etat", "")) in ("Stage terminé", "Rejetée"):
-                continue
-            try:
-                dff = datetime.datetime.strptime(str(row["date_fin"]), "%d/%m/%Y").date()
-                delta = (dff - aujourd_hui).days
-                if 0 <= delta <= 7:
-                    alertes_list.append((delta, row))
-            except Exception:
-                pass
+        aujourd_hui = datetime.date.today()
+        alertes_list = []
+        if not df.empty:
+            for _, row in df.iterrows():
+                if str(row.get("etat", "")) in ("Stage terminé", "Rejetée"):
+                    continue
+                try:
+                    dff = datetime.datetime.strptime(str(row["date_fin"]), "%d/%m/%Y").date()
+                    delta = (dff - aujourd_hui).days
+                    if 0 <= delta <= 7:
+                        alertes_list.append((delta, row))
+                except Exception:
+                    pass
 
-    if not alertes_list:
-        st.success("✅ Aucun stage n'arrive à échéance dans les 7 prochains jours.")
-    else:
-        alertes_list.sort(key=lambda x: x[0])
-        for delta, row in alertes_list:
-            libelle = f"**{row.get('nom_stagiaire','?')}** — {row.get('chantier','?')} — Fin dans **{delta}j** ({row.get('date_fin','?')})"
-            with st.expander(libelle):
-                nom_s = str(row.get("nom_stagiaire", "xxx"))
-                dd = str(row.get("date_debut", ""))
-                dff_s = str(row.get("date_fin", ""))
-                tuteur = str(row.get("nom_tuteur", ""))
+        if not alertes_list:
+            st.success("✅ Aucun stage n'arrive à échéance dans les 7 prochains jours.")
+        else:
+            alertes_list.sort(key=lambda x: x[0])
+            for delta, row in alertes_list:
+                libelle = f"**{row.get('nom_stagiaire','?')}** — {row.get('chantier','?')} — Fin dans **{delta}j** ({row.get('date_fin','?')})"
+                with st.expander(libelle):
+                    nom_s = str(row.get("nom_stagiaire", "xxx"))
+                    dd = str(row.get("date_debut", ""))
+                    dff_s = str(row.get("date_fin", ""))
+                    tuteur = str(row.get("nom_tuteur", ""))
 
-                mail_tuteur = f"""**Objet : Gestion des stagiaires au sein de TGCC**
+                    mail_tuteur = f"""**Objet : Gestion des stagiaires au sein de TGCC**
 
 Bonjour,
 
@@ -979,17 +1072,17 @@ Nous vous informons que le stage de {nom_s} dont vous étiez son tuteur, prendra
 Merci de bien compléter son dossier par les éléments suivants :
 *Le formulaire d'appréciation stagiaire ;
 
-Disponible via ce drive : https://drive.google.com/drive/u/3/folders/1FaoQw6aRp76M9U1VAB8Y6Hk1zaQ4VBjK
+Disponible via ce drive : https://drive.google.com/drive/u/3/folders/{DRIVE_ROOT_FOLDER_ID}
 
 Cordialement"""
 
-                st.text_area(f"📋 Canevas mail tuteur ({tuteur})", value=mail_tuteur, height=220, key=f"mail_tuteur_{row['id_demande']}")
+                    st.text_area(f"📋 Canevas mail tuteur ({tuteur})", value=mail_tuteur, height=220, key=f"mail_tuteur_{row['id_demande']}")
 
-                if st.button(f"✅ Alerte traitée pour {nom_s}", key=f"alerte_traitee_{row['id_demande']}"):
-                    update_stagiaire_field(row["id_demande"], {"etat": "Stage terminé"})
-                    st.success("Stage marqué comme terminé.")
-                    refresh_data()
-                    st.rerun()
+                    if st.button(f"✅ Alerte traitée pour {nom_s}", key=f"alerte_traitee_{row['id_demande']}"):
+                        update_stagiaire_field(row["id_demande"], {"etat": "Stage terminé"})
+                        st.success("Stage marqué comme terminé.")
+                        refresh_data()
+                        st.rerun()
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ONGLET 6 — ATTESTATION DE STAGE
@@ -999,8 +1092,9 @@ if not is_rh():
         st.subheader("📄 Attestation de stage")
 
         # ── Recruteur : demander une attestation ───────────────────────────────
-        st.markdown("#### Demander une attestation pour un stagiaire")
-        eligibles_attest = df[df["etat"].isin(["Dossier conforme", "Stage en cours", "Stage terminé"])] if not df.empty else pd.DataFrame()
+        st.markdown("#### Générer une attestation pour un stagiaire")
+        # Tout stagiaire ayant un nom renseigné ET une demande non rejetée est éligible
+        eligibles_attest = df[~df["etat"].isin(["En attente validation", "Rejetée"]) & (df["nom_stagiaire"].astype(str).str.strip() != "")] if not df.empty else pd.DataFrame()
         if eligibles_attest.empty:
             st.info("Aucun stagiaire éligible à une attestation (dossier conforme / stage en cours / terminé).")
         else:
