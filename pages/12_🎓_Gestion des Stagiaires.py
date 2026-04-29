@@ -260,7 +260,11 @@ def extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
 
     # Essai 2 : OCR via PyMuPDF (fitz) → pytesseract, sans dépendance poppler
     try:
-        import pytesseract
+        try:
+            import pytesseract
+        except Exception as e:
+            st.warning("⚠️ pytesseract non disponible : installez le package Python 'pytesseract' et le binaire tesseract (ex: apt install tesseract-ocr).")
+            return ""
         from PIL import Image as PILImage
         doc2 = fitz.open(stream=pdf_bytes, filetype="pdf")
         textes = []
@@ -269,12 +273,14 @@ def extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
                 pix = page.get_pixmap(dpi=300)
                 img = PILImage.frombytes("RGB", (pix.width, pix.height), pix.samples)
                 textes.append(pytesseract.image_to_string(img, lang="fra+ara"))
-            except Exception:
+            except Exception as e:
+                st.warning(f"⚠️ OCR page échouée : {e}")
                 continue
         texte_ocr = "\n".join(textes)
         return texte_ocr
-    except Exception:
-        pass
+    except Exception as e:
+        st.warning(f"⚠️ OCR global échoué : {e}")
+        return ""
 
     return ""
 
