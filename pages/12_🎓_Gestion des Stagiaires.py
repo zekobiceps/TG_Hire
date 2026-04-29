@@ -41,7 +41,7 @@ except ImportError:
 # ─────────────────────────── CONFIGURATION ───────────────────────────────────
 STAGIAIRES_SHEET_URL = "https://docs.google.com/spreadsheets/d/1PwaZA9LjIQvHk0iiM-uA0ndmyVCJ2SPuNP21QzJI09k/edit"
 STAGIAIRES_WORKSHEET = "Stagiaires"
-DRIVE_ROOT_FOLDER_ID = "1FaoQw6aRp76M9U1VAB8Y6Hk1zaQ4VBjK"
+DRIVE_ROOT_FOLDER_ID = st.secrets.get("DRIVE_ROOT_FOLDER_ID", "1FaoQw6aRp76M9U1VAB8Y6Hk1zaQ4VBjK")
 
 FORMS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Forms")
 
@@ -179,31 +179,50 @@ def update_stagiaire_field(id_demande: str, updates: dict):
 def _get_or_create_folder(service, name: str, parent_id: str) -> str:
     q = (f"name='{name}' and mimeType='application/vnd.google-apps.folder' "
          f"and '{parent_id}' in parents and trashed=false")
-    res = service.files().list(q=q, fields="files(id)").execute()
+    res = service.files().list(q=q, fields="files(id)", supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
     files = res.get("files", [])
     if files:
         return files[0]["id"]
     meta = {"name": name, "mimeType": "application/vnd.google-apps.folder", "parents": [parent_id]}
-    f = service.files().create(body=meta, fields="id").execute()
+    f = service.files().create(body=meta, fields="id", supportsAllDrives=True).execute()
     return f["id"]
 
-def upload_to_drive(file_bytes: bytes, filename: str, nom_stagiaire: str, mimetype="application/pdf") -> str:
-    """Crée l'arbo année/nom_stagiaire et uploade le fichier. Retourne l'URL."""
+def upload_files_to_folder(files: list[tuple[bytes, str, str]], folder_name: str, parent_id: str = DRIVE_ROOT_FOLDER_ID) -> tuple[str, list[str]]:
+    """Crée (ou récupère) un dossier sous parent_id/année/folder_name et uploade les fichiers.
+    files: list of tuples (bytes, filename, mimetype)
+    Retourne (folder_id, [webViewLink,...])
+    """
     service = _get_drive_service()
     if not service:
-        return ""
+        return "", []
     try:
         annee = str(datetime.date.today().year)
-        annee_id = _get_or_create_folder(service, annee, DRIVE_ROOT_FOLDER_ID)
-        stag_id = _get_or_create_folder(service, nom_stagiaire.upper(), annee_id)
+        annee_id = _get_or_create_folder(service, annee, parent_id)
+        folder_id = _get_or_create_folder(service, folder_name.upper(), annee_id)
         from googleapiclient.http import MediaIoBaseUpload
-        media = MediaIoBaseUpload(io.BytesIO(file_bytes), mimetype=mimetype)
-        meta = {"name": filename, "parents": [stag_id]}
-        uploaded = service.files().create(body=meta, media_body=media, fields="id,webViewLink").execute()
-        return uploaded.get("webViewLink", "")
+        links = []
+        for bts, fname, mimetype in files:
+            media = MediaIoBaseUpload(io.BytesIO(bts), mimetype=mimetype)
+            meta = {"name": fname, "parents": [folder_id]}
+            uploaded = service.files().create(body=meta, media_body=media, fields="id,webViewLink", supportsAllDrives=True).execute()
+            links.append(uploaded.get("webViewLink", ""))
+        return folder_id, links
     except Exception as e:
         st.error(f"❌ Upload Drive : {e}")
-        return ""
+        return "", []
+
+def list_folder_files(folder_id: str) -> list[dict]:
+    """Retourne la liste des fichiers (id,name,webViewLink) dans un dossier."""
+    service = _get_drive_service()
+    if not service or not folder_id:
+        return []
+    try:
+        q = f"'{folder_id}' in parents and trashed=false"
+        res = service.files().list(q=q, fields="files(id,name,webViewLink)", supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
+        return res.get("files", [])
+    except Exception as e:
+        st.error(f"❌ Liste Drive : {e}")
+        return []
 
 # ─────────────────────────── HELPERS DeepSeek ────────────────────────────────
 
@@ -477,23 +496,26 @@ df: pd.DataFrame = _raw_df if isinstance(_raw_df, pd.DataFrame) else pd.DataFram
 
 # ─────────────────────────── ONGLETS ─────────────────────────────────────────
 
-tabs = st.tabs([
-    "📝 Nouvelle Demande",
-    "📊 Tableau de Bord",
-    "✅ Validation RH",
-    "📧 Traitement & Suivi",
-    "🔔 Alertes J-7",
-    "📄 Attestation de Stage",
-])
+if is_rh():
+    tabs_labels = ["📊 Tableau de Bord", "✅ Validation RH"]
+else:
+    tabs_labels = [
+        "📝 Nouvelle Demande",
+        "📊 Tableau de Bord",
+        "✅ Validation RH",
+        "📧 Traitement & Suivi",
+        "🔔 Alertes J-7",
+        "📄 Attestation de Stage",
+    ]
+
+tabs = st.tabs(tabs_labels)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # ONGLET 1 — NOUVELLE DEMANDE
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[0]:
-    st.subheader("📝 Nouvelle demande de stagiaire")
-    if is_rh():
-        st.info("Cet onglet est réservé aux Recruteurs.")
-    else:
+if not is_rh():
+    with tabs[tabs_labels.index("📝 Nouvelle Demande")]:
+        st.subheader("📝 Nouvelle demande de stagiaire")
         # Upload formulaire scanné (obligatoire)
         st.markdown("#### 1. Formulaire de demande scanné (FR 19) *obligatoire*")
         formulaire_file = st.file_uploader(
@@ -606,6 +628,42 @@ with tabs[0]:
                         # Effacer le pré-remplissage IA
                         if "ia_form_data" in st.session_state:
                             del st.session_state["ia_form_data"]
+
+                        # Créer le dossier YEAR / ID_DEMANDE dès la soumission (même si pas de PJ)
+                        try:
+                            service = _get_drive_service()
+                            if service:
+                                try:
+                                    annee = str(datetime.date.today().year)
+                                    annee_id = _get_or_create_folder(service, annee, DRIVE_ROOT_FOLDER_ID)
+                                    folder_id = _get_or_create_folder(service, id_demande.upper(), annee_id)
+                                    if folder_id:
+                                        folder_url = f"https://drive.google.com/drive/folders/{folder_id}"
+                                        update_stagiaire_field(id_demande, {"drive_folder_url": folder_url})
+                                except Exception:
+                                    # ne pas bloquer la soumission si la création du dossier échoue
+                                    pass
+                        except Exception:
+                            pass
+
+                        # Upload immédiat du formulaire (+ CV si fourni) vers Drive
+                        try:
+                            files_to_upload = []
+                            # formulaire_file existe (obligatoire)
+                            formulaire_file.seek(0)
+                            files_to_upload.append((formulaire_file.read(), f"{id_demande}_formulaire.pdf", "application/pdf"))
+                            if cv_file is not None:
+                                cv_file.seek(0)
+                                files_to_upload.append((cv_file.read(), f"{id_demande}_cv.pdf", "application/pdf"))
+                            if files_to_upload:
+                                # upload into DRIVE_ROOT_FOLDER_ID (the helper will create YEAR/ID if needed)
+                                folder_id, links = upload_files_to_folder(files_to_upload, id_demande, parent_id=DRIVE_ROOT_FOLDER_ID)
+                                if folder_id:
+                                    folder_url = f"https://drive.google.com/drive/folders/{folder_id}"
+                                    update_stagiaire_field(id_demande, {"drive_folder_url": folder_url})
+                        except Exception:
+                            # ne pas bloquer la soumission si l'upload échoue
+                            pass
                         refresh_data()
                     else:
                         st.error("❌ Erreur lors de la sauvegarde.")
@@ -613,7 +671,7 @@ with tabs[0]:
 # ══════════════════════════════════════════════════════════════════════════════
 # ONGLET 2 — TABLEAU DE BORD
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[1]:
+with tabs[tabs_labels.index("📊 Tableau de Bord")]:
     st.subheader("📊 Tableau de bord des stagiaires")
 
     if df.empty:
@@ -670,7 +728,7 @@ with tabs[1]:
 # ══════════════════════════════════════════════════════════════════════════════
 # ONGLET 3 — VALIDATION RH
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[2]:
+with tabs[tabs_labels.index("✅ Validation RH")]:
     st.subheader("✅ Validation des demandes — Responsable RH")
 
     if not is_rh():
@@ -693,6 +751,25 @@ with tabs[2]:
                         st.markdown(f"**Formation souhaitée :** {row.get('formation_souhaitee','')}")
                         st.markdown(f"**Missions :** {row.get('missions','')}")
                         st.markdown(f"**Indemnisation :** {row.get('indemnisation_min','')} – {row.get('indemnisation_max','')} MAD")
+                        # Afficher les pièces jointes si présentes
+                        folder_url = str(row.get("drive_folder_url", ""))
+                        if folder_url:
+                            st.markdown("**Pièces jointes transmises :**")
+                            try:
+                                if "folders/" in folder_url:
+                                    fid = folder_url.split('folders/')[1].split('?')[0]
+                                else:
+                                    fid = folder_url.rstrip('/').split('/')[-1]
+                                files = list_folder_files(fid)
+                                if files:
+                                    for f in files:
+                                        name = f.get('name')
+                                        link = f.get('webViewLink')
+                                        st.markdown(f"- [{name}]({link})")
+                                else:
+                                    st.markdown("- Aucune pièce jointe trouvée dans le dossier Drive.")
+                            except Exception:
+                                st.markdown("- Impossible de lister les pièces jointes.")
 
                     # Compteur stagiaires actifs dans ce chantier
                     chantier_cible = str(row.get("chantier", ""))
@@ -739,12 +816,10 @@ with tabs[2]:
 # ══════════════════════════════════════════════════════════════════════════════
 # ONGLET 4 — TRAITEMENT & SUIVI
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[3]:
-    st.subheader("📧 Traitement des demandes validées")
+if not is_rh():
+    with tabs[tabs_labels.index("📧 Traitement & Suivi")]:
+        st.subheader("📧 Traitement des demandes validées")
 
-    if is_rh():
-        st.info("Cet onglet est réservé aux Recruteurs.")
-    else:
         valides_df = df[df["etat"].isin(["Validée", "Mail envoyé", "Documents reçus"])] if not df.empty else pd.DataFrame()
         if valides_df.empty:
             st.info("Aucune demande validée en attente de traitement.")
@@ -818,19 +893,20 @@ Bienvenue au sein de TGCC"""
             nom_stag_drive = str(row.get("nom_stagiaire", sel_id)).strip() or sel_id
             if docs_uploader and st.button("☁️ Uploader vers Google Drive", key="upload_drive"):
                 with st.spinner("Upload en cours..."):
-                    liens = []
+                    files_to_upload = []
                     for f_up in docs_uploader:
                         fb = f_up.read()
                         mime = "application/pdf" if f_up.name.endswith(".pdf") else "image/jpeg"
-                        lien = upload_to_drive(fb, f_up.name, nom_stag_drive, mimetype=mime)
-                        if lien:
-                            liens.append(lien)
-                    if liens:
-                        update_stagiaire_field(sel_id, {
-                            "etat": "Documents reçus",
-                            "drive_folder_url": liens[0],
-                        })
-                        st.success(f"✅ {len(liens)} fichier(s) uploadé(s) sur Drive.")
+                        files_to_upload.append((fb, f_up.name, mime))
+                    if files_to_upload:
+                        folder_id, links = upload_files_to_folder(files_to_upload, nom_stag_drive)
+                        if folder_id:
+                            folder_url = f"https://drive.google.com/drive/folders/{folder_id}"
+                            update_stagiaire_field(sel_id, {
+                                "etat": "Documents reçus",
+                                "drive_folder_url": folder_url,
+                            })
+                            st.success(f"✅ {len(links)} fichier(s) uploadé(s) sur Drive.")
                         refresh_data()
 
             st.markdown("---")
@@ -861,8 +937,9 @@ Nous gardons contact et vous souhaitons une belle carrière.
 # ══════════════════════════════════════════════════════════════════════════════
 # ONGLET 5 — ALERTES J-7
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[4]:
-    st.subheader("🔔 Alertes fins de stage (J-7)")
+if not is_rh():
+    with tabs[tabs_labels.index("🔔 Alertes J-7")]:
+        st.subheader("🔔 Alertes fins de stage (J-7)")
     aujourd_hui = datetime.date.today()
     alertes_list = []
     if not df.empty:
@@ -913,11 +990,11 @@ Cordialement"""
 # ══════════════════════════════════════════════════════════════════════════════
 # ONGLET 6 — ATTESTATION DE STAGE
 # ══════════════════════════════════════════════════════════════════════════════
-with tabs[5]:
-    st.subheader("📄 Attestation de stage")
+if not is_rh():
+    with tabs[tabs_labels.index("📄 Attestation de Stage")]:
+        st.subheader("📄 Attestation de stage")
 
-    # ── Recruteur : demander une attestation ───────────────────────────────
-    if not is_rh():
+        # ── Recruteur : demander une attestation ───────────────────────────────
         st.markdown("#### Demander une attestation pour un stagiaire")
         eligibles_attest = df[df["etat"].isin(["Dossier conforme", "Stage en cours", "Stage terminé"])] if not df.empty else pd.DataFrame()
         if eligibles_attest.empty:
@@ -952,7 +1029,7 @@ with tabs[5]:
                     st.info("📨 L'attestation est en attente de signature par la Responsable RH (onglet Validation RH).")
 
     # ── RH : signer et finaliser ───────────────────────────────────────────
-    else:
+    if is_rh():
         st.markdown("#### Attestions en attente de signature")
         a_signer = df[df["attestation_generee"] == "Demandée"] if not df.empty else pd.DataFrame()
         if a_signer.empty:
