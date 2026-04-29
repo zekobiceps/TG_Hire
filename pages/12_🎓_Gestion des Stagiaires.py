@@ -41,7 +41,7 @@ except ImportError:
 # ─────────────────────────── CONFIGURATION ───────────────────────────────────
 STAGIAIRES_SHEET_URL = "https://docs.google.com/spreadsheets/d/1PwaZA9LjIQvHk0iiM-uA0ndmyVCJ2SPuNP21QzJI09k/edit"
 STAGIAIRES_WORKSHEET = "Stagiaires"
-DRIVE_ROOT_FOLDER_ID = st.secrets.get("DRIVE_ROOT_FOLDER_ID", "1FaoQw6aRp76M9U1VAB8Y6Hk1zaQ4VBjK")
+DRIVE_ROOT_FOLDER_ID = st.secrets.get("DRIVE_ROOT_FOLDER_ID", "1OPwPhMfkMLvnNdisQyRtQB4s8KknQnVa")
 
 FORMS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Forms")
 
