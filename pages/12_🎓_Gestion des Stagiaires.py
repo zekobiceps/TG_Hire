@@ -1,186 +1,14 @@
 # -*- coding: utf-8 -*-
-import streamlit as st
-from utils import display_commit_info, require_login
-
-st.set_page_config(
-    page_title="Gestion des Stagiaires",
-    page_icon="🎓",
-    layout="wide"
-)
-
-require_login()
-
 import os
+import io
 import json
 import base64
 import datetime
-import uuid
-import io
 import requests
-import fitz  # PyMuPDF
+import fitz
+import streamlit as st
+from typing import List
 
-import pandas as pd
-from PIL import Image
-
-try:
-    import gspread
-    from google.oauth2 import service_account
-    from googleapiclient.discovery import build
-    GOOGLE_AVAILABLE = True
-except ImportError:
-    GOOGLE_AVAILABLE = False
-
-try:
-    from reportlab.pdfgen import canvas
-    from reportlab.lib.pagesizes import A4
-    from reportlab.lib.utils import ImageReader
-    REPORTLAB_AVAILABLE = True
-except ImportError:
-    REPORTLAB_AVAILABLE = False
-
-# ─────────────────────────── CONFIGURATION ───────────────────────────────────
-STAGIAIRES_SHEET_URL = "https://docs.google.com/spreadsheets/d/1PwaZA9LjIQvHk0iiM-uA0ndmyVCJ2SPuNP21QzJI09k/edit"
-STAGIAIRES_WORKSHEET = "Stagiaires"
-DRIVE_ROOT_FOLDER_ID = st.secrets.get("DRIVE_ROOT_FOLDER_ID", "1OPwPhMfkMLvnNdisQyRtQB4s8KknQnVa")
-
-FORMS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "Forms")
-
-DOCS_TGCC = {
-    "FR 20 - Fiche de renseignement": "FR 20 - PS MCH Fiche de renseignement -Stagiaire- V3 .docx (2).pdf",
-    "Clause de discrétion": "Clause de discrétion stagiaire (15).pdf",
-    "FI 04 - Liste des documents": "FI 04 - PS MCH LISTE DES DOCUMENTS A FOURNIR -DOSSIER STAGIAIRES-V2 (2).pdf",
-}
-
-COLONNES_SHEET = [
-    "id_demande", "date_demande", "type_demande", "chantier", "responsable_demandeur",
-    "fonction_demandeur", "civilite_tuteur", "nom_tuteur", "fonction_tuteur", "fonction_stagiaire",
-    "type_stage", "duree_semaines", "date_debut", "date_fin", "missions",
-    "formation_souhaitee", "experience_souhaitee", "indemnisation_min", "indemnisation_max",
-    "commentaire", "nom_stagiaire", "email_stagiaire", "cv_uploaded", "formulaire_uploaded",
-    "recruteur", "etat", "date_validation_rh", "valideur_rh", "drive_folder_url",
-    "attestation_generee", "motif_rejet",
-]
-
-ETATS = [
-    "En attente validation",
-    "Validée",
-    "Rejetée",
-    "Mail envoyé",
-    "Documents reçus",
-    "Dossier conforme",
-    "Attestation demandée",
-    "Stage en cours",
-    "Stage terminé",
-]
-
-# ─────────────────────────── HELPERS GOOGLE ──────────────────────────────────
-
-def _build_sa_info():
-    return {
-        "type": st.secrets["GCP_TYPE"],
-        "project_id": st.secrets["GCP_PROJECT_ID"],
-        "private_key_id": st.secrets["GCP_PRIVATE_KEY_ID"],
-        "private_key": st.secrets["GCP_PRIVATE_KEY"].replace("\\n", "\n").strip(),
-        "client_email": st.secrets["GCP_CLIENT_EMAIL"],
-        "client_id": st.secrets["GCP_CLIENT_ID"],
-        "auth_uri": st.secrets.get("GCP_AUTH_URI", "https://accounts.google.com/o/oauth2/auth"),
-        "token_uri": st.secrets.get("GCP_TOKEN_URI", "https://oauth2.googleapis.com/token"),
-        "auth_provider_x509_cert_url": st.secrets.get("GCP_AUTH_PROVIDER_CERT_URL", "https://www.googleapis.com/oauth2/v1/certs"),
-        "client_x509_cert_url": st.secrets.get("GCP_CLIENT_CERT_URL", ""),
-    }
-
-@st.cache_resource
-def _get_gspread_client():
-    if not GOOGLE_AVAILABLE:
-        return None
-    try:
-        return gspread.service_account_from_dict(_build_sa_info())
-    except Exception as e:
-        st.error(f"❌ Connexion Google Sheets : {e}")
-        return None
-
-@st.cache_resource
-def _get_drive_service():
-    if not GOOGLE_AVAILABLE:
-        return None
-    try:
-        creds = service_account.Credentials.from_service_account_info(
-            _build_sa_info(),
-            scopes=["https://www.googleapis.com/auth/drive"]
-        )
-        return build("drive", "v3", credentials=creds)
-    except Exception as e:
-        st.error(f"❌ Connexion Google Drive : {e}")
-        return None
-
-def _get_or_create_worksheet():
-    gc = _get_gspread_client()
-    if not gc:
-        return None
-    try:
-        sh = gc.open_by_url(STAGIAIRES_SHEET_URL)
-    except Exception as e:
-        st.error(f"❌ Impossible d'ouvrir le Google Sheet : {e}")
-        return None
-    try:
-        ws = sh.worksheet(STAGIAIRES_WORKSHEET)
-    except gspread.exceptions.WorksheetNotFound:
-        ws = sh.add_worksheet(title=STAGIAIRES_WORKSHEET, rows=500, cols=len(COLONNES_SHEET))
-        ws.append_row(COLONNES_SHEET)
-    return ws
-
-def load_stagiaires() -> pd.DataFrame:
-    ws = _get_or_create_worksheet()
-    if ws is None:
-        return pd.DataFrame(columns=COLONNES_SHEET)
-    try:
-        records = ws.get_all_records()
-        if not records:
-            return pd.DataFrame(columns=COLONNES_SHEET)
-        return pd.DataFrame(records)
-    except Exception as e:
-        st.error(f"❌ Chargement données : {e}")
-        return pd.DataFrame(columns=COLONNES_SHEET)
-
-def append_stagiaire(row: dict):
-    ws = _get_or_create_worksheet()
-    if ws is None:
-        return False
-    try:
-        values = [str(row.get(c, "")) for c in COLONNES_SHEET]
-        ws.append_row(values)
-        return True
-    except Exception as e:
-        st.error(f"❌ Sauvegarde : {e}")
-        return False
-
-def update_stagiaire_field(id_demande: str, updates: dict):
-    """Met à jour des champs d'une ligne identifiée par id_demande."""
-    ws = _get_or_create_worksheet()
-    if ws is None:
-        return False
-    try:
-        records = ws.get_all_records()
-        for i, rec in enumerate(records, start=2):
-            if str(rec.get("id_demande", "")) == str(id_demande):
-                for col_name, val in updates.items():
-                    if col_name in COLONNES_SHEET:
-                        col_idx = COLONNES_SHEET.index(col_name) + 1
-                        ws.update_cell(i, col_idx, str(val))
-                # Mise à jour optimiste du session_state pour refléter immédiatement les changements
-                if st.session_state.get("stagiaires_df") is not None:
-                    mask = st.session_state.stagiaires_df["id_demande"] == id_demande
-                    for k, v in updates.items():
-                        if k in st.session_state.stagiaires_df.columns:
-                            st.session_state.stagiaires_df.loc[mask, k] = str(v)
-                return True
-        st.warning("Demande introuvable.")
-        return False
-    except Exception as e:
-        st.error(f"❌ Mise à jour : {e}")
-        return False
-
-# ─────────────────────────── HELPERS DRIVE ───────────────────────────────────
 
 def _get_or_create_folder(service, name: str, parent_id: str) -> str:
     q = (f"name='{name}' and mimeType='application/vnd.google-apps.folder' "
@@ -303,18 +131,51 @@ def pdf_to_base64_images(pdf_bytes: bytes) -> list[str]:
 def lire_formulaire_ia(pdf_bytes: bytes) -> dict:
     """Appelle DeepSeek pour extraire les champs du formulaire FR 19.
     Utilise la vision (images) si le texte OCR est insuffisant."""
+    # Récupérer la clé API si présente (optionnelle)
     api_key = st.secrets.get("DEEPSEEK_API_KEY") or os.environ.get("DEEPSEEK_API_KEY")
-    if not api_key:
-        st.error("❌ Clé DEEPSEEK_API_KEY manquante dans les secrets.")
-        return {}
 
-    # Utiliser le texte extrait (OCR si nécessaire) pour l'appel DeepSeek (mode texte)
+    # Utiliser le texte extrait (OCR si disponible)
     texte = extract_text_from_pdf_bytes(pdf_bytes)
+
+    # Si aucun texte extrait et qu'on a une clé DeepSeek, essayer le mode vision (images)
+    use_vision = False
+    b64_images = []
     if not texte.strip():
-        st.warning("⚠️ Impossible d'extraire le texte du PDF via OCR.")
-        return {}
+        if api_key:
+            b64_images = pdf_to_base64_images(pdf_bytes)
+            if b64_images:
+                use_vision = True
+            else:
+                st.warning("⚠️ Impossible de convertir le PDF en images pour le mode vision.")
+                return {}
+        else:
+            st.warning("⚠️ Impossible d'extraire le texte du PDF via OCR et clé DEEPSEEK_API_KEY absente.")
+            return {}
 
-    prompt = f"""Tu es un assistant RH. Voici le contenu d'un formulaire de demande de stage TGCC (FR 19).
+    # Construire le prompt / messages
+    if use_vision:
+        # Préparer payload multimodal (texte d'instruction + images)
+        content_parts: list = [
+            {"type": "text", "text": (
+                "Tu es un assistant RH. Voici les pages d'un formulaire de demande de stage TGCC (FR 19) rempli manuellement.\n"
+                "Extrais les informations suivantes et retourne un JSON valide UNIQUEMENT (aucun texte autour) :\n"
+                '{\n  "type_demande": "",\n  "chantier": "",\n  "responsable_demandeur": "",\n'
+                '  "fonction_demandeur": "",\n  "nom_tuteur": "",\n  "fonction_tuteur": "",\n'
+                '  "fonction_stagiaire": "",\n  "type_stage": "",\n  "duree_semaines": "",\n'
+                '  "date_debut": "",\n  "date_fin": "",\n  "missions": "",\n'
+                '  "formation_souhaitee": "",\n  "experience_souhaitee": "",\n'
+                '  "indemnisation_min": "",\n  "indemnisation_max": "",\n  "commentaire": ""\n}'
+            )}
+        ]
+        for b64 in b64_images[:3]:
+            content_parts.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{b64}"}
+            })
+        messages = [{"role": "user", "content": content_parts}]
+        model = "deepseek-chat"
+    else:
+        prompt = f"""Tu es un assistant RH. Voici le contenu d'un formulaire de demande de stage TGCC (FR 19).
 Extrais les informations suivantes et retourne un JSON valide UNIQUEMENT (aucun texte autour) :
 {{
   "type_demande": "",
@@ -339,33 +200,8 @@ Extrais les informations suivantes et retourne un JSON valide UNIQUEMENT (aucun 
 Contenu du formulaire :
 {texte[:4000]}
 """
-    messages = [{"role": "user", "content": prompt}]
-    model = "deepseek-chat"
-    prompt = f"""Tu es un assistant RH. Voici le contenu d'un formulaire de demande de stage TGCC (FR 19).
-Extrais les informations suivantes et retourne un JSON valide UNIQUEMENT (aucun texte autour) :
-{{
-  "type_demande": "",
-  "chantier": "",
-  "responsable_demandeur": "",
-  "fonction_demandeur": "",
-  "nom_tuteur": "",
-  "fonction_tuteur": "",
-  "fonction_stagiaire": "",
-  "type_stage": "",
-  "duree_semaines": "",
-  "date_debut": "",
-  "date_fin": "",
-  "missions": "",
-  "formation_souhaitee": "",
-  "experience_souhaitee": "",
-  "indemnisation_min": "",
-  "indemnisation_max": "",
-  "commentaire": ""
-}}
-
-Contenu du formulaire :
-{texte[:4000]}
-"""
+        messages = [{"role": "user", "content": prompt}]
+        model = "deepseek-chat"
     try:
         resp = requests.post(
             "https://api.deepseek.com/v1/chat/completions",
