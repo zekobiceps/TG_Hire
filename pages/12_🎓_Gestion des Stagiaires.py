@@ -573,10 +573,10 @@ if not is_rh():
                     ["Stage PFE", "Stage conventionné", "Stage non conventionné", "Stage d'observation"],
                     index=["Stage PFE", "Stage conventionné", "Stage non conventionné", "Stage d'observation"].index(prefill.get("type_demande", "Stage PFE")) if prefill.get("type_demande") in ["Stage PFE", "Stage conventionné", "Stage non conventionné", "Stage d'observation"] else 0
                 )
-                type_stage = st.text_input("Type de stage (ex: PFE Génie Civil)", value=prefill.get("type_stage", ""))
+                duree_semaines = st.number_input("Durée (semaines)", min_value=1, max_value=52, value=int(prefill.get("duree_semaines", 8) or 8))
             with fb:
                 chantier = st.text_input("Chantier / Direction concerné(e)", value=prefill.get("chantier", ""))
-                duree_semaines = st.number_input("Durée (semaines)", min_value=1, max_value=52, value=int(prefill.get("duree_semaines", 8) or 8))
+                responsable_demandeur = st.text_input("Responsable demandeur", value=prefill.get("responsable_demandeur", ""))
             with fc:
                 try:
                     date_debut_default = datetime.datetime.strptime(prefill.get("date_debut", ""), "%d/%m/%Y").date() if prefill.get("date_debut") else datetime.date.today()
@@ -592,17 +592,16 @@ if not is_rh():
                 date_fin = st.date_input("Date de fin", value=date_fin_default)
                 indemnisation_max = st.number_input("Indemnisation max (MAD)", min_value=0, value=int(prefill.get("indemnisation_max", 0) or 0))
 
-            # Ligne 2 — 4 colonnes : demandeur / tuteur
-            g1, g2, g3, g4 = st.columns(4)
+            # Ligne 2 — 3 colonnes : tuteur
+            g1, g2, g3 = st.columns(3)
+            fonction_demandeur = ""
+            type_stage = prefill.get("type_stage", "")
             with g1:
-                responsable_demandeur = st.text_input("Responsable demandeur", value=prefill.get("responsable_demandeur", ""))
-            with g2:
-                fonction_demandeur = st.text_input("Fonction du demandeur", value=prefill.get("fonction_demandeur", ""))
-            with g3:
                 civilite_tuteur = st.selectbox("Civilité du tuteur", ["M.", "Mme."], key="civilite_tuteur_form")
                 nom_tuteur = st.text_input("Nom & prénom du tuteur", value=prefill.get("nom_tuteur", ""))
-            with g4:
+            with g2:
                 fonction_tuteur = st.text_input("Fonction du tuteur", value=prefill.get("fonction_tuteur", ""))
+            with g3:
                 fonction_stagiaire = st.text_input("Fonction attribuée au stagiaire", value=prefill.get("fonction_stagiaire", ""))
 
             missions = st.text_area("Missions", value=prefill.get("missions", ""), height=80)
