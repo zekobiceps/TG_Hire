@@ -302,36 +302,13 @@ def lire_formulaire_ia(pdf_bytes: bytes) -> dict:
         st.error("❌ Clé DEEPSEEK_API_KEY manquante dans les secrets.")
         return {}
 
+    # Utiliser le texte extrait (OCR si nécessaire) pour l'appel DeepSeek (mode texte)
     texte = extract_text_from_pdf_bytes(pdf_bytes)
-    utilise_vision = len(texte.strip()) < 100  # texte trop court = formulaire scanné
+    if not texte.strip():
+        st.warning("⚠️ Impossible d'extraire le texte du PDF via OCR.")
+        return {}
 
-    if utilise_vision:
-        # Envoyer les images à DeepSeek-Vision
-        b64_images = pdf_to_base64_images(pdf_bytes)
-        if not b64_images:
-            st.warning("⚠️ Impossible de convertir le PDF en images. Vérifiez que poppler est installé.")
-            return {}
-        content_parts: list = [
-            {"type": "text", "text": (
-                "Tu es un assistant RH. Voici les pages d'un formulaire de demande de stage TGCC (FR 19) rempli manuellement.\n"
-                "Extrais les informations suivantes et retourne un JSON valide UNIQUEMENT (aucun texte autour) :\n"
-                '{\n  "type_demande": "",\n  "chantier": "",\n  "responsable_demandeur": "",\n'
-                '  "fonction_demandeur": "",\n  "nom_tuteur": "",\n  "fonction_tuteur": "",\n'
-                '  "fonction_stagiaire": "",\n  "type_stage": "",\n  "duree_semaines": "",\n'
-                '  "date_debut": "",\n  "date_fin": "",\n  "missions": "",\n'
-                '  "formation_souhaitee": "",\n  "experience_souhaitee": "",\n'
-                '  "indemnisation_min": "",\n  "indemnisation_max": "",\n  "commentaire": ""\n}'
-            )}
-        ]
-        for b64 in b64_images[:3]:  # max 3 pages
-            content_parts.append({
-                "type": "image_url",
-                "image_url": {"url": f"data:image/jpeg;base64,{b64}"}
-            })
-        messages = [{"role": "user", "content": content_parts}]
-        model = "deepseek-chat"  # deepseek-vision si disponible sur votre compte
-    else:
-        prompt = f"""Tu es un assistant RH. Voici le contenu d'un formulaire de demande de stage TGCC (FR 19).
+    prompt = f"""Tu es un assistant RH. Voici le contenu d'un formulaire de demande de stage TGCC (FR 19).
 Extrais les informations suivantes et retourne un JSON valide UNIQUEMENT (aucun texte autour) :
 {{
   "type_demande": "",
@@ -356,12 +333,8 @@ Extrais les informations suivantes et retourne un JSON valide UNIQUEMENT (aucun 
 Contenu du formulaire :
 {texte[:4000]}
 """
-        messages = [{"role": "user", "content": prompt}]
-        model = "deepseek-chat"
-
-    if not texte.strip() and not utilise_vision:
-        st.warning("⚠️ Impossible d'extraire le texte du PDF.")
-        return {}
+    messages = [{"role": "user", "content": prompt}]
+    model = "deepseek-chat"
     prompt = f"""Tu es un assistant RH. Voici le contenu d'un formulaire de demande de stage TGCC (FR 19).
 Extrais les informations suivantes et retourne un JSON valide UNIQUEMENT (aucun texte autour) :
 {{
@@ -394,8 +367,13 @@ Contenu du formulaire :
             json={"model": model, "messages": messages, "temperature": 0},
             timeout=60,
         )
-        resp.raise_for_status()
-        content = resp.json()["choices"][0]["message"]["content"].strip()
+        try:
+            resp.raise_for_status()
+        except Exception as err:
+            # Afficher le contenu brut pour débogage
+            st.error(f"❌ Erreur DeepSeek : {err} — status={resp.status_code} — body={resp.text}")
+            return {}
+        content = resp.json().get("choices", [])[0].get("message", {}).get("content", "").strip()
         # Nettoyer markdown si présent
         if content.startswith("```"):
             content = content.split("```")[1]
