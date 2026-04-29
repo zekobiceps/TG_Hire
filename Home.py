@@ -51,7 +51,7 @@ def load_users_from_gsheet():
         spreadsheet = gc.open_by_url(USERS_SHEET_URL)
         worksheet = spreadsheet.worksheet(USERS_WORKSHEET_NAME)
         records = worksheet.get_all_records()
-        return {str(r.get("email", "")).strip().lower(): {"password": str(r.get("password", "")), "name": str(r.get("name", ""))} for r in records if r.get("email")}
+        return {str(r.get("email", "")).strip().lower(): {"password": str(r.get("password", "")), "name": str(r.get("name", "")), "role": str(r.get("Rôle", "recruteur")).strip().lower()} for r in records if r.get("email")}
     except Exception as e:
         st.error(f"❌ Erreur lors du chargement des utilisateurs: {e}")
         return {}
@@ -156,6 +156,7 @@ if not st.session_state.logged_in:
                 if email in st.session_state.users and st.session_state.users[email]["password"] == password:
                     st.session_state.logged_in = True
                     st.session_state.current_user = st.session_state.users[email]["name"]
+                    st.session_state.current_role = st.session_state.users[email].get("role", "recruteur")
                     st.session_state.last_activity_ts = time.time()
                     st.rerun()
                 else:
