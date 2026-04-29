@@ -167,6 +167,12 @@ def update_stagiaire_field(id_demande: str, updates: dict):
                     if col_name in COLONNES_SHEET:
                         col_idx = COLONNES_SHEET.index(col_name) + 1
                         ws.update_cell(i, col_idx, str(val))
+                # Mise à jour optimiste du session_state pour refléter immédiatement les changements
+                if st.session_state.get("stagiaires_df") is not None:
+                    mask = st.session_state.stagiaires_df["id_demande"] == id_demande
+                    for k, v in updates.items():
+                        if k in st.session_state.stagiaires_df.columns:
+                            st.session_state.stagiaires_df.loc[mask, k] = str(v)
                 return True
         st.warning("Demande introuvable.")
         return False
@@ -252,21 +258,17 @@ def extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
     except Exception:
         pass
 
-    # Essai 2 : OCR via pdf2image + pytesseract (PDF scanné ou manuscrit)
+    # Essai 2 : OCR via PyMuPDF (fitz) → pytesseract, sans dépendance poppler
     try:
-        import shutil
-        from pdf2image import convert_from_bytes
         import pytesseract
-        # Trouver pdftoppm (poppler)
-        poppler_path = None
-        for candidate in ["/usr/bin", "/usr/local/bin", "/opt/homebrew/bin"]:
-            if shutil.which("pdftoppm", path=candidate):
-                poppler_path = candidate
-                break
-        images = convert_from_bytes(pdf_bytes, dpi=300, poppler_path=poppler_path)
+        from PIL import Image as PILImage
+        doc2 = fitz.open(stream=pdf_bytes, filetype="pdf")
         texte_ocr = "\n".join(
-            pytesseract.image_to_string(img, lang="fra+ara")
-            for img in images
+            pytesseract.image_to_string(
+                PILImage.frombytes("RGB", [p.width, p.height], (p := page.get_pixmap(dpi=300)).samples),
+                lang="fra+ara"
+            )
+            for page in doc2
         )
         return texte_ocr
     except Exception:
@@ -276,20 +278,13 @@ def extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
 
 
 def pdf_to_base64_images(pdf_bytes: bytes) -> list[str]:
-    """Convertit les pages d'un PDF en images base64 (pour DeepSeek vision)."""
+    """Convertit les pages d'un PDF en images base64 (PyMuPDF, sans poppler)."""
     try:
-        import shutil
-        from pdf2image import convert_from_bytes
-        poppler_path = None
-        for candidate in ["/usr/bin", "/usr/local/bin", "/opt/homebrew/bin"]:
-            if shutil.which("pdftoppm", path=candidate):
-                poppler_path = candidate
-                break
-        images = convert_from_bytes(pdf_bytes, dpi=200, poppler_path=poppler_path)
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
         result = []
-        for img in images:
-            buf = io.BytesIO()
-            img.save(buf, format="JPEG", quality=80)
+        for page in doc:
+            pix = page.get_pixmap(dpi=200)
+            buf = io.BytesIO(pix.tobytes("jpeg"))
             result.append(base64.b64encode(buf.getvalue()).decode())
         return result
     except Exception as e:
@@ -570,44 +565,54 @@ if not is_rh():
 
         st.markdown("#### 2. Informations de la demande")
         with st.form("form_nouvelle_demande"):
-            c1, c2 = st.columns(2)
-            with c1:
+            # Ligne 1 — 4 colonnes : type / chantier / dates
+            fa, fb, fc, fd = st.columns(4)
+            with fa:
                 type_demande = st.selectbox(
                     "Type de demande",
                     ["Stage PFE", "Stage conventionné", "Stage non conventionné", "Stage d'observation"],
                     index=["Stage PFE", "Stage conventionné", "Stage non conventionné", "Stage d'observation"].index(prefill.get("type_demande", "Stage PFE")) if prefill.get("type_demande") in ["Stage PFE", "Stage conventionné", "Stage non conventionné", "Stage d'observation"] else 0
                 )
-                chantier = st.text_input("Chantier / Direction concerné(e)", value=prefill.get("chantier", ""))
-                responsable_demandeur = st.text_input("Responsable demandeur", value=prefill.get("responsable_demandeur", ""))
-                fonction_demandeur = st.text_input("Fonction du demandeur", value=prefill.get("fonction_demandeur", ""))
-            with c2:
-                civilite_tuteur = st.selectbox("Civilité du tuteur", ["M.", "Mme."], key="civilite_tuteur_form")
-                nom_tuteur = st.text_input("Nom & prénom du tuteur", value=prefill.get("nom_tuteur", ""))
-                fonction_tuteur = st.text_input("Fonction du tuteur", value=prefill.get("fonction_tuteur", ""))
-                fonction_stagiaire = st.text_input("Fonction attribuée au stagiaire", value=prefill.get("fonction_stagiaire", ""))
                 type_stage = st.text_input("Type de stage (ex: PFE Génie Civil)", value=prefill.get("type_stage", ""))
-
-            c3, c4 = st.columns(2)
-            with c3:
+            with fb:
+                chantier = st.text_input("Chantier / Direction concerné(e)", value=prefill.get("chantier", ""))
                 duree_semaines = st.number_input("Durée (semaines)", min_value=1, max_value=52, value=int(prefill.get("duree_semaines", 8) or 8))
+            with fc:
                 try:
                     date_debut_default = datetime.datetime.strptime(prefill.get("date_debut", ""), "%d/%m/%Y").date() if prefill.get("date_debut") else datetime.date.today()
                 except Exception:
                     date_debut_default = datetime.date.today()
                 date_debut = st.date_input("Date de début", value=date_debut_default)
-            with c4:
                 indemnisation_min = st.number_input("Indemnisation min (MAD)", min_value=0, value=int(prefill.get("indemnisation_min", 0) or 0))
-                indemnisation_max = st.number_input("Indemnisation max (MAD)", min_value=0, value=int(prefill.get("indemnisation_max", 0) or 0))
+            with fd:
                 try:
-                    date_fin_default = datetime.datetime.strptime(prefill.get("date_fin", ""), "%d/%m/%Y").date() if prefill.get("date_fin") else date_debut + datetime.timedelta(weeks=int(duree_semaines))
+                    date_fin_default = datetime.datetime.strptime(prefill.get("date_fin", ""), "%d/%m/%Y").date() if prefill.get("date_fin") else date_debut_default + datetime.timedelta(weeks=int(prefill.get("duree_semaines", 8) or 8))
                 except Exception:
-                    date_fin_default = date_debut + datetime.timedelta(weeks=8)
+                    date_fin_default = date_debut_default + datetime.timedelta(weeks=8)
                 date_fin = st.date_input("Date de fin", value=date_fin_default)
+                indemnisation_max = st.number_input("Indemnisation max (MAD)", min_value=0, value=int(prefill.get("indemnisation_max", 0) or 0))
+
+            # Ligne 2 — 4 colonnes : demandeur / tuteur
+            g1, g2, g3, g4 = st.columns(4)
+            with g1:
+                responsable_demandeur = st.text_input("Responsable demandeur", value=prefill.get("responsable_demandeur", ""))
+            with g2:
+                fonction_demandeur = st.text_input("Fonction du demandeur", value=prefill.get("fonction_demandeur", ""))
+            with g3:
+                civilite_tuteur = st.selectbox("Civilité du tuteur", ["M.", "Mme."], key="civilite_tuteur_form")
+                nom_tuteur = st.text_input("Nom & prénom du tuteur", value=prefill.get("nom_tuteur", ""))
+            with g4:
+                fonction_tuteur = st.text_input("Fonction du tuteur", value=prefill.get("fonction_tuteur", ""))
+                fonction_stagiaire = st.text_input("Fonction attribuée au stagiaire", value=prefill.get("fonction_stagiaire", ""))
 
             missions = st.text_area("Missions", value=prefill.get("missions", ""), height=80)
-            formation_souhaitee = st.text_input("Formation(s) souhaitée(s)", value=prefill.get("formation_souhaitee", ""))
-            experience_souhaitee = st.text_input("Expérience(s) souhaitables", value=prefill.get("experience_souhaitee", ""))
-            commentaire = st.text_area("Commentaire", value=prefill.get("commentaire", ""), height=60)
+            h1, h2, h3 = st.columns(3)
+            with h1:
+                formation_souhaitee = st.text_input("Formation(s) souhaitée(s)", value=prefill.get("formation_souhaitee", ""))
+            with h2:
+                experience_souhaitee = st.text_input("Expérience(s) souhaitables", value=prefill.get("experience_souhaitee", ""))
+            with h3:
+                commentaire = st.text_input("Commentaire", value=prefill.get("commentaire", ""))
 
             st.markdown("#### 3. CV du stagiaire")
             sourcing_interne = st.checkbox("Pas de CV — Sourcing à effectuer par le recruteur")
