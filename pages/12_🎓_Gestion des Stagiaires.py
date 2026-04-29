@@ -208,20 +208,113 @@ def upload_to_drive(file_bytes: bytes, filename: str, nom_stagiaire: str, mimety
 # ─────────────────────────── HELPERS DeepSeek ────────────────────────────────
 
 def extract_text_from_pdf_bytes(pdf_bytes: bytes) -> str:
+    """Extrait le texte d'un PDF. Si le PDF est scanné/manuscrit, utilise l'OCR pytesseract."""
+    # Essai 1 : extraction texte natif (PDF numérique)
     try:
         doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        return "\n".join(str(page.get_text()) for page in doc)
+        texte = "\n".join(str(page.get_text()) for page in doc)
+        if texte.strip():
+            return texte
     except Exception:
-        return ""
+        pass
+
+    # Essai 2 : OCR via pdf2image + pytesseract (PDF scanné ou manuscrit)
+    try:
+        from pdf2image import convert_from_bytes
+        import pytesseract
+        images = convert_from_bytes(pdf_bytes, dpi=300)
+        texte_ocr = "\n".join(
+            pytesseract.image_to_string(img, lang="fra+ara")
+            for img in images
+        )
+        return texte_ocr
+    except Exception:
+        pass
+
+    return ""
+
+
+def pdf_to_base64_images(pdf_bytes: bytes) -> list[str]:
+    """Convertit les pages d'un PDF en images base64 (pour DeepSeek vision)."""
+    try:
+        from pdf2image import convert_from_bytes
+        images = convert_from_bytes(pdf_bytes, dpi=200)
+        result = []
+        for img in images:
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=80)
+            result.append(base64.b64encode(buf.getvalue()).decode())
+        return result
+    except Exception:
+        return []
+
 
 def lire_formulaire_ia(pdf_bytes: bytes) -> dict:
-    """Appelle DeepSeek pour extraire les champs du formulaire FR 19."""
+    """Appelle DeepSeek pour extraire les champs du formulaire FR 19.
+    Utilise la vision (images) si le texte OCR est insuffisant."""
     api_key = st.secrets.get("DEEPSEEK_API_KEY") or os.environ.get("DEEPSEEK_API_KEY")
     if not api_key:
         st.error("❌ Clé DEEPSEEK_API_KEY manquante dans les secrets.")
         return {}
+
     texte = extract_text_from_pdf_bytes(pdf_bytes)
-    if not texte.strip():
+    utilise_vision = len(texte.strip()) < 100  # texte trop court = formulaire scanné
+
+    if utilise_vision:
+        # Envoyer les images à DeepSeek-Vision
+        b64_images = pdf_to_base64_images(pdf_bytes)
+        if not b64_images:
+            st.warning("⚠️ Impossible de convertir le PDF en images. Vérifiez que poppler est installé.")
+            return {}
+        content_parts: list = [
+            {"type": "text", "text": (
+                "Tu es un assistant RH. Voici les pages d'un formulaire de demande de stage TGCC (FR 19) rempli manuellement.\n"
+                "Extrais les informations suivantes et retourne un JSON valide UNIQUEMENT (aucun texte autour) :\n"
+                '{\n  "type_demande": "",\n  "chantier": "",\n  "responsable_demandeur": "",\n'
+                '  "fonction_demandeur": "",\n  "nom_tuteur": "",\n  "fonction_tuteur": "",\n'
+                '  "fonction_stagiaire": "",\n  "type_stage": "",\n  "duree_semaines": "",\n'
+                '  "date_debut": "",\n  "date_fin": "",\n  "missions": "",\n'
+                '  "formation_souhaitee": "",\n  "experience_souhaitee": "",\n'
+                '  "indemnisation_min": "",\n  "indemnisation_max": "",\n  "commentaire": ""\n}'
+            )}
+        ]
+        for b64 in b64_images[:3]:  # max 3 pages
+            content_parts.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{b64}"}
+            })
+        messages = [{"role": "user", "content": content_parts}]
+        model = "deepseek-chat"  # deepseek-vision si disponible sur votre compte
+    else:
+        prompt = f"""Tu es un assistant RH. Voici le contenu d'un formulaire de demande de stage TGCC (FR 19).
+Extrais les informations suivantes et retourne un JSON valide UNIQUEMENT (aucun texte autour) :
+{{
+  "type_demande": "",
+  "chantier": "",
+  "responsable_demandeur": "",
+  "fonction_demandeur": "",
+  "nom_tuteur": "",
+  "fonction_tuteur": "",
+  "fonction_stagiaire": "",
+  "type_stage": "",
+  "duree_semaines": "",
+  "date_debut": "",
+  "date_fin": "",
+  "missions": "",
+  "formation_souhaitee": "",
+  "experience_souhaitee": "",
+  "indemnisation_min": "",
+  "indemnisation_max": "",
+  "commentaire": ""
+}}
+
+Contenu du formulaire :
+{texte[:4000]}
+"""
+        messages = [{"role": "user", "content": prompt}]
+        model = "deepseek-chat"
+
+    if not texte.strip() and not utilise_vision:
         st.warning("⚠️ Impossible d'extraire le texte du PDF.")
         return {}
     prompt = f"""Tu es un assistant RH. Voici le contenu d'un formulaire de demande de stage TGCC (FR 19).
@@ -253,8 +346,8 @@ Contenu du formulaire :
         resp = requests.post(
             "https://api.deepseek.com/v1/chat/completions",
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={"model": "deepseek-chat", "messages": [{"role": "user", "content": prompt}], "temperature": 0},
-            timeout=30,
+            json={"model": model, "messages": messages, "temperature": 0},
+            timeout=60,
         )
         resp.raise_for_status()
         content = resp.json()["choices"][0]["message"]["content"].strip()
@@ -307,7 +400,22 @@ def generer_attestation(nom_stagiaire: str, chantier: str, date_debut: str,
 # ─────────────────────────── HELPERS RÔLE ────────────────────────────────────
 
 def get_role() -> str:
-    return st.session_state.get("current_role", "recruteur").lower()
+    """Lit le rôle depuis la session. Si absent (session pré-existante),
+    le redéduit depuis le dict users chargé par Home.py."""
+    role = st.session_state.get("current_role", "")
+    if not role:
+        # Fallback : retrouver via l'email (current_user = nom) dans users dict
+        users: dict = st.session_state.get("users", {})
+        current_user: str = st.session_state.get("current_user", "")
+        for _email, udata in users.items():
+            if str(udata.get("name", "")).strip() == current_user.strip():
+                role = str(udata.get("role", "recruteur")).strip().lower()
+                # Mettre en cache pour la suite
+                st.session_state["current_role"] = role
+                break
+        else:
+            role = "recruteur"
+    return role.lower()
 
 def is_rh() -> bool:
     return get_role() == "rh"
